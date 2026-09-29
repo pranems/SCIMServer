@@ -1,0 +1,147 @@
+{
+  "scope": "Focused P2 flag and default P9 integration proof, not final C0",
+  "verifiedAt": "2026-09-29",
+  "sourceCommit": "29b3b2c6a2177fed19e939ee4cf158fe2d320df8",
+  "integrationHeadAtRun": "8d2110d103b7c3f17c10209cd68a2aca7e9e4500",
+  "sourceSha256": "8ac05f98632305af12b2e8f01f8a8589c731fbebc6b5c76ed38f0b1b83cec35e",
+  "fingerprintMethod": "Sorted tracked/nonignored api/src, api/test and scripts path plus file bytes; includes uncommitted integration corrections subsequently committed",
+  "finalSourceSha256": "21400abcc53328dc5b7d9bfb6e45ee5d3ea96792875db98b1b9fa46f123bad42",
+  "postHttpSourceDelta": {
+    "file": "api/src/modules/endpoint/endpoint-guidance.spec.ts",
+    "change": "Strengthened the two description assertions to match exact OFF/rejection/no-write claims, not scope phrases alone",
+    "verification": "353 relevant units rerun and lint passed; replacing only this file with its saved at-run bytes reproduces the exact HTTP/live source fingerprint",
+    "productionHttpAndLiveSourceChanged": false
+  },
+  "build": {
+    "command": "npm run build",
+    "result": "passed"
+  },
+  "unitRuns": [
+    {
+      "scope": "Patch domain and neighboring integration overlaps",
+      "suites": 15,
+      "passed": 717,
+      "failed": 0
+    },
+    {
+      "scope": "Default corpus, main wiring, guidance and endpoint configuration",
+      "suites": 4,
+      "passed": 353,
+      "failed": 0
+    }
+  ],
+  "redControls": {
+    "defaultDiscovery": 2,
+    "mainRunner": 1,
+    "operatorGuidance": 2
+  },
+  "lint": {
+    "touchedFiles": 15,
+    "errors": 0,
+    "warnings": 56,
+    "warningBaseline": 56,
+    "rulesRelaxed": false
+  },
+  "http": {
+    "transport": "Supertest against Nest test listeners, distinct from built-live processes",
+    "suites": [
+      "entra-compatibility.e2e-spec.ts",
+      "patch-compatibility-flags.e2e-spec.ts",
+      "common-externalid-patch.e2e-spec.ts",
+      "profile-validation-p7.e2e-spec.ts",
+      "ordered-patch.e2e-spec.ts"
+    ],
+    "inmemory": {
+      "passed": 356,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0
+    },
+    "postgresql": {
+      "passed": 356,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    },
+    "integrationEnvironmentFlagPresent": false
+  },
+  "builtLive": {
+    "artifact": "Local npm build output, node api/dist/main.js; not an immutable packaged image",
+    "inmemory": {
+      "p9Cases": 19,
+      "p9Assertions": 1228,
+      "p2Assertions": 188,
+      "ownedApiStopped": true,
+      "endpointCollectionUnchanged": true
+    },
+    "postgresql": {
+      "p9Cases": 19,
+      "p9Assertions": 1228,
+      "p2Assertions": 188,
+      "ownedApiStopped": true,
+      "endpointCollectionUnchanged": true
+    },
+    "mainSharedEntryInmemory": {
+      "reportedChecks": 143,
+      "failedChecks": 0,
+      "nestedAssertionTotalsAreDistinct": true
+    }
+  },
+  "policyProof": {
+    "method": "PATCH",
+    "I02": "Unchanged primary-handoff outcome passed before optional dispatch removal",
+    "I03": "Unchanged 400 SCIM error and complete unchanged GET/version outcome passed before optional dispatch removal",
+    "explicitCoreDottedUserPathsVerboseOff": "Rejected without writing in both strict modes",
+    "quotedUserActiveCoercionOff": "Rejected without writing in both strict modes; physical repository readback asserted",
+    "independentPositiveControls": [
+      "Native active Boolean values",
+      "Recognized quoted active with coercion enabled",
+      "Legacy no-path dotted objects with verbose disabled",
+      "Registered extension child paths and selectors",
+      "String-typed extension active in both coercion modes",
+      "Lenient legacy active wrapper with separate ON/OFF outcomes"
+    ],
+    "defaultsChanged": false,
+    "newFlags": false
+  },
+  "cleanup": {
+    "postgresRun": "3146557472549a38",
+    "databaseScope": "Unique labeled loopback-only tmpfs container with verified owner, run, port, database, cluster and system identity; pinned bootstrap",
+    "inheritedDatabaseUrlUsed": false,
+    "preexistingMarkerAccepted": false,
+    "exactOwnedContainerRemoved": true
+  },
+  "documentation": {
+    "contentDocsPassed": 26,
+    "freshnessAndCouplingDocsPassed": 26,
+    "literalJsonBlocksParsed": 30,
+    "newRelativeLinksResolved": 12,
+    "originalCaseIdsPreserved": 82,
+    "backendDispositionsUnchanged": 164,
+    "renderedPatchGuideDiagrams": 4,
+    "themesPerDiagram": 2,
+    "mermaidVersion": "11.15.0",
+    "securityLevel": "strict",
+    "editorVersionParity": "Unverified: existing renderer discovery reports 0.0.0; no repinning or preview-parity claim"
+  },
+  "historicalEvidence": {
+    "unchangedReceipt": "../scim-p9/validation.json",
+    "originalSupportedCases": 17,
+    "originalPendingCases": 2,
+    "originalLiveAssertions": 1104
+  },
+  "remainingHolds": [
+    "Whole registered namespace strict prevalidation",
+    "P7 id/meta and shared core-extension binding context",
+    "Eight pre-existing P7 expectation reconciliations",
+    "P3b generic representation, admission and query correctness",
+    "Profile-revision coordination and P6 performance",
+    "Original 82-case per-backend disposition ledger",
+    "Final authoritative matrix and exact packaged-artifact evidence"
+  ],
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

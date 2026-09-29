@@ -44,21 +44,21 @@ No stored profile is repaired or downgraded automatically; see
 
 ## Reconciled matrix
 
-**Authorized follow-up, not current proof:** the parent assigned P2 rejection
-of explicit core dotted paths with verbose support OFF and active strings
-with coercion OFF in both strict modes. The matrix below still distinguishes
-the committed historical behavior from tests that have actually run. Update
-those rows only after the merged follow-up is verified; do not infer closure
-from the frozen `7113ee86` or the strict-ON P9 receipt.
+**Verified integrated follow-up:** P2 `29b3b2c6` / integration `8d2110d1`
+passes the default 19-case P9 corpus and the separate 33-case flag suite on
+both backends. The latter checks repository state in both strict modes.
+[Integrated receipt](evidence/scim-flags-default-corpus-20260929/validation.json).
+This does not widen the historical strict-ON P9 receipt or close every
+setting/characteristic cross-product.
 
 | Setting | Unset effective value | Actual outcome / limitation | Unit evidence | HTTP evidence | Live evidence |
 | --- | --- | --- | --- | --- | --- |
 | `PatchOpAllowRemoveAllMembers` | false | Gates bare removal of all Group members; explicit filtered/value-array removal remains available | Group service remove-all assertions | config-flags deny/allow; P9 E10/E11 explicit removals | P9 E10/E11 do not certify bare-remove toggle |
-| `VerbosePatchSupported` | false | Enables supported dotted User paths. Off can store literal keys on this base; not an Entra recommendation | User patch engine dotted resolution | P9 E06/E17; I03 pending | E06/E17; off-mode safety gap explicit |
+| `VerbosePatchSupported` | false | OFF rejects explicit core dotted User paths without a write in both strict modes. No-path objects, extension child paths and selectors remain independent | User patch engine flag controls; registry guidance regression | P9 E06/E17/I03 plus P2 flag suite | 19-case P9 plus expanded P2 contract on both backends |
 | `logLevel` | inherit | Endpoint logging threshold overrides category/global threshold, not resource behavior | scim-logger level filtering | test-gaps-audit M6 is config acceptance/CRUD smoke only; does not inspect emitted levels | gap: P9 disables log volume |
 | `StrictSchemaValidation` | true | Types/cardinality/unknowns/envelope; required and immutable rules also run when off after P7a | schema-validator-p7 | P7a; P9 E01/E08 | P9 E01/E08 and P7a live |
 | `RequireIfMatch` | false | Requires conditional write when ETag capability active; does not make check-and-save atomic | enforceIfMatch helper assertions | etag-conditional; query/capability integration boundaries remain | live-test 9y checks 428; not rerun here |
-| `AllowAndCoerceBooleanStrings` | true | Configured conversion runs before execution in both strict modes; with strict OFF and coercion OFF legacy active still converts recognized strings. Output conversion is separate | Coercion helper plus prevalidation/legacy extractor ordering | P9 E02-E05/E07 are strict ON only; full active/strict precedence remains open | Same strict-ON P9 scope; strict-OFF raw storage requires repository readback, not response inference |
+| `AllowAndCoerceBooleanStrings` | true | For PATCH, OFF rejects quoted User active in both strict modes; ON preserves recognized legacy values. Native Booleans and string-typed extension active remain independent; output conversion is separate | Coercion/extractor controls; registry guidance regression | P9 strict-ON corpus plus separate P2 both-strict-mode repository readback, explicit/qualified/no-path and lenient-wrapper controls | P2 188 assertions/backend; not a universal strict-OFF complex-primary storage claim |
 | `SecretTokenBearerAuthEnabled` | false | Per-endpoint bearer create and resource authentication, subject to method declaration precedence | admin-credential controller and method resolver | per-endpoint-credentials accepts correct token/rejects disabled method | existing live credential flow; not every precedence permutation |
 | `OAuthClientCredentialsAuthEnabled` | false | Endpoint OAuth credential create/mint; not a general admin-auth switch | admin-credential controller and OAuth service | endpoint-oauth-client and per-endpoint-credentials rejection/mint | existing OAuth live flow; not a P9 cryptographic certification |
 | `SharedSecretBearerAuthEnabled` | true | Allows global shared secret for resource requests; method declaration may override | method resolver/shared-secret guard | per-endpoint-credentials denies legacy token when disabled | P9 uses default shared secret in live only; disabled live gap |
@@ -70,7 +70,7 @@ from the frozen `7113ee86` or the strict-ON P9 receipt.
 | `MultiMemberPatchOpForGroupEnabled` | true | Allows more than one member in an operation; does not govern every SCIM array | Group service cardinality guard | P9 E12 verifies no partial write | E12; multi-member-enabled boundary elsewhere |
 | `SchemaDiscoveryEnabled` | true | Controls endpoint discovery reads, not resource write validity | discovery service/controller | test-gaps-audit-5 blocks all three discovery routes and verifies User readback still works | existing discovery live checks; toggle not P9 |
 | `logFileEnabled` | true | Controls per-endpoint file sink; global main log is a different sink | file-log transport routing | config-flags/log defaults are config only for physical file output | live-test 9z-K is default/config only; physical file gap |
-| `PrimaryEnforcement` | passthrough | Final-payload reject/normalize/pass-through; ordered PATCH handoff is supplied by P2, not inferred from final-state policy | schema validator and ordered PATCH executor | existing primary tests; I02 now default-running after P2 integration | I02 passes on the assembled InMemory/built-local path; original P9 two-backend receipt predates this promotion |
+| `PrimaryEnforcement` | passthrough | Final-payload reject/normalize/pass-through; ordered PATCH handoff is supplied by P2, not inferred from final-state policy | schema validator and ordered PATCH executor | existing primary tests plus default-running I02 on both backends | I02 passes on both separately built runtimes; frozen source receipt predates the promotion |
 | `WifCredentialsEnabled` | false | Enables WIF trust/credential and mint path, with method precedence | admin-credential controller accepts/rejects WIF and method override | wif-assertion and wif-tenant-gleaning | existing WIF live proof; not P9 |
 | `CredentialSecretVisibility` | always | Fixed retained encrypted reveal; new once rejected; legacy value resolves always | endpoint-config and admin-credential controller | credential-secret-visibility rejects once; credential-reveal checks reveal contract | existing reveal live flow; once is not a supported policy |
 | `EnforceResourceTypes` | true | Unserved User/Group lists reject; false gives empty warning response for probes; item/write still reject | resource-type-enforcement helper | profile-enforcement-gaps assertions | existing profile live checks; full custom/Bulk integration separate |

@@ -31,6 +31,20 @@ describe('operator-facing setting descriptions', () => {
     expect(definitions.ALLOW_AND_COERCE_BOOLEAN_STRINGS.description).toContain('native');
   });
 
+  it('describes the integrated explicit-path rejection without promising literal-key storage', () => {
+    expect(definitions.VERBOSE_PATCH_SUPPORTED.description).toContain(
+      'When false (default), rejects explicit core dotted User paths with 400 invalidPath and no write',
+    );
+    expect(definitions.VERBOSE_PATCH_SUPPORTED.description).not.toContain('stored as literal');
+  });
+
+  it('describes active-string rejection in both strict modes after the flag follow-up', () => {
+    expect(definitions.ALLOW_AND_COERCE_BOOLEAN_STRINGS.description).toContain(
+      'When OFF, quoted User active PATCH values are rejected in both strict modes',
+    );
+    expect(definitions.ALLOW_AND_COERCE_BOOLEAN_STRINGS.description).not.toContain('not fully gated');
+  });
+
   const evidence = readFileSync(resolve(__dirname, '../../../../docs/SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md'), 'utf8');
   it('keeps every registered setting in the evidence table with an explicit layer disposition', () => {
     assertCompleteSettingsTable(evidence);

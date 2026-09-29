@@ -14,23 +14,30 @@ P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEM
 owns current combined results; the records below are source-package evidence,
 not deployment claims. P4's raw repository-error gap was closed separately
 with value/content regressions, not assumed fixed by P5's scalar formatting.
-P2, final P7 PATCH, P3b/compatibility dispositions and concurrent FK-error
-normalization still block C0. Cleanup/no-orphan checks are not error-contract proof.
+Final P7 PATCH/context, P3b representation/admission/query and case-level
+dispositions still block C0. Scoped precise interrupted-create errors now have
+combined proof; cleanup/no-orphan checks alone are not error-contract proof.
 
 P9 is locally implemented on P7a/P1: emitted strict-on Entra guidance,
 honest fixed/inert setting descriptions and a shared 17-case HTTP/live
 corpus, including the proven modern pathless shape.
 Both owned PostgreSQL 17.8 (22 migrations) and InMemory pass.
-The original P9 run had two open P2 checks. After core P2 integration I02
-passes and runs by default; I03 still fails explicitly, and active-coercion
-policy still awaits its owning follow-up. Owned P9 bootstrap now pins the
+The original P9 run had two open P2 checks. After core P2 and authorized
+follow-up `29b3b2c6` / `8d2110d1`, both pass unchanged on the assembled
+backends. All 19 cases now run by default, without TODO/environment gating.
+Each built runtime passes 1,228 P9 and 188 P2 assertions; five focused HTTP
+suites pass 356 cases/backend with zero pending/TODO. [Separate integrated
+receipt](evidence/scim-flags-default-corpus-20260929/validation.json).
+Owned P9 bootstrap now pins the
 verified URL against later marker changes; inherited URLs are cleared before
 provisioning and readiness checks target TCP.
 See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
 [37-setting reconciliation](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 No version/lockfile, UI code, push or deployment changes.
-P9 corpus evidence is strict-ON only. Strict-OFF legacy active conversion
-remains an unresolved parent/P7b policy, not a P2 fix. Legacy global uniqueness
+P9 corpus evidence is strict-ON only. The separate P2 flag suite verifies
+quoted User active rejection with coercion OFF in both strict modes and
+asserts raw repository state. Namespace-only strict prevalidation remains
+separate. Legacy global uniqueness
 can block unrelated profile-subblock edits because merged profiles are fully
 revalidated; do not silently downgrade the declaration or call it RFC-invalid.
 

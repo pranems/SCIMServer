@@ -2,25 +2,23 @@
 
 **Last verified:** 2026-09-29
 
-**Scope:** P9 on P7a/P1 base `8e42f15f54a955fd6b93d58e9471c393329f4d3a`.
-Local implementation evidence, not a deployed-service certification.
+**Scope:** historical P9 on P7a/P1 base `8e42f15f54a955fd6b93d58e9471c393329f4d3a`,
+plus the explicitly identified integration checkpoint below. Local evidence,
+not a deployed-service certification.
 See the [correctness tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md),
 [37-setting evidence table](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md), and
 [execution ledger](SCIM_P9_EXECUTION_RCA.md).
 
-**P2 integration checkpoint:** I02 primary handoff now passes the assembled
-InMemory HTTP and built-local live paths and runs by default. The current
-bounded corpus is **18 cases / 1,162 live assertions**. I03 remains RED when
-explicitly enabled; quoted-active flag precedence remains an unresolved
-implementation/verification item under the parent-authorized P2 follow-up,
-not a frozen P2 fix. That follow-up must reject explicit core dotted paths
-with verbose support OFF and active strings with coercion OFF in both strict
-modes. No implemented result is claimed until its committed merge is tested. The original
-two-backend P9 receipt below stays unchanged.
-Frozen P2 `7113ee86` deliberately preserved the historical non-selector
-literal-dotted-key mode when `VerbosePatchSupported=false`; it did not claim
-I03 was fixed. I03 is an open parent-reviewed safety/policy acceptance check,
-not a new regression caused by merging P2.
+**Verified P2 integration checkpoint, September 29:** `29b3b2c6` is integrated
+as `8d2110d1`. I02 and the unchanged I03 rejection/no-write assertions pass
+on both InMemory and actual PostgreSQL 17.8. All **19 P9 cases / 1,228
+built-live assertions** now run by default, with no TODO or environment
+selection. The separate P2 flag suite verifies both strict modes and
+repository readback; its built-live contract passes **188 assertions** per
+backend. [New integrated receipt](evidence/scim-flags-default-corpus-20260929/validation.json).
+The original P9 **17-supported / 2-pending** receipt remains historical and
+unchanged. Frozen P2 `7113ee86` preserved literal-dotted behavior; the
+parent-authorized follow-up deliberately replaces it, without changing defaults.
 
 ## Start here
 
@@ -89,8 +87,9 @@ Inputs use invented `example.com` identities and the effective `entra-id`
 preset, not captured customer payloads. Native and legacy cases are distinct.
 **Scope:** every P9 endpoint explicitly enables `StrictSchemaValidation`.
 E04/E05's coercion-switch results therefore apply to strict ON only.
-Neither the 17-case source receipt nor the later default I02 addition proves
-strict-OFF raw persistence or universal coercion-switch precedence.
+The P9 corpus itself does not prove strict-OFF raw persistence or universal
+coercion-switch precedence. The separate 33-case P2 flag suite now supplies
+the explicit User active/path controls described below.
 
 | Case | Wire shape and setting | Outcome checked, not just HTTP status |
 | --- | --- | --- |
@@ -109,6 +108,7 @@ strict-OFF raw persistence or universal coercion-switch precedence.
 | E16 | Array-wrapped `active:[{"value":"False"}]` | Rejected 400 invalidSyntax; no state change |
 | E17 | Microsoft's modern pathless dotted-name and enterprise-URN update | Actual nested name and employeeNumber updated; no literal dotted key |
 | I02 | New primary email appended to the existing collection | Both emails retained, old primary cleared, new primary true; now default-running after the P2 core integration proof |
+| I03 | Explicit `name.familyName` with verbose support off | 400 SCIM error; complete subsequent GET including version unchanged; no literal key stored |
 
 E16 is a product boundary probe, **not a claim that current Microsoft emits
 that wrapper**. Quoted Boolean support does not promise arbitrary wrappers.
@@ -120,45 +120,40 @@ responses assert a SCIM envelope, string status/detail, and key allowlist.
 Successful mutations are checked by a subsequent GET. Endpoint cleanup checks
 204 then 404. This catches a plausible-looking success with the wrong state.
 
-### Integration checks that are not counted as passing compatibility
+### Resolved integration policy and its limits
 
-| Case | Intended contract | Why separate |
-| --- | --- | --- |
-| I03 | With verbose disabled, a dotted path must not silently become a literal key | Open safety/policy decision: frozen P2 intentionally preserves historical literal-key mode; it does not claim this check passes |
+The initial source run found I02/I03 RED; its evidence is not rewritten.
+After the authorized follow-up, the unchanged intended outcomes passed before
+default dispatch was enabled. Permanent discovery checks prevent either case
+being made optional again. No special environment variable is needed.
 
-I03 remains executable and is reported as TODO in the bounded default lane.
-`SCIM_P9_INTEGRATION=1` enables its assertions. The assembled code still
-fails it as expected from the preserved historical mode; I02 was separately
-verified and promoted to default execution.
-The latest parent decision requires rejection for explicit core dotted paths
-when verbose support is OFF. The frozen core's compatibility choice does not
-itself close that new acceptance requirement.
-Do not change defaults, semantics or the expected assertion without the
-reviewed policy decision, and do not recommend literal-key mode universally
-for Entra. A separate exploratory run enabled all integration
-assertions on the base: the pathless modern case passed and was promoted to
-E17; I02 and I03 failed for the actual intended outcomes.
+`VerbosePatchSupported=false` rejects **explicit core dotted User paths**,
+independently of strict validation. It does not disable legacy no-path
+dotted objects, registered extension child paths or selectors. E17 remains
+the original verbose-ON pathless baseline; the additional flag suite separately
+proves no-path behavior with the switch OFF. Whole registered namespace
+operations are tested in lenient mode; their strict prevalidation remains a
+separate P7 integration boundary, not a claim from those passing controls.
 
-Another open boundary is legacy `active` PATCH extraction: source currently
-retains a special-case converter. The P2 owner confirmed that it was preserved,
-not fixed, by the frozen core. The branch order matters:
+The promoted User active extractor now receives the effective coercion flag:
 
 | Strict validation | Coercion switch | Scalar quoted User active behavior | Evidence boundary |
 |---|---|---|---|
-| ON | ON | Converted before execution | Explicit legacy-on P9 case E03 |
-| ON | OFF | Rejected by service prevalidation before the legacy extractor | Source/owner-confirmed boundary; P9 E04/E05 themselves test quoted complex primary, not this complete active cross-product |
-| OFF | ON | P2 runs configured coercion before execution, including primary-transition inputs | P2 implementation change; not a strict-OFF claim from the P9 corpus |
-| OFF | OFF | Recognized active strings still reach the legacy converter and become Booleans in frozen core | Parent-authorized P2 follow-up must reject; awaiting committed implementation/merged proof |
+| ON | ON | Recognized quoted active converted to a native Boolean | P9 E03 plus P2 HTTP repository readback and built-live controls |
+| ON | OFF | Quoted active rejected without changing stored state/version | P2 explicit, qualified and no-path HTTP controls plus built-live |
+| OFF | ON | Recognized quoted active converted to a native Boolean | Separate P2 HTTP repository readback and built-live controls |
+| OFF | OFF | Quoted active rejected without changing stored state/version | Separate P2 HTTP repository readback and built-live controls |
 
 Do not infer stored strict-OFF primary values from response sanitization.
 Any expanded strict-OFF test must assert repository readback as well as HTTP
 output and distinguish promoted active from other schema-aware Boolean paths.
-The parent has now assigned that active-string rejection to the P2 follow-up.
-This documentation records authorization, not implementation. No default or
-new flag is implied; separate native/quoted and wrapper controls are required.
-The additional strict-OFF branches are source-reviewed boundaries, not
-executed P9 corpus cases; output Boolean sanitization may differ from stored
-`emails[].primary` JSON.
+Native active Booleans work with either coercion setting. String-typed
+extension `active` remains a string. The legacy `{active: "False"}` wrapper
+is separately tested in lenient mode: ON converts it, OFF rejects it without
+a write. This does not promise arbitrary wrappers or strict-mode acceptance
+of that object-shaped Boolean. No default or new flag changed. The strict-OFF
+evidence belongs to P2, not retroactively to P9; output Boolean sanitization
+may still differ from stored `emails[].primary` JSON.
 No zero-match-remove, filtered-add or optional-protocol default was changed.
 
 ## Attributes and characteristics: supported is not universal
@@ -174,7 +169,7 @@ No zero-match-remove, filtered-add or optional-protocol default was changed.
 | caseExact | Controls value comparison, not attribute-name casing. Complete namespace-aware search/sort and uniqueness require the query/persistence packages. |
 | referenceTypes | P7a checks declaration shape and URI syntax. It does not prove remote existence, all allowed target types, or referential integrity. |
 | nested complex | RFC 7643 2.3.8 forbids complex sub-attributes. Existing flag-off acceptance is a product extension, not RFC conformance; strict RFC-shaped mode remains opt-in. |
-| primary | POST/PUT policy can reject/normalize/pass through. P2 supplies ordered handoff; I02 now runs by default and proves both emails/primary values. Final integrated PostgreSQL acceptance remains separate. |
+| primary | POST/PUT policy can reject/normalize/pass through. I02 now proves ordered handoff by default on both backends and separate built runtimes. Complete final C0 characteristic acceptance remains separate. |
 
 See [P7a](SCIM_P7A_PROFILE_VALIDATION.md) for scalar formats and limitations.
 Use published characteristic values when present; otherwise use RFC defaults.
@@ -223,7 +218,9 @@ Both are PATCH requests to the endpoint's User item route with a bearer token
 and `Content-Type: application/scim+json`; the subsequent GET proves native
 `false` was persisted. Neither requires disabling strict validation.
 
-Run from this isolated worktree. The existing harness refuses other branches,
+The following commands reproduce the **historical source-package harness
+from its dedicated P9 worktree**, not from the consolidation worktree. That
+harness deliberately refuses other branches,
 an unrelated base, a pre-existing test database marker and arbitrary DB URLs.
 It creates a uniquely labeled, loopback-only PostgreSQL container, checks
 container/database/cluster/system identity, replays migrations and removes
@@ -245,7 +242,7 @@ node .\scripts\p1-validation\run.cjs
 Recorded hardened run: `test-results/p9/backends-255b25a57fc13ed9/run.json`;
 [sanitized permanent receipt](evidence/scim-p9/validation.json).
 The following counts describe the original P9 source-package checkpoint,
-not the later 18-case integrated corpus:
+not the later 19-case integrated corpus:
 Actual PostgreSQL **17.8**, all **22 migrations**, **17 HTTP cases passed per
 backend**, **2 integration TODOs per backend**. Each built local runtime
 passed **17 live cases / 1,104 assertions**, including cleanup assertions.

@@ -409,7 +409,7 @@ combined checkpoint has its own counts in section 11.1.
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | Authorized flag follow-up integrated; merged proof pending | Core `7113ee86` -> `2242860d` plus `29b3b2c6` now rejects explicit core dotted User paths when verbose OFF and active strings when coercion OFF in both strict modes. Source receipts retain their own counts; merged P7/common, namespace-only and default P9 I02/I03 proof remain required before closure |
+| P2 | Authorized flags integrated and focused dual-backend proof passed | `29b3b2c6` -> `8d2110d1`; 356 HTTP cases/backend preserve ordered/common/P7 overlaps. Quoted active and explicit dotted User controls pass both strict modes; P2 built-live188/backend. Namespace-only strict prevalidation and final C0 remain separate; section 11.22 |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Core/RFC/Group-adapter verified; generic-authority follow-up active | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`, `6dc2bc63` -> `3766e9f4`. Exact builtin identity/member-shape controls pass. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Owner now corrects generic raw-payload uniqueness/immutable reconstruction with RED-first tests; admission/query and final acceptance remain open |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
@@ -417,13 +417,14 @@ combined checkpoint has its own counts in section 11.1.
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | Common externalId POST/PUT/PATCH focused parity verified; other acceptance items open | [Common contract](SCIM_P7_COMMON_EXTERNAL_ID.md) from `8e8aa72e` plus integration original-value/completed-candidate checks; neutral PUT matching retained. 973 units, 392 HTTP/backend and built-live proof in 11.19. Eight baseline expectations, query/uniqueness boundaries and final case-level acceptance remain open |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
-| P9 | Integrated with owned-bootstrap hardening; current corpus/policy statuses preserved | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Follow-up `8679e90f` pins the guarded database target. I02 remains default-running (18 cases); I03 remains the parent-reviewed safety/policy hold, not a frozen-core claim; active coercion remains open |
-| C0 | Incremental assembly verified only | Checkpoints through 11.20; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. Scoped exact-create error proof now exists; all original case dispositions, remaining I03/active, P7/context/test, P3b/representation/admission and performance/artifact acceptance still require closure |
+| P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
+| C0 | Incremental assembly verified only | Checkpoints through 11.22; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. P2 flag/I03 and precise-create scopes now have proof; original case dispositions, P7/context/test/namespace, P3b/representation/admission/query and performance/artifact acceptance still require closure |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
 and integrated here. The bounded package and focused overlap checks passed;
-P9's I03 remains RED; I02 now passes by default after P2 core integration. The final combined matrix,
+P9's unchanged I02/I03 now pass by default after authorized P2 integration.
+The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
@@ -1700,6 +1701,63 @@ and filter/sort probes: write-side GREEN cannot prove column pushdown is
 faithful to every custom schema. No generic-all-shapes or admission closure
 is claimed while the follow-up is pending. No sibling worktree is read or
 modified by this coordination note.
+
+### 11.22 Authorized flag semantics and default corpus, 2026-09-29
+
+P2 source `29b3b2c6a2177fed19e939ee4cf158fe2d320df8` is preserved as
+integration `8d2110d103b7c3f17c10209cd68a2aca7e9e4500`. The merge retains
+the common-value check before lossy hooks and after complete candidate
+normalization, the neutral one-to-one matcher, public `deepEqual`, and P7's
+fifth immutable-mode parameter. No repository/CAS/aggregate seam changed.
+
+The authorized behavior rejects explicit core dotted **User** paths when
+verbose support is OFF, with no write regardless of strict mode. No-path
+dotted objects, registered extension child paths and selectors remain
+independent. Quoted User active is rejected when coercion is OFF in both
+strict modes. Native values, schema-defined string extension active and the
+explicit lenient legacy-wrapper boundary have separate controls.
+No default or new flag was introduced.
+
+I02/I03 passed their unchanged intended assertions before optional dispatch
+was removed. New REDs then caught the default corpus still excluding I03,
+the shared runner's obsolete selection/counts, and operator descriptions
+still promising literal-key storage or an ungated active converter.
+The follow-up removes corpus metadata, HTTP TODO dispatch and live selection;
+updates measured P9/P2 counts; and corrects only the misleading guidance.
+
+| Focused evidence | Result and boundary |
+|---|---|
+| Build and lint | API build passes; 15 touched TypeScript files: zero errors, 56 existing warnings unchanged. New HTTP typing errors were fixed using the existing typed helper, not disabled rules |
+| Unit overlap run | 15 suites / 717 passed |
+| Default dispatch/config/guidance run | 4 suites / 353 passed; includes two default-discovery REDs, one main-wiring RED and two guidance REDs |
+| HTTP | Five suites / 356 passed on each backend, zero pending/TODO, with the integration environment variable absent |
+| Actual database | Owned PostgreSQL 17.8; all 22 migrations replayed and verified, pinned bootstrap, no inherited URL/marker |
+| Separate built Node runtimes | Each backend: P9 19 cases / 1,228 assertions and P2 188 assertions. APIs stopped and endpoint inventories unchanged |
+| Standard shared live entry | InMemory 143 reported checks / zero failures, including all new default outcomes; these check rows are not the nested assertion total |
+| Documentation | 26 content/freshness/coupling checks; 30 literal JSON blocks and 12 new links; all82 original IDs/164 backend dispositions preserved unchanged. Four imported PATCH-guide diagrams render under pinned11.15.0, strict, both themes. Existing editor-version discovery0.0.0 means preview parity remains unverified |
+| Portable receipt | [New integrated evidence](evidence/scim-flags-default-corpus-20260929/validation.json); frozen P9 17-supported/2-pending receipt remains unchanged |
+
+Final review tightened only the two description-test predicates to exact
+OFF/rejection/no-write claims. The relevant 353 units and lint reran. A
+byte-level projection reproduces the saved HTTP/live source fingerprint
+when replacing only that test with its at-run bytes; production, HTTP and
+live source are unchanged. The receipt records both fingerprints instead
+of claiming an unchanged full-source hash or repeating unrelated DB runs.
+
+Whole registered namespace operations have lenient-mode controls; this is
+not closure of their strict P7 prevalidation boundary. Nor does the P9
+strict-ON corpus establish arbitrary strict-OFF raw complex-Boolean storage.
+Remaining P7 role/id/meta and eight old expectations, P3b generic authority/
+admission/query, profile coordination, P6 performance and every original
+82-case/backend disposition still require their own evidence.
+
+**Test/gate improvement: applied.** Verified behavior must become ordinary
+default execution, not remain hidden behind an integration switch. Published
+operator descriptions now have discriminating semantic regressions.
+**Design/architecture disposition: accepted.** The existing User adapter
+owns its flag policy; integration removes obsolete harness branching and
+uses the existing type-only HTTP boundary. No speculative strategy or
+framework was added. No release metadata, publication or deployment occurred.
 
 ## 12. Architecture and self-improvement decisions
 

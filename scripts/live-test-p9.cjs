@@ -8,15 +8,15 @@ async function runLiveP9(baseUrl, secret) {
   assert.equal(base.hostname, "127.0.0.1");
   assert.equal(base.protocol, "http:");
   assert.ok(secret.length >= 32);
-  return runP9Contract(baseUrl, secret, process.env.SCIM_P9_INTEGRATION === "1");
+  return runP9Contract(baseUrl, secret);
 }
 
-async function runP9Contract(baseUrl, secret, includeIntegration = false) {
+async function runP9Contract(baseUrl, secret) {
   const base = new URL(baseUrl);
   assert.ok(["http:", "https:"].includes(base.protocol));
   assert.ok(secret);
   const outcomes = [];
-  for (const test of cases.filter(item => !item.integration || includeIntegration)) {
+  for (const test of cases) {
     outcomes.push(await runCase(test, async (method, route, body) => {
       const response = await fetch(`${baseUrl}${route}`, {
         method,

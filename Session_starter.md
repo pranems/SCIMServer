@@ -10,6 +10,16 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
+**P2 authorized flags and default P9 verified:** `29b3b2c6` -> `8d2110d1`.
+I02/I03 pass unchanged, then all opt-in/TODO dispatch was removed. Both
+backends pass 356 focused HTTP cases with zero pending/TODO; separate built
+runtimes pass 19 P9 cases / 1,228 assertions and 188 P2 assertions each.
+Actual PostgreSQL 17.8 replayed all 22 migrations. Main shared live smoke:
+143 checks, no failures, unchanged endpoint collection. New default-dispatch,
+live-count and operator-guidance RED/GREEN regressions prevent stale gating
+or literal-key/coercion-bypass advice. [Integrated proof](docs/evidence/scim-flags-default-corpus-20260929/validation.json).
+No default, historical receipt, release version or deployment changed.
+
 **Precise interrupted-create errors integrated and verified:** `d8441f46` ->
 `6a52ae32`. P3 conditional writes, P3b transactions, P4 aggregates and P8c
 remain intact. New barrier-forwarding RED/GREEN prevents dropped policy/member
@@ -33,7 +43,8 @@ those on merge. No shared-schema role or id/meta closure is claimed yet.
 **P9 harness hardening integrated:** `8679e90f` -> `2c5067a4`. P9 now pins the
 verified URL through bootstrap; the shared runner clears inherited URLs and
 uses TCP readiness. Eight focused isolation/discovery units and 23 selected
-resolver/default-corpus cases pass, with only unresolved I03 left opt-in.
+resolver/default-corpus cases passed, with I03 still opt-in at that earlier
+checkpoint. The verified 19-case default lane above supersedes that state.
 P5's identical helper contract and P2/P7 selector/minimum guards are preserved.
 
 **P3b core assembled:** `de05e67b` -> `1d37e7b8` adds atomic uniqueness
@@ -58,7 +69,7 @@ Generic candidate authority and admission remain separate open holds.
 The new generic-authority follow-up is pending; no generic-all-shapes or
 filter/sort closure is inferred from the preceding Group adapter proof.
 
-**Latest integration fix:** shared one-to-one matching closes the confirmed
+**Earlier integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
 failures; GREEN: all 16 new units, 289 targeted HTTP cases per backend and
 60 built-live cases / 1,260 assertions per backend on owned InMemory and
@@ -66,22 +77,17 @@ PostgreSQL 17.8 (22 migrations). [Receipt](docs/evidence/scim-retained-put-20260
 Eight broader neighboring P7 expectations fail identically on untouched
 committed source and remain explicit test-reconciliation blockers.
 
-P2 core is now integrated: build and 1,229 combined units pass; a new
+Historical P2 core checkpoint: build and 1,229 combined units passed; a new
 default-discovery test adds one distinct pass (1,230 total). Initial combined
 HTTP is **327 passed / 1 blocking I03 failure / 1 PostgreSQL-only skip**.
 I02 passes and now runs by default; the final affected HTTP rerun passes 162
 cases with only I03 opt-in. The bounded combined live run has 133 checks,
 including P2's 112 assertions and P9's 18 cases / 1,162 assertions.
-**Parent-authorized P2 follow-up, awaiting committed proof:** reject explicit
-core dotted User paths when verbose support is OFF, and reject active strings
-when coercion is OFF in both strict modes. This is not inferred from frozen
-`7113ee86`: its strict-OFF/coercion-OFF extractor still converts those strings.
-Verify merged I02/I03 outcomes first, then remove remaining TODO/environment
-gating and record new counts. I02 is already default-running locally.
-P9's corpus is strict ON only and proves no strict-OFF raw-storage contract.
-Frozen P2 intentionally retained historical literal-dotted mode and never
-claimed to fix I03. Its RED remains a parent-reviewed safety/policy acceptance
-item pending that authorized correction, not a new frozen-P2 regression.
+These old counts remain historical. The authorized follow-up is now
+verified above: explicit core dotted User paths are rejected when verbose
+OFF, and quoted active is rejected when coercion OFF in both strict modes.
+That result belongs to `29b3b2c6`, not frozen `7113ee86`. P9 remains strict
+ON; the separate P2 flag suite supplies both-strict-mode repository readback.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
@@ -89,9 +95,9 @@ unchanged. P8b cleanup and its precise interrupted-create follow-up now have
 focused combined-backend proof; genuine DB faults and conditional 412 remain
 distinct. Final P7 PATCH integration depends
 on remaining follow-ups; the P2/P7 selected-value/cardinality and POST/PUT
-overlap checks pass. P7 common-attribute verification and P3b remain active;
-I03 and active-coercion semantics are not declared closed.
-All remain open before C0.
+overlap checks pass. P7 schema-role/id/meta and namespace-only prevalidation,
+P3b generic authority/admission/query, eight old P7 expectations and the
+case-level/performance/artifact matrix remain open before C0.
 
 **Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
 uses an owned loopback Nest listener inside the Node test process; it does not
@@ -129,15 +135,16 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P8b `88b96c74` -> `39a58c9a` and `2db239a9` -> `9178d60c`; deletion checks use `9z-CX`, preserving integrated P8a `9z-CS` and P8c `9z-CT`.
 - [x] ✅ COMPLETED: P9 `109a1099` -> `3ddd8a1b`; bounded compatibility coverage uses `9z-CY`. I02/I03 were executed, not relabeled as supported passes.
 - [x] ✅ COMPLETED: P2 core `7113ee86` -> `2242860d`; public deepEqual/P7 seams preserved, `9z-CZ` runs ordered PATCH, and verified I02 is default-running.
+- [x] ✅ COMPLETED: P2 flag follow-up `29b3b2c6` -> `8d2110d1`; unchanged I02/I03 verified on both backends, then default-running P9 19/1228 and P2 188 live assertions wired without environment/TODO gating.
 - [x] ✅ COMPLETED: Separate PUT retention correction shares P2's matcher through a neutral domain seam, with `9z-DA` live coverage.
 - [x] ✅ COMPLETED: P3b core assembled with P3/P4/P8 guards intact; `9z-DB` runs the original 21 string-MV uniqueness assertions plus endpoint cleanup.
 - [x] ✅ COMPLETED: P3b RFC follow-up `cefb540b` integrated as `1f0a024a`; supported types/references corrected without claiming generic representation closure.
 - [x] ✅ COMPLETED: P7 common externalId source plus original-value/completed-PATCH integration; `9z-CV` has 426 assertions and new `9z-DC` has 66 cases / 718 assertions.
 - [x] ✅ COMPLETED: P8b exact six-route interrupted-create errors integrated with current transactions; `9z-CX` now supplies 16 checks.
-- [ ] Close P3b's documented unsupported-type/generic-authority acceptance hold before claiming promised uniqueness complete.
+- [ ] Close remaining P3b generic-authority, admission and query holds before claiming promised uniqueness complete.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close P2's I03/active-coercion follow-up, final P7/common-attribute validation, P3b/compatibility and concurrent FK-error boundaries before C0.
+- [ ] Close remaining P7 schema-role/id/meta and namespace-only boundaries plus profile-revision coordination before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.
@@ -145,11 +152,12 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | Authorized P2 flags integrated as `8d2110d1`; unchanged I02/I03 verified, then optional dispatch removed. Both backends: 356 HTTP, P9 built-live19/1228 and P2 built-live188. PostgreSQL17.8/22 migrations and exact cleanup. Added default-discovery/count/guidance RED/GREEN controls; 26-doc content/freshness/coupling gates pass. Historical receipts and release metadata unchanged. |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
 | 2026-09-29 | P7 common externalId correction applies RFC 7643 3.1 to every resource core: String/SV/caseExact/readWrite, original JSON type validation in both strict modes, with independent extension names and custom displayName/active controls. [Evidence and remaining integration boundaries](docs/SCIM_P7_COMMON_EXTERNAL_ID.md). No versions, locks, push or deployment. |
 | 2026-09-28 | P7 recursive readOnly follow-up closes POST/PUT stripping through supported nested-complex compatibility objects/arrays. Focused units: 1,517; per backend HTTP: 67; live: 228; PostgreSQL 17.8 with 22 migrations and InMemory. [Characteristic status](docs/SCIM_P7_CHARACTERISTIC_STATUS.md) separates optional behavior, global capability policy and exact P3b uniqueness gaps. P7 remains open for final P2 integration. |
-| 2026-09-29 | P9 source-harness follow-up: verified URL pinned through bootstrap, inherited URL cleared before provisioning, TCP readiness used. Five resolver tests and source-package PostgreSQL 17.8/22 migrations plus InMemory rerun pass (17 HTTP +17 built-live /1,104 assertions each). The assembled corpus separately includes default I02 (18 cases); I03 remains the parent-reviewed safety/policy hold, not a frozen-P2 promised fix. |
-| 2026-09-29 | P9 policy clarification: all supported corpus cases are strict ON; strict-OFF legacy active conversion is unresolved parent/P7b policy, not a P2 fix. Whole merged profile revalidation can block unrelated subblock edits when an old schema declares global uniqueness; this is provider capability policy, not an RFC-invalid keyword. No stored profile repair or semantic change. |
+| 2026-09-29 | Historical P9 source-harness follow-up: verified URL pinned through bootstrap, inherited URL cleared before provisioning, TCP readiness used. Five resolver tests and source-package PostgreSQL17.8/22 migrations plus InMemory passed (17 HTTP +17 built-live /1104 assertions each). At that checkpoint the assembly had default I02 (18 cases), while I03 remained a reviewed policy hold, not a frozen-P2 promised fix. |
+| 2026-09-29 | Historical P9 policy clarification: its supported corpus is strict ON; strict-OFF legacy active conversion was unresolved at that source checkpoint, not fixed by core P2. Whole merged profile revalidation can block unrelated subblock edits when an old schema declares global uniqueness; this is provider capability policy, not an RFC-invalid keyword. No stored profile repair. |
 | 2026-09-28 | P9 locally implemented on P7a/P1 in `fix/scim-compatibility-contract-20260928`: emitted-guidance RED/GREEN, corrected strict-on Entra and fixed/inert-control guidance, all 37 settings reconciled. Owned PostgreSQL 17.8 + 22 migrations and InMemory each pass 17 HTTP + 17 built-live cases (1,104 assertions), with 2 P2 integration TODOs excluded. 411 distinct targeted unit tests pass. See [compatibility/evidence](docs/SCIM_ENTRA_COMPATIBILITY.md) and [RCA](docs/SCIM_P9_EXECUTION_RCA.md). No UI/default/version/lockfile/push/deploy change. |
 | 2026-09-28 | P7a declaration, scalar/cardinality and POST/PUT correctness implemented on `fix/scim-profile-validation-20260928`, based on P1 `3ecaba55`. Focused units: 1,507. Owned PostgreSQL/InMemory HTTP and local-live evidence, boundaries and remaining PATCH integration are in [P7a](docs/SCIM_P7A_PROFILE_VALIDATION.md). No versions, locks, push or deployment changed. |
 | 2026-09-29 | P2 flag-contract follow-up validated: I03 rejects verbose-disabled explicit User dotted paths; E17 no-path compatibility and numeric-version namespaces preserved; quoted active honors coercion OFF in lenient mode. Default-running I02/I03/E17 HTTP/live regressions. RED 9 domain + 12 HTTP, review RED 3; GREEN 1,543 units, 234 HTTP and 246 built-live assertions per owned PostgreSQL17.8/InMemory backend. Independent closure passed; [receipts](docs/SCIM_P2_IMPLEMENTATION.md#p9-integration-flag-follow-up). |

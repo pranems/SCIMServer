@@ -63,8 +63,8 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * This enables interoperability with clients like Microsoft Entra ID that send boolean
    * values as strings (e.g., roles[].primary = "True" instead of true).
    * Scope: supported schema-aware input conversion, before strict type checks.
-   * Output normalization is separate. Legacy active PATCH extraction is not fully
-   * gated by this switch; see docs/SCIM_ENTRA_COMPATIBILITY.md.
+   * Output normalization is separate. Quoted User active PATCH values are rejected
+   * when OFF in both strict modes; ON preserves explicit legacy-string compatibility.
    * When false, string boolean values are passed through as-is and will be rejected
    * by StrictSchemaValidation if that flag is also enabled.
    * In practice: keep true unless all clients send proper JSON booleans.
@@ -414,10 +414,10 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     type: 'boolean',
     default: false,
     description:
-      'When true, enables dot-notation path resolution in PATCH (e.g., "name.givenName" → nested object). ' +
-      'When false (default), dot-notation paths are stored as literal top-level keys. ' +
-      'Enable for documented Entra dotted User paths as well. Disabling is a legacy ' +
-      'representation mode, not an Entra recommendation; it can retain literal dotted keys.',
+      'When true, enables explicit dotted User core paths (e.g., "name.givenName" resolves to a nested object). ' +
+      'When false (default), rejects explicit core dotted User paths with 400 invalidPath and no write. ' +
+      'Legacy no-path objects, registered extension paths and selectors remain supported. ' +
+      'This User-only control is not a client-brand switch; enable it for documented Entra explicit dotted User paths.',
   },
   LOG_LEVEL: {
     key: ENDPOINT_CONFIG_FLAGS.LOG_LEVEL,
@@ -457,8 +457,9 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'When true (default), boolean-typed attributes received as strings ("True"/"False") ' +
       'are coerced to native booleans before schema validation and storage. ' +
       'Applies to supported schema-aware input paths before strict validation. Native JSON booleans ' +
-      'need no coercion. Output normalization is separate; legacy active PATCH extraction is not ' +
-      'fully gated by this switch. See docs/SCIM_ENTRA_COMPATIBILITY.md for tested boundaries.',
+      'need no coercion. When OFF, quoted User active PATCH values are rejected in both strict modes; ' +
+      'ON retains explicit legacy-string compatibility. Output normalization remains separate. ' +
+      'See docs/SCIM_ENTRA_COMPATIBILITY.md for tested boundaries.',
   },
   SECRET_TOKEN_BEARER_AUTH_ENABLED: {
     key: ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,

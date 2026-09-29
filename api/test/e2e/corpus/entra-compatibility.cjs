@@ -11,8 +11,8 @@ const DIAG = "urn:scimserver:api:messages:2.0:Diagnostics";
 const WARNING = "urn:scimserver:api:messages:2.0:Warning";
 const patch = (...Operations) => ({ schemas: [PATCH], Operations });
 const cases = [];
-const scenario = (id, title, settings, run, integration = false) =>
-  cases.push({ id, title, settings, run, integration });
+const scenario = (id, title, settings, run) =>
+  cases.push({ id, title, settings, run });
 
 scenario("E01", "native User POST, GET, matching and empty queries, PUT and DELETE", {
   AllowAndCoerceBooleanStrings: false,
@@ -105,7 +105,7 @@ scenario("E07", "native Boolean selector updates its actual target under strict 
   c.eq(read["emails[primary eq true]"], undefined);
 });
 
-scenario("I03", "P2 integration: verbose-disabled dotted path never stores a literal key", {
+scenario("I03", "verbose-disabled explicit dotted path rejects without a write", {
   VerbosePatchSupported: false,
 }, async c => {
   const user = await c.user();
@@ -114,7 +114,7 @@ scenario("I03", "P2 integration: verbose-disabled dotted path never stores a lit
     { op: "Replace", path: "name.familyName", value: "Updated" },
   ), 400), 400);
   c.eq(await c.read("Users", user.id), before);
-}, true);
+});
 
 scenario("E08", "unknown attributes fail with strict validation enabled", {}, async c => {
   const input = { ...c.userInput(), unregisteredAttribute: "bad" };

@@ -56,4 +56,11 @@ describe('integrated correctness live coverage', () => {
     expect(source.includes('$receipt.assertions -eq 426')).toBe(true);
     expect(source.includes('426 declaration, scalar, POST/PUT, projection and cleanup assertions')).toBe(true);
   });
+
+  it('requires all resolved compatibility and flag assertions without environment gating', () => {
+    const source = read(section);
+    expect(source.includes('SCIM_P9_INTEGRATION')).toBe(false);
+    expect(source.includes('$receipt.assertions -eq 1228')).toBe(true);
+    expect(source.includes('$receipt.assertions -eq 188')).toBe(true);
+  });
 });

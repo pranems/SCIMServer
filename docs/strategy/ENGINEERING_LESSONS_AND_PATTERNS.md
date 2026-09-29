@@ -28,6 +28,17 @@ built-server adapters. Unsupported integration cases remain explicit failing
 checks, never a green baseline of malformed storage.
 See [P9 evidence](../SCIM_ENTRA_COMPATIBILITY.md).
 
+**Integration recurrence, 2026-09-29:** P2's corrected runtime merged while
+registry text still promised literal-key storage and a coercion bypass.
+Conflict-free merging and generic advice checks did not catch the false
+specific claims. Assert a changed control's actual ON/OFF semantics in its
+published description as well as its execution. Two semantic REDs now lock
+the corrected guidance; this repeated high-severity class is promoted to
+R10.5. Separately, verified I02/I03 had to lose their optional dispatch:
+discovery/count tests now require ordinary default execution, while frozen
+source receipts remain historical. See C0-I33/I34 in the
+[integration ledger](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
 ### P7a: semantic presence and ownership survive framework transformations
 
 **Common-value recurrence, 2026-09-29:** preserving a DTO's original externalId

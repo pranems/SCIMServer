@@ -5,6 +5,15 @@
 Companion: [compatibility](SCIM_ENTRA_COMPATIBILITY.md) and
 [setting evidence](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 
+**Historical source-package ledger:** the 17-supported / 2-pending receipt
+below is frozen. Integration subsequently verified the unchanged I02/I03
+assertions after authorized P2 `29b3b2c6`, removed all optional dispatch, and
+measured 19 cases / 1,228 built-live assertions on both backends. The separate
+P2 flag suite supplies both-strict-mode raw-state proof. [New integrated
+receipt](evidence/scim-flags-default-corpus-20260929/validation.json).
+Earlier open-policy entries below describe their detection checkpoint,
+not the current integration status.
+
 | Issue / type / severity | Symptom and cause | Resolution and why | Detection / earliest practical gate |
 | --- | --- | --- | --- |
 | Guidance / product documentation / High | Startup recommended strict-off for all Entra; registry descriptions repeated it and described retired secret policies as effective | Applied emitted-log and description RED/GREEN tests; corrected narrowly without changing policy/defaults | P9 test / original guidance unit test |

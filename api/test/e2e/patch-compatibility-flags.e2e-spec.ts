@@ -2,12 +2,21 @@ import type { INestApplication } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { scimPost, scimGet, scimPatch } from './helpers/request.helper';
+import { scimPost as rawPost, scimGet as rawGet, scimPatch as rawPatch } from './helpers/request.helper';
+import type { TypedHttpTest } from './helpers/typed-http';
 import { USER, CONTOSO, PATCH, DIAGNOSTICS, typedPatchProfile } from './helpers/typed-patch-fixtures';
 import { USER_REPOSITORY } from '../../src/domain/repositories/repository.tokens';
 import type { IUserRepository } from '../../src/domain/repositories/user.repository.interface';
 import type { SchemaAttributeDefinition } from '../../src/domain/validation/validation-types';
 const NUMERIC_EXTENSION = 'urn:scimserver:devshapes:user:hr-extras:1.0';
+
+interface Payload extends Record<string, unknown> {
+  [CONTOSO]: Record<string, unknown>;
+}
+interface WireBody extends Payload { id: string }
+const scimPost = (...args: Parameters<typeof rawPost>) => rawPost(...args) as unknown as TypedHttpTest<WireBody>;
+const scimGet = (...args: Parameters<typeof rawGet>) => rawGet(...args) as unknown as TypedHttpTest<WireBody>;
+const scimPatch = (...args: Parameters<typeof rawPatch>) => rawPatch(...args) as unknown as TypedHttpTest<WireBody>;
 
 describe('P2 default-running Entra integration and flag contracts', () => {
   let app: INestApplication;
@@ -39,7 +48,7 @@ describe('P2 default-running Entra integration and flag contracts', () => {
     const readStored = async () => {
       const stored = await app.get<IUserRepository>(USER_REPOSITORY).findByScimId(endpoint.body.id, created.body.id);
       if (!stored) throw new Error('Missing owned fixture');
-      return { payload: JSON.parse(String(stored.rawPayload)), active: stored.active, version: stored.version };
+      return { payload: JSON.parse(String(stored.rawPayload)) as Payload, active: stored.active, version: stored.version };
     };
     const patch = (Operations: unknown[]) => scimPatch(app, url, token, { schemas: [PATCH], Operations });
     const unchanged = async (before: Awaited<ReturnType<typeof readStored>>) => {

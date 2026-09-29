@@ -6,7 +6,7 @@ import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-interface CorpusCase { id: string; title: string; integration: boolean }
+interface CorpusCase { id: string; title: string }
 interface WireResponse { status: number; body: unknown }
 const loadCorpus = createRequire(__filename);
 const { cases, runCase } = loadCorpus('./corpus/entra-compatibility.cjs') as {
@@ -22,10 +22,6 @@ describe('P9 public Microsoft Entra compatibility corpus', () => {
   afterAll(async () => { await app.close(); });
 
   for (const test of cases) {
-    if (test.integration && process.env.SCIM_P9_INTEGRATION !== '1') {
-      it.todo(`${test.id}: ${test.title}`);
-      continue;
-    }
     it(`${test.id}: ${test.title}`, async () => {
       const result = await runCase(test, async (
         method: Method, path: string, body?: object,

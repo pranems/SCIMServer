@@ -172,13 +172,9 @@ function Invoke-ScimCorrectnessContractTests {
                 $result = & node (Join-Path $PSScriptRoot 'entra-compatibility.cjs')
                 if ($LASTEXITCODE -ne 0) { throw 'Entra compatibility contract process failed.' }
                 $receipt = $result | ConvertFrom-Json -ErrorAction Stop
-                $includeIntegration = $env:SCIM_P9_INTEGRATION -eq '1'
-                $expectedCases = if ($includeIntegration) { 19 } else { 18 }
-                $assertionsMatch = if ($includeIntegration) { $receipt.assertions -gt 1162 } else { $receipt.assertions -eq 1162 }
                 $caseIds = @($receipt.outcomes.id)
-                $hasPendingCase = 'I03' -in $caseIds
-                Test-Result -Success ($caseIds.Count -eq $expectedCases -and 'I02' -in $caseIds -and $assertionsMatch -and $hasPendingCase -eq $includeIntegration) `
-                    -Message "9z-CY: $expectedCases Entra cases; integration checks enabled=$includeIntegration"
+                Test-Result -Success ($caseIds.Count -eq 19 -and 'I02' -in $caseIds -and 'I03' -in $caseIds -and $receipt.assertions -eq 1228) `
+                    -Message '9z-CY: 19 default-running Entra cases / 1228 assertions'
             } catch {
                 Test-Result -Success $false -Message "9z-CY: Entra compatibility failed: $($_.Exception.Message)"
             } finally {
@@ -195,7 +191,7 @@ function Invoke-ScimCorrectnessContractTests {
                 $result = & node (Join-Path $PSScriptRoot 'ordered-patch.cjs')
                 if ($LASTEXITCODE -ne 0) { throw 'Ordered PATCH contract process failed.' }
                 $receipt = $result | ConvertFrom-Json -ErrorAction Stop
-                Test-Result -Success ($receipt.assertions -eq 112) -Message '9z-CZ: 112 ordered PATCH append, all-match, transition and rollback assertions'
+                Test-Result -Success ($receipt.assertions -eq 188) -Message '9z-CZ: 188 ordered PATCH, flag and rollback assertions'
             } catch {
                 Test-Result -Success $false -Message "9z-CZ: ordered PATCH failed: $($_.Exception.Message)"
             } finally {

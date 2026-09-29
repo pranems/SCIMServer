@@ -588,9 +588,9 @@ Coerces supported string representations of booleans (`"True"`, `"False"`, `"tru
 **After coercion:** `{ "active": true }`
 
 Applies to supported schema-aware input paths, including nested extensions.
-Output normalization is separate, and the legacy `active` PATCH extractor is
-not fully gated by this switch on the P7a/P1 base. See
-[E02-E05 and the integration limits](SCIM_ENTRA_COMPATIBILITY.md).
+Output normalization is separate. The historical P7a/P1 extractor was not
+fully gated; the integrated P2 follow-up now closes that User active input
+gap. See [the verified flag matrix and limits](SCIM_ENTRA_COMPATIBILITY.md).
 
 P2 follow-up: OFF rejects quoted User `active` in PATCH even when strict
 schema validation is OFF; the promoted-field adapter cannot silently
