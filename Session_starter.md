@@ -15,6 +15,9 @@ The latest P9 increment passes build and 383 focused units. Its explicit
 I02 primary handoff and I03 verbose-disabled literal-key safety remain P2 work.
 The bounded combined live run has 132 reported checks, including P9's 17
 supported cases / 1,104 assertions; it does not claim I02/I03 passed.
+At final P2 integration, resolved I02/I03 must run by default, not remain
+environment-gated TODOs. P2 also owns making quoted active PATCH extraction
+honor `AllowAndCoerceBooleanStrings`, with explicit legacy mode preserved.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
@@ -51,7 +54,7 @@ No live scan, backup, replay, repair or deployment is authorized here.
 - [x] ✅ COMPLETED: P8b `88b96c74` -> `39a58c9a` and `2db239a9` -> `9178d60c`; deletion checks use `9z-CX`, preserving integrated P8a `9z-CS` and P8c `9z-CT`.
 - [x] ✅ COMPLETED: P9 `109a1099` -> `3ddd8a1b`; bounded compatibility coverage uses `9z-CY`. I02/I03 were executed, not relabeled as supported passes.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close P2 including I02/I03, final P7 PATCH integration, P3b/compatibility dispositions and the concurrent FK-error boundary before the final C0 matrix.
+- [ ] Close P2 including default-running I02/I03 and effective active-value coercion controls, final P7 PATCH, P3b/compatibility dispositions and the concurrent FK-error boundary before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.

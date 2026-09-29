@@ -402,7 +402,7 @@ combined checkpoint has its own counts in section 11.1.
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | In progress separately | Await parent-supplied commit; pending diffs are not part of this assembly |
+| P2 | In progress separately | Await parent-supplied commit. Closure includes I02/I03 as default-running regressions and effective quoted-active coercion policy; see 11.12. Pending diffs are not part of this assembly |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Active parent-assigned worker | Promised schema-uniqueness closure is in progress; no new commit supplied for assembly. P3 alone does not claim these guarantees and C0 is not unblocked |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
@@ -1014,6 +1014,43 @@ or deployment has been performed by this documentation update.
 remediation have separate evidence and approval gates.
 **Design disposition: accepted.** This adds no automatic migration, runtime
 reinterpretation, parser fallback or speculative remediation framework.
+
+### 11.12 P2 compatibility closure and permanent regression requirements
+
+The parent clarified the required closure of P9's remaining gaps. These are
+P2-owned protocol behaviors, not additional passing compatibility claims:
+
+| Case or boundary | Required verified outcome |
+|---|---|
+| I02 primary handoff | Appending a new primary email retains the prior email, clears its primary flag, sets the new primary, and persists both entries without unrelated changes |
+| I03 verbose-disabled dotted User path | Never persist a literal dotted key. Current P9 expects rejection. A deliberately reviewed nested-resolution contract is also acceptable only with accurate flag policy and nested-value/no-literal-key assertions; changing 400 to 200 alone is not a fix |
+| Quoted active extraction | `AllowAndCoerceBooleanStrings` must have its documented effect on legacy active PATCH extraction, not be bypassed by a special-case converter. Prove native Boolean controls, conversion-disabled behavior, explicit legacy conversion-enabled behavior and unchanged state for rejected writes |
+
+The coercion contract must name the exercised wire shapes and strict-validation
+settings. Retain explicit legacy support; do not use blanket strict-off advice,
+invent a new default, or silently describe an ignored flag as effective.
+The existing 17 passing P9 cases do not prove this active-extraction boundary.
+
+**Resolved cases must become ordinary permanent regressions.** Once the P2
+behavior is integrated and verified, remove I02/I03's `integration` gating and
+the corresponding `it.todo`/environment-only selection for those cases.
+The default Supertest and shared built-live corpus must then execute their
+assertions without `SCIM_P9_INTEGRATION=1`. Update receipt counts, settings
+guidance and the main live runner together, without weakening assertions or
+turning unsupported behavior into a baseline. Until resolution, retain and
+report the actually executed RED results separately.
+
+Final integration must verify default discovery selects these cases and attach
+both-backend outcome proof to the relevant original-case and supplemental C0
+rows. An opt-in-only test is not accepted as permanent coverage of a resolved
+production defect. Integration coordinates this with the P2 owner and does not
+duplicate fixes in their pending worktree.
+
+**Assurance improvement: applied.** Temporary opt-in failure probes have an
+explicit promotion-to-default gate after their fixes.
+**Design disposition: accepted.** Preserve the shared corpus and existing
+configuration policy boundaries; no parallel legacy parser or speculative
+compatibility framework is introduced by this requirement.
 
 ## 12. Architecture and self-improvement decisions
 
