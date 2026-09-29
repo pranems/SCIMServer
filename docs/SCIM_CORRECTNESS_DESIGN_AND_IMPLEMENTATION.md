@@ -415,10 +415,10 @@ combined checkpoint has its own counts in section 11.1.
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | Common-context source assembled; new combined validation pending | `8d5915ba` adds [binding-specific id/meta/common views](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md) and authoritative generic timestamps; source1698 units/108 HTTP/472 live per backend. Existing common externalId PATCH and neutral PUT matching fixes remain preserved. Namespace-only, eight baseline expectations, query/admission and final acceptance stay open |
+| P7 | Four source commits assembled; focused context overlaps verified | `8d5915ba` -> `e80da689`; binding-local common views and authoritative timestamps preserve existing PATCH/retention fixes.754 units,537 InMemory/538 PostgreSQL HTTP and143 live checks/backend including472 P7 assertions pass. Namespace-only, prior eight expectations and broader query/admission acceptance remain open; section11.24 |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Incremental assembly only; explicit read/admission blockers remain | Checkpoints through11.23; original82-case/backend ledger unchanged. P3b writes now have combined proof; numeric/MV displayName filtering, malformed profile omission, P7/context/test/namespace, uniqueness admission/profile coordination and performance/artifact acceptance remain open |
+| C0 | Supplied source assembly complete; acceptance remains open | Checkpoints through11.24; original82-case/backend ledger unchanged. Numeric/MV displayName filtering, malformed profile omission, P7b characteristics/query/test/namespace, uniqueness admission/profile coordination and performance/artifact acceptance remain open |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -1812,6 +1812,56 @@ before release.** Reuse the existing representation/filter seams; no schema
 restriction, new policy DSL or speculative abstraction was added here.
 P7 common-context source is still pending; final82-case/backend reconciliation,
 performance, exact packaged-artifact proof and publication remain separate.
+
+### 11.24 Binding-context source integration, 2026-09-29
+
+P7 source `8d5915ba4f1a5c3f900dbc2df363f5f6a279cfcc` is preserved as
+`e80da689d4443d589e11538f9970ae99848d9d2c`, after the three earlier P7
+source commits. This completes the supplied source-package assembly, not
+the final C0 acceptance matrix.
+
+Merge decisions:
+
+* Keep both `effectiveCommonAttributes` and the integration-only
+  `validateCommonAttributeValues` in the existing domain helper.
+* Preserve public `deepEqual`, the fifth immutable-mode argument and the
+  neutral retained-entry matcher; do not reintroduce the old PUT defect.
+* Keep explicit extension `isCoreSchema:false` and required-binding metadata.
+  Remove the duplicate identical property introduced by automatic merging.
+* Preserve the guarded standalone P7 entry and shared explicit-target HTTP
+  entry, with the new common-context fixture loader.
+* Retain P1/P2/P9 harness branches while raising only P7's source minimum
+  from104 to108. Other packages' current statuses survive the source docs.
+* Preserve P3b's raw generic reconstruction and source-authoritative
+  timestamps. Common views do not mutate stored shared schema declarations.
+
+| Focused integrated evidence | Result |
+|---|---|
+| Build / touched lint | API build passed;13 files, zero errors/33 warnings, unchanged rules |
+| Domain/helper/profile/retention units |14 suites,754 passed |
+| Live wiring RED/GREEN | One RED while the main runner expected426; now requires the actually executed472 P7 assertions at9z-CV |
+| HTTP typing correction | Five missing metadata-field diagnostics and one unsafe matcher assignment; only the wire interface/matcher typing changed |
+| InMemory HTTP |537 distinct passes plus one native-only skip across nine suites:429 passed initially, then the previously uncompiled profile suite alone reran108 |
+| PostgreSQL HTTP |538 passes, zero pending/TODO, actual17.8 and all22 migrations on a uniquely owned pinned target |
+| Separate built runtimes |143 shared live checks/backend, including472 P7 assertions, with unchanged endpoint inventories and exact cleanup |
+| Documentation |26 content/freshness/coupling docs pass;24 literal JSON blocks and27 new links checked. The one new diagram renders under11.15.0 in both strict themes; existing editor-version discovery0.0.0 leaves preview parity unverified |
+| Receipt | [Integrated context proof](evidence/scim-common-context-integration-20260929/validation.json); source1698/108/472 receipt unchanged |
+
+The proof retains default-running I02/I03, common externalId validation before
+hooks/on complete candidates, typed generic payload authority and one-to-one
+retention. It does not close whole-namespace strict PATCH validation, prior
+eight P7 expectation mismatches, every common-characteristic/query consumer,
+the numeric displayName filter hold, malformed-profile omission handling,
+unsupported uniqueness admission, profile coordination or performance.
+Those belong to the independent combined P7b/C0 pass on a fresh worktree.
+
+**Test/gate improvement: applied.** A package's expanded live contract cannot
+silently retain its old main-runner count; the permanent wiring test changed
+RED before the integration wiring correction. Typed HTTP boundaries retain
+the actual published metadata instead of weakening assertions.
+**Design/architecture disposition: accepted.** Context views, PATCH value
+checks and shared retention remain separate cohesive concerns in existing
+seams; no global profile rewrite or duplicate matcher was introduced.
 
 ## 12. Architecture and self-improvement decisions
 

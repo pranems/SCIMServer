@@ -2,8 +2,9 @@
 
 **Last verified:** 2026-09-29
 
-**Status:** Local follow-up to `892b74ba`. Not merged, pushed or deployed.
-P7 remains open until final P2 integration. Atomic uniqueness is P3b-owned.
+**Status:** Source follow-up to `892b74ba`, now locally assembled with the
+later binding-context correction. Not merged to master, pushed or deployed.
+Remaining P7b/C0 acceptance stays open. Atomic uniqueness is P3b-owned.
 
 **Integration update:** source `8e8aa72e` is assembled as `e8a6e487`.
 The separate completed-PATCH correction below is locally validated on both

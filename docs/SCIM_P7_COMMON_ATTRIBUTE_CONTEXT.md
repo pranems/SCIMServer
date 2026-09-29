@@ -163,11 +163,18 @@ and [the live runner](../scripts/live-test-p7.cjs).
 The shared fixture is
 [profile-p7-common-context.fixture.ts](../api/test/e2e/helpers/profile-p7-common-context.fixture.ts).
 
-P2 integration still must use full evolving candidates for common-attribute
-PATCH checks, rather than require missing fields on a touched partial view.
-The separately confirmed PUT duplicate/anonymous entry-matching defect
-remains an integration blocker. This package does not silently claim either
-as fixed.
+The source package did not itself include P2's completed-candidate common
+checks or the separate PUT retention correction. The current assembly
+already supplies those through `4a0ac7d5` and `b21e44cb`, and preserves both
+when importing this source as `e80da689`. It validates original common input
+before lossy hooks and the complete evolving candidate, never complete
+POST/PUT requiredness on a touched PATCH partial view. One neutral matcher
+handles duplicate/anonymous retention across PUT and PATCH.
+[New integration proof](evidence/scim-common-context-integration-20260929/validation.json)
+records754 focused units,537 InMemory/538 PostgreSQL HTTP and143 main shared
+live checks per backend, including this package's472 assertions. The source
+receipt below stays historical; namespace-only strict validation and remaining
+P7b/C0 characteristic/query acceptance are not closed by these counts.
 
 **Design gate: applied.** Keep role/context at the existing schema-definition
 boundary and common precedence in the existing domain helper. Do not mutate

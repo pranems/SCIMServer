@@ -35,10 +35,15 @@ and completed-candidate checks now pass 973 units, 392 HTTP cases/backend,
 Actual owned PostgreSQL 17.8 replayed 22 migrations and was removed; APIs
 stopped with unchanged endpoint inventories. [Separate proof](docs/evidence/scim-common-patch-20260929/validation.json).
 This is not full C0 or generic query/uniqueness representation closure.
-P7 now owns a separate parent-requested follow-up for common id/meta and
-schemas used in both core and extension roles. The assembly already keeps
-generic extension `isCoreSchema:false` plus required-binding metadata; preserve
-those on merge. No shared-schema role or id/meta closure is claimed yet.
+**P7 binding-context source integrated:** `8d5915ba` -> `e80da689`.
+Common id/meta and core-versus-extension views preserve stored declarations;
+generic timestamps use authoritative record columns. Existing common-PATCH
+checks and neutral PUT matching remain intact. Combined proof: 754 units,
+537 InMemory HTTP plus one native-only skip, 538 PostgreSQL17.8 HTTP after
+22 migrations, and 143 shared live checks/backend including P7's472 assertions.
+[Separate context integration receipt](docs/evidence/scim-common-context-integration-20260929/validation.json).
+All supplied source packages are now assembled; remaining P7b/query/admission
+and final case-level acceptance are not declared complete.
 
 **P9 harness hardening integrated:** `8679e90f` -> `2c5067a4`. P9 now pins the
 verified URL through bootstrap; the shared runner clears inherited URLs and
@@ -152,7 +157,7 @@ without applying POST/PUT required checks to partial PATCH views.
 - [ ] Close numeric/MV displayName query failures, uniqueness admission and profile-revision coordination before C0.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close remaining P7 schema-role/id/meta and namespace-only boundaries plus profile-revision coordination before C0.
+- [ ] Close remaining P7b namespace-only/characteristic-query boundaries and old expectations, plus profile-revision coordination before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.
@@ -160,6 +165,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | P7 context source `8d5915ba` integrated as `e80da689`, preserving common-PATCH validation and neutral retention.754 units,537 InMemory/538 PostgreSQL HTTP,143 shared live checks/backend including472 P7 assertions pass. Source/live count wiring was RED then GREEN; imported HTTP wire metadata typing corrected without changing assertions. Other C0 holds remain explicit. |
 | 2026-09-29 | P3b custom authority integrated as `7001d194`: 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared built-live checks/backend pass. Separate five-shape probe records43/45 outcomes per backend; numeric/MV displayName equality remains a C0 query blocker (InMemory empty200, PostgreSQL500). Profile omission500 recorded separately. No final matrix or deployment claim. |
 | 2026-09-29 | Authorized P2 flags integrated as `8d2110d1`; unchanged I02/I03 verified, then optional dispatch removed. Both backends: 356 HTTP, P9 built-live19/1228 and P2 built-live188. PostgreSQL17.8/22 migrations and exact cleanup. Added default-discovery/count/guidance RED/GREEN controls; 26-doc content/freshness/coupling gates pass. Historical receipts and release metadata unchanged. |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |

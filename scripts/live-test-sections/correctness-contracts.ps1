@@ -113,7 +113,7 @@ function Invoke-ScimCorrectnessContractTests {
             $result = & node (Join-Path $PSScriptRoot 'profile-validation.cjs')
             if ($LASTEXITCODE -ne 0) { throw 'Profile validation contract process failed.' }
             $receipt = $result | ConvertFrom-Json -ErrorAction Stop
-            Test-Result -Success ($receipt.assertions -eq 426) -Message '9z-CV: 426 declaration, scalar, POST/PUT, projection and cleanup assertions'
+            Test-Result -Success ($receipt.assertions -eq 472) -Message '9z-CV: 472 declaration, binding-context, POST/PUT, projection and cleanup assertions'
         } catch {
             Test-Result -Success $false -Message "9z-CV: profile validation failed: $($_.Exception.Message)"
         } finally {

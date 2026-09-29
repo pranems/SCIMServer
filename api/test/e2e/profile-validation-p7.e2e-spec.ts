@@ -17,7 +17,7 @@ interface WireBody extends Record<string, unknown> {
     schemas: { id: string; attributes: Record<string, unknown>[] }[];
     settings: Record<string, unknown>;
   };
-  meta: { version: string };
+  meta: { resourceType: string; created: string; lastModified: string; location: string; version: string };
   [EXT]: Record<string, unknown>;
   [DIAG]: { attributePaths: string[] };
 }
@@ -65,7 +65,7 @@ describe('P7 declaration and POST/PUT contracts', () => {
     const created = await scim('post', `${base}/Shareds`).send(coreBody).expect(201);
     expect(typeof created.body.id).toBe('string');
     expect(created.body.id).not.toBe('spoof');
-    expect(created.body.meta).toMatchObject({ resourceType: 'Shared', location: expect.stringContaining(`/Shareds/${created.body.id}`) });
+    expect(created.body.meta).toMatchObject({ resourceType: 'Shared', location: expect.stringContaining(`/Shareds/${created.body.id}`) as unknown });
     expect(created.body.externalId).toBe('Client-AbC');
     expect(created.body.displayName).toEqual([7, 9]);
     expect(created.body.active).toBe('custom');

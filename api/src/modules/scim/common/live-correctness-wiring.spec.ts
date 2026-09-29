@@ -53,8 +53,8 @@ describe('integrated correctness live coverage', () => {
 
   it('requires the expanded recursive readOnly live contract', () => {
     const source = read(section);
-    expect(source.includes('$receipt.assertions -eq 426')).toBe(true);
-    expect(source.includes('426 declaration, scalar, POST/PUT, projection and cleanup assertions')).toBe(true);
+    expect(source.includes('$receipt.assertions -eq 472')).toBe(true);
+    expect(source.includes('472 declaration, binding-context, POST/PUT, projection and cleanup assertions')).toBe(true);
   });
 
   it('requires all resolved compatibility and flag assertions without environment gating', () => {

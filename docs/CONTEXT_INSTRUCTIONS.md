@@ -46,9 +46,14 @@ protects generic id/meta and prevents core semantics from mutating independent
 extension uses of shared schemas. Admin rejection of core-only conflicts is
 provider policy; runtime common precedence is the RFC requirement. Generic
 meta timestamps now come from authoritative record fields. Source regression:
-1,698 tests,108 HTTP and472 live assertions per backend. Combined context
-validation is pending; the existing common-PATCH and PUT retention fixes
-are preserved, not reopened by this source snapshot.
+1,698 tests,108 HTTP and472 live assertions per backend.
+Integration `8d5915ba` -> `e80da689` separately passes754 units,
+537 InMemory HTTP plus one native-only skip,538 PostgreSQL17.8 HTTP after
+22 migrations, and143 shared live checks/backend including472 P7 assertions.
+[Combined receipt](evidence/scim-common-context-integration-20260929/validation.json).
+Existing common-PATCH and PUT retention fixes are preserved, not reopened.
+Namespace-only strict validation, broader characteristic/query consumers and
+the old test-expectation reconciliation remain distinct P7b work.
 
 P7's [common externalId follow-up](SCIM_P7_COMMON_EXTERNAL_ID.md) corrects
 admission/runtime behavior for all resource cores using RFC 7643 3.1, not
