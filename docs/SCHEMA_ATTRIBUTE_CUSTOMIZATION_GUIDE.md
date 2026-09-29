@@ -10,6 +10,13 @@
 
 ## Cross-References
 
+**Integration hold:** do not tighten Boolean/dateTime/binary or generic
+promoted-name uniqueness based on the P3b table alone. The assembled package
+still needs the [documented standards/representation corrections](SCIM_UNIQUENESS_IMPLEMENTATION.md).
+Common top-level externalId follows RFC 7643 section 3.1; extension homonyms
+and custom-core displayName/active are not restricted by convenience columns.
+No policy/default or legacy data is automatically migrated.
+
 **P3b branch update:** `uniqueness:server` now reserves typed scalar values,
 including MV elements and complex scalar children, at the repository commit.
 Null/absence reserve nothing; self-updates do not conflict. Do not use `global`,

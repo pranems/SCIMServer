@@ -220,6 +220,9 @@ function Invoke-ScimCorrectnessContractTests {
                 $env:SCIM_LIVE_BASE_URL = $oldBase
                 $env:SCIM_LIVE_TOKEN = $oldToken
             }
+
+            . "$PSScriptRoot\atomic-uniqueness.ps1"
+            Invoke-ScimAtomicUniquenessTests -BaseUrl $base -Headers $Headers
         }
     }
 }

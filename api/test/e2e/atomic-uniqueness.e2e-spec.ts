@@ -31,7 +31,7 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
   const http = (verb: 'post' | 'get' | 'put' | 'patch' | 'delete', url: string, body?: object): Promise<Response> =>
     request(app.getHttpServer() as Server)[verb](url)
       .set('Authorization', `Bearer ${getLegacyToken()}`)
-      .set('Content-Type', 'application/scim+json').send(body) as unknown as Promise<Response>;
+      .set('Content-Type', 'application/scim+json').send(body);
   const base = (ep: string, route: Route) => `/scim/v2/endpoints/${ep}/${route}`;
   const schema = (route: Route) => ({ Users: USER, Groups: GROUP, Devices: DEVICE }[route]);
   const body = (route: Route, extension: object, name: string = randomUUID()) => ({

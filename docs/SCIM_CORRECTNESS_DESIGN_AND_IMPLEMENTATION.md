@@ -411,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Core integrated; contract corrections and combined validation pending | `de05e67b` adds repository-commit uniqueness and owned backend evidence. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Its Boolean/dateTime/binary policy and custom-core promoted-column assumptions conflict with the reviewed contract; follow-up remains with P3b, distinct from P7 common externalId |
+| P3b | Core integrated and focused mechanics validated; contract corrections OPEN | `de05e67b` -> `1d37e7b8` adds repository-commit uniqueness and owned source-package evidence. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Six no-write probes confirm Boolean/dateTime/binary policy and custom-core promoted-column discrepancies; follow-up remains with P3b, distinct from P7 common externalId |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
@@ -1266,6 +1266,71 @@ controls for missing/added/anonymous values and actual stored readback.
 for three real consumers rather than copy a matcher or couple SchemaValidator
 back to PATCH execution. No schema admission, uniqueness rule, default,
 required-PATCH partial-view rule or live-data repair was added.
+
+### 11.16 P3b core assembly with contract corrections open
+
+Source `de05e67b72755c8a06df0e5fd210db3317c76e68`, based on P3/P4,
+was appended as `1d37e7b8`. The atomic mechanics use PostgreSQL transaction
+namespace locks, post-lock ReadCommitted scans and same-transaction writes;
+InMemory checks and publication remain synchronous. No migration or global
+process mutex was added.
+
+**Runtime conflict decisions:** retain P3 expected-version checks, P4 staged
+Group/member publication and P8 deleted-endpoint barriers together. Group
+create and member append run uniqueness checks on staged data, then check the
+endpoint barrier before publishing. Keep P4's safe mapped 500/503 error detail
+while adding P3b's INVALID_VALUE-to-400/scimType mapping. Generic extension
+definitions retain both P7 `required` metadata and explicit `isCoreSchema:false`;
+neither the namespace identity nor required binding is discarded.
+
+The now-required append-member uniqueness argument exposed four older deletion
+fixture calls. They explicitly pass an empty policy because those fixtures test
+lifecycle semantics; real uniqueness paths retain their compiled policy.
+The port was not weakened back to optional. Original P3b live assertions are
+shared by guarded standalone and main-runner paths; `9z-DB` owns a dedicated
+endpoint and verifies 21 String/MV duplicate/conflict/no-write assertions plus
+cleanup. Its route and section coverage were RED before hookup.
+
+| Focused assembly check | Result and boundary |
+|---|---|
+| API build | PASS |
+| Policy, repositories, services, P3/P4/P8 and wiring units | 13 suites / 524 tests passed |
+| Initial HTTP mechanics/overlap run | Five executed suites passed 299 cases; two native database controls skipped; the sixth suite initially failed compilation for the required append policy argument |
+| Follow-up lifecycle/P7/schema-uniqueness HTTP | Three suites / 83 passed; combined distinct HTTP passes are 382, not a full matrix |
+| Final changed-HTTP compile check | Namespace-isolation case passes; 64 other cases intentionally not selected in this type-only rerun |
+| Lint | 0 errors / 134 existing warnings across the 27-file merged scope after removing one redundant assertion; five edited integration test files have zero errors/warnings |
+| Built-local main live section | 136 reported checks pass, including P3b's 21 String/MV assertions and dedicated endpoint cleanup |
+| Cleanup | Endpoint collection identical before/after; owned local API stopped |
+
+**These GREENs do not close policy acceptance.** Six no-write probes against
+the compiled source are retained in
+`test-results/scim-integration-p3b/contract-probes.json`:
+
+| Observed source behavior | Required disposition |
+|---|---|
+| Boolean, dateTime and binary server uniqueness compile and normalize values | OPEN: these types have no uniqueness characteristic under the reviewed RFC clauses; do not invent normalized uniqueness as a requirement. P3b must explicitly handle unsupported/inconsistent promises |
+| Generic core decimal or MV displayName server uniqueness is rejected because the promoted column is String | OPEN: valid custom-core displayName/active shapes are not restricted by convenience-column representation |
+| Generic candidate reconstruction overwrites raw displayName/active with promoted column values | OPEN: P3b's extractor must use the resource-family/schema-authoritative representation, coordinated with P2/P7 rather than solved by new admission restrictions |
+
+Top-level externalId remains the separate RFC common String/single-value
+contract owned by P7; extension homonyms are independent. The source package's
+test outcomes are not an endorsement of its disputed policies. P3b has been
+given the exact source locations/probe outcomes and owns the follow-up; no
+competing policy correction is authored here.
+
+Original P3b PostgreSQL 17.8/22-migration and independent-pool race receipts
+remain source-package evidence. This incremental assembled run used explicit
+InMemory/inert URL only and is not claimed as a new integrated PostgreSQL
+or final exact-artifact matrix. Logs are in `test-results/scim-integration-p3b/`.
+All 82 original IDs/164 backend dispositions remain pending independently of
+the aggregate counts above.
+
+**Assurance improvement: applied.** Separate locking correctness from the
+correctness of the policy and candidate representation being locked.
+**Design disposition: accepted for assembly mechanics; policy corrections
+remain open.** Typed repository policies compose with existing CAS/lifecycle
+ports; no copied mapper, admission framework or speculative type comparison is
+added by the integration fix.
 
 ## 12. Architecture and self-improvement decisions
 

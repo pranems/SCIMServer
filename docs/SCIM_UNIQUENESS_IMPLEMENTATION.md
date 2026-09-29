@@ -5,6 +5,17 @@
 **Status:** P3b local implementation on P4 tip `66a7229f`. Integration,
 release metadata, exact-tip CI and deployment remain parent-owned.
 
+> **Integration acceptance hold (2026-09-29):** the atomic-write core is
+> assembled, but the as-committed policies below are not all approved.
+> Six no-write probes confirm that Boolean/dateTime/binary server uniqueness
+> is accepted, valid numeric/MV custom-core displayName server promises are
+> rejected by convenience-column assumptions, and generic candidate fields
+> are overwritten by promoted columns. These conflict with the parent-reviewed
+> RFC/type and custom-schema contract. P3b owns their correction; P7 separately
+> owns common top-level externalId. Do not deploy or interpret the passing
+> package counts as acceptance of those policies. See
+> [integration disposition](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open).
+
 ## Client-visible outcome
 
 Two different resources cannot acquire the same declared unique value by
@@ -18,8 +29,10 @@ resource types, provider installations or external organizations.
 
 ## Namespace and equality contract
 
-The contract was expressed in the competing-resource HTTP fixtures before
-production changes. The formal policy is:
+The source package expressed the following behavior in competing-resource
+fixtures before production changes. This describes the committed implementation;
+the integration acceptance hold above supersedes any claim that every policy
+has been approved. Its namespace is:
 
 `endpoint id + resource type + core-or-extension schema identity + attribute path`
 
@@ -27,7 +40,7 @@ Resource id identifies an owner, not a uniqueness namespace. Repeating a value
 within one resource is not a conflict with another owner. A multi-valued leaf
 reserves each distinct value, not an ordered array or an entire complex object.
 
-| Characteristic / shape | Promised behavior |
+| Characteristic / shape | As-committed behavior, subject to the hold above |
 |---|---|
 | Missing `uniqueness`, or `none` | No added constraint. User `externalId` and `displayName`, and custom names, are not made unique by their spelling. |
 | `server` | The namespace above. Core and extension attributes with the same name remain separate. |

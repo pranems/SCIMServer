@@ -9,7 +9,7 @@
 
 ## Active Delivery Process
 
-The local initial assembly now includes P1/P2 core, P3/P4, P5, P6a/P6b, P7a,
+The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
 P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
 owns current combined results; the records below are source-package evidence,
 not deployment claims. P4's raw repository-error gap was closed separately
@@ -67,6 +67,8 @@ P7 admission and P8 profile-revision coordination remain separate packages.
 The source commit's Boolean/dateTime/binary comparison policies and generic
 promoted-column assumptions still require correction against parent-approved
 standards and custom-field contracts. Atomicity evidence alone does not close them.
+See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
+P7 common externalId and P3b uniqueness policies have separate owners.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory

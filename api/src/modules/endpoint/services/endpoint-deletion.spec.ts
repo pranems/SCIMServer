@@ -128,7 +128,7 @@ describe('Endpoint deletion ownership', () => {
       ]),
       () => resources.create({ ...owned.customInput, scimId: randomUUID() }),
       () => credentials.create({ ...owned.credentialInput, lookupKey: randomUUID() }),
-      () => groups.addMembers(owned.parent.id, [{ userId: null, value: 'late', type: null, display: null }]),
+      () => groups.addMembers(owned.parent.id, [{ userId: null, value: 'late', type: null, display: null }], []),
       () => credentials.rotate(other.active.id, owned.credentialInput),
       () => users.update(owned.user.id, { active: false }),
       () => groups.update(owned.child.id, { displayName: 'late' }),

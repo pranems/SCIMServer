@@ -169,7 +169,7 @@ describe('Endpoint deletion storage and HTTP contract', () => {
       () => groups.create(owned.groupInput),
       () => resources.create(owned.customInput),
       () => credentials.create(owned.credentialInput),
-      () => groups.addMembers(owned.parent.id, [{ userId: null, value: 'late', type: null, display: null }]),
+      () => groups.addMembers(owned.parent.id, [{ userId: null, value: 'late', type: null, display: null }], []),
       () => credentials.rotate(other.active.id, owned.credentialInput),
     ]) await expect(write()).rejects.toThrow();
     expect(await credentials.findById(other.active.id)).toMatchObject({ active: true });

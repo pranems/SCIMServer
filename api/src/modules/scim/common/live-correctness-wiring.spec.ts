@@ -30,21 +30,24 @@ describe('integrated correctness live coverage', () => {
       'entra-compatibility.cjs',
       'ordered-patch.cjs',
       'retained-entry-put.cjs',
+      'Invoke-ScimAtomicUniquenessTests -BaseUrl',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
     expect(source).toContain('finally');
     expect(source).toContain('-Method Delete');
+    expect(read('live-test-sections/atomic-uniqueness.ps1')).toContain('Invoke-ScimAtomicUniquenessContract -EndpointUrl');
   });
 
   it('gives every integration section a unique identifier across main and shared runners', () => {
     const main = read('live-test.ps1');
     const search = read('live-test-sections/search-contract.ps1');
+    const atomic = read('live-test-sections/atomic-uniqueness.ps1');
     const source = existsSync(resolve(scripts, section)) ? read(section) : main;
-    const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-(?:C[O-Z]|D[A-Z])):/g)]
+    const sections = [...`${main}\n${source}\n${search}\n${atomic}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-(?:C[O-Z]|D[A-Z])):/g)]
       .map((match) => match[1]);
     expect(new Set(sections).size).toBe(sections.length);
-    expect(sections.length).toBeGreaterThanOrEqual(13);
+    expect(sections.length).toBeGreaterThanOrEqual(14);
   });
 
   it('requires the expanded recursive readOnly live contract', () => {

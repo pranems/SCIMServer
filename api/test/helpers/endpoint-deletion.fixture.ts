@@ -25,11 +25,11 @@ export async function seedDeletionRows(app: INestApplicationContext, endpointId:
   const groupInput = { ...base, scimId: randomUUID(), displayName: 'child' };
   const child = await groups.create(groupInput);
   const parent = await groups.create({ ...groupInput, scimId: randomUUID(), displayName: 'parent' });
-  await groups.addMembers(child.id, [{ userId: user.id, value: user.scimId, type: 'User', display: null }]);
+  await groups.addMembers(child.id, [{ userId: user.id, value: user.scimId, type: 'User', display: null }], []);
   await groups.addMembers(parent.id, [
     { userId: child.id, value: child.scimId, type: 'Group', display: null },
     { userId: null, value: 'external-reference', type: null, display: null },
-  ]);
+  ], []);
   const customInput = { ...base, resourceType: 'Device', scimId: randomUUID(), displayName: 'owned-device' };
   const custom = await resources.create(customInput);
   await resources.create({ ...customInput, resourceType: 'Application', scimId: randomUUID() });
