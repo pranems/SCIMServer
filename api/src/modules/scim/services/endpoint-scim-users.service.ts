@@ -39,7 +39,6 @@ import {
   stripNeverReturnedFromPayload,
   stripInternalResponseFields,
   ScimSchemaHelpers,
-  assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { resolveNumericLimit } from '../common/capability-resolver';
@@ -121,13 +120,6 @@ export class EndpointScimUsersService {
       });
     }
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })));
-    }
-
     const now = new Date();
     const scimId = randomUUID();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
@@ -149,7 +141,7 @@ export class EndpointScimUsersService {
 
     let created: UserRecord;
     try {
-      created = await this.userRepo.create(input);
+      created = await this.userRepo.create(input, this.schemaHelpers.getUniquenessPolicy(endpointId));
     } catch (error) {
       handleRepositoryError(error, 'create user', this.logger, LogCategory.SCIM_USER, { userName: dto.userName, endpointId });
     }
@@ -237,7 +229,7 @@ export class EndpointScimUsersService {
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, updatedData, expectedVersion);
+      updatedUser = await this.userRepo.update(user.id, updatedData, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
     } catch (error) {
       handleRepositoryError(error, 'patch user', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -297,13 +289,6 @@ export class EndpointScimUsersService {
 
     await this.assertUniqueUserNameForEndpoint(dto.userName, endpointId, scimId);
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })), scimId);
-    }
-
     const now = new Date();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
     const meta = parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
@@ -322,7 +307,7 @@ export class EndpointScimUsersService {
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, data, expectedVersion);
+      updatedUser = await this.userRepo.update(user.id, data, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
     } catch (error) {
       handleRepositoryError(error, 'replace user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
@@ -590,12 +575,6 @@ export class EndpointScimUsersService {
       user.scimId,
     );
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })), user.scimId);
-    }
 
     return {
       userName: extractedFields.userName,

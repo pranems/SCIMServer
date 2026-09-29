@@ -4,6 +4,10 @@
 
 **Status:** P4 implemented and locally validated. Not merged, released or deployed.
 
+**P3b follow-up:** [schema-driven uniqueness](SCIM_UNIQUENESS_IMPLEMENTATION.md)
+now evaluates the complete Group scalar/member aggregate inside the same
+transaction, including the explicit-policy member append port.
+
 **Implementation commit:** `212a6b929683c3d853e23ec84f56310536941c3a`.
 The follow-up handoff records this immutable identity and verified cleanup;
 it does not change production code or validation inputs.

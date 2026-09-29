@@ -6,6 +6,7 @@
  * both endpointId AND resourceType to ensure proper data isolation.
  */
 import type { ExpectedVersion } from './write-precondition';
+import type { UniquenessPolicy } from './uniqueness-policy';
 import type {
   GenericResourceRecord,
   GenericResourceCreateInput,
@@ -14,7 +15,7 @@ import type {
 
 export interface IGenericResourceRepository {
   /** Create a new generic resource and return the complete record. */
-  create(input: GenericResourceCreateInput): Promise<GenericResourceRecord>;
+  create(input: GenericResourceCreateInput, uniqueness?: UniquenessPolicy): Promise<GenericResourceRecord>;
 
   /** Find a generic resource by its SCIM-visible id within an endpoint + resourceType. */
   findByScimId(
@@ -37,7 +38,7 @@ export interface IGenericResourceRepository {
   ): Promise<GenericResourceRecord[]>;
 
   /** Update a generic resource by its internal storage ID. */
-  update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion): Promise<GenericResourceRecord>;
+  update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy): Promise<GenericResourceRecord>;
 
   /** Delete a generic resource by its internal storage ID. */
   delete(id: string, expectedVersion?: ExpectedVersion): Promise<void>;

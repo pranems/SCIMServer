@@ -5,6 +5,10 @@
 **Status:** P3 implemented and locally validated on both backends. Release,
 reviewed integration, version metadata and deployment gates remain pending.
 
+**P3b follow-up:** [atomic schema-driven uniqueness](SCIM_UNIQUENESS_IMPLEMENTATION.md)
+extends persistence protection to Group/custom names and declared scalar/MV
+extension leaves. It does not alter the conditional-write semantics below.
+
 ## What changes for a client
 
 A client that reads `W/"v1"` and sends it back with PUT, PATCH or DELETE can

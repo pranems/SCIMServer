@@ -22,6 +22,7 @@ import type {
 } from '../../../domain/models/user.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
 import { RepositoryError } from '../../../domain/errors/repository-error';
+import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
 import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
@@ -36,8 +37,10 @@ export class InMemoryUserRepository implements IUserRepository {
     return prepareMapRemoval(this.users, row => row.endpointId === endpointId, rows => { this.users = rows; });
   }
 
-  async create(input: UserCreateInput): Promise<UserRecord> {
+  async create(input: UserCreateInput, uniqueness: UniquenessPolicy = []): Promise<UserRecord> {
     this.assertUniqueUserName(input.endpointId, input.userName);
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload(input), [...this.users.values()]
+      .filter((r) => r.endpointId === input.endpointId).map((r) => uniquenessPayload(r)));
     const now = new Date();
     const record: UserRecord = {
       id: randomUUID(),
@@ -98,10 +101,12 @@ export class InMemoryUserRepository implements IUserRepository {
     return results.map((u) => ({ ...u }));
   }
 
-  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion): Promise<UserRecord> {
+  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<UserRecord> {
     const existing = this.users.get(id);
     assertWritePrecondition(existing, expectedVersion);
     this.assertUniqueUserName(existing.endpointId, data.userName ?? existing.userName, id);
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }), [...this.users.values()]
+      .filter((r) => r.id !== id && r.endpointId === existing.endpointId).map((r) => uniquenessPayload(r)));
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: UserRecord = {
       ...existing,

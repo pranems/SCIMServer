@@ -19,6 +19,8 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { isValidUuid } from './uuid-guard';
 import { wrapPrismaError } from './prisma-error.util';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import { withUniqueWrite } from './prisma-uniqueness';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
@@ -45,9 +47,9 @@ function toUserRecord(resource: Record<string, unknown>): UserRecord {
 export class PrismaUserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: UserCreateInput): Promise<UserRecord> {
+  async create(input: UserCreateInput, uniqueness: UniquenessPolicy = []): Promise<UserRecord> {
     try {
-      const created = await this.prisma.scimResource.create({
+      const created = await withUniqueWrite(this.prisma, uniqueness, { endpointId: input.endpointId, resourceType: 'User' }, input, (tx) => tx.scimResource.create({
         data: {
           resourceType: 'User',
           scimId: input.scimId,
@@ -59,7 +61,7 @@ export class PrismaUserRepository implements IUserRepository {
           meta: input.meta,
           endpoint: { connect: { id: input.endpointId } },
         },
-      });
+      }));
       return toUserRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `User create(${input.scimId})`);
@@ -104,7 +106,7 @@ export class PrismaUserRepository implements IUserRepository {
     }
   }
 
-  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion): Promise<UserRecord> {
+  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<UserRecord> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
@@ -114,10 +116,10 @@ export class PrismaUserRepository implements IUserRepository {
     // Phase 7: Atomically increment version for ETag-based concurrency control
     prismaData.version = { increment: 1 };
     try {
-      const updated = await this.prisma.scimResource.update({
+      const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
-      });
+      }));
       return toUserRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `User update(${id})`, expectedVersion);

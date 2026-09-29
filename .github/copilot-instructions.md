@@ -914,3 +914,15 @@ side effect. Include a hidden child without a hidden top-level sibling,
 typed sort outcomes, missing values and count zero. Preserve internal `/Me`
 lookup when external filtering is disabled. Assert actual rows/order/totals
 and forbidden output keys, not only HTTP success.
+
+## Atomic Invariant Representation Rule (P3b, 2026-09-28)
+
+For a persistence uniqueness/invariant change, tests MUST force two DIFFERENT
+owners to compete, not only two writes to the same version. Assert one losing
+conflict, one stored owner and unchanged loser state on both backends.
+The representation checked under a lock must match what storage commits:
+reject ambiguous case-insensitive keys on constrained paths before JSONB can
+reorder them, and carry explicit schema identity instead of inferring it from
+a URN substring. Enumerate every mutating repository port, including retained
+append/helper ports; each must participate in the same policy and atomicity
+protocol. See [P3b RCA](../docs/SCIM_UNIQUENESS_EXECUTION_RCA.md).

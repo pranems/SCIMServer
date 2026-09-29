@@ -16,7 +16,7 @@ const {
 sourceGuard();
 assert.equal(process.argv.length, 2, "No external database or arguments accepted.");
 const suite = process.env.PERSISTENCE_TEST_SUITE ?? "conditional-writes";
-assert.ok(["conditional-writes", "group-transactions"].includes(suite), "Unknown persistence suite.");
+assert.ok(["conditional-writes", "group-transactions", "atomic-uniqueness"].includes(suite), "Unknown persistence suite.");
 delete process.env.DATABASE_URL;
 const { Client } = require(path.join(API, "node_modules", "pg"));
 const run = crypto.randomBytes(8).toString("hex");
@@ -157,7 +157,7 @@ async function main() {
   }
   assert.ok(ready, "Task PostgreSQL did not become ready.");
   receipt.beforeMigration = await databaseGuard({ marker: false });
-  if (suite === "group-transactions")
+  if (suite !== "conditional-writes")
     assert.match(receipt.beforeMigration.server.version, /^PostgreSQL 17\.8 /);
   process.env.PG_ANALYSIS_SYSTEM_ID =
     receipt.beforeMigration.server.system_identifier;
@@ -249,6 +249,9 @@ async function main() {
     ];
     if (suite === "group-transactions")
       tests.push(...["group-aggregate", "group-lifecycle", "group-parity-gaps"]
+        .map((name) => path.join(API, "test", "e2e", `${name}.e2e-spec.ts`)));
+    if (suite === "atomic-uniqueness")
+      tests.push(...["atomic-uniqueness", "schema-driven-uniqueness", "group-aggregate"]
         .map((name) => path.join(API, "test", "e2e", `${name}.e2e-spec.ts`)));
     assert.deepEqual(JSON.parse(listing.stdout).sort(), [...tests].sort());
     const exitCode = command(`${backend}-corpus`, [

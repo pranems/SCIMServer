@@ -152,7 +152,8 @@ describe('EndpointScimUsersService', () => {
           userName: createDto.userName,
           externalId: createDto.externalId,
           endpointId: mockEndpoint.id,
-        })
+        }),
+        expect.arrayContaining([expect.objectContaining({ path: [{ name: 'userName', multiValued: false }] })]),
       );
     });
 
@@ -478,7 +479,7 @@ describe('EndpointScimUsersService', () => {
       expect(result.userName).toBe('nopath@example.com');
       expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
         userName: 'nopath@example.com',
-      }), undefined);
+      }), undefined, expect.any(Array));
     });
 
     it('should update externalId and active via no-path replace', async () => {
@@ -984,7 +985,7 @@ describe('EndpointScimUsersService', () => {
       expect(result.externalId).toBe('pathed-ext-id');
       expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
         externalId: 'pathed-ext-id',
-      }), undefined);
+      }), undefined, expect.any(Array));
     });
 
     it('should remove simple attribute via path', async () => {
@@ -1804,7 +1805,7 @@ describe('EndpointScimUsersService', () => {
         expect(result.userName).toBe('normalized@example.com');
         expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
           userName: 'normalized@example.com',
-        }), undefined);
+        }), undefined, expect.any(Array));
       });
 
       it('should normalize DISPLAYNAME to displayName in no-path replace', async () => {
@@ -2415,6 +2416,7 @@ describe('EndpointScimUsersService', () => {
         deactivatedUser.id,
         expect.objectContaining({ active: true }),
         undefined,
+        expect.any(Array),
       );
     });
 

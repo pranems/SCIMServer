@@ -17,6 +17,7 @@ import type {
   GenericResourceUpdateInput,
 } from '../../../domain/models/generic-resource.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
+import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
 import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
@@ -31,7 +32,9 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
     return prepareMapRemoval(this.resources, row => row.endpointId === endpointId, rows => { this.resources = rows; });
   }
 
-  async create(input: GenericResourceCreateInput): Promise<GenericResourceRecord> {
+  async create(input: GenericResourceCreateInput, uniqueness: UniquenessPolicy = []): Promise<GenericResourceRecord> {
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload(input), [...this.resources.values()]
+      .filter((r) => r.endpointId === input.endpointId && r.resourceType === input.resourceType).map((r) => uniquenessPayload(r)));
     const now = new Date();
     const record: GenericResourceRecord = {
       id: randomUUID(),
@@ -89,9 +92,11 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       .map((r) => ({ ...r }));
   }
 
-  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion): Promise<GenericResourceRecord> {
+  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<GenericResourceRecord> {
     const existing = this.resources.get(id);
     assertWritePrecondition(existing, expectedVersion);
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }), [...this.resources.values()]
+      .filter((r) => r.id !== id && r.endpointId === existing.endpointId && r.resourceType === existing.resourceType).map((r) => uniquenessPayload(r)));
 
     const updated: GenericResourceRecord = {
       ...existing,

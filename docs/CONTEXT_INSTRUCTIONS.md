@@ -59,6 +59,15 @@ records the typed-path contract, 1,476 focused unit / 65 HTTP passes and owned
 backend/live evidence. Keep P2 operation semantics separate. Version and
 CHANGELOG coordination remain the parent integration gate.
 
+P3b adds repository-commit schema uniqueness for User/Group/custom resources,
+including scalar multi-values and complex children. Database-owned namespace
+locks coordinate PostgreSQL writers; InMemory commits synchronously.
+See [contract, compatibility limits and evidence](SCIM_UNIQUENESS_IMPLEMENTATION.md).
+P7 admission and P8 profile-revision coordination remain separate packages.
+The source commit's Boolean/dateTime/binary comparison policies and generic
+promoted-column assumptions still require correction against parent-approved
+standards and custom-field contracts. Atomicity evidence alone does not close them.
+
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory
 cases (one PostgreSQL-only FK control is skipped). Initial members commit

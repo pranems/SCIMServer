@@ -1,6 +1,6 @@
 # Schema Attribute Customization Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-04 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Version**: 1.1 - **Date**: 2026-08-04 - **Status**: Complete (PATCH merge semantics re-verified against `mergeProfilePartial()` on 2026-08-04; the full line-by-line source pass dates from v0.40.0)  
 > **Audience**: Operators, ISV admins, Entra ID integration engineers  
@@ -9,6 +9,15 @@
 ---
 
 ## Cross-References
+
+**P3b branch update:** `uniqueness:server` now reserves typed scalar values,
+including MV elements and complex scalar children, at the repository commit.
+Null/absence reserve nothing; self-updates do not conflict. Do not use `global`,
+whole-complex or computed-value uniqueness declarations as promises this server
+can enforce. See [the exact namespace, equality and unsupported-shape
+contract](SCIM_UNIQUENESS_IMPLEMENTATION.md) before tightening a profile.
+P7 owns registration rejection; this package alone fails unsupported resource
+writes closed rather than silently ignoring the declaration.
 
 | Topic | Document |
 |-------|----------|
@@ -124,8 +133,8 @@ RFC 7643 §2.2 and §7 define 7 attribute characteristics with defaults:
 | Value | Meaning |
 |-------|---------|
 | `none` | No uniqueness enforced |
-| `server` | Must be unique within the endpoint |
-| `global` | Must be unique across all endpoints (not commonly used) |
+| `server` | This provider scopes ownership to endpoint, resource type, schema and attribute path |
+| `global` | RFC-defined global scope beyond one provider; unsupported by this implementation, not merely an all-endpoints check |
 
 ### canonicalValues (RFC 7643 §2.3.1)
 
@@ -205,7 +214,9 @@ When overriding attributes on **RFC-defined schemas** (User, Group, EnterpriseUs
 
 **Mutability**: `readOnly (0)` < `immutable (1)` < `writeOnly (2)` < `readWrite (3)`
 
-**Uniqueness**: `global (0)` < `server (1)` < `none (2)`
+**Uniqueness rank**: `global (0)` < `server (1)` < `none (2)`. This is the
+characteristic ordering, not a promise to support `global`. P7 admission rejects
+unsupported declarations; P3b resource writes also fail closed.
 
 ### Custom Schemas - No Restrictions
 
@@ -333,7 +344,14 @@ If not already enabled, add to the same PATCH:
 
 **Example definition:**
 ```json
-{ "name": "title", "type": "string", "canonicalValues": ["Engineer", "PM"] }
+{
+  "name": "title",
+  "type": "string",
+  "canonicalValues": [
+    "Engineer",
+    "PM"
+  ]
+}
 ```
 
 **Rejection message:**
@@ -357,7 +375,11 @@ Attribute 'title' value 'CEO' is not one of the canonical values: [Engineer, PM]
 
 **Example definition:**
 ```json
-{ "name": "displayName", "type": "string", "required": true }
+{
+  "name": "displayName",
+  "type": "string",
+  "required": true
+}
 ```
 
 **Rejection message:**
@@ -390,7 +412,11 @@ Required attribute 'displayName' is missing.
 
 **Example - make `employeeNumber` immutable:**
 ```json
-{ "name": "employeeNumber", "type": "string", "mutability": "immutable" }
+{
+  "name": "employeeNumber",
+  "type": "string",
+  "mutability": "immutable"
+}
 ```
 
 **Rejection messages:**
@@ -419,7 +445,11 @@ Required attribute 'displayName' is missing.
 
 **Example - make `ims` only returned on request:**
 ```json
-{ "name": "ims", "type": "complex", "returned": "request" }
+{
+  "name": "ims",
+  "type": "complex",
+  "returned": "request"
+}
 ```
 
 **Security note:** `returned: "never"` cannot be loosened to any other value on RFC schemas. This prevents accidentally exposing `password`.
@@ -437,7 +467,11 @@ Required attribute 'displayName' is missing.
 
 **Example - make `externalId` case-sensitive:**
 ```json
-{ "name": "externalId", "type": "string", "caseExact": true }
+{
+  "name": "externalId",
+  "type": "string",
+  "caseExact": true
+}
 ```
 
 **Impact:** `?filter=externalId eq "ABC123"` will NOT match a stored value of `"abc123"`.
@@ -451,12 +485,16 @@ Required attribute 'displayName' is missing.
 | **Type** | `string` - `none`, `server`, `global` |
 | **Default** | `none` |
 | **Enforced** | Service layer + DB - always active (no config flag needed) |
-| **Tighten-only** | Can only tighten: `none → server → global` |
+| **Tighten-only** | Supported tightening: `none → server`; the metadata rank does not make `global` implementable |
 | **Error** | `409 uniqueness` |
 
 **Example - make `displayName` unique:**
 ```json
-{ "name": "displayName", "type": "string", "uniqueness": "server" }
+{
+  "name": "displayName",
+  "type": "string",
+  "uniqueness": "server"
+}
 ```
 
 **Rejection message:**
@@ -493,9 +531,19 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Schema:** `urn:ietf:params:scim:schemas:core:2.0:User`  
 
 ```json
-{ "name": "title", "type": "string", "required": false, "caseExact": false,
-  "mutability": "readWrite", "returned": "default", "multiValued": false,
-  "canonicalValues": ["Engineer", "PM"] }
+{
+  "name": "title",
+  "type": "string",
+  "required": false,
+  "caseExact": false,
+  "mutability": "readWrite",
+  "returned": "default",
+  "multiValued": false,
+  "canonicalValues": [
+    "Engineer",
+    "PM"
+  ]
+}
 ```
 
 | Test | Input | Result |
@@ -535,9 +583,20 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Schema:** `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`
 
 ```json
-{ "name": "department", "type": "string", "required": false, "caseExact": false,
-  "mutability": "readWrite", "returned": "default", "uniqueness": "none",
-  "multiValued": false, "canonicalValues": ["HR", "Finance"] }
+{
+  "name": "department",
+  "type": "string",
+  "required": false,
+  "caseExact": false,
+  "mutability": "readWrite",
+  "returned": "default",
+  "uniqueness": "none",
+  "multiValued": false,
+  "canonicalValues": [
+    "HR",
+    "Finance"
+  ]
+}
 ```
 
 | Test | Input | Result |
@@ -553,9 +612,17 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **RFC default:** `["work", "home", "other"]` → Override to `["work"]`
 
 ```json
-{ "name": "type", "type": "string", "caseExact": false,
-  "mutability": "readWrite", "returned": "default", "multiValued": false,
-  "canonicalValues": ["work"] }
+{
+  "name": "type",
+  "type": "string",
+  "caseExact": false,
+  "mutability": "readWrite",
+  "returned": "default",
+  "multiValued": false,
+  "canonicalValues": [
+    "work"
+  ]
+}
 ```
 
 | Test | Input | Result |
@@ -570,9 +637,18 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Characteristics:** `required: true` + `canonicalValues`
 
 ```json
-{ "name": "title", "type": "string", "required": true,
-  "mutability": "readWrite", "returned": "default", "multiValued": false,
-  "canonicalValues": ["Engineer", "PM"] }
+{
+  "name": "title",
+  "type": "string",
+  "required": true,
+  "mutability": "readWrite",
+  "returned": "default",
+  "multiValued": false,
+  "canonicalValues": [
+    "Engineer",
+    "PM"
+  ]
+}
 ```
 
 | Test | Input | Result |
@@ -588,8 +664,13 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Characteristic:** `mutability: "immutable"`
 
 ```json
-{ "name": "employeeNumber", "type": "string", "mutability": "immutable",
-  "returned": "default", "multiValued": false }
+{
+  "name": "employeeNumber",
+  "type": "string",
+  "mutability": "immutable",
+  "returned": "default",
+  "multiValued": false
+}
 ```
 
 | Test | Operation | Result |
@@ -607,8 +688,13 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Characteristic:** `returned: "request"`
 
 ```json
-{ "name": "ims", "type": "complex", "multiValued": true,
-  "returned": "request", "mutability": "readWrite" }
+{
+  "name": "ims",
+  "type": "complex",
+  "multiValued": true,
+  "returned": "request",
+  "mutability": "readWrite"
+}
 ```
 
 | Test | Query | Result |
@@ -624,8 +710,14 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 **Characteristic:** `uniqueness: "server"`
 
 ```json
-{ "name": "displayName", "type": "string", "required": true,
-  "uniqueness": "server", "mutability": "readWrite", "returned": "default" }
+{
+  "name": "displayName",
+  "type": "string",
+  "required": true,
+  "uniqueness": "server",
+  "mutability": "readWrite",
+  "returned": "default"
+}
 ```
 
 | Test | Input | Result |
@@ -641,13 +733,16 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 Apply several changes to a single attribute:
 
 ```json
-{ "name": "employeeNumber", "type": "string",
+{
+  "name": "employeeNumber",
+  "type": "string",
   "required": true,
   "mutability": "immutable",
   "caseExact": true,
   "uniqueness": "server",
   "returned": "default",
-  "multiValued": false }
+  "multiValued": false
+}
 ```
 
 **Result:** `employeeNumber` is now:
@@ -667,14 +762,34 @@ Custom schemas bypass tighten-only rules. Define anything:
   "id": "urn:mycompany:scim:ext:hr:2.0:User",
   "name": "HRExtension",
   "attributes": [
-    { "name": "employmentType", "type": "string", "required": true,
-      "mutability": "readWrite", "returned": "default",
-      "canonicalValues": ["full-time", "part-time", "contractor"] },
-    { "name": "badgeNumber", "type": "string", "required": false,
-      "mutability": "immutable", "caseExact": true, "uniqueness": "server",
-      "returned": "default" },
-    { "name": "internalNotes", "type": "string", "required": false,
-      "mutability": "readWrite", "returned": "never" }
+    {
+      "name": "employmentType",
+      "type": "string",
+      "required": true,
+      "mutability": "readWrite",
+      "returned": "default",
+      "canonicalValues": [
+        "full-time",
+        "part-time",
+        "contractor"
+      ]
+    },
+    {
+      "name": "badgeNumber",
+      "type": "string",
+      "required": false,
+      "mutability": "immutable",
+      "caseExact": true,
+      "uniqueness": "server",
+      "returned": "default"
+    },
+    {
+      "name": "internalNotes",
+      "type": "string",
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "never"
+    }
   ]
 }
 ```
@@ -686,8 +801,14 @@ Custom schemas bypass tighten-only rules. Define anything:
 To remove `canonicalValues`, simply omit the property or set it to `[]`:
 
 ```json
-{ "name": "title", "type": "string", "required": false,
-  "mutability": "readWrite", "returned": "default", "multiValued": false }
+{
+  "name": "title",
+  "type": "string",
+  "required": false,
+  "mutability": "readWrite",
+  "returned": "default",
+  "multiValued": false
+}
 ```
 
 After PATCH, `title` accepts any string value again.
@@ -727,11 +848,16 @@ When PATCHing an endpoint profile, different sections use different merge strate
 
 ### Safe Pattern (DO ✅)
 
-```json
+```jsonc
+// Schematic shape: replace the schemas placeholder with the complete array from GET.
 {
   "profile": {
-    "schemas": [ "...COMPLETE array from GET, with modifications..." ],
-    "settings": { "StrictSchemaValidation": "True" }
+    "schemas": [
+      "...COMPLETE array from GET, with modifications..."
+    ],
+    "settings": {
+      "StrictSchemaValidation": "True"
+    }
   }
 }
 ```
@@ -742,8 +868,17 @@ When PATCHing an endpoint profile, different sections use different merge strate
 {
   "profile": {
     "schemas": [
-      { "id": "urn:ietf:params:scim:schemas:core:2.0:User",
-        "attributes": [{ "name": "title", "canonicalValues": ["A"] }] }
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "attributes": [
+          {
+            "name": "title",
+            "canonicalValues": [
+              "A"
+            ]
+          }
+        ]
+      }
     ]
   }
 }
@@ -857,7 +992,10 @@ Set `IgnoreReadOnlyAttributesInPatch: "True"` in the endpoint settings. ReadOnly
 
 ### "Uniqueness is case-sensitive but I expected case-insensitive"
 
-Uniqueness checks are always case-insensitive. `"JohnDoe"` and `"johndoe"` are considered duplicates regardless of `caseExact`.
+Schema-driven string/reference uniqueness follows `caseExact`. With the RFC
+default `false`, `"JohnDoe"` and `"johndoe"` conflict; with `true`, they are
+distinct. Intrinsic User `userName` retains the existing case-insensitive
+CITEXT/lowercase provider tightening. See the [equality contract](SCIM_UNIQUENESS_IMPLEMENTATION.md).
 
 ### "returned:request attribute always shows up"
 
@@ -1000,7 +1138,7 @@ MATCHING IS CASE-INSENSITIVE: "engineer" = "Engineer" = "ENGINEER"
 | `mutability` | `readWrite` | ✅ →`immutable`→`readOnly` | ❌ | StrictSchema=true |
 | `returned` | `default` | ✅ (except from `never`) | ❌ from `never` | Always |
 | `caseExact` | `false` | ✅ →`true` | ❌ | Always (filters) |
-| `uniqueness` | `none` | ✅ →`server`→`global` | ❌ | Always |
+| `uniqueness` | `none` | ✅ →`server`; global unsupported | ❌ | Always |
 | `type` | `string` | ❌ immutable | ❌ | StrictSchema=true |
 | `multiValued` | `false` | ❌ immutable | ❌ | StrictSchema=true |
 

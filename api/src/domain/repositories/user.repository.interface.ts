@@ -9,6 +9,7 @@
  * case-insensitive comparison without a pre-computed lowercase column.
  */
 import type { ExpectedVersion } from './write-precondition';
+import type { UniquenessPolicy } from './uniqueness-policy';
 import type {
   UserRecord,
   UserCreateInput,
@@ -18,7 +19,7 @@ import type {
 
 export interface IUserRepository {
   /** Create a new user and return the complete record. */
-  create(input: UserCreateInput): Promise<UserRecord>;
+  create(input: UserCreateInput, uniqueness?: UniquenessPolicy): Promise<UserRecord>;
 
   /** Find a user by its SCIM-visible id within an endpoint. */
   findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null>;
@@ -38,7 +39,7 @@ export interface IUserRepository {
   ): Promise<UserRecord[]>;
 
   /** Update a user by its internal storage ID. */
-  update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion): Promise<UserRecord>;
+  update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy): Promise<UserRecord>;
 
   /** Delete a user by its internal storage ID. */
   delete(id: string, expectedVersion?: ExpectedVersion): Promise<void>;

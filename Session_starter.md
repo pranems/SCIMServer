@@ -123,7 +123,7 @@ historical execution record, not the current branch or priority authority.
 
 - [x] ✅ COMPLETED P3 local implementation and focused dual-backend validation.
 - [ ] Parent consolidation: release metadata, independent review and full applicable matrix.
-- [ ] P3b: separately design schema-driven and Group/custom-name atomic uniqueness.
+- [x] ✅ COMPLETED P3b implementation: schema-driven and Group/custom-name uniqueness at repository commit. Final focused evidence and limitations are in [the implementation guide](docs/SCIM_UNIQUENESS_IMPLEMENTATION.md).
 - [x] ✅ COMPLETED P4 Group aggregate persistence: initial members commit with the Group; InMemory validates/stages writes and reads a consistent snapshot. [Implementation](docs/SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md) and [execution RCA](docs/SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md).
 - P4 implementation commit: `212a6b929683c3d853e23ec84f56310536941c3a`. The committed API/scripts hash matches the final dual-backend receipt; owned containers, tool junctions and generated files are removed.
 
@@ -137,6 +137,15 @@ and assert stored versions and winner values under deterministic barriers.
 Group create must include initial members in the repository operation, not a
 later append. A read-side await can still tear an otherwise atomic InMemory
 aggregate; read scalar and member state in one turn.
+
+| Date | Summary |
+|---|---|
+| 2026-09-28 | P3b adds typed scalar/MV-leaf uniqueness, database-owned namespace locks and synchronous InMemory enforcement. Different-owner races, independent PostgreSQL pools and live smoke verified; independent review findings closed with RED controls. No migration, version/lockfile regeneration, push or deployment. |
+
+Assistant memory: case-insensitive attribute lookup must reject ambiguous
+aliases before JSONB can reorder keys; schema identity comes from the resolved
+resource type, not a `:core:` substring. Every retained writer, including member
+append, must participate in the repository policy.
 
 ### Workspace Tenant Isolation (CRITICAL - read before any `az` command)
 

@@ -484,7 +484,7 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
         { userId: null, value: 'scim-2', type: 'User', display: 'Bob' },
       ];
 
-      await repo.addMembers('grp-1', members);
+      await repo.addMembers('grp-1', members, []);
 
       expect(prisma.resourceMember.createMany).toHaveBeenCalledWith({
         data: expect.arrayContaining([
@@ -503,7 +503,7 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
     });
 
     it('should skip when members array is empty', async () => {
-      await repo.addMembers('grp-1', []);
+      await repo.addMembers('grp-1', [], []);
       expect(prisma.resourceMember.createMany).not.toHaveBeenCalled();
     });
   });

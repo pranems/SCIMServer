@@ -16,6 +16,7 @@
  *   - returned:never stripping on output
  */
 import { Inject, Injectable } from '@nestjs/common';
+import { compileUniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
@@ -51,7 +52,6 @@ import {
   stripInternalResponseFields,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
-  assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { SchemaValidator } from '../../../domain/validation';
@@ -137,11 +137,12 @@ export class EndpointScimGenericService {
         schemas.push({
           id: profileExt.id,
           attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+          isCoreSchema: false,
           required: ext.required,
         });
       } else {
         const extDef = this.schemaRegistry.getSchema(ext.schema);
-        if (extDef) schemas.push({ ...extDef, required: ext.required } as SchemaDefinition);
+        if (extDef) schemas.push({ ...extDef, isCoreSchema: false, required: ext.required } as SchemaDefinition);
       }
     }
 
@@ -195,13 +196,6 @@ export class EndpointScimGenericService {
 
     const scimId = randomUUID();
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
-    if (uniqueAttrs.length > 0) {
-      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-      assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })));
-    }
-
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -233,7 +227,7 @@ export class EndpointScimGenericService {
 
     let record;
     try {
-      record = await this.genericRepo.create(input);
+      record = await this.genericRepo.create(input, compileUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)));
     } catch (error) {
       handleRepositoryError(error, `create ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -371,13 +365,6 @@ export class EndpointScimGenericService {
 
     // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrsPut = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
-    if (uniqueAttrsPut.length > 0) {
-      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-      assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })), scimId);
-    }
-
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -405,7 +392,7 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(payload),
         meta: JSON.stringify(metaObj),
-      }, expectedVersion);
+      }, expectedVersion, compileUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)));
     } catch (error) {
       handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -623,15 +610,6 @@ export class EndpointScimGenericService {
 
     // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    {
-      const uniqueAttrsPatch = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
-      if (uniqueAttrsPatch.length > 0) {
-        const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-        assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })), scimId);
-      }
-    }
-
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -656,7 +634,7 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(patchedPayload),
         meta: JSON.stringify(metaObj),
-      }, expectedVersion);
+      }, expectedVersion, compileUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)));
     } catch (error) {
       handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }

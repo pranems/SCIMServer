@@ -9,6 +9,7 @@
  * handles case-insensitive comparison without a pre-computed lowercase column.
  */
 import type { ExpectedVersion } from './write-precondition';
+import type { UniquenessPolicy } from './uniqueness-policy';
 import type {
   GroupRecord,
   GroupWithMembers,
@@ -19,7 +20,7 @@ import type {
 
 export interface IGroupRepository {
   /** Atomically create a Group and its initial members; failure publishes neither. */
-  create(input: GroupCreateInput, members?: MemberCreateInput[]): Promise<GroupRecord>;
+  create(input: GroupCreateInput, members?: MemberCreateInput[], uniqueness?: UniquenessPolicy): Promise<GroupRecord>;
 
   /** Find a group by SCIM id within an endpoint (without members). */
   findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null>;
@@ -41,7 +42,7 @@ export interface IGroupRepository {
   ): Promise<GroupWithMembers[]>;
 
   /** Update a group by its internal storage ID. */
-  update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion): Promise<GroupRecord>;
+  update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy): Promise<GroupRecord>;
 
   /** Delete a group by its internal storage ID. */
   delete(id: string, expectedVersion?: ExpectedVersion): Promise<void>;
@@ -66,8 +67,8 @@ export interface IGroupRepository {
     excludeScimId?: string,
   ): Promise<GroupRecord | null>;
 
-  /** Add members to a group. */
-  addMembers(groupId: string, members: MemberCreateInput[]): Promise<void>;
+  /** Append members atomically; callers must explicitly supply the resource policy. */
+  addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy): Promise<void>;
 
   /**
    * Atomically update group fields and replace all members.
@@ -78,5 +79,6 @@ export interface IGroupRepository {
     data: GroupUpdateInput,
     members: MemberCreateInput[],
     expectedVersion?: ExpectedVersion,
+    uniqueness?: UniquenessPolicy,
   ): Promise<void>;
 }

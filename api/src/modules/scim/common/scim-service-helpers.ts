@@ -31,6 +31,7 @@ import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-pars
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { compileUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ export function handleRepositoryError(
     const status = repositoryErrorToHttpStatus(error.code);
     throw createScimError({
       status,
-      scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : undefined,
+      scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : error.code === 'INVALID_VALUE' ? 'invalidValue' : undefined,
       detail: status >= 500 ? `Failed to ${operation}.` : `Failed to ${operation}: ${error.message}`,
       diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
@@ -1188,6 +1189,17 @@ export class ScimSchemaHelpers {
    */
   getSchemaDefinitions(_endpointId?: string): SchemaDefinition[] {
     return this.getProfileAwareSchemaDefinitions();
+  }
+
+  getUniquenessPolicy(endpointId?: string): UniquenessPolicy {
+    try {
+      return compileUniquenessPolicy(this.getSchemaDefinitions(endpointId));
+    } catch (error) {
+      if (error instanceof RepositoryError && error.code === 'INVALID_VALUE') {
+        throw createScimError({ status: 400, scimType: 'invalidValue', detail: error.message });
+      }
+      throw error;
+    }
   }
 
   // ─── Precomputed Cache Accessors (Parent→Children Maps) ───────────

@@ -1,0 +1,61 @@
+{
+  "base": "66a7229fe8646b15e620514c8bf82f7b1f72343c",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "51dc93647bdd3197",
+  "sourceTreeSha256": "0348ebc6106d6829d9e0c190b62a671b29177df019155148a48b74bccd438824",
+  "sourceHashScope": "Sorted tracked and untracked nonignored api and scripts paths, each path followed by file bytes",
+  "artifact": "test-results/atomic-uniqueness/postgres-51dc93647bdd3197/run.json",
+  "startedAt": "2026-09-29T06:26:55.310Z",
+  "finishedAt": "2026-09-29T06:29:47.103Z",
+  "postgresVersion": "17.8",
+  "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+  "migrationReplay": {
+    "applied": 22,
+    "failed": 0,
+    "newMigrations": 0
+  },
+  "unit": {
+    "suites": 10,
+    "passed": 638,
+    "failed": 0
+  },
+  "http": [
+    {
+      "backend": "prisma",
+      "passed": 142,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "backend": "inmemory",
+      "passed": 140,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "Native PostgreSQL member foreign key rollback",
+        "Independent PostgreSQL application connection pools"
+      ]
+    }
+  ],
+  "livePerBackend": {
+    "atomicUniquenessAssertions": 21,
+    "conditionalWriteAssertions": 33,
+    "groupAggregateAssertions": 69
+  },
+  "lint": {
+    "baselineErrors": 0,
+    "baselineWarnings": 142,
+    "currentErrors": 0,
+    "currentWarnings": 137
+  },
+  "buildExitCode": 0,
+  "safetyNegativeControls": 3,
+  "cleanup": {
+    "exactContainerId": "989d964a51fc10eaf6b747db86c336eed7a8a26ba3936a7191ba1b5e2ddd5f6e",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  },
+  "deploymentPerformed": false,
+  "packageOrLockfilesChanged": false
+}

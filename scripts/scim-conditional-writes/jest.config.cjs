@@ -19,6 +19,8 @@ module.exports = {
   roots: [path.join(API, "test", "e2e")],
   testRegex: process.env.PERSISTENCE_TEST_SUITE === "group-transactions"
     ? "(group-aggregate|group-lifecycle|group-parity-gaps|conditional-writes|etag-conditional)\\.e2e-spec\\.ts$"
+    : process.env.PERSISTENCE_TEST_SUITE === "atomic-uniqueness"
+    ? "(atomic-uniqueness|schema-driven-uniqueness|group-aggregate|conditional-writes|etag-conditional)\\.e2e-spec\\.ts$"
     : "(conditional-writes|etag-conditional)\\.e2e-spec\\.ts$",
   moduleFileExtensions: [...original.moduleFileExtensions, "cjs"],
   modulePaths: [path.join(API, "node_modules")],

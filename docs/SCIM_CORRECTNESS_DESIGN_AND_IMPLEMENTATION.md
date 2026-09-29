@@ -281,6 +281,13 @@ rule before adding constraints. A local scan cannot promise global uniqueness.
 Database migrations, if needed, require existing-data analysis and independent
 replay tests; do not silently delete conflicting rows.
 
+**P3b implementation:** [atomic schema uniqueness](SCIM_UNIQUENESS_IMPLEMENTATION.md)
+defines endpoint/resource-type/schema/path ownership and typed scalar/MV-leaf
+equality. PostgreSQL namespace transaction locks and synchronous InMemory
+commits enforce it, including Group members. No migration; unsupported
+computed/complex/global declarations fail closed. P7 owns admission validation,
+and P8 owns different-profile-revision coordination.
+
 ## 7. Reads, discovery, capabilities, and endpoint lifecycle
 
 ```mermaid
@@ -404,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Active parent-assigned worker | Promised schema-uniqueness closure is in progress; no new commit supplied for assembly. P3 alone does not claim these guarantees and C0 is not unblocked |
+| P3b | Core integrated; contract corrections and combined validation pending | `de05e67b` adds repository-commit uniqueness and owned backend evidence. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Its Boolean/dateTime/binary policy and custom-core promoted-column assumptions conflict with the reviewed contract; follow-up remains with P3b, distinct from P7 common externalId |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |

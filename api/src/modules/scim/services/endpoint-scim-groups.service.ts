@@ -44,7 +44,6 @@ import {
   stripNeverReturnedFromPayload,
   stripInternalResponseFields,
   ScimSchemaHelpers,
-  assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { resolveNumericLimit } from '../common/capability-resolver';
@@ -118,7 +117,8 @@ export class EndpointScimGroupsService {
       : null;
 
     // Check for duplicate displayName - always throw 409 on conflict
-    const displayNameConflict = await this.groupRepo.findByDisplayName(endpointId, dto.displayName);
+    const displayNameConflict = this.usesFoldedNameUniqueness(endpointId)
+      ? await this.groupRepo.findByDisplayName(endpointId, dto.displayName) : null;
     if (displayNameConflict) {
       this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: displayName '${dto.displayName}'`, {
         endpointId, conflictScimId: displayNameConflict.scimId,
@@ -143,13 +143,6 @@ export class EndpointScimGroupsService {
     // BF-1: Server MUST generate id (RFC 7643 §2.2 - id is readOnly, server-assigned)
     const scimId = randomUUID();
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })));
-    }
-
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
     const input: GroupCreateInput = {
@@ -168,7 +161,7 @@ export class EndpointScimGroupsService {
     let group;
     try {
       const memberInputs = await this.resolveMemberInputs(dto.members ?? [], endpointId);
-      group = await this.groupRepo.create(input, memberInputs);
+      group = await this.groupRepo.create(input, memberInputs, this.schemaHelpers.getUniquenessPolicy(endpointId));
     } catch (error) {
       handleRepositoryError(error, 'create group', this.logger, LogCategory.SCIM_GROUP, { displayName: dto.displayName, endpointId });
     }
@@ -386,13 +379,6 @@ export class EndpointScimGroupsService {
     // externalId is NOT checked - saved as received per RFC 7643.
     await this.assertUniqueDisplayName(displayName, endpointId, scimId);
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrsPatch = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrsPatch.length > 0) {
-      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrsPatch, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
-    }
-
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
@@ -407,7 +393,7 @@ export class EndpointScimGroupsService {
           ...parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
           lastModified: new Date().toISOString()
         })
-      }, memberInputs, expectedVersion);
+      }, memberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
     } catch (error) {
       handleRepositoryError(error, 'patch group (transaction)', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -478,13 +464,6 @@ export class EndpointScimGroupsService {
       ? (dto as Record<string, unknown>).externalId as string
       : null;
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrsPut = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrsPut.length > 0) {
-      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
-    }
-
     const now = new Date();
     const meta = parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
 
@@ -502,7 +481,7 @@ export class EndpointScimGroupsService {
           ...meta,
           lastModified: now.toISOString()
         })
-      }, replaceMemberInputs, expectedVersion);
+      }, replaceMemberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
     } catch (error) {
       handleRepositoryError(error, 'replace group (transaction)', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
@@ -561,12 +540,19 @@ export class EndpointScimGroupsService {
    * Assert displayName uniqueness within the endpoint (case-insensitive).
    * Per SCIM spec, duplicate groups should be rejected with 409 Conflict.
    */
+  private usesFoldedNameUniqueness(endpointId: string): boolean {
+    return this.schemaHelpers.getUniquenessPolicy(endpointId).some((attr) =>
+      attr.schemaUrn === null && attr.path.length === 1 &&
+      attr.path[0].name.toLowerCase() === 'displayname' && !attr.caseExact);
+  }
+
   private async assertUniqueDisplayName(
     displayName: string,
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
     // Phase 3: Pass original name - CITEXT (PostgreSQL) / toLowerCase (InMemory) handles case-insensitivity
+    if (!this.usesFoldedNameUniqueness(endpointId)) return;
     const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
