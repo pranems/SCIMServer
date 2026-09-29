@@ -33,6 +33,26 @@ the final evidence and exact source identity.
 
 ## Self-improvement and architecture disposition
 
+### Integration closure of G7, 2026-09-29
+
+P5 was present in the assembly, but its scalar-error normalization did not
+sanitize an already-SCIM repository error. Two unit and two HTTP tests still
+returned the injected private message or internal repository context. The
+shared repository bridge now returns operation-only detail for mapped 500/503
+failures while preserving statuses, diagnostics and the logged original cause.
+The original G7 observation above remains the historical source-package result.
+
+The new HTTP cases use the real Prisma error translator at the repository
+seam without connecting to PostgreSQL; they are not a new database matrix.
+Both turn GREEN, alongside 185 existing/new helper/filter unit checks and the
+API build. The full P4 error contract again rejects the original raw injected
+markers, so future PostgreSQL runs also enforce this closure.
+
+**Test improvement: applied.** Check safe serialized content as well as scalar
+shape. **Design disposition: accepted.** Keep translation into domain errors
+inside the adapter and safe public formatting in the existing SCIM boundary;
+do not put HTTP logic into repositories or alter transaction behavior.
+
 **Applied:** rollback tests now check the full stored aggregate, not just
 the status: payload, scalar fields, version, timestamps and member row ids.
 A deterministic torn-read regression also guards the read side.

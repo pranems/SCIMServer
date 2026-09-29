@@ -2486,6 +2486,14 @@ lists in the diagnostics extension. OAuth token errors continue to use their
 separate OAuth JSON envelope. This local implementation is pending release
 consolidation; see [the P5 report](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md).
 
+The local P4 integration also masks mapped repository server failures:
+unexpected storage failures keep status `500`, and connection failures keep
+`503`, but their public detail contains only the operation, for example
+`Failed to create group.` Internal repository context and the original cause
+remain in server logs, not the response. Existing client-error details and the
+`DATABASE_ERROR` diagnostics classification are preserved. This is separate
+from P5's scalar-message normalization and is not yet deployed.
+
 ```json
 {
   "schemas": [

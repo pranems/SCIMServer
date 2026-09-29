@@ -72,10 +72,11 @@ export function handleRepositoryError(
       errorCode: error.code,
       ...context,
     });
+    const status = repositoryErrorToHttpStatus(error.code);
     throw createScimError({
-      status: repositoryErrorToHttpStatus(error.code),
+      status,
       scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : undefined,
-      detail: `Failed to ${operation}: ${error.message}`,
+      detail: status >= 500 ? `Failed to ${operation}.` : `Failed to ${operation}: ${error.message}`,
       diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
   }

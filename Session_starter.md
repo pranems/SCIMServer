@@ -27,6 +27,7 @@ depends on P2; P3b and compatibility dispositions must close before C0.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. Full P4 integration validation and live wiring are still in progress. |
 | 2026-09-28 | P7a declaration, scalar/cardinality and POST/PUT correctness implemented on `fix/scim-profile-validation-20260928`, based on P1 `3ecaba55`. Focused units: 1,507. Owned PostgreSQL/InMemory HTTP and local-live evidence, boundaries and remaining PATCH integration are in [P7a](docs/SCIM_P7A_PROFILE_VALIDATION.md). No versions, locks, push or deployment changed. |
 | 2026-09-28 | P1 typed PATCH paths implemented in isolated `fix/scim-correctness-p1-20260928`; focused 1,476 unit and 65 HTTP tests pass, plus owned PostgreSQL/InMemory and local-live proof. See [P1 implementation](docs/SCIM_P1_IMPLEMENTATION.md). No merge/deploy; central release metadata remains pending. |
 

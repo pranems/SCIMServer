@@ -13,6 +13,7 @@ import type { IGroupRepository } from '../../src/domain/repositories/group.repos
 import type { IUserRepository } from '../../src/domain/repositories/user.repository.interface';
 import type { GroupCreateInput, MemberCreateInput } from '../../src/domain/models/group.model';
 import { SCIM_EVENTS } from '../../src/modules/stats/scim-events';
+import { wrapPrismaError } from '../../src/infrastructure/repositories/prisma/prisma-error.util';
 
 const GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 const USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
@@ -44,7 +45,7 @@ describe('Group aggregate HTTP and persistence contract', () => {
     expect(typeof data.detail).toBe('string');
     for (const key of Object.keys(data))
       expect(['schemas', 'status', 'detail', 'scimType', 'urn:scimserver:api:messages:2.0:Diagnostics']).toContain(key);
-    expect(JSON.stringify(data)).not.toMatch(/P2002|PrismaClient|"stack"/);
+    expect(JSON.stringify(data)).not.toMatch(/P2002|PrismaClient|"stack"|injected member failure|member lookup unavailable/);
   }
   beforeAll(async () => {
     app = await createTestApp();
@@ -86,6 +87,21 @@ describe('Group aggregate HTTP and persistence contract', () => {
     errorContract(result, 500);
     expect(await stored()).toEqual([]);
     expect(events.mock.calls.some(([name]) => name === SCIM_EVENTS.GROUP_CREATED)).toBe(false);
+  });
+
+  it.each([
+    ['injected private member failure', 500],
+    ['connect refused at private database host', 503],
+  ] as const)('sanitizes the mapped repository failure: %s', async (message, status) => {
+    jest.spyOn(groups, 'create').mockRejectedValueOnce(
+      wrapPrismaError(new Error(message), 'Group.create(private-row-id)'),
+    );
+    const result = await http('post', `${base()}/Groups`, body());
+    errorContract(result, status);
+    const responseBody = result.body as Record<string, unknown>;
+    expect(responseBody.detail).toBe('Failed to create group.');
+    expect(JSON.stringify(responseBody)).not.toMatch(/private|injected/);
+    expect(await stored()).toEqual([]);
   });
 
   for (const failure of ['duplicate', 'injected'] as const) {
