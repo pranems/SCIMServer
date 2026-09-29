@@ -1,4 +1,5 @@
 import type { ProfileValidationError } from './endpoint-profile.service';
+import { COMMON_EXTERNAL_ID } from '../../../domain/validation/common-attributes';
 
 const KEYWORDS: Record<string, readonly string[]> = {
   type: ['string', 'boolean', 'decimal', 'integer', 'dateTime', 'reference', 'complex', 'binary'],
@@ -18,7 +19,9 @@ export function validateSchemaDeclarations(input: unknown): ProfileValidationErr
   const errors: ProfileValidationError[] = [];
   const fail = (path: string, detail: string, code = 'INVALID_DECLARATION') =>
     errors.push({ code, detail: `${path}: ${detail}` });
-  const attributes = (value: unknown, path: string): void => {
+  const coreSchemas = new Set(object(input) && Array.isArray(input.resourceTypes)
+    ? input.resourceTypes.filter(object).map(rt => rt.schema) : []);
+  const attributes = (value: unknown, path: string, coreRoot = false): void => {
     if (!Array.isArray(value)) { fail(path, 'must be an array of attribute definitions.'); return; }
     const seen = new Set<string>();
     for (const [index, attr] of value.entries()) {
@@ -45,6 +48,13 @@ export function validateSchemaDeclarations(input: unknown): ProfileValidationErr
           fail(`${here}.${key}`, 'must be an array of strings.');
         }
       }
+      if (coreRoot && typeof attr.name === 'string' && attr.name.toLowerCase() === 'externalid') {
+        for (const key of ['type', 'multiValued', 'caseExact', 'mutability'] as const) {
+          if (attr[key] !== undefined && attr[key] !== COMMON_EXTERNAL_ID[key]) {
+            fail(`${here}.${key}`, `must be ${String(COMMON_EXTERNAL_ID[key])} for the common externalId attribute (RFC 7643 3.1).`);
+          }
+        }
+      }
       if (attr.uniqueness === 'global') {
         fail(here, 'global uniqueness cannot be guaranteed by this provider; use a supported scope.', 'UNSUPPORTED_DECLARATION');
       }
@@ -63,7 +73,9 @@ export function validateSchemaDeclarations(input: unknown): ProfileValidationErr
       for (const key of ['id', 'name']) {
         if (typeof schema[key] !== 'string' || !schema[key].length) fail(`${here}.${key}`, 'must be a non-empty string.');
       }
-      if (schema.attributes !== undefined && schema.attributes !== 'all') attributes(schema.attributes, `${here}.attributes`);
+      if (schema.attributes !== undefined && schema.attributes !== 'all') {
+        attributes(schema.attributes, `${here}.attributes`, coreSchemas.has(schema.id));
+      }
     }
   }
   if (input.resourceTypes !== undefined) {

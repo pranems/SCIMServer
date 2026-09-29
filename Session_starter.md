@@ -120,6 +120,7 @@ strict OFF, without applying POST/PUT required checks to partial PATCH views.
 | Date | Summary |
 | --- | --- |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
+| 2026-09-29 | P7 common externalId correction applies RFC 7643 3.1 to every resource core: String/SV/caseExact/readWrite, original JSON type validation in both strict modes, with independent extension names and custom displayName/active controls. [Evidence and remaining integration boundaries](docs/SCIM_P7_COMMON_EXTERNAL_ID.md). No versions, locks, push or deployment. |
 | 2026-09-28 | P7 recursive readOnly follow-up closes POST/PUT stripping through supported nested-complex compatibility objects/arrays. Focused units: 1,517; per backend HTTP: 67; live: 228; PostgreSQL 17.8 with 22 migrations and InMemory. [Characteristic status](docs/SCIM_P7_CHARACTERISTIC_STATUS.md) separates optional behavior, global capability policy and exact P3b uniqueness gaps. P7 remains open for final P2 integration. |
 | 2026-09-29 | P9 source-harness follow-up: verified URL pinned through bootstrap, inherited URL cleared before provisioning, TCP readiness used. Five resolver tests and source-package PostgreSQL 17.8/22 migrations plus InMemory rerun pass (17 HTTP +17 built-live /1,104 assertions each). The assembled corpus separately includes default I02 (18 cases); I03 remains the parent-reviewed safety/policy hold, not a frozen-P2 promised fix. |
 | 2026-09-29 | P9 policy clarification: all supported corpus cases are strict ON; strict-OFF legacy active conversion is unresolved parent/P7b policy, not a P2 fix. Whole merged profile revalidation can block unrelated subblock edits when an old schema declares global uniqueness; this is provider capability policy, not an RFC-invalid keyword. No stored profile repair or semantic change. |
@@ -131,6 +132,8 @@ strict OFF, without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P1 native Boolean selector and malformed-path repair, with permanent regression tests.
 - [x] ✅ COMPLETED: P7a bounded declaration/scalar/POST/PUT implementation and owned runtime proof; P7 as a whole remains open.
 - [x] ✅ COMPLETED: Recursive POST/PUT readOnly stripping in the existing nested-complex compatibility mode, with cached/fallback and both-backend proof.
+- [x] ✅ COMPLETED: Common externalId declaration/runtime correction with explicit original-type and namespace-independence tests.
+- [ ] Integration blocker: PUT duplicate/anonymous entry retention needs one-to-one matching; confirmed separately, not fixed by the common externalId change.
 - [ ] P7b: final P2 integration and concrete remaining characteristic promises; P3b owns identified server-uniqueness enforcement gaps. External referential integrity/raw token reconstruction are not speculative feature requirements.
 - [ ] P2: operation transitions, append/all-match behavior, primary/required/immutable policies.
 - [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.

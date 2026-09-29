@@ -29,6 +29,7 @@ import type {
   ValidationResult,
 } from './validation-types';
 import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
+import { COMMON_EXTERNAL_ID, effectiveCommonAttribute } from './common-attributes';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -89,7 +90,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -143,6 +144,10 @@ export class SchemaValidator {
       // class-transformer materializes optional DTO fields with undefined values.
       if (value === undefined) continue;
       // Skip reserved SCIM keys
+      if (key.toLowerCase() === 'externalid') {
+        if (options.mode === 'patch') this.validateAttribute(key, value, COMMON_EXTERNAL_ID, options, errors);
+        continue;
+      }
       if (RESERVED_KEYS.has(key)) continue;
 
       // Extension URN blocks are validated separately
@@ -256,7 +261,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -642,7 +647,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -665,6 +670,13 @@ export class SchemaValidator {
     extensionSchemas: Map<string, SchemaDefinition>,
     errors: ValidationError[],
   ): void {
+    // Common externalId remains typed even when strict schema checks are off or
+    // an old/custom core omitted its declaration. Namespaced fields are independent.
+    for (const [key, value] of Object.entries(payload)) {
+      if (key.toLowerCase() === 'externalid' && value != null && typeof value !== 'string') {
+        errors.push({ path: key, message: 'Common externalId must be a single string (RFC 7643 3.1).', scimType: 'invalidValue' });
+      }
+    }
     const collect = (obj: Record<string, unknown>, attrs: Iterable<SchemaAttributeDefinition>, prefix: string): void => {
       for (const attr of attrs) {
         if (attr.mutability === 'readOnly') continue;
@@ -739,7 +751,7 @@ export class SchemaValidator {
       }
     };
     for (const schema of schemas) {
-      if (isCoreSchema(schema)) preserve(existing, incoming, schema.attributes);
+      if (isCoreSchema(schema)) preserve(existing, incoming, schema.attributes.map(attr => effectiveCommonAttribute(attr, true)));
       else {
         const old = existing[schema.id];
         const next = incoming[schema.id];
@@ -787,7 +799,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -1006,7 +1018,7 @@ export class SchemaValidator {
     };
 
     for (const schema of schemas) {
-      collect(schema.attributes);
+      collect(schema.attributes.map(attr => effectiveCommonAttribute(attr, isCoreSchema(schema))));
     }
 
     return names;
@@ -1495,7 +1507,8 @@ export class SchemaValidator {
     };
 
     for (const schema of schemas) {
-      collect(schema.attributes);
+      if (isCoreSchema(schema)) result.add('externalid');
+      collect(schema.attributes.map(attr => effectiveCommonAttribute(attr, isCoreSchema(schema))));
     }
 
     return result;
@@ -1597,7 +1610,7 @@ export class SchemaValidator {
 
     for (const schema of schemas) {
       if (isCoreSchema(schema)) {
-        collect(schema.attributes, core, coreSubAttrs);
+        collect(schema.attributes.map(attr => effectiveCommonAttribute(attr, true)), core, coreSubAttrs);
       } else {
         const extSet = new Set<string>();
         const extSubMap = new Map<string, Set<string>>();
@@ -1679,8 +1692,11 @@ export class SchemaValidator {
       // Build attribute definition lookups
       if (isCore) {
         for (const attr of schema.attributes) {
-          coreAttrMap.set(attr.name.toLowerCase(), attr);
+          coreAttrMap.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
         }
+        if (!coreAttrMap.has('externalid')) coreAttrMap.set('externalid', COMMON_EXTERNAL_ID);
+        addTo(caseExactByParent, topParent, 'externalid');
+        caseExactPaths.add('externalid');
       } else {
         extensionSchemaMap.set(schema.id, schema);
       }
@@ -1690,7 +1706,8 @@ export class SchemaValidator {
         parentKey: string,
         isTopLevel: boolean,
       ): void => {
-        for (const attr of attrs) {
+        for (const declared of attrs) {
+          const attr = effectiveCommonAttribute(declared, isCore && isTopLevel);
           const nameLower = attr.name.toLowerCase();
           const returned = attr.returned?.toLowerCase();
           const mutability = attr.mutability?.toLowerCase();

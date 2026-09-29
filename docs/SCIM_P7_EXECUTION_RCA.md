@@ -26,6 +26,29 @@ Ordered PATCH and cross-package integration remain separate.
 
 ## Design disposition
 
+### Common externalId follow-up to 892b74ba
+
+| Issue | Type / severity | Confirmed mechanism and fix | Prevention / detection |
+| --- | --- | --- | --- |
+| Common externalId was treated as a custom/reserved bypass | Standards/correctness / high | Custom cores admitted conflicting type/cardinality/case/mutability; reserved-key validation bypassed values. RFC 7643 3.1 common characteristics take precedence on every resource core. | Thirteen domain REDs and 24 HTTP REDs; shared common definition, core-only declaration checks/expansion and runtime validation in both strict modes. Extension names remain independent and custom displayName/active controls stay flexible. |
+| User DTO silently converted non-string identifiers | Framework / high | Implicit String conversion made numeric/Boolean input appear valid before domain validation. | externalId is unknown at DTO boundary like active; shared common validation rejects original JSON type with uniform SCIM invalidValue. Regression tests use enableImplicitConversion and HTTP, not only plain DTO validation. |
+| Common characteristic check initially duplicated diagnostics | Test/implementation / low | First insertion landed inside the two-key canonical/reference metadata loop. An exact one-error regression caught duplicate messages. | Moved the check outside that loop; do not weaken error-count assertions to hide duplicate validation. |
+| Fallback and cached case-exact characteristics drifted | Correctness / medium | Adding common externalId to the cache alone broke equality with the fallback collector. | Both paths now include common externalId even when omitted from the schema list; existing parity regression retained. |
+
+Final common-externalId proof: 1,687 focused unit tests; 104 HTTP tests and
+426 live assertions per backend; PostgreSQL 17.8 with all 22 migrations and
+InMemory. The source fingerprint matches the exact tested source. Both
+runtime PIDs stopped, endpoints were deleted, and the owned container was
+removed. Build passed; lint remained 0 errors/14 warnings.
+
+This entry was reconciled against the visible common-attribute execution
+turns and retained RED/GREEN/regression/lint/backend artifacts. The parent
+owns the standards-correction narrative and full-parent-transcript audit.
+Self-review checked that core precedence never becomes an extension-name
+blacklist and that string preservation/duplicate acceptance are asserted
+under ordinary client-scoped profiles. The unrelated confirmed PUT
+one-to-one retention blocker remains open with integration.
+
 ### Recursive readOnly follow-up to 8e42f15f
 
 | Issue | Type / severity | Confirmed mechanism and fix | Prevention / detection |

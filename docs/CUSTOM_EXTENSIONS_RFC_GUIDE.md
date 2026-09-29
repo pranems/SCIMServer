@@ -1,6 +1,6 @@
 # Custom Resource Extensions - RFC-Compliant Authoring Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
 > **Local P7a update, not deployed:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > adds declaration/type/cardinality checks, required extension enforcement,
@@ -10,6 +10,9 @@
 > [The follow-up matrix](SCIM_P7_CHARACTERISTIC_STATUS.md) explains existing
 > profile edits, supported nested readOnly stripping, and actual uniqueness
 > gaps separately from optional referential-integrity behavior.
+> **Common-attribute correction:** top-level externalId follows RFC 7643 3.1
+> even on custom resources; extension-namespaced externalId remains governed
+> by its own schema. See [the admission/runtime proof](SCIM_P7_COMMON_EXTERNAL_ID.md).
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026

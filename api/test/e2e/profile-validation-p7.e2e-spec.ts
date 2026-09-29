@@ -5,6 +5,7 @@ import { getAuthToken } from './helpers/auth.helper';
 import { randomUUID } from 'crypto';
 import type { Server } from 'node:http';
 import { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } from './helpers/profile-p7-readonly.fixture';
+import { effectiveCharacteristic } from './helpers/schema-characteristics.helper';
 
 const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
 const EXT = 'urn:example:params:scim:schemas:extension:p7:2.0:Test';
@@ -49,6 +50,28 @@ describe('P7 declaration and POST/PUT contracts', () => {
   afterAll(async () => {
     for (const id of endpoints) await admin('delete', `/${id}`);
     await app.close();
+  });
+
+  it('keeps custom-core displayName and active schema-driven while enforcing common externalId', async () => {
+    const core = 'urn:example:core:2.0:P7Flexible';
+    const createdEndpoint = await admin('post').send({ name: `p7-flexible-${randomUUID()}`, profile: {
+      schemas: [{ id: core, name: 'Flexible', attributes: [
+        { name: 'displayName', type: 'integer', multiValued: true },
+        { name: 'active', type: 'string' }, { name: 'externalId' },
+      ] }],
+      resourceTypes: [{ id: 'Flexible', name: 'Flexible', endpoint: '/Flexibles', schema: core, schemaExtensions: [] }],
+      settings: { StrictSchemaValidation: true, AllowAndCoerceBooleanStrings: true },
+    } }).expect(201);
+    endpoints.push(createdEndpoint.body.id);
+    const route = `/scim/endpoints/${createdEndpoint.body.id}/Flexibles`;
+    const input = { schemas: [core], displayName: [17, 23], active: 'custom-state', externalId: 'Client-AbC' };
+    const created = await scim('post', route).send(input).expect(201);
+    expect(created.body).toMatchObject(input);
+    const replaced = await scim('put', `${route}/${created.body.id}`).send(input).expect(200);
+    expect(replaced.body).toMatchObject(input);
+    const invalid = await scim('put', `${route}/${created.body.id}`).send({ ...input, externalId: [17] }).expect(400);
+    error(invalid.body, 'invalidValue');
+    expect((await scim('get', `${route}/${created.body.id}`).expect(200)).body).toEqual(replaced.body);
   });
 
   it.each([{ type: 'typo' }, { multiValued: 'false' }, { mutability: 'Readonly' }, { uniqueness: 'global' }])(
@@ -99,8 +122,9 @@ describe('P7 declaration and POST/PUT contracts', () => {
         beforeAll(async () => {
           const response = await admin('post').send({ name: `p7-${resource}-${randomUUID()}`, profile: {
             schemas: [
-              { id: core, name: resource, attributes: [{ name: primary, type: 'string', required: true }, ...attrs] },
-              { id: EXT, name: 'P7Extension', attributes: [{ name: 'requiredValue', type: 'string', required: true }, ...attrs] },
+              { id: core, name: resource, attributes: [{ name: primary, type: 'string', required: true }, { name: 'externalId' }, ...attrs] },
+              { id: EXT, name: 'P7Extension', attributes: [{ name: 'requiredValue', type: 'string', required: true },
+                { name: 'externalId', type: 'integer', multiValued: true }, ...attrs] },
             ],
             resourceTypes: [{ id: resource, name: resource, description: 'P7', endpoint: `/${resource}s`, schema: core,
               schemaExtensions: [{ schema: EXT, required: true }] }],
@@ -113,6 +137,51 @@ describe('P7 declaration and POST/PUT contracts', () => {
         });
         const body = () => ({
           schemas: [core, EXT], [primary]: `p7-${randomUUID()}`, [EXT]: { requiredValue: 'present' },
+        });
+
+        it.each([42, false, ['client'], { value: 'client' }])('rejects non-string top-level externalId %j atomically regardless of strict mode', async externalId => {
+          const input = { ...body(), externalId: 'Client-AbC' };
+          const created = await scim('post', base).send(input).expect(201);
+          const before = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
+          const post = await scim('post', base).send({ ...body(), externalId }).expect(400);
+          error(post.body, 'invalidValue');
+          const put = await scim('put', `${base}/${created.body.id}`).send({ ...input, externalId }).expect(400);
+          error(put.body, 'invalidValue');
+          expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(before);
+        });
+
+        it('preserves externalId case, permits client-scoped duplicates and allows replacement', async () => {
+          const input = { ...body(), externalId: 'Client-AbC', [EXT]: { requiredValue: 'present', externalId: [7, 9] } };
+          const first = await scim('post', base).send(input).expect(201);
+          const second = await scim('post', base).send({ ...body(), externalId: 'Client-AbC' }).expect(201);
+          expect(first.body.externalId).toBe('Client-AbC');
+          expect(first.body[EXT].externalId).toEqual([7, 9]);
+          expect(second.body.externalId).toBe('Client-AbC');
+          const changed = await scim('put', `${base}/${first.body.id}`).send({ ...input, externalId: 'Client-aBc' }).expect(200);
+          expect(changed.body.externalId).toBe('Client-aBc');
+          expect(changed.body[EXT].externalId).toEqual([7, 9]);
+          const schemas = await scim('get', `/scim/endpoints/${endpointId}/Schemas`).expect(200);
+          const published = schemas.body.Resources.find((s: { id: string }) => s.id === core).attributes
+            .find((a: { name: string }) => a.name.toLowerCase() === 'externalid');
+          expect(published).toBeDefined();
+          expect(effectiveCharacteristic(published, 'type')).toBe('string');
+          expect(effectiveCharacteristic(published, 'multiValued')).toBe(false);
+          expect(effectiveCharacteristic(published, 'caseExact')).toBe(true);
+          expect(effectiveCharacteristic(published, 'mutability')).toBe('readWrite');
+        });
+
+        it('rejects conflicting common externalId profile updates before saving', async () => {
+          const before = (await admin('get', `/${endpointId}`).expect(200)).body;
+          for (const override of [{ type: 'integer' }, { multiValued: true }, { caseExact: false }, { mutability: 'readOnly' }]) {
+            const profile = structuredClone(before.profile);
+            const declaration = profile.schemas.find((s: { id: string }) => s.id === core).attributes
+              .find((a: { name: string }) => a.name.toLowerCase() === 'externalid');
+            Object.assign(declaration, override);
+            await admin('patch', `/${endpointId}`).send({ profile }).expect(400);
+            const after = (await admin('get', `/${endpointId}`).expect(200)).body;
+            expect(after.profile).toEqual(before.profile);
+            expect(after.updatedAt).toBe(before.updatedAt);
+          }
         });
 
         it('requires extension binding even when omitted from schemas and resource body', async () => {

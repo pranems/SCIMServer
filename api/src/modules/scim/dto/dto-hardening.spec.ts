@@ -18,6 +18,7 @@ import { PatchGroupDto } from './patch-group.dto';
 import { CreateUserDto } from './create-user.dto';
 import { CreateGroupDto, GroupMemberDto } from './create-group.dto';
 import { SearchRequestDto } from './search-request.dto';
+import { SchemaValidator } from '../../../domain/validation/schema-validator';
 
 // ─── V15: PatchOperationDto.op must be add/replace/remove ─────────────────────
 
@@ -366,16 +367,18 @@ describe('CreateUserDto - additional validators', () => {
     expect(activeErrors).toHaveLength(0);
   });
 
-  it('should reject non-string externalId (@IsString)', async () => {
+  it('preserves non-string externalId under implicit conversion for shared common-attribute validation', async () => {
     const dto = plainToInstance(CreateUserDto, {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
       userName: 'alice@example.com',
-      externalId: 12345 as any,
-    });
+      externalId: 12345,
+    }, { enableImplicitConversion: true });
     const errors = await validate(dto);
     const extErrors = errors.filter(e => e.property === 'externalId');
-    expect(extErrors.length).toBeGreaterThan(0);
-    expect(extErrors[0].constraints?.isString).toBeDefined();
+    expect(extErrors).toHaveLength(0);
+    expect(dto.externalId).toBe(12345);
+    expect(SchemaValidator.validateRequired(dto, [], 'create').errors)
+      .toEqual([expect.objectContaining({ path: 'externalId', scimType: 'invalidValue' })]);
   });
 
   it('should accept string externalId', async () => {

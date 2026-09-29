@@ -127,7 +127,7 @@ export class EndpointScimUsersService {
     const input: UserCreateInput = {
       endpointId,
       scimId,
-      externalId: dto.externalId ?? null,
+      externalId: typeof dto.externalId === 'string' ? dto.externalId : null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
       active: (dto.active as boolean) ?? true,
@@ -294,7 +294,7 @@ export class EndpointScimUsersService {
     const meta = parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
 
     const data: UserUpdateInput = {
-      externalId: dto.externalId ?? null,
+      externalId: typeof dto.externalId === 'string' ? dto.externalId : null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
       active: (dto.active as boolean) ?? true,

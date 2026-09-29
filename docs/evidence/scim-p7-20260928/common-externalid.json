@@ -1,0 +1,90 @@
+{
+  "package": "P7 common externalId follow-up",
+  "base": "892b74ba262579d2f5aeed5df8bb2ca4704c2e6d",
+  "branch": "fix/scim-profile-validation-20260928",
+  "sourceSha256": "711c28424cec55c6dcb0edd2bf77d09ceb96173a76985c9a932db1ece0777c93",
+  "sourceFileCount": 554,
+  "status": "locally-validated-not-pushed-or-deployed",
+  "standards": {
+    "reference": "https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1",
+    "commonExternalId": "String, single-valued, caseExact true, readWrite, issued by provisioning client and scoped to its provisioning domain",
+    "extensionExternalId": "Independent custom attribute",
+    "customCoreDisplayNameAndActive": "Not restricted by convenience storage-column types"
+  },
+  "red": {
+    "unitFailed": 13,
+    "unitPassed": 1,
+    "httpFailed": 24,
+    "httpPassed": 6,
+    "unitArtifact": "test-results/p7-common/unit-red.json",
+    "httpArtifact": "test-results/p7-common/http-red.json"
+  },
+  "focusedRegression": {
+    "suites": 25,
+    "passed": 1687,
+    "failed": 0,
+    "artifact": "test-results/p7-common/regression.json"
+  },
+  "backendRun": {
+    "startedAt": "2026-09-29T06:45:52.551Z",
+    "artifact": "test-results/p7/backends-0eff4deaa476984a/run.json",
+    "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+    "postgres": {
+      "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "versionNum": 170008,
+      "database": "scim_p1_0eff4deaa476984a",
+      "clusterName": "scim-p1-0eff4deaa476984a",
+      "systemIdentifier": "7690844941797572642",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "migrationsAppliedAndVerified": 22
+    },
+    "backends": [
+      {
+        "backend": "inmemory",
+        "httpPassed": 104,
+        "httpFailed": 0,
+        "liveAssertions": 426,
+        "runtimePid": 52200,
+        "runtimeStopped": true,
+        "endpointsDeleted": true
+      },
+      {
+        "backend": "prisma",
+        "httpPassed": 104,
+        "httpFailed": 0,
+        "liveAssertions": 426,
+        "runtimePid": 56244,
+        "runtimeStopped": true,
+        "endpointsDeleted": true
+      }
+    ],
+    "cleanup": {
+      "exactContainerId": "c54c968a7707cbb6802d1d7d8a630e48a1a3a371296ce74714d8fce683c37cd9",
+      "removed": true
+    }
+  },
+  "gates": {
+    "build": "passed",
+    "productionLintErrors": 0,
+    "productionLintWarningsBefore": 14,
+    "productionLintWarningsAfter": 14,
+    "mermaid": "22 blocks in touched docs rendered in light and dark under strict security",
+    "docFreshness": "passed: 26 documents",
+    "docContent": "passed: 26 documents",
+    "rendererWarning": "Existing built-in version discovery reports 0.0.0; pinned Mermaid 11.15.0 Chromium rendering passed. No package change.",
+    "review": "Self-reviewed core versus extension context, old-definition precedence, shared strict/lenient value rules, preservation of original DTO JSON type and namespace-independent valid controls. No open finding within this bounded change."
+  },
+  "scope": {
+    "orderedPatchExecutionChanged": false,
+    "newFlagsOrDefaultPolicyTightening": false,
+    "atomicUniquenessImplementationChanged": false,
+    "versionsOrLockfilesChanged": false,
+    "liveEstateOrSharedDatabaseAccess": false,
+    "p7Complete": false,
+    "remaining": [
+      "P2 integration must validate common externalId against the full evolving PATCH candidate, including strict-off behavior.",
+      "Previously confirmed PUT duplicate/anonymous entry retention requires one-to-one matching in integration.",
+      "This bounded correction does not claim a complete audit of every common attribute or query/serialization path."
+    ]
+  }
+}

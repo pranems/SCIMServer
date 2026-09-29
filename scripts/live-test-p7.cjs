@@ -57,8 +57,9 @@ async function runP7Contract(baseUrl, secret) {
       ];
       const profile = {
         schemas: [
-          { id: core, name: resource, attributes: [{ name: primary, type: "string", required: true }, ...attrs] },
-          { id: EXT, name: "Live", attributes: [{ name: "requiredValue", type: "string", required: true }, ...attrs] },
+          { id: core, name: resource, attributes: [{ name: primary, type: "string", required: true }, { name: "externalId" }, ...attrs] },
+          { id: EXT, name: "Live", attributes: [{ name: "requiredValue", type: "string", required: true },
+            { name: "externalId", type: "integer", multiValued: true }, ...attrs] },
         ],
         resourceTypes: [{ id: resource, name: resource, endpoint: `/${resource}s`, schema: core,
           schemaExtensions: [{ schema: EXT, required: true }] }],
@@ -135,8 +136,36 @@ async function runP7Contract(baseUrl, secret) {
         eq(failedNested.body.scimType, "invalidValue");
         eq(typeof failedNested.body.detail, "string");
         eq((await http("GET", nestedItem)).body, nestedRead.body);
+        const clientInput = { ...input, [primary]: `common-${crypto.randomUUID()}`, externalId: "Client-AbC",
+          [EXT]: { requiredValue: "present", externalId: [7, 9] } };
+        const clientCreated = await http("POST", route, clientInput);
+        eq(clientCreated.status, 201);
+        eq(clientCreated.body.externalId, "Client-AbC");
+        eq(clientCreated.body[EXT].externalId, [7, 9]);
+        const clientItem = `${route}/${clientCreated.body.id}`;
+        const clientBefore = await http("GET", clientItem);
+        for (const externalId of [42, false, ["client"], { value: "client" }]) {
+          const badPost = await http("POST", route, { ...clientInput, [primary]: `bad-${crypto.randomUUID()}`, externalId });
+          eq(badPost.status, 400);
+          eq(badPost.body.scimType, "invalidValue");
+          eq(typeof badPost.body.detail, "string");
+          const badPut = await http("PUT", clientItem, { ...clientInput, externalId });
+          eq(badPut.status, 400);
+          eq(badPut.body.scimType, "invalidValue");
+          eq((await http("GET", clientItem)).body, clientBefore.body);
+        }
+        const clientDuplicate = await http("POST", route, { ...clientInput, [primary]: `duplicate-${crypto.randomUUID()}` });
+        eq(clientDuplicate.status, 201);
+        eq(clientDuplicate.body.externalId, "Client-AbC");
+        const clientChanged = await http("PUT", clientItem, { ...clientInput, externalId: "Client-aBc" });
+        eq(clientChanged.status, 200);
+        eq(clientChanged.body.externalId, "Client-aBc");
+        const badCommon = structuredClone(profile);
+        Object.assign(badCommon.schemas[0].attributes.find(a => a.name === "externalId"), { type: "integer" });
+        eq((await http("PATCH", admin, { profile: badCommon })).status, 400);
+        eq((await http("GET", admin)).body.profile, beforeProfile.body.profile);
         observed.push({ resource, strict, create: created.status, replace: replacement.status,
-          immutableError: rejected.body.scimType, recursiveReadOnly: "passed" });
+          immutableError: rejected.body.scimType, recursiveReadOnly: "passed", commonExternalId: "passed" });
       } finally {
         eq((await http("DELETE", admin)).status, 204);
       }

@@ -34,6 +34,14 @@ remains an unresolved parent/P7b policy, not a P2 fix. Legacy global uniqueness
 can block unrelated profile-subblock edits because merged profiles are fully
 revalidated; do not silently downgrade the declaration or call it RFC-invalid.
 
+P7's [common externalId follow-up](SCIM_P7_COMMON_EXTERNAL_ID.md) corrects
+admission/runtime behavior for all resource cores using RFC 7643 3.1, not
+column convenience. Namespaced externalId and custom displayName/active
+remain independent. Focused regression: 1,687 tests. P7 remains open for
+completed-candidate PATCH integration. This source package did not fix PUT
+duplicate/anonymous retention; assembly separately fixed and verified that
+behavior in `b21e44cb`, retaining the neutral matcher.
+
 P7a is implemented locally in its own P1-based worktree. The
 [P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,
 scalar/cardinality checks and POST/PUT contracts with 1,507 focused unit

@@ -1029,7 +1029,7 @@ describe('SchemaValidator', () => {
       expect(result.has('identifier.value')).toBe(true);
     });
 
-    it('should return empty set when no caseExact attributes exist', () => {
+    it('retains common externalId caseExact even when no listed attribute is case-exact', () => {
       const schema = makeCoreSchema([
         makeAttr({ name: 'displayName', caseExact: false }),
         makeAttr({ name: 'title' }), // caseExact defaults to undefined/falsy
@@ -1037,7 +1037,7 @@ describe('SchemaValidator', () => {
 
       const result = SchemaValidator.collectCaseExactAttributes([schema]);
 
-      expect(result.size).toBe(0);
+      expect([...result]).toEqual(['externalid']);
     });
   });
 

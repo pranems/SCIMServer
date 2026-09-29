@@ -25,6 +25,7 @@ import {
   PROJECT_AUTO_INJECT_ATTRIBUTES,
 } from './rfc-baseline';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
+import { COMMON_EXTERNAL_ID } from '../../../domain/validation/common-attributes';
 // Settings v7: SCIM_CORE_GROUP_SCHEMA import removed (D7 Group active removed)
 
 // ─── Expand a single attribute ──────────────────────────────────────────
@@ -251,6 +252,12 @@ export function expandProfile(input: ShorthandProfileInput): EndpointProfile {
 
   // 3. Resource types (already fully defined in presets/input)
   const resourceTypes = input.resourceTypes ?? [];
+  const coreSchemas = new Set(resourceTypes.map(rt => rt.schema));
+  for (const schema of injectedSchemas) {
+    if (!coreSchemas.has(schema.id)) continue;
+    schema.attributes = schema.attributes.map(attr => attr.name.toLowerCase() === 'externalid'
+      ? { ...COMMON_EXTERNAL_ID, ...attr } : attr);
+  }
 
   // 4. SPC
   const serviceProviderConfig = expandServiceProviderConfig(input.serviceProviderConfig);

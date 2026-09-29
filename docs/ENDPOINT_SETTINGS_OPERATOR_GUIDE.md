@@ -1,6 +1,6 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-28 - **Product version at capture:** `0.55.33`
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-29 - **Product version at capture:** `0.55.33`
 > The historical preset matrix in [Section 3](#3-preset-matrix-measured) and request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) were measured on the live dev estate at the capture version. P7a/P9 notes below describe newer local source and owned backend/live evidence, not a re-capture or deployment.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
@@ -21,6 +21,11 @@ Booleans need no conversion; documented legacy quoted values can use the
 targeted coercion setting. Dotted User paths also occur in Microsoft's
 current examples. See [the permanent corpus](SCIM_ENTRA_COMPATIBILITY.md)
 and [all 37 settings with behavioral evidence and gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
+
+The [common externalId correction](SCIM_P7_COMMON_EXTERNAL_ID.md) rejects
+non-string top-level identifiers in both strict modes. This is an RFC 7643
+3.1 common contract, not a new flag/default or a blanket rule for custom
+attributes that happen to share a promoted column name.
 
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 

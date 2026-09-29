@@ -1,6 +1,6 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
 > **Version:** 0.55.35 - **Updated:** 2026-09-18
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
@@ -19,6 +19,11 @@ profile, use Boolean characteristic values, valid SCIM type/mutability/returned
 keywords and arrays of attribute definitions. Omitted RFC defaults remain
 valid. Unsupported `global` uniqueness is rejected before saving. See
 [the declaration checklist and HTTP proof](SCIM_P7A_PROFILE_VALIDATION.md).
+
+Top-level externalId cannot be redefined as numeric/multi-valued on a custom
+resource: it is a common String/single-valued/caseExact/readWrite attribute.
+An externalId inside an extension has its own independent definition.
+See [the standards correction](SCIM_P7_COMMON_EXTERNAL_ID.md).
 
 ---
 

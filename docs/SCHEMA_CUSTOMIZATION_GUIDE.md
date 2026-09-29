@@ -1,6 +1,6 @@
 # Schema Customization Guide - Operator Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
 > **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.
@@ -10,6 +10,10 @@
 > `global` remains a valid RFC keyword; rejection here is a provider policy.
 > Editing any profile subblock revalidates the full stored profile, including
 > old global declarations.
+> [Common externalId](SCIM_P7_COMMON_EXTERNAL_ID.md) is String/single-valued,
+> caseExact true and readWrite on every resource core, including custom
+> types. A namespaced extension externalId is independent. Custom-core
+> displayName/active are not restricted by storage-column types.
 
 > **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types

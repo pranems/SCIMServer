@@ -10,6 +10,7 @@ readOnly follow-up is a separate commit.
 
 | Concern | Classification | Status and next action |
 | --- | --- | --- |
+| Common top-level externalId on every resource core | RFC-defined contract, not column policy | [Common externalId correction](SCIM_P7_COMMON_EXTERNAL_ID.md): String/SV/caseExact true/readWrite, including custom resources; extension names remain independent |
 | Valid declaration shapes, type/Boolean/keyword checks, omitted defaults | Implemented P7a contract | Profile validation checks raw and expanded declarations. Existing defaults are unchanged. |
 | Scalar and array/child cardinality under strict validation | Implemented P7a contract | Values use the existing SchemaValidator; strict-off behavior remains a deliberate compatibility choice. |
 | POST/PUT readOnly at supported RFC depths | Implemented P7a contract | Ignore input, preserve server-owned state on PUT, and normalize only client-writable input. |
@@ -51,12 +52,20 @@ is observational evidence for P3b, not a conformance pass for those cases.
 | Simple child of single complex `contact.value`, uniqueness server on value | Collector never visits child uniqueness; cache requires isTopLevel | Duplicate child across resources, including PUT and PATCH |
 | Simple child of MV complex `contacts[].value` | Same top-level-only restriction | Duplicate value across entries/resources; removing an entry is not assigning a new unique value |
 | Extension scalar named `id`, `userName`, `displayName`, or `externalId` | Unqualified name skip mistakes an ordinary extension attribute for a promoted core column | Four namespace-specific duplicate tests; one core field must not exempt the same name in an extension |
-| Core externalId on U/G/custom, core User displayName, custom-core userName/displayName | Same skip; not all names have a dedicated uniqueness check for that resource family | Test the declared scope on the actual family, not just a generic collector |
+| Core User displayName, custom-core userName/displayName | Same skip; not all names have a dedicated uniqueness check for that resource family | Test the declared scope on the actual family, not just a generic collector |
 | Ordinary custom single scalar already collected | Service scan and subsequent save are separate operations | Two synchronized creates or replacements with the same value; one wins and one receives the documented conflict, with atomic rollback |
 
 The MV/child rows also apply to other types for which uniqueness is meaningful
 (for example integer/decimal/reference). Do not extrapolate them into a new
 uniqueness promise for types whose RFC definition explicitly has none.
+
+**Common externalId correction:** top-level externalId is not an arbitrary
+custom-core field. RFC 7643 3.1 defines it as client-issued, provisioning-domain
+scoped String/SV/caseExact true/readWrite and describes client-managed uniqueness.
+Its name being skipped is therefore not by itself a missing default
+server-uniqueness requirement. Assess any explicit stronger provider promise
+separately. Extension-namespaced externalId is independent and remains in the
+name-collision gap inventory. See [the verified admission/runtime fix](SCIM_P7_COMMON_EXTERNAL_ID.md).
 
 ### Source and existing test evidence
 

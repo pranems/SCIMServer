@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
 > **Updated:** 2026-09-18
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -39,6 +39,12 @@ policy. Because `mergeProfilePartial` validates the entire merged profile,
 even a settings-only profile edit rejects an old stored global declaration.
 Reads and top-level endpoint edits without a `profile` block are not automatic
 profile migrations. See [the exact behavior matrix](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy).
+
+Core externalId admission and internal runtime characteristics now apply RFC
+7643 3.1 precedence on every resource type, not just the builtin User/Group
+baselines. Its shorthand expands common characteristics, and obsolete core
+definitions cannot turn client-owned identifiers readOnly. Namespaced
+extension attributes remain independent. [Implementation and evidence](SCIM_P7_COMMON_EXTERNAL_ID.md).
 
 Every endpoint has a **profile** that fully defines its SCIM behavior. A profile is the single source of truth for:
 
