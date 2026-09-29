@@ -17,6 +17,12 @@
 > in another: [common semantics are resolved per binding](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md),
 > not inferred solely from a URN prefix or applied to every namespaced homonym.
 
+> **Local PUT entry correction, 2026-09-29:** [One-to-one preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
+> keeps duplicate-value entries' readOnly and omitted immutable children with
+> the correct retained occurrence. Core and extension arrays share the matcher
+> with PATCH, without importing PATCH append intent into PUT. Ambiguous equal
+> entries use documented occurrence order; required/immutable rejection is atomic.
+
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026
 > **Related:**
@@ -320,7 +326,9 @@ urn:opentext:scim:schemas:extension:mailbox:2.0:User
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Schema"],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Schema"
+  ],
   "id":   "urn:opentext:scim:schemas:extension:mailbox:2.0:User",
   "name": "Mailbox",
   "description": "OpenText mailbox routing extension for User. Carries the user's full set of mailbox-addressable identifiers as a flat list of typed-prefix strings, wire-compatible with Microsoft Exchange / Entra ID 'proxyAddresses' semantics.",
@@ -366,15 +374,23 @@ urn:opentext:scim:schemas:extension:mailbox:2.0:User
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
+  ],
   "id":   "User",
   "name": "User",
   "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
   "endpoint": "/Users",
   "description": "Customer Portal User Account",
   "schemaExtensions": [
-    { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
-    { "schema": "urn:opentext:scim:schemas:extension:mailbox:2.0:User",       "required": false }
+    {
+      "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+      "required": false
+    },
+    {
+      "schema": "urn:opentext:scim:schemas:extension:mailbox:2.0:User",
+      "required": false
+    }
   ],
   "meta": {
     "resourceType": "ResourceType",
@@ -400,7 +416,10 @@ Accept:        application/scim+json
     "urn:opentext:scim:schemas:extension:mailbox:2.0:User"
   ],
   "userName": "bjensen@example.com",
-  "name":     { "givenName": "Barbara", "familyName": "Jensen" },
+  "name": {
+    "givenName": "Barbara",
+    "familyName": "Jensen"
+  },
   "active":   true,
   "urn:opentext:scim:schemas:extension:mailbox:2.0:User": {
     "proxyAddresses": [
@@ -423,15 +442,19 @@ ETag:     W/"v1"
 Content-Type: application/scim+json
 ```
 
-```json
+```jsonc
+// Schematic response shape; resource identifiers depend on the request.
 {
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
     "urn:opentext:scim:schemas:extension:mailbox:2.0:User"
   ],
-  "id":   "<server-assigned-uuid>",
+  "id": "<server-assigned-uuid>",
   "userName": "bjensen@example.com",
-  "name":     { "givenName": "Barbara", "familyName": "Jensen" },
+  "name": {
+    "givenName": "Barbara",
+    "familyName": "Jensen"
+  },
   "active":   true,
   "urn:opentext:scim:schemas:extension:mailbox:2.0:User": {
     "proxyAddresses": [

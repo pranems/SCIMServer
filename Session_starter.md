@@ -6,6 +6,19 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
+**Bounded PUT entry correction, 2026-09-29:** Based only on committed combined
+snapshot `5581e6b7`, [PUT entry preservation](docs/SCIM_PUT_ENTRY_PRESERVATION.md)
+reuses one neutral matcher for PUT and PATCH. It fixes duplicate-value/type
+reorders, anonymous occurrence pairing and recursive immutable comparison.
+Focused final units: 107; applicable domain/service/controller units: 1,771.
+Owned PostgreSQL 17.8 plus 22 migrations: 249 HTTP passes; InMemory: 248
+passes and one native-FK-only non-applicable case. Built runtimes each pass
+six live cases / 5,474 assertions; exact build/source hashes are retained.
+Eight pre-existing readOnly expectation failures reproduce on the committed
+base and remain visible for consolidation. No pending peer package was read
+or merged; common-attribute PATCH/admission/query and P3b remain separate.
+See [RCA](docs/SCIM_PUT_ENTRY_PRESERVATION_RCA.md) for independent review closure.
+
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
@@ -192,6 +205,7 @@ without applying POST/PUT required checks to partial PATCH views.
 | 2026-09-29 | P7 context source `8d5915ba` integrated as `e80da689`, preserving common-PATCH validation and neutral retention.754 units,537 InMemory/538 PostgreSQL HTTP,143 shared live checks/backend including472 P7 assertions pass. Source/live count wiring was RED then GREEN; imported HTTP wire metadata typing corrected without changing assertions. Other C0 holds remain explicit. |
 | 2026-09-29 | P3b custom authority integrated as `7001d194`: 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared built-live checks/backend pass. Separate five-shape probe records43/45 outcomes per backend; numeric/MV displayName equality remains a C0 query blocker (InMemory empty200, PostgreSQL500). Profile omission500 recorded separately. No final matrix or deployment claim. |
 | 2026-09-29 | Authorized P2 flags integrated as `8d2110d1`; unchanged I02/I03 verified, then optional dispatch removed. Both backends: 356 HTTP, P9 built-live19/1228 and P2 built-live188. PostgreSQL17.8/22 migrations and exact cleanup. Added default-discovery/count/guidance RED/GREEN controls; 26-doc content/freshness/coupling gates pass. Historical receipts and release metadata unchanged. |
+| 2026-09-29 | Bounded PUT duplicate/anonymous array preservation fix on committed `5581e6b7`; shared neutral matching, type-restoration stability and atomic required/immutable failure checks. No versions, locks, push or deployment changed. Evidence and cleanup are in the dedicated feature doc. |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
 | 2026-09-29 | P7 common-context follow-up protects generic id/meta even with absent/obsolete declarations and preserves shared core/extension schemas without global common-field rewrites. Explicit extension roles and authoritative generic metadata timestamps are covered by RED/GREEN tests; 1,698 focused units pass. [Contract and evidence](docs/SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md). P7 stays open for final integration. |
 | 2026-09-29 | P7 common externalId correction applies RFC 7643 3.1 to every resource core: String/SV/caseExact/readWrite, original JSON type validation in both strict modes, with independent extension names and custom displayName/active controls. [Evidence and remaining integration boundaries](docs/SCIM_P7_COMMON_EXTERNAL_ID.md). No versions, locks, push or deployment. |

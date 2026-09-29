@@ -12,6 +12,18 @@
 
 ## 1. What we are delivering
 
+**Bounded combined-source correction, 2026-09-29:** [PUT entry preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
+repairs first-match reuse and last-match immutable comparison on committed
+`5581e6b7`. It shares neutral value/type/occurrence matching with PATCH and
+preserves P3/P4 persistence boundaries. Its [RCA](SCIM_PUT_ENTRY_PRESERVATION_RCA.md)
+records the independent discriminator-restoration finding and regression.
+This closes only the PUT array-preservation blocker when its evidence is
+accepted; it is not acceptance of later packages or the remaining 82-case ledger.
+
+- [x] ✅ COMPLETED: Shared PUT/PATCH retained-entry matcher and focused RED/GREEN tests.
+- [x] ✅ COMPLETED: Independent review finding reproduced and corrected with stable typed occurrence allocation.
+- [ ] C0: integrate the bounded fix and its exact-source receipts; reconcile unrelated baseline readOnly expectations separately.
+
 The goal is to make SCIM requests behave correctly and consistently for Users,
 Groups, and custom resource types on both PostgreSQL and InMemory.
 

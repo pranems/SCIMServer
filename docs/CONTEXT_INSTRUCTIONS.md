@@ -20,6 +20,15 @@ That final state now passes176 units,367 InMemory HTTP plus two native-only
 skips,369 PostgreSQL17.8 HTTP and143 shared live checks/backend.
 [Corrected integration evidence](evidence/scim-common-uniqueness-integration-20260929/validation.json).
 
+
+The bounded [PUT retained-entry correction](SCIM_PUT_ENTRY_PRESERVATION.md)
+is a parallel source snapshot on `5581e6b7`. Its additional type-capacity,
+restoration stability and nested immutable controls extend the already
+integrated b21e44cb fix; the old neutral path remains a re-export, never a
+second matcher. Source evidence is107 contract checks within1771 tests;
+merged proof is still pending. The eight base expectations were subsequently
+reconciled by parentdf3ca957/bd82e681 and are not reopened.
+
 The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
 P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
 owns current combined results; the records below are source-package evidence,

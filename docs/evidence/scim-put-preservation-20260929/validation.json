@@ -1,0 +1,173 @@
+{
+  "scope": "PUT complex-array retained-entry preservation only",
+  "branch": "fix/scim-put-entry-preservation-20260929",
+  "base": "5581e6b73d8ba9fd206ddf92fa303c96c90ba610",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "source": {
+    "headAtValidation": "5581e6b73d8ba9fd206ddf92fa303c96c90ba610",
+    "includesUncommittedImplementation": true,
+    "sha256": "b0596676047b9d70b1fbf66616e368e795cfb7d5bab79c847d2dca374dab466f",
+    "files": 605
+  },
+  "build": {
+    "node": "v24.13.0",
+    "javascriptFiles": 246,
+    "sha256": "416879aa3cc606d4bc4703f3bdf72ea86e0b77d1a532fe338d60b20e543169e9"
+  },
+  "tdd": {
+    "initialUnit": {
+      "failed": 52,
+      "productFailures": 48,
+      "fixturePolicyExpectationErrors": 4,
+      "passedControls": 34
+    },
+    "reviewDiscriminatorRed": {
+      "failed": 16,
+      "passedControls": 88
+    },
+    "reviewNullTypeRed": {
+      "failed": 2,
+      "passedControls": 104
+    },
+    "focusedFinalPassed": 107,
+    "finalCorpusOnCommittedBase": {
+      "failed": 6,
+      "runtimeErrors": 0,
+      "productionFilesReadFrom": "5581e6b73d8ba9fd206ddf92fa303c96c90ba610"
+    },
+    "exhaustiveStandaloneValidRestorationChecksThroughLengthFour": 187018
+  },
+  "unit": {
+    "applicableSuites": 26,
+    "passed": 1771,
+    "failed": 0,
+    "controllers": {
+      "users": 41,
+      "groups": 48,
+      "generic": 1
+    },
+    "separatePreexistingBaseline": {
+      "file": "api/src/domain/validation/extension-flags-validation.spec.ts",
+      "failedOnBaseAndCandidate": 8,
+      "passedOnBaseAndCandidate": 68,
+      "reason": "Existing expectations require rejecting readOnly POST/PUT values, contrary to committed P7 ignore behavior."
+    }
+  },
+  "backendRun": {
+    "run": "4b2b514f67d21a08",
+    "finishedAt": "2026-09-29T08:40:12.293Z",
+    "postgres": {
+      "version": "17.8",
+      "serverVersionNum": 170008,
+      "systemIdentifier": "7690873329158598691",
+      "migrationsReplayedAndVerified": 22,
+      "containerId": "09756c7440b5ffde8aabb1fc9331ab7f7a573bb094e57a2c68740074d0bd0204",
+      "database": "scim_p1_4b2b514f67d21a08",
+      "loopbackOnly": true,
+      "ephemeralStorageOnly": true,
+      "ownershipRowVerified": true,
+      "inheritedDatabaseUrlDiscarded": true
+    },
+    "inmemory": {
+      "httpPassed": 248,
+      "httpFailed": 0,
+      "httpSkipped": 1,
+      "skip": "Native PostgreSQL foreign-key rollback is not applicable",
+      "liveCases": 6,
+      "liveAssertions": 5474,
+      "runtimePid": 21724,
+      "runtimePort": 54062,
+      "runtimeStopped": true
+    },
+    "prisma": {
+      "httpPassed": 249,
+      "httpFailed": 0,
+      "httpSkipped": 0,
+      "liveCases": 6,
+      "liveAssertions": 5474,
+      "runtimePid": 37248,
+      "runtimePort": 56432,
+      "runtimeStopped": true
+    },
+    "prismaSuites": {
+      "ordered-patch": 134,
+      "put-entry-preservation": 6,
+      "profile-validation-p7": 67,
+      "conditional-writes": 28,
+      "group-aggregate": 14
+    }
+  },
+  "gates": {
+    "apiBuild": "passed",
+    "focusedLintErrors": 0,
+    "focusedLintUnchangedWarnings": 1,
+    "safetyNegativeControls": 3,
+    "safetyPositiveControls": 1,
+    "docContent": "passed, 26 documents",
+    "docFreshnessCoupledToBase": "passed, 26 documents",
+    "literalJsonBlocksParsed": 20,
+    "renderedMermaidBlocks": 17,
+    "mermaidThemes": [
+      "default",
+      "dark"
+    ],
+    "mermaidSecurityLevel": "strict",
+    "mermaidVersion": "11.15.0",
+    "editorVersionWarning": "Installed built-in renderer metadata reports 0.0.0; no dependency repin performed."
+  },
+  "review": {
+    "independentReadOnlyPasses": 2,
+    "findings": [
+      "Restored immutable type changed equal-typed occurrence pairing",
+      "Restored null type gained exact-match priority over absent type"
+    ],
+    "disposition": "Both reproduced RED and corrected with permanent unit and HTTP cases.",
+    "architecture": "Applied neutral dependency-free matching; no persisted identity, hidden global context, repository changes or PUT append intent."
+  },
+  "cleanup": {
+    "taskEndpointsDeletedAndAbsenceVerified": true,
+    "exactOwnedContainerRemovedAndAbsenceVerified": true,
+    "ownedRuntimePidsStopped": true,
+    "dependencyJunctionsRemoved": true,
+    "allThreeRunContainersAbsent": true,
+    "allSixRunRuntimePidsAbsent": true,
+    "databaseMarkerAbsent": true,
+    "installedToolingTargetsIntact": true
+  },
+  "unchanged": [
+    "package versions and lockfiles",
+    "P3 repository CAS",
+    "P4 Group aggregate transaction boundaries",
+    "common-attribute PATCH, admission and query ownership",
+    "pending P3b work",
+    "other worktree source",
+    "live estates"
+  ],
+  "files": [
+    ".github/copilot-instructions.md",
+    "Session_starter.md",
+    "api/src/domain/attribute-values.ts",
+    "api/src/domain/patch/patch-readonly.ts",
+    "api/src/domain/patch/patch-values.ts",
+    "api/src/domain/validation/put-entry-preservation.spec.ts",
+    "api/src/domain/validation/schema-validator.ts",
+    "api/test/e2e/corpus/put-entry-preservation.cjs",
+    "api/test/e2e/put-entry-preservation.e2e-spec.ts",
+    "docs/CONTEXT_INSTRUCTIONS.md",
+    "docs/CUSTOM_EXTENSIONS_RFC_GUIDE.md",
+    "docs/INDEX.md",
+    "docs/SCHEMA_CUSTOMIZATION_GUIDE.md",
+    "docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md",
+    "docs/SCIM_P2_IMPLEMENTATION.md",
+    "docs/SCIM_P7_CHARACTERISTIC_STATUS.md",
+    "docs/SCIM_PUT_ENTRY_PRESERVATION.md",
+    "docs/SCIM_PUT_ENTRY_PRESERVATION_RCA.md",
+    "docs/evidence/scim-put-preservation-20260929/validation.json",
+    "docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md",
+    "scripts/live-test-put-preservation.cjs",
+    "scripts/p1-validation/baseline-transform.cjs",
+    "scripts/p1-validation/jest.config.cjs",
+    "scripts/p1-validation/run.cjs",
+    "scripts/p1-validation/safety.cjs"
+  ]
+}

@@ -1,10 +1,10 @@
 import type { SchemaAttributeDefinition as Attribute } from '../validation/validation-types';
 import { SchemaValidator } from '../validation/schema-validator';
+import { retainedEntries } from '../attribute-values';
 import { PatchError } from './patch-error';
-import { retainedEntries } from '../retained-entries';
 import { readResolvedProperty as read, withResolvedProperty as put, withoutResolvedProperty as omit } from '../../modules/scim/utils/scim-patch-path';
 
-export { retainedEntries } from '../retained-entries';
+export { retainedEntries } from '../attribute-values';
 
 export const objectValue = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);

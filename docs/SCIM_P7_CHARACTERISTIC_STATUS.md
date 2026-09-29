@@ -16,6 +16,7 @@ readOnly follow-up is a separate commit.
 | Scalar and array/child cardinality under strict validation | Implemented P7a contract | Values use the existing SchemaValidator; strict-off behavior remains a deliberate compatibility choice. |
 | POST/PUT readOnly at supported RFC depths | Implemented P7a contract | Ignore input, preserve server-owned state on PUT, and normalize only client-writable input. |
 | POST/PUT readOnly in nested-complex compatibility mode | Previously promised-but-broken; fixed in this follow-up | Recursive stripping works through real objects and arrays with or without a cache. No new flag or default change. |
+| PUT readOnly/immutable state on duplicate or anonymous array entries | [Local combined-source correction](SCIM_PUT_ENTRY_PRESERVATION.md) | One neutral matcher shared with PATCH; type-capacity reservation and stable occurrence fallback, recursive immutable comparison. Does not close unrelated P7/P3b acceptance rows. |
 | Required attributes and ResourceType-required extensions on POST/PUT | Implemented P7a contract | Checks run in both strict modes, independent of optional extension attributes. |
 | Required/immutable/primary transitions in ordered PATCH | Required integration work | P2 owns execution; P7 stays open until combined tests pass. |
 | returned:request on POST/PUT, namespace isolation | Implemented P7a contract | Only defined client-supplied values count as implicit requests. PATCH integration remains separate. |

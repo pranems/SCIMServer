@@ -2,10 +2,14 @@
 // overwriting the working tree or accessing another worktree's source.
 const path = require("node:path");
 const cp = require("node:child_process");
-const { API, ROOT, BASE, sourceGuard } = require("./safety.cjs");
+const { API, ROOT, BASE, IS_PUT, sourceGuard } = require("./safety.cjs");
 sourceGuard();
 const transformer = require(path.join(API, "node_modules", "ts-jest")).default;
-const changed = new Set(cp.execFileSync("git", [
+const changed = new Set(IS_PUT ? [
+  "api/src/domain/validation/schema-validator.ts",
+  "api/src/domain/patch/patch-values.ts",
+  "api/src/domain/patch/patch-readonly.ts",
+] : cp.execFileSync("git", [
   "-C", ROOT, "diff", "--name-only", BASE, "--", "api/src",
 ], { encoding: "utf8" }).trim().split("\n").filter(file => !file.endsWith(".spec.ts")));
 module.exports = {

@@ -281,6 +281,14 @@ Origin: 2026-06-12. A Playwright / ad-hoc capture run dropped 38 numbered PNGs (
 
 ## Schema-Characteristic Test Rule (CRITICAL - RFC 7643 §2.2 + §7)
 
+**Retained-array ownership (2026-09-29):** PUT and PATCH must share neutral
+one-to-one entry matching. Test duplicate values/types, omitted and null
+discriminators, anonymous occurrences, and added/removed/nested entries.
+Recheck matching after restoring optional immutable/readOnly discriminators;
+a correct initial pairing alone is insufficient. Never infer identity from a
+first/last-value lookup or persist invented IDs. See
+[PUT preservation RCA](../docs/SCIM_PUT_ENTRY_PRESERVATION_RCA.md).
+
 When writing tests against `/Schemas` attribute definitions (unit, E2E, or live), the test MUST:
 
 1. **Check for the presence** of the attribute characteristic in the published schema.

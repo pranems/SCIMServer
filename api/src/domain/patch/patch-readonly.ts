@@ -1,7 +1,7 @@
 import type { SchemaAttributeDefinition as Attribute } from '../validation/validation-types';
 import { PatchError } from './patch-error';
 import { objectValue, attribute, replacementState } from './patch-values';
-import { retainedEntries } from '../retained-entries';
+import { retainedEntries } from '../attribute-values';
 import { readResolvedProperty as read, withResolvedProperty as put } from '../../modules/scim/utils/scim-patch-path';
 
 export const IGNORED_PATCH_VALUE = Symbol('ignored-readonly-patch-value');

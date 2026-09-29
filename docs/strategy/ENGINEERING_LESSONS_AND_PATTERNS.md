@@ -16,6 +16,16 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Retained-array identity must survive restoration
+
+The [PUT correction](../SCIM_PUT_ENTRY_PRESERVATION_RCA.md) found three incompatible
+policies: first-value lookup, last-value map and greedy one-to-one matching.
+Share one neutral matcher, reserve type capacity before fallback, and assign
+equal-typed occurrences in stable order. Test the complete permutation and
+then repeat comparison after restoring optional immutable discriminators.
+An initially correct pairing is insufficient if restoration changes the next
+pairing. Never invent persisted IDs for anonymous or indistinguishable values.
+
 ### P9: configuration presence is not behavior or safe operator guidance
 
 A registry count proved that 37 controls existed, but did not detect startup

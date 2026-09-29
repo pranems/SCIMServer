@@ -30,6 +30,7 @@ import type {
 } from './validation-types';
 import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
 import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, effectiveCommonAttributes, validateCommonAttributeValues } from './common-attributes';
+import { retainedEntries } from '../attribute-values';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -43,7 +44,6 @@ const RESERVED_KEYS = new Set([
 ]);
 
 import { parsePatchPath, type ParsedPatchPath } from '../patch/patch-path';
-import { retainedEntries } from '../retained-entries';
 
 /**
  * Determine whether a schema definition represents the core schema for a resource type.
@@ -912,25 +912,23 @@ export class SchemaValidator {
   ): void {
     if (!Array.isArray(existingVal) || !Array.isArray(incomingVal)) return;
 
-    const immutableSubs = subAttributes.filter(sa => sa.mutability === 'immutable');
-
     const retained = retainedEntries(existingVal, incomingVal);
-
     for (let i = 0; i < incomingVal.length; i++) {
       const incomingItem = incomingVal[i];
       if (!incomingItem || typeof incomingItem !== 'object' || Array.isArray(incomingItem)) continue;
       const incomingObj = incomingItem as Record<string, unknown>;
       const existingItem = retained[i];
-      if (!existingItem) continue;
-      for (const subDef of immutableSubs) {
-        this.checkImmutableAttribute(
-          `${parentPath}[${i}].${subDef.name}`,
-          existingItem,
-          incomingObj,
-          subDef,
-          errors,
-          mode,
-        );
+      if (existingItem) {
+        for (const subDef of subAttributes) {
+          this.checkImmutableAttribute(
+            `${parentPath}[${i}].${subDef.name}`,
+            existingItem,
+            incomingObj,
+            subDef,
+            errors,
+            mode,
+          );
+        }
       }
     }
   }

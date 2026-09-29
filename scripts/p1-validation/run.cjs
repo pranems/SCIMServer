@@ -3,7 +3,7 @@ const path = require("node:path");
 const cp = require("node:child_process");
 const crypto = require("node:crypto");
 const assert = require("node:assert/strict");
-const { ROOT, API, OWNER, IS_P2, IS_P7, IS_P9, docker, sourceGuard, containerGuard, databaseGuard } = require("./safety.cjs");
+const { ROOT, API, OWNER, IS_P2, IS_P7, IS_P9, IS_PUT, docker, sourceGuard, containerGuard, databaseGuard } = require("./safety.cjs");
 
 const source = sourceGuard();
 // Provision only a fresh owned target; never carry an inherited database into setup.
@@ -11,7 +11,7 @@ delete process.env.DATABASE_URL;
 const { Client } = require(path.join(API, "node_modules", "pg"));
 const run = crypto.randomBytes(8).toString("hex");
 const password = crypto.randomBytes(36).toString("base64url");
-const output = path.join(ROOT, "test-results", IS_P9 ? "p9" : IS_P7 ? "p7" : IS_P2 ? "p2" : "p1", `backends-${run}`);
+const output = path.join(ROOT, "test-results", IS_PUT ? "put-preservation" : IS_P9 ? "p9" : IS_P7 ? "p7" : IS_P2 ? "p2" : "p1", `backends-${run}`);
 fs.mkdirSync(output, { recursive: true });
 process.env.P1_SOURCE_SHA256 = source.sourceSha256;
 process.env.PG_ANALYSIS_RUN = run;
@@ -72,7 +72,9 @@ async function smoke(backend) {
       await new Promise(resolve => setTimeout(resolve, 250));
     }
     assert.ok(ready, "Owned runtime did not authenticate the task credential");
-    const result = IS_P9
+    const result = IS_PUT
+      ? await require("../live-test-put-preservation.cjs").runLivePutPreservation(`http://127.0.0.1:${port}`, secret)
+      : IS_P9
       ? await require("../live-test-p9.cjs").runLiveP9(`http://127.0.0.1:${port}`, secret)
       : IS_P7
       ? await require("../live-test-p7.cjs").runLiveP7(`http://127.0.0.1:${port}`, secret)
@@ -150,12 +152,13 @@ async function main() {
       "--runInBand", "--forceExit", "--json", "--outputFile", resultFile,
     ]);
     const result = JSON.parse(fs.readFileSync(resultFile, "utf8"));
-    const lane = { backend, exit, passed: result.numPassedTests, failed: result.numFailedTests, total: result.numTotalTests };
+    const lane = { backend, exit, passed: result.numPassedTests, failed: result.numFailedTests, total: result.numTotalTests,
+      ...(IS_PUT ? { skipped: result.numPendingTests, runtimeErrors: result.numRuntimeErrorTestSuites } : {}) };
     receipt.backends.push(lane);
     save();
     assert.equal(exit, 0, `${backend} HTTP tests failed`);
     assert.equal(result.numFailedTests, 0);
-    assert.ok(result.numPassedTests >= (IS_P9 ? 17 : IS_P7 ? 108 : IS_P2 ? 234 : 24), "Missing permanent package cases");
+    assert.ok(result.numPassedTests >= (IS_PUT ? 100 : IS_P9 ? 17 : IS_P7 ? 108 : IS_P2 ? 234 : 24), "Missing permanent package cases");
     lane.live = await smoke(backend);
     save();
   }

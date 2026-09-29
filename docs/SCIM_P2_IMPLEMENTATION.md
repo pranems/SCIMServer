@@ -96,6 +96,12 @@ client scope is not a promise of global or server-wide externalId uniqueness.
 The legacy `patch-selection.ts` export is retained for historical consumers
 and the pinned P1 negative control. None of the resource engines uses it.
 
+**Combined-source follow-up, 2026-09-29:** [PUT entry preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
+extracts retained-entry matching into a neutral domain helper used by PUT and
+PATCH. Exact type capacity is reserved before fallback; indistinguishable typed
+occurrences remain ordered consistently even after PUT restores a discriminator.
+PATCH append markers remain PATCH-only.
+
 ## Example: the second operation sees the new primary
 
 Starting value:
