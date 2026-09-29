@@ -1,6 +1,6 @@
 # Multi-Endpoint Architecture Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Version:** 0.55.35 - **Updated:** June 3, 2026
 > **Source of truth:** [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -101,13 +101,17 @@ UNIQUE INDEX ON "ScimResource" ("endpointId", "scimId");
 
 ### Cascade Delete
 
-Deleting an endpoint cascades to all associated data:
+Deleting an endpoint removes its owned provisioning resources and credentials.
+RequestLog has no endpoint FK: existing and late audit records are retained
+with the original endpointId. P8b adds equivalent InMemory cleanup with
+rollback and a late-write barrier; see the
+[local implementation evidence](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md).
 
 ```mermaid
 flowchart TD
     DEL[DELETE /admin/endpoints/:id] --> E[Endpoint Row]
     E -->|CASCADE| R[ScimResource rows]
-    E -->|CASCADE| L[RequestLog rows]
+    E -.->|"RETAIN audit correlation, no FK"| L["RequestLog rows"]
     E -->|CASCADE| C[EndpointCredential rows]
     R -->|CASCADE| M[ResourceMember rows]
 ```
@@ -131,7 +135,7 @@ stateDiagram-v2
 |-------|----------------|------------------|------|
 | **Active** | Allowed | Allowed | Preserved |
 | **Inactive** | Blocked (403) | Allowed | Preserved |
-| **Deleted** | N/A | N/A | Cascade deleted |
+| **Deleted** | N/A | N/A | Provisioning resources and credentials deleted; audit history retained |
 
 ---
 

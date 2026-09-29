@@ -214,6 +214,24 @@ are not changed by this increment.
 | P6b-I12 | Tooling / Low | New test lint rejected unsafe Supertest bodies; documentation rendering initially skipped | HTTP library body type is any; root/web tooling was absent after cleanup | Assert object bodies through a typed test helper; restore frozen documentation/browser dependencies after the real missing-tool result | Static gate / same | A skipped renderer is not a render pass; no shared dependency targets or lockfiles are modified |
 | P6b-I13 | Documentation diagnostics / Low | Link scan found three old Session references; renderer discovery reported editor version 0.0.0 | Historical Session text names removed tests/ignored settings; available renderer metadata cannot establish a matching bundle version | Compare against starting HEAD, record the existing links, and render with pinned 11.15.0 without changing dependency pins or editor state | Documentation gate / same | No new broken links accepted; historical cleanup and editor-version discovery remain outside P6b |
 
+### P8b confirmed issues
+
+| ID | Type / severity | Symptom and cause | Confirmed resolution | Earliest / actual detection | Prevention |
+|---|---|---|---|---|---|
+| P8b-I01 | Product / High | Endpoint DELETE returned success while repository counts remained User 1, Group 1, custom 1, credentials 3. Endpoint cache eviction never touched the independent resource stores. | Required lifecycle DI port stages storage swaps and rolls back synchronous commit failures; the original count assertion is now GREEN. PostgreSQL still uses one FK-backed endpoint delete. | Storage contract / focused unit RED | Assert exact remaining rows and raw memberships, not only route 404; cover late writes and failed deletes. |
+| P8b-I02 | Tooling / Low | Jest was absent in the isolated worktree. | After the missing-tool failure, junction existing tooling read-only and generate the Prisma client into this worktree with an inert database URL. | Setup / first test command | Do not install or regenerate shared tooling or lockfiles. |
+| P8b-I03 | Test typing / Low | Initial fixture used null for required string `meta`; no behavioral test ran. | Use the actual model contract (`'{}'`), then confirm the distinct row-count RED before production edits. | Fixture review / TypeScript test compile | Compilation/setup failures are not TDD RED. |
+| P8b-I04 | Cache lifecycle / Medium | A PostgreSQL reader returned 404 after remote deletion but its warmed WIF cache still held one trust. Endpoint cache eviction did not notify credential-cache listeners. | Emit the existing deletion event when an authoritative read forgets an endpoint. Real two-app PostgreSQL HTTP regression now passes; P8a's read boundary is unchanged. | Cache ownership review / PostgreSQL HTTP RED | Verify derived credential state, not only endpoint cache or route status. |
+| P8b-I05 | Harness contract / Low | The audit assertion used SCIM `totalResults` but the log service returns `total`. | Type checking identified the mismatch; corrected the assertion before any HTTP behavior was claimed. | Response type inspection / test compile | Use the actual service return shape. |
+| P8b-I06 | Live fixture / Low | Credential creation returned 403 on both owned live runtimes. | The minimal inline profile omitted the credential enablement flags. Explicitly enable bearer and OAuth methods in the fixture; both live suites now pass 10 checks and clean their own endpoints. | Fixture policy inspection / immediate live smoke | A fixture must enable the same methods it attempts to use; no production default was weakened. |
+| P8b-I07 | Test invocation / Medium | Independent review found ordinary PostgreSQL E2E would fail on missing task-only guard variables. | Confine trigger injection to explicitly guarded runs; ordinary runs use nondestructive failure injection. The standard E2E config passed 6/6 on another owned PostgreSQL 17.8 database with task variables absent in the test process. | Invocation-path test / review | Validate standard and owned-fault invocation paths separately; do not weaken database isolation to make a test pass. |
+| P8b-I08 | Tooling / Low | Optional editor/container tools returned execution errors; the first diagram run skipped because web tooling was absent; a patch context containing masked token text did not match. | Use existing native build/lint and guarded P8a tooling; link web tooling only after the missing-tool result; match non-secret headings for documentation edits. All 17 diagrams render under the pinned Mermaid build. | Tool availability / first invocation | Treat a skipped render as missing evidence, never success; do not change a dependency to the editor detector's existing placeholder `0.0.0`. |
+| P8b-I09 | Provenance tooling / Low | Full transcript scan hit `includes` on an undefined tool result. | Some completed tool events have no result; normalize that value to an empty string. Full scan completes and counts tool-start/result pairs without printing transcript contents. | Input schema inspection / scan | Missing optional fields in telemetry need explicit handling. |
+| P8b-I10 | Test correctness / Medium | Self-audit found the live helper checked an unsupported single-credential GET, which would return 404 even before deletion. | Check the supported credential collection instead, and first prove active and revoked credential IDs/states on that same route. Both live backends pass 10 checks. Audit readback also now uses `flushPending`, which waits for any in-flight buffer flush. | Route/assertion review / self-audit | A post-delete 404 must be paired with a pre-delete successful supported route; audit assertions need completed durability, not a flush request. |
+
+Evidence is in ignored `test-results/p8b/` logs. No shared database, deployment,
+product version or dependency manifest was changed.
+
 For each new issue record:
 
 1. Type and severity.
@@ -297,3 +315,28 @@ processes; build; lint at the unchanged 0-error/21-warning scope baseline;
 diagrams in both strict themes. Independent review found no significant issues.
 The recurring atomicity gap is promoted as PC-4 and the conditional-write rule.
 No release, deployment or live-data repair is implied.
+
+### P8b transcript reconciliation and disposition
+
+The complete parent `events.jsonl` was scanned twice by event, not reconstructed
+from a compaction summary. At the reconciliation checkpoint it contained
+28,601 events, with 226 tool starts selected by the cleanup worktree/P8b scope
+and 224 completed results. The local scan artifact records exact counts.
+Error-signal passes covered TypeScript failures, missing tools, FAIL/SKIP,
+403, assertion and patch errors. A separate narration pass covered root cause,
+stale state, no-op, rollback, silent failure, guard and atomicity terms.
+
+The confirmed issues map to P8b-I01 through I10. Source quotations, deliberate
+negative controls, reviewer prompts and search echoes were dismissed as
+non-issues rather than counted as extra failures. Later confirmation runs
+passed the guarded and standard PostgreSQL paths, live tests and final
+InMemory HTTP tests. No shared or estate database was involved.
+
+**Test/gate disposition: applied.** Exact row/member counts and supported-route
+preconditions prevent false-green deletion checks. Standard and guarded test
+entry points are separate assertions, not interchangeable evidence.
+
+**Design/architecture disposition: accepted.** A required narrow lifecycle
+port and synchronous storage swaps preserve the existing repository boundaries.
+The deleted-ID barrier intentionally does not expire. A generalized UnitOfWork
+or shared-store rewrite is not needed for this package.

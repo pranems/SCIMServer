@@ -45,6 +45,15 @@ See [implementation and limits](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md).
 This is local branch work, not a deployed-version claim; release metadata and
 the integration matrix remain parent-owned.
 
+Local correctness work now includes reviewed P8a (`39841319`) and P8b endpoint
+deletion cleanup. P8b uses a required repository lifecycle port, reversible
+InMemory storage swaps and deleted-ID write barriers; PostgreSQL remains
+FK-backed. RequestLog is retained, not cascaded. See
+[the package evidence and boundaries](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md).
+These are local changes, not a new product version or deployment. The source
+package excluded P8c/P3; this assembly combines them with P4 while retaining
+separate cleanup and concurrent-error-contract acceptance claims.
+
 Use [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
 for change sizing, validation lanes, commit/push/PR/merge/deploy ownership,
 session boundaries, model routing, and bounded-log/context rules. It preserves

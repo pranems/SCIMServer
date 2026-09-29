@@ -23,10 +23,18 @@ import type {
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
 import { RepositoryError } from '../../../domain/errors/repository-error';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 
 @Injectable()
 export class InMemoryUserRepository implements IUserRepository {
-  private readonly users: Map<string, UserRecord> = new Map();
+  private users: Map<string, UserRecord> = new Map();
+
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    return prepareMapRemoval(this.users, row => row.endpointId === endpointId, rows => { this.users = rows; });
+  }
 
   async create(input: UserCreateInput): Promise<UserRecord> {
     this.assertUniqueUserName(input.endpointId, input.userName);
@@ -45,6 +53,7 @@ export class InMemoryUserRepository implements IUserRepository {
       createdAt: now,
       updatedAt: now,
     };
+    this.writes.assertWritable(input.endpointId);
     this.users.set(record.id, record);
     return { ...record };
   }

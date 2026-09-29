@@ -154,8 +154,10 @@ version parity is not claimed and no dependency was changed to that placeholder.
 * This package fixes endpoint read freshness, not resource PATCH semantics.
 * It does not make endpoint read-check-write updates atomic; conditional admin
   writes require their own persistence-boundary treatment.
-* It does not clean up orphaned InMemory resources after endpoint deletion.
-  That is the separate P8b repository-lifecycle package.
+* P8a did not clean up orphaned InMemory resources after endpoint deletion.
+  The separate [P8b repository-lifecycle package](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md)
+  now implements that cleanup and invalidates local WIF cache entries when a
+  reader observes remote deletion, without removing the authoritative read.
 * It does not turn independent InMemory instances into a replicated backend.
 * Consolidation still owns release metadata, the complete applicable matrix,
   reviewed PR and exact-tip CI. This local evidence is not a deployment claim.

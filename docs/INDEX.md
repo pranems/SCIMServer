@@ -19,6 +19,7 @@
 | Use JSON search arrays, legacy string compatibility and scalar SCIM validation errors | [SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md) |
 | Understand when another application instance sees saved endpoint settings and deletions | [SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) |
 | Understand all-or-nothing Group creation/membership, rollback and verified database constraints | [SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md) and [execution RCA](SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md) |
+| Understand endpoint deletion, complete resource cleanup, retained audit history and in-flight writes | [SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) |
 | Understand the reported PATCH failure, real PostgreSQL/InMemory differences, RFC and attribute checks, and the step-by-step fix plan | [SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md) |
 | Understand the portable endpoint boundary, discovery translation, effective authentication state, APIs, DB mappings, and target UX | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) |
 | Create and edit User, Group, and custom resources from endpoint schemas | [PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md](PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md) |

@@ -381,7 +381,7 @@ Quick checks per recipe:
 # Deactivate (keeps data, blocks SCIM ops with 403)
 Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id" -Method Patch -Headers $H -ContentType 'application/json' -Body '{"active":false}'
 
-# Or delete permanently (cascades users, groups, logs, credentials)
+# Or delete permanently (removes resources and credentials; retains audit logs)
 Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id" -Method Delete -Headers $H
 ```
 

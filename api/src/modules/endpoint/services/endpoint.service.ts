@@ -18,7 +18,8 @@ import { getBuiltInPreset, DEFAULT_PRESET_NAME, BUILT_IN_PRESETS, PRESET_NAMES }
 import type { EndpointProfile } from '../../scim/endpoint-profile/endpoint-profile.types';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
-import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import { USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import type { IEndpointLifecycleRepository } from '../../../domain/repositories/endpoint-lifecycle.repository.interface';
 import {
   SCIM_EVENTS,
   type ScimEndpointEventPayload,
@@ -159,6 +160,7 @@ export class EndpointService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scimLogger: ScimLogger,
+    @Inject(ENDPOINT_LIFECYCLE_REPOSITORY) private readonly lifecycle: IEndpointLifecycleRepository,
     @Optional() @Inject(USER_REPOSITORY) private readonly userRepo?: IUserRepository,
     @Optional() @Inject(GROUP_REPOSITORY) private readonly groupRepo?: IGroupRepository,
     /**
@@ -278,6 +280,10 @@ export class EndpointService implements OnModuleInit {
     this.scimLogger.clearEndpointLevel(endpoint.id);
     this.scimLogger.disableEndpointFileLogging(endpoint.id);
     this.profileChangeListener?.(endpoint.id, null);
+    this.emitEndpointEvent(SCIM_EVENTS.ENDPOINT_DELETED, {
+      endpointId: endpoint.id,
+      name: endpoint.name,
+    });
   }
 
   // ─── Profile Summary Builder ────────────────────────────────────────
@@ -907,8 +913,10 @@ export class EndpointService implements OnModuleInit {
       if (!cached) {
         throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
       }
+      await this.lifecycle.deleteEndpoint(endpointId);
       this.cacheDelete(cached);
       this.scimLogger.clearEndpointLevel(endpointId);
+      this.scimLogger.disableEndpointFileLogging(endpointId);
       this.profileChangeListener?.(endpointId, null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint deleted', { endpointId, name: cached.name });
       // Phase J (v0.48.1): broadcast onto SSE.
@@ -932,12 +940,11 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
-    await this.prisma.endpoint.delete({
-      where: { id: endpointId }
-    });
+    await this.lifecycle.deleteEndpoint(endpointId);
 
     if (cached) this.cacheDelete(cached);
     this.scimLogger.clearEndpointLevel(endpointId);
+    this.scimLogger.disableEndpointFileLogging(endpointId);
     this.profileChangeListener?.(endpointId, null);
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint deleted', { endpointId, name: endpoint.name });
     // Phase J (v0.48.1): broadcast onto SSE.

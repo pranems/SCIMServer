@@ -18,10 +18,18 @@ import type {
 } from '../../../domain/models/generic-resource.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 
 @Injectable()
 export class InMemoryGenericResourceRepository implements IGenericResourceRepository {
-  private readonly resources: Map<string, GenericResourceRecord> = new Map();
+  private resources: Map<string, GenericResourceRecord> = new Map();
+
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    return prepareMapRemoval(this.resources, row => row.endpointId === endpointId, rows => { this.resources = rows; });
+  }
 
   async create(input: GenericResourceCreateInput): Promise<GenericResourceRecord> {
     const now = new Date();
@@ -39,6 +47,7 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       createdAt: now,
       updatedAt: now,
     };
+    this.writes.assertWritable(input.endpointId);
     this.resources.set(record.id, record);
     return { ...record };
   }

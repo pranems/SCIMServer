@@ -506,6 +506,12 @@ On the process handling the PATCH, the service replaces the cached endpoint,
 discards its lazily-built `_schemaCaches`, fires `profileChangeListener` and
 broadcasts `ENDPOINT_UPDATED` on SSE.
 
+The [P8b deletion package](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) removes
+owned resources and credentials before evicting the endpoint profile and its
+schema characteristics caches. It retains RequestLog audit history. A reader
+that discovers a remotely deleted endpoint also invalidates its local WIF
+trust cache through the existing deletion event.
+
 The P8a implementation also handles a different PostgreSQL-backed process:
 every new endpoint lookup reads the authoritative row. A changed snapshot
 refreshes that process's schema overlay and logging settings; an unchanged

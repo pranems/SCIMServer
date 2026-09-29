@@ -25,11 +25,25 @@ import type {
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { RepositoryError } from '../../../domain/errors/repository-error';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
-  private readonly groups: Map<string, GroupRecord> = new Map();
-  private readonly members: Map<string, MemberRecord> = new Map();
+  private groups: Map<string, GroupRecord> = new Map();
+  private members: Map<string, MemberRecord> = new Map();
+
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    const groupIds = new Set([...this.groups.values()].filter(row => row.endpointId === endpointId).map(row => row.id));
+    const groups = prepareMapRemoval(this.groups, row => groupIds.has(row.id), rows => { this.groups = rows; });
+    const members = prepareMapRemoval(this.members, row => groupIds.has(row.groupId), rows => { this.members = rows; });
+    return {
+      commit: () => { groups.commit(); members.commit(); },
+      rollback: () => { members.rollback(); groups.rollback(); },
+    };
+  }
 
   async create(input: GroupCreateInput, members: MemberCreateInput[] = []): Promise<GroupRecord> {
     if (this.findGroup(input.endpointId, input.scimId)) {
@@ -50,6 +64,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
       updatedAt: now,
     };
     const initialMembers = this.stageMembers(record.id, members, now);
+    this.writes.assertWritable(input.endpointId);
     this.groups.set(record.id, record);
     for (const member of initialMembers) this.members.set(member.id, member);
     return { ...record };
@@ -163,9 +178,11 @@ export class InMemoryGroupRepository implements IGroupRepository {
 
   async addMembers(groupId: string, members: MemberCreateInput[]): Promise<void> {
     if (members.length === 0) return;
-    assertWritePrecondition(this.groups.get(groupId));
+    const group = this.groups.get(groupId);
+    assertWritePrecondition(group);
     const existing = this.getMembersForGroup(groupId);
     const staged = this.stageMembers(groupId, members, new Date(), new Set(existing.map((m) => m.value)));
+    this.writes.assertWritable(group.endpointId);
     for (const member of staged) this.members.set(member.id, member);
   }
 

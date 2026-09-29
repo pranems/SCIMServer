@@ -304,6 +304,12 @@ describe('EndpointController', () => {
   });
 
   describe('deleteEndpoint', () => {
+    it('propagates lifecycle failure instead of reporting a successful deletion', async () => {
+      const failure = new Error('storage delete failed');
+      mockEndpointService.deleteEndpoint.mockRejectedValueOnce(failure);
+      await expect(controller.deleteEndpoint('endpoint-1')).rejects.toBe(failure);
+    });
+
     it('should delete an endpoint', async () => {
       mockEndpointService.deleteEndpoint.mockResolvedValue(undefined);
 

@@ -3,6 +3,8 @@ import { EndpointService } from './endpoint.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import type { Endpoint } from '../../../generated/prisma/client';
+import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import { PrismaEndpointLifecycleRepository } from '../../../infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository';
 
 describe('Persistent endpoint cache freshness', () => {
   let module: TestingModule;
@@ -52,6 +54,7 @@ describe('Persistent endpoint cache freshness', () => {
     module = await Test.createTestingModule({
       providers: [
         EndpointService,
+        { provide: ENDPOINT_LIFECYCLE_REPOSITORY, useClass: PrismaEndpointLifecycleRepository },
         { provide: PrismaService, useValue: prisma },
         { provide: ScimLogger, useValue: logger },
       ],

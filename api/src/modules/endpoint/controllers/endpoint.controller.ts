@@ -158,9 +158,10 @@ export class EndpointController {
   }
 
   /**
-   * Delete endpoint and all associated data
+   * Delete endpoint and its owned provisioning data
    * DELETE /admin/endpoints/{endpointId}
-   * Cascade deletes all users, groups, group members, and logs for this endpoint
+   * Removes users, groups, memberships, custom resources and all credentials.
+   * RequestLog history is retained; endpointId remains an audit correlation value.
    */
   @Delete(':endpointId')
   @HttpCode(204)

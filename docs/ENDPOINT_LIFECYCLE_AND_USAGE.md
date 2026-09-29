@@ -1,6 +1,6 @@
 # Endpoint Lifecycle & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Version:** 0.55.35 - **Updated:** June 3, 2026
 > Quick-start recipes for common SCIMServer operations
@@ -29,7 +29,10 @@
 curl -X POST http://localhost:8080/scim/admin/endpoints \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"name":"prod","profilePreset":"entra-id"}'
+  -d '{
+    "name": "prod",
+    "profilePreset": "entra-id"
+  }'
 ```
 
 ### 2. Configure
@@ -84,7 +87,9 @@ curl -N http://localhost:8080/scim/endpoints/{id}/logs/stream \
 curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"active":false}'
+  -d '{
+    "active": false
+  }'
 ```
 
 ### 6. Reactivate
@@ -93,13 +98,27 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"active":true}'
+  -d '{
+    "active": true
+  }'
 ```
 
 ### 7. Delete
 
+Deletion returns `204 No Content`. It removes Users, Groups and membership
+rows, all custom resources, and all bearer/OAuth/WIF credentials, including
+inactive or expired rows. Other endpoints are unaffected. RequestLog entries
+remain available in the shared audit log with the deleted endpoint's ID; they
+are not cascaded or erased.
+
+[P8b](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) brings InMemory cleanup into
+line with the PostgreSQL ownership contract, rejects in-flight writes that
+would recreate deleted data, and clears derived endpoint/credential caches.
+It is locally validated, not yet deployed. Reusing the old name creates a new
+endpoint ID, not a recovery of the deleted resources.
+
 ```bash
-# Cascades all resources, logs, credentials
+# Removes provisioning resources and credentials; retains audit logs
 curl -X DELETE http://localhost:8080/scim/admin/endpoints/{id} \
   -H "Authorization: Bearer changeme-scim"
 ```
@@ -338,7 +357,10 @@ curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
 curl -X POST http://localhost:8080/scim/admin/endpoints/{id}/credentials \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"label":"entra-connector","credentialType":"bearer"}'
+  -d '{
+    "label": "entra-connector",
+    "credentialType": "bearer"
+  }'
 # Save the returned token - it is shown only once!
 ```
 
@@ -416,7 +438,10 @@ curl http://localhost:8080/scim/admin/endpoints/{id}/stats \
 curl -X POST http://localhost:8080/scim/admin/endpoints \
   -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"name":"entra-prod","profilePreset":"entra-id"}'
+  -d '{
+    "name": "entra-prod",
+    "profilePreset": "entra-id"
+  }'
 ```
 
 ### 2. Note the SCIM URL

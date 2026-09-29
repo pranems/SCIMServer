@@ -534,7 +534,13 @@ Deeper guides: [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) fo
 
 ### DELETE /scim/admin/endpoints/:endpointId
 
-Delete endpoint and all associated resources, logs, and credentials (cascade).
+Delete the endpoint and its Users, Groups, membership rows, all custom resource
+types, and all credentials (active, revoked, expired, and WIF). RequestLog is
+retained: its endpointId is an audit correlation value, not a cascading FK.
+The response is `204 No Content`, with no response body. Other endpoints are
+unchanged. [P8b cleanup and in-flight-write behavior](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md)
+is locally validated but not yet deployed; PostgreSQL keeps its existing
+FK-backed deletion.
 
 ```http
 DELETE /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
