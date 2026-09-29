@@ -1,8 +1,14 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-23 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
+
+For actual supported shapes and integration limits, see
+[SCIM/Entra compatibility](docs/SCIM_ENTRA_COMPATIBILITY.md) and
+[the 37-setting behavior/evidence matrix](docs/SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
+Keep strict validation enabled for Entra; diagnose the request and effective
+schema before applying a targeted compatibility setting.
 
 [![Version](https://img.shields.io/badge/version-0.55.35-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
@@ -612,12 +618,25 @@ A profile has 4 sections:
     }
   ],
   "serviceProviderConfig": {
-    "patch": { "supported": true },
-    "bulk": { "supported": false },
-    "filter": { "supported": true, "maxResults": 200 },
-    "sort": { "supported": false },
-    "etag": { "supported": true },
-    "changePassword": { "supported": false }
+    "patch": {
+      "supported": true
+    },
+    "bulk": {
+      "supported": false
+    },
+    "filter": {
+      "supported": true,
+      "maxResults": 200
+    },
+    "sort": {
+      "supported": false
+    },
+    "etag": {
+      "supported": true
+    },
+    "changePassword": {
+      "supported": false
+    }
   },
   "settings": {
     "StrictSchemaValidation": true,
@@ -952,9 +971,13 @@ If-Match: W/"1"
 
 **Response (200 OK):**
 
-```json
+```jsonc
+// Schematic response: shortened identifiers, schemas and locations.
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "..."],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "..."
+  ],
   "id": "f47ac10b-...",
   "userName": "jane.doe@example.com",
   "displayName": "Jane D. Smith",
@@ -995,20 +1018,29 @@ Authorization: Bearer changeme-scim
 
 **Response (200 OK):**
 
-```json
+```jsonc
+// Schematic response: shortened identifiers and locations.
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+  ],
   "totalResults": 1,
   "startIndex": 1,
   "itemsPerPage": 1,
   "Resources": [
     {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:User"
+      ],
       "id": "f47ac10b-...",
       "userName": "jane.doe@example.com",
       "displayName": "Jane D. Smith",
       "emails": [
-        { "value": "jane.doe@example.com", "type": "work", "primary": true }
+        {
+          "value": "jane.doe@example.com",
+          "type": "work",
+          "primary": true
+        }
       ],
       "meta": {
         "resourceType": "User",
@@ -1024,9 +1056,12 @@ Authorization: Bearer changeme-scim
 
 ### SCIM Error Response
 
-```json
+```jsonc
+// Schematic response: shortened identifiers and diagnostic paths.
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
   "status": "409",
   "scimType": "uniqueness",
   "detail": "User with userName 'jane.doe@example.com' already exists",
@@ -1140,23 +1175,32 @@ Content-Type: application/scim+json
 
 **Response (200 OK):**
 
-```json
+```jsonc
+// Schematic response: shortened identifiers and locations.
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkResponse"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+  ],
   "Operations": [
     {
       "method": "POST",
       "bulkId": "user1",
       "status": "201",
       "location": ".../Users/f47ac10b-...",
-      "response": { "id": "f47ac10b-...", "userName": "bulk.user@example.com" }
+      "response": {
+        "id": "f47ac10b-...",
+        "userName": "bulk.user@example.com"
+      }
     },
     {
       "method": "POST",
       "bulkId": "group1",
       "status": "201",
       "location": ".../Groups/b23cd40e-...",
-      "response": { "id": "b23cd40e-...", "displayName": "Bulk Group" }
+      "response": {
+        "id": "b23cd40e-...",
+        "displayName": "Bulk Group"
+      }
     }
   ]
 }

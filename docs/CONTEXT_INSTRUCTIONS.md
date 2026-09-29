@@ -17,6 +17,15 @@ with value/content regressions, not assumed fixed by P5's scalar formatting.
 P2, final P7 PATCH, P3b/compatibility dispositions and concurrent FK-error
 normalization still block C0. Cleanup/no-orphan checks are not error-contract proof.
 
+P9 is locally implemented on P7a/P1: emitted strict-on Entra guidance,
+honest fixed/inert setting descriptions and a shared 17-case HTTP/live
+corpus, including the proven modern pathless shape.
+Both owned PostgreSQL 17.8 (22 migrations) and InMemory pass.
+Two executable P2 integration checks remain TODO, not compatibility
+passes. See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
+[37-setting reconciliation](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
+No version/lockfile, UI code, push or deployment changes.
+
 P7a is implemented locally in its own P1-based worktree. The
 [P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,
 scalar/cardinality checks and POST/PUT contracts with 1,507 focused unit

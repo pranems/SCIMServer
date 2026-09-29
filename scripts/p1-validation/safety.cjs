@@ -6,7 +6,8 @@ const assert = require("node:assert/strict");
 const ROOT = path.resolve(__dirname, "..", "..");
 const API = path.join(ROOT, "api");
 const IS_P7 = path.basename(ROOT).toLowerCase() === "scimserver-scim-profile-validation";
-const BASE = IS_P7 ? "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51" : "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e";
+const IS_P9 = path.basename(ROOT).toLowerCase() === "scimserver-scim-compatibility";
+const BASE = IS_P9 ? "8e42f15f" : IS_P7 ? "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51" : "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e";
 const OWNER = "bf8209ca-96fe-46aa-8cab-1641c725a077";
 const docker = (...args) =>
   cp
@@ -15,8 +16,8 @@ const docker = (...args) =>
 
 function sourceGuard() {
   const git = (...args) => cp.execFileSync("git", ["-C", ROOT, ...args], { encoding: "utf8" }).trim();
-  assert.equal(path.basename(ROOT).toLowerCase(), IS_P7 ? "scimserver-scim-profile-validation" : "scimserver-scim-implementation");
-  assert.equal(git("branch", "--show-current"), IS_P7 ? "fix/scim-profile-validation-20260928" : "fix/scim-correctness-p1-20260928");
+  assert.equal(path.basename(ROOT).toLowerCase(), IS_P9 ? "scimserver-scim-compatibility" : IS_P7 ? "scimserver-scim-profile-validation" : "scimserver-scim-implementation");
+  assert.equal(git("branch", "--show-current"), IS_P9 ? "fix/scim-compatibility-contract-20260928" : IS_P7 ? "fix/scim-profile-validation-20260928" : "fix/scim-correctness-p1-20260928");
   git("merge-base", "--is-ancestor", BASE, "HEAD");
   assert.equal(
     fs.existsSync(path.join(API, "test", "e2e", ".test-db-path")),
@@ -25,7 +26,7 @@ function sourceGuard() {
   );
   const hash = require("node:crypto").createHash("sha256");
   const files = git("ls-files", "-co", "--exclude-standard", "--",
-    "api/src", "api/test", "api/prisma", "scripts/p1-validation", "scripts/live-test-p1.cjs", "scripts/live-test-p7.cjs",
+    "api/src", "api/test", "api/prisma", "scripts/p1-validation", "scripts/live-test-p1.cjs", "scripts/live-test-p7.cjs", "scripts/live-test-p9.cjs",
   ).split("\n").filter(Boolean).sort();
   for (const file of files) {
     hash.update(file);
@@ -144,6 +145,7 @@ module.exports = {
   API,
   BASE,
   IS_P7,
+  IS_P9,
   OWNER,
   docker,
   sourceGuard,

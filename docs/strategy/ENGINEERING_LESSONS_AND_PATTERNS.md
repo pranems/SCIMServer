@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### P9: configuration presence is not behavior or safe operator guidance
+
+A registry count proved that 37 controls existed, but did not detect startup
+advice to disable validation for every Entra client, or descriptions promising
+retired secret-retention policies. P9 now asserts the **emitted** startup
+message and current description claims. Its settings matrix separates actual
+outcome tests from configuration roundtrips, and names missing wire evidence.
+One shared corpus verifies persisted values through both HTTP-harness and
+built-server adapters. Unsupported integration cases remain explicit failing
+checks, never a green baseline of malformed storage.
+See [P9 evidence](../SCIM_ENTRA_COMPATIBILITY.md).
+
 ### P7a: semantic presence and ownership survive framework transformations
 
 The [P7a review](../SCIM_P7_EXECUTION_RCA.md) reproduced two defects from the

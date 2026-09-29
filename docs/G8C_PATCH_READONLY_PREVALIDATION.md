@@ -25,7 +25,7 @@ Before v0.17.3, the `SchemaValidator.validatePatchOperationValue()` method perfo
 
 Added readOnly mutability pre-validation directly in `validatePatchOperationValue()`, which runs inside the `if (StrictSchemaValidation)` guard in both `endpoint-scim-users.service.ts` and `endpoint-scim-groups.service.ts`. This ensures:
 
-1. **Entra compatibility**: When `StrictSchemaValidation` is `false` (default), readOnly checks are skipped - matching Azure AD / Microsoft Entra behavior.
+1. **Historical lenient mode**: At this feature's introduction, strict validation defaulted off. It now defaults on. Keep it enabled for Entra and use `IgnoreReadOnlyAttributesInPatch` only for a verified readOnly-input mismatch; see [current compatibility guidance](SCIM_ENTRA_COMPATIBILITY.md).
 2. **RFC compliance**: When `StrictSchemaValidation` is `true`, all PATCH operations targeting readOnly attributes are rejected with HTTP 400.
 3. **Zero PatchEngine changes**: The fix lives in the validation layer, not the patch engine - maintaining clean separation of concerns.
 

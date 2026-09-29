@@ -1,0 +1,62 @@
+{
+  "package": "P9 compatibility guidance and corpus",
+  "base": "8e42f15f54a955fd6b93d58e9471c393329f4d3a",
+  "testedSourceSha256": "ca51398f105646183891f0593029def15aa4780c84292e337084f5131ec60068",
+  "sourceFileCount": 555,
+  "sourceHashScope": "Guarded API source/tests/Prisma and P1/P7/P9 harness files; documentation excluded",
+  "completedAt": "2026-09-29T05:56:33.452Z",
+  "rawReceipt": "test-results/p9/backends-be0f8ff8b02077b3/run.json",
+  "postgresVersion": "17.8",
+  "completedMigrations": 22,
+  "backends": [
+    {
+      "name": "inmemory",
+      "httpPassed": 17,
+      "integrationTodo": 2,
+      "liveCasesPassed": 17,
+      "liveAssertions": 1104,
+      "runtimePid": 2480,
+      "runtimeStopped": true
+    },
+    {
+      "name": "prisma",
+      "httpPassed": 17,
+      "integrationTodo": 2,
+      "liveCasesPassed": 17,
+      "liveAssertions": 1104,
+      "runtimePid": 61688,
+      "runtimeStopped": true
+    }
+  ],
+  "cleanup": {
+    "containerId": "50a8d8217d06235ad77c3764a95c3c506593c886939c7248cebe90194a417dd9",
+    "removed": true,
+    "externalDatabaseUsed": false
+  },
+  "unitEvidence": {
+    "distinctTestsPassed": 411,
+    "distinctSuitesPassed": 7,
+    "newTests": 6,
+    "startupGuidanceRedThenGreen": true,
+    "registryGuidanceRedThenGreen": true,
+    "inventoryNegativeControlPassed": true
+  },
+  "integrationOnly": [
+    {
+      "id": "I02",
+      "resultOnBase": "failed",
+      "requirement": "Append a new primary without losing the previous email; clear its primary flag"
+    },
+    {
+      "id": "I03",
+      "resultOnBase": "failed",
+      "requirement": "Verbose-disabled dotted User PATCH must not save a literal dotted property"
+    }
+  ],
+  "scopeLimits": [
+    "Not a full RFC or Entra certification",
+    "Not the parent's final integrated validation matrix",
+    "No deployment or shared database mutation",
+    "No claims of complete HTTP/live enforcement for all 37 settings"
+  ]
+}

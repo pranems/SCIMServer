@@ -1,7 +1,7 @@
 # Endpoint Settings - Operator Guide
 
 > **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-28 - **Product version at capture:** `0.55.33`
-> **Every value in this document was measured against a running server**, not transcribed from source. The preset matrix in [Section 3](#3-preset-matrix-measured) was produced by creating one endpoint per preset on the live dev estate, reading back what the server actually published, and deleting them. The request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) are verbatim wire captures.
+> The historical preset matrix in [Section 3](#3-preset-matrix-measured) and request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) were measured on the live dev estate at the capture version. P7a/P9 notes below describe newer local source and owned backend/live evidence, not a re-capture or deployment.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
 ---
@@ -15,6 +15,12 @@ bindings and immutable rules still apply with it off. Canonical values are
 suggestions, not an implicit closed enum. POST/PUT ignore readOnly input.
 See [the implementation and verification scope](SCIM_P7A_PROFILE_VALIDATION.md).
 The historical measured preset tables below have not been re-captured.
+
+**P9 compatibility:** keep strict validation enabled for Entra. Native
+Booleans need no conversion; documented legacy quoted values can use the
+targeted coercion setting. Dotted User paths also occur in Microsoft's
+current examples. See [the permanent corpus](SCIM_ENTRA_COMPATIBILITY.md)
+and [all 37 settings with behavioral evidence and gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 
@@ -80,9 +86,9 @@ This is an implementation-branch addition, not a claim that P8a is deployed.
 | Setting | What it actually does |
 |---|---|
 | `StrictSchemaValidation` | Reject resources whose `schemas[]` is missing a declared extension URN. Also rejects attributes and sub-attributes the schema does not declare. |
-| `AllowAndCoerceBooleanStrings` | Coerce `"True"` / `"False"` string values to real booleans on write. Without it, `"active": "True"` is a type error. |
+| `AllowAndCoerceBooleanStrings` | Coerce supported quoted Boolean inputs before strict validation. Native values need none. Legacy `active` PATCH extraction is not fully gated by this switch; see P9 limits rather than assuming universal rejection when off. |
 | `RfcCompliantSubAttributes` | OFF (default) preserves current behaviour: a schema may declare a *complex* sub-attribute and payloads populating it are accepted. ON refuses that shape per RFC 7643 2.3.8 (erratum 8415). The flag only ever tightens. A multi-valued *simple* sub-attribute (1.2, erratum 5607) is accepted and element-wise type-checked by `StrictSchemaValidation` itself, at either setting of this flag. |
-| `PrimaryEnforcement` | How a resource with more than one `primary=true` sub-attribute is handled. Three values: `passthrough` (accept as-is), `normalize` (keep the first primary, clear the rest), `reject` (422). |
+| `PrimaryEnforcement` | Final-state policy: `passthrough` (accept as-is), `normalize` (keep first primary, clear rest), `reject` (400 invalidValue). Ordered PATCH handoff is separately tracked by P9 I02. |
 
 > **Gotcha worth knowing.** `StrictSchemaValidation` governs *undeclared* attributes. It does **not** govern *required* attributes - those are checked by a separate `RequiredAttributeCheck` that runs regardless. Turning strict off will not let you create a user that is missing `displayName` on an `entra-id` endpoint. This was measured directly: a payload missing `displayName` and `emails` still returned 400 with `"triggeredBy": "RequiredAttributeCheck"` and `"activeConfig": { "StrictSchemaValidation": false }`.
 
@@ -319,7 +325,11 @@ The `profile.settings` object in the response contains only the explicitly-writt
 
 **A data-plane 401 is not an admin-plane problem.** Turning off an auth method on one endpoint makes that endpoint's SCIM routes return 401 - which is correct and configured. Until **0.55.1**, two admin routes (`/scim/admin/endpoints/{id}/overview` and `/stats`) also began returning 401 in that state, because the auth guard extracted an endpoint id from any URL matching `/endpoints/<uuid>/`. Since the pattern required a trailing slash, `/admin/endpoints/{id}` was unaffected while `/admin/endpoints/{id}/overview` was not - which is what showed the behaviour was accidental rather than a policy. Admin routes are now excluded from endpoint-scoped auth, so you can always administer an endpoint whose data plane refuses you.
 
-**Legacy data can outlive its schema.** A schema tightened after data was written leaves rows the endpoint would no longer accept. This is legitimate and observable: on one production endpoint, `GET /Users` returns records containing `name.formatted`, while `POST`-ing that same record back returns **400** because `name` now declares only `givenName` and `familyName`. If you are copying data between endpoints, expect this and relax `StrictSchemaValidation` for the duration of the copy.
+**Legacy data can outlive its schema.** A tightened schema can leave stored
+rows that a new write would reject. Before copying, compare source data with
+the target's effective schema and choose an explicit mapping/schema update.
+Do not disable strict validation as a generic copy workaround: it can retain
+malformed data and cannot bypass required or immutable rules.
 
 **Custom resource types are not behind a setting.** You will not find a toggle for them, and you do not need one: an endpoint serves whatever is declared in `profile.resourceTypes[]`, so registering a type on the Resource Types tab is all that is required. A toggle did exist until settings-v8 and was retired as redundant. Until **0.55.13** the UI still hid Create and Delete when it was absent, which made a working capability look unavailable; if you previously concluded custom types were switched off for an endpoint, re-check it.
 

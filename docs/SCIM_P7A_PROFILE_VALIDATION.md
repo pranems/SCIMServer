@@ -64,7 +64,8 @@ case-insensitive, readWrite, returned default and uniqueness none.
 `global` is a valid RFC keyword. Rejecting it is this provider's intentional
 supported-capability policy, not an RFC mandate. A local duplicate scan does
 not establish a global guarantee. See the
-[capability matrix and stored-profile edit implications](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy).
+[capability matrix and stored-profile edit implications](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy)
+and [compatibility/policy summary](SCIM_ENTRA_COMPATIBILITY.md).
 
 ## Value rules
 

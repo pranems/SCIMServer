@@ -9,6 +9,9 @@
 
 | If you want to... | Read |
 |---|---|
+| Diagnose Entra without disabling strict validation; review native/legacy HTTP evidence | [SCIM_ENTRA_COMPATIBILITY.md](SCIM_ENTRA_COMPATIBILITY.md) |
+| Distinguish all 37 settings' actual behavior, inert controls, and unit/HTTP/live gaps | [SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) |
+| Review P9 execution issues and unresolved integration contracts | [SCIM_P9_EXECUTION_RCA.md](SCIM_P9_EXECUTION_RCA.md) |
 | Understand the typed PATCH-path repair, exact incident, backend proof and remaining P2 limits | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
 | Understand schema-aware filtering, typed sorting, hidden-field projection, page limits and custom ETag consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
 | Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
