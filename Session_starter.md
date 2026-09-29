@@ -92,6 +92,9 @@ verification/correction of actual admission/runtime gaps. Custom-core
 displayName/active and extension-namespaced homonyms still follow their resolved
 schemas, not convenience columns. The [corrected contract](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1113-standards-correction-common-externalid-is-not-a-custom-core-field)
 supersedes the earlier unrestricted custom-core externalId assumption.
+The pending P7 implementation is POST/PUT-only at this seam. Integration must
+separately prove completed PATCH candidates respect common externalId in
+strict OFF, without applying POST/PUT required checks to partial PATCH views.
 
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.

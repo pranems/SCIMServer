@@ -854,7 +854,7 @@ similarly named suite:
 | Supported direct, Bulk, `/Me` and custom CRUD paths | Explicit operation/resource/route inventory, real response values and stored outcomes, capability-enabled/disabled behavior, documented unsupported combinations | B: P2/P7/P9 and route reconciliation remain open |
 | All registered settings | Derive the registry inventory from the integrated source; map each key's documented policy, relevant enforcement tests and untested interactions. Do not infer coverage from registration or UI presence | B: registry-to-evidence reconciliation pending |
 | Generic custom fields sharing promoted names | For schema-valid custom-core displayName/active and extension homonyms, verify POST -> GET -> PUT/PATCH -> GET plus filtering/typed sorting against rawPayload authority. Distinguish builtin User/Group constraints; pushdown is valid only when its column faithfully represents the resolved schema | B: P3b owns tightly coupled reconstruction; integration owns cross-package probes; no storage-column-driven admission restriction authorized |
-| Common externalId versus extension homonyms | Top-level externalId is the RFC common single-valued String, caseExact true and readWrite across all resource types; contradictory older schema declarations do not redefine it. Test common string behavior and invalid numeric/MV inputs separately from valid schema-defined extension-namespaced externalId types/cardinalities | B: P7 owns common-attribute admission/runtime gap verification; integration owns final cross-package proof. This corrects the earlier parent generalization, not a column-convenience restriction |
+| Common externalId versus extension homonyms | Top-level externalId is the RFC common single-valued String, caseExact true and readWrite across all resource types; older declarations do not redefine it. Test POST/PUT and completed PATCH candidates, especially strict OFF, with invalid numeric/Boolean/MV values and exact rollback. Extension externalId types/cardinalities remain independent | B: P7 owns its bounded admission/POST-PUT correction; integration owns the completed-candidate PATCH seam and proof after its committed SHA arrives. Never use POST/PUT required checks on PATCH partial views |
 | Attribute characteristics | Core/extension namespace, scalar/MV/complex-child, required/readOnly/immutable/returned/caseExact/uniqueness boundaries, defaults when omitted, provider restrictions and compatibility consequences | B: P3b/P7/P9 and characteristic reconciliation pending |
 | Controlled races and Group rollback | Deterministic same-condition races at real mutation boundaries on both backends; complete scalar/payload/member/version/timestamp rollback and no partial create or success event | B: reconcile P3/P4/P8c with final tip |
 | Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b focused proof exists; exact-case/final-tip reconciliation remains pending |
@@ -1156,6 +1156,20 @@ The cross-package acceptance probes must separate:
 3. Extension externalId homonyms with valid custom scalar/MV types through
    the same persistence/query paths, proving common-attribute rules do not
    bleed into an extension namespace.
+
+**P7 handoff boundary:** the in-progress common-attribute correction deliberately
+does not edit PATCH callbacks/execution. Its create/replace required pass can
+validate externalId even with strict OFF, but `validateRequired(..., 'patch')`
+still returns early. Therefore source-package POST/PUT GREEN is not proof of
+lenient PATCH correctness. On receipt of the committed SHA, integration must
+independently test the completed candidate for explicit and pathless externalId
+changes across resource families, native versus invalid scalar/array shapes,
+extension homonyms and unchanged stored state/version on rejection.
+Reuse the common-attribute value seam where appropriate; do not call complete
+POST/PUT required-extension checks against touched partial PATCH views.
+Preserve public deepEqual and selected-target shape normalization before type/
+cardinality checks. This combined seam is integration-owned, not a second
+competing P7 implementation.
 
 These are pending probes, not newly verified runtime outcomes. The parent
 owns the standards-correction RCA; this section updates the shared contract
