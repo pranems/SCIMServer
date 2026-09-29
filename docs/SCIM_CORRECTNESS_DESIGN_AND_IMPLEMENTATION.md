@@ -1460,6 +1460,17 @@ their raw values. No pending fix is presumed merely because the concern was
 previously routed to P3b. Parent decisions are required before C0, not inferred
 from the absence of further worker edits.
 
+**Subsequent owner update:** P3b has resumed one narrow runtime follow-up for
+builtin Group membership: only represented relation leaves/type-shapes can
+carry an enforceable uniqueness promise; unrepresented children are not
+limited to `$ref`. Builtin classification must use the full RFC core URN
+together with explicit core/extension identity, not suffix matching.
+Positive controls must preserve custom-core/extension `members`, `groups`,
+`$ref`, arbitrary represented readOnly values, and absent/none declarations.
+This supersedes the no-edits status only for that specific follow-up; its SHA
+and dual-backend proof are pending. Generic promoted-field reconstruction and
+registration admission remain separately unclosed.
+
 **Assurance improvement: applied.** Type-specific characteristic applicability
 is checked before choosing equality semantics, with both rejection and
 legitimate-no-constraint controls.
