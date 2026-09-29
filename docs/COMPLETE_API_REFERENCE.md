@@ -285,6 +285,9 @@ Returns full endpoint object (same shape as POST response).
 should quote. `id` and `name` are deliberately excluded: `name` is immutable after create and
 `id` identifies the row, so neither can participate in a lost update.
 
+With P8c, `?view=summary` publishes the same editable-state token while returning
+only the summary body. The token and response come from one resolved snapshot.
+
 ```http
 HTTP/1.1 200 OK
 ETag: W/"e9adceb0cbc7d89b3ac549485c210902"
@@ -353,10 +356,16 @@ change.
 | `*` | matches any current state; used to force an overwrite |
 | stale | `412 Precondition Failed`, `scimType: versionMismatch`, and the write is **not** applied |
 
-It matters most when you replace a whole profile section. `settings` and
-`serviceProviderConfig` merge **per key** server-side, so two callers changing different keys
-already both survive and do not need this. `schemas`, `resourceTypes` and `authentication` are
-replaced **wholesale**, so a read-modify-write of those is where an edit can be silently lost.
+`settings` and `serviceProviderConfig` merge **per key** across sequential
+requests; this alone does not protect simultaneous database read-modify-write
+operations. `schemas`, `resourceTypes` and `authentication` are replaced
+**wholesale**. Use `If-Match` when competing edits must not overwrite one another.
+
+The P8c implementation checks the condition at the write boundary. Two different
+edits using the same token cannot both commit, on either PostgreSQL or InMemory.
+This remains the admin API's existing weak content-token compatibility policy,
+not general HTTP strong-validator semantics. See
+[the contract and dual-backend evidence](ENDPOINT_WRITE_CONCURRENCY.md).
 
 For `profile.settings`, omission means no change and an explicit `null` removes only that key,
 allowing the endpoint to inherit the server/default value while preserving every sibling setting.

@@ -1,11 +1,12 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { Endpoint, Prisma } from '../../../generated/prisma/client';
+import { type Endpoint, Prisma } from '../../../generated/prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { isUuid } from '../../../shared/uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
+import { assertEndpointIfMatch, endpointETag, rejectEndpointIfMatch } from '../common/endpoint-etag';
 import { ENDPOINT_CONFIG_FLAGS, parseBooleanValue, validateEndpointConfig } from '../endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
@@ -535,9 +536,21 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpoint(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
+    return this.toResponse(await this.resolveEndpoint(endpointId), view);
+  }
+
+  async getEndpointWithETag(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<{ endpoint: EndpointResponse; etag: string }> {
+    const snapshot = await this.resolveEndpoint(endpointId);
+    return {
+      endpoint: this.toResponse(snapshot, view),
+      etag: endpointETag(this.toFullResponse(snapshot)),
+    };
+  }
+
+  private async resolveEndpoint(endpointId: string): Promise<CachedEndpoint> {
     const cached = this.cacheById.get(endpointId.toLowerCase()) ?? this.cacheByName.get(endpointId.toLowerCase());
     if (this.isInMemoryBackend) {
-      if (cached) return this.toResponse(cached, view);
+      if (cached) return cached;
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
 
@@ -553,7 +566,7 @@ export class EndpointService implements OnModuleInit {
       this.forgetPersistentEndpoint(cached);
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
-    return this.toResponse(this.observePersistentEndpoint(endpoint), view);
+    return this.observePersistentEndpoint(endpoint);
   }
 
   async getEndpointByName(name: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
@@ -608,13 +621,14 @@ export class EndpointService implements OnModuleInit {
     };
   }
 
-  async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
+  async updateEndpoint(endpointId: string, dto: UpdateEndpointDto, ifMatch?: string): Promise<EndpointResponse> {
     const current = this.cacheById.get(endpointId);
 
     if (this.isInMemoryBackend) {
       if (!current) {
         throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
       }
+      assertEndpointIfMatch(this.toFullResponse(current), ifMatch);
 
       let newProfile = current.profile;
 
@@ -662,19 +676,26 @@ export class EndpointService implements OnModuleInit {
       return this.toFullResponse(updated);
     }
 
-    let endpoint: Endpoint | null;
-    try {
-      endpoint = await this.prisma.endpoint.findUnique({
-        where: { id: endpointId }
-      });
-    } catch (e) {
-      this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint lookup failed during update', { endpointId, error: (e as Error).message });
+    if (!isUuid(endpointId)) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
+    const endpoint = await this.prisma.endpoint.findUnique({ where: { id: endpointId } });
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
+
+    const where: Prisma.EndpointWhereUniqueInput = { id: endpointId };
+    if (ifMatch && ifMatch !== '*') {
+      // Compare the stored row before profile normalization changes its runtime representation.
+      where.displayName = endpoint.displayName;
+      where.description = endpoint.description;
+      where.active = endpoint.active;
+      where.profile = {
+        equals: endpoint.profile === null ? Prisma.DbNull : structuredClone(endpoint.profile),
+      };
+    }
+    assertEndpointIfMatch(this.toFullResponse(this.toCached(endpoint)), ifMatch);
 
     // Build profile update
     let profileUpdate: any = undefined;
@@ -686,15 +707,23 @@ export class EndpointService implements OnModuleInit {
       this.normalizeStaleSettingsKeys(profileUpdate);
     }
 
-    const dbUpdated = await this.prisma.endpoint.update({
-      where: { id: endpointId },
-      data: {
-        displayName: dto.displayName,
-        description: dto.description,
-        profile: profileUpdate,
-        active: dto.active
+    let dbUpdated: Endpoint;
+    try {
+      dbUpdated = await this.prisma.endpoint.update({
+        where,
+        data: {
+          displayName: dto.displayName,
+          description: dto.description,
+          profile: profileUpdate,
+          active: dto.active
+        }
+      });
+    } catch (error) {
+      if (ifMatch && ifMatch !== '*' && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        rejectEndpointIfMatch(await this.getEndpoint(endpointId), ifMatch);
       }
-    });
+      throw error;
+    }
 
     const cached = this.toCached(dbUpdated);
     // Update cache (delete old name entry if name changed)

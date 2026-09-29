@@ -1,7 +1,7 @@
-# Endpoint write concurrency (B / C / D)
+# Endpoint write concurrency
 
-**Last verified:** 2026-08-19
-**Applies to:** v0.55.12+
+**Last verified:** 2026-09-28
+**Applies to:** the original v0.55.12+ admin API, with the locally validated P8c fix described below
 
 ## Why this exists
 
@@ -15,15 +15,19 @@ The work was scoped by first measuring **which writes can actually lose data**, 
 
 | Section | Merge semantics | Lost update possible? |
 |---|---|---|
-| `settings` | per-key merge | **No** |
-| `serviceProviderConfig` | per-key merge | **No** |
+| `settings` | per-key merge | Yes, if concurrent database read-modify-write operations are unconditional |
+| `serviceProviderConfig` | per-key merge | Yes, if concurrent database read-modify-write operations are unconditional |
 | `schemas` | replaced wholesale | Yes |
 | `resourceTypes` | replaced wholesale | Yes |
 | `authentication` | replaced wholesale | Yes |
 
-This is the central fact. Two admins toggling two different config flags **already** both succeed, because the server merges per key. A blanket precondition on the endpoint would have added a `412` to the frequent, already-correct path in order to protect a rare one - so it was deliberately **not** added there.
+Per-key merging preserves unrelated keys across sequential requests. It is not
+a database isolation guarantee. The earlier version of this document called
+those rows unconditionally safe; that was too broad. Clients that need protection
+against competing edits should send the returned `If-Match` token. The token
+covers the whole editable endpoint state, not only the keys being patched.
 
-Only two places do read-modify-write of a wholesale-replaced section:
+Two important places do read-modify-write of a wholesale-replaced section:
 
 1. **[ResourceTypesTab](../web/src/pages/ResourceTypesTab.tsx)** merges the whole `resourceTypes[]` + `schemas[]` arrays **client-side**, from the profile read when the page loaded, then sends both. Operator-vs-operator, minutes apart.
 2. **[admin-authentication-method.controller.ts](../api/src/modules/scim/controllers/admin-authentication-method.controller.ts)** loads the whole `authentication` block, edits it, and writes it back. Request-vs-request, milliseconds apart.
@@ -33,10 +37,11 @@ These need **different** fixes, which is why this is three changes and not one.
 ```mermaid
 flowchart TD
   W["A write to the endpoint"] --> Q{"Which section?"}
-  Q -->|"settings / serviceProviderConfig"| M["Per-key merge - already safe, left alone"]
+  Q -->|"settings / serviceProviderConfig"| M["Per-key merge; concurrent edits still need protection"]
   Q -->|"schemas / resourceTypes / authentication"| R{"Who races?"}
   R -->|"two operators, minutes apart"| C["C - If-Match, opt-in per call site"]
   R -->|"two requests, milliseconds apart"| D["D - serialize server-side"]
+  M --> C
   C --> CD["412 + ConflictDialog: refresh, overwrite, or cancel"]
   D --> DL["KeyedMutex per endpoint id"]
 ```
@@ -54,7 +59,12 @@ ETag: W/"e9adceb0cbc7d89b3ac549485c210902"
 Content-Type: application/json
 ```
 
-The value is a SHA-256 content hash of `{displayName, description, active, profile}` ([endpoint-etag.ts](../api/src/modules/endpoint/controllers/endpoint-etag.ts)).
+The value is a SHA-256 content hash of `{displayName, description, active, profile}` ([endpoint-etag.ts](../api/src/modules/endpoint/common/endpoint-etag.ts)).
+
+P8c obtains the response and token from one endpoint snapshot. A `view=summary`
+response has the same editable-state token as a full response, but still omits
+the full profile. Previously its token was calculated after projection and
+therefore could not be used for an unchanged conditional edit.
 
 Three choices worth stating:
 
@@ -75,7 +85,9 @@ Content-Type: application/json
 
 {
   "profile": {
-    "resourceTypes": [ ... ]
+    "settings": {
+      "StrictSchemaValidation": true
+    }
   }
 }
 
@@ -99,6 +111,50 @@ Rules:
 - **`If-Match: *` matches any state**, which is what the UI's force-overwrite uses.
 - **The refusal names both versions**, so the caller can tell what it was working from and what it collided with.
 
+These are the existing **admin API's opt-in content-token semantics**. In
+particular, its exact matching of a weak token is a compatibility choice, not
+a claim to implement the strong comparison required by general HTTP
+[`If-Match`](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.1).
+This package does not change SCIM resource ETag policy or add tag-list syntax.
+
+### P8c: check at the write, not only in the controller
+
+The original implementation checked the token in the controller and then
+called the service. Two requests could both pass that check before either
+saved. A controlled HTTP test reproduced two `200` responses from the same
+token on both InMemory and PostgreSQL.
+
+```mermaid
+sequenceDiagram
+    participant A as First editor
+    participant B as Second editor
+    participant S as Endpoint service
+    participant DB as Endpoint storage
+    A->>S: PATCH with token T
+    B->>S: PATCH with token T
+    S->>DB: Compare persisted editable fields and update
+    DB-->>S: First write succeeds
+    S-->>A: 200 with new token
+    S->>DB: Compare the same old fields and update
+    DB-->>S: Old state no longer matches
+    S-->>B: 412 with current token
+```
+
+On InMemory, the check and publication run synchronously in the service,
+without an intervening await. On PostgreSQL, the ORM update includes the old
+`displayName`, `description`, `active` and complete stored profile in its
+condition. Comparing and updating are one database operation. The condition
+uses the original database values before runtime profile normalization, and
+distinguishes database NULL from JSON null.
+
+No timestamp, distributed mutex, schema migration or hidden retry is needed.
+A rejected database comparison is surfaced as a conflict; even if another
+writer restores the old content before read-back, the failed operation is not
+reported as success. Unrelated database errors propagate normally.
+
+Unconditional calls and `If-Match: *` retain their existing behavior. They do
+not acquire lost-update protection merely because conditional calls are fixed.
+
 In the UI, only the resource-types tab opts in, via `useUpdateEndpointConfig(id, { concurrencyChecked: true })`. Settings writes deliberately do not. Conflicts reuse the existing Phase K5 [ConflictDialog](../web/src/components/primitives/ConflictDialog.tsx) rather than a new surface, so the operator gets the established three-way recovery: refresh-and-reapply, force-overwrite, or cancel. Force-overwrite is implemented by forgetting the remembered version, so the retry simply carries no `If-Match`.
 
 ## D - a race no caller could have resolved
@@ -107,16 +163,23 @@ In the UI, only the resource-types tab opts in, via `useUpdateEndpointConfig(id,
 
 `If-Match` is the wrong instrument here. The race is between two requests milliseconds apart, not two operators, and no client could resolve a conflict it never saw. The fix is to serialize the read-modify-write per endpoint with [KeyedMutex](../api/src/common/keyed-mutex.ts).
 
-Its limit is stated in the source rather than assumed: an in-process lock is a **complete** fix only while one process serves a given endpoint. Both dev and prod run `minReplicas = maxReplicas = 1`, so it closes the whole window today. Raising the replica count reopens it and would need a conditional write in the database instead.
+Its limit is important: an in-process lock serializes only callers using that
+lock in that process. The original August verification assumed a single
+serving process. It does not establish safety across replicas or against other
+write paths that do not take the lock. P8c does not silently opt this separate
+authentication-method workflow into conditional writes.
 
 ## Test coverage
 
 | Level | Location | What it locks |
 |---|---|---|
 | Unit | [endpoint-etag.spec.ts](../api/src/modules/endpoint/controllers/endpoint-etag.spec.ts) | ETag format, stability, what does and does not change it, the four `If-Match` outcomes |
+| Unit | [endpoint-conditional-write.spec.ts](../api/src/modules/endpoint/services/endpoint-conditional-write.spec.ts) | Persisted-field condition, database NULL, stale state, wildcard/unconditional policy, failed-comparison handling and database failures |
 | Unit | [keyed-mutex.spec.ts](../api/src/common/keyed-mutex.spec.ts) | Same-key serialization, different-key concurrency, release on rejection, no key leak |
 | E2E | [endpoint-concurrency.e2e-spec.ts](../api/test/e2e/endpoint-concurrency.e2e-spec.ts) | The lost-update scenario end to end, and that three simultaneous auth-method adds all survive |
+| E2E | [endpoint-conditional-write.e2e-spec.ts](../api/test/e2e/endpoint-conditional-write.e2e-spec.ts) | Controlled simultaneous writes, winning stored state, summary-token usability and identical-content resubmission on both backends |
 | Live | `scripts/live-test.ps1` section `9z-CI` | The same behaviour on a running server, including a genuinely parallel add via `ForEach-Object -Parallel` |
+| Live | [live-endpoint-conditional.cjs](../scripts/live-endpoint-conditional.cjs), main runner section `9z-CS` | Eight outcome checks on one runtime or two PostgreSQL-backed processes |
 | Browser | [endpoint-write-conflict.spec.ts](../web/e2e/endpoint-write-conflict.spec.ts) | An operator saving over a competing edit sees the conflict dialog, and force-overwrite preserves their work |
 | Component | [ResourceTypesTab.test.tsx](../web/src/pages/ResourceTypesTab.test.tsx) | 412 opens the dialog, force-overwrite retries the same payload, cancel writes nothing, non-412 uses the generic error |
 
@@ -126,6 +189,45 @@ Two assertions carry more weight than the status codes:
 
 - After a `412`, the E2E and live tests **re-read the endpoint** and prove the data was not modified. A server that returned `412` *and* applied the write would be worse than no check at all, and asserting only the status would not notice.
 - After force-overwrite, the browser test reads the endpoint back and proves the operator's resource type actually exists. A conflict flow that loses their work politely is still losing their work.
+
+### P8c validation checkpoint
+
+The focused result is **172 unit tests**, **32 HTTP tests per backend**, and
+**eight live checks per backend**. The PostgreSQL run used version 17.8, replayed
+all 22 migrations on a task-owned disposable database and exercised two built
+Node processes for live requests. The summary-token test also demonstrated a
+separate RED before its fix. API build and targeted lint pass with no new
+warnings. Independent review found no significant issues. Existing evidence
+remains historical; this is not a deployment claim.
+
+For a two-process smoke check:
+
+```powershell
+node .\scripts\live-endpoint-conditional.cjs `
+  --base-url $WriterBaseUrl `
+  --reader-url $ReaderBaseUrl `
+  --token $TestToken
+```
+
+Both addresses must reach processes sharing the same PostgreSQL database.
+Omit `--reader-url` for the single-runtime check. The helper cleans up only
+its own newly created endpoint. Controlled interleaving is proved by the
+permanent HTTP regression, not inferred from timing in the live smoke.
+
+**Test/gate improvement: applied.** A barrier forces both requests past the
+old controller check, so the test fails for the actual race rather than
+depending on scheduler luck. A separate assertion proves that the token
+published with a summary can authorize an unchanged edit.
+
+**Design disposition: applied.** The controller delegates the condition to
+the write boundary. Shared token logic lives in the endpoint common layer,
+and body projection and token generation use one resolved snapshot. The
+existing Prisma persistence path is retained; no general-purpose transaction
+framework is introduced.
+
+The repeated controller-precheck failure is also recorded as PC-4 in
+[the engineering-pattern ledger](strategy/ENGINEERING_LESSONS_AND_PATTERNS.md)
+and enforced by the conditional-write rule and permanent regression tests.
 
 ## Execution issues and RCA
 

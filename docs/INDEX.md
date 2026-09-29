@@ -102,7 +102,7 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 121 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
-| [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) | **Concurrent config edits (B/C/D)** - which profile sections can actually lose data and which merge safely, the `ETag` on endpoint reads, opt-in `If-Match` with `412 versionMismatch`, the conflict dialog flow, and the per-endpoint lock that fixed the silent auth-method race |
+| [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) | **Concurrent config edits, including P8c** - atomic opt-in `If-Match` on both backends, usable full/summary state tokens, `412 versionMismatch`, the existing conflict dialog, and the limits of unconditional merging and process-local locks |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
 | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) | Multi-endpoint architecture, data isolation, tenant provisioning |

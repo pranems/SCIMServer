@@ -140,6 +140,10 @@ P8b guarantee was added by the section-wiring correction.
 | P8-I07 | Harness readiness / Low | First local health call received connection refused | The detached server was still starting when the caller probed it | Verify readiness before smoke testing; the two-process PostgreSQL harness uses a bounded health wait and fails if its owned server exits | Server setup / first health call | A running process is not yet a ready HTTP server |
 | P8-I08 | Tooling / Low | Two guessed paths did not exist and symbol lookup could not resolve the sibling worktree | The controller has a different filename, no shared InMemory database file exists, and the language provider did not accept the sibling-worktree reference | Use file discovery and scoped source search instead of inventing a shared storage object | File discovery / attempted read | No product change; repository boundaries must be verified from actual declarations |
 | P8-I09 | Test typing / Low | Lint rejected two list assertions, including the first attempted matcher rewrite | Supertest response bodies and nested asymmetric matcher assignments are typed as `any` | Validate the body as `unknown` and require an actual endpoint array before checking its contents. Final focused HTTP and lint checks pass | Static analysis / targeted lint | Test HTTP boundaries with real type guards rather than casts or weakened lint rules |
+| P8c-I01 | Product correctness / High | Two different endpoint PATCH edits with the same token both returned 200 on both backends | The controller compared the token before the service write; the two checks could both pass | Move the check into the synchronous InMemory write and condition the PostgreSQL update on the old persisted editable fields. The controlled race now returns one 200 and one 412, with only the winning state stored | Forced-interleaving HTTP test / forced-interleaving HTTP test | Keep the barrier regression and the persistence-condition unit test; sequential stale-token tests do not prove race safety |
+| P8c-I02 | Response contract / High | Summary GET published a token different from the full editable-state token | The token was hashed from the projected response with its profile removed | Resolve one snapshot and derive the projected body plus full-state token together; summary-edit regression is GREEN on both backends without exposing the full profile | Alternate-view contract test / alternate-view contract test | Every view publishing a write token must prove the token can authorize an unchanged edit |
+| P8c-I03 | Environment / Low | First command could not find Jest in the new worktree | Dependencies and generated client are not copied into a new worktree | After that failure, reuse the installed tooling through an owned junction and generate the local client with an inert URL | First validation command / first validation command | Keep setup failures separate from the confirmed race RED |
+| P8c-I04 | Documentation / Medium | The older concurrency guide described per-key settings merges as unconditionally safe | Sequential merge semantics were mistaken for isolation between simultaneous database operations | Correct the claim: send If-Match for competing edits; no-header and wildcard writes deliberately retain their existing behavior | Read/write isolation review / implementation documentation review | Name the isolation boundary and distinguish conditional calls from unconditional calls |
 
 ## Entry checklist
 
@@ -194,3 +198,21 @@ packages' 401 discussions were excluded as non-issues for P8a.
 
 This is a package-scoped reconciliation, not a claim that every still-running
 implementation package or its separate transcript has been reconciled.
+
+### P8c transcript reconciliation and final gates
+
+The complete parent event log was scanned through 21,967 events, correlating
+tool inputs/results for the conditional-endpoint worktree and checking error
+and diagnosis signals. The confirmed race, projected-token mismatch, dependency
+setup failure and overbroad merge-safety claim are recorded as P8c-I01 through
+P8c-I04. PostgreSQL RED receipts were also checked explicitly. Source quotations,
+review reads, passing tests whose names contain "stale", and expected synthetic
+error paths were excluded as additional incidents.
+
+Final focused gates: 172 unit tests; 32 HTTP tests per backend; eight live
+checks per backend; PostgreSQL 17.8 with 22 migrations and two live Node
+processes; build; lint at the unchanged 0-error/21-warning scope baseline;
+43 JSON blocks in touched Markdown files; content/freshness; four changed-doc
+diagrams in both strict themes. Independent review found no significant issues.
+The recurring atomicity gap is promoted as PC-4 and the conditional-write rule.
+No release, deployment or live-data repair is implied.

@@ -22,7 +22,7 @@ import {
 } from '../services/endpoint.service';
 import { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import { UpdateEndpointDto } from '../dto/update-endpoint.dto';
-import { endpointETag, assertEndpointIfMatch } from './endpoint-etag';
+import { endpointETag } from '../common/endpoint-etag';
 import {
   resolveEndpointEgressOverrides,
   type EndpointConfig,
@@ -104,9 +104,9 @@ export class EndpointController {
     @Res({ passthrough: true }) res?: Response,
   ): Promise<EndpointResponse> {
     const resolvedView = (view === 'full' || view === 'summary') ? view : 'full';
-    const endpoint = await this.endpointService.getEndpoint(endpointId, resolvedView);
+    const { endpoint, etag } = await this.endpointService.getEndpointWithETag(endpointId, resolvedView);
     // A9 - the token a caller echoes back in If-Match to detect a lost update.
-    res?.setHeader('ETag', endpointETag(endpoint));
+    res?.setHeader('ETag', etag);
     return endpoint;
   }
 
@@ -151,11 +151,7 @@ export class EndpointController {
     @Headers('if-match') ifMatch?: string,
     @Res({ passthrough: true }) res?: Response,
   ): Promise<EndpointResponse> {
-    if (ifMatch) {
-      // Read-then-compare BEFORE the write, so a stale caller never mutates.
-      assertEndpointIfMatch(await this.endpointService.getEndpoint(endpointId, 'full'), ifMatch);
-    }
-    const updated = await this.endpointService.updateEndpoint(endpointId, dto);
+    const updated = await this.endpointService.updateEndpoint(endpointId, dto, ifMatch);
     // Hand back the new token so a client can chain edits without re-reading.
     res?.setHeader('ETag', endpointETag(updated));
     return updated;

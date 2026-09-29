@@ -30,6 +30,7 @@ describe('EndpointController', () => {
     createEndpoint: jest.fn(),
     listEndpoints: jest.fn(),
     getEndpoint: jest.fn(),
+    getEndpointWithETag: jest.fn(),
     getEndpointByName: jest.fn(),
     updateEndpoint: jest.fn(),
     deleteEndpoint: jest.fn(),
@@ -156,24 +157,24 @@ describe('EndpointController', () => {
 
   describe('getEndpoint', () => {
     it('should get an endpoint by ID (default full view)', async () => {
-      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpointResponse);
+      mockEndpointService.getEndpointWithETag.mockResolvedValue({ endpoint: mockEndpointResponse, etag: 'W/"state"' });
 
       const result = await controller.getEndpoint('endpoint-1');
 
       expect(result).toEqual(mockEndpointResponse);
-      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1', 'full');
+      expect(mockEndpointService.getEndpointWithETag).toHaveBeenCalledWith('endpoint-1', 'full');
     });
 
     it('should pass view=summary when requested', async () => {
-      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpointResponse);
+      mockEndpointService.getEndpointWithETag.mockResolvedValue({ endpoint: mockEndpointResponse, etag: 'W/"state"' });
 
       await controller.getEndpoint('endpoint-1', 'summary');
 
-      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1', 'summary');
+      expect(mockEndpointService.getEndpointWithETag).toHaveBeenCalledWith('endpoint-1', 'summary');
     });
 
     it('should propagate NotFoundException for non-existent endpoint', async () => {
-      mockEndpointService.getEndpoint.mockRejectedValue(
+      mockEndpointService.getEndpointWithETag.mockRejectedValue(
         new NotFoundException('Endpoint with ID "non-existent" not found')
       );
 
@@ -239,6 +240,15 @@ describe('EndpointController', () => {
   });
 
   describe('updateEndpoint', () => {
+    it('passes the client token to the service instead of checking it before the write boundary', async () => {
+      mockEndpointService.updateEndpoint.mockResolvedValue(mockEndpointResponse);
+      await controller.updateEndpoint('endpoint-1', { displayName: 'Updated Name' }, 'W/"previous-state"');
+      expect(mockEndpointService.updateEndpoint).toHaveBeenCalledWith(
+        'endpoint-1', { displayName: 'Updated Name' }, 'W/"previous-state"',
+      );
+      expect(mockEndpointService.getEndpoint).not.toHaveBeenCalled();
+    });
+
     it('should update endpoint displayName', async () => {
       const updatedEndpoint = { ...mockEndpointResponse, displayName: 'Updated Name' };
       mockEndpointService.updateEndpoint.mockResolvedValue(updatedEndpoint);
@@ -248,7 +258,7 @@ describe('EndpointController', () => {
       expect(result).toEqual(updatedEndpoint);
       expect(mockEndpointService.updateEndpoint).toHaveBeenCalledWith('endpoint-1', {
         displayName: 'Updated Name',
-      });
+      }, undefined);
     });
 
     it('should update endpoint profile settings', async () => {

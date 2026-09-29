@@ -480,6 +480,14 @@ the endpoint still had its previous single resource type.
 
 ### When the change takes effect
 
+The P8c implementation makes an endpoint PATCH with `If-Match` conditional at
+the write boundary, not only at the earlier controller check. PostgreSQL
+compares the persisted editable fields as part of the update; InMemory checks
+and publishes without an intervening await. The summary and full GET views
+publish a token for the same editable state. See
+[endpoint write concurrency](ENDPOINT_WRITE_CONCURRENCY.md) for the race
+regression, compatibility limits and dual-backend evidence.
+
 On the process handling the PATCH, the service replaces the cached endpoint,
 discards its lazily-built `_schemaCaches`, fires `profileChangeListener` and
 broadcasts `ENDPOINT_UPDATED` on SSE.

@@ -91,10 +91,10 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (30 seeded)
+    title Patterns by category (31)
     "A Test/gate integrity" : 9
     "B Environment/deploy" : 4
-    "C Framework/middleware" : 3
+    "C Framework/middleware" : 4
     "D Security at sinks" : 2
     "E Process/introspection" : 5
     "F Design/architecture" : 3
@@ -137,6 +137,12 @@ Global middleware and framework defaults shape contracts in ways the design stag
 | **PC-1** | Global filters/interceptors are contract-shaping | The SCIM exception filter rewrapped the OAuth `{error}` body into `{detail}`; the content-type middleware 415'd a form-urlencoded token POST | A new endpoint under an existing prefix inherits its middleware. Assert the ACTUAL serialized body; decide content-type/error policy explicitly per cross-protocol route | (convention; A3 carve-out) | auth I-03, I-04 |
 | **PC-2** | Cross-backend parity is not optional | An InMemory endpoint-create was missing the duplicate-name guard that Prisma had; it escaped for months with no unit lock | Any file with an `isInMemoryBackend` branch MUST be walked through the parity matrix; run both backends | Stage 2.5 + 2.6; `crossBackendParityAudit` | Finding-B 2026-05 |
 | **PC-3** | **A `try/catch` spanning a multi-step fallback can make later steps unreachable** | `resolveUserDisplayName` looked up by `scimId` then fell back to `userName`. The fallback ran only when the first lookup returned **null** - but for a userName-shaped input the first query **threw**, so control left the function entirely. The fallback was dead code, and the outer `catch` returned `null`, which is exactly what "not found" looks like | A catch that spans several steps converts "step 1 failed" into "the whole thing found nothing." When step N+1 exists **because** step N can miss, step N must be able to MISS rather than THROW - guard its precondition instead of relying on the catch. Review any `try` block containing a sequential fallback chain: ask whether an early throw silently skips the rest | (convention; guarded with the shared `isUuid` predicate) | 2026-07-30 |
+
+Atomic writes need an explicit persistence-boundary check:
+
+| ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
+|---|---|---|---|---|---|
+| **PC-4** | A precondition is only effective if it still holds when the write commits | Resource and endpoint-admin requests compared versions before a later write; two requests could both pass and both save | Condition the actual database mutation on the old state, or use a transaction that protects the comparison through publication. InMemory needs the equivalent indivisible check and publish. Prove the race with controlled interleaving, and prove every response view's write token can authorize an unchanged edit | Stage 3a.4 conditional-write rule and permanent P3/P8c backend tests | SCIM correctness P3 and P8c, 2026-09-28 |
 
 ### Category D - Security at sinks
 
@@ -200,6 +206,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PC-1 (contract-shaping middleware) | 2 (I-03, I-04) | convention; revisit if a 3rd escape |
 | PC-2 (cross-backend parity) | 1 (high-sev: Finding-B) | YES (Stage 2.5/2.6) |
 | PC-3 (try/catch makes a fallback unreachable) | 1 (medium-sev: dead code path disguised as a clean degrade) | convention; promote on a 2nd sighting |
+| PC-4 (check before commit is not atomic) | 2 (resource writes and endpoint-admin writes) | YES - Stage 3a.4, controlled races on both backends and summary-token contract test |
 | PD-1 (sink guard) | 1 (high-sev: security) | YES (guard + tests) |
 | PD-2 (fix the class, enumerate every column of the type) | 2 (high-sev, same vector: `requestId` v0.54.85, `endpointId` v0.54.89) | YES - Security Gate Map row + one shared guard module |
 | PE-1 / PE-2 (capture timing + transcript) | 1 (operator-surfaced) | YES - this doc + RCA rule |
