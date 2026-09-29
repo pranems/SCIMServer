@@ -75,5 +75,13 @@ function Invoke-ScimCorrectnessContractTests {
                 Test-Result -Success $false -Message '9z-CR: failed to remove dedicated conditional endpoint'
             }
         }
+
+        $script:currentSection = '9z-CS: Endpoint Cache Freshness'
+        try {
+            & (Join-Path $PSScriptRoot '..\test-scim-endpoint-freshness.ps1') -BaseUrl $base -Token $token |
+                ForEach-Object { Test-Result -Success $_.Success -Message "9z-CS: $($_.Message)" }
+        } catch {
+            Test-Result -Success $false -Message "9z-CS: endpoint freshness failed: $($_.Exception.Message)"
+        }
     }
 }

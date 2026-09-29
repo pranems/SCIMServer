@@ -21,20 +21,21 @@ describe('integrated correctness live coverage', () => {
       'test-scim-capability-boundary.ps1',
       'typed-patch.cjs',
       'Invoke-ScimConditionalWriteContract -EndpointUrl',
+      'test-scim-endpoint-freshness.ps1',
     ]) {
-      expect(source).toContain(invocation);
+      expect(source.includes(invocation)).toBe(true);
     }
     expect(source).toContain('finally');
     expect(source).toContain('-Method Delete');
   });
 
-  it('gives search and capability checks distinct sections', () => {
+  it('gives every integration section a unique identifier across main and shared runners', () => {
     const main = read('live-test.ps1');
     const search = read('live-test-sections/search-contract.ps1');
     const source = existsSync(resolve(scripts, section)) ? read(section) : main;
-    const sections = [...`${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"]([^:'"]+):/g)]
+    const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-C[O-Z]):/g)]
       .map((match) => match[1]);
-    expect(sections.length).toBeGreaterThanOrEqual(4);
+    expect(sections.length).toBeGreaterThanOrEqual(5);
     expect(new Set(sections).size).toBe(sections.length);
   });
 });

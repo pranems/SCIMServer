@@ -7,14 +7,17 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Active Execution Reference
 
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
-assembles P1, P3 (including its cleanup follow-up), P5 and P6a on D0.
+assembles P1, P3 (including its cleanup follow-up), P5, P6a and P8a on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
-record the exact source-to-integration mapping. API build, 1,011 focused unit
-tests, four package HTTP suites (91 cases), and the combined live section pass.
+record the exact source-to-integration mapping. The pre-P8a checkpoint passed
+1,011 units and 91 HTTP cases. The P8a increment passes API build, 166 focused
+units, 26 HTTP cases and 78 combined live checks with unchanged endpoint state.
 No package is deployed by this assembly. Product/version/lock metadata stays
-unchanged. P2, P4, P6b, P7a and parent-owned P8a remain separate active work.
+unchanged. P2, P4, P6b, P7a and P8b remain separate work; P8a does not claim
+repository cleanup or conditional-admin-write guarantees.
 
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
+- [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
 - [ ] Final C0 matrix, release metadata on the approved runner, review/PR and deployment.
 

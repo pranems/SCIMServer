@@ -408,8 +408,8 @@ combined checkpoint has its own counts in section 11.1.
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3, P5, P6a and P8a are implemented and locally validated in their source worktrees,
-and integrated here. The pre-P8a checkpoint passed; focused P8a integration
-validation is pending. The final combined matrix,
+and integrated here. The pre-P8a checkpoint and focused P8a integration
+validation passed. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
@@ -462,6 +462,40 @@ Full logs stay in ignored `test-results/scim-integration-initial/`. Package-loca
 PostgreSQL receipts remain independent evidence, not relabeled as an
 integration-branch database run. Other packages are still being authored; do
 not start final C0 or release from this checkpoint.
+
+### 11.2 P8a incremental assembly, 2026-09-28
+
+Source `39841319ae658ab700fb92f23a6b13d0e1ee3c85` was appended as
+`a1a62484` after the existing five source commits and integration wiring fix.
+No history was rewritten. The endpoint service's authoritative PostgreSQL
+reads, content fingerprints, schema/logging refresh and statistics existence
+check were retained unchanged. Shared docs retain the actual integrated
+package states, rather than restoring the source branch's earlier snapshot.
+
+The package's `9z-CR` live section collided with P3. Before fixing it, the
+expanded wiring regression failed two assertions: the shared orchestrator
+lacked P8a, and five declarations had only four distinct identifiers. P8a now
+runs as `9z-CS` through the same main-runner entry point. Its standalone
+helper still supports separate writer/reader URLs and tokens, and still
+cleans only its dedicated fixture.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| Endpoint service, InMemory, controller, ETag and wiring units | 6 suites / 166 tests passed |
+| Freshness/profile HTTP plus P6a interaction | 3 suites / 26 cases passed, explicit InMemory and inert database URL |
+| Lint | 0 errors; 19 existing production warnings plus 3 existing service-test warnings; new wiring/freshness tests have none |
+| Combined main live section | 78 checks passed: previous 71 plus 7 freshness checks |
+| Cleanup | Endpoint collection identical before/after; owned API process stopped |
+| Script syntax | 3 affected PowerShell files parsed |
+| Documentation coupling | PASS for the committed package range; final wiring-commit check follows |
+
+The package's 163-unit, 18-HTTP-per-backend, two-PostgreSQL-process live and
+22-migration evidence remains in [its implementation report](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md).
+This increment does not repeat or reclassify that evidence as a new integrated
+PostgreSQL run. Logs are in `test-results/scim-integration-p8a/`.
+**P8b cleanup and conditional-admin-write guarantees remain separate.**
+Final C0, version/lock updates, publication and deployment remain pending.
 
 ## 12. Architecture and self-improvement decisions
 

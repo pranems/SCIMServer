@@ -16133,18 +16133,6 @@ Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -Foregrou
 . "$PSScriptRoot\live-test-sections\correctness-contracts.ps1"
 Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 
-# TEST SECTION 9z-CR: ENDPOINT CACHE FRESHNESS
-$script:currentSection = "9z-CR: Endpoint cache freshness"
-# ============================================
-$freshnessToken = ([string]$headers.Authorization) -replace '^Bearer\s+', ''
-try {
-    & "$PSScriptRoot\test-scim-endpoint-freshness.ps1" -BaseUrl $baseUrl -Token $freshnessToken |
-        ForEach-Object { Test-Result -Success $_.Success -Message "9z-CR: $($_.Message)" }
-} catch {
-    Test-Result -Success $false -Message "9z-CR: $($_.Exception.Message)"
-}
-
-# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
