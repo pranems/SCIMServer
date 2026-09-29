@@ -1,0 +1,107 @@
+{
+  "scope": "Final corrected P3b common-characteristic state with merged P7/P2/CAS/Group controls, not final C0",
+  "verifiedAt": "2026-09-29",
+  "historyPair": [
+    {
+      "source": "4ba9373c509f6305c7f67cf082ce78bf03b6ae37",
+      "integrated": "d93d1a0d029958e61cc1c5db38551294d48491f2",
+      "status": "SUPERSEDED provenance only; never independently accepted, validated or deployed"
+    },
+    {
+      "source": "2d2da4e17f6f205c5fcb445416cc1331a733b7c4",
+      "integrated": "43b01c4e7393f09b5541c385971c8a1696f1b9ee",
+      "status": "Corrected final state evaluated"
+    }
+  ],
+  "rollbackBoundary": "Treat the fifth/sixth pair together; do not revert the correction alone to the superseded common-externalId interpretation",
+  "sourceSha256": "ed487e929841558ce0035ecfb3a1db8ff8b8d19e77b5c813ae7fc0b6ae144628",
+  "fingerprintMethod": "Sorted tracked/nonignored api/src, api/test and scripts path plus bytes",
+  "netRuntimeDeltaFromAccepted704d701f": "Restore the existing all-core String/SV guard and additionally force common externalId exact-case comparison when an explicit server policy reaches compilation. No default uniqueness or generic payload-authority change.",
+  "build": "passed",
+  "unit": {
+    "suites": 5,
+    "passed": 176,
+    "failed": 0
+  },
+  "lint": {
+    "files": 3,
+    "errors": 0,
+    "warnings": 0,
+    "rulesRelaxed": false
+  },
+  "http": {
+    "suites": [
+      "atomic-uniqueness",
+      "profile-validation-p7",
+      "common-externalid-patch",
+      "retained-entry-put",
+      "conditional-writes",
+      "group-aggregate"
+    ],
+    "inmemory": {
+      "passed": 367,
+      "failed": 0,
+      "nativeOnlySkipped": 2
+    },
+    "postgresql": {
+      "passed": 369,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    },
+    "claims": [
+      "Duplicate common externalId strings remain allowed with default none on User, Group and Device",
+      "Extension-namespaced integer/scalar and string/MV externalId retain independent policies",
+      "Competing POST/PUT/PATCH ownership checks preserve GET/raw-payload/version outcomes",
+      "Typed immutable custom values survive self-PUT and reject changed values",
+      "Merged common-type, binding-context and neutral retained-entry controls remain"
+    ]
+  },
+  "live": {
+    "artifact": "Local npm build output, separate node api/dist/main.js processes; not an immutable published image",
+    "inmemorySharedChecksPassed": 143,
+    "postgresqlSharedChecksPassed": 143,
+    "failed": 0,
+    "scope": "Existing main shared correctness entry; not a new full settings/characteristics matrix"
+  },
+  "ownership": {
+    "postgresRun": "fc3a47d149b0fa18",
+    "verifiedFreshLoopbackTmpfsDatabase": true,
+    "inheritedDatabaseUrlUsed": false,
+    "pinnedBootstrap": true,
+    "exactOwnedContainerRemoved": true,
+    "ownedRuntimesStopped": true,
+    "endpointInventoriesUnchanged": true
+  },
+  "policyLimits": [
+    "Top-level common externalId remains String/SV/caseExact/readWrite on every resource core",
+    "Default none is unchanged; no new server-uniqueness admission policy is introduced",
+    "An existing explicit product namespace constraint is not a claim of RFC-required, provisioning-client-scoped or global uniqueness",
+    "Admission and runtime policy consumers still need coordinated binding-qualified common views",
+    "Extension homonyms and legitimate custom displayName/active types remain independent"
+  ],
+  "remainingC0": [
+    "Known numeric/MV displayName query failures",
+    "Whole-namespace strict PATCH and remaining P7b characteristic consumers",
+    "Prior expectation reconciliation and malformed-profile omission behavior",
+    "Shared uniqueness admission and profile coordination",
+    "Original82-case/164-backend ledger, performance and exact packaged-artifact proof"
+  ],
+  "sourceReceipts": {
+    "superseded": "../scim-uniqueness-externalid-20260929.json",
+    "corrected": "../scim-uniqueness-common-20260929.json",
+    "unchanged": true
+  },
+  "documentation": {
+    "contentAndFreshnessCouplingDocsPassed": 26,
+    "newRelativeLinksResolved": 8,
+    "diagramEdits": 0,
+    "original82CaseLedgerUnchanged": true
+  },
+  "finalMatrix": false,
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

@@ -45,11 +45,18 @@ checks and neutral PUT matching remain intact. Combined proof: 754 units,
 All accepted source packages are now assembled; remaining P7b/query/admission
 and final case-level acceptance are not declared complete.
 
-**Held source, not imported:** `4ba9373c` proposes numeric/MV top-level
-externalId for custom cores. Its committed policy delta contradicts the
-authoritative common String/SV/caseExact/readWrite contract and approved
-`6fbd1770` clarification. The accepted P3b chain remains through `704d701f`;
-only extension homonyms retain independent types. See tracker11.25.
+**Corrected source-history pair:** the held `4ba9373c` interpretation is
+SUPERSEDED by `2d2da4e1`. Both are now preserved consecutively as
+`d93d1a0d` / `43b01c4e`; only the final corrected state is evaluated.
+All-core common externalId remains String/SV/exact-case, with default `none`.
+The net runtime change from accepted `704d701f` adds common exact-case
+precedence; independent extension homonyms retain declared types/equality.
+The fifth commit is not an independently accepted rollback target.
+Final corrected-state proof:176 units,367 InMemory HTTP plus two native-only
+skips,369 PostgreSQL17.8 HTTP after22 migrations, and143 shared built-live
+checks/backend. [Paired integration receipt](docs/evidence/scim-common-uniqueness-integration-20260929/validation.json).
+The prior source hold is resolved only by this corrective child; other C0
+query/admission/characteristic acceptance remains open.
 
 **P9 harness hardening integrated:** `8679e90f` -> `2c5067a4`. P9 now pins the
 verified URL through bootstrap; the shared runner clears inherited URLs and
@@ -171,6 +178,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | Preserved superseded4ba9373c/corrective2d2da4e1 consecutively asd93d1a0d/43b01c4e. Only corrected final state tested:176units,367InMemory/369PostgreSQL HTTP,143shared live checks/backend. All-core common externalId String/SV/exact semantics and defaultnone retained; namespaced homonyms independent. Prior hold and bad receipt remain historical, not standalone acceptance. |
 | 2026-09-29 | Held `4ba9373c` without cherry-picking: its numeric/MV custom-core externalId permission contradicts the current RFC common-attribute contract. Source GREEN is not contract acceptance. No runtime/tests/defaults changed; all accepted package sequences remain assembled, with the conflicting source explicitly excluded pending parent reconciliation. |
 | 2026-09-29 | P7 context source `8d5915ba` integrated as `e80da689`, preserving common-PATCH validation and neutral retention.754 units,537 InMemory/538 PostgreSQL HTTP,143 shared live checks/backend including472 P7 assertions pass. Source/live count wiring was RED then GREEN; imported HTTP wire metadata typing corrected without changing assertions. Other C0 holds remain explicit. |
 | 2026-09-29 | P3b custom authority integrated as `7001d194`: 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared built-live checks/backend pass. Separate five-shape probe records43/45 outcomes per backend; numeric/MV displayName equality remains a C0 query blocker (InMemory empty200, PostgreSQL500). Profile omission500 recorded separately. No final matrix or deployment claim. |

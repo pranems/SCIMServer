@@ -9,12 +9,16 @@
 
 ## Active Delivery Process
 
-**Unaccepted source:** `4ba9373c` was inspected but not imported. It limits
-the common externalId String guard to builtin User/Group and introduces
-numeric/MV custom-core positives, contrary to the current authoritative
-all-core common contract. Accepted P3b source stops at `704d701f`.
-Extension homonyms remain independently typed; no blanket custom-field
-restriction is introduced. See [held-source decision](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1125-held-externalid-relaxation-not-imported-2026-09-29).
+**Corrected source pair:** `4ba9373c` was held for violating the common
+externalId contract. Corrective child `2d2da4e1` restores all-core String/SV
+and adds exact-case precedence. Their history is now retained as
+`d93d1a0d` / `43b01c4e`, but the fifth commit is never independently
+accepted or validated. Default `none` and independent extension homonyms
+remain. The [initial hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1125-held-externalid-relaxation-not-imported-2026-09-29)
+is historical; evaluate only the corrected pair's final state.
+That final state now passes176 units,367 InMemory HTTP plus two native-only
+skips,369 PostgreSQL17.8 HTTP and143 shared live checks/backend.
+[Corrected integration evidence](evidence/scim-common-uniqueness-integration-20260929/validation.json).
 
 The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
 P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
@@ -136,7 +140,8 @@ independent. Numeric/MV custom displayName and extension externalId are covered.
 Latest corrected source evidence:654 units,170 PostgreSQL HTTP and168
 InMemory plus two database-only N/A. Earlier648/158/156 counts remain
 historical; the651/167/165 checkpoint4ba9373c is SUPERSEDED by2d2da4e1,
-not independently accepted. The final corrected pair must pass merged proof.
+not independently accepted. The final corrected pair now has the separate
+merged proof above; these source counts are not its combined totals.
 C0/P6 own representation-aware filter/sort pushdown validation for those names.
 P7 common runtime is integrated; shared-policy admission remains parent/C0 work.
 

@@ -5,8 +5,12 @@
 **Status:** P3b local implementation on P4 tip `66a7229f`. Integration,
 release metadata, exact-tip CI and deployment remain parent-owned.
 
-> **Integration acceptance boundary (2026-09-29):** all four P3b source
-> commits are assembled through `704d701f` -> `7001d194`.
+> **Integration acceptance boundary (2026-09-29):** six source commits
+> are preserved through corrected `2d2da4e1` -> `43b01c4e`.
+> The fifth source4ba9373c is SUPERSEDED history, never independently
+> accepted or tested as the final state. [Corrected pair proof](evidence/scim-common-uniqueness-integration-20260929/validation.json)
+> records176 units,367 InMemory/369 PostgreSQL HTTP and143 shared live
+> checks/backend without changing default common externalId uniqueness.
 > The original six no-write probes remain historical evidence. Follow-up
 > `cefb540b` corrects unsupported-type uniqueness and reference exactness.
 > The fourth correction removes the numeric/MV custom-core restrictions and
@@ -27,15 +31,13 @@ authority correction is verified separately from query and final acceptance.
 
 **Registration is a separate open guarantee.** Runtime rejection does not
 prove the endpoint profile/discovery rejects unsupported uniqueness promises.
-P7 owns type- and namespace-qualified admission checks for genuinely
-unsupported declarations. The current generic promoted-column restriction
-must not become a blanket admission rule for otherwise valid custom-core
-displayName/active or extension homonyms.
-No committed P7 admission closure is established here. The P3b worker reports
-its Group-adapter source frozen, but has now resumed a separate generic-
-authority correction after confirming raw payload is the generic response
-authority. That new SHA and evidence remain pending; registration/discovery
-admission is still a separate parent-owned disposition, not an assumed fix.
+The parent/C0 admission pass must reuse the shared capability policy with
+binding-qualified common views. P7's general declaration/common-context
+validation does not establish that uniqueness admission is wired. No
+convenience-column assumption may become a blanket ban on valid custom
+displayName/active or extension homonyms. Generic writer authority is now
+corrected; registration/discovery, query pushdown and profile coordination
+remain separate, not assumed fixes.
 
 **Group-adapter increment integrated:** `6dc2bc63` is assembled as `3766e9f4`.
 Exact builtin identity and represented member-leaf checks pass the focused

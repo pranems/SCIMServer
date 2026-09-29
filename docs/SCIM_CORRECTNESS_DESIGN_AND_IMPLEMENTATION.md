@@ -411,14 +411,14 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Authorized flags integrated and focused dual-backend proof passed | `29b3b2c6` -> `8d2110d1`; 356 HTTP cases/backend preserve ordered/common/P7 overlaps. Quoted active and explicit dotted User controls pass both strict modes; P2 built-live188/backend. Namespace-only strict prevalidation and final C0 remain separate; section 11.22 |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Corrective history pair assembled; final merged proof pending | `4ba9373c` retained only with child`2d2da4e1`, which restores all-core String/SV common externalId and forces exact comparison for existing explicit policies. Source654/170/168 plus two native N/A is distinct from prior integration proof; no acceptance of the superseded numeric/MV common interpretation |
+| P3b | Six-source history retained; corrected final state verified | `4ba9373c` -> `d93d1a0d` is superseded by `2d2da4e1` -> `43b01c4e`. All-core String/SV/exact common externalId, defaultnone and independent extension policies remain. Combined176units/367InMemory/369PostgreSQL HTTP and143live/backend pass; no standalone fifth-commit acceptance; section11.26 |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | Four source commits assembled; focused context overlaps verified | `8d5915ba` -> `e80da689`; binding-local common views and authoritative timestamps preserve existing PATCH/retention fixes.754 units,537 InMemory/538 PostgreSQL HTTP and143 live checks/backend including472 P7 assertions pass. Namespace-only, prior eight expectations and broader query/admission acceptance remain open; section11.24 |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Accepted source assembly complete; conflicting source and acceptance remain open | Checkpoints through11.25; original82-case/backend ledger unchanged. `4ba9373c` held; query/admission/P7b/performance/artifact decisions remain explicit. No final matrix or publication |
+| C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.26; superseded source conflict resolved only by its corrective child. Original82-case/backend ledger and query/admission/P7b/performance/artifact holds unchanged |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -1867,8 +1867,10 @@ seams; no global profile rewrite or duplicate matcher was introduced.
 
 Committed source `4ba9373c509f6305c7f67cf082ce78bf03b6ae37`, child of
 `704d701f`, was supplied after the completed source-assembly handoff.
-It is **held and has not been cherry-picked**. Inspection was limited to
-committed content; no pending sibling diff was read or edited.
+At that checkpoint it was **held and not cherry-picked**. Inspection was
+limited to committed content; no pending sibling diff was read or edited.
+The later corrective child `2d2da4e1` supersedes this hold; both source
+commits are retained together, never as independent acceptance of the fifth.
 
 Its `compileUniquenessPolicy` change removes externalId from the all-core
 String guard and applies that guard only to builtin User/Group. New positive
@@ -1884,8 +1886,8 @@ Its source-only GREEN receipt cannot replace that contract. No new runtime
 test was needed to establish the contradictory code change; the existing
 common-value negative controls are retained, not weakened to accept it.
 
-**Disposition: held for parent reconciliation.** The accepted P3b chain
-remains the first four commits through `704d701f`. Do not silently cherry-pick
+**Initial disposition: held for parent reconciliation.** The accepted P3b chain
+then stopped at the first four commits through `704d701f`. Do not silently cherry-pick
 the fifth, relabel its invalid common-value positives as extension tests, or
 add numeric common-externalId query support. Future coordinated compiler/
 admission work must resolve common views per ResourceType binding before
@@ -1896,6 +1898,46 @@ on the current accepted contract, not a stale handoff's approval wording or
 passing implementation tests. **Design disposition: accepted.** No extra
 validator, schema rewrite, default change or runtime edit is introduced by
 this hold. Existing verification and source fingerprints remain unchanged.
+
+### 11.26 Corrective source pair after the hold, 2026-09-29
+
+The final net policy of source `2d2da4e1` was inspected against accepted
+`704d701f` before importing history. It restores the all-core String/SV
+guard and adds exact-case precedence for common externalId when an existing
+explicit server policy reaches the repository. Default `none` stays
+non-unique; no new admission or provisioning-client/global uniqueness claim
+is introduced. Corrected positive numeric/MV homonyms are explicitly
+extension-namespaced, not silently relabeled top-level common values.
+
+For provenance, source4ba9373c and corrective child2d2da4e1 are retained
+consecutively as `d93d1a0d` and `43b01c4e`. No runtime was launched and no
+conformance validation was claimed on the intermediate fifth state.
+Treat both commits as a paired rollback boundary; never revert the correction
+alone to the superseded interpretation. Their original receipts are unchanged
+and separately labeled historical/superseded versus corrected.
+
+| Focused final-state check | Result |
+|---|---|
+| Build / lint | API build passed; policy/unit/HTTP files lint at zero errors and zero warnings |
+| Policy/common/PATCH/retention/generic units | Five suites,176 passed |
+| HTTP | Six suites:367 InMemory plus two native-only skips;369 PostgreSQL, zero pending/TODO |
+| Database | Actual PostgreSQL17.8, all22 migrations, uniquely owned loopback/tmpfs target with pinned bootstrap |
+| Built-live |143 main shared checks pass on each separately started runtime; endpoints unchanged, APIs stopped, exact container removed |
+| Receipt | [Corrected common-uniqueness integration](evidence/scim-common-uniqueness-integration-20260929/validation.json) |
+
+The tests preserve common string duplicates under defaultnone across User,
+Group and Device, extension-specific numeric/MV races and equality,
+GET/raw-payload/version outcomes and immutable self-PUT controls.
+P7 common runtime and the integration's original-value/completed-candidate
+checks remain. Admission and runtime policy consumers still need coordinated
+role-qualified common views; this is not final admission or client-domain
+namespace acceptance. Existing query/P7b/performance/artifact holds remain.
+
+**Test/gate improvement: applied.** The initial hold caught a contract
+conflict that isolated GREEN could not settle; only the corrected net state
+received integrated evidence. **Design/architecture disposition: accepted.**
+Reuse the existing compiler and common/runtime seams; no duplicate table,
+schema restriction or implicit uniqueness default was added.
 
 ## 12. Architecture and self-improvement decisions
 
