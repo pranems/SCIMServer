@@ -1,7 +1,8 @@
 import { RepositoryError } from '../errors/repository-error';
 import type { SchemaAttributeDefinition, SchemaDefinition } from '../validation/validation-types';
 
-const SCALAR_TYPES = ['string', 'reference', 'boolean', 'integer', 'decimal', 'dateTime', 'binary'] as const;
+// RFC 7643 sections 2.3.2/5/6/8: boolean, dateTime, binary and complex have no uniqueness.
+const SCALAR_TYPES = ['string', 'reference', 'integer', 'decimal'] as const;
 type UniqueScalarType = typeof SCALAR_TYPES[number];
 function isScalarType(type: string): type is UniqueScalarType {
   return (SCALAR_TYPES as readonly string[]).includes(type);
@@ -40,7 +41,7 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
               (path.length !== 1 || path[0].multiValued || (attr.type ?? 'string') !== promotedType)))) {
             throw new RepositoryError('INVALID_VALUE', 'Unsupported uniqueness declaration on a computed or incompatible promoted core attribute.');
           }
-          result.push({ schemaUrn: core ? null : schema.id, path, type, caseExact: attr.caseExact ?? false });
+          result.push({ schemaUrn: core ? null : schema.id, path, type, caseExact: type === 'reference' || (attr.caseExact ?? false) });
         }
         if (attr.subAttributes) walk(attr.subAttributes, path);
       }
@@ -61,28 +62,16 @@ function valueKey(value: unknown, attr: UniqueAttribute): string {
   const invalid = () => new RepositoryError('INVALID_VALUE', 'A unique attribute must contain a valid value of its declared type.');
   switch (attr.type) {
     case 'string':
-    case 'reference':
       if (typeof value !== 'string') throw invalid();
       return attr.caseExact ? value : value.toLowerCase();
-    case 'boolean':
-      if (typeof value !== 'boolean') throw invalid();
-      return String(value);
+    case 'reference':
+      if (typeof value !== 'string') throw invalid();
+      return value;
     case 'integer':
     case 'decimal':
       if (typeof value !== 'number' || !Number.isFinite(value) ||
           (attr.type === 'integer' && !Number.isSafeInteger(value))) throw invalid();
       return String(value);
-    case 'dateTime': {
-      if (typeof value !== 'string') throw invalid();
-      const match = /^(.+T\d\d:\d\d:\d\d)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$/i.exec(value);
-      const seconds = match ? Date.parse(`${match[1]}${match[3]}`) : NaN;
-      if (!Number.isFinite(seconds)) throw invalid();
-      // Preserve sub-millisecond precision while comparing equivalent timezone offsets.
-      return `${seconds}:${(match![2] ?? '').replace(/0+$/, '')}`;
-    }
-    case 'binary':
-      if (typeof value !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}(?:==)?|[A-Za-z0-9+/]{3}=?)?$/.test(value)) throw invalid();
-      return Buffer.from(value, 'base64').toString('base64');
     default:
       throw invalid();
   }

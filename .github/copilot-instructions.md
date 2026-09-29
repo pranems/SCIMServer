@@ -926,3 +926,10 @@ reorder them, and carry explicit schema identity instead of inferring it from
 a URN substring. Enumerate every mutating repository port, including retained
 append/helper ports; each must participate in the same policy and atomicity
 protocol. See [P3b RCA](../docs/SCIM_UNIQUENESS_EXECUTION_RCA.md).
+
+Before defining equality, verify the type-specific applicability of the
+characteristic: RFC 7643 section 2.3 gives boolean/dateTime/binary/complex no
+uniqueness and makes reference case exact. A permissive schema admission path
+is not evidence that an inconsistent declaration deserves a new comparison
+mode. Reject unsupported/inconsistent promises explicitly and test legitimate
+non-unique values remain accepted.

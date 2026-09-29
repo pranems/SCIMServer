@@ -7,23 +7,23 @@ release metadata, exact-tip CI and deployment remain parent-owned.
 
 > **Integration acceptance hold (2026-09-29):** the atomic-write core is
 > assembled, but the as-committed policies below are not all approved.
-> Six no-write probes confirm that Boolean/dateTime/binary server uniqueness
-> is accepted, valid numeric/MV custom-core displayName server promises are
-> rejected by convenience-column assumptions, and generic candidate fields
-> are overwritten by promoted columns. These conflict with the parent-reviewed
-> RFC/type and custom-schema contract. P3b owns their correction; P7 separately
+> The original six no-write probes remain historical evidence. Follow-up
+> `cefb540b` corrects unsupported-type uniqueness and reference exactness.
+> Valid numeric/MV custom-core displayName server promises are still rejected
+> by convenience-column assumptions, and generic candidate fields are still
+> overwritten by promoted columns. These remaining custom-schema discrepancies
+> belong to P3b; P7 separately
 > owns common top-level externalId. Do not deploy or interpret the passing
 > package counts as acceptance of those policies. See
 > [integration disposition](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open).
 
-**Owner-confirmed additional correction:** reference values are inherently
+**Integrated RFC correction, not a full acceptance claim:** reference values are inherently
 case-exact under [RFC 7643 section 2.3.7](https://www.rfc-editor.org/rfc/rfc7643.html#section-2.3.7).
-The current shared String/reference lowercase default is therefore another
-open P3b policy defect. The owner is preparing a new RED/GREEN follow-up for
-reference exactness and rejection of inconsistent server uniqueness on
-Boolean/dateTime/binary/whole-complex attributes. P7 owns matching admission
-checks. No corrected behavior is claimed until the new commit is integrated;
-the custom-core displayName/active authority hold also remains open.
+Follow-up `cefb540b` removes reference folding and rejects inconsistent server
+uniqueness on Boolean/dateTime/binary/whole-complex attributes. P7 owns matching
+admission checks. Source-package RED/GREEN evidence is linked below; final
+integrated acceptance and the custom-core displayName/active authority hold
+remain separate.
 
 ## Client-visible outcome
 
@@ -54,11 +54,10 @@ reserves each distinct value, not an ordered array or an entire complex object.
 | Missing `uniqueness`, or `none` | No added constraint. User `externalId` and `displayName`, and custom names, are not made unique by their spelling. |
 | `server` | The namespace above. Core and extension attributes with the same name remain separate. |
 | `global` | Unsupported capability, not an RFC prohibition. This server cannot prove uniqueness beyond its own storage; P7 owns admission rejection. Runtime compilation fails closed. |
-| String / reference | Exact text when `caseExact:true`; otherwise JavaScript lowercase equality, without trimming or a new Unicode normalization policy. |
+| String | Exact text when `caseExact:true`; otherwise JavaScript lowercase equality, without trimming or a new Unicode normalization policy. |
+| Reference | Intrinsically case exact under RFC 7643 section 2.3.7, regardless of omitted or false `caseExact` metadata. No URI normalization is introduced. |
 | Integer / decimal | Finite JSON numeric equality, not lexical equality; integers must be safely representable. |
-| Boolean | Boolean equality. `false` is a value, not absence. |
-| dateTime | Equivalent instants compare equally across timezone offsets; fractional seconds retain precision beyond milliseconds. |
-| Binary | Decoded base64 bytes compare equally, including padded/unpadded spellings. |
+| Boolean, dateTime, binary | These types have no uniqueness under RFC 7643 sections 2.3.2, 2.3.5 and 2.3.6. `server` declarations are inconsistent and fail closed; ordinary repeated values without the declaration remain accepted. |
 | Multi-valued scalar | Any overlap with another owner's values conflicts. Empty arrays reserve nothing. |
 | Scalar child of complex SV or MV | Walk the declared parent shape and compare each scalar leaf. Works in core or extension schemas. |
 | Null or absent | No reservation. Removal/null releases a previous value; unchanged self-values do not conflict. |
@@ -82,8 +81,9 @@ whether an operator may relax the Group baseline; P3b does not change it.
 | Declaration | Decision and impact |
 |---|---|
 | Uniqueness on an entire complex object | Unsupported: tuple/object equality is not defined by this implementation. Declare supported scalar child constraints instead. |
+| Uniqueness on boolean, dateTime or binary | Inconsistent with their RFC type definitions, not an invitation to add bespoke equality. Remove the characteristic; repeated values are legitimate. |
 | Computed core `meta`, `schemas`, User `groups`, Group `members.$ref` | Unsupported: these values are synthesized, not owned by the resource writer. |
-| Core promoted string fields declared numeric, complex or MV; `active` other than SV boolean | Unsupported: the existing column/response model cannot preserve the declared shape. The same names in extensions remain supported. |
+| Core promoted string fields declared numeric, complex or MV; uniqueness on `active` | Unsupported: the existing column/response model cannot preserve an incompatible shape, and boolean has no uniqueness. The same names in extensions remain supported when their declared type supports uniqueness. |
 | Unknown scalar type | Unsupported. Do not publish a constraint whose equality cannot be evaluated. |
 | Malformed value in a unique field with strict validation off | Rejected with 400 / invalidValue. Disabling general strict validation does not disable a promised uniqueness invariant. |
 
@@ -164,9 +164,9 @@ data analysis and replay evidence, not an unreviewed optimization here.
 
 ## Evidence and reproduction
 
-Final run: **`postgres-51dc93647bdd3197`**. [Sanitized durable receipt](evidence/scim-uniqueness-20260928.json)
+Final RFC-corrected run: **`postgres-85aea7a5dee16b2d`**. [Sanitized durable receipt](evidence/scim-uniqueness-rfc-20260929.json)
 records the exact API/scripts hash and cleanup identity. Focused unit:
-**638 passed / 10 suites**. HTTP: **142 PostgreSQL passed**, **140 InMemory
+**640 passed / 10 suites**. HTTP: **144 PostgreSQL passed**, **142 InMemory
 passed plus two N/A** (native foreign key and independent database pools).
 Each backend also runs **21 new uniqueness live assertions**, plus the existing
 33 conditional and 69 Group aggregate live assertions.
@@ -176,6 +176,11 @@ from the identical-path HEAD baseline **0 / 142**. Both new diagrams render
 under strict security in light and dark themes. Content and freshness gates
 pass for all 26 manifest documents. Release/full integration gates remain
 parent-owned, not implied by this focused evidence.
+
+The RFC follow-up changed policy files independently lint at **0 errors / 0
+warnings**, and its narrow independent review reports no significant issues.
+The [initial receipt](evidence/scim-uniqueness-20260928.json) remains preserved
+for audit history rather than rewritten as if it tested the corrected policy.
 
 | Layer | Evidence |
 |---|---|
@@ -207,6 +212,9 @@ change belongs to this package.
 
 [RFC 7643 section 2.2](https://www.rfc-editor.org/rfc/rfc7643#section-2.2)
 defines `none`, `server`, `global`, defaults and caseExact.
+[Section 2.3](https://www.rfc-editor.org/rfc/rfc7643#section-2.3)
+limits which types have uniqueness and makes references intrinsically case
+exact; those restrictions take precedence over generic characteristic defaults.
 [Section 2.4](https://www.rfc-editor.org/rfc/rfc7643#section-2.4)
 describes multi-valued values, and
 [section 7](https://www.rfc-editor.org/rfc/rfc7643#section-7)
@@ -222,3 +230,10 @@ orchestrators; no policy language, global service mutex or speculative storage
 engine is added. Test improvement: **applied**, distinguish different-owner
 invariant races from same-owner optimistic concurrency tests and verify stored
 outcomes, not merely successful HTTP statuses.
+
+**Standards follow-up:** the first P3b commit implemented comparison for
+boolean/dateTime/binary values before consulting their type-specific RFC
+restrictions. P7's independent review identified that overpromise. The
+follow-up removes those policies instead of claiming extra RFC guarantees,
+and makes reference equality intrinsically exact. The existing implementation
+is preserved in Git; no history is rewritten.

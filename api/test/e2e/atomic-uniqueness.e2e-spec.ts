@@ -62,9 +62,10 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
             { name: 'free', type: 'string', uniqueness: 'none' },
             { name: 'defaultFree', type: 'string' },
             { name: 'number', type: 'decimal', uniqueness: 'server' },
-            { name: 'enabled', type: 'boolean', uniqueness: 'server' },
-            { name: 'instant', type: 'dateTime', uniqueness: 'server' },
-            { name: 'binary', type: 'binary', uniqueness: 'server' },
+            { name: 'reference', type: 'reference', uniqueness: 'server', referenceTypes: ['external'] },
+            { name: 'enabled', type: 'boolean' },
+            { name: 'instant', type: 'dateTime' },
+            { name: 'binary', type: 'binary' },
           ] },
         ],
         resourceTypes: routes.map((route) => ({
@@ -271,12 +272,27 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
     }
   });
   it.each([
-    ['number', 4, 4.0], ['enabled', false, false],
-    ['instant', '2026-09-28T12:00:00Z', '2026-09-28T14:00:00+02:00'],
-    ['binary', 'YQ==', 'YQ'],
+    ['number', 4, 4.0],
+    ['reference', 'https://example.com/Resource', 'https://example.com/Resource'],
   ])('typed equality for %s', async (attribute, first, second) => {
     const ep = await endpoint();
     expect((await http('post', base(ep, 'Devices'), body('Devices', { [attribute]: first }))).status).toBe(201);
     conflict(await http('post', base(ep, 'Devices'), body('Devices', { [attribute]: second })));
+  });
+  it('reference uniqueness is case exact by type, without needing a caseExact declaration', async () => {
+    const ep = await endpoint();
+    for (const reference of ['https://example.com/Resource', 'https://example.com/resource']) {
+      expect((await http('post', base(ep, 'Devices'), body('Devices', { reference }))).status).toBe(201);
+    }
+    expect(await rows(ep, 'Devices')).toHaveLength(2);
+  });
+  it.each([
+    ['enabled', false], ['instant', '2026-09-28T12:00:00Z'], ['binary', 'YQ=='],
+  ])('%s is a non-unique type, not a missing equality implementation', async (attribute, value) => {
+    const ep = await endpoint();
+    for (const _owner of [0, 1]) {
+      expect((await http('post', base(ep, 'Devices'), body('Devices', { [attribute]: value }))).status).toBe(201);
+    }
+    expect(await rows(ep, 'Devices')).toHaveLength(2);
   });
 });

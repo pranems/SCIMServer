@@ -164,6 +164,7 @@ aggregate; read scalar and member state in one turn.
 | Date | Summary |
 |---|---|
 | 2026-09-28 | P3b adds typed scalar/MV-leaf uniqueness, database-owned namespace locks and synchronous InMemory enforcement. Different-owner races, independent PostgreSQL pools and live smoke verified; independent review findings closed with RED controls. No migration, version/lockfile regeneration, push or deployment. |
+| 2026-09-29 | P3b RFC type-applicability follow-up: only string/integer/decimal/reference support uniqueness; reference is intrinsically exact. Boolean/dateTime/binary/whole-complex declarations fail closed instead of inventing equality. RED five units, GREEN 640 units and PG144/IM142 HTTP plus two N/A; local only. |
 
 Assistant memory: case-insensitive attribute lookup must reject ambiguous
 aliases before JSONB can reorder keys; schema identity comes from the resolved

@@ -1,0 +1,59 @@
+{
+  "base": "de05e67b72755c8a06df0e5fd210db3317c76e68",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "85aea7a5dee16b2d",
+  "sourceTreeSha256": "588a83430edc150ff4b280cc0dc32b75a3ce34ad4015fd0fd29f04df6976179c",
+  "sourceHashScope": "Sorted tracked and untracked nonignored api and scripts paths, each path followed by file bytes",
+  "artifact": "test-results/atomic-uniqueness/postgres-85aea7a5dee16b2d/run.json",
+  "postgresVersion": "17.8",
+  "migrationReplay": {
+    "applied": 22,
+    "failed": 0,
+    "newMigrations": 0
+  },
+  "redUnit": {
+    "passed": 30,
+    "failed": 5,
+    "artifact": "test-results/uniqueness/rfc-red.json"
+  },
+  "unit": {
+    "suites": 10,
+    "passed": 640,
+    "failed": 0
+  },
+  "http": [
+    {
+      "backend": "prisma",
+      "passed": 144,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "backend": "inmemory",
+      "passed": 142,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "Native PostgreSQL member foreign key rollback",
+        "Independent PostgreSQL application connection pools"
+      ]
+    }
+  ],
+  "livePerBackend": {
+    "atomicUniquenessAssertions": 21,
+    "conditionalWriteAssertions": 33,
+    "groupAggregateAssertions": 69
+  },
+  "changedPolicyLint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "buildExitCode": 0,
+  "review": "No significant issues found in narrowly reviewed RFC follow-up",
+  "cleanup": {
+    "exactContainerId": "4494fc1cd620f0f970c86c4a58e796c492dff941897c0bd957a53dd4bca5bf46",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  }
+}

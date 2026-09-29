@@ -999,9 +999,11 @@ Set `IgnoreReadOnlyAttributesInPatch: "True"` in the endpoint settings. ReadOnly
 
 ### "Uniqueness is case-sensitive but I expected case-insensitive"
 
-Schema-driven string/reference uniqueness follows `caseExact`. With the RFC
+Schema-driven string uniqueness follows `caseExact`. With the RFC
 default `false`, `"JohnDoe"` and `"johndoe"` conflict; with `true`, they are
-distinct. Intrinsic User `userName` retains the existing case-insensitive
+distinct. Reference uniqueness is intrinsically case exact (RFC 7643 section
+2.3.7). Boolean, dateTime, binary and complex types have no uniqueness; use
+valid scalar child declarations instead. Intrinsic User `userName` retains the existing case-insensitive
 CITEXT/lowercase provider tightening. See the [equality contract](SCIM_UNIQUENESS_IMPLEMENTATION.md).
 
 ### "returned:request attribute always shows up"

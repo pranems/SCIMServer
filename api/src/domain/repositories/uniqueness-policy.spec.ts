@@ -41,7 +41,10 @@ describe('typed uniqueness policy', () => {
   it.each(['none', undefined] as const)('does not impose uniqueness for %s', (uniqueness) => {
     expect(policy({ uniqueness })).toEqual([]);
   });
-  it.each([{ uniqueness: 'global' }, { type: 'complex' }] as const)('fails closed for unsupported %j', (attr) => {
+  it.each([
+    { uniqueness: 'global' }, { type: 'complex' }, { type: 'boolean' },
+    { type: 'dateTime' }, { type: 'binary' },
+  ] as const)('fails closed for unsupported %j', (attr) => {
     expect(() => policy(attr)).toThrow('Unsupported uniqueness declaration');
   });
   it.each([
@@ -61,15 +64,13 @@ describe('typed uniqueness policy', () => {
   });
   it.each([
     ['string', 'X', 'x'], ['integer', 0, -0], ['decimal', 4.0, 4],
-    ['boolean', false, false], ['reference', 'HTTPS://EXAMPLE.COM', 'https://example.com'],
-    ['dateTime', '2026-09-28T12:00:00.123400Z', '2026-09-28T14:00:00.1234+02:00'],
-    ['binary', 'YQ==', 'YQ'],
+    ['reference', 'https://example.com/Resource', 'https://example.com/Resource'],
   ])('compares %s values by typed equality', (type, first, second) => {
     expect(() => assertUnique(policy({ type }), { [urn]: { code: first } }, [{ [urn]: { code: second } }])).toThrow('already owned');
   });
-  it('does not round away dateTime precision', () => {
-    expect(() => assertUnique(policy({ type: 'dateTime' }), { [urn]: { code: '2026-09-28T12:00:00.1234Z' } },
-      [{ [urn]: { code: '2026-09-28T12:00:00.1235Z' } }])).not.toThrow();
+  it.each([undefined, false, true])('reference equality is intrinsically exact despite caseExact %s', (caseExact) => {
+    expect(() => assertUnique(policy({ type: 'reference', caseExact }), { [urn]: { code: 'https://example.com/Resource' } },
+      [{ [urn]: { code: 'https://example.com/resource' } }])).not.toThrow();
   });
   it('caseExact true preserves case, insensitive keys preserve attribute identity', () => {
     expect(() => assertUnique(policy({ caseExact: true }), { [urn.toUpperCase()]: { CODE: 'X' } },

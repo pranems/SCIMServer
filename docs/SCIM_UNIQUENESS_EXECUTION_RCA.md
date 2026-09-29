@@ -18,6 +18,7 @@
 | U10 | Namespace / high | Independent review / pure policy unit | A `:core:` substring classified a legal extension as core. Use explicit identity or the standard RFC core prefix only; HTTP fixture now intentionally uses `:core:` in its extension URN. |
 | U11 | Repository boundary / medium | Independent review / repository unit | Retained `addMembers` did not take a policy. Its required policy argument now drives the same aggregate check and database lock; direct append failure leaves members untouched. |
 | U12 | Compatibility / low | Neighbor repository units / neighbor repository units | Two sorting fixtures deliberately omit payloads. Eager uniqueness parsing ran even for an empty policy. Empty-policy InMemory calls now skip the new parser/scanner, matching Prisma and preserving unrelated behavior. |
+| U13 | Standards interpretation / high | P7 sibling feedback after local commit / RFC type-table design review | Initial P3b implemented boolean/dateTime/binary equality despite RFC 7643 sections 2.3.2/5/6 saying these types have no uniqueness, and treated reference as default case-insensitive despite section 2.3.7. Five RED unit controls now require fail-closed inconsistent declarations and intrinsic exact reference equality. Correct in a normal follow-up commit; P7 owns admission rejection. |
 
 ## Why the fix works
 
@@ -37,12 +38,20 @@ existing-data rewrite is needed for a transaction-scoped protocol.
 
 ## Provenance and disposition
 
-Final source run `postgres-51dc93647bdd3197`: 638 units; PostgreSQL 17.8
+Initial source run `postgres-51dc93647bdd3197`: 638 units; PostgreSQL 17.8
 142 HTTP passed; InMemory 140 passed plus two justified database-only N/A.
 Each backend executes 21 new live assertions plus 33 conditional and 69 Group
 aggregate assertions. [Durable receipt](evidence/scim-uniqueness-20260928.json).
 The final review finds no significant code issue; its pending unit gate was
 subsequently rerun green (638/638).
+
+U13 confirmed fix: `postgres-85aea7a5dee16b2d`, 640 units, PostgreSQL 17.8
+144 HTTP passed and InMemory 142 plus two N/A. All live assertions and
+22 migrations passed again. Policy lint 0 errors/0 warnings; independent
+narrow review has no significant finding. [RFC follow-up receipt](evidence/scim-uniqueness-rfc-20260929.json).
+The fix removes invalid promises rather than inventing behavior contrary to
+the scalar type definitions. Prevention: include type-specific characteristic
+applicability in the policy design table before writing equality tests.
 
 The issue list was reconciled against the available execution outputs and
 review reports for this worktree, separating missing-tool/setup/registration

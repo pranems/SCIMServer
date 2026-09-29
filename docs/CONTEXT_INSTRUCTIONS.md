@@ -70,11 +70,15 @@ including scalar multi-values and complex children. Database-owned namespace
 locks coordinate PostgreSQL writers; InMemory commits synchronously.
 See [contract, compatibility limits and evidence](SCIM_UNIQUENESS_IMPLEMENTATION.md).
 P7 admission and P8 profile-revision coordination remain separate packages.
-The source commit's Boolean/dateTime/binary comparison policies and generic
-promoted-column assumptions still require correction against parent-approved
-standards and custom-field contracts. Atomicity evidence alone does not close them.
+The generic promoted-column assumptions still require correction against
+parent-approved custom-field contracts. Atomicity evidence alone does not
+close that hold.
 See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
 P7 common externalId and P3b uniqueness policies have separate owners.
+The RFC follow-up limits unique types to string/integer/decimal/reference;
+references are intrinsically exact. Latest focused evidence: 640 units,
+144 PostgreSQL HTTP and 142 InMemory plus two database-only N/A in the
+source package; combined-tip validation is separate.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory
