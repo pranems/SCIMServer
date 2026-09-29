@@ -9,8 +9,8 @@
 
 ## Active Delivery Process
 
-The local initial assembly now includes P1, P3/P4, P5, P6a/P6b, P7a and
-P8a/P8b/P8c. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#119-p8b-cleanup-integration-2026-09-29)
+The local initial assembly now includes P1, P3/P4, P5, P6a/P6b, P7a,
+P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
 owns current combined results; the records below are source-package evidence,
 not deployment claims. P4's raw repository-error gap was closed separately
 with value/content regressions, not assumed fixed by P5's scalar formatting.
@@ -21,8 +21,9 @@ P9 is locally implemented on P7a/P1: emitted strict-on Entra guidance,
 honest fixed/inert setting descriptions and a shared 17-case HTTP/live
 corpus, including the proven modern pathless shape.
 Both owned PostgreSQL 17.8 (22 migrations) and InMemory pass.
-Two executable P2 integration checks remain TODO, not compatibility
-passes. See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
+Two executable P2 integration checks remain open, not compatibility passes;
+the integrated `SCIM_P9_INTEGRATION=1` run explicitly reproduced both failures.
+See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
 [37-setting reconciliation](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 No version/lockfile, UI code, push or deployment changes.
 

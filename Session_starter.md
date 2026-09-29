@@ -7,19 +7,21 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Active Execution Reference
 
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
-assembles P1, P3/P4 (including follow-ups), P5, P6a/P6b, P7a and P8a/P8b/P8c on D0.
+assembles P1, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
-The latest P8b increment passes build, 305 focused units, 69 HTTP cases
-(one PostgreSQL-only FK control skipped), and 131 combined live checks,
-including 10 deletion checks and all 228 P7 assertions.
+The latest P9 increment passes build and 383 focused units. Its explicit
+19-case HTTP run has **17 supported passes and 2 blocking failures**:
+I02 primary handoff and I03 verbose-disabled literal-key safety remain P2 work.
+The bounded combined live run has 132 reported checks, including P9's 17
+supported cases / 1,104 assertions; it does not claim I02/I03 passed.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
 unchanged. P8b cleanup is integrated, but concurrent FK-error normalization
 remains a separate parent-reviewed boundary. Final P7 PATCH integration depends
-on P2; the nested-readOnly POST/PUT follow-up is now integrated. Parent-assigned P3b and P9
-workers are closing promised uniqueness and compatibility/guidance work.
+on P2; the nested-readOnly POST/PUT follow-up is now integrated. P3b remains
+active, while P9's package is integrated with its explicit P2 checks still open.
 All remain open before C0.
 
 **Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
@@ -41,8 +43,9 @@ rows remain blocking; frozen evidence and its source guards remain unchanged.
 - [x] ✅ COMPLETED: P4 `212a6b92` -> `c95d0fb6` and `66a7229f` -> `de14fc5b`; aggregate checks use `9z-CW`.
 - [x] ✅ COMPLETED: Recursive readOnly `892b74ba` -> `168c074f`; `9z-CV` now requires all 228 assertions.
 - [x] ✅ COMPLETED: P8b `88b96c74` -> `39a58c9a` and `2db239a9` -> `9178d60c`; deletion checks use `9z-CX`, preserving integrated P8a `9z-CS` and P8c `9z-CT`.
+- [x] ✅ COMPLETED: P9 `109a1099` -> `3ddd8a1b`; bounded compatibility coverage uses `9z-CY`. I02/I03 were executed, not relabeled as supported passes.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close P2, final P7 PATCH integration, P3b/P9 and the concurrent FK-error boundary before the final C0 matrix.
+- [ ] Close P2 including I02/I03, final P7 PATCH integration, P3b/compatibility dispositions and the concurrent FK-error boundary before the final C0 matrix.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.

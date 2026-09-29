@@ -105,6 +105,8 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I13 | Test typing / Low | Explicit lint including the expanded P7 E2E spec found 124 unsafe-value diagnostics despite zero production-file lint errors | Supertest request/result boundaries and Object.fromEntries had implicit any types; existing and new test cases reused them | Add local typed wire/request interfaces, a typed HTTP server boundary, unknown-valued payload fields and tuple-typed entries. Keep runtime value/key assertions and add a missing-fixture guard. After two residual diagnostic passes, all six selected files have zero errors / 14 existing warnings and all 67 P7 HTTP cases pass | Explicit E2E lint / integration | Applied: lint the touched HTTP spec, not only src; no lint-disable comments, rule relaxations or changed protocol expectations |
 | C0-I14 | Harness/integration / Low | P8c unit setup failed eight cases for the new required lifecycle provider; P8b's Group race test timed out | The older P8c test module did not register the new port. P8b paused `groups.update`, but P4 intentionally removed that non-atomic inner call | Register the required test provider. Move the controlled pause before the real aggregate commit, then prove both unconditioned NOT_FOUND and conditioned PRECONDITION_FAILED rejection after endpoint deletion, with zero rows restored. All 305 focused units pass, including unchanged P4 atomic-stage/torn-read tests | Focused integrated unit setup / same | Setup failures are not product RED. Do not reintroduce an await inside P4 to satisfy an obsolete spy; preserve the atomic boundary and test a genuinely suspended caller |
 | C0-I15 | Integration / Low | P8b source reserved `9z-CT`, already used by integrated P8c, and lacked a shared-runner route | Source-branch section allocations differed from the assembled map | Two wiring assertions failed before moving P8b to `9z-CX`. Preserve P8a `9z-CS`, P8c `9z-CT`, original standalone deletion helper and fixture cleanup. All four wiring tests pass | Existing cross-runner regression / same | Applied: ten-package invocation/unique-section inventory; source-package reservations remain historical notes rather than overriding assembled identifiers |
+| C0-I16 | Integration/harness / Low | P9 was absent from main live coverage; its inherited shared harness expected only 55 P7 HTTP cases | The P9 source branch preceded the accepted 67-case readOnly follow-up and the integration wrapper | Preserve P9's guarded branch and all ownership checks, combine minimums as P9=17/P7=67/P1=24, and share only explicit-target HTTP assertions in `9z-CY`. Two wiring failures turn GREEN in 383 focused units | Merge review and wiring regression / same | Applied: eleven-package route/section inventory; `SCIM_P9_INTEGRATION=1` still requests the two unresolved normative cases instead of silently omitting them |
+| C0-I17 | Test typing / Low | Explicit lint of P9's HTTP adapter reported 12 unsafe-value/import errors | CommonJS corpus loading and Supertest server/body boundaries were untyped | Use createRequire with a narrow corpus contract, typed Server input and unknown-valued wire payload. No corpus assertion or expected outcome changed. Six-file lint now passes with zero errors / six existing warnings | Explicit HTTP lint / integration | Applied: keep CJS shared assertions, type the adapter, never suppress lint rules |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -189,6 +191,17 @@ contract proof. No mapper change or new database claim is hidden in this
 cleanup integration. **Design disposition: accepted.** Preserve P3 CAS,
 P4 staged aggregates and P8b lifecycle barriers without introducing shared
 mutable storage or a generalized transaction framework.
+
+P9 integration confirmation: **383 focused units** pass. All **19** corpus
+cases were explicitly executed with `SCIM_P9_INTEGRATION=1`: **17 supported
+cases pass, I02 and I03 fail** with the expected unresolved behavior. These
+are retained blocking findings, not hidden TODOs or accepted compatibility.
+The separately labeled bounded live lane passes **132 reported checks**,
+including **17 P9 cases / 1,104 assertions**, and cleans its dedicated endpoint
+state exactly. Logs use `test-results/scim-integration-p9/`; no new PostgreSQL
+matrix or release proof is claimed. **Design disposition: accepted.** Keep
+the shared corpus and thin typed HTTP adapters, preserve ownership guards and
+leave P2-owned protocol changes to their package owner.
 
 ## P8a issues
 
