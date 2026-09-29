@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
@@ -19,6 +20,11 @@ async function main() {
 
   require("./preload.cjs");
   assert.equal(require(HISTORICAL_SAFETY), current);
+  const { buildRunnerSource, historicalRun } = require("./run.cjs");
+  const runnerSource = buildRunnerSource(fs.readFileSync(historicalRun, "utf8"));
+  assert.match(runnerSource, /"scim-current-acceptance"/);
+  assert.match(runnerSource, /`\$\{BASE\.slice\(0, 12\)\}-\$\{run\}`/);
+  assert.doesNotMatch(runnerSource, /"fresh-analysis"/);
 
   const saved = {
     backend: process.env.PERSISTENCE_BACKEND,
@@ -49,14 +55,14 @@ async function main() {
       "dual-backend.spec.cjs",
     );
     const adapted = require("./corpus-transformer.cjs").adaptCorpus(
-      require("node:fs").readFileSync(corpusPath, "utf8"),
+      fs.readFileSync(corpusPath, "utf8"),
       corpusPath,
     );
     assert.match(adapted, /strict && response\.status !== 200/);
     assert.match(adapted, /repos\.Groups\.updateGroupWithMembers = async/);
     assert.match(adapted, /repos\.Groups\.create = async/);
     assert.doesNotMatch(
-      require("node:fs").readFileSync(corpusPath, "utf8"),
+      fs.readFileSync(corpusPath, "utf8"),
       /strict && response\.status !== 200/,
     );
     assert.deepEqual(await current.testGuard(), {

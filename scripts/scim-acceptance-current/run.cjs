@@ -14,30 +14,44 @@ const historicalRun = path.join(
   "run.cjs",
 );
 
-require(preload);
-const historicalSource = fs.readFileSync(historicalRun, "utf8");
-const oldConfig =
-  'const config = path.join(__dirname, "jest.config.cjs");';
-const currentConfig =
-  'const config = path.join(ROOT, "scripts", "scim-acceptance-current", "jest.config.cjs");';
-assert.equal(
-  historicalSource.split(oldConfig).length,
-  2,
-  "Historical runner config seam changed; review before reuse.",
-);
-const oldOutput = `  "fresh-analysis",
-  \`postgres-20260928-\${run}\`,`;
-const currentOutput = `  "scim-current-acceptance",
-  \`\${BASE.slice(0, 12)}-\${run}\`,`;
-assert.equal(
-  historicalSource.split(oldOutput).length,
-  2,
-  "Historical runner output seam changed; review before reuse.",
-);
-const source = historicalSource
-  .replace(oldConfig, currentConfig)
-  .replace(oldOutput, currentOutput);
-const loaded = new Module(historicalRun, module);
-loaded.filename = historicalRun;
-loaded.paths = Module._nodeModulePaths(path.dirname(historicalRun));
-loaded._compile(source, historicalRun);
+function buildRunnerSource(historicalSource) {
+  const oldConfig =
+    'const config = path.join(__dirname, "jest.config.cjs");';
+  const currentConfig =
+    'const config = path.join(ROOT, "scripts", "scim-acceptance-current", "jest.config.cjs");';
+  assert.equal(
+    historicalSource.split(oldConfig).length,
+    2,
+    "Historical runner config seam changed; review before reuse.",
+  );
+  const eol = historicalSource.includes("\r\n") ? "\r\n" : "\n";
+  const oldOutput = [
+    '  "fresh-analysis",',
+    "  `postgres-20260928-${run}`,",
+  ].join(eol);
+  const currentOutput = [
+    '  "scim-current-acceptance",',
+    "  `${BASE.slice(0, 12)}-${run}`,",
+  ].join(eol);
+  assert.equal(
+    historicalSource.split(oldOutput).length,
+    2,
+    "Historical runner output seam changed; review before reuse.",
+  );
+  return historicalSource
+    .replace(oldConfig, currentConfig)
+    .replace(oldOutput, currentOutput);
+}
+
+function main() {
+  require(preload);
+  const source = buildRunnerSource(fs.readFileSync(historicalRun, "utf8"));
+  const loaded = new Module(historicalRun, module);
+  loaded.filename = historicalRun;
+  loaded.paths = Module._nodeModulePaths(path.dirname(historicalRun));
+  loaded._compile(source, historicalRun);
+}
+
+if (require.main === module) main();
+
+module.exports = { buildRunnerSource, historicalRun };

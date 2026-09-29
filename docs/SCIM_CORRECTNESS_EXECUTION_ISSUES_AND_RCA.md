@@ -260,6 +260,18 @@ remains a consolidation gate, not a claimed completed check.
   container. Earliest/actual detection: benchmark outcome assertion.
   Prevention: benchmark fixtures assert seed size, transferred rows, candidate
   callbacks, total matches and returned page before publishing measurements.
+- **C0-I63 - exact-tip output rewrite / Low.** The first final exact-tip
+  invocation failed before starting Jest or Docker because the newly added
+  current-source output-path rewrite assumed LF line endings while the
+  immutable historical runner was checked out with CRLF. The source guard
+  already normalized line endings for hashes, but the separate exact-text
+  rewrite did not. The transformer now detects the historical source line
+  ending, constructs the guarded two-line seam with that ending, and exposes
+  a side-effect-free builder. The safety self-test proves the current output
+  path is present and the historical path absent before any runtime starts.
+  Earliest/actual detection: final exact-tip wrapper invocation. Prevention:
+  every guarded runner rewrite must be exercised by the preflight safety test,
+  including checkout line-ending variance.
 
 **Test/gate improvement: applied.** Per-binding promise tests and admission
 publication checks close the original blind spots. **Design/architecture
