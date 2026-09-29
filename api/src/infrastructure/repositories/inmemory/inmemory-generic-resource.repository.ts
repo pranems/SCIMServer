@@ -33,8 +33,8 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
   }
 
   async create(input: GenericResourceCreateInput, uniqueness: UniquenessPolicy = []): Promise<GenericResourceRecord> {
-    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload(input), [...this.resources.values()]
-      .filter((r) => r.endpointId === input.endpointId && r.resourceType === input.resourceType).map((r) => uniquenessPayload(r)));
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload(input, undefined, 'payload'), [...this.resources.values()]
+      .filter((r) => r.endpointId === input.endpointId && r.resourceType === input.resourceType).map((r) => uniquenessPayload(r, undefined, 'payload')));
     const now = new Date();
     const record: GenericResourceRecord = {
       id: randomUUID(),
@@ -95,8 +95,8 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
   async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<GenericResourceRecord> {
     const existing = this.resources.get(id);
     assertWritePrecondition(existing, expectedVersion);
-    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }), [...this.resources.values()]
-      .filter((r) => r.id !== id && r.endpointId === existing.endpointId && r.resourceType === existing.resourceType).map((r) => uniquenessPayload(r)));
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }, undefined, 'payload'), [...this.resources.values()]
+      .filter((r) => r.id !== id && r.endpointId === existing.endpointId && r.resourceType === existing.resourceType).map((r) => uniquenessPayload(r, undefined, 'payload')));
 
     const updated: GenericResourceRecord = {
       ...existing,

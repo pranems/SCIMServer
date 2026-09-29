@@ -77,6 +77,7 @@ reserves each distinct value, not an ordered array or an entire complex object.
 | Boolean, dateTime, binary | These types have no uniqueness under RFC 7643 sections 2.3.2, 2.3.5 and 2.3.6. `server` declarations are inconsistent and fail closed; ordinary repeated values without the declaration remain accepted. |
 | Multi-valued scalar | Any overlap with another owner's values conflicts. Empty arrays reserve nothing. |
 | Scalar child of complex SV or MV | Walk the declared parent shape and compare each scalar leaf. Works in core or extension schemas. |
+| Custom-core `displayName`, `userName`, `active` | Follow the actual custom schema and persisted public payload, not the builtin fields' types or convenience columns. Numeric/MV displayName and numeric active/userName remain legitimate custom attributes. |
 | Null or absent | No reservation. Removal/null releases a previous value; unchanged self-values do not conflict. |
 | Inactive / soft-deleted resource | Remains an owner until the stored record or value is removed, preserving existing policy. |
 | Case-aliased keys on a constrained path | Rejected with 400 / invalidValue; JSONB key ordering must not change the meaning of a checked value. |
@@ -101,7 +102,7 @@ whether an operator may relax the Group baseline; P3b does not change it.
 | Uniqueness on boolean, dateTime or binary | Inconsistent with their RFC type definitions, not an invitation to add bespoke equality. Remove the characteristic; repeated values are legitimate. |
 | Core `meta`, `schemas`, builtin User `groups` | Unsupported: these structural, computed or inverse-membership values are not authoritatively owned by this resource writer. |
 | Builtin Group `members` children other than `value`, `type`, `display` | Unsupported: the relation adapter does not store `$ref` or arbitrary additional children. Those three supported leaves must be single-valued strings/references under multi-valued `members`. |
-| Core promoted string fields declared numeric, complex or MV; uniqueness on `active` | Unsupported: the existing column/response model cannot preserve an incompatible shape, and boolean has no uniqueness. The same names in extensions remain supported when their declared type supports uniqueness. |
+| Builtin User/Group promoted string fields with incompatible shapes; common `id`/`externalId` | Builtin adapters and RFC common string attributes require compatible string shapes. This restriction does not apply to ordinary custom-core displayName/userName/active or same-named extensions. |
 | Unknown scalar type | Unsupported. Do not publish a constraint whose equality cannot be evaluated. |
 | Malformed value in a unique field with strict validation off | Rejected with 400 / invalidValue. Disabling general strict validation does not disable a promised uniqueness invariant. |
 
@@ -146,7 +147,11 @@ sequenceDiagram
 ```
 
 * [Typed policy](../api/src/domain/repositories/uniqueness-policy.ts) resolves
-  schema identity, scalar equality, MV traversal and promoted-column ownership.
+  schema identity, scalar equality, MV traversal and family-specific ownership.
+  Builtin User/Group fields use authoritative promoted columns; generic resources
+  explicitly use rawPayload, matching their public response, plus server scimId.
+  Generic convenience columns cannot replace a valid numeric or MV payload value.
+  Generic immutable-state reconstruction follows the same public representation.
 * [Prisma wrapper](../api/src/infrastructure/repositories/prisma/prisma-uniqueness.ts)
   uses a PostgreSQL transaction advisory lock. Hash collisions can serialize
   unrelated namespaces, but cannot allow a duplicate. The lock is database-owned,
@@ -189,9 +194,9 @@ data analysis and replay evidence, not an unreviewed optimization here.
 
 ## Evidence and reproduction
 
-Final RFC/adapter-corrected run: **`postgres-2321df0d53ff0f52`**. [Sanitized durable receipt](evidence/scim-uniqueness-members-20260929.json)
+Final RFC/adapter/custom-payload run: **`postgres-72052466392b3008`**. [Sanitized durable receipt](evidence/scim-uniqueness-custom-20260929.json)
 records the exact API/scripts hash and cleanup identity. Focused unit:
-**646 passed / 10 suites**. HTTP: **147 PostgreSQL passed**, **145 InMemory
+**648 passed / 10 suites**. HTTP: **158 PostgreSQL passed**, **156 InMemory
 passed plus two N/A** (native foreign key and independent database pools).
 Each backend also runs **21 new uniqueness live assertions**, plus the existing
 33 conditional and 69 Group aggregate live assertions.
@@ -206,6 +211,10 @@ The RFC follow-up changed policy files independently lint at **0 errors / 0
 warnings**, and its narrow independent review reports no significant issues.
 The final adapter follow-up repeats these results and adds HTTP preservation
 checks for extension `members.$ref` on all three families.
+The custom-payload follow-up adds competing POST/PUT/PATCH for numeric/MV
+custom displayName, duplicate-permitting `none` controls, custom active/userName
+values and immutable numeric self-replacement. Changed-source lint is unchanged
+at 0 errors / 26 warnings; independent review reports no significant issue.
 The [initial receipt](evidence/scim-uniqueness-20260928.json) remains preserved
 for audit history rather than rewritten as if it tested the corrected policy.
 

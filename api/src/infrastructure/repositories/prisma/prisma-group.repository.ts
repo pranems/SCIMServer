@@ -98,7 +98,7 @@ export class PrismaGroupRepository implements IGroupRepository {
           const created = await tx.scimResource.create({ data });
           if (members.length > 0) await tx.resourceMember.createMany({ data: toMemberData(created.id, members) });
           return toGroupRecord(created);
-        }, members, members.length > 0);
+        }, { members, transaction: members.length > 0 });
     } catch (error) {
       throw await wrapEndpointCreateError(error, `Group create(${input.scimId})`, input.endpointId, this.prisma);
     }
@@ -239,7 +239,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     try {
       await withUniqueWrite(this.prisma, uniqueness, { id: groupId }, {}, async (tx) => {
         await tx.resourceMember.createMany({ data: toMemberData(groupId, members) });
-      }, members, false, true);
+      }, { members, appendMembers: true });
     } catch (error) {
       throw wrapPrismaError(error, `Group addMembers(${groupId})`);
     }
@@ -278,7 +278,7 @@ export class PrismaGroupRepository implements IGroupRepository {
           });
         }
       },
-      members, true,
+      { members, transaction: true },
     ).catch((error) => {
       throw wrapPrismaError(error, `Group updateGroupWithMembers(${groupId})`, expectedVersion);
     });

@@ -20,6 +20,7 @@
 | U12 | Compatibility / low | Neighbor repository units / neighbor repository units | Two sorting fixtures deliberately omit payloads. Eager uniqueness parsing ran even for an empty policy. Empty-policy InMemory calls now skip the new parser/scanner, matching Prisma and preserving unrelated behavior. |
 | U13 | Standards interpretation / high | P7 sibling feedback after local commit / RFC type-table design review | Initial P3b implemented boolean/dateTime/binary equality despite RFC 7643 sections 2.3.2/5/6 saying these types have no uniqueness, and treated reference as default case-insensitive despite section 2.3.7. Five RED unit controls now require fail-closed inconsistent declarations and intrinsic exact reference equality. Correct in a normal follow-up commit; P7 owns admission rejection. |
 | U14 | Representation completeness / medium | P7 adapter inventory / initial adapter inventory | Builtin Group members discard all additional child fields, not only `$ref`; treating other declared leaves as absent silently ignored a promise. Three RED controls exposed extra child skips and an overbroad builtin-URN suffix check. Require the exact represented Group relation leaves and full builtin URN identity; preserve extension/custom-core member paths. |
+| U15 | Representation authority / high | P7 response-source correction / initial response-contract inventory | Generic response emits rawPayload, not promoted convenience columns. Initial P3b wrongly imposed builtin displayName/active shapes on custom cores and overlaid their valid values with null/Boolean columns. Three unit and seven HTTP RED controls per backend prove the regression. Generic repositories now explicitly compare rawPayload plus authoritative id; generic immutable reconstruction also matches response. |
 
 ## Why the fix works
 
@@ -61,6 +62,16 @@ no significant issue. [Adapter follow-up receipt](evidence/scim-uniqueness-membe
 The fix is path/namespace-specific, not a blanket rejection of readOnly or
 same-named extension attributes. Prevention: enumerate the actual adapter's
 round-tripped leaf allowlist, not only one known dropped field.
+
+U15 confirmed fix: `postgres-72052466392b3008`, 648 units, PostgreSQL 158
+HTTP and InMemory 156 plus two N/A, all live assertions and 22 migrations.
+Changed-source lint remains 0 errors / 26 warnings, build passes, narrow
+review reports no significant issue. [Custom authority receipt](evidence/scim-uniqueness-custom-20260929.json).
+The correction preserves accepted custom numeric/MV displayName and numeric
+active/userName rather than treating convenience columns as public schema
+limits. A typed options object keeps the shared transaction helper explicit
+instead of adding another positional Boolean. Prevention: derive representation
+authority from the response and mutation reconstruction, not column names.
 
 The issue list was reconciled against the available execution outputs and
 review reports for this worktree, separating missing-tool/setup/registration

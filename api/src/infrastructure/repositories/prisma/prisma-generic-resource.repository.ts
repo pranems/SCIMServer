@@ -57,7 +57,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
           meta: input.meta,
           endpoint: { connect: { id: input.endpointId } },
         },
-      }));
+      }), { representation: 'payload' });
       return toGenericRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
       throw await wrapEndpointCreateError(error, `GenericResource create(${input.scimId})`, input.endpointId, this.prisma);
@@ -112,7 +112,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
       const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
-      }));
+      }), { representation: 'payload' });
       return toGenericRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `GenericResource update(${id})`, expectedVersion);

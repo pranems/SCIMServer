@@ -33,8 +33,9 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
           const type = attr.type ?? 'string';
           if (!isScalarType(type)) throw new RepositoryError('INVALID_VALUE', 'Unsupported uniqueness declaration type.');
           const root = path[0].name.toLowerCase();
-          const promotedType = ['id', 'externalid', 'displayname'].includes(root) ? 'string'
-            : root === 'active' ? 'boolean'
+          const promotedType = ['id', 'externalid'].includes(root) ? 'string'
+            : (builtinUser || builtinGroup) && root === 'displayname' ? 'string'
+              : (builtinUser || builtinGroup) && root === 'active' ? 'boolean'
               : builtinUser && root === 'username' ? 'string' : undefined;
           const computed = root === 'meta' || root === 'schemas' ||
             (builtinUser && root === 'groups');
@@ -119,12 +120,17 @@ export function assertUnique(
   }
 }
 
-/** Promoted core columns are authoritative; extension attributes with the same name are separate. */
+/** Builtin columns and custom payloads have different public representations. */
 export function uniquenessPayload(
   record: { rawPayload: string; scimId: string; externalId: string | null; displayName?: string | null; active?: boolean; userName?: string },
   members?: readonly { value: string; type: string | null; display: string | null }[],
+  representation: 'columns' | 'payload' = 'columns',
 ): Record<string, unknown> {
   const payload = JSON.parse(record.rawPayload) as Record<string, unknown>;
+  if (representation === 'payload') {
+    for (const key of Object.keys(payload)) if (key.toLowerCase() === 'id') delete payload[key];
+    return { ...payload, id: record.scimId };
+  }
   const promoted: Record<string, unknown> = {
     id: record.scimId, externalId: record.externalId, displayName: record.displayName,
     active: record.active, ...(record.userName === undefined ? {} : { userName: record.userName }),

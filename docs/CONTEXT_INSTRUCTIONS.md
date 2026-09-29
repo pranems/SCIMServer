@@ -92,17 +92,19 @@ including scalar multi-values and complex children. Database-owned namespace
 locks coordinate PostgreSQL writers; InMemory commits synchronously.
 See [contract, compatibility limits and evidence](SCIM_UNIQUENESS_IMPLEMENTATION.md).
 P7 admission and P8 profile-revision coordination remain separate packages.
-The generic promoted-column assumptions still require correction against
-parent-approved custom-field contracts. Atomicity evidence alone does not
-close that hold.
+Source follow-up `704d701f` corrects generic promoted-column assumptions
+against the approved custom-field contract. Focused combined validation,
+query/sort, admission and profile coordination remain separate evidence.
 See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
 P7 common externalId and P3b uniqueness policies have separate owners.
 The RFC follow-up limits unique types to string/integer/decimal/reference;
 references are intrinsically exact. The final adapter follow-up rejects only
 unrepresented builtin Group member leaves, not same-named extensions.
-Latest focused evidence: 646 units, 147 PostgreSQL HTTP and 145 InMemory
-plus two database-only N/A in the source package. This does not close the
-separate generic promoted-column and admission holds above.
+Generic resources use public rawPayload authority, preserving custom numeric/MV
+displayName and other same-named custom fields instead of imposing builtin types.
+Latest source-package evidence: 648 units, 158 PostgreSQL HTTP and 156 InMemory
+plus two database-only N/A. Earlier 646/147/145 counts remain historical;
+this is not yet a claim of combined integration or admission closure.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory

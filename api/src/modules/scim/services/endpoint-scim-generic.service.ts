@@ -1154,9 +1154,6 @@ export class EndpointScimGenericService {
     return {
       schemas: [resourceType.schema],
       ...rawPayload,
-      externalId: record.externalId ?? undefined,
-      displayName: record.displayName ?? undefined,
-      active: record.active,
     };
   }
 

@@ -73,8 +73,7 @@ describe('typed uniqueness policy', () => {
     expect(() => policy(attr)).toThrow('Unsupported uniqueness declaration');
   });
   it.each([
-    { name: 'displayName', type: 'integer' }, { name: 'externalId', multiValued: true },
-    { name: 'active', type: 'string' },
+    { name: 'externalId', multiValued: true },
     { name: 'meta', type: 'complex', uniqueness: 'none', subAttributes: [
       { name: 'location', type: 'reference', uniqueness: 'server', multiValued: false, required: false },
     ] },
@@ -123,6 +122,20 @@ describe('typed uniqueness policy', () => {
     expect(p.displayName).toBe('actual');
     expect(p[urn]).toEqual({ displayName: 'extension' });
     expect(p).not.toHaveProperty('DISPLAYNAME');
+  });
+  it.each([
+    { name: 'displayName', type: 'integer' },
+    { name: 'displayName', type: 'string', multiValued: true },
+    { name: 'active', type: 'integer' },
+  ])('custom core values keep their published payload representation: %j', (attr) => {
+    expect(policy(attr, true)).toHaveLength(1);
+  });
+  it('payload mode preserves custom promoted-name values while server id remains authoritative', () => {
+    const payload = uniquenessPayload({
+      scimId: 'actual-id', externalId: null, displayName: null, active: true,
+      rawPayload: JSON.stringify({ id: 'ignored-id', displayName: [1, 2], active: 42, userName: 7 }),
+    }, undefined, 'payload');
+    expect(payload).toEqual({ id: 'actual-id', displayName: [1, 2], active: 42, userName: 7 });
   });
 });
 

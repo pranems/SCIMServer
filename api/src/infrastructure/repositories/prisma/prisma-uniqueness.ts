@@ -9,6 +9,12 @@ type Candidate = {
 };
 type Member = { value: string; type: string | null; display: string | null };
 type Scope = { endpointId: string; resourceType: string };
+interface UniqueWriteOptions {
+  members?: readonly Member[];
+  transaction?: boolean;
+  appendMembers?: boolean;
+  representation?: 'columns' | 'payload';
+}
 
 /**
  * The lock is held by PostgreSQL, not this process. READ COMMITTED must read
@@ -20,10 +26,9 @@ export async function withUniqueWrite<T>(
   target: Scope | { id: string; expectedVersion?: ExpectedVersion },
   change: Candidate,
   write: (tx: Prisma.TransactionClient) => Promise<T>,
-  members?: readonly Member[],
-  transaction = false,
-  appendMembers = false,
+  options: UniqueWriteOptions = {},
 ): Promise<T> {
+  const { members, transaction = false, appendMembers = false, representation = 'columns' } = options;
   if (policy.length === 0) {
     return transaction ? prisma.$transaction(write, { maxWait: 10000, timeout: 30000 }) : write(prisma);
   }
@@ -43,14 +48,14 @@ export async function withUniqueWrite<T>(
     if ('id' in target) assertWritePrecondition(previous, target.expectedVersion);
     const document = (r: typeof resources[number]) => uniquenessPayload({
       ...r, rawPayload: JSON.stringify(r.payload), userName: r.userName ?? undefined,
-    }, scope.resourceType === 'Group' ? r.membersAsGroup : undefined);
+    }, scope.resourceType === 'Group' ? r.membersAsGroup : undefined, representation);
     const candidate = uniquenessPayload({
       scimId: previous?.scimId ?? '', externalId: previous?.externalId ?? null,
       displayName: previous?.displayName, active: previous?.active,
       userName: previous?.userName ?? undefined, rawPayload: JSON.stringify(previous?.payload ?? {}),
       ...change,
     }, appendMembers ? [...(previous?.membersAsGroup ?? []), ...(members ?? [])]
-      : members ?? (scope.resourceType === 'Group' ? previous?.membersAsGroup ?? [] : undefined));
+      : members ?? (scope.resourceType === 'Group' ? previous?.membersAsGroup ?? [] : undefined), representation);
     assertUnique(policy, candidate, resources.filter((r) => r.id !== previous?.id).map(document));
     return write(tx);
   }, { isolationLevel: 'ReadCommitted', maxWait: 10000, timeout: 30000 });

@@ -1,0 +1,57 @@
+{
+  "base": "6dc2bc63ff353f7acc00ff1f91917d2f56ea4080",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "72052466392b3008",
+  "sourceTreeSha256": "4b168c92595226f496f8a50f8a3a941d485a178b6a98d0a1312c909ae23f5f77",
+  "artifact": "test-results/atomic-uniqueness/postgres-72052466392b3008/run.json",
+  "postgresVersion": "17.8",
+  "migrationsApplied": 22,
+  "newMigrations": 0,
+  "red": {
+    "unitFailed": 3,
+    "httpFailedPerBackend": 7,
+    "httpRun": "ba1d214d22b4719d"
+  },
+  "unit": {
+    "suites": 10,
+    "passed": 648,
+    "failed": 0
+  },
+  "http": [
+    {
+      "backend": "prisma",
+      "passed": 158,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "backend": "inmemory",
+      "passed": 156,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "Native PostgreSQL member foreign key rollback",
+        "Independent PostgreSQL application connection pools"
+      ]
+    }
+  ],
+  "livePerBackend": {
+    "atomicUniquenessAssertions": 21,
+    "conditionalWriteAssertions": 33,
+    "groupAggregateAssertions": 69
+  },
+  "changedSourceLint": {
+    "baselineErrors": 0,
+    "baselineWarnings": 26,
+    "currentErrors": 0,
+    "currentWarnings": 26
+  },
+  "buildExitCode": 0,
+  "review": "No significant issues found in custom payload authority follow-up",
+  "cleanup": {
+    "exactContainerId": "d2f15197e3f8163bee36b184ba0ee3d04fc23ad233b92cdc3370a6b31d70705f",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  }
+}

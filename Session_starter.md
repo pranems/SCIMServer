@@ -220,6 +220,7 @@ aggregate; read scalar and member state in one turn.
 | 2026-09-28 | P3b adds typed scalar/MV-leaf uniqueness, database-owned namespace locks and synchronous InMemory enforcement. Different-owner races, independent PostgreSQL pools and live smoke verified; independent review findings closed with RED controls. No migration, version/lockfile regeneration, push or deployment. |
 | 2026-09-29 | P3b RFC type-applicability follow-up: only string/integer/decimal/reference support uniqueness; reference is intrinsically exact. Boolean/dateTime/binary/whole-complex declarations fail closed instead of inventing equality. RED five units, GREEN 640 units and PG144/IM142 HTTP plus two N/A; local only. |
 | 2026-09-29 | P3b adapter follow-up rejects unrepresented builtin Group member leaves while preserving extension/custom-core `members.$ref`. Builtin exclusions require exact RFC URNs. RED three units; GREEN 646 units, PostgreSQL 147 HTTP and InMemory 145 plus two N/A, same live assertions. |
+| 2026-09-29 | P3b custom-payload correction: generic response/rawPayload is authoritative, not convenience columns. Preserve numeric/MV displayName and numeric active/userName; immutable self-PUT agrees with public state. RED three units/seven HTTP per backend; GREEN 648 units, PostgreSQL 158 HTTP, InMemory 156 plus two N/A. |
 
 Assistant memory: case-insensitive attribute lookup must reject ambiguous
 aliases before JSONB can reorder keys; schema identity comes from the resolved
