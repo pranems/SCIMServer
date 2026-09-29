@@ -54,6 +54,7 @@ No live scan, backup, replay, repair or deployment is authorized here.
 - [x] ✅ COMPLETED: P8b `88b96c74` -> `39a58c9a` and `2db239a9` -> `9178d60c`; deletion checks use `9z-CX`, preserving integrated P8a `9z-CS` and P8c `9z-CT`.
 - [x] ✅ COMPLETED: P9 `109a1099` -> `3ddd8a1b`; bounded compatibility coverage uses `9z-CY`. I02/I03 were executed, not relabeled as supported passes.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
+- [ ] P2 tip `7113ee86` metadata inspected, not imported yet; preserve the [P2/P7 merge seams](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#p2p7-merge-contract), including public `deepEqual` and selected-singleton cardinality.
 - [ ] Close P2 including default-running I02/I03 and effective active-value coercion controls, final P7 PATCH, P3b/compatibility dispositions and the concurrent FK-error boundary before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.

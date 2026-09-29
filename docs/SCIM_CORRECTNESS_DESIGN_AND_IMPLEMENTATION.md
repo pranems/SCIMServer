@@ -1046,6 +1046,25 @@ rows. An opt-in-only test is not accepted as permanent coverage of a resolved
 production defect. Integration coordinates this with the P2 owner and does not
 duplicate fixes in their pending worktree.
 
+#### P2/P7 merge contract
+
+The P7 owner identified these required merge seams for committed P2 tip
+`7113ee866b6b2a039e8cb332943dae48f9027682`, a single child commit after P1.
+The tip has been inspected, not imported by this coordination update. The P7
+source remains frozen at accepted `8e42f15f` plus `892b74ba`; combined
+verification belongs to the integration worktree.
+
+| Seam | Required preservation and combined check |
+|---|---|
+| `SchemaValidator.deepEqual(a, b)` | Retain P2's public visibility; P7's inherited private visibility is not a requirement and must not hide it from executor callers |
+| PATCH value validation | Preserve the unchanged `validatePatchOperationValue` signature, P7 scalar format rules and omitted-type string default. Child validation must use `validateAttribute` so cardinality is not bypassed |
+| Required checks | Keep POST/PUT recursive required checks and ResourceType required-extension metadata. The unchanged `validateRequired` early return for PATCH does not replace P2's per-operation transition enforcement |
+| Immutable checks | Retain the optional fifth `mode: 'patch' \| 'replace' = 'patch'` parameter; helpers pass explicit replacement mode only for PUT |
+| Replacement preparation | Run `prepareReplacement(existing, incoming, schemas)` after writable normalization, preserving readOnly and omitted nonrequired immutable data |
+| Recursive readOnly follow-up | Preserve its existing metadata-map interfaces and object/array walker. It changes POST/PUT stripping, not `stripReadOnlyPatchOps`, executor flags or schema-nesting policy |
+| Selected singleton values | Run combined ordered PATCH HTTP/domain cases after P7's tightened child cardinality. Do not infer correct singleton normalization from either package's isolated GREEN |
+| Characteristics | Canonical values remain suggestions; binary/reference/dateTime validation remains active. No flag/default or unsupported uniqueness policy is invented by merging the two packages |
+
 **Assurance improvement: applied.** Temporary opt-in failure probes have an
 explicit promotion-to-default gate after their fixes.
 **Design disposition: accepted.** Preserve the shared corpus and existing
