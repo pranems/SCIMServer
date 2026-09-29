@@ -409,7 +409,7 @@ combined checkpoint has its own counts in section 11.1.
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | P7a/readOnly follow-up integrated; focused revalidation passed | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Recursive readOnly commit `892b74ba` preserves the existing map interface and POST/PUT-only scope. Final ordered PATCH integration still waits for P2; uniqueness and compatibility closure remain separately owned |
-| P8 | P8a/P8b/P8c integrated; focused cleanup revalidation passed | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) adds lifecycle port, synchronous reversible InMemory cleanup, write barriers and retained audit history. Concurrent FK-error normalization remains a distinct parent-reviewed boundary |
+| P8 | P8a/P8b/P8c integrated; concurrent-error follow-up active | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) proves cleanup/retained audit behavior. Its original worker owns exact missing-parent error normalization for raced User/Group/custom/applicable credential routes on both backends; genuine DB faults and P3 conditional 412 remain distinct |
 | P9 | Integrated; 17 supported cases verified, 2 integration blockers | [Strict-on Entra guidance and 17-case corpus](SCIM_ENTRA_COMPATIBILITY.md), [all 37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). I02/I03 were explicitly executed RED on the assembled tip and remain P2 integration checks, not supported compatibility passes. No defaults changed |
 | C0 | Incremental assembly verified only | Checkpoints 11.1-11.10; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. No full matrix until P2/I02/I03, final P7 PATCH, P3b/compatibility and concurrent FK-error normalization close |
 
@@ -850,7 +850,7 @@ similarly named suite:
 | Attribute characteristics | Core/extension namespace, scalar/MV/complex-child, required/readOnly/immutable/returned/caseExact/uniqueness boundaries, defaults when omitted, provider restrictions and compatibility consequences | B: P3b/P7/P9 and characteristic reconciliation pending |
 | Controlled races and Group rollback | Deterministic same-condition races at real mutation boundaries on both backends; complete scalar/payload/member/version/timestamp rollback and no partial create or success event | B: reconcile P3/P4/P8c with final tip |
 | Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b focused proof exists; exact-case/final-tip reconciliation remains pending |
-| Concurrent deletion/FK error contract | Prove each raced resource/credential operation's exact status, SCIM envelope, diagnostics and sanitized detail separately from no-orphan/rollback checks; retain P3 preconditions and P4 atomicity | B: precise parent-reviewed error-normalization boundary remains open |
+| Concurrent deletion/FK error contract | Prove each raced User/Group/custom/applicable credential operation's exact status, SCIM envelope, diagnostics and sanitized detail separately from no-orphan/rollback checks; retain genuine DB faults, P3 conditional 412 and P4 atomicity | B: original P8b worker's follow-up is active; awaiting committed dual-backend proof |
 | Built-runtime proof | Source SHA, build/artifact identity, actual launched command/runtime and backend, live wire outcomes and fixture cleanup. In-process test listeners and local spot checks are separate claims | B: final exact-artifact live gate pending |
 | P6b resource cost | Measure residual candidate materialization, selectivity, latency, memory and database work on stated datasets; document trade-offs without inferring unchanged cost from functional GREEN | B: final performance assessment pending |
 
@@ -965,6 +965,55 @@ executed integration failures are separate columns, not mixed into a blanket
 GREEN statement. **Design disposition: accepted.** One shared corpus supplies
 Supertest and real HTTP adapters; no new compatibility policy or protocol
 implementation is introduced by consolidation.
+
+### 11.11 Concurrent-deletion follow-up and separate data-repair boundary
+
+The parent assigned the original P8b worker
+`0d433b20-691e-4f7a-955b-836928161c22` to close exact concurrent-deletion
+error behavior. The current paused-HTTP assertion accepts 400 through 599,
+which proves only that a losing write did not succeed. The follow-up must
+prove exact status/envelope/diagnostics for Users, Groups, custom resources
+and applicable credential routes on both backends. Normalize missing-parent
+failures narrowly: do not turn genuine database faults into missing resources,
+and do not overwrite P3's conditional-write 412 semantics. This remains a
+pre-matrix blocker until the committed result is integrated and reconciled.
+Integration does not duplicate that worker's production fix.
+
+**P1 prevention is not retrospective remediation.** The typed parser prevents
+new malformed selector keys; neither its deployment nor a successful normal
+SCIM round-trip proves that old literal-bracket keys were removed from stored
+live JSON. No package, local test, or deployment in this plan implicitly
+authorizes a live-data scan or repair. Do not replay the original request or
+delete suspicious keys automatically.
+
+#### Proposed repair handoff, requiring separate operator approval
+
+This is a required final-handoff proposal, not an approved or executed runbook.
+Before any live access, fill in and obtain explicit operator approval for the
+estate, endpoint/resource scope, tool/version, data-handling location, window,
+responsible operator, and stop/rollback conditions.
+
+| Stage | Required artifact and acceptance check | Authorization boundary |
+|---|---|---|
+| Scope and authority | Identify exact estate through the registry, resource IDs, relevant schemas/settings, incident paths and authoritative intended values. Distinguish literal malformed keys from valid schema data; mark uncertain/conflicting intent for manual review | Separate approval for bounded read-only assessment; no mutation |
+| Backup and recovery | Capture an access-controlled, restorable database backup plus exact affected records, resource IDs/versions and related state. Verify restore on an isolated owned target. Record backup identity, storage/access policy and recovery procedure; keep sensitive payloads out of Git/chat | Approval of backup scope/location/retention and verified restore before any write |
+| Dry-run transformation | Use the restorable snapshot in an isolated environment and the pinned proposed tool. Produce a per-resource before/after proposal, field mapping, conflict list and invariants. A literal key may conflict with a legitimate nested value; never guess which wins | No live mutation; ambiguous mappings fail closed and require operator decisions |
+| Contract validation | Prove intended nested values, removal only of confirmed malformed keys, unchanged resource identity/unrelated attributes/members/credentials, correct version/cache behavior and applicable SCIM validation. Show replay/idempotency and rollback checks on the clone | Operator reviews the evidence and exact proposed delta |
+| Approved execution | Select a reviewed mechanism that can actually address literal JSON keys without interpreting them as fresh selector syntax. Apply only the approved resource/field delta, atomically per required aggregate and conditional on the captured version/state. Stop or re-review changed resources; never blindly overwrite concurrent edits | Separate explicit repair approval naming the tool/artifact, backup, dry-run result and target list |
+| Post-repair verification | Compare stored and SCIM readback values, IDs/counts, audit trail and unrelated state against the approved plan. Record successes, skips and failures individually; use the validated rollback or roll-forward procedure when stop conditions trigger | Report actual outcomes; code rollback and data recovery are separate decisions |
+
+The final handoff must name any unresolved mechanism choice. Do not invent an
+untested public PATCH request that claims to remove a literal selector key,
+and do not silently substitute direct database writes for an approved API
+operation. If no safe unambiguous repair can be demonstrated, hand off the
+affected records as unresolved rather than presenting an automatic cleanup.
+
+No live backup, dry run on live data, repair tool execution, tenant operation
+or deployment has been performed by this documentation update.
+**Assurance improvement: applied.** Prevention, code deployment and data
+remediation have separate evidence and approval gates.
+**Design disposition: accepted.** This adds no automatic migration, runtime
+reinterpretation, parser fallback or speculative remediation framework.
 
 ## 12. Architecture and self-improvement decisions
 

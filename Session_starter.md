@@ -18,8 +18,9 @@ supported cases / 1,104 assertions; it does not claim I02/I03 passed.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
-unchanged. P8b cleanup is integrated, but concurrent FK-error normalization
-remains a separate parent-reviewed boundary. Final P7 PATCH integration depends
+unchanged. P8b cleanup is integrated, but its original worker now owns an active
+follow-up for exact concurrent-deletion errors on both backends. Genuine DB
+faults and P3 conditional 412 semantics must remain distinct. Final P7 PATCH integration depends
 on P2; the nested-readOnly POST/PUT follow-up is now integrated. P3b remains
 active, while P9's package is integrated with its explicit P2 checks still open.
 All remain open before C0.
@@ -36,6 +37,11 @@ Suite totals cannot close rows. Each backend needs an exact-source proof or
 an explicit standards-backed policy/non-applicability rationale. Unreconciled
 rows remain blocking; frozen evidence and its source guards remain unchanged.
 
+**Deployment is not data repair.** P1 prevents new literal-bracket corruption;
+it has not cleaned historical live JSON. The final handoff must include the
+[operator-approved backup/dry-run/repair plan](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1111-concurrent-deletion-follow-up-and-separate-data-repair-boundary).
+No live scan, backup, replay, repair or deployment is authorized here.
+
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
 - [x] ✅ COMPLETED: P8c `8eb2f162` integrated as `2c0536ef`; conditional endpoint writes use `9z-CT`.
@@ -48,6 +54,7 @@ rows remain blocking; frozen evidence and its source guards remain unchanged.
 - [ ] Close P2 including I02/I03, final P7 PATCH integration, P3b/compatibility dispositions and the concurrent FK-error boundary before the final C0 matrix.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
+- [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 
 | Date | Summary |
