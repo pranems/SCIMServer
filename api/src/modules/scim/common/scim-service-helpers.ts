@@ -26,7 +26,7 @@ import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristics
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
-import { parsePatchPath, patchAttributePath, type ParsedPatchPath } from '../../../domain/patch/patch-path';
+import { parsePatchPath, parsePatchTarget, patchAttributePath, type ParsedPatchPath } from '../../../domain/patch/patch-path';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
@@ -703,12 +703,20 @@ export function stripReadOnlyPatchOps(
     if (op.path) {
       let parsed: ParsedPatchPath;
       try {
-        parsed = parsePatchPath(op.path, [...extensionSchemaMap.keys()], schemaDefinitions.find(s => s.isCoreSchema)?.id);
+        parsed = parsePatchTarget(op.path, [...extensionSchemaMap.keys()], schemaDefinitions.find(s => s.isCoreSchema)?.id);
       } catch {
         filtered.push(op); // Malformed paths must reach indexed error reporting.
         continue;
       }
       const targetAttr = parsed.attribute;
+      if (parsed.schemaUrn && !targetAttr && op.op.toLowerCase() !== 'remove' &&
+          op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+        const wrapper = { [parsed.schemaUrn]: structuredClone(op.value) };
+        const removed = stripReadOnlyAttributes(wrapper, schemaDefinitions);
+        stripped.push(...removed);
+        filtered.push(removed.length ? { ...op, value: wrapper[parsed.schemaUrn] } : op);
+        continue;
+      }
 
       // NEVER strip operations targeting 'id' - let G8c hard-reject
       if (targetAttr.toLowerCase() === 'id') {
@@ -760,6 +768,17 @@ export function stripReadOnlyPatchOps(
       for (const key of Object.keys(valueObj)) {
         // Never strip 'id' - let G8c reject
         if (key.toLowerCase() === 'id') continue;
+
+        // Expanded no-path keys must receive the same policy as explicit paths.
+        const target = stripReadOnlyPatchOps([{ ...op, path: key, value: valueObj[key] }],
+          schemaDefinitions, { core, extensions, coreSubAttrs });
+        if (target.stripped.length) {
+          if (target.filtered.length) valueObj[key] = target.filtered[0].value;
+          else delete valueObj[key];
+          stripped.push(...target.stripped);
+          modified = true;
+          continue;
+        }
 
         if (core.has(key.toLowerCase())) {
           delete valueObj[key];
@@ -1539,7 +1558,7 @@ export class ScimSchemaHelpers {
   ): { filtered: PatchOperation[]; stripped: string[] } {
     const cache = this.getSchemaCache(endpointId);
     if (cache) {
-      return stripReadOnlyPatchOps(operations, [], cache.readOnlyCollected);
+      return stripReadOnlyPatchOps(operations, this.getSchemaDefinitions(endpointId), cache.readOnlyCollected);
     }
     const schemas = this.getSchemaDefinitions(endpointId);
     return stripReadOnlyPatchOps(operations, schemas);

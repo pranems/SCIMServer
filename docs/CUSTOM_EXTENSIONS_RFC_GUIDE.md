@@ -54,6 +54,15 @@
 
 ### Pending release: typed extension PATCH paths
 
+The [bounded P7b integration](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) also validates
+whole registered namespace objects, including numeric-version URNs, before
+mutation. Strict malformed containers/types/unknown children fail with the
+operation index and no save. Required binding and immutable transitions use
+the evolving candidate. Optional namespace removal is distinct from removing
+a required attribute inside a retained namespace. Supplied request-only
+extension fields are returned on PATCH without exposing their core homonyms
+or overriding never/writeOnly suppression.
+
 The integrated [common externalId PATCH check](SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate)
 also runs with strict validation OFF. It applies to the common top-level
 String only, not to a namespaced extension externalId integer array or a

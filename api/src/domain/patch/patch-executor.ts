@@ -253,10 +253,19 @@ export class PatchExecutor {
   }
 
   private checkRequired(candidate: Record<string, unknown>, before: Record<string, unknown>, operation: PatchOperation): void {
-    // Check touched roots only. Existing unrelated invalid data must not block a PATCH.
     const paths = operation.path ? [operation.path] : Object.keys(operation.value as Record<string, unknown>);
-    for (const path of paths) {
-      const parsed = this.parse(path);
+    const targets = paths.map(path => this.parse(path));
+    // Binding presence is a whole-resource invariant, not a partial POST/PUT check.
+    for (const schema of this.options.schemaDefinitions ?? []) {
+      if (!schema.required || !this.options.extensionUrns?.includes(schema.id)) continue;
+      if (!read(before, schema.id) && !targets.some(target => target.schemaUrn?.toLowerCase() === schema.id.toLowerCase())) continue;
+      const namespace = read(candidate, schema.id);
+      if (!objectValue(namespace) || !Object.keys(namespace).length) {
+        throw new PatchError(400, `Required extension '${schema.id}' cannot be unassigned.`, 'invalidValue');
+      }
+    }
+    // Check touched roots only. Existing unrelated invalid data must not block a PATCH.
+    for (const parsed of targets) {
       const local = parsed.schemaUrn ? read(candidate, parsed.schemaUrn) : candidate;
       const previous = parsed.schemaUrn ? read(before, parsed.schemaUrn) : before;
       const defs = this.definitions(parsed) ?? [];
@@ -264,7 +273,7 @@ export class PatchExecutor {
       if (!local && !previous) continue;
       for (const def of touched) {
         const next = objectValue(local) ? read(local, def.name) : undefined;
-        requiredValues(next, def);
+        if (!parsed.schemaUrn || local) requiredValues(next, def);
         immutableTransition(objectValue(previous) ? read(previous, def.name) : undefined, next, def);
       }
     }

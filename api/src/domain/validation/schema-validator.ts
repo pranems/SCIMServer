@@ -43,7 +43,7 @@ const RESERVED_KEYS = new Set([
   'meta',
 ]);
 
-import { parsePatchPath, type ParsedPatchPath } from '../patch/patch-path';
+import { parsePatchTarget, type ParsedPatchPath } from '../patch/patch-path';
 
 /**
  * Determine whether a schema definition represents the core schema for a resource type.
@@ -1209,44 +1209,8 @@ export class SchemaValidator {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const obj = value as Record<string, unknown>;
         for (const [key, val] of Object.entries(obj)) {
-          if (RESERVED_KEYS.has(key)) continue;
-          // Extension blocks
-          if (key.startsWith('urn:')) {
-            const extSchema = extensionSchemas.get(key);
-            if (extSchema && val && typeof val === 'object' && !Array.isArray(val)) {
-              // G8c: Check readOnly on extension attributes
-              for (const [extKey] of Object.entries(val as Record<string, unknown>)) {
-                const extAttrDef = extSchema.attributes.find(
-                  a => a.name.toLowerCase() === extKey.toLowerCase(),
-                );
-                if (extAttrDef?.mutability === 'readOnly') {
-                  errors.push({
-                    path: `${key}:${extKey}`,
-                    message: `Attribute '${extKey}' is readOnly and cannot be modified via PATCH.`,
-                    scimType: 'mutability',
-                  });
-                }
-              }
-              for (const [child, incoming] of Object.entries(val)) {
-                errors.push(...this.validatePatchOperationValue(op, `${key}:${child}`, incoming, schemas, preBuiltMaps).errors);
-              }
-            }
-            continue;
-          }
-          const attrDef = coreAttributes.get(key.toLowerCase());
-          if (attrDef) {
-            // G8c: readOnly mutability check for no-path operations
-            if (attrDef.mutability === 'readOnly') {
-              errors.push({
-                path: key,
-                message: `Attribute '${attrDef.name}' is readOnly and cannot be modified via PATCH.`,
-                scimType: 'mutability',
-              });
-              continue;
-            }
-            this.validateAttribute(key, opLower === 'add' ? this.patchAddShape(val, attrDef) : val,
-              attrDef, { strictMode: false, mode: 'patch' }, errors);
-          }
+          if (['schemas', 'id', 'meta'].includes(key.toLowerCase())) continue;
+          errors.push(...this.validatePatchOperationValue(op, key, val, schemas, preBuiltMaps).errors);
         }
       }
       return { valid: errors.length === 0, errors };
@@ -1255,11 +1219,26 @@ export class SchemaValidator {
     // Resolve the path to its attribute definition
     let parsed: ParsedPatchPath;
     try {
-      parsed = parsePatchPath(path, [...extensionSchemas.keys()], schemas.find(isCoreSchema)?.id);
+      parsed = parsePatchTarget(path, [...extensionSchemas.keys()], schemas.find(isCoreSchema)?.id);
     } catch (error) {
       return { valid: false, errors: [{ path, message: (error as Error).message, scimType: 'invalidPath' }] };
     }
+    if (parsed.schemaUrn && !parsed.attribute) {
+      // Whole namespace targets use the same parsed semantics as execution.
+      // Null/remove unassign; required/immutable checks need the evolving resource.
+      if (opLower === 'remove' || value == null) return { valid: true, errors: [] };
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        return { valid: false, errors: [{ path, message: 'Extension namespace requires an object.', scimType: 'invalidValue' }] };
+      }
+      for (const [key, incoming] of Object.entries(value)) {
+        errors.push(...this.validatePatchOperationValue(op, `${parsed.schemaUrn}:${key}`, incoming, schemas, preBuiltMaps).errors);
+      }
+      return { valid: errors.length === 0, errors };
+    }
     const attrDef = this.resolvePatchPath(parsed, coreAttributes, extensionSchemas);
+    if (parsed.schemaUrn && !attrDef && extensionSchemas.has(parsed.schemaUrn)) {
+      return { valid: false, errors: [{ path, message: `Unknown extension attribute '${parsed.attribute}'.`, scimType: 'invalidPath' }] };
+    }
 
     // G8c: Also check if the ROOT attribute in the path chain is readOnly.
     // e.g. "groups[value eq \"x\"].display" - `groups` is readOnly, so the
@@ -1301,7 +1280,7 @@ export class SchemaValidator {
         path,
         opLower === 'add' ? this.patchAddShape(targetValue, targetDef) : targetValue,
         targetDef,
-        { strictMode: false, mode: 'patch' },
+        { strictMode: !!parsed.schemaUrn, mode: 'patch' },
         errors,
       );
     } else if (opLower === 'remove') {

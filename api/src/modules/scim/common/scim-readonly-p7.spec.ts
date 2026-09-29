@@ -1,6 +1,6 @@
 import { SchemaValidator } from '../../../domain/validation/schema-validator';
 import type { SchemaAttributeDefinition, SchemaDefinition } from '../../../domain/validation/validation-types';
-import { stripReadOnlyAttributes } from './scim-service-helpers';
+import { stripReadOnlyAttributes, stripReadOnlyPatchOps } from './scim-service-helpers';
 
 const core = 'urn:example:core:2.0:Widget';
 const ext = 'urn:example:extension:2.0:Widget';
@@ -9,6 +9,19 @@ const attr = (name: string, extra: Partial<SchemaAttributeDefinition> = {}): Sch
   ({ name, type: 'string', required: false, multiValued: false, ...extra });
 
 describe('P7 recursive readOnly stripping', () => {
+  it.each([true, false])('strips readOnly before strict namespace prevalidation, explicit=%s', explicit => {
+    const numeric = 'urn:example:extension:2.0';
+    const schemas: SchemaDefinition[] = [{ id: core, isCoreSchema: true, attributes: [] },
+      { id: numeric, isCoreSchema: false, attributes: [attr('locked', { mutability: 'readOnly' }), attr('open')] }];
+    const operation = explicit
+      ? { op: 'replace', path: numeric, value: { locked: 7, open: 'kept' } }
+      : { op: 'replace', value: { [`${numeric}:locked`]: 7, [`${numeric}:open`]: 'kept' } };
+    const result = stripReadOnlyPatchOps([operation], schemas);
+    expect(result.stripped).toHaveLength(1);
+    expect(result.filtered).toEqual([explicit
+      ? { op: 'replace', path: numeric, value: { open: 'kept' } }
+      : { op: 'replace', value: { [`${numeric}:open`]: 'kept' } }]);
+  });
   for (const outerMany of [false, true]) {
     for (const innerMany of [false, true]) {
       it.each([false, true])(`strips deep children: outerMany=${outerMany}, innerMany=${innerMany}, cache=%s`, cached => {

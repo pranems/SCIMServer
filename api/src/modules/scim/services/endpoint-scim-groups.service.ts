@@ -321,7 +321,7 @@ export class EndpointScimGroupsService {
           strictSchema: strictSchemaEnabled,
           ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
           onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),
-          schemaDefinitions: this.schemaHelpers.buildSchemaDefinitions({ schemas: [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns] }, endpointId),
+          schemaDefinitions: this.schemaHelpers.getSchemaDefinitions(endpointId),
           normalize: (candidate, operation) => {
             candidate.schemas = [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns.filter(urn => urn in candidate)];
             this.schemaHelpers.coerceBooleansByParentIfEnabled(candidate, endpointId, endpointConfig);

@@ -6,6 +6,26 @@ import type { Request } from 'express';
 import { typedPatchProfile, CONTOSO, DEVICE, PATCH } from '../../../../test/e2e/helpers/typed-patch-fixtures';
 
 describe('P2 custom-resource PATCH controller', () => {
+  it('projects request-only PATCH input before the service can mutate the DTO', async () => {
+    const dto = { schemas: [PATCH], Operations: [
+      { op: 'replace', path: `${CONTOSO}:requested`, value: 'supplied' },
+    ] };
+    const result = { schemas: [DEVICE, CONTOSO], id: 'device',
+      requested: 'not-supplied', [CONTOSO]: { requested: 'supplied' } };
+    const controller = new EndpointScimGenericController(
+      { getEndpoint: jest.fn().mockResolvedValue({ active: true, profile: typedPatchProfile(true) }) } as unknown as EndpointService,
+      { setContext: jest.fn(), getWarnings: () => [] } as unknown as EndpointContextStorage,
+      { patchResource: jest.fn().mockImplementation(() => { dto.Operations = []; return result; }),
+        getAlwaysReturnedByParent: () => new Map(),
+        getRequestReturnedByParent: () => new Map([[DEVICE.toLowerCase(), new Set(['requested'])],
+          [CONTOSO.toLowerCase(), new Set(['requested'])]]),
+      } as unknown as EndpointScimGenericService,
+    );
+    const req = { protocol: 'http', get: () => 'localhost', headers: {} } as unknown as Request;
+    expect(await controller.patchResource('endpoint', 'Devices', 'device', dto, req)).toEqual({
+      schemas: [DEVICE, CONTOSO], id: 'device', [CONTOSO]: { requested: 'supplied' },
+    });
+  });
   it('preserves operation ordering and returns only the projected service contract', async () => {
     const profile = typedPatchProfile(true);
     const endpoint = { active: true, profile };

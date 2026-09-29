@@ -93,6 +93,7 @@ export function applyAttributeProjection(
   alwaysReturnedByParent?: Map<string, Set<string>>,
   requestReturnedByParent?: Map<string, Set<string>>,
   writePayload?: Record<string, unknown>,
+  patchSuppliedPaths?: ReadonlySet<string>,
 ): Record<string, unknown> {
   let result = resource;
 
@@ -106,7 +107,8 @@ export function applyAttributeProjection(
   // Strip returned:'request' attributes (unless explicitly named in `attributes`)
   if (requestReturnedByParent && requestReturnedByParent.size > 0) {
     const requestedSet = attributes ? parseAttrList(attributes) : new Set<string>();
-    result = stripRequestOnlyAttrs(result, requestReturnedByParent, requestedSet, attributes ? undefined : writePayload);
+    result = stripRequestOnlyAttrs(result, requestReturnedByParent, requestedSet,
+      attributes ? undefined : writePayload, attributes ? undefined : patchSuppliedPaths);
   }
 
   return result;
@@ -233,6 +235,7 @@ function stripRequestOnlyAttrs(
   requestByParent: Map<string, Set<string>>,
   requestedAttrs: Set<string>,
   writePayload?: Record<string, unknown>,
+  suppliedPaths?: ReadonlySet<string>,
 ): Record<string, unknown> {
   const roots = [...requestByParent.keys()].filter(key => !isSubAttrKey(key));
   const urns = Array.isArray(resource.schemas) ? resource.schemas.filter((s): s is string => typeof s === 'string') : [];
@@ -256,7 +259,7 @@ function stripRequestOnlyAttrs(
       const childPath = extension ? lower : path ? `${path}${path.startsWith('urn:') && path === parent ? ':' : '.'}${lower}` : lower;
       const suppliedKey = input ? findKey(input, key) : undefined;
       const wasSupplied = suppliedKey !== undefined && input![suppliedKey] !== undefined;
-      if (requestOnly?.has(lower) && !explicitlyRequested(childPath) && !wasSupplied) continue;
+      if (requestOnly?.has(lower) && !explicitlyRequested(childPath) && !wasSupplied && !suppliedPaths?.has(childPath)) continue;
       out[key] = walk(child, extension ? lower : `${parent}.${lower}`, childPath,
         suppliedKey !== undefined ? input![suppliedKey] : undefined);
     }

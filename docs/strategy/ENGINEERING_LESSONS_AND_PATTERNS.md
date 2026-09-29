@@ -26,6 +26,20 @@ then repeat comparison after restoring optional immutable discriminators.
 An initially correct pairing is insufficient if restoration changes the next
 pairing. Never invent persisted IDs for anonymous or indistinguishable values.
 
+### PATCH projection needs stable schema context after a write
+
+P7b's first returned:request fix parsed client paths against the final response's
+schemas. Removing an optional namespace shrank that list, so a valid accepted
+numeric-version target became invalid during projection. The repository had
+already committed; the caller received 500. Snapshot the registered resource
+type namespace bindings and compute client presence before invoking the write.
+Do not reconstruct validation context from a filtered response. Twelve HTTP
+negative controls now require successful response, correct body and persisted
+version after namespace removal. A follow-up control also covers ignored keys:
+response generation must not revalidate input that execution intentionally
+discarded. The collector leaves indexed syntax errors to execution.
+See the [P7 RCA](../SCIM_P7_EXECUTION_RCA.md).
+
 ### P9: configuration presence is not behavior or safe operator guidance
 
 A registry count proved that 37 controls existed, but did not detect startup

@@ -50,6 +50,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { resolveResourceType } from '../common/resource-type-resolver';
 import { buildBaseUrl } from '../common/base-url.util';
+import { patchSuppliedPaths } from '../../../domain/patch/patch-presence';
 import { SearchRequestDto } from '../dto/search-request.dto';
 import { searchAttributeSelectionToQuery } from '../dto/search-attribute-selection';
 
@@ -354,6 +355,8 @@ export class EndpointScimGenericController {
       req,
     );
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const extensionUrns = resourceType.schemaExtensions.map(ext => ext.schema);
+    const suppliedPaths = patchSuppliedPaths(body?.Operations, extensionUrns, resourceType.schema);
     const result = await this.genericService.patchResource(
       id,
       body,
@@ -366,7 +369,8 @@ export class EndpointScimGenericController {
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
     const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, undefined,
+      suppliedPaths);
     return this.attachWarnings(projected, config);
   }
 

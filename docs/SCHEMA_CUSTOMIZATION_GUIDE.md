@@ -31,6 +31,16 @@
 
 ### Pending release: PATCH validation uses typed paths
 
+The [P7b integration](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) extends this to whole
+namespace objects and numeric-version URNs. With strict validation enabled,
+wrong containers, unknown fields and malformed nested values fail before
+saving. Required extension removal and required/immutable transitions are
+checked after each operation in both strict modes, against the evolving
+resource rather than a partial POST/PUT view. An optional namespace may be
+absent; its locally required attributes matter when it is present.
+PATCH write responses now include supplied returned:request fields, subject
+to explicit projection and never/writeOnly priority. No flag/default changed.
+
 The [common externalId integration](SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate)
 checks original PATCH values before adapters and the completed candidate in
 both strict modes. It does not reuse POST/PUT required-field checks on partial

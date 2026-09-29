@@ -1,7 +1,7 @@
 import type { PatchOperation, GroupMemberPatchConfig, GroupPatchResult, GroupMemberDto } from './patch-types';
 import { PatchExecutor } from './patch-executor';
 import { PatchError } from './patch-error';
-import { matchesPatchSelection, parsePatchPath } from './patch-path';
+import { matchesPatchSelection, parsePatchTarget } from './patch-path';
 import { objectValue } from './patch-values';
 import { readResolvedProperty as read, withResolvedProperty as put } from '../../modules/scim/utils/scim-patch-path';
 
@@ -39,7 +39,7 @@ export class GroupPatchEngine {
           }
         }
         if (operation.path) {
-          const path = parsePatchPath(operation.path, config.extensionUrns);
+          const path = parsePatchTarget(operation.path, config.extensionUrns);
           if (!path.schemaUrn && path.attribute.toLowerCase() === 'members' && path.kind === 'selection' &&
             !path.subAttribute && Array.isArray(operation.value) && operation.value.length === 1 &&
             operation.op.toLowerCase() !== 'remove') operation = { ...operation, value: operation.value[0] };

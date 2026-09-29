@@ -354,7 +354,7 @@ describe('EndpointScimUsersService', () => {
   describe('patchUserForEndpoint', () => {
     it('P1 persists the exact four-op incident only after every selector succeeds', async () => {
       jest.spyOn(service['schemaHelpers'], 'getExtensionUrns').mockReturnValue([GOOGLE, CONTOSO]);
-      jest.spyOn(service['schemaHelpers'], 'buildSchemaDefinitions').mockReturnValue(
+      jest.spyOn(service['schemaHelpers'], 'getSchemaDefinitions').mockReturnValue(
         require('../../../../test/e2e/helpers/typed-patch-fixtures').incidentSchemas,
       );
       const user = { ...mockUser, rawPayload: JSON.stringify(incidentPayload()) };
@@ -373,7 +373,7 @@ describe('EndpointScimUsersService', () => {
 
     it('P1 rejects operation 3 without calling persistence after earlier valid changes', async () => {
       jest.spyOn(service['schemaHelpers'], 'getExtensionUrns').mockReturnValue([GOOGLE, CONTOSO]);
-      jest.spyOn(service['schemaHelpers'], 'buildSchemaDefinitions').mockReturnValue(
+      jest.spyOn(service['schemaHelpers'], 'getSchemaDefinitions').mockReturnValue(
         require('../../../../test/e2e/helpers/typed-patch-fixtures').incidentSchemas,
       );
       mockUserRepo.findByScimId.mockResolvedValueOnce({ ...mockUser, rawPayload: JSON.stringify(incidentPayload()) });

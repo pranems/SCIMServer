@@ -1,6 +1,6 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
 > **Version:** 0.55.35 - **Updated:** 2026-09-28
 > **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
@@ -20,6 +20,17 @@ omitted non-required immutable values and rejects explicit immutable changes.
 Required extension bindings apply in both strict modes. Supplied
 `returned:request` values appear in POST/PUT responses unless explicit
 projection excludes them. See [contracts and evidence](SCIM_P7A_PROFILE_VALIDATION.md).
+
+**Local P7b PATCH update, not deployed:** whole registered extension URNs
+(including numeric-version suffixes) and no-path namespace objects share
+strict attribute validation. Invalid later operations save nothing and
+report their zero-based index. Required bindings and required/immutable
+transitions use the evolving candidate, not a partial POST/PUT view.
+Supplied `returned:request` paths appear in PATCH responses; explicit
+projection still wins and never/writeOnly fields remain private.
+User `/Me` shares this response behavior. User/Group Bulk delegates the
+same write checks, but success envelopes return status/location/version,
+not resource bodies. See [P7b contracts and owned evidence](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md).
 
 - [Authentication](#authentication)
 - [Common Headers](#common-headers)

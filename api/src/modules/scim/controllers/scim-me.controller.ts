@@ -38,6 +38,7 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
 import { applyAttributeProjection } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
+import { patchSuppliedPaths } from '../../../domain/patch/patch-presence';
 import { createScimError } from '../common/scim-errors';
 import { resolveResourceType } from '../common/resource-type-resolver';
 import { enforcePatchSupported } from '../common/capability-enforcement';
@@ -228,10 +229,12 @@ export class ScimMeController {
     enforcePatchSupported(profile);
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const extensionUrns = profile?.resourceTypes?.find(rt => rt.name === 'User')?.schemaExtensions.map(ext => ext.schema) ?? [];
+    const suppliedPaths = patchSuppliedPaths(dto.Operations, extensionUrns);
     const result = await this.usersService.patchUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);
     const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
     const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, undefined, suppliedPaths);
   }
 
   /**

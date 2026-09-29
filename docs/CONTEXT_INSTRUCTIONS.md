@@ -9,16 +9,18 @@
 
 ## Active Delivery Process
 
-**Current C0 local bridge, not deployed:** common attribute normalization now
+**Current C0 P7b assembly, not deployed:** common attribute normalization now
 feeds runtime uniqueness compilation per ResourceType, and admission uses the
 same compiler before profile publication. Shared declarations are unchanged;
 core-only unsupported computed promises remain admission errors. Omitted
-optional extension lists are safely normalized. Both storage backends passed
-the focused binding/query/CAS/aggregate checks and126 new built-live assertions.
-See [checkpoint11.31](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29)
-for exact counts, the preserved stale harness-count failure and cleanup proof.
-Worker2f90 separately owns the remaining PATCH-schema combination work;
-profile-revision/performance and final C0 acceptance remain open.
+optional extension lists are safely normalized. P7b is now assembled once:
+whole-namespace validation, evolving required/immutable transitions, and
+returned:request presence are integrated without replacing the accepted
+binding, query, retention or transaction seams. Focused assembly evidence is
+184 overlap units and553 HTTP cases per backend. Built runtimes each pass
+P7b153/905 plus P7a472 assertions. PostgreSQL17.8 replayed22 migrations and
+exact owned cleanup passed. Profile-revision/performance, broader
+characteristics and final C0 acceptance remain open.
 
 **Corrected source pair:** `4ba9373c` was held for violating the common
 externalId contract. Corrective child `2d2da4e1` restores all-core String/SV
@@ -47,13 +49,16 @@ reconciled by parentdf3ca957/bd82e681 and are not reopened.
 The parent canonical-path/fixture integration separately passes428 units,
 305 InMemory/306 PostgreSQL HTTP and164 main live checks/backend, including
 84 retained cases/1764 assertions. [Latest receipt](evidence/scim-parent-reservation-integration-20260929.json).
+The [P7b guide](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) and its
+[source receipt](evidence/scim-patch-schema-p7b-20260929/validation.json)
+remain source-specific evidence, not the final C0 matrix.
 
 The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
 P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
 owns current combined results; the records below are source-package evidence,
 not deployment claims. P4's raw repository-error gap was closed separately
 with value/content regressions, not assumed fixed by P5's scalar formatting.
-Final P7 PATCH/context, P3b representation/admission/query and case-level
+Remaining P7 schema-role/id/meta context, P3b representation/admission/query and case-level
 dispositions still block C0. Scoped precise interrupted-create errors now have
 combined proof; cleanup/no-orphan checks alone are not error-contract proof.
 
@@ -75,8 +80,8 @@ See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
 No version/lockfile, UI code, push or deployment changes.
 P9 corpus evidence is strict-ON only. The separate P2 flag suite verifies
 quoted User active rejection with coercion OFF in both strict modes and
-asserts raw repository state. Namespace-only strict prevalidation remains
-separate. Legacy global uniqueness
+asserts raw repository state. Namespace-only strict prevalidation now has the
+bounded P7b proof above. Legacy global uniqueness
 can block unrelated profile-subblock edits because merged profiles are fully
 revalidated; do not silently downgrade the declaration or call it RFC-invalid.
 
@@ -91,8 +96,8 @@ Integration `8d5915ba` -> `e80da689` separately passes754 units,
 22 migrations, and143 shared live checks/backend including472 P7 assertions.
 [Combined receipt](evidence/scim-common-context-integration-20260929/validation.json).
 Existing common-PATCH and PUT retention fixes are preserved, not reopened.
-Namespace-only strict validation and broader characteristic/query/policy
-consumers remain distinct P7b work. The parent-owned eight-expectation
+Namespace-only strict validation is now integrated through P7b. Broader
+characteristic and profile-coordination consumers remain open. The parent-owned eight-expectation
 reconciliation is integrated as`df3ca957` -> `bd82e681`:142 tests in three
 suites pass with exact assertions and four opposing controls; no production
 change, skipped case or database rerun was introduced.
@@ -159,8 +164,8 @@ is now closed by the corrected P6c pair plus explicit binding-role fix.
 [New query/write/schema proof](evidence/scim-query-authority-integration-20260929/validation.json):
 45/45 additional probe outcomes per backend,398 InMemory/399 PostgreSQL
 HTTP and163 shared live checks/backend including52 query outcomes.
-Admission, profile coordination and broader P7b/characteristic acceptance
-remain separate; this is not the final matrix.
+Binding-qualified admission is integrated. Profile coordination and broader
+characteristic acceptance remain separate; this is not the final matrix.
 See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
 P7 common externalId and P3b uniqueness policies have separate owners.
 The RFC follow-up limits unique types to string/integer/decimal/reference;

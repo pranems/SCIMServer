@@ -47,9 +47,9 @@ describe('PATCH common externalId integration', () => {
           );
           return repo.findByScimId(...(family === 'Widget' ? [endpointId, family, id] : [endpointId, id]));
         }
-        for (const pathless of [false, true]) {
+        for (const target of ['direct', 'qualified', 'pathless']) {
           it.each(invalidCommonExternalIds)(
-            `rejects invalid common externalId with full rollback, pathless=${pathless}: %j`, async value => {
+            `rejects invalid common externalId with full rollback, target=${target}: %j`, async value => {
               const created = await create();
               const url = `${base}/${created.body.id}`;
               const before = await get(app, url, token).expect(200);
@@ -57,8 +57,8 @@ describe('PATCH common externalId integration', () => {
               const response = await patch(app, url, token, {
                 schemas: [patchUrn], Operations: [
                   { op: 'replace', path: 'marker', value: 'must-rollback' },
-                  pathless ? { op: 'replace', value: { externalId: value } }
-                    : { op: 'replace', path: 'externalId', value },
+                  target === 'pathless' ? { op: 'replace', value: { externalId: value } }
+                    : { op: 'replace', path: target === 'qualified' ? `${fixture.core}:externalId` : 'externalId', value },
                 ],
               });
               expect(response.status).toBe(400);
@@ -80,13 +80,17 @@ describe('PATCH common externalId integration', () => {
             schemas: [patchUrn], Operations: [
               { op: 'replace', path: 'EXTERNALID', value: 'NewCase' },
               { op: 'replace', path: `${extension}:externalId`, value: [2, 3] },
+              ...(family === 'Widget' ? [
+                { op: 'replace', path: 'displayName', value: [11, 12] },
+                { op: 'replace', path: 'active', value: 'next-custom' },
+              ] : []),
             ],
           }).expect(200);
           expect(response.body.externalId).toBe('NewCase');
           expect(response.body[extension].externalId).toEqual([2, 3]);
           if (family === 'Widget') {
-            expect(response.body.displayName).toEqual([7, 8]);
-            expect(response.body.active).toBe('custom');
+            expect(response.body.displayName).toEqual([11, 12]);
+            expect(response.body.active).toBe('next-custom');
           }
           expect((await get(app, url, token).expect(200)).body).toEqual(response.body);
         });

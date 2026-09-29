@@ -28,6 +28,20 @@ selection clears the old primary before the next operation. Expanded no-path
 readOnly targets and namespace clearing respect the configured ignore/reject
 policy. See the P2 guide for the explicitly retained compatibility boundaries.
 
+**P7b namespace and response integration:** registered whole-extension
+targets use the same parsed semantics as attribute paths, including URNs
+ending in numeric versions. Strict malformed containers, unknown fields and
+nested type errors reject the indexed operation without saving earlier
+changes. Required extension removal and required/immutable transitions are
+checked on the full evolving candidate; unrelated legacy attributes are not
+revalidated through a partial POST/PUT view. Ignored readOnly input is stripped
+before strict prevalidation in both cached and uncached paths.
+PATCH returns supplied request-only attributes like POST/PUT, unless explicit
+projection excludes them. Ordinary GET omits them; never/writeOnly suppression
+still wins and extension homonyms remain independent. See the
+[P7b guide](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) for policy boundaries,
+optional-extension removal, rollback, review regressions and owned evidence.
+
 **Shared retention identity:** the integrated PUT follow-up now uses the same
 operation-neutral one-to-one entry matcher as PATCH preservation and immutable
 transitions. Duplicate `value` fields are disambiguated by `type` and consumed

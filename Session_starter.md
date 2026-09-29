@@ -6,24 +6,24 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
-**Current C0 binding-uniqueness checkpoint, 2026-09-29 (local, not deployed):**
+**Current C0 P7b assembly checkpoint, 2026-09-29 (local, not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
 profile admission. One schema can remain numeric/MV under an extension
 binding while core id/externalId/meta use RFC characteristics. The original
 storage compiler remains the only capability table; core-only unsupported
 computed promises are rejected before publication. Optional omitted
 schemaExtensions becomes an empty list; explicit malformed lists remain400.
-Evidence:383 unit checks plus8 final wiring checks,318 distinct InMemory
-HTTP controls (317 primary plus one added omission control),320 PostgreSQL
-HTTP,22 migrations,165 main live checks/backend and126 new live assertions
-per backend. The PostgreSQL wrapper's stale164 count is preserved as a
-harness failure; targeted live replay verified final endpoint inventory and
-cleanup without repeating320 HTTP tests. See
+The integrated P7b package adds whole-namespace validation, evolving required
+binding/immutable transitions, and stable returned:request path capture before
+persistence. Its focused RED was18 failures/4 controls; after assembly,
+184 overlap units pass. Both backends pass553 focused HTTP cases plus built
+P7b153 cases/905 assertions and P7a472 assertions. PostgreSQL17.8 replayed22
+migrations; endpoint inventory was unchanged and exact owned runtimes/container
+were removed. See
 [checkpoint11.31](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
-Worker2f90 exclusively owns namespace-only PATCH prevalidation, evolving
-required-extension transitions and returned:request projection. Those,
-profile-revision coordination, performance and final82-case acceptance remain
-open. No source receipt, version, lockfile, release or deployment was changed.
+Broader characteristic overlays, profile-revision coordination, performance
+and final82-case acceptance remain open. No version, lockfile, release or
+deployment was changed.
 
 **Historical bounded PUT source receipt, 2026-09-29:** Based only on committed combined
 snapshot `5581e6b7`, [PUT entry preservation](docs/SCIM_PUT_ENTRY_PRESERVATION.md)
@@ -37,7 +37,6 @@ Eight pre-existing readOnly expectation failures reproduced on that source
 base; parentdf3ca957 and integratedbd82e681 subsequently closed them. No pending peer package was read
 or merged; common-attribute PATCH/admission/query and P3b remain separate.
 See [RCA](docs/SCIM_PUT_ENTRY_PRESERVATION_RCA.md) for independent review closure.
-
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
@@ -176,8 +175,9 @@ unchanged. P8b cleanup and its precise interrupted-create follow-up now have
 focused combined-backend proof; genuine DB faults and conditional 412 remain
 distinct. Final P7 PATCH integration depends
 on remaining follow-ups; the P2/P7 selected-value/cardinality and POST/PUT
-overlap checks pass. P7 schema-role/id/meta and namespace-only prevalidation,
-remaining shared-policy admission/coordination and the
+overlap checks pass. P7b closes namespace-only prevalidation and response
+presence; the binding-qualified compiler/admission bridge closes the runtime
+policy seam. Broader characteristics, profile coordination and the
 case-level/performance/artifact matrix remain open before C0.
 
 **Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
@@ -224,10 +224,11 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P8b exact six-route interrupted-create errors integrated with current transactions; `9z-CX` now supplies 16 checks.
 - [x] ✅ COMPLETED: P3b fourth source `704d701f` -> `7001d194`; generic write authority verified with current P3/P4/P7/P8 seams on both backends.
 - [x] ✅ COMPLETED: Measured numeric/MV displayName equality failures and explicit extension-role query regression, with real query/write/schema parity proof.
-- [ ] Close remaining characteristic/query coverage, uniqueness admission and profile-revision coordination before C0.
+- [ ] Close remaining characteristic coverage and profile-revision coordination before C0.
 - [x] ✅ COMPLETED: Parent test-only reconciliationdf3ca957 -> bd82e681 closes the eight legacy expectations with exact assertions, four opposing controls and142 merged unit passes, without skips.
-- [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close remaining P7b namespace-only/characteristic/runtime-policy bridges plus profile-revision coordination before C0.
+- [x] ✅ COMPLETED: P7b source `3cd17ac3` assembled once with later accepted seams preserved.
+- [x] ✅ COMPLETED: Bounded P7b namespace PATCH, required-binding transitions and request-only responses with both-backend/live proof.
+- [ ] Close broader characteristic overlays and profile-revision coordination before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.
@@ -242,6 +243,7 @@ without applying POST/PUT required checks to partial PATCH views.
 | 2026-09-29 | Held `4ba9373c` without cherry-picking: its numeric/MV custom-core externalId permission contradicts the current RFC common-attribute contract. Source GREEN is not contract acceptance. No runtime/tests/defaults changed; all accepted package sequences remain assembled, with the conflicting source explicitly excluded pending parent reconciliation. |
 | 2026-09-29 | P7 context source `8d5915ba` integrated as `e80da689`, preserving common-PATCH validation and neutral retention.754 units,537 InMemory/538 PostgreSQL HTTP,143 shared live checks/backend including472 P7 assertions pass. Source/live count wiring was RED then GREEN; imported HTTP wire metadata typing corrected without changing assertions. Other C0 holds remain explicit. |
 | 2026-09-29 | P3b custom authority integrated as `7001d194`: 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared built-live checks/backend pass. Separate five-shape probe records43/45 outcomes per backend; numeric/MV displayName equality remains a C0 query blocker (InMemory empty200, PostgreSQL500). Profile omission500 recorded separately. No final matrix or deployment claim. |
+| 2026-09-29 | P7b source `3cd17ac3` assembled onto the binding-qualified checkpoint. Focused RED18/22 then GREEN22/22;184 overlap units,553 HTTP/backend, built P7b153/905 plus P7a472/backend. PostgreSQL17.8/22 migrations, unchanged endpoint inventory and exact owned cleanup. No version, lockfile, push or deployment. |
 | 2026-09-29 | Authorized P2 flags integrated as `8d2110d1`; unchanged I02/I03 verified, then optional dispatch removed. Both backends: 356 HTTP, P9 built-live19/1228 and P2 built-live188. PostgreSQL17.8/22 migrations and exact cleanup. Added default-discovery/count/guidance RED/GREEN controls; 26-doc content/freshness/coupling gates pass. Historical receipts and release metadata unchanged. |
 | 2026-09-29 | Bounded PUT duplicate/anonymous array preservation fix on committed `5581e6b7`; shared neutral matching, type-restoration stability and atomic required/immutable failure checks. No versions, locks, push or deployment changed. Evidence and cleanup are in the dedicated feature doc. |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
@@ -263,7 +265,7 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: Common externalId declaration/runtime correction with explicit original-type and namespace-independence tests.
 - [x] ✅ COMPLETED: The source P7 PUT duplicate/anonymous entry blocker was separately fixed and verified by integration `b21e44cb`.
 - [x] ✅ COMPLETED: Generic id/meta precedence and context-aware shared-schema handling with original-type, metadata authority and no-schema-mutation tests.
-- [ ] P7b: final P2 integration and concrete remaining characteristic promises; P3b owns identified server-uniqueness enforcement gaps. External referential integrity/raw token reconstruction are not speculative feature requirements.
+- [x] ✅ COMPLETED: P7b/P2 integration and binding-qualified uniqueness runtime/admission; broader characteristic combinations remain a separate acceptance item. External referential integrity/raw token reconstruction are not speculative feature requirements.
 - [x] ✅ COMPLETED: P2 operation transitions and original owned-backend validation.
 - [x] ✅ COMPLETED: P2 flag-contract assembly validation and default P9 gating removal; later common-context changes receive a separate overlap rerun.
 - [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.

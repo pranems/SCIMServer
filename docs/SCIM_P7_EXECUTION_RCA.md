@@ -1,6 +1,69 @@
-# P7a execution issues
+# P7 execution issues
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
+
+## P7b bounded PATCH integration
+
+Base: `2788304eb5727698a39c563cb544af56e18553e7`. Worktree:
+`SCIMServer-scim-patch-schema-integration`. These are new evidence, not edits
+to frozen P1/P2/P7 receipts or a claim of final C0 completion.
+
+| Issue | Type / severity | Symptom and root cause | Confirmed fix and prevention | Detection / earliest |
+| --- | --- | --- | --- | --- |
+| Whole extension namespace used an attribute parser | Correctness / high | A numeric-version URN was split as an attribute path before execution. Valid whole objects failed; the no-path prevalidator skipped malformed namespace containers. Group normalization had the same parser mismatch. | Shared `parsePatchTarget` now supplies prevalidation and Group normalization. Whole/no-path objects traverse actual definitions, including nested unknown fields. Initial RED: 16/20 domain failures and 50/126 HTTP failures; initial GREEN: 22 units and 222 HTTP cases including common externalId. | Domain and HTTP / domain |
+| Required extension binding disappeared before PATCH execution | Correctness / high | User/Group passed payload-derived definitions without binding metadata. The executor checked required attributes but never the required namespace itself. | Pass effective resource definitions and check namespace presence on the complete evolving candidate after each operation. Keep ordinary required checks scoped to touched roots. Late rejection checks exact repository, GET and metadata rollback. | HTTP / domain plus service wiring |
+| PATCH response projected supplied request-only attributes as GET | Standards / medium | Controllers omitted supplied-input context. RFC 7643 Section 7 explicitly includes PATCH in returned:request write presence. | Snapshot Operations before service normalization and collect exact schema-qualified supplied paths with the shared parser. Explicit `attributes` projection still wins; never/writeOnly filtering remains upstream. A controller RED also reproduces DTO mutation. | HTTP / controller |
+| Worktree tool restoration | Environment / low | Missing Jest, then absent local generated Prisma types. VS Code test/problem tools were unavailable. | After the actual missing failure, use authorized dependency junctions and generate only this worktree's Prisma client. No dependency, lockfile or shared junction-target edits. CLI tests provide actual assertion evidence. | Tool launch / same |
+| New fixture omitted domain-default fields | Test correctness / low | The domain SchemaAttributeDefinition type requires explicit required/multiValued booleans. Initial run did not reach assertions. | Supply both flags; record the later assertion RED separately from compilation failures. | TypeScript / same |
+| Required children confused namespace presence and container shape | Correctness / medium | The touched-root check rejected removing an optional namespace whose attributes were required only when present, yet a lenient scalar could bypass a required child. | Two additional actual domain REDs; skip required descendants only when the optional namespace is absent, while checking required children of any assigned candidate container. Immutable checks remain independent. GREEN: 27 focused units and 153 HTTP cases including Bulk/Me. | Domain / same |
+| Independent review: projection reparsed against a smaller final schema set | Correctness / high | Clearing an optional numeric-version namespace removed its URN from the response. Projection then failed to parse the accepted original target, returning 500 after the repository had committed. | Twelve permanent HTTP REDs cover all families/strict axes and both path forms. Controllers now snapshot registered namespace context, not only Operations. All twelve turn GREEN with successful response, persisted value and version assertions. | Independent review / response-after-removal HTTP |
+| Strict prevalidation raced the readOnly ignore policy | Integration / medium | Reusing ordinary path validation for expanded no-path keys correctly found readOnly definitions, but the earlier ignore filter had not expanded those keys. Three P2 cases failed on both backends. | Expand those keys through the existing readOnly filter; whole namespace objects use the existing recursive stripper. Two added units fail before the change; 29 focused units and 18 selected HTTP cases pass after it. The full bounded backend run is repeated because source changed. | Dual-backend consolidation / existing focused P2 HTTP |
+| Legacy expectations in an unaffected neighboring suite | Test correctness / medium | Eight extension-flags tests expect closed canonical enums, malformed extension acceptance or readOnly POST/PUT rejection. | A separate ts-jest base-source control reproduces exactly the same eight failures on `2788304e` with 68 positive controls. No production workaround or unrelated test rewrite. These remain explicit pre-existing P7a reconciliation work. | Neighbor unit run / base-source control |
+| Follow-up review: ignored keys and cached namespace metadata | Correctness / high | Stable bindings alone did not prevent reparsing ignored `prototype` input after commit; cached User/Group readOnly stripping also discarded the schema definitions needed by the new whole-namespace branch. | Five new HTTP REDs plus four positive controls. Presence is now computed before the service writes, follows ignored-key semantics and leaves indexed syntax errors to execution. Cached stripping retains effective definitions. All 21 review regressions and 150 related units pass. | Follow-up independent review / cached-vs-uncached HTTP |
+| Service fixture mocked the old definition seam | Harness / low | Two P1 service tests mocked payload-derived definitions, while production correctly moved to effective definitions with binding metadata. | Move the same fixture to the effective-definition method; retain original exact four-operation persistence and index-3 no-write assertions. No production fallback to an incomplete schema view. | Focused service tests / same |
+
+Confirmed issues are recorded when their gate turns GREEN. Final source,
+backend, live and cleanup evidence is recorded in the P7b implementation
+document. No query, uniqueness-admission or retained-entry matcher change
+belongs to this package.
+
+### P7b provenance, completeness and disposition
+
+The final [receipt](evidence/scim-patch-schema-p7b-20260929/validation.json)
+records exact source/build identity, 1,126 units, 549 HTTP cases/backend and
+both built-live runs. All owned containers and API processes were removed or
+stopped, with no database marker left behind.
+
+Reconciliation examined all **36 captured task log files**, the Jest result
+JSONs and the **full available session transcript snapshot**: 229,667,158 bytes
+/ 55,361 events, streamed twice rather than loaded into chat. Although
+`VSCODE_TARGET_SESSION_LOG` was unset, the known session's `events.jsonl`
+provided the fallback. Worktree tool arguments were correlated to call/turn
+IDs: 277 task tool outputs and 362 associated messages. The artifacts
+`test-results/p7b/rca-signal-reconciliation.json` and
+`test-results/p7b/session-transcript-reconciliation.json` record the error/
+signal and narration-phrase passes, issue mapping and dismissed hits.
+Expected negative-test logging, duplicate stacks, source/comment echoes,
+unrelated parallel work, audit search echoes and Git's deliberate missing-HEAD
+lookup for new files are not additional issues. Early missing-tool and
+fixture-compilation failures were captured at diagnosis and recovered in the
+transcript pass, not counted as behavioral REDs.
+
+Renderer setup initially lacked the worktree's web dependency junction.
+Restoring the authorized junction enabled real Chromium validation. The
+existing built-in Mermaid discovery warning reports invalid version `0.0.0`;
+the pinned 11.15.0 rendered both strict themes. No package repin was made.
+Initial guesses for P2/P7-specific harness directories found no such files;
+the tracked P5 harness supplied the verified isolation seam instead.
+
+**Self-improvement: applied.** Permanent cached/uncached, ignored-key and
+post-removal response regressions close the review escapes. The existing P2
+readOnly matrix is part of the bounded consolidation command.
+**Design disposition: accepted.** The small pure presence collector is not a
+second executor, and controllers remain orchestration boundaries. No
+speculative policy framework or uniqueness/query abstraction was added.
+
+## Historical P7a scope
 
 Scope: declaration validation, scalar/cardinality checks and POST/PUT.
 Ordered PATCH and cross-package integration remain separate.

@@ -24,6 +24,14 @@ accepted; it is not acceptance of later packages or the remaining 82-case ledger
 - [x] ✅ COMPLETED: Independent review finding reproduced and corrected with stable typed occurrence allocation.
 - [x] ✅ COMPLETED: Integrated bounded retention evidence and parent reservation89810f0c; parentdf3ca957 separately reconciled the eight baseline expectations.
 
+**Bounded P7b assembly, 2026-09-29:** source commit `3cd17ac3` is assembled
+once on the binding-qualified checkpoint. Whole-namespace PATCH validation,
+evolving required binding/immutable contracts and write-response presence now
+coexist with accepted query, admission, retention and transaction changes.
+See [P7b implementation and scoped source evidence](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md)
+and section 11.32 for combined-source evidence. This does not close the
+original 82-case ledger or authorize data repair.
+
 The goal is to make SCIM requests behave correctly and consistently for Users,
 Groups, and custom resource types on both PostgreSQL and InMemory.
 
@@ -421,16 +429,16 @@ combined checkpoint has its own counts in section 11.1.
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | Authorized flags integrated and focused dual-backend proof passed | `29b3b2c6` -> `8d2110d1`; 356 HTTP cases/backend preserve ordered/common/P7 overlaps. Quoted active and explicit dotted User controls pass both strict modes; P2 built-live188/backend. Namespace-only strict prevalidation and final C0 remain separate; section 11.22 |
+| P2 | Authorized flags integrated and focused dual-backend proof passed | `29b3b2c6` -> `8d2110d1`; 356 HTTP cases/backend preserve ordered/common/P7 overlaps. Quoted active and explicit dotted User controls pass both strict modes; P2 built-live188/backend. Section 11.22 is historical; namespace-only prevalidation now has separate [P7b proof](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md). Final C0 remains separate. |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Six-source history retained; corrected final state verified | `4ba9373c` -> `d93d1a0d` is superseded by `2d2da4e1` -> `43b01c4e`. All-core String/SV/exact common externalId, defaultnone and independent extension policies remain. Combined176units/367InMemory/369PostgreSQL HTTP and143live/backend pass; no standalone fifth-commit acceptance; section11.26 |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | Context source verified; legacy expectations reconciled | `8d5915ba` -> `e80da689` preserves PATCH/retention fixes with scoped proof in11.24. Parent test-only`df3ca957` -> `bd82e681` now closes the eight old expectations:142 merged units, exact outcomes, no skips. Namespace/common-view/compiler/admission and broader acceptance remain open |
+| P7 | P7b assembled; broader acceptance open | Context, expectations and binding-qualified runtime/admission are preserved. P7b source `3cd17ac3` adds whole namespaces, evolving binding/attribute transitions and supplied response presence. Combined184 overlap units,553 HTTP/backend, built P7b153/905 plus P7a472/backend pass; section11.32. |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.27; measured numeric-displayName and explicit-role query failures now closed. Original82-case/backend ledger, broader P7b/characteristic/admission/coordination/performance/artifact acceptance remain open |
+| C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.32; query, binding-qualified admission and bounded P7b failures are closed. Original82-case/backend ledger, broader characteristic/coordination/performance/artifact acceptance remain open |
 | P6c/P6d | Corrected source pair and cross-package query regression verified | `f77786c4` -> `09b59b43`, `2aa96f0b` -> `8f3510a8`; explicit-false role fix follows2unit/2HTTP REDs.398IM/399PG HTTP,52query live and45/45typed authority outcomes/backend. Initial numeric-common interpretation superseded, not accepted; section11.27 |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
@@ -2182,11 +2190,45 @@ exercise the runtime capability compiler. **Design/architecture disposition:
 accepted.** Thin view/admission consumers reuse existing policy and validation
 seams; no second table, generic transaction framework or PATCH fork.
 
-**Still open:** worker2f90's namespace-only strict PATCH, evolving required
-extensions and returned:request work; broader characteristic overlays,
-profile-revision coordination, candidate-materialization performance and the
-original82-case/164-backend acceptance ledger. This checkpoint does not update
-that frozen ledger or claim an authoritative release matrix.
+**Still open after this checkpoint:** P7b assembly; broader characteristic
+overlays, profile-revision coordination, candidate-materialization performance
+and the original82-case/164-backend acceptance ledger.
+
+### 11.32 P7b combined-source assembly, 2026-09-29
+
+Source commit `3cd17ac38a29a13447c2cc046f25b9cc6c137303` was reviewed and
+applied once to the binding-qualified checkpoint rather than blindly
+cherry-picked. Later accepted common-attribute, query, matching, transaction
+and uniqueness changes were retained while conflicts were reconciled.
+
+TDD remained discriminating on the combined source. Before production import,
+the focused P7b contract produced18 failures and4 passing controls. Failures
+covered numeric-version whole namespaces, malformed namespace values,
+optional versus required extension binding, and evolving required/immutable
+state. After integration, the same22 tests passed. The five closest domain,
+controller and service suites then passed184 tests.
+
+The API build passed. The guarded validation runner accepted only the named
+source or consolidation worktree/branch while retaining base ancestry, marker,
+database ownership and exact cleanup checks. Both InMemory and Prisma lanes
+passed553 focused HTTP tests with zero failed or pending. Both built runtimes
+passed153 P7b cases/905 assertions plus472 P7a assertions, with unchanged
+endpoint inventory. PostgreSQL17.8 replayed all22 migrations. Exact owned API
+PIDs stopped and the disposable container was removed. The combined
+working-tree fingerprint was
+`88e83bf83bf55bcd7f8a60b8a676ae403729c284567d3d80c1fc2a619f0e58df`;
+receipt: `test-results/p7b/7170eb44aac27ccb/receipt.json`.
+
+**Self-improvement: applied.** A source-locked guarded runner may name the
+approved consolidation worktree and branch, but must retain all ancestry,
+marker, ownership and exact-cleanup guards. **Design/architecture disposition:
+accepted.** P7b reuses the shared parser, executor and projection seam; no
+second PATCH engine or schema policy table was introduced.
+
+**Still open:** broader characteristic combinations, profile-revision/write
+coordination, candidate-materialization performance, the original82-case/
+164-backend ledger and final exact-tip release assurance. This checkpoint does
+not change release metadata or authorize publication, deployment or repair.
 
 ## 12. Architecture and self-improvement decisions
 

@@ -58,8 +58,10 @@ export function requiredValues(value: unknown, def: Attribute): void {
   }
   const values = Array.isArray(value) ? value : [value];
   for (const entry of values) {
-    if (!objectValue(entry)) continue;
-    for (const sub of def.subAttributes ?? []) requiredValues(read(entry, sub.name), sub);
+    if (!assigned(entry)) continue;
+    for (const sub of def.subAttributes ?? []) {
+      requiredValues(objectValue(entry) ? read(entry, sub.name) : undefined, sub);
+    }
   }
 }
 
