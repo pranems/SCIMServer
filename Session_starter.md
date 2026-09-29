@@ -45,8 +45,9 @@ unique types and compares references exactly. Build, 211 focused units,
 the 21-assertion built-local smoke pass.
 **Acceptance remains blocked:** the three generic promoted-column
 restriction/candidate-authority probes remain unresolved in P3b's committed
-code. The P3b worker reports no further edits underway; these need explicit
-follow-up ownership or parent disposition, separately from P7 common externalId.
+code. The P3b worker has now accepted the concrete response-authority mismatch
+and resumed a RED-first follow-up for generic raw payload extraction and
+immutable reconstruction, separately from P7 common externalId.
 Prior receipts remain historical. Uniqueness admission is also unclosed;
 do not assume P7 fixed it. P3b's runtime 400 is not registration proof. Do not convert a
 convenience-column mismatch into a blanket custom-schema admission ban.
@@ -54,6 +55,8 @@ P3b's narrow Group-adapter follow-up is integrated: `6dc2bc63` -> `3766e9f4`.
 Build, 144 units, 102 InMemory HTTP cases (four native-only skips), 14
 no-write identity/shape controls and the 21-assertion built-local smoke pass.
 Generic candidate authority and admission remain separate open holds.
+The new generic-authority follow-up is pending; no generic-all-shapes or
+filter/sort closure is inferred from the preceding Group adapter proof.
 
 **Latest integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP

@@ -411,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Core/RFC/Group-adapter changes integrated and focused checks passed | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`, `6dc2bc63` -> `3766e9f4`. Exact builtin identity/member-shape controls pass. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Three generic representation probes and registration/discovery admission remain independent OPEN holds |
+| P3b | Core/RFC/Group-adapter verified; generic-authority follow-up active | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`, `6dc2bc63` -> `3766e9f4`. Exact builtin identity/member-shape controls pass. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Owner now corrects generic raw-payload uniqueness/immutable reconstruction with RED-first tests; admission/query and final acceptance remain open |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
@@ -1676,6 +1676,30 @@ binding and stored relation shape, not a URI suffix or attribute spelling.
 **Design disposition: accepted for this narrow correction.** The existing
 typed policy/transaction interfaces remain unchanged; no broad schema ban
 or new admission implementation was introduced.
+
+#### Subsequent generic-authority follow-up
+
+The P3b owner subsequently verified that generic responses emit raw payload
+without promoted-column overlay and accepted the remaining representation
+defect. A new, separately committed follow-up is now active: remove
+column-convenience restrictions on valid custom-core displayName/active,
+make generic uniqueness candidates use raw payload plus authoritative
+generated id, retain real User/Group adapter column authority, and align
+generic immutable reconstruction with the response.
+
+Required source controls include competing create/update with numeric and
+multi-valued custom displayName, applicable case/equality behavior and `none`
+controls. Common top-level externalId remains the RFC String contract; this
+does not reintroduce numeric/MV common externalId. Extension homonyms and
+explicit schema-role identity stay independent.
+
+Integration will preserve P2 column-unassignment behavior, neutral retained-
+entry matching, P7 common-value checks and P8 deletion barriers when the SHA
+arrives. It separately owns final cross-package POST/GET/PUT/PATCH/readback
+and filter/sort probes: write-side GREEN cannot prove column pushdown is
+faithful to every custom schema. No generic-all-shapes or admission closure
+is claimed while the follow-up is pending. No sibling worktree is read or
+modified by this coordination note.
 
 ## 12. Architecture and self-improvement decisions
 

@@ -32,9 +32,10 @@ unsupported declarations. The current generic promoted-column restriction
 must not become a blanket admission rule for otherwise valid custom-core
 displayName/active or extension homonyms.
 No committed P7 admission closure is established here. The P3b worker reports
-no additional edits underway; remaining admission and candidate-authority
-items therefore require explicit parent ownership/disposition rather than an
-assumption that either worker has completed them.
+its Group-adapter source frozen, but has now resumed a separate generic-
+authority correction after confirming raw payload is the generic response
+authority. That new SHA and evidence remain pending; registration/discovery
+admission is still a separate parent-owned disposition, not an assumed fix.
 
 **Group-adapter increment integrated:** `6dc2bc63` is assembled as `3766e9f4`.
 Exact builtin identity and represented member-leaf checks pass the focused
