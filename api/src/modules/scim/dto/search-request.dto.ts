@@ -14,21 +14,21 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
+import { IsSearchAttributeSelection, type SearchAttributeSelection } from './search-attribute-selection';
 
 export class SearchRequestDto {
   @IsOptional()
   schemas?: string[];
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000, { message: 'attributes parameter is too long (max 2000 characters).' })
-  attributes?: string;
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsSearchAttributeSelection()
+  attributes?: SearchAttributeSelection;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000, { message: 'excludedAttributes parameter is too long (max 2000 characters).' })
-  excludedAttributes?: string;
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsSearchAttributeSelection()
+  excludedAttributes?: SearchAttributeSelection;
 
   @IsOptional()
   @IsString()

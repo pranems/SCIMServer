@@ -94,6 +94,14 @@ describe('EndpointScimGroupsController', () => {
   });
 
   describe('Group Operations', () => {
+    it('projects JSON search exclusions without mutating the service response', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      const resource = { id: 'group-1', displayName: 'Search', members: [{ value: 'user-1' }] };
+      mockGroupsService.listGroupsForEndpoint.mockResolvedValue({ Resources: [resource], totalResults: 1 });
+      const result = await controller.searchGroups('endpoint-1', { excludedAttributes: ['members'] }, mockRequest);
+      expect(result.Resources).toEqual([{ id: 'group-1', displayName: 'Search' }]);
+      expect(resource.members).toEqual([{ value: 'user-1' }]);
+    });
     describe('POST /endpoints/:endpointId/Groups', () => {
       it('should create a group in specific endpoint', async () => {
         const createDto: CreateGroupDto = {

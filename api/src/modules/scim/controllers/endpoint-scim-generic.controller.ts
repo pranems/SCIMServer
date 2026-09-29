@@ -50,6 +50,8 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { resolveResourceType } from '../common/resource-type-resolver';
 import { buildBaseUrl } from '../common/base-url.util';
+import { SearchRequestDto } from '../dto/search-request.dto';
+import { searchAttributeSelectionToQuery } from '../dto/search-attribute-selection';
 
 @Controller('endpoints/:endpointId')
 export class EndpointScimGenericController {
@@ -217,7 +219,7 @@ export class EndpointScimGenericController {
   async searchResources(
     @Param('endpointId') endpointId: string,
     @Param('resourceType') resourceTypePath: string,
-    @Body() body: { filter?: string; startIndex?: number; count?: number; sortBy?: string; sortOrder?: 'ascending' | 'descending'; attributes?: string; excludedAttributes?: string },
+    @Body() body: SearchRequestDto,
     @Req() req: Request,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
@@ -247,8 +249,8 @@ export class EndpointScimGenericController {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources as Record<string, unknown>[],
-          body.attributes,
-          body.excludedAttributes,
+          searchAttributeSelectionToQuery(body.attributes),
+          searchAttributeSelectionToQuery(body.excludedAttributes),
           alwaysByParent,
           requestByParent,
         ),

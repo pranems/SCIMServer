@@ -1,8 +1,9 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Version:** 0.55.35 - **Updated:** 2026-09-18
+> **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 >
@@ -2146,6 +2147,17 @@ Content-Type: application/scim+json
 
 Server-side search via POST body (RFC 7644 S3.4.3). Useful when filter expressions exceed URL length limits.
 
+**P5 local implementation, pending release consolidation:** Users, Groups and
+registered custom resources accept JSON arrays for `attributes` and
+`excludedAttributes`. Comma-separated JSON strings remain an explicit
+compatibility form; GET URL parameters remain comma-separated strings.
+Each field permits at most 100 array entries and 2000 characters including
+joining commas (legacy strings retain the 2000-character bound). Empty arrays
+mean no selection. Null, objects, non-string/nested array items, empty items,
+embedded commas within an array item and exceeded limits return HTTP 400.
+The existing always-returned and `attributes`-precedence rules are unchanged.
+See [implementation and validation](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md).
+
 ```http
 POST /scim/endpoints/a1b2c3d4-.../Users/.search HTTP/1.1
 Host: localhost:8080
@@ -2153,14 +2165,22 @@ Authorization: Bearer changeme-scim
 Content-Type: application/scim+json
 
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
   "filter": "emails[type eq \"work\"].value co \"@example.com\" and active eq true",
   "startIndex": 1,
   "count": 25,
   "sortBy": "meta.lastModified",
   "sortOrder": "descending",
-  "attributes": ["userName", "emails", "active"],
-  "excludedAttributes": ["phoneNumbers"]
+  "attributes": [
+    "userName",
+    "emails",
+    "active"
+  ],
+  "excludedAttributes": [
+    "phoneNumbers"
+  ]
 }
 ```
 
@@ -2409,9 +2429,18 @@ All SCIM error responses follow RFC 7644 S3.12.
 
 ### Error Format
 
+SCIM `status` is a string. `detail` is optional and, when present, is one
+human-readable string, never a Nest validation-message array. P5 joins multiple
+validation messages with `; ` without flattening existing field-level diagnostic
+lists in the diagnostics extension. OAuth token errors continue to use their
+separate OAuth JSON envelope. This local implementation is pending release
+consolidation; see [the P5 report](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md).
+
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
   "status": "409",
   "scimType": "uniqueness",
   "detail": "User with userName 'jane.doe@example.com' already exists",

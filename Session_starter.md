@@ -14,6 +14,17 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 - [ ] P2: operation transitions, append/all-match behavior, primary/required/immutable policies.
 - [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.
 
+**P5 isolated implementation, 2026-09-28:** [JSON search and error contract](docs/SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md)
+is locally validated on `fix/scim-search-contract-20260928`, baseline
+`cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e`. RFC arrays and legacy strings share
+a validated boundary on Users/Groups/custom search; invalid DTO errors have
+scalar detail. Evidence: 354 focused units, 61 HTTP tests per backend
+(PostgreSQL 17.8, 22 migrations), and 61 local live assertions.
+The task-owned database and API were removed/stopped. No cloud or sibling
+worktree changes. Product version/release metadata remains parent-owned.
+
+- [x] ✅ COMPLETED: P5 local implementation and backend/live proof; initial integration here, not deployed.
+
 The current shipped baseline is `master` v0.55.35. Use
 [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](docs/strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
 for the operating process and [REMAINING_WORK_REGISTER.md](docs/auth/REMAINING_WORK_REGISTER.md)

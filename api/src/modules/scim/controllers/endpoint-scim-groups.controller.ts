@@ -34,6 +34,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateGroupDto } from '../dto/create-group.dto';
 import { PatchGroupDto } from '../dto/patch-group.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
+import { searchAttributeSelectionToQuery } from '../dto/search-attribute-selection';
 import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 
@@ -259,8 +260,8 @@ export class EndpointScimGroupsController {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
-          dto.attributes,
-          dto.excludedAttributes,
+          searchAttributeSelectionToQuery(dto.attributes),
+          searchAttributeSelectionToQuery(dto.excludedAttributes),
           alwaysByParent,
           requestByParent
         )

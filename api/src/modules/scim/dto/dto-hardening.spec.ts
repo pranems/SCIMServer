@@ -279,7 +279,7 @@ describe('V5 - SearchRequestDto @MaxLength enforcement', () => {
     const errors = await validate(dto);
     const attrErrors = errors.filter(e => e.property === 'attributes');
     expect(attrErrors.length).toBeGreaterThan(0);
-    expect(attrErrors[0].constraints?.maxLength).toBeDefined();
+    expect(attrErrors[0].constraints?.searchAttributeSelection).toContain('max 2000 characters');
   });
 
   it('should accept attributes at exactly 2000 characters', async () => {
@@ -294,7 +294,7 @@ describe('V5 - SearchRequestDto @MaxLength enforcement', () => {
     const errors = await validate(dto);
     const exclErrors = errors.filter(e => e.property === 'excludedAttributes');
     expect(exclErrors.length).toBeGreaterThan(0);
-    expect(exclErrors[0].constraints?.maxLength).toBeDefined();
+    expect(exclErrors[0].constraints?.searchAttributeSelection).toContain('max 2000 characters');
   });
 
   it('should reject filter exceeding 10000 characters', async () => {

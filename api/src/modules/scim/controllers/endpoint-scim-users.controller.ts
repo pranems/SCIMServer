@@ -34,6 +34,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
+import { searchAttributeSelectionToQuery } from '../dto/search-attribute-selection';
 import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 
@@ -258,8 +259,8 @@ export class EndpointScimUsersController {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
-          dto.attributes,
-          dto.excludedAttributes,
+          searchAttributeSelectionToQuery(dto.attributes),
+          searchAttributeSelectionToQuery(dto.excludedAttributes),
           alwaysByParent,
           requestByParent
         )

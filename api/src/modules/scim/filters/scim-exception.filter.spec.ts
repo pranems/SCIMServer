@@ -67,6 +67,45 @@ describe('ScimExceptionFilter', () => {
     expect(filter).toBeDefined();
   });
 
+  describe('scalar SCIM detail contract', () => {
+    it('joins multiple Nest validation messages without leaking framework keys', () => {
+      filter.catch(new HttpException({
+        statusCode: 400, error: 'Bad Request',
+        message: ['count must be >= 0.', 'startIndex must be >= 1.'],
+      }, 400), mockHost);
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.detail).toBe('count must be >= 0.; startIndex must be >= 1.');
+      expect(body.status).toBe('400');
+      expect(Object.keys(body).sort()).toEqual(['schemas', 'detail', 'status'].sort());
+    });
+
+    it.each([['invalid'], { secret: 'not a wire message' }, 42, null])(
+      'does not forward a non-scalar SCIM detail: %p',
+      (detail) => {
+        const diagnostics = { attributePaths: ['name.givenName'], errorCode: 'VALIDATION_SCHEMA' };
+        filter.catch(new HttpException({
+          schemas: [SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN],
+          status: 400, detail, [SCIM_DIAGNOSTICS_URN]: diagnostics,
+        }, 400), mockHost);
+        const body = mockResponse.json.mock.calls[0][0];
+        expect(typeof body.detail).toBe('string');
+        expect(body.detail).not.toContain('not a wire message');
+        expect(body[SCIM_DIAGNOSTICS_URN]).toEqual(diagnostics);
+      },
+    );
+
+    it('leaves absent SCIM detail absent and preserves structured field diagnostics', () => {
+      const diagnostics = { attributePaths: ['count', 'startIndex'] };
+      filter.catch(new HttpException({
+        schemas: [SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN],
+        status: '400', [SCIM_DIAGNOSTICS_URN]: diagnostics,
+      }, 400), mockHost);
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body).not.toHaveProperty('detail');
+      expect(body[SCIM_DIAGNOSTICS_URN]).toEqual(diagnostics);
+    });
+  });
+
   describe('WI-D1 OAuth token-endpoint error passthrough (RFC 6749)', () => {
     beforeEach(() => {
       mockRequest.originalUrl = '/scim/oauth/token';

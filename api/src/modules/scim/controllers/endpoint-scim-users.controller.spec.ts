@@ -95,6 +95,20 @@ describe('EndpointScimUsersController', () => {
   });
 
   describe('User Operations', () => {
+    it('projects JSON search arrays after forwarding only list parameters', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.listUsersForEndpoint.mockResolvedValue({
+        Resources: [{ id: 'user-1', userName: 'search', displayName: 'Search', active: true }],
+        totalResults: 1,
+      });
+      const result = await controller.searchUsers('endpoint-1', {
+        attributes: ['displayName'], count: 5,
+      }, mockRequest);
+      expect(result.Resources).toEqual([{ id: 'user-1', userName: 'search', displayName: 'Search' }]);
+      expect(mockUsersService.listUsersForEndpoint.mock.calls[0][0]).toEqual({
+        filter: undefined, startIndex: undefined, count: 5, sortBy: undefined, sortOrder: undefined,
+      });
+    });
     describe('POST /endpoints/:endpointId/Users', () => {
       it('should create a user in specific endpoint', async () => {
         const createDto: CreateUserDto = {

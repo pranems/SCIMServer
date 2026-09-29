@@ -397,7 +397,7 @@ mean merged or deployed.
 | P3 | Validated locally | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Deferred with explicit scope | Schema-driven, Group and custom-name atomic uniqueness need a separate design; P3 does not claim these guarantees |
 | P4 | Pending | Native and injected member failures already reproduce |
-| P5 | Pending | Valid search arrays and invalid error detail already reproduce |
+| P5 | Locally validated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and independent consolidation remain pending |
 | P6 | Pending | Custom/Bulk capability controls already reproduce |
 | P7 | Pending | Verify each current schema promise before changing enforcement |
 | P8 | Pending | Cleanup plus cache-freshness implementation requires explicit contracts |
@@ -405,7 +405,7 @@ mean merged or deployed.
 | C0 | Pending | Do not mark complete while a package or applicable gate is unresolved |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1 and P3 are implemented and locally validated in their source worktrees,
+P1, P3, and P5 are implemented and locally validated in their source worktrees,
 and integrated here. Combined validation, release metadata, PR, and deployment
 remain pending. Other package statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed

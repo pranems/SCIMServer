@@ -16130,6 +16130,9 @@ try {
 Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -ForegroundColor Green
 
 # ============================================
+. "$PSScriptRoot\live-test-sections\search-contract.ps1"
+Invoke-ScimSearchContractTests -BaseUrl $baseUrl -Headers $headers
+
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
