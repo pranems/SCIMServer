@@ -404,14 +404,14 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | In progress separately | Await parent-supplied commit; pending diffs are not part of this assembly |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Awaiting explicit disposition | Schema-driven, Group and custom-name atomic uniqueness need a separate design or accepted scope decision; P3 does not claim these guarantees and C0 is not unblocked |
+| P3b | Active parent-assigned worker | Promised schema-uniqueness closure is in progress; no new commit supplied for assembly. P3 alone does not claim these guarantees and C0 is not unblocked |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | P7a integrated; focused combined validation passed | [Declaration, scalar/cardinality and POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md). Ordered PATCH integration still waits for P2; unsupported server uniqueness/reference/deep-compatibility promises remain explicit follow-up work |
+| P7 | P7a integrated; follow-ups open | [Declaration, scalar/cardinality and POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md). Nested-readOnly follow-up is active; final ordered PATCH integration still waits for P2. Remaining promises must be resolved explicitly |
 | P8 | Partly integrated | P8a authoritative reads/fingerprints from `39841319`: [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8c conditional admin PATCH from `8eb2f162`: [CAS and single-snapshot token evidence](ENDPOINT_WRITE_CONCURRENCY.md), 172 units, 32 HTTP and 8 live checks per backend. P8b repository cleanup remains separate |
-| P9 | Awaiting compatibility disposition | Follow changed behavior; preserve legitimate compatibility and close the disposition before C0 |
-| C0 | Incremental assembly verified only | Checkpoints 11.1-11.5; no full matrix until P2/P8b, P7 PATCH integration and P3b/compatibility dispositions close |
+| P9 | Active parent-assigned worker | Compatibility corpus and accurate guidance are in progress; no commit supplied for assembly and no compatibility closure claimed |
+| C0 | Incremental assembly verified only | Checkpoints 11.1-11.5; evidence boundaries in 11.6. No full matrix until P2/P8b, P7 PATCH/readOnly follow-ups and P3b/P9 work close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
@@ -635,6 +635,38 @@ PostgreSQL; this is not a new integration database matrix. Original P4 database
 and 22-migration evidence remains unchanged. P3b uniqueness remains open.
 No full authoritative matrix, publication, deployment or release-metadata
 update is authorized by this checkpoint.
+
+### 11.6 Parent evidence checkpoint and open work, 2026-09-29
+
+The parent verified portable P4 evidence and completed-package ancestry
+against the unchanged master `ccde1d5d`. This does not convert any scoped
+package check into final release evidence.
+
+| Evidence | What it proves | What remains separate |
+|---|---|---|
+| P4 package live receipt | Real HTTP against an owned loopback Nest listener in the Node test process | It does not establish execution through `dist/main.js` or the final built release artifact |
+| Integration live spot checks | The recorded local smoke harness launches this worktree's `api/dist/main.js` and checks selected contracts and cleanup | C0 must still run distinct live proof against the exact built artifact; these focused local checks are not the authoritative artifact matrix |
+| P6b correctness GREEN | Returned rows, ordering, totals, projection and capability behavior match the assertions | Residual filters materialize candidates. No unchanged-cost or performance-parity claim follows from functional GREEN |
+
+The final performance assessment must explicitly account for candidate
+cardinality and residual-filter selectivity, including latency, memory and
+database/query work. Do not hide materialization cost behind page-size caps
+or reuse correctness counts as performance evidence.
+
+| Open work | Parent ownership reported | Assembly status |
+|---|---|---|
+| P3b promised schema uniqueness | Worker `b1929e07` | Active; awaiting committed result |
+| P9 compatibility corpus and accurate guidance | Worker `34cb4c37` | Active; awaiting committed result |
+| P7 nested-readOnly follow-up | Parent-owned follow-up | Active; final P7 PATCH integration also depends on P2 |
+| P2 and P8b | Existing package owners | Still open in this assembly |
+
+The worker identifiers above are not commit SHAs. No pending worker diffs
+were read or imported. No authoritative full matrix starts until these open
+items and their compatibility/uniqueness dispositions close.
+
+**Assurance improvement: applied.** Evidence is labeled by the actual runtime
+and claim it supports. **Design disposition: accepted.** This is an
+evidence/coordination update, not a new runtime abstraction or optimization.
 
 ## 12. Architecture and self-improvement decisions
 

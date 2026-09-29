@@ -16,8 +16,16 @@ live checks, including all 69 P4 assertions. Endpoint state is unchanged after
 cleanup. The raw-error issue remained after P5 and was fixed separately in
 `9991ff50` with two unit and two HTTP RED/GREEN regressions.
 No package is deployed by this assembly. Product/version/lock metadata stays
-unchanged. P2 and P8b remain separate work. Final P7 PATCH integration
-depends on P2; P3b and compatibility dispositions must close before C0.
+unchanged. P2 and P8b remain separate work. Final P7 PATCH integration depends
+on P2; the nested-readOnly follow-up is active. Parent-assigned P3b and P9
+workers are closing promised uniqueness and compatibility/guidance work.
+All remain open before C0.
+
+**Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
+uses an owned loopback Nest listener inside the Node test process; it does not
+prove a final built artifact. Integration's focused `dist/main.js` smokes also
+do not replace C0's separate exact-artifact live gate. P6b residual filtering
+materializes candidates; green correctness tests do not prove unchanged cost.
 
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
@@ -25,7 +33,8 @@ depends on P2; P3b and compatibility dispositions must close before C0.
 - [x] ✅ COMPLETED: P6b `cc3ccdbc` -> `5075a82c` and P7a `8e42f15f` -> `0a6b9c5d`; live sections `9z-CU`/`9z-CV`.
 - [x] ✅ COMPLETED: P4 `212a6b92` -> `c95d0fb6` and `66a7229f` -> `de14fc5b`; aggregate checks use `9z-CW`.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close P2/P8b, P7 PATCH integration and P3b/compatibility dispositions before the final C0 matrix.
+- [ ] Close P2/P8b, P7 PATCH/nested-readOnly follow-ups and P3b/P9 work before the final C0 matrix.
+- [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 
 | Date | Summary |
