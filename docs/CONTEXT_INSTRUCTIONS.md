@@ -24,13 +24,18 @@ skips,369 PostgreSQL17.8 HTTP and143 shared live checks/backend.
 The bounded [PUT retained-entry correction](SCIM_PUT_ENTRY_PRESERVATION.md)
 is a parallel source snapshot on `5581e6b7`. Its additional type-capacity,
 restoration stability and nested immutable controls extend the already
-integrated b21e44cb fix; the old neutral path remains a re-export, never a
-second matcher. Source evidence is107 contract checks within1771 tests.
+integrated b21e44cb fix. The later authoritative parent89810f0c is integrated
+ase38b36aa: retained-entries.ts is again canonical, original consumers use
+that path, and attribute-values is a compatibility export only. There is
+never a second implementation. Source evidence is107 contract checks within1771 tests.
 Integration414e14e8 -> d8c9a79a now separately passes491 units,
 509 InMemory/511 PostgreSQL HTTP and164 shared live checks/backend,
 including6 new corpus cases/5474 assertions. [Merged residual proof](evidence/scim-retention-stability-integration-20260929/validation.json).
 The eight base expectations were subsequently
 reconciled by parentdf3ca957/bd82e681 and are not reopened.
+The parent canonical-path/fixture integration separately passes428 units,
+305 InMemory/306 PostgreSQL HTTP and164 main live checks/backend, including
+84 retained cases/1764 assertions. [Latest receipt](evidence/scim-parent-reservation-integration-20260929.json).
 
 The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
 P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)

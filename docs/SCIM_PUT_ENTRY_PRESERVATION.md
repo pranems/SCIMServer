@@ -16,8 +16,10 @@ omitted/changed type stealing the later explicit work match.
 [New integration receipt](evidence/scim-retention-stability-integration-20260929/validation.json)
 records491 units,509 InMemory/511 PostgreSQL HTTP and164 main built-live
 checks/backend, including this6-case/5474-assertion corpus. The original
-retained-entry path is now a compatibility export to attribute-values;
-there is only one implementation. Both old and new test/live contracts
+retained-entry path was initially a compatibility export. Authoritative
+parent source89810f0c subsequently restores it as the canonical implementation
+and original consumer path; attribute-values now forwards to it instead.
+There is only one implementation. Both old and new test/live contracts
 remain, as do the later common-attribute, query and parent-owned expectation
 corrections. Source counts below remain historical, not final C0 proof.
 
@@ -28,10 +30,17 @@ A PUT that reordered two `records` entries with the same `value`, but different
 immutable comparator had the opposite collision: its map kept only the last
 entry. Anonymous entries and nested immutable children could escape comparison.
 
-[The neutral domain helper](../api/src/domain/attribute-values.ts) now supplies
+[The canonical neutral domain helper](../api/src/domain/retained-entries.ts) now supplies
 one-to-one pairing for PUT preparation, PUT immutable validation, PATCH readOnly
 preservation and PATCH immutable transitions. Neither flow owns a separate
 matcher. PATCH-specific append/replacement markers remain in PATCH.
+
+The later parent-only matcher/fixture delta has its own
+[integration receipt](evidence/scim-parent-reservation-integration-20260929.json).
+It preserves the original filename and consumers and expands9z-DA to
+84 cases/1764 assertions. Earlier committed source work remains recorded;
+the restoration/null guards address hazards of reservation rather than
+two additional independently reproduced bugs in the greedy b21 matcher.
 
 The underlying obligations are
 [RFC 7644 section 3.5.1](https://www.rfc-editor.org/rfc/rfc7644#section-3.5.1)

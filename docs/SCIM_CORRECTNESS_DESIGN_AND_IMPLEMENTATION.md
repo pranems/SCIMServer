@@ -2084,6 +2084,40 @@ Admission/common-policy bridges, whole-namespace strict PATCH, broader
 characteristics, coordination/performance and exact82-case artifact
 acceptance remain separate.
 
+### 11.30 Parent canonical matcher and fixture delta, 2026-09-29
+
+Parent source `89810f0cb7c8083849adbc95842435c189cbaa1c`, following
+already-integrated `df3ca957`, is preserved as
+`e38b36aaf9ee50687b3ad576150de57ee8e83b4f`. The parent matcher file is
+retained unchanged. Its original `domain/retained-entries.ts` path, exports
+and PATCH/PUT consumer imports are authoritative again. The previously
+introduced attribute-values path only re-exports it, so there is one
+implementation. No second cherry-pick of414e14e8 or history rewrite occurred.
+
+Current committed common/query/policy and nested immutable work was not
+silently discarded during path reconciliation. The parent delta is narrow:
+reserved exact assigned-type capacity, stable equal-typed occurrences,
+null/absent-type guards and two additional shared fixture cases. The causal
+claim is equally narrow: greedy stealing is the reproduced b21 defect;
+restoration stability and null-priority protections guard the reservation
+approach, not two extra independently demonstrated original defects.
+
+| Integrated proof | Result |
+|---|---|
+| Build / lint | Build passed; scoped lint zero errors/one existing warning, no rule relaxation |
+| Units |8 suites,428 passed, including parent and existing preservation/PATCH/common controls |
+| HTTP |6 suites:305 InMemory plus one native-only skip;306 PostgreSQL17.8, zero pending/TODO, all22 migrations |
+| Built-live |164 main checks/backend;9z-DA expands to84 cases/1764 assertions, while prior9z-DD6/5474 remains intact |
+| Cleanup |Endpoint inventories unchanged, owned runtimes stopped, exact fresh PostgreSQL container removed |
+| Receipt |[Parent canonical integration](evidence/scim-parent-reservation-integration-20260929.json), separate from the parent's313-case source proof |
+
+**Test/gate improvement: applied.** Keep the additional cases in the original
+shared fixture and require their actual84/1764 main-entry result.
+**Design/architecture disposition: accepted.** Canonical filename and
+consumers restored, compatibility shim only, one matching algorithm and no
+PATCH intent semantics added to PUT. Other P7b/common-policy/admission/
+coordination/performance and final82-case artifact acceptance remain open.
+
 ## 12. Architecture and self-improvement decisions
 
 | Decision | Disposition and reason |

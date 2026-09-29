@@ -36,8 +36,10 @@ occurrence fallback and remains stable when server-owned types are restored.
 Null and absent types are both unassigned; null and absent value identities
 remain distinct. Anonymous/indistinguishable entries use the documented
 occurrence policy, not an invented identity. The single implementation is
-`domain/attribute-values.ts`; the older neutral path is a compatibility
-export. PATCH append intent remains PATCH-only. See the
+`domain/retained-entries.ts`, preserving the original filename, exports and
+consumer imports. The historical attribute-values path forwards to it only.
+PATCH append intent remains PATCH-only. Restoration/null guards make the
+reservation approach stable; they are not extra RFC identity rules. See the
 [original proof](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries)
 and [additional restoration/nested coverage](SCIM_PUT_ENTRY_PRESERVATION.md).
 
