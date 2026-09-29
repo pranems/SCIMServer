@@ -73,7 +73,6 @@ describe('typed uniqueness policy', () => {
     expect(() => policy(attr)).toThrow('Unsupported uniqueness declaration');
   });
   it.each([
-    { name: 'externalId', multiValued: true },
     { name: 'meta', type: 'complex', uniqueness: 'none', subAttributes: [
       { name: 'location', type: 'reference', uniqueness: 'server', multiValued: false, required: false },
     ] },
@@ -126,9 +125,18 @@ describe('typed uniqueness policy', () => {
   it.each([
     { name: 'displayName', type: 'integer' },
     { name: 'displayName', type: 'string', multiValued: true },
+    { name: 'externalId', type: 'integer' },
+    { name: 'externalId', type: 'string', multiValued: true },
     { name: 'active', type: 'integer' },
   ])('custom core values keep their published payload representation: %j', (attr) => {
     expect(policy(attr, true)).toHaveLength(1);
+  });
+  it.each(['User', 'Group'])('builtin %s externalId remains a string-shaped field', (family) => {
+    expect(() => compileUniquenessPolicy([{
+      id: `urn:ietf:params:scim:schemas:core:2.0:${family}`, isCoreSchema: true, attributes: [
+        { name: 'externalId', type: 'integer', required: false, multiValued: false, uniqueness: 'server' },
+      ],
+    }])).toThrow('Unsupported uniqueness declaration');
   });
   it('payload mode preserves custom promoted-name values while server id remains authoritative', () => {
     const payload = uniquenessPayload({

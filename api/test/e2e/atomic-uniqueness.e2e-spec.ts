@@ -287,49 +287,67 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
       expect((await http('post', base(ep, route), body(route, { badge: 'shared' }, 'shared'))).status).toBe(201);
     }
   });
-  for (const definition of [
+  for (const attribute of ['displayName', 'externalId']) for (const definition of [
     { type: 'integer', multiValued: false },
     { type: 'string', multiValued: true },
   ]) {
     for (const verb of ['post', 'put', 'patch'] as const) {
-      it(`custom core displayName ${definition.type} MV=${definition.multiValued}: competing ${verb} follows payload, not the column`, async () => {
-        const ep = await endpoint({ ...definition, uniqueness: 'server' });
+      it(`custom core ${attribute} ${definition.type} MV=${definition.multiValued}: competing ${verb} follows payload, not the column`, async () => {
+        const field = { ...definition, uniqueness: 'server' };
+        const ep = attribute === 'displayName' ? await endpoint(field)
+          : await endpoint({ type: 'string' }, [{ name: attribute, ...field }]);
         const value = definition.multiValued ? ['shared', 'other'] : 42;
-        const valueBody = (displayName: unknown) => ({ schemas: [DEVICE, EXT], displayName, [EXT]: {} });
+        const valueBody = (value: unknown) => ({ schemas: [DEVICE, EXT], displayName: randomUUID(), [attribute]: value, [EXT]: {} });
         const initial = verb === 'post' ? [] : await Promise.all([0, 1].map((i) =>
           http('post', base(ep, 'Devices'), valueBody(definition.multiValued ? [`initial-${i}`] : i))));
         initial.forEach((r) => expect(r.status).toBe(201));
+        for (const r of initial) {
+          const read = await http('get', `${base(ep, 'Devices')}/${r.body.id}`);
+          expect(read.status).toBe(200);
+          expect(read.body[attribute]).toEqual(r.body[attribute]);
+        }
         const result = await compete('Devices', verb, () => Promise.all([0, 1].map((i) =>
           http(verb, verb === 'post' ? base(ep, 'Devices') : `${base(ep, 'Devices')}/${initial[i].body.id}`,
-            verb === 'patch' ? { schemas: [PATCH], Operations: [{ op: 'replace', path: 'displayName', value }] }
+            verb === 'patch' ? { schemas: [PATCH], Operations: [{ op: 'replace', path: attribute, value }] }
               : valueBody(value)))));
         expect(result.map((r) => r.status).sort()).toEqual([verb === 'post' ? 201 : 200, 409]);
         conflict(result.find((r) => r.status === 409)!);
-        expect(result.find((r) => r.status !== 409)!.body.displayName).toEqual(value);
+        const winner = result.find((r) => r.status !== 409)!;
+        expect(winner.body[attribute]).toEqual(value);
+        const read = await http('get', `${base(ep, 'Devices')}/${winner.body.id}`);
+        expect(read.status).toBe(200);
+        expect(read.body[attribute]).toEqual(value);
         const stored = await rows(ep, 'Devices');
-        expect(stored.filter((r) => JSON.stringify((JSON.parse(r.rawPayload) as Record<string, unknown>).displayName) === JSON.stringify(value))).toHaveLength(1);
+        expect(stored.filter((r) => JSON.stringify((JSON.parse(r.rawPayload) as Record<string, unknown>)[attribute]) === JSON.stringify(value))).toHaveLength(1);
         expect(stored.map((r) => r.version).sort()).toEqual(verb === 'post' ? [1] : [1, 2]);
       });
     }
-    it(`custom core displayName ${definition.type} MV=${definition.multiValued}: none permits repeated values`, async () => {
-      const ep = await endpoint({ ...definition, uniqueness: 'none' });
-      const displayName = definition.multiValued ? ['shared'] : 42;
+    it(`custom core ${attribute} ${definition.type} MV=${definition.multiValued}: none permits repeated values`, async () => {
+      const field = { ...definition, uniqueness: 'none' };
+      const ep = attribute === 'displayName' ? await endpoint(field)
+        : await endpoint({ type: 'string' }, [{ name: attribute, ...field }]);
+      const value = definition.multiValued ? ['shared'] : 42;
       for (const _owner of [0, 1]) {
-        const res = await http('post', base(ep, 'Devices'), { schemas: [DEVICE, EXT], displayName, [EXT]: {} });
+        const res = await http('post', base(ep, 'Devices'), { schemas: [DEVICE, EXT], displayName: randomUUID(), [attribute]: value, [EXT]: {} });
         expect(res.status).toBe(201);
-        expect(res.body.displayName).toEqual(displayName);
+        expect(res.body[attribute]).toEqual(value);
       }
     });
   }
-  it('custom immutable numeric displayName preserves the public payload during self replacement', async () => {
-    const ep = await endpoint({ type: 'integer', uniqueness: 'server', mutability: 'immutable' });
-    const original = { schemas: [DEVICE, EXT], displayName: 42, [EXT]: {} };
+  it.each(['displayName', 'externalId'])('custom immutable numeric %s preserves the public payload during self replacement', async (attribute) => {
+    const field = { type: 'integer', uniqueness: 'server', mutability: 'immutable' };
+    const ep = attribute === 'displayName' ? await endpoint(field)
+      : await endpoint({ type: 'string' }, [{ name: attribute, ...field }]);
+    const original = { schemas: [DEVICE, EXT], displayName: 'unchanged', [attribute]: 42, [EXT]: {} };
     const created = await http('post', base(ep, 'Devices'), original);
     expect(created.status).toBe(201);
     const replaced = await http('put', `${base(ep, 'Devices')}/${created.body.id}`, original);
     expect(replaced.status).toBe(200);
-    expect(replaced.body.displayName).toBe(42);
-    const changed = await http('put', `${base(ep, 'Devices')}/${created.body.id}`, { ...original, displayName: 43 });
+    expect(replaced.body[attribute]).toBe(42);
+    const read = await http('get', `${base(ep, 'Devices')}/${created.body.id}`);
+    expect(read.status).toBe(200);
+    expect(read.body[attribute]).toBe(42);
+    const changed = await http('put', `${base(ep, 'Devices')}/${created.body.id}`, { ...original, [attribute]: 43 });
     expect(changed.status).toBe(400);
     expect(changed.body.scimType).toBe('mutability');
     expect((await rows(ep, 'Devices'))[0].version).toBe(2);

@@ -33,8 +33,8 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
           const type = attr.type ?? 'string';
           if (!isScalarType(type)) throw new RepositoryError('INVALID_VALUE', 'Unsupported uniqueness declaration type.');
           const root = path[0].name.toLowerCase();
-          const promotedType = ['id', 'externalid'].includes(root) ? 'string'
-            : (builtinUser || builtinGroup) && root === 'displayname' ? 'string'
+          const promotedType = root === 'id' ? 'string'
+            : (builtinUser || builtinGroup) && ['displayname', 'externalid'].includes(root) ? 'string'
               : (builtinUser || builtinGroup) && root === 'active' ? 'boolean'
               : builtinUser && root === 'username' ? 'string' : undefined;
           const computed = root === 'meta' || root === 'schemas' ||

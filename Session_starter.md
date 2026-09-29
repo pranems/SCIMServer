@@ -245,6 +245,7 @@ aggregate; read scalar and member state in one turn.
 | 2026-09-29 | P3b RFC type-applicability follow-up: only string/integer/decimal/reference support uniqueness; reference is intrinsically exact. Boolean/dateTime/binary/whole-complex declarations fail closed instead of inventing equality. RED five units, GREEN 640 units and PG144/IM142 HTTP plus two N/A; local only. |
 | 2026-09-29 | P3b adapter follow-up rejects unrepresented builtin Group member leaves while preserving extension/custom-core `members.$ref`. Builtin exclusions require exact RFC URNs. RED three units; GREEN 646 units, PostgreSQL 147 HTTP and InMemory 145 plus two N/A, same live assertions. |
 | 2026-09-29 | P3b custom-payload correction: generic response/rawPayload is authoritative, not convenience columns. Preserve numeric/MV displayName and numeric active/userName; immutable self-PUT agrees with public state. RED three units/seven HTTP per backend; GREEN 648 units, PostgreSQL 158 HTTP, InMemory 156 plus two N/A. |
+| 2026-09-29 | Parent-directed custom externalId compatibility closure preserves accepted numeric/MV schema values too. Explicit POST/GET/PUT/PATCH/GET outcomes and races pass: 651 units, PostgreSQL 167 HTTP, InMemory 165 plus two N/A. C0/P6 own query filtering/sorting pushdown probes, not part of this write guarantee. |
 
 Assistant memory: case-insensitive attribute lookup must reject ambiguous
 aliases before JSONB can reorder keys; schema identity comes from the resolved

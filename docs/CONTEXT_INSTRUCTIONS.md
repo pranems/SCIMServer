@@ -133,6 +133,9 @@ displayName and other same-named custom fields instead of imposing builtin types
 Latest source-package evidence: 648 units, 158 PostgreSQL HTTP and 156 InMemory
 plus two database-only N/A. Earlier 646/147/145 counts remain historical;
 these source counts are not the combined counts above or admission closure.
+The later651/167/165 source checkpoint4ba9373c used an incorrect common
+externalId interpretation. It is retained only with corrective child2d2da4e1,
+not independently accepted. The final corrected pair must pass merged proof.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory

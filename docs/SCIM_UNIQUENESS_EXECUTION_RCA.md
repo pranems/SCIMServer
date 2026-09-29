@@ -21,6 +21,7 @@
 | U13 | Standards interpretation / high | P7 sibling feedback after local commit / RFC type-table design review | Initial P3b implemented boolean/dateTime/binary equality despite RFC 7643 sections 2.3.2/5/6 saying these types have no uniqueness, and treated reference as default case-insensitive despite section 2.3.7. Five RED unit controls now require fail-closed inconsistent declarations and intrinsic exact reference equality. Correct in a normal follow-up commit; P7 owns admission rejection. |
 | U14 | Representation completeness / medium | P7 adapter inventory / initial adapter inventory | Builtin Group members discard all additional child fields, not only `$ref`; treating other declared leaves as absent silently ignored a promise. Three RED controls exposed extra child skips and an overbroad builtin-URN suffix check. Require the exact represented Group relation leaves and full builtin URN identity; preserve extension/custom-core member paths. |
 | U15 | Representation authority / high | P7 response-source correction / initial response-contract inventory | Generic response emits rawPayload, not promoted convenience columns. Initial P3b wrongly imposed builtin displayName/active shapes on custom cores and overlaid their valid values with null/Boolean columns. Three unit and seven HTTP RED controls per backend prove the regression. Generic repositories now explicitly compare rawPayload plus authoritative id; generic immutable reconstruction also matches response. |
+| U16 | Compatibility boundary / medium | Parent integration decision / accepted custom-schema inventory | The U15 fix still constrained generic custom externalId by the builtin/common string assumption. Parent confirmed the accepted rawPayload schema contract must be preserved, with query pushdown checked separately by C0/P6. Two unit/seven HTTP RED cases per backend now require numeric/MV externalId preservation and competing ownership; builtin User/Group string constraints remain. |
 
 ## Why the fix works
 
@@ -72,6 +73,13 @@ active/userName rather than treating convenience columns as public schema
 limits. A typed options object keeps the shared transaction helper explicit
 instead of adding another positional Boolean. Prevention: derive representation
 authority from the response and mutation reconstruction, not column names.
+
+U16 confirmed fix: `postgres-806b7a07a49c9a38`, 651 units, PostgreSQL 167
+HTTP and InMemory 165 plus two N/A, all live assertions and 22 migrations.
+Explicit GETs before and after PUT/PATCH prove public raw values survive
+round trips for both custom names. Build, policy lint 0/0 and independent
+review pass. [Final compatibility receipt](evidence/scim-uniqueness-externalid-20260929.json).
+Query filtering/sorting probes are assigned to C0/P6, not duplicated here.
 
 The issue list was reconciled against the available execution outputs and
 review reports for this worktree, separating missing-tool/setup/registration

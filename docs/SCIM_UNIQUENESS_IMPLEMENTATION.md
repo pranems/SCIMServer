@@ -77,7 +77,7 @@ reserves each distinct value, not an ordered array or an entire complex object.
 | Boolean, dateTime, binary | These types have no uniqueness under RFC 7643 sections 2.3.2, 2.3.5 and 2.3.6. `server` declarations are inconsistent and fail closed; ordinary repeated values without the declaration remain accepted. |
 | Multi-valued scalar | Any overlap with another owner's values conflicts. Empty arrays reserve nothing. |
 | Scalar child of complex SV or MV | Walk the declared parent shape and compare each scalar leaf. Works in core or extension schemas. |
-| Custom-core `displayName`, `userName`, `active` | Follow the actual custom schema and persisted public payload, not the builtin fields' types or convenience columns. Numeric/MV displayName and numeric active/userName remain legitimate custom attributes. |
+| Custom-core `displayName`, `externalId`, `userName`, `active` | Follow the accepted custom schema and persisted public payload, not the builtin fields' types or convenience columns. Numeric/MV displayName/externalId and numeric active/userName retain their existing custom contract. |
 | Null or absent | No reservation. Removal/null releases a previous value; unchanged self-values do not conflict. |
 | Inactive / soft-deleted resource | Remains an owner until the stored record or value is removed, preserving existing policy. |
 | Case-aliased keys on a constrained path | Rejected with 400 / invalidValue; JSONB key ordering must not change the meaning of a checked value. |
@@ -102,7 +102,7 @@ whether an operator may relax the Group baseline; P3b does not change it.
 | Uniqueness on boolean, dateTime or binary | Inconsistent with their RFC type definitions, not an invitation to add bespoke equality. Remove the characteristic; repeated values are legitimate. |
 | Core `meta`, `schemas`, builtin User `groups` | Unsupported: these structural, computed or inverse-membership values are not authoritatively owned by this resource writer. |
 | Builtin Group `members` children other than `value`, `type`, `display` | Unsupported: the relation adapter does not store `$ref` or arbitrary additional children. Those three supported leaves must be single-valued strings/references under multi-valued `members`. |
-| Builtin User/Group promoted string fields with incompatible shapes; common `id`/`externalId` | Builtin adapters and RFC common string attributes require compatible string shapes. This restriction does not apply to ordinary custom-core displayName/userName/active or same-named extensions. |
+| Builtin User/Group promoted string fields with incompatible shapes; server `id` | Builtin adapters require compatible string shapes; id is generated from scimId. This restriction does not apply to accepted custom-core displayName/externalId/userName/active or same-named extensions. |
 | Unknown scalar type | Unsupported. Do not publish a constraint whose equality cannot be evaluated. |
 | Malformed value in a unique field with strict validation off | Rejected with 400 / invalidValue. Disabling general strict validation does not disable a promised uniqueness invariant. |
 
@@ -118,6 +118,16 @@ Arbitrary readOnly attributes are not rejected merely for being readOnly:
 storage representation, not mutability/returned characteristics, determines
 whether the uniqueness policy can be evaluated. Intrinsic core `id` is read
 from authoritative `scimId`, never from `rawPayload.id`.
+
+**Custom compatibility decision:** this change preserves the accepted generic
+schema-validated rawPayload contract, including numeric/MV custom-core
+`externalId`. It does not reinterpret that custom declaration as the builtin
+User/Group externalId solely because the storage table has a string convenience
+column. This is an existing product compatibility choice, not a claim that the
+RFC common attribute's published definition changed. Consolidation owns query
+filter/sort probes: column pushdown is valid only when its representation
+faithfully matches the resolved schema. The uniqueness package does not alter
+query pushdown or claim those separate cross-package gates are complete.
 
 Pre-existing duplicate or malformed unique values are not repaired automatically.
 A write that retains a conflicting value fails; an operator can remove/change
@@ -194,9 +204,9 @@ data analysis and replay evidence, not an unreviewed optimization here.
 
 ## Evidence and reproduction
 
-Final RFC/adapter/custom-payload run: **`postgres-72052466392b3008`**. [Sanitized durable receipt](evidence/scim-uniqueness-custom-20260929.json)
+Final compatibility run: **`postgres-806b7a07a49c9a38`**. [Sanitized durable receipt](evidence/scim-uniqueness-externalid-20260929.json)
 records the exact API/scripts hash and cleanup identity. Focused unit:
-**648 passed / 10 suites**. HTTP: **158 PostgreSQL passed**, **156 InMemory
+**651 passed / 10 suites**. HTTP: **167 PostgreSQL passed**, **165 InMemory
 passed plus two N/A** (native foreign key and independent database pools).
 Each backend also runs **21 new uniqueness live assertions**, plus the existing
 33 conditional and 69 Group aggregate live assertions.
@@ -215,6 +225,10 @@ The custom-payload follow-up adds competing POST/PUT/PATCH for numeric/MV
 custom displayName, duplicate-permitting `none` controls, custom active/userName
 values and immutable numeric self-replacement. Changed-source lint is unchanged
 at 0 errors / 26 warnings; independent review reports no significant issue.
+The final externalId compatibility gate extends the same numeric/MV
+POST/PUT/PATCH races and explicit POST-to-GET-to-write-to-GET preservation to
+both custom displayName and externalId. Changed policy lint is 0/0; independent
+review reports no significant issue.
 The [initial receipt](evidence/scim-uniqueness-20260928.json) remains preserved
 for audit history rather than rewritten as if it tested the corrected policy.
 
