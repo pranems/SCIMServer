@@ -2,10 +2,27 @@ import type { INestApplication } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { scimPost, scimGet, scimPatch } from './helpers/request.helper';
+import { scimPost as rawPost, scimGet as rawGet, scimPatch as rawPatch } from './helpers/request.helper';
+import type { TypedHttpTest } from './helpers/typed-http';
 import { typedPatchProfile, USER, GROUP, DEVICE, CONTOSO, PATCH, DIAGNOSTICS } from './helpers/typed-patch-fixtures';
 import { USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY } from '../../src/domain/repositories/repository.tokens';
 import type { SchemaAttributeDefinition } from '../../src/domain/validation/validation-types';
+
+interface StoredPayload extends Record<string, unknown> {
+  [CONTOSO]: Record<string, unknown> & {
+    contacts: Record<string, unknown>[];
+    record: Record<string, unknown>;
+  };
+}
+interface WireBody extends StoredPayload {
+  id: string;
+  emails: Record<string, unknown>[];
+  [DIAGNOSTICS]: { failedOperationIndex: number };
+}
+const scimPost = (...args: Parameters<typeof rawPost>) => rawPost(...args) as unknown as TypedHttpTest<WireBody>;
+const scimGet = (...args: Parameters<typeof rawGet>) => rawGet(...args) as unknown as TypedHttpTest<WireBody>;
+const scimPatch = (...args: Parameters<typeof rawPatch>) => rawPatch(...args) as unknown as TypedHttpTest<WireBody>;
+const storedPayload = (raw: string): StoredPayload => JSON.parse(raw) as StoredPayload;
 
 const attr = (name: string, extra: Partial<SchemaAttributeDefinition> = {}): SchemaAttributeDefinition =>
   ({ name, type: 'string', required: false, multiValued: false, ...extra });
@@ -69,24 +86,24 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
         ? [endpoint.body.id, 'Device', created.body.id] : [endpoint.body.id, created.body.id]));
     const readStored = async () => {
       const saved = await findStored();
-      return { payload: JSON.parse(saved.rawPayload), version: saved.version };
+      return { payload: storedPayload(saved.rawPayload), version: saved.version };
     };
     const seedServerValue = async (onContact = false) => {
       const saved = await findStored();
-      const payload = JSON.parse(saved.rawPayload);
+      const payload = storedPayload(saved.rawPayload);
       if (onContact) payload[CONTOSO].contacts[0].server = 'server';
       else payload[CONTOSO].readOnlyValue = 'server';
       await repository.update(saved.id, { rawPayload: JSON.stringify(payload) });
     };
-    const seedContacts = async (contacts: unknown[]) => {
+    const seedContacts = async (contacts: Record<string, unknown>[]) => {
       const saved = await findStored();
-      const payload = JSON.parse(saved.rawPayload);
+      const payload = storedPayload(saved.rawPayload);
       payload[CONTOSO].contacts = contacts;
       await repository.update(saved.id, { rawPayload: JSON.stringify(payload) });
     };
     const seedNested = async () => {
       const saved = await findStored();
-      const payload = JSON.parse(saved.rawPayload);
+      const payload = storedPayload(saved.rawPayload);
       payload[CONTOSO].record.children = [{ value: 'same', server: 'server' }];
       payload[CONTOSO].record.serverTags = ['server'];
       await repository.update(saved.id, { rawPayload: JSON.stringify(payload) });
@@ -192,7 +209,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
       expect({ status: response.status, detail: response.body.detail }).toEqual({ status: 200, detail: undefined });
       for (const body of [response.body, (await scimGet(app, url, token).expect(200)).body, (await readStored()).payload]) {
         expect(body[CONTOSO]).toMatchObject({ tags: ['a', 'b', 'c', 'd'], record: { tags: ['a', 'b'], label: 'keep' } });
-        expect(body[CONTOSO].contacts.map((c: { tags: string[] }) => c.tags)).toEqual([['a', 'c'], ['b', 'c']]);
+        expect(body[CONTOSO].contacts.map(c => c.tags)).toEqual([['a', 'c'], ['b', 'c']]);
         expect(JSON.stringify(body)).not.toContain('contacts[');
       }
       expect(response.body[CONTOSO]).not.toHaveProperty('secret');
@@ -202,7 +219,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
       const { url, readStored } = await create(family);
       const response = await patch(url, [{ op: 'replace', path: `${CONTOSO}:contacts[type eq "work"]`, value: { value: 'changed' } }]);
       expect({ status: response.status, detail: response.body.detail }).toEqual({ status: 200, detail: undefined });
-      expect(response.body[CONTOSO].contacts.map((c: { value: string; type: string }) => [c.value, c.type]))
+      expect(response.body[CONTOSO].contacts.map(c => [c.value, c.type]))
         .toEqual([['changed', 'work'], ['changed', 'work']]);
       expect((await readStored()).payload[CONTOSO].contacts).toEqual(response.body[CONTOSO].contacts);
     });
@@ -213,7 +230,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
     });
     it.each([[true, false, 400], [true, true, 200], [false, false, 200]])(
       'guards expanded no-path readOnly targets strict=%s ignore=%s', async (strict, ignore, status) => {
-        const { url, readStored, seedServerValue } = await create(family, strict as boolean, { IgnoreReadOnlyAttributesInPatch: ignore });
+        const { url, readStored, seedServerValue } = await create(family, strict, { IgnoreReadOnlyAttributesInPatch: ignore });
         await seedServerValue();
         const response = await patch(url, [{ op: 'replace', value: { [`${CONTOSO}:readOnlyValue`]: 'client' } }]);
         expect(response.status).toBe(status);
@@ -222,7 +239,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
     );
     it.each([[true, false, 400], [true, true, 200], [false, false, 200]])(
       'guards namespace readOnly descendants strict=%s ignore=%s', async (strict, ignore, status) => {
-        const { url, readStored, seedServerValue } = await create(family, strict as boolean, { IgnoreReadOnlyAttributesInPatch: ignore }, true);
+        const { url, readStored, seedServerValue } = await create(family, strict, { IgnoreReadOnlyAttributesInPatch: ignore }, true);
         await seedServerValue();
         const before = await readStored();
         const response = await patch(url, [{ op: 'replace', value: { [CONTOSO]: null } }]);
@@ -239,7 +256,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
         { op: 'replace', path: `${CONTOSO}:contacts[primary eq true].value`, value: 'selected' },
       ]);
       expect({ status: response.status, detail: response.body.detail }).toEqual({ status: 200, detail: undefined });
-      expect(response.body[CONTOSO].contacts.map((c: { value: string; primary: boolean }) => [c.value, c.primary]))
+      expect(response.body[CONTOSO].contacts.map(c => [c.value, c.primary]))
         .toEqual([['one', false], ['selected', true]]);
       expect((await readStored()).payload[CONTOSO].contacts).toEqual(response.body[CONTOSO].contacts);
     });
@@ -265,7 +282,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
     ])('rejects %s with no repository write', async (_name, operations, scimType, index) => {
       const { url, created, readStored } = await create(family);
       const before = await readStored();
-      const response = await patch(url, operations as unknown[]);
+      const response = await patch(url, operations);
       expect(response.status).toBe(400);
       expect(response.body.scimType).toBe(scimType);
       expect(response.body[DIAGNOSTICS].failedOperationIndex).toBe(index);
@@ -277,7 +294,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
     });
     it.each([[true, false, 400], [true, true, 200], [false, false, 200]])(
       'keeps readOnly compatibility strict=%s ignore=%s', async (strict, ignore, status) => {
-        const { url, readStored } = await create(family, strict as boolean, { IgnoreReadOnlyAttributesInPatch: ignore });
+        const { url, readStored } = await create(family, strict, { IgnoreReadOnlyAttributesInPatch: ignore });
         const response = await patch(url, [
           { op: 'replace', path: `${CONTOSO}:readOnlyValue`, value: 'discard' },
           { op: 'add', path: `${CONTOSO}:tags`, value: ['kept'] },
@@ -296,7 +313,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
       { op: 'add', path: 'emails[type eq "work"].primary', value: true },
       { op: 'replace', path: 'emails[primary eq true].value', value: 'new@example.test' },
     ]).expect(200);
-    expect(response.body.emails.map((email: { primary: boolean; value: string }) => [email.primary, email.value]))
+    expect(response.body.emails.map(email => [email.primary, email.value]))
       .toEqual([[false, 'old@example.test'], [true, 'new@example.test']]);
   });
   it.each([true, false])('User quoted Boolean synthesis hands off primary strict=%s', async strict => {
@@ -308,7 +325,7 @@ describe('P2 ordered PATCH HTTP and repository contract', () => {
       { op: 'replace', path: 'emails[primary eq true].value', value: 'selected@example.test' },
     ]);
     expect({ status: response.status, detail: response.body.detail }).toEqual({ status: 200, detail: undefined });
-    expect(response.body.emails.map((email: { primary: boolean }) => email.primary)).toEqual([false, true]);
+    expect(response.body.emails.map(email => email.primary)).toEqual([false, true]);
   });
   it('Group scalar selectors cannot bypass matching through promoted-field hooks', async () => {
     const { url, readStored } = await create('Groups');

@@ -1,12 +1,18 @@
 # SCIM and Microsoft Entra compatibility
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
 **Scope:** P9 on P7a/P1 base `8e42f15f54a955fd6b93d58e9471c393329f4d3a`.
 Local implementation evidence, not a deployed-service certification.
 See the [correctness tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md),
 [37-setting evidence table](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md), and
 [execution ledger](SCIM_P9_EXECUTION_RCA.md).
+
+**P2 integration checkpoint:** I02 primary handoff now passes the assembled
+InMemory HTTP and built-local live paths and runs by default. The current
+bounded corpus is **18 cases / 1,162 live assertions**. I03 remains RED when
+explicitly enabled; quoted-active coercion controls remain a separate P2
+follow-up. The original two-backend P9 receipt below stays unchanged.
 
 ## Start here
 
@@ -90,6 +96,7 @@ preset, not captured customer payloads. Native and legacy cases are distinct.
 | E14/E15 | User/Group hard-delete switch off | Product policy returns 400; resource and version unchanged |
 | E16 | Array-wrapped `active:[{"value":"False"}]` | Rejected 400 invalidSyntax; no state change |
 | E17 | Microsoft's modern pathless dotted-name and enterprise-URN update | Actual nested name and employeeNumber updated; no literal dotted key |
+| I02 | New primary email appended to the existing collection | Both emails retained, old primary cleared, new primary true; now default-running after the P2 core integration proof |
 
 E16 is a product boundary probe, **not a claim that current Microsoft emits
 that wrapper**. Quoted Boolean support does not promise arbitrary wrappers.
@@ -105,11 +112,11 @@ Successful mutations are checked by a subsequent GET. Endpoint cleanup checks
 
 | Case | Intended contract | Why separate |
 | --- | --- | --- |
-| I02 | Adding a new primary email clears the previous primary, retaining both emails | Requires P2 ordered semantics |
 | I03 | With verbose disabled, a dotted path must not silently become a literal key | Reproduced on this base: 200 with unchanged name and an extra dotted key |
 
-The two are permanent executable cases, reported as TODO by default.
-`SCIM_P9_INTEGRATION=1` enables their assertions after P2 integration.
+I03 remains executable and is reported as TODO in the bounded default lane.
+`SCIM_P9_INTEGRATION=1` enables its assertions. The assembled P2 core still
+fails it; I02 was separately verified and promoted to default execution.
 I03 currently demands a rejection; if P2 deliberately resolves the path
 instead, review the compatibility policy and change that assertion to the
 correct nested result, never to malformed storage. A separate exploratory run enabled all integration
@@ -135,7 +142,7 @@ No zero-match-remove, filtered-add or optional-protocol default was changed.
 | caseExact | Controls value comparison, not attribute-name casing. Complete namespace-aware search/sort and uniqueness require the query/persistence packages. |
 | referenceTypes | P7a checks declaration shape and URI syntax. It does not prove remote existence, all allowed target types, or referential integrity. |
 | nested complex | RFC 7643 2.3.8 forbids complex sub-attributes. Existing flag-off acceptance is a product extension, not RFC conformance; strict RFC-shaped mode remains opt-in. |
-| primary | POST/PUT policy can reject/normalize/pass through. That is not equivalent to RFC ordered PATCH primary handoff; I02 remains required. |
+| primary | POST/PUT policy can reject/normalize/pass through. P2 supplies ordered handoff; I02 now runs by default and proves both emails/primary values. Final integrated PostgreSQL acceptance remains separate. |
 
 See [P7a](SCIM_P7A_PROFILE_VALIDATION.md) for scalar formats and limitations.
 Use published characteristic values when present; otherwise use RFC defaults.
@@ -182,6 +189,8 @@ node .\scripts\p1-validation\run.cjs
 
 Recorded run: `test-results/p9/backends-be0f8ff8b02077b3/run.json`;
 [sanitized permanent receipt](evidence/scim-p9/validation.json).
+The following counts describe the original P9 source-package checkpoint,
+not the later 18-case integrated corpus:
 Actual PostgreSQL **17.8**, all **22 migrations**, **17 HTTP cases passed per
 backend**, **2 integration TODOs per backend**. Each built local runtime
 passed **17 live cases / 1,104 assertions**, including cleanup assertions.

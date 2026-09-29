@@ -7,16 +7,16 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Active Execution Reference
 
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
-assembles P1, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
+assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
-The latest P9 increment passes build and 383 focused units. Its explicit
-19-case HTTP run has **17 supported passes and 2 blocking failures**:
-I02 primary handoff and I03 verbose-disabled literal-key safety remain P2 work.
-The bounded combined live run has 132 reported checks, including P9's 17
-supported cases / 1,104 assertions; it does not claim I02/I03 passed.
-At final P2 integration, resolved I02/I03 must run by default, not remain
-environment-gated TODOs. P2 also owns making quoted active PATCH extraction
+P2 core is now integrated: build and 1,229 combined units pass; a new
+default-discovery test adds one distinct pass (1,230 total). Initial combined
+HTTP is **327 passed / 1 blocking I03 failure / 1 PostgreSQL-only skip**.
+I02 passes and now runs by default; the final affected HTTP rerun passes 162
+cases with only I03 opt-in. The bounded combined live run has 133 checks,
+including P2's 112 assertions and P9's 18 cases / 1,162 assertions.
+Resolved I03 must also become default-running when fixed. P2 still owns making quoted active PATCH extraction
 honor `AllowAndCoerceBooleanStrings`, with explicit legacy mode preserved.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
@@ -24,8 +24,9 @@ No package is deployed by this assembly. Product/version/lock metadata stays
 unchanged. P8b cleanup is integrated, but its original worker now owns an active
 follow-up for exact concurrent-deletion errors on both backends. Genuine DB
 faults and P3 conditional 412 semantics must remain distinct. Final P7 PATCH integration depends
-on P2; the nested-readOnly POST/PUT follow-up is now integrated. P3b remains
-active, while P9's package is integrated with its explicit P2 checks still open.
+on remaining follow-ups; the P2/P7 selected-value/cardinality and POST/PUT
+overlap checks pass. P7 common-attribute verification and P3b remain active;
+I03 and active-coercion semantics are not declared closed.
 All remain open before C0.
 
 **Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
@@ -60,9 +61,9 @@ supersedes the earlier unrestricted custom-core externalId assumption.
 - [x] ✅ COMPLETED: Recursive readOnly `892b74ba` -> `168c074f`; `9z-CV` now requires all 228 assertions.
 - [x] ✅ COMPLETED: P8b `88b96c74` -> `39a58c9a` and `2db239a9` -> `9178d60c`; deletion checks use `9z-CX`, preserving integrated P8a `9z-CS` and P8c `9z-CT`.
 - [x] ✅ COMPLETED: P9 `109a1099` -> `3ddd8a1b`; bounded compatibility coverage uses `9z-CY`. I02/I03 were executed, not relabeled as supported passes.
+- [x] ✅ COMPLETED: P2 core `7113ee86` -> `2242860d`; public deepEqual/P7 seams preserved, `9z-CZ` runs ordered PATCH, and verified I02 is default-running.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] P2 tip `7113ee86` metadata inspected, not imported yet; preserve the [P2/P7 merge seams](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#p2p7-merge-contract), including public `deepEqual` and selected-singleton cardinality.
-- [ ] Close P2 including default-running I02/I03 and effective active-value coercion controls, final P7 PATCH, P3b/compatibility dispositions and the concurrent FK-error boundary before C0.
+- [ ] Close P2's I03/active-coercion follow-up, final P7/common-attribute validation, P3b/compatibility and concurrent FK-error boundaries before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.

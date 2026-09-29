@@ -173,14 +173,31 @@ function Invoke-ScimCorrectnessContractTests {
                 if ($LASTEXITCODE -ne 0) { throw 'Entra compatibility contract process failed.' }
                 $receipt = $result | ConvertFrom-Json -ErrorAction Stop
                 $includeIntegration = $env:SCIM_P9_INTEGRATION -eq '1'
-                $expectedCases = if ($includeIntegration) { 19 } else { 17 }
-                $assertionsMatch = if ($includeIntegration) { $receipt.assertions -gt 1104 } else { $receipt.assertions -eq 1104 }
+                $expectedCases = if ($includeIntegration) { 19 } else { 18 }
+                $assertionsMatch = if ($includeIntegration) { $receipt.assertions -gt 1162 } else { $receipt.assertions -eq 1162 }
                 $caseIds = @($receipt.outcomes.id)
-                $hasPendingCases = 'I02' -in $caseIds -and 'I03' -in $caseIds
-                Test-Result -Success ($caseIds.Count -eq $expectedCases -and $assertionsMatch -and $hasPendingCases -eq $includeIntegration) `
+                $hasPendingCase = 'I03' -in $caseIds
+                Test-Result -Success ($caseIds.Count -eq $expectedCases -and 'I02' -in $caseIds -and $assertionsMatch -and $hasPendingCase -eq $includeIntegration) `
                     -Message "9z-CY: $expectedCases Entra cases; integration checks enabled=$includeIntegration"
             } catch {
                 Test-Result -Success $false -Message "9z-CY: Entra compatibility failed: $($_.Exception.Message)"
+            } finally {
+                $env:SCIM_LIVE_BASE_URL = $oldBase
+                $env:SCIM_LIVE_TOKEN = $oldToken
+            }
+
+            $script:currentSection = '9z-CZ: Ordered PATCH'
+            $oldBase = $env:SCIM_LIVE_BASE_URL
+            $oldToken = $env:SCIM_LIVE_TOKEN
+            try {
+                $env:SCIM_LIVE_BASE_URL = $base
+                $env:SCIM_LIVE_TOKEN = $token
+                $result = & node (Join-Path $PSScriptRoot 'ordered-patch.cjs')
+                if ($LASTEXITCODE -ne 0) { throw 'Ordered PATCH contract process failed.' }
+                $receipt = $result | ConvertFrom-Json -ErrorAction Stop
+                Test-Result -Success ($receipt.assertions -eq 112) -Message '9z-CZ: 112 ordered PATCH append, all-match, transition and rollback assertions'
+            } catch {
+                Test-Result -Success $false -Message "9z-CZ: ordered PATCH failed: $($_.Exception.Message)"
             } finally {
                 $env:SCIM_LIVE_BASE_URL = $oldBase
                 $env:SCIM_LIVE_TOKEN = $oldToken

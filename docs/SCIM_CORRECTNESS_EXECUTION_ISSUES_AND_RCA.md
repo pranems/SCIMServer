@@ -107,6 +107,9 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I15 | Integration / Low | P8b source reserved `9z-CT`, already used by integrated P8c, and lacked a shared-runner route | Source-branch section allocations differed from the assembled map | Two wiring assertions failed before moving P8b to `9z-CX`. Preserve P8a `9z-CS`, P8c `9z-CT`, original standalone deletion helper and fixture cleanup. All four wiring tests pass | Existing cross-runner regression / same | Applied: ten-package invocation/unique-section inventory; source-package reservations remain historical notes rather than overriding assembled identifiers |
 | C0-I16 | Integration/harness / Low | P9 was absent from main live coverage; its inherited shared harness expected only 55 P7 HTTP cases | The P9 source branch preceded the accepted 67-case readOnly follow-up and the integration wrapper | Preserve P9's guarded branch and all ownership checks, combine minimums as P9=17/P7=67/P1=24, and share only explicit-target HTTP assertions in `9z-CY`. Two wiring failures turn GREEN in 383 focused units | Merge review and wiring regression / same | Applied: eleven-package route/section inventory; `SCIM_P9_INTEGRATION=1` still requests the two unresolved normative cases instead of silently omitting them |
 | C0-I17 | Test typing / Low | Explicit lint of P9's HTTP adapter reported 12 unsafe-value/import errors | CommonJS corpus loading and Supertest server/body boundaries were untyped | Use createRequire with a narrow corpus contract, typed Server input and unknown-valued wire payload. No corpus assertion or expected outcome changed. Six-file lint now passes with zero errors / six existing warnings | Explicit HTTP lint / integration | Applied: keep CJS shared assertions, type the adapter, never suppress lint rules |
+| C0-I18 | Integration / Low | P2's owned harness conflicted with the accepted P7/P9 harness branches and case minimums | Independently implemented worktree-specific runners shared the same file paths | Add explicit IS_P2 selection while retaining P1/P7/P9 path/branch checks, all source/database ownership checks, P2 exact 17.8, and P7's 67-case minimum. Baseline transformation is confined to the designated P2 context; the source-built identity check remains intact | Merge review / same | No frozen historical harness or evidence changed; combined code builds with public deepEqual and P7's fifth immutable mode preserved |
+| C0-I19 | Integration/coverage / Low | P2 had no main-runner route, and its now-passing I02 case was still opt-in | Source package smoke and compatibility discovery were maintained independently | Two wiring failures precede `9z-CZ`; an additional discovery test fails before removing I02's integration flag. I02 now runs by default in HTTP/live; the measured default P9 corpus is 18 cases / 1,162 live assertions. I03 remains an explicitly executed RED | Wiring/discovery regression / same | Applied: promote fixed cases to default execution; do not hide unresolved I03 or claim a final matrix |
+| C0-I20 | Test typing / Low | Explicit lint found 74 unsafe-value errors in ordered PATCH HTTP tests and 54 in the touched manager suite | Supertest and stored JSON boundaries were untyped; narrower annotations hid nested any values | Reuse a type-only HTTP response contract for the two real consumers, retain original request helpers/tracing, and type stored fixture payloads with unknown-valued leaves. Remove obsolete type assertions. HTTP fixture lint is now zero errors/warnings; 162 final selected HTTP cases pass and a last type-only rerun compiles the full spec and passes three selected singleton checks | Explicit HTTP lint / integration | No lint rule or runtime assertion weakened; type-only helper has two actual consumers and no production responsibility |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -202,6 +205,24 @@ state exactly. Logs use `test-results/scim-integration-p9/`; no new PostgreSQL
 matrix or release proof is claimed. **Design disposition: accepted.** Keep
 the shared corpus and thin typed HTTP adapters, preserve ownership guards and
 leave P2-owned protocol changes to their package owner.
+
+P2 core integration confirmation: the first combined run passes **1,229
+units** and **327 HTTP cases**, with one explicit PostgreSQL-only FK skip
+and **I03 still failing**. I02 passes and is promoted to default execution
+after a discovery RED/GREEN check; that adds one distinct unit test for
+**1,230 total distinct targeted unit passes**. The final typed-fixture/default
+corpus rerun passes **162 HTTP cases**, with I03 still an explicit TODO only
+in that bounded lane; its failed execution remains in the earlier result JSON.
+The combined built-local smoke passes **133 reported checks**, including
+P2's **112** assertions and default P9's **18 cases / 1,162 assertions**.
+Endpoint state is unchanged and the owned APIs are stopped.
+
+Logs use `test-results/scim-integration-p2/`. Common-attribute and quoted-active/
+I03 follow-ups remain separately owned; no production fix is duplicated here.
+**Design disposition: accepted.** Public deepEqual and P7 cardinality,
+replacement-mode and recursive-readOnly seams coexist with the ordered
+executor. The added HTTP helper is type-only and serves two concrete test
+consumers; repository boundaries, defaults and live-data policy are unchanged.
 
 ## P8a issues
 

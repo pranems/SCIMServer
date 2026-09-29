@@ -402,21 +402,21 @@ combined checkpoint has its own counts in section 11.1.
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | Core integrated; combined validation pending | Frozen `7113ee86`: [shared executor and source receipts](SCIM_P2_IMPLEMENTATION.md), 1,522 units / 201 HTTP and 170 built-live assertions per backend. Combined P7/P3/P4 checks, default-running I02/I03 and effective quoted-active coercion still require closure; see 11.12 |
+| P2 | Core integrated; bounded combined checks pass with I03 open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. Combined P7/P3/P4 checks pass; I02 now runs by default. I03 and effective quoted-active coercion remain separately owned follow-ups; see 11.14 |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Active parent-assigned worker | Promised schema-uniqueness closure is in progress; no new commit supplied for assembly. P3 alone does not claim these guarantees and C0 is not unblocked |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | P7a/readOnly follow-up integrated; focused revalidation passed | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Recursive readOnly commit `892b74ba` preserves the existing map interface and POST/PUT-only scope. Final ordered PATCH integration still waits for P2; uniqueness and compatibility closure remain separately owned |
+| P7 | P7a/readOnly plus P2 overlap verified locally; common-attribute follow-up open | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Public deepEqual, selected-value/cardinality, explicit PUT mode and recursive preservation coexist in passing local checks. Common externalId/RFC3.1 and final dual-backend acceptance remain open |
 | P8 | P8a/P8b/P8c integrated; concurrent-error follow-up active | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) proves cleanup/retained audit behavior. Its original worker owns exact missing-parent error normalization for raced User/Group/custom/applicable credential routes on both backends; genuine DB faults and P3 conditional 412 remain distinct |
-| P9 | Integrated; 17 supported cases verified, 2 integration blockers | [Strict-on Entra guidance and 17-case corpus](SCIM_ENTRA_COMPATIBILITY.md), [all 37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). I02/I03 were explicitly executed RED on the assembled tip and remain P2 integration checks, not supported compatibility passes. No defaults changed |
-| C0 | Incremental assembly verified only | Checkpoints 11.1-11.10; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. No full matrix until P2/I02/I03, final P7 PATCH, P3b/compatibility and concurrent FK-error normalization close |
+| P9 | Integrated; 18 default cases verified locally, I03 open | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). P2 core resolves I02, now default-running in HTTP/live. I03 remains an executed RED and active-coercion controls remain an explicit gap; original P9 receipts are unchanged |
+| C0 | Incremental assembly verified only | Checkpoints through 11.14; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. I02 is default-verified locally; no full matrix until I03/active coercion, final P7/common attributes, P3b/compatibility and concurrent FK-error normalization close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
 and integrated here. The bounded package and focused overlap checks passed;
-P9's two explicitly enabled normative integration cases remain RED. The final combined matrix,
+P9's I03 remains RED; I02 now passes by default after P2 core integration. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
@@ -1051,7 +1051,8 @@ duplicate fixes in their pending worktree.
 
 The P7 owner identified these required merge seams for committed P2 tip
 `7113ee866b6b2a039e8cb332943dae48f9027682`, a single child commit after P1.
-The tip has been inspected, not imported by this coordination update. The P7
+The tip was inspected, not imported at this coordination checkpoint; section
+11.14 records its later integration. The P7
 source remains frozen at accepted `8e42f15f` plus `892b74ba`; combined
 verification belongs to the integration worktree.
 
@@ -1122,6 +1123,66 @@ before inferring supported contracts from historical storage behavior.
 **Design disposition: accepted.** Keep schema identity and authoritative
 representation separate from convenience-column layout; no new parallel
 admission implementation is introduced here.
+
+### 11.14 P2 core integration, 2026-09-29
+
+Frozen source `7113ee866b6b2a039e8cb332943dae48f9027682` was appended as
+`2242860d`. Original source/build fingerprints are retained in the P2 receipt,
+not reused as fingerprints of the merged tree. The core source package remains
+its own rollback unit; this assembly does not import the owner's pending
+coercion/I03 work or P7's active common-attribute follow-up.
+
+**Merge decisions.** Preserve public `SchemaValidator.deepEqual`, unchanged
+PATCH-validation signatures, P7 `validateAttribute` child cardinality and
+scalar formats, the fifth immutable mode argument and post-normalization PUT
+preparation. P3 expected versions still reach every repository mutation; P4
+aggregate writes and P8 lifecycle barriers remain intact. The original strict/
+lenient incident and late-failure rollback tests run alongside selected-object/
+singleton adds, ordered transitions and the recursive-readOnly P7 tests.
+
+The shared owned harness now selects P1/P2/P7/P9 explicitly rather than
+overwriting another package's source guard. P2 retains its exact PostgreSQL
+17.8 guard, 201-case minimum and source/build fingerprints; P7 retains its
+67-case minimum. This merged source guard still rejects the integration
+worktree; focused integration tests use explicit InMemory and an inert URL,
+not a weakened historical/owned database guard.
+
+**I02 is resolved in the integrated local proof and now runs by default.**
+Its default-discovery assertion failed before the corpus integration flag was
+removed. The ordinary P9 HTTP/live corpus is now 18 cases; measured live
+assertions are 1,162. I03 remains opt-in only while it is unresolved, and was
+actually executed RED with expected 400 versus received 200. No assertion was
+changed to accept literal dotted storage. Quoted active extraction remains the
+original P2 owner's follow-up, not an inferred fixed behavior.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| Engines, ordered execution, P7 cache/cardinality/readOnly, service/controller overlap | 20 suites / 1,229 tests passed |
+| Added default-case discovery regression | 1 additional test passed after RED; 1,230 distinct targeted units total |
+| Initial combined HTTP with P9 integration enabled | 10 suites, 327 passed / 1 I03 failure / 1 PostgreSQL-only FK skip |
+| Final touched-HTTP/default-corpus rerun | 3 suites / 162 passed; I03 is the sole default TODO and remains explicitly RED in the earlier run |
+| Final type-only selected-add compile/run | 3 passed; all test source in the spec compiles |
+| Production/test source lint | 0 errors / 102 warnings across 19 merged files; no ceilings changed |
+| Explicit touched HTTP fixture lint | 0 errors / 0 warnings across 5 files after typing Supertest/stored JSON boundaries |
+| Built-local combined live section | 133 reported checks pass, including P2 `9z-CZ` 112 assertions, P1 58, and default P9 18 cases / 1,162 assertions |
+| Cleanup | Existing endpoint collection identical before/after; every owned API process stopped |
+
+The new live route was added only after two wiring REDs. Typed HTTP adapters
+keep the existing request helpers and tracing; a shared type-only helper has
+two real test consumers and adds no production behavior. Logs are under
+`test-results/scim-integration-p2/`.
+
+**Still blocking:** I03, documented active-coercion control, P7 common
+attributes, P3b atomic uniqueness/generic reconstruction, concurrent deletion
+errors, final performance/case reconciliation and exact-artifact proof.
+The 82 original IDs/164 backend dispositions remain pending. No final matrix,
+new integrated PostgreSQL receipt, live-data repair or deployment is claimed.
+**Assurance improvement: applied.** A resolved optional probe becomes an
+unconditional default regression; unresolved probes retain explicit REDs.
+**Design disposition: accepted.** Ordered mutation remains in the shared
+executor while validation modes, resource hooks and conditional persistence
+retain their separate responsibilities.
 
 ## 12. Architecture and self-improvement decisions
 

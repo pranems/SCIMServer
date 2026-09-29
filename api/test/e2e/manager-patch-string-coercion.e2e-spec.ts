@@ -2,12 +2,13 @@ import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import {
-  scimPost,
-  scimPatch,
-  scimGet,
+  scimPost as rawPost,
+  scimPatch as rawPatch,
+  scimGet as rawGet,
   createEndpointWithConfig,
   scimBasePath,
 } from './helpers/request.helper';
+import type { TypedHttpTest } from './helpers/typed-http';
 import {
   validUser,
   patchOp,
@@ -16,6 +17,14 @@ import {
 
 const ENT_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 const MANAGER_PATH = `${ENT_URN}:manager`;
+
+interface WireBody extends Record<string, unknown> {
+  id: string;
+  [ENT_URN]: { manager: Record<string, unknown> };
+}
+const scimPost = (...args: Parameters<typeof rawPost>) => rawPost(...args) as unknown as TypedHttpTest<WireBody>;
+const scimGet = (...args: Parameters<typeof rawGet>) => rawGet(...args) as unknown as TypedHttpTest<WireBody>;
+const scimPatch = (...args: Parameters<typeof rawPatch>) => rawPatch(...args) as unknown as TypedHttpTest<WireBody>;
 
 /**
  * Manager PATCH String Coercion (RFC 7644 §3.5.2.3 + Postel's Law)

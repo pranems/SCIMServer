@@ -213,7 +213,7 @@ scenario("E17", "modern pathless dotted and enterprise update resolves into actu
   c.eq(read["name.givenName"], undefined);
 });
 
-scenario("I02", "P2 integration: sequential primary handoff", {
+scenario("I02", "sequential primary handoff retains the prior email", {
   PrimaryEnforcement: "reject",
 }, async c => {
   const user = await c.user();
@@ -224,7 +224,7 @@ scenario("I02", "P2 integration: sequential primary handoff", {
   c.eq(emails.length, 2);
   c.eq(emails.find(e => e.type === "work").primary, false);
   c.eq(emails.find(e => e.type === "home").primary, true);
-}, true);
+});
 
 async function runCase(test, send) {
   let assertions = 0;

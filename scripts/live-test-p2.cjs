@@ -8,6 +8,12 @@ async function runLiveP2(baseUrl, secret) {
   assert.equal(new URL(baseUrl).hostname, "127.0.0.1");
   assert.equal(new URL(baseUrl).protocol, "http:");
   assert.ok(secret?.length >= 32);
+  return runP2Contract(baseUrl, secret);
+}
+
+async function runP2Contract(baseUrl, secret) {
+  assert.ok(["http:", "https:"].includes(new URL(baseUrl).protocol));
+  assert.ok(secret);
   const file = path.join(API, "test", "e2e", "helpers", "typed-patch-fixtures.ts");
   const loaded = new (require("node:module"))(file, module);
   loaded._compile(require(path.join(API, "node_modules", "typescript")).transpileModule(
@@ -84,4 +90,4 @@ async function runLiveP2(baseUrl, secret) {
   }
   return { assertions, families: ["Users", "Groups", "Devices"], strictModes: [true, false] };
 }
-module.exports = { runLiveP2 };
+module.exports = { runLiveP2, runP2Contract };

@@ -28,6 +28,7 @@ describe('integrated correctness live coverage', () => {
       'Invoke-ScimGroupAggregateContract -EndpointUrl',
       'test-scim-endpoint-deletion.ps1',
       'entra-compatibility.cjs',
+      'ordered-patch.cjs',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
@@ -42,7 +43,7 @@ describe('integrated correctness live coverage', () => {
     const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-C[O-Z]):/g)]
       .map((match) => match[1]);
     expect(new Set(sections).size).toBe(sections.length);
-    expect(sections.length).toBeGreaterThanOrEqual(11);
+    expect(sections.length).toBeGreaterThanOrEqual(12);
   });
 
   it('requires the expanded recursive readOnly live contract', () => {
