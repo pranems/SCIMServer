@@ -96,6 +96,8 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I04 | Documentation / Medium | F4 source coupling rejected Custom Extensions and Schema Customization guides | P1 changed `schema-validator.ts`, but these two source-bound guides had no corresponding package update | Add operator-facing typed-selector, strict-off syntax, namespace/caseExact and diagnostic notes with explicit not-deployed status. Fifteen literal JSON blocks in edited docs parse; content audit passes. The coupled gate's explicit BaseRef mode compares committed HEAD, so final-range verification follows this commit rather than pretending uncommitted changes are visible | Package source-coupling audit / initial integration | Keep the existing F4 gate unchanged; a feature-specific implementation report does not replace each bound operator guide |
 | C0-I05 | Integration/test coverage / Medium | P8a added endpoint freshness under `9z-CR`, already owned by conditional writes | Independently chosen section identifiers collided; the original uniqueness regression inspected shared helpers but not new declarations in the main script | Two focused regressions failed with missing shared invocation and 4 distinct identifiers for 5 declarations. Move P8a into the shared orchestrator as `9z-CS` and inspect identifiers across the main script and both helper layers. All three wiring tests pass within 166 focused units | Entry-point/section contract / P8a assembly | Applied: future main-script additions cannot evade this integration-section uniqueness check. P8a's dedicated endpoint cleanup and optional two-reader arguments remain unchanged |
 | C0-I06 | Integration / Low | P8c declared `9z-CS`, already assigned to P8a | Source packages authored against separate snapshots cannot reserve global live-section IDs | Existing cross-runner uniqueness coverage caught six declarations with only five identifiers; the new package-route assertion also failed. Move P8c into the shared orchestrator as `9z-CT`. All 175 units, 30 InMemory HTTP cases and 86 live checks pass; endpoint collection remains identical | Existing integration regression / P8c assembly | Applied: extend the package invocation inventory, retain the cross-main/helper uniqueness gate, and preserve P8c's dedicated fixture cleanup and optional second reader |
+| C0-I07 | Integration / Medium | P6b's generic If-Match edits conflicted with P3; P7a moved PUT snapshot reads ahead of replacement preparation | The independent packages changed different responsibilities in the same methods | Keep P6b's profile-aware checks and P7a's earlier single snapshot, but bind the returned expected version there and pass it to P3's repository mutation. Remove the obsolete second read. The 229 HTTP cases include real-repository conditional-write barriers alongside typed PATCH, query and P7a contracts; all pass | Merge review / merge review and focused HTTP | Preserve the persistence condition when moving validation order; do not restore an unconditional save or validate replacement from a different snapshot |
+| C0-I08 | Integration / Low | P6b reused `9z-CP`; P7a had no main-runner invocation | Package-local smoke helpers do not reserve globally unique sections or prove main-runner reachability | Two wiring assertions failed before edits. Route P6b through `9z-CU` and P7a through `9z-CV`; share P7a's explicit-target HTTP assertions while preserving its original source/database/loopback guards. All three wiring tests pass within 1,044 focused units | Existing wiring regression / same | Applied: eight-package inventory and cross-main/helper identifier checks; no ownership guard is bypassed |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -136,6 +138,16 @@ New evidence is in `test-results/scim-integration-p8c/`.
 reviewed P8c rollback unit; this wiring-only follow-up adds its sixth real
 consumer to the existing small orchestrator. PC-4 and instruction 3a.4 are
 retained, and no P8b deletion/cleanup implementation is imported.
+
+P6b/P7a incremental confirmation: **119 combined live checks** pass, including
+32 query checks and the entire 156-assertion P7a contract. Endpoint state is
+unchanged and the owned API process is stopped. Prior checkpoint receipts
+remain unchanged; new logs use `test-results/scim-integration-p6b-p7a/`.
+**Design disposition: accepted.** Query authorization/evaluation, schema
+validation/projection, and atomic persistence retain their existing seams.
+The merge does not add a universal repository or a shared mutable snapshot.
+Eight real live consumers justify the existing small orchestrator; final
+PATCH semantics and P8b cleanup are not silently pulled into this increment.
 
 ## P8a issues
 

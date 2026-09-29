@@ -1,5 +1,5 @@
-// Owned loopback runtime only. The P1/P7 harness verifies source, backend,
-// container and database ownership before this live HTTP smoke can execute.
+// The P1/P7 entry point retains ownership guards. The main live runner shares
+// only the explicit-target HTTP contract through runP7Contract.
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const { testGuard } = require("./p1-validation/safety.cjs");
@@ -10,6 +10,13 @@ async function runLiveP7(baseUrl, secret) {
   assert.equal(base.hostname, "127.0.0.1");
   assert.equal(base.protocol, "http:");
   assert.ok(secret.length >= 32);
+  return runP7Contract(baseUrl, secret);
+}
+
+async function runP7Contract(baseUrl, secret) {
+  const base = new URL(baseUrl);
+  assert.ok(["http:", "https:"].includes(base.protocol));
+  assert.ok(secret);
   let assertions = 0;
   const eq = (actual, expected) => { assert.deepEqual(actual, expected); assertions++; };
   const http = async (method, route, body) => {
@@ -105,4 +112,4 @@ async function runLiveP7(baseUrl, secret) {
   }
   return { assertions, observed, endpointCleanup: "deleted" };
 }
-module.exports = { runLiveP7 };
+module.exports = { runLiveP7, runP7Contract };

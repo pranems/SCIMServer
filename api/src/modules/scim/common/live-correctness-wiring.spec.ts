@@ -23,6 +23,8 @@ describe('integrated correctness live coverage', () => {
       'Invoke-ScimConditionalWriteContract -EndpointUrl',
       'test-scim-endpoint-freshness.ps1',
       'live-endpoint-conditional.cjs',
+      'test-scim-query-semantics.ps1',
+      'profile-validation.cjs',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
@@ -36,7 +38,7 @@ describe('integrated correctness live coverage', () => {
     const source = existsSync(resolve(scripts, section)) ? read(section) : main;
     const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-C[O-Z]):/g)]
       .map((match) => match[1]);
-    expect(sections.length).toBeGreaterThanOrEqual(6);
     expect(new Set(sections).size).toBe(sections.length);
+    expect(sections.length).toBeGreaterThanOrEqual(8);
   });
 });

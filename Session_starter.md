@@ -7,21 +7,23 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Active Execution Reference
 
 **Initial integration, 2026-09-28:** `integrate/scim-correctness-20260928`
-assembles P1, P3 (including its cleanup follow-up), P5, P6a, P8a and P8c on D0.
+assembles P1, P3 (including its cleanup follow-up), P5, P6a/P6b, P7a, P8a and P8c on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
-record the exact source-to-integration mapping. The pre-P8a checkpoint passed
-1,011 units and 91 HTTP cases. The P8a increment passes API build, 166 focused
-units, 26 HTTP cases and 78 combined live checks. The P8c increment passes
-build, 175 units, 30 HTTP cases and 86 combined live checks with unchanged endpoint state.
+record the exact source-to-integration mapping and earlier checkpoints.
+The latest P6b/P7a increment passes build, 1,044 focused units, 229 HTTP cases
+and 119 combined live checks, including all 156 P7a assertions. Endpoint state
+is unchanged after cleanup.
 No package is deployed by this assembly. Product/version/lock metadata stays
-unchanged. P2, P4, P6b, P7a and P8b remain separate work. P8c adds conditional
-admin PATCH guarantees; P8b repository cleanup is not claimed integrated.
+unchanged. P2, P4 and P8b remain separate work. Final P7 PATCH integration
+depends on P2; P3b and compatibility dispositions must close before C0.
 
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
 - [x] ✅ COMPLETED: P8c `8eb2f162` integrated as `2c0536ef`; conditional endpoint writes use `9z-CT`.
+- [x] ✅ COMPLETED: P6b `cc3ccdbc` -> `5075a82c` and P7a `8e42f15f` -> `0a6b9c5d`; live sections `9z-CU`/`9z-CV`.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Final C0 matrix, release metadata on the approved runner, review/PR and deployment.
+- [ ] Close P2/P4/P8b, P7 PATCH integration and P3b/compatibility dispositions before the final C0 matrix.
+- [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 
 | Date | Summary |
 | --- | --- |

@@ -397,18 +397,18 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | In progress separately | Await parent-supplied commit; pending diffs are not part of this assembly |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Deferred with explicit scope | Schema-driven, Group and custom-name atomic uniqueness need a separate design; P3 does not claim these guarantees |
+| P3b | Awaiting explicit disposition | Schema-driven, Group and custom-name atomic uniqueness need a separate design or accepted scope decision; P3 does not claim these guarantees and C0 is not unblocked |
 | P4 | In progress separately | Await parent-supplied commit; native and injected member failures remain acceptance checks |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
-| P6 | Integrated; combined validation pending | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | P7a integrated; combined validation pending | [Declaration, scalar/cardinality and POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md). Ordered PATCH integration still waits for P2; unsupported server uniqueness/reference/deep-compatibility promises remain explicit follow-up work |
+| P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
+| P7 | P7a integrated; focused combined validation passed | [Declaration, scalar/cardinality and POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md). Ordered PATCH integration still waits for P2; unsupported server uniqueness/reference/deep-compatibility promises remain explicit follow-up work |
 | P8 | Partly integrated | P8a authoritative reads/fingerprints from `39841319`: [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8c conditional admin PATCH from `8eb2f162`: [CAS and single-snapshot token evidence](ENDPOINT_WRITE_CONCURRENCY.md), 172 units, 32 HTTP and 8 live checks per backend. P8b repository cleanup remains separate |
-| P9 | Pending | Follow changed behavior; preserve legitimate compatibility |
-| C0 | Initial assembly verified | Section 11.1 only; final matrix/release readiness waits for remaining packages |
+| P9 | Awaiting compatibility disposition | Follow changed behavior; preserve legitimate compatibility and close the disposition before C0 |
+| C0 | Incremental assembly verified only | Checkpoints 11.1-11.4; no full matrix until P2/P4/P8b, P7 PATCH integration and P3b/compatibility dispositions close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3, P5, P6a, P8a and P8c are implemented and locally validated in their source worktrees,
-and integrated here. The initial checkpoint and focused P8a/P8c integration
+P1, P3, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
+and integrated here. The initial checkpoint and focused incremental integration
 validation passed. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
@@ -535,6 +535,53 @@ they are not claimed as a newly run integration database matrix. New logs are
 in `test-results/scim-integration-p8c/`. P8b cleanup remains separately owned
 and may change the endpoint deletion path later. No publication, deployment,
 release metadata update or final C0 matrix is part of this assembly.
+
+### 11.4 P6b/P7a incremental assembly, 2026-09-28
+
+| Package | Source commit | Integration commit |
+|---|---|---|
+| P6b query semantics | `cc3ccdbca260033879e764d1bc05d85fe6713e97` | `5075a82c` |
+| P7a declarations/scalars/POST-PUT | `8e42f15f54a955fd6b93d58e9471c393329f4d3a` | `0a6b9c5d` |
+
+Both remain separate rollback units. The parent-confirmed master baseline is
+still `ccde1d5d`. The important service resolutions were:
+
+* P6b generic ETag checks retain P3's returned expected version, not only a
+  pre-write assertion. The same resolved profile still disables ETags when
+  configured.
+* P7a prepares replacements from an earlier existing-resource snapshot.
+  Bind the expected version to that snapshot and remove the obsolete second
+  read in all three PUT services. The final write remains conditional.
+* P6b evaluates authorized filters and typed ordering over internal data before
+  pagination/projection. P7a's write-response projection uses the original
+  POST/PUT input captured before service normalization. P5 search-array
+  normalization and P6a capability checks remain intact.
+* Shared documentation retains integrated P3/P5/P6/P8 states and each
+  package's RCA and user guidance. No earlier failure evidence was rewritten.
+
+P6b's `9z-CP` collided with the capability section, and P7a had no main-runner
+route. Two wiring regressions failed before changes. The shared runner now
+uses `9z-CU` for query semantics and `9z-CV` for profile validation. P7a's
+explicit-target HTTP contract is shared without weakening its original
+source, database, or loopback guards.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| Focused query, schema, projection, service, conditional and wiring units | 16 suites / 1,044 tests passed |
+| Query/sort/P7a/P1/P3/P5/P6a/projection/profile HTTP | 9 suites / 229 cases passed on explicit InMemory and inert database URL |
+| Focused source lint | 0 errors / 99 warnings across 27 files; no gate or warning ceiling changed |
+| Combined main live section | 119 reported checks passed, including 32 P6b checks and the full 156-assertion P7a contract |
+| Cleanup | Endpoint collection identical before/after; owned API process stopped |
+| Guard and syntax | Original P7 entry point rejects an unowned source context; new/affected Node and PowerShell files parse |
+| Documentation | Content/source-coupling audits pass and 61 literal JSON blocks parse; final integration-fix range is checked after commit |
+
+Original P6b and P7a PostgreSQL 17.8, 22-migration and InMemory receipts remain
+in their feature reports; this is not a new integrated PostgreSQL matrix.
+Logs are in `test-results/scim-integration-p6b-p7a/`.
+**Final P7 PATCH integration still depends on P2.** Do not run the full
+authoritative matrix until P2, P4, P8b and the P3b/compatibility dispositions
+are closed. No version/lock regeneration, publication or deployment occurred.
 
 ## 12. Architecture and self-improvement decisions
 

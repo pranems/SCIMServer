@@ -93,5 +93,32 @@ function Invoke-ScimCorrectnessContractTests {
         } catch {
             Test-Result -Success $false -Message "9z-CT: $($_.Exception.Message)"
         }
+
+        $script:currentSection = '9z-CU: Query Semantics'
+        try {
+            $queryChecks = @(& (Join-Path $PSScriptRoot '..\test-scim-query-semantics.ps1') -BaseUrl $base -Token $token)
+            foreach ($check in $queryChecks) {
+                Test-Result -Success $check.Success -Message "9z-CU: $($check.Message)"
+            }
+        } catch {
+            Test-Result -Success $false -Message "9z-CU: query semantics failed: $($_.Exception.Message)"
+        }
+
+        $script:currentSection = '9z-CV: Profile Validation'
+        $oldBase = $env:SCIM_LIVE_BASE_URL
+        $oldToken = $env:SCIM_LIVE_TOKEN
+        try {
+            $env:SCIM_LIVE_BASE_URL = $base
+            $env:SCIM_LIVE_TOKEN = $token
+            $result = & node (Join-Path $PSScriptRoot 'profile-validation.cjs')
+            if ($LASTEXITCODE -ne 0) { throw 'Profile validation contract process failed.' }
+            $receipt = $result | ConvertFrom-Json -ErrorAction Stop
+            Test-Result -Success ($receipt.assertions -eq 156) -Message '9z-CV: 156 declaration, scalar, POST/PUT, projection and cleanup assertions'
+        } catch {
+            Test-Result -Success $false -Message "9z-CV: profile validation failed: $($_.Exception.Message)"
+        } finally {
+            $env:SCIM_LIVE_BASE_URL = $oldBase
+            $env:SCIM_LIVE_TOKEN = $oldToken
+        }
     }
 }
