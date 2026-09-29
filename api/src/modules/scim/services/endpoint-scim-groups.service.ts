@@ -47,6 +47,7 @@ import {
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { resolveNumericLimit } from '../common/capability-resolver';
+import { enforcePatchSupported } from '../common/capability-enforcement';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListGroupsParams {
@@ -265,6 +266,7 @@ export class EndpointScimGroupsService {
 
   async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
     this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'patch' });
+    enforcePatchSupported(this.endpointContext.getProfile?.());
     ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });

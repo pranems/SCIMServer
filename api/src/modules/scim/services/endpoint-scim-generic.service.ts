@@ -66,6 +66,7 @@ import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import { buildGenericFilter } from '../filters/apply-scim-filter';
 import { SCIM_EVENTS } from '../../stats/scim-events';
+import { enforceFilterSupported, enforcePatchSupported, enforceSortSupported } from '../common/capability-enforcement';
 
 interface ListGenericParams {
   filter?: string;
@@ -288,6 +289,9 @@ export class EndpointScimGenericService {
     _config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'list' });
+    const profile = this.endpointContext.getProfile?.();
+    enforceFilterSupported(profile, params.filter);
+    enforceSortSupported(profile, params.sortBy);
     this.scimLogger.info(LogCategory.SCIM_RESOURCE, `List ${resourceType.name}`, { endpointId, filter: params.filter });
     const startIndex = Math.max(params.startIndex ?? 1, 1);
     const count = Math.min(Math.max(params.count ?? DEFAULT_COUNT, 0), MAX_COUNT);
@@ -488,6 +492,7 @@ export class EndpointScimGenericService {
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'patch' });
+    enforcePatchSupported(this.endpointContext.getProfile?.());
     this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Patch ${resourceType.name}`, { scimId, endpointId });
     // Validate PATCH schema
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);

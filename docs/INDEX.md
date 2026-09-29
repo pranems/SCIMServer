@@ -10,6 +10,7 @@
 | If you want to... | Read |
 |---|---|
 | Understand the typed PATCH-path repair, exact incident, backend proof and remaining P2 limits | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
+| Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
 | Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
 | Understand atomic If-Match writes, User uniqueness parity and verified two-backend races | [SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md) |
 | Use JSON search arrays, legacy string compatibility and scalar SCIM validation errors | [SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md) |

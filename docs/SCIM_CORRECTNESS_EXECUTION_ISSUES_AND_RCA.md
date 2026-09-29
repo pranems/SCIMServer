@@ -74,6 +74,18 @@ independent review and saved RED/GREEN logs as issues were resolved. No full
 parent transcript was supplied to this worker; transcript-wide reconciliation
 remains a consolidation gate, not a claimed completed check.
 
+### P6a issues
+
+| ID | Type / severity | Symptom | Root cause | Resolution and why it works | Earliest possible / actual detection | Prevention / status |
+|---|---|---|---|---|---|---|
+| P6-I01 | Environment / Low | Jest was missing, then PrismaService types were unavailable | A fresh worktree has neither dependencies nor a generated client | After the actual failures, reuse an owned dependency junction and generate from this worktree's schema with an inert URL; the focused tests then execute | First test command / same | Never count import/setup errors as RED; preserve frozen dependencies |
+| P6-I02 | Test fixture / Low | Group fixture failed creation instead of exercising its Bulk capability | DTO supplies `members`, but the minimal schema omitted it | Include `members`, rerun against the baseline, then observe all seven intended behavior assertions fail | Fixture setup / first run | Positive fixture creation precedes negative capability assertions |
+| P6-I03 | Test contract / Low | A Bulk test expected a diagnostics extension that the documented embedded envelope does not expose | Assumed direct and embedded error shapes were identical | Assert the exact existing Bulk error envelope, including scalar status/detail, then verify unchanged stored state | Test authoring / first GREEN attempt | Check the public envelope before writing shape expectations |
+| P6-I04 | Test typing / Low | New test lacked ResourceType description and unsafe Supertest values failed lint | Incomplete typed fixture and raw library body access | Supply the required description, guard resource IDs, and reuse shared HTTP helpers; new test lint and unit/HTTP tests pass | Type/lint check / focused validation | New tests must compile and pass their applicable type-aware lint rules |
+| P6-I05 | Tooling / Low | Local readiness command had a PowerShell catch syntax error | Missing whitespace before a typed catch clause | Corrected the command, verified health, ran 7/7 smoke checks and stopped the owned process | Shell parse / same | Use valid typed catch syntax; readiness must succeed before smoke |
+| P6-I06 | Design/test correctness / Medium | The first shared read guard blocked `/Me` when client filtering was disabled | `/Me` uses the User service's filtered lookup internally; an internal lookup is not a client query capability | Added a failing `/Me` regression, retained User/Group query guards at their existing HTTP boundary, and kept custom list plus all PATCH checks at their service boundary; 69 HTTP and 346 unit tests pass | Cross-flow design review / focused review before commit | Every capability move must identify internal callers and include an unaffected-caller control |
+| P6-I07 | Test tooling / Low | Two PostgreSQL attempts stopped before migration/tests | First guard compared different IP/CIDR forms; the next inline script shadowed the global URL constructor used by pg | Final runner reuses the existing ownership/database guards, normalizes CIDR for address comparison, and uses `databaseUrl`; 22 migrations and 69 PostgreSQL HTTP tests pass, exact container removed | Runner initialization / same | Do not weaken ownership checks; preserve failed setup separately from behavior evidence; avoid globals named URL |
+
 ## Entry checklist
 
 For each new issue record:

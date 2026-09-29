@@ -16133,6 +16133,18 @@ Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -Foregrou
 . "$PSScriptRoot\live-test-sections\search-contract.ps1"
 Invoke-ScimSearchContractTests -BaseUrl $baseUrl -Headers $headers
 
+# TEST SECTION 9z-CO: CAPABILITY BOUNDARY
+# Capability boundary coverage is independently runnable for focused RED/GREEN.
+$script:currentSection = "9z-CO: Capability Boundary"
+try {
+    $capabilityChecks = @(& (Join-Path $PSScriptRoot 'test-scim-capability-boundary.ps1') -BaseUrl $baseUrl -Token $Token)
+    foreach ($check in $capabilityChecks) {
+        Test-Result -Success $check.Success -Message "9z-CO: $($check.Message)"
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CO: capability boundary smoke failed: $($_.Exception.Message)"
+}
+
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

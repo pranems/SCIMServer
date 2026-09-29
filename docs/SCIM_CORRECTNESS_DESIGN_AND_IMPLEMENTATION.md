@@ -391,21 +391,21 @@ mean merged or deployed.
 
 | Package | Status | Evidence / next action |
 |---|---|---|
-| D0 | Validated; committing | 53 new docs/evidence/reproducer files reviewed; 22 JSON artifacts parse; 140 relative links resolve; 10 diagrams render in both themes; content/freshness and safety controls pass |
+| D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Validated locally | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Pending | Depends on stable typed path contract |
 | P3 | Validated locally | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Deferred with explicit scope | Schema-driven, Group and custom-name atomic uniqueness need a separate design; P3 does not claim these guarantees |
 | P4 | Pending | Native and injected member failures already reproduce |
 | P5 | Locally validated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and independent consolidation remain pending |
-| P6 | Pending | Custom/Bulk capability controls already reproduce |
+| P6 | In progress | P6a capability boundary validated: 69 HTTP tests on each backend, 346 unit tests, 7 local live checks and independent review; query/projection/sort/limit work remains |
 | P7 | Pending | Verify each current schema promise before changing enforcement |
 | P8 | Pending | Cleanup plus cache-freshness implementation requires explicit contracts |
 | P9 | Pending | Follow changed behavior; preserve legitimate compatibility |
 | C0 | Pending | Do not mark complete while a package or applicable gate is unresolved |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3, and P5 are implemented and locally validated in their source worktrees,
+P1, P3, P5, and P6a are implemented and locally validated in their source worktrees,
 and integrated here. Combined validation, release metadata, PR, and deployment
 remain pending. Other package statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed

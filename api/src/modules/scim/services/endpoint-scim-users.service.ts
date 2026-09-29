@@ -42,6 +42,7 @@ import {
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { resolveNumericLimit } from '../common/capability-resolver';
+import { enforcePatchSupported } from '../common/capability-enforcement';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListUsersParams {
@@ -243,6 +244,7 @@ export class EndpointScimUsersService {
     ifMatch?: string,
   ): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'patch' });
+    enforcePatchSupported(this.endpointContext.getProfile?.());
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch user', { scimId, endpointId, opCount: patchDto.Operations?.length });
