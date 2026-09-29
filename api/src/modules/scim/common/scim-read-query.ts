@@ -1,5 +1,6 @@
 import type { SchemaAttributeDefinition, SchemaDefinition } from '../../../domain/validation';
 import { evaluateFilter, parseScimFilter, type FilterNode } from '../filters/scim-filter-parser';
+import type { FilterAttributeShape } from '../filters/apply-scim-filter';
 import { createScimError } from './scim-errors';
 import { DEFAULT_COUNT } from './scim-constants';
 
@@ -12,7 +13,11 @@ export interface ReadQueryParams {
 }
 
 type Resource = Record<string, unknown>;
-type FilterBuilder = (filter?: string, exact?: Set<string>) => { dbWhere: Resource };
+type FilterBuilder = (
+  filter?: string,
+  exact?: Set<string>,
+  shapes?: ReadonlyMap<string, FilterAttributeShape>,
+) => { dbWhere: Resource };
 interface Attribute {
   path: string[];
   definition: SchemaAttributeDefinition;
@@ -241,7 +246,16 @@ export function createReadQuery(
     0,
     Math.min(Number.isFinite(params.count) ? params.count! : DEFAULT_COUNT, maxResults),
   );
-  const dbWhere = canPush ? buildFilter(params.filter, coreExact).dbWhere : {};
+  const shapes = new Map(
+    [...attributes].map(([path, attribute]) => [
+      path,
+      {
+        type: attribute.definition.type ?? 'string',
+        multiValued: attribute.definition.multiValued ?? false,
+      },
+    ]),
+  );
+  const dbWhere = canPush ? buildFilter(params.filter, coreExact, shapes).dbWhere : {};
 
   return {
     dbWhere,

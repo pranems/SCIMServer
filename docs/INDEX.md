@@ -16,7 +16,7 @@
 | Distinguish all 37 settings' actual behavior, inert controls, and unit/HTTP/live gaps | [SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) |
 | Review P9 execution issues and unresolved integration contracts | [SCIM_P9_EXECUTION_RCA.md](SCIM_P9_EXECUTION_RCA.md) |
 | Understand the typed PATCH-path repair and exact incident | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
-| Understand schema-aware filtering, typed sorting, hidden-field projection, page limits and custom ETag consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
+| Understand schema-aware filtering, representation-safe query push-down, typed sorting, hidden-field projection, page limits and custom ETag consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
 | Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
 | Understand P7a schema declaration, scalar/cardinality and POST/PUT correctness with owned backend proof | [SCIM_P7A_PROFILE_VALIDATION.md](SCIM_P7A_PROFILE_VALIDATION.md) |
 | Understand one-to-one PUT retention of repeated, reordered and anonymous complex entries | [Retained-entry preservation](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries) and [focused proof](evidence/scim-retained-put-20260929/validation.json) |

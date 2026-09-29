@@ -144,6 +144,75 @@ describe('Schema-aware query semantics (P6b)', () => {
     await scimDelete(app, `/scim/admin/endpoints/${endpointId}`, token).expect(204);
   });
 
+  it.each([
+    ['displayName', 'integer', false],
+    ['displayName', 'string', true],
+    ['externalId', 'integer', false],
+    ['externalId', 'string', true],
+  ] as const)(
+    'queries custom %s with type=%s multiValued=%s without a lossy string-column prefilter',
+    async (name, type, multiValued) => {
+      await scimPatch(app, `/scim/admin/endpoints/${endpointId}`, token, {
+        profile: {
+          schemas: profileSchemas.map((schema) =>
+            schema.id !== CUSTOM
+              ? schema
+              : {
+                  ...schema,
+                  attributes: [
+                    ...schema.attributes.filter((a) => a.name !== name),
+                    {
+                      name,
+                      type,
+                      multiValued,
+                      caseExact: name === 'externalId',
+                      uniqueness: 'none',
+                    },
+                  ],
+                },
+          ),
+        },
+      }).expect(200);
+      const ids: string[] = [];
+      const values = multiValued ? [['other', 'needle'], ['elsewhere'], []] : [2, 10, undefined];
+      for (const [index, value] of values.entries()) {
+        const created = await scimPost(app, `${base}/QueryWidgets`, token, {
+          schemas: [CUSTOM],
+          rank: index,
+          [name]: value,
+        }).expect(201);
+        ids.push(jsonBody(created).id);
+        expect(created.body).toMatchObject(value === undefined ? {} : { [name]: value });
+      }
+      const literal = multiValued ? '"needle"' : '2';
+      const filters = [
+        [`${name} eq ${literal}`, [ids[0]]],
+        [`${CUSTOM}:${name} eq ${literal}`, [ids[0]]],
+        [`${name} pr`, ids.slice(0, 2)],
+        [`${name} eq ${literal} or rank eq 1`, ids.slice(0, 2)],
+        [`${name} pr and rank eq 0`, [ids[0]]],
+        ...(multiValued
+          ? [
+              [`${name} co "eed"`, [ids[0]]],
+              [`${name} sw "need"`, [ids[0]]],
+              [`${name} ew "dle"`, [ids[0]]],
+            ]
+          : []),
+      ] as [string, string[]][];
+      for (const method of ['GET', 'POST']) {
+        for (const [filter, expectedIds] of filters) {
+          const result = await query('QueryWidgets', method, { filter, sortBy: 'rank' });
+          expect(result.status).toBe(200);
+          expect(jsonBody(result).totalResults).toBe(expectedIds.length);
+          expect(jsonBody(result).Resources.map((r) => r.id)).toEqual(expectedIds);
+        }
+        const zero = await query('QueryWidgets', method, { filter: `${name} pr`, count: 0 });
+        expect(zero.status).toBe(200);
+        expect(zero.body).toMatchObject({ totalResults: 2, Resources: [], itemsPerPage: 0 });
+      }
+    },
+  );
+
   async function seed(f: (typeof fixtures)[number]) {
     const ids: string[] = [];
     for (const [index, rank] of [10, 2, undefined].entries()) {

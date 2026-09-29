@@ -295,6 +295,7 @@ consumers; repository boundaries, defaults and live-data policy are unchanged.
 | P6b-I11 | Standards/test policy / Medium | Draft test accepted a complex sort parent without a scalar child | Confused multi-valued primary selection with permission to infer a complex child | RFC 7644 section 3.4.2.3 requires the child path; reject bare complex parents and test `entries.value` instead | Standards review / focused review | Read the normative clause before treating a convenient shorthand as required behavior |
 | P6b-I12 | Tooling / Low | New test lint rejected unsafe Supertest bodies; documentation rendering initially skipped | HTTP library body type is any; root/web tooling was absent after cleanup | Assert object bodies through a typed test helper; restore frozen documentation/browser dependencies after the real missing-tool result | Static gate / same | A skipped renderer is not a render pass; no shared dependency targets or lockfiles are modified |
 | P6b-I13 | Documentation diagnostics / Low | Link scan found three old Session references; renderer discovery reported editor version 0.0.0 | Historical Session text names removed tests/ignored settings; available renderer metadata cannot establish a matching bundle version | Compare against starting HEAD, record the existing links, and render with pinned 11.15.0 without changing dependency pins or editor state | Documentation gate / same | No new broken links accepted; historical cleanup and editor-version discovery remain outside P6b |
+| P6b-I14 | Cross-package query correctness / High | Custom numeric/multi-valued displayName and externalId returned zero matches through unqualified equality/presence queries, while their payload values existed | Candidate push-down used a fixed string column selected by attribute name; P6b supplied caseExact but not the resolved type/cardinality. Null promoted columns discarded payload-backed candidates before the correct evaluator ran | The read plan now passes explicit schema shapes to the existing builders, which reject incompatible column push-down for the whole expression. RED was two unit cases and four HTTP cases; GREEN focused InMemory is 100 unit, 92 HTTP, 40 live checks | Cross-package representation review / sibling P3 coordination after initial P6b validation | Test common promoted names with custom numeric and multi-valued schemas, plus compatible scalar controls. Persistence reconstruction remains P3-owned; this follow-up changes no writes |
 
 ### P8b confirmed issues
 
@@ -380,6 +381,15 @@ containers were stopped/removed.
 The doc render passed with pinned Mermaid 11.15.0 in both themes, but renderer
 discovery reported the editor's version as `0.0.0`. That environment diagnostic
 is recorded, not "fixed" by changing the pin to an invalid version.
+
+**P6c/P6b-I14 follow-up confirmation:** the same 92 HTTP tests and 40 live
+checks passed on task-owned PostgreSQL 17.8 after 22 migrations. Container
+`f228d341701a0c9dc0893c0ca18495969f63014ead0e121f05f04b1a87748dea`
+was removed by exact identity and both APIs stopped. The retained
+`test-results/p6c/` RED/GREEN logs contain no fixture failures; 100 focused
+unit tests, API build and the unchanged two-warning lint baseline passed.
+No persistence changes were imported from P3. This is focused follow-up
+evidence, not full cross-package consolidation or full-transcript proof.
 
 **Test/gate disposition:** historical failure evidence is retained; permanent
 regression tests are required before production edits.

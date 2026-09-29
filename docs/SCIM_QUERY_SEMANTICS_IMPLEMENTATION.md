@@ -1,6 +1,6 @@
 # SCIM queries: filter first, return only permitted fields
 
-> **Last verified:** 2026-09-28
+> **Last verified:** 2026-09-29
 >
 > **Scope:** P6b, following the committed [P6a capability fix](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md).
 > Local implementation evidence, not a release or deployment claim.
@@ -200,6 +200,57 @@ The main [live suite](../scripts/live-test.ps1) invokes it as section **9z-CP**.
 No inherited/shared/live database, cloud deployment, or data repair was used.
 
 ## Completion boundaries
+
+### P6c follow-up: a published name does not guarantee column equivalence
+
+Coordination with the independent P3 representation work exposed a missing
+cross-package control. A custom schema can define `displayName` or `externalId`
+as numeric or multi-valued. Their complete values are in `rawPayload`, while
+the optional promoted query column is a scalar string and can be null.
+Pushing `externalId pr` or `displayName eq 2` into that string column can
+discard a matching resource before the internal evaluator sees it.
+
+The read plan now supplies each resolved attribute's type and cardinality to
+the existing filter builder. The builder pushes a mapped comparison only
+when those characteristics agree with the column representation. A compound
+filter containing an incompatible mapped operand stays entirely residual;
+qualified paths retain the existing residual behavior. Compatible scalar
+strings and built-in Boolean columns still use the existing indexed path.
+There is no new repository port and no change to POST/PUT/PATCH persistence.
+
+For example, a custom resource containing `displayName: 2` and
+`externalId: ["other", "needle"]` must match all of these:
+
+```text
+displayName eq 2
+externalId eq "needle"
+displayName pr and externalId pr
+externalId co "eed"
+```
+
+The follow-up tests assert matching IDs, scalar/list payload values,
+unqualified/qualified equivalence, compound AND/OR, count zero, and the
+unchanged compatible string push-down. RED on `cc3ccdbc` was **2 unit tests
+and 4 HTTP tests**, with valid POST fixtures and actual zero-match errors.
+Focused GREEN is **100 unit tests, 92 HTTP tests per backend, and 40 live
+checks per backend**. Actual PostgreSQL 17.8 replayed 22 migrations under the
+same task-owned identity guards; the exact container and both owned API
+processes were removed/stopped. API build passed. Changed-file lint is
+**0 errors / 2 existing warnings**, with no increase. Documentation content
+and freshness passed, 42 JSON blocks parsed, 381 relative links resolved,
+and both diagrams rendered in two themes. The previously documented editor
+version-detection warning is unchanged.
+
+Receipts are separately recorded under `test-results/p6c/`; they do not
+overwrite original P6b results. The current-tip harness validates the changed
+source and excludes the standard destructive E2E teardown.
+
+The live helper remains section **9z-CP**; no sibling's section IDs changed.
+P3 owns representation preservation and schema validation on writes.
+Cross-package integration and release validation remain parent-owned.
+**Design disposition accepted:** explicit schema shape is a narrow extension
+of the existing filter-builder input, not another query framework. The
+filter compiler still has one responsibility and the three services share it.
 
 The [P6 tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#11-progress-tracker)
 and [P6b RCA entries](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#p6b-confirmed-corrections)

@@ -1855,6 +1855,10 @@ sort by type; strings honor that exact namespace's `caseExact`. Multi-valued
 sort paths select the primary item, otherwise the first; missing values sort
 last ascending and first descending. `totalResults` counts all matches before
 paging. GET and the existing string-form JSON `.search` use the same read plan.
+For custom numeric or multi-valued attributes named `displayName` or
+`externalId`, filtering uses the schema-typed payload value rather than an
+incompatible optional string query column. This includes presence and
+compound predicates; qualified and unqualified paths agree.
 See [query semantics and implementation evidence](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md).
 
 Custom PUT/PATCH/DELETE use the same ETag capability profile as discovery:

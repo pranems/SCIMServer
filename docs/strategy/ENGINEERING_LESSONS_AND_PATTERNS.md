@@ -266,6 +266,11 @@ colliding namespaces and a hidden child with no hidden top-level sibling.
 The [query implementation](../SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) supplies
 the unit, HTTP and two-backend controls; the standing query regression rule
 turns this lesson into a required assertion class.
+The P6c/P3 coordination follow-up adds representation to that identity:
+custom numeric or multi-valued attributes can reuse a promoted string-column
+name. Query push-down must carry the resolved type/cardinality rather than
+infer storage equivalence from that name. Residual evaluation cannot recover
+matches already discarded by a lossy candidate query.
 
 ### Category G - Configuration and operational defaults (a silent default is not a decision)
 

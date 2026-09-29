@@ -926,6 +926,10 @@ side effect. Include a hidden child without a hidden top-level sibling,
 typed sort outcomes, missing values and count zero. Preserve internal `/Me`
 lookup when external filtering is disabled. Assert actual rows/order/totals
 and forbidden output keys, not only HTTP success.
+When schema-defined fields reuse promoted column names, test numeric and
+multi-valued representations as well as scalar strings. A database prefilter
+must be equivalent to the resolved type/cardinality; a later correct residual
+evaluator cannot recover candidates that a lossy prefilter already removed.
 
 ## Atomic Invariant Representation Rule (P3b, 2026-09-28)
 

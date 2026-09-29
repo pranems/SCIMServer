@@ -1,5 +1,5 @@
 import type { SchemaAttributeDefinition, SchemaDefinition } from '../../../domain/validation';
-import { buildUserFilter } from '../filters/apply-scim-filter';
+import { buildGenericFilter, buildUserFilter } from '../filters/apply-scim-filter';
 import { createReadQuery, type ReadQueryParams } from './scim-read-query';
 import { stripNeverReturnedFromPayload } from './scim-service-helpers';
 
@@ -58,6 +58,56 @@ function page(params: ReadQueryParams, rows: Record<string, unknown>[], limit = 
 }
 
 describe('Shared read query plan', () => {
+  it.each(['displayName', 'externalId'])(
+    'retains numeric and multi-valued %s candidates instead of using a string column',
+    (name) => {
+      for (const definition of [
+        attr(name, { type: 'integer', caseExact: name === 'externalId' }),
+        attr(name, { multiValued: true, caseExact: name === 'externalId' }),
+      ]) {
+        const definitions: SchemaDefinition[] = [
+          { id: CORE, isCoreSchema: true, attributes: [definition] },
+        ];
+        const numeric = definition.type === 'integer';
+        const rows = [{ id: 'matching', [name]: numeric ? 2 : ['unrelated', 'needle'] }];
+        for (const filter of [`${name} eq ${numeric ? '2' : '"needle"'}`, `${name} pr`]) {
+          const query = createReadQuery({ filter }, definitions, 100, buildGenericFilter);
+          expect(query.dbWhere).toEqual({});
+          expect(
+            query.page(
+              rows,
+              (r) => r,
+              (r) => r,
+            ).Resources,
+          ).toEqual(rows);
+        }
+      }
+    },
+  );
+
+  it('keeps string-column push-down for compatible scalar custom attributes', () => {
+    for (const name of ['displayName', 'externalId']) {
+      const definitions: SchemaDefinition[] = [
+        {
+          id: CORE,
+          isCoreSchema: true,
+          attributes: [attr(name, { caseExact: name === 'externalId' })],
+        },
+      ];
+      const query = createReadQuery(
+        { filter: `${name} eq "needle"` },
+        definitions,
+        100,
+        buildGenericFilter,
+      );
+      expect(query.dbWhere).toEqual(
+        name === 'externalId'
+          ? { externalId: 'needle' }
+          : { displayName: { equals: 'needle', mode: 'insensitive' } },
+      );
+    }
+  });
+
   it('does not push null literals into nonnullable database fields', () => {
     const query = createReadQuery({ filter: 'id eq null' }, schemas, 100, buildUserFilter);
     expect(query.dbWhere).toEqual({});
