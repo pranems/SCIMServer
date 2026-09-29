@@ -3,10 +3,27 @@ import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { randomUUID } from 'crypto';
+import type { Server } from 'node:http';
 import { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } from './helpers/profile-p7-readonly.fixture';
 
 const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
 const EXT = 'urn:example:params:scim:schemas:extension:p7:2.0:Test';
+interface WireBody extends Record<string, unknown> {
+  id: string;
+  profile: {
+    schemas: { id: string; attributes: Record<string, unknown>[] }[];
+    settings: Record<string, unknown>;
+  };
+  meta: { version: string };
+  [EXT]: Record<string, unknown>;
+  [DIAG]: { attributePaths: string[] };
+}
+type WireResponse = Omit<request.Response, 'body'> & { body: WireBody };
+type WireTest = Omit<request.Test, 'then' | 'send' | 'query' | 'expect'> & PromiseLike<WireResponse> & {
+  send(body: object): WireTest;
+  query(query: Record<string, unknown>): WireTest;
+  expect(status: number | ((response: WireResponse) => void)): WireTest;
+};
 const shapes = [
   ['text', 'string', 'bespoke'], ['flag', 'boolean', false], ['whole', 'integer', 27],
   ['fraction', 'decimal', 1.25], ['encoded', 'binary', '+/8='],
@@ -18,10 +35,10 @@ describe('P7 declaration and POST/PUT contracts', () => {
   let token: string;
   const endpoints: string[] = [];
   const admin = (method: 'post' | 'patch' | 'get' | 'delete', path = '') =>
-    request(app.getHttpServer())[method](`/scim/admin/endpoints${path}`).set('Authorization', `Bearer ${token}`);
+    request(app.getHttpServer() as Server)[method](`/scim/admin/endpoints${path}`).set('Authorization', `Bearer ${token}`) as unknown as WireTest;
   const scim = (method: 'post' | 'put' | 'get', path: string) =>
-    request(app.getHttpServer())[method](path).set('Authorization', `Bearer ${token}`).set('Content-Type', 'application/scim+json');
-  const error = (body: Record<string, any>, type: string) => {
+    request(app.getHttpServer() as Server)[method](path).set('Authorization', `Bearer ${token}`).set('Content-Type', 'application/scim+json') as unknown as WireTest;
+  const error = (body: Record<string, unknown>, type: string) => {
     expect(body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:Error');
     expect(body.status).toBe('400');
     expect(body.scimType).toBe(type);
@@ -103,7 +120,7 @@ describe('P7 declaration and POST/PUT contracts', () => {
           const rejected = await scim('post', base).send(input).expect(400);
           error(rejected.body, 'invalidValue');
           expect(rejected.body[DIAG].attributePaths).toContain(EXT);
-          const listed = await scim('get', base).query({ filter: `${primary} eq "${input[primary]}"` }).expect(200);
+          const listed = await scim('get', base).query({ filter: `${primary} eq "${String(input[primary])}"` }).expect(200);
           expect(listed.body.totalResults).toBe(0);
         });
 
@@ -148,7 +165,7 @@ describe('P7 declaration and POST/PUT contracts', () => {
             const originalProfile = (await admin('get', `/${endpointId}`).expect(200)).body.profile;
             const seedProfile = structuredClone(originalProfile);
             for (const schema of seedProfile.schemas) {
-              schema.attributes = schema.attributes.map((a: { name: string }) =>
+              schema.attributes = schema.attributes.map(a =>
                 a.name === 'nested' ? recursiveReadOnlyAttribute('readWrite') : a);
             }
             let id: string;
@@ -197,8 +214,10 @@ describe('P7 declaration and POST/PUT contracts', () => {
           const created = await scim('post', base).send({ ...body(), lockedContacts: contacts }).expect(201);
           const beforeProfile = (await admin('get', `/${endpointId}`).expect(200)).body.profile;
           const updatedProfile = structuredClone(beforeProfile);
-          updatedProfile.schemas.find((schema: { id: string }) => schema.id === core).attributes
-            .find((attr: { name: string }) => attr.name === 'lockedContacts').mutability = 'readOnly';
+          const lockedContacts = updatedProfile.schemas.find(schema => schema.id === core)?.attributes
+            .find(attr => attr.name === 'lockedContacts');
+          if (!lockedContacts) throw new Error('Expected lockedContacts in the published core schema.');
+          lockedContacts.mutability = 'readOnly';
           updatedProfile.settings.PrimaryEnforcement = 'normalize';
           try {
             await admin('patch', `/${endpointId}`).send({ profile: updatedProfile }).expect(200);
@@ -214,7 +233,8 @@ describe('P7 declaration and POST/PUT contracts', () => {
         });
 
         it('stores valid scalar/list/complex shapes and projects returned characteristics', async () => {
-          const values = Object.fromEntries(shapes.flatMap(([name, , value]) => [[name, value], [`${name}List`, [value]]]));
+          const values = Object.fromEntries<unknown>(shapes.flatMap(([name, , value]): [string, unknown][] =>
+            [[name, value], [`${name}List`, [value]]]));
           const input = { ...body(), ...values, suggested: 'bespoke', hidden: 'never', secret: 'write-only', asked: 'on-request',
             children: [{ value: 'child', labels: ['a', 'b'] }],
             [EXT]: { requiredValue: 'present', ...values, suggested: 'bespoke', hidden: 'ext-never', secret: 'ext-secret' },
@@ -246,8 +266,8 @@ describe('P7 declaration and POST/PUT contracts', () => {
             const created = await scim('post', base).send(input).expect(201);
             const before = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
             for (const extension of [false, true]) {
-              const bad = extension ? { ...input, [EXT]: { requiredValue: 'present', [key as string]: invalid } }
-                : { ...input, [key as string]: invalid };
+              const bad = extension ? { ...input, [EXT]: { requiredValue: 'present', [key]: invalid } }
+                : { ...input, [key]: invalid };
               const rejected = await scim('put', `${base}/${created.body.id}`).send(bad).expect(400);
               error(rejected.body, key === 'children' ? 'invalidSyntax' : 'invalidValue');
               expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(before);

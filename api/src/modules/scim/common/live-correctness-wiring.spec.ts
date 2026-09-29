@@ -42,4 +42,10 @@ describe('integrated correctness live coverage', () => {
     expect(new Set(sections).size).toBe(sections.length);
     expect(sections.length).toBeGreaterThanOrEqual(9);
   });
+
+  it('requires the expanded recursive readOnly live contract', () => {
+    const source = read(section);
+    expect(source.includes('$receipt.assertions -eq 228')).toBe(true);
+    expect(source.includes('228 declaration, scalar, POST/PUT, projection and cleanup assertions')).toBe(true);
+  });
 });

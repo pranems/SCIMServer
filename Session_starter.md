@@ -10,14 +10,14 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 assembles P1, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a and P8c on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
-The latest P4 increment passes build, 390 focused unit tests plus three wiring
-checks, 112 HTTP cases (one PostgreSQL-only FK control skipped) and 121 combined
-live checks, including all 69 P4 assertions. Endpoint state is unchanged after
-cleanup. The raw-error issue remained after P5 and was fixed separately in
-`9991ff50` with two unit and two HTTP RED/GREEN regressions.
+The latest P7 recursive-readOnly increment passes build, 645 focused units,
+186 HTTP cases (one PostgreSQL-only FK control skipped), and 121 combined live
+checks containing all 228 P7 assertions. Final P7 HTTP fixture rerun: 67 passes.
+Endpoint state is unchanged after cleanup. P4's raw-error correction remains
+the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
 unchanged. P2 and P8b remain separate work. Final P7 PATCH integration depends
-on P2; the nested-readOnly follow-up is active. Parent-assigned P3b and P9
+on P2; the nested-readOnly POST/PUT follow-up is now integrated. Parent-assigned P3b and P9
 workers are closing promised uniqueness and compatibility/guidance work.
 All remain open before C0.
 
@@ -32,8 +32,9 @@ materializes candidates; green correctness tests do not prove unchanged cost.
 - [x] ✅ COMPLETED: P8c `8eb2f162` integrated as `2c0536ef`; conditional endpoint writes use `9z-CT`.
 - [x] ✅ COMPLETED: P6b `cc3ccdbc` -> `5075a82c` and P7a `8e42f15f` -> `0a6b9c5d`; live sections `9z-CU`/`9z-CV`.
 - [x] ✅ COMPLETED: P4 `212a6b92` -> `c95d0fb6` and `66a7229f` -> `de14fc5b`; aggregate checks use `9z-CW`.
+- [x] ✅ COMPLETED: Recursive readOnly `892b74ba` -> `168c074f`; `9z-CV` now requires all 228 assertions.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
-- [ ] Close P2/P8b, P7 PATCH/nested-readOnly follow-ups and P3b/P9 work before the final C0 matrix.
+- [ ] Close P2/P8b, final P7 PATCH integration and P3b/P9 work before the final C0 matrix.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 

@@ -101,6 +101,8 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I09 | Error contract / Medium | P4's deferred raw-error issue was still present after P5: both a private injected message and internal repository context reached HTTP clients | P5 normalizes scalar shape but deliberately preserves an already-SCIM envelope. The shared repository bridge interpolated `RepositoryError.message`, which includes Prisma mapper context/cause text, into server-error detail | Two unit and two HTTP assertions proved RED on the assembled code. Mask mapped 500/503 detail to the operation only; retain status, diagnostics, client-error behavior and logged original cause. Build, 185 helper/filter units and the two HTTP cases pass. Restore raw-marker assertions in the full P4 HTTP contract | P4 error-contract RED / P4 integration closure | Applied: actual Prisma error translation feeds permanent unit and HTTP seam tests; a scalar string is not necessarily safe content. No historical P4 or P5 evidence is rewritten |
 | C0-I10 | Integration / Low | P4's standalone helper was not reachable from the main live runner | The helper expected a pre-created owned loopback endpoint; the main runner had neither invocation nor fixture setup | Two wiring assertions failed. Add `9z-CW`, create a dedicated endpoint, share the unchanged 69 HTTP assertions through a callable function, and retain the original guarded script. Three wiring tests and all 121 combined live checks pass; endpoint state is identical after cleanup | Existing wiring regression / same | Applied: nine-package inventory, unique sections and main-runner cleanup proof. An initial insertion matched an earlier repeated finally block; source review moved it after `9z-CV` before execution |
 | C0-I11 | Documentation/tooling / Low | Both independent pattern additions had total 31; renderer initially skipped for missing web/root tooling | P4 added PA-10 while the assembled branch already included PC-4; fresh worktree dependency trees were absent | Combine A=10 and C=4 with total 32. After actual missing-tool results, reuse owned read-only web/root links. Both diagrams in the changed ledger render in both strict themes; version discovery still reports the pre-existing 0.0.0 sentinel | Merge review/render gate / same | Preserve both patterns and recompute totals, never choose one side. SKIP is not render proof; no version pin or dependency was changed |
+| C0-I12 | Integration / Low | The shared live runner still required the original 156 P7 assertions after importing the 228-assertion recursive readOnly contract | The source helper gained tests independently of its integration receipt check | A new wiring assertion failed before the expected count/message was updated. All four wiring tests now pass, and the real combined live section reports 121 successful checks including the complete 228-assertion P7 contract | Wiring regression / same | Applied: retained guard-first standalone wrapper; loaded the new fixture inside the explicit-target shared contract; original checkpoint counts remain historical |
+| C0-I13 | Test typing / Low | Explicit lint including the expanded P7 E2E spec found 124 unsafe-value diagnostics despite zero production-file lint errors | Supertest request/result boundaries and Object.fromEntries had implicit any types; existing and new test cases reused them | Add local typed wire/request interfaces, a typed HTTP server boundary, unknown-valued payload fields and tuple-typed entries. Keep runtime value/key assertions and add a missing-fixture guard. After two residual diagnostic passes, all six selected files have zero errors / 14 existing warnings and all 67 P7 HTTP cases pass | Explicit E2E lint / integration | Applied: lint the touched HTTP spec, not only src; no lint-disable comments, rule relaxations or changed protocol expectations |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -160,6 +162,19 @@ receipts remain unchanged. **Design disposition: accepted.** Aggregate
 transaction mechanics stay in the Group repository ports; safe server-error
 formatting stays in the existing SCIM boundary. The two corrections are
 separate rollback units, and no universal transaction framework is introduced.
+
+P7 recursive-readOnly integration confirmation: **645 focused units** and
+**186 HTTP cases** pass (one native PostgreSQL FK control is explicitly skipped
+on InMemory). The final typed-fixture rerun passes **67 P7 HTTP cases**.
+The combined built-local `dist/main.js` smoke still reports **121 checks**,
+now containing **228 P7 assertions**, with unchanged endpoint state and the
+owned process stopped. Prior receipts remain unchanged; new logs use
+`test-results/scim-integration-p7-readonly/`.
+**Design disposition: accepted.** The recursive walker keeps the existing
+map interface and separation between metadata collection, input stripping and
+protocol execution. The test-only response types describe exercised wire
+shapes without adding a production abstraction. PATCH execution/flags/defaults
+are not changed by this increment.
 
 ## P8a issues
 

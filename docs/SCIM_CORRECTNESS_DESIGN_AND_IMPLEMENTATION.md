@@ -408,10 +408,10 @@ combined checkpoint has its own counts in section 11.1.
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | P7a/readOnly follow-up integrated; focused revalidation pending | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Recursive readOnly commit `892b74ba` preserves the existing map interface and POST/PUT-only scope. Final ordered PATCH integration still waits for P2; uniqueness and compatibility closure remain separately owned |
+| P7 | P7a/readOnly follow-up integrated; focused revalidation passed | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Recursive readOnly commit `892b74ba` preserves the existing map interface and POST/PUT-only scope. Final ordered PATCH integration still waits for P2; uniqueness and compatibility closure remain separately owned |
 | P8 | Partly integrated | P8a authoritative reads/fingerprints from `39841319`: [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8c conditional admin PATCH from `8eb2f162`: [CAS and single-snapshot token evidence](ENDPOINT_WRITE_CONCURRENCY.md), 172 units, 32 HTTP and 8 live checks per backend. P8b repository cleanup remains separate |
 | P9 | Active parent-assigned worker | Compatibility corpus and accurate guidance are in progress; no commit supplied for assembly and no compatibility closure claimed |
-| C0 | Incremental assembly verified only | Checkpoints 11.1-11.5; evidence boundaries in 11.6. No full matrix until P2/P8b, P7 PATCH/readOnly follow-ups and P3b/P9 work close |
+| C0 | Incremental assembly verified only | Checkpoints 11.1-11.7; evidence boundaries in 11.6. No full matrix until P2/P8b, final P7 PATCH integration and P3b/P9 work close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
@@ -657,7 +657,7 @@ or reuse correctness counts as performance evidence.
 |---|---|---|
 | P3b promised schema uniqueness | Worker `b1929e07` | Active; awaiting committed result |
 | P9 compatibility corpus and accurate guidance | Worker `34cb4c37` | Active; awaiting committed result |
-| P7 nested-readOnly follow-up | Parent-owned follow-up | Active; final P7 PATCH integration also depends on P2 |
+| P7 nested-readOnly follow-up | Parent-owned follow-up | Active at this checkpoint; integrated later in 11.7. Final P7 PATCH integration still depends on P2 |
 | P2 and P8b | Existing package owners | Still open in this assembly |
 
 The worker identifiers above are not commit SHAs. No pending worker diffs
@@ -667,6 +667,45 @@ items and their compatibility/uniqueness dispositions close.
 **Assurance improvement: applied.** Evidence is labeled by the actual runtime
 and claim it supports. **Design disposition: accepted.** This is an
 evidence/coordination update, not a new runtime abstraction or optimization.
+
+### 11.7 P7 recursive readOnly integration, 2026-09-29
+
+Source `892b74ba262579d2f5aeed5df8bb2ca4704c2e6d` was appended as
+`168c074f`. Its production diff is limited to recursive metadata collection in
+`SchemaValidator.collectReadOnlyAttributes` and the object/array segment walker
+in `stripReadOnlyAttributes`; signatures and map interfaces are unchanged.
+This does not change PATCH execution, settings or defaults.
+
+The shared live wrapper retains its original guard-first standalone entry
+point. The new recursive fixture loads inside the explicit-target contract,
+so both entry points execute the same assertions. A failing wiring regression
+preceded the shared runner's expected-count update from 156 to 228.
+Explicit lint of the touched HTTP spec also exposed unsafe Supertest values;
+test-only wire/request types remove them while retaining all runtime assertions.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| ReadOnly cached/fallback, schema cache, services, errors and wiring units | 9 suites / 645 tests passed |
+| P7/P1/P3/P4/query/projection HTTP overlap | 6 suites / 186 cases passed; one PostgreSQL-only native FK control skipped on InMemory |
+| Typed-fixture final rerun | All 67 P7 HTTP cases passed |
+| Focused production, unit, HTTP and fixture lint | 0 errors / 14 existing warnings across 6 files |
+| Shared main live section | 121 reported checks passed, now containing all 228 P7 assertions |
+| Cleanup | Endpoint collection unchanged; owned built-local API process stopped |
+| Test/gate improvement | Count-contract RED/GREEN and explicit HTTP lint; no lowered gates |
+
+New logs use `test-results/scim-integration-p7-readonly/`. Source-package
+PostgreSQL 17.8, 22-migration and both-backend evidence stays in its original
+receipt; this incremental run is explicitly InMemory with an inert database
+URL. The local `dist/main.js` smoke is not C0 exact-artifact release proof.
+
+The imported [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md) and
+[uniqueness inventory](evidence/scim-p7-20260928/uniqueness-inventory.json)
+inform separately owned P3b/P9 work. `global` is a valid RFC keyword rejected
+by deliberate provider capability policy; whole merged-profile revalidation
+can therefore reject an unrelated profile edit on a legacy declaration.
+Neither uniqueness closure nor compatibility acceptance follows from the
+readOnly tests. **P7 remains OPEN for final P2/PATCH integration.**
 
 ## 12. Architecture and self-improvement decisions
 
