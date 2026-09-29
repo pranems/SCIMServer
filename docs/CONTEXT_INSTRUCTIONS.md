@@ -9,6 +9,17 @@
 
 ## Active Delivery Process
 
+**Current C0 local bridge, not deployed:** common attribute normalization now
+feeds runtime uniqueness compilation per ResourceType, and admission uses the
+same compiler before profile publication. Shared declarations are unchanged;
+core-only unsupported computed promises remain admission errors. Omitted
+optional extension lists are safely normalized. Both storage backends passed
+the focused binding/query/CAS/aggregate checks and126 new built-live assertions.
+See [checkpoint11.31](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29)
+for exact counts, the preserved stale harness-count failure and cleanup proof.
+Worker2f90 separately owns the remaining PATCH-schema combination work;
+profile-revision/performance and final C0 acceptance remain open.
+
 **Corrected source pair:** `4ba9373c` was held for violating the common
 externalId contract. Corrective child `2d2da4e1` restores all-core String/SV
 and adds exact-case precedence. Their history is now retained as

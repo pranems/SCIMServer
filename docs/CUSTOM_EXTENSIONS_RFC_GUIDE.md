@@ -17,6 +17,16 @@
 > in another: [common semantics are resolved per binding](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md),
 > not inferred solely from a URN prefix or applied to every namespaced homonym.
 
+> **C0 local uniqueness integration, not deployed:** an extension's numeric/MV
+> id/externalId and scalar meta may carry supported server uniqueness even
+> when that same schema is a core elsewhere. Core writes compile the effective
+> RFC common view, extension writes compile the independent declared view,
+> and no global schema rewrite occurs. Unsupported core-only computed
+> promises are rejected at admission. Default common externalId uniqueness is
+> still none; explicit server policies are endpoint/resource-type/path scoped,
+> not provisioning-client or global guarantees.
+> [Combined-source behavior and tests](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
+
 > **Local PUT entry correction, 2026-09-29:** [One-to-one preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
 > keeps duplicate-value entries' readOnly and omitted immutable children with
 > the correct retained occurrence. Core and extension arrays share the matcher

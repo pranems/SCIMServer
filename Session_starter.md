@@ -6,7 +6,26 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
-**Bounded PUT entry correction, 2026-09-29:** Based only on committed combined
+**Current C0 binding-uniqueness checkpoint, 2026-09-29 (local, not deployed):**
+The effective common view now reaches runtime uniqueness compilation and
+profile admission. One schema can remain numeric/MV under an extension
+binding while core id/externalId/meta use RFC characteristics. The original
+storage compiler remains the only capability table; core-only unsupported
+computed promises are rejected before publication. Optional omitted
+schemaExtensions becomes an empty list; explicit malformed lists remain400.
+Evidence:383 unit checks plus8 final wiring checks,318 distinct InMemory
+HTTP controls (317 primary plus one added omission control),320 PostgreSQL
+HTTP,22 migrations,165 main live checks/backend and126 new live assertions
+per backend. The PostgreSQL wrapper's stale164 count is preserved as a
+harness failure; targeted live replay verified final endpoint inventory and
+cleanup without repeating320 HTTP tests. See
+[checkpoint11.31](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
+Worker2f90 exclusively owns namespace-only PATCH prevalidation, evolving
+required-extension transitions and returned:request projection. Those,
+profile-revision coordination, performance and final82-case acceptance remain
+open. No source receipt, version, lockfile, release or deployment was changed.
+
+**Historical bounded PUT source receipt, 2026-09-29:** Based only on committed combined
 snapshot `5581e6b7`, [PUT entry preservation](docs/SCIM_PUT_ENTRY_PRESERVATION.md)
 reuses one neutral matcher for PUT and PATCH. It fixes duplicate-value/type
 reorders, anonymous occurrence pairing and recursive immutable comparison.
@@ -14,8 +33,8 @@ Focused final units: 107; applicable domain/service/controller units: 1,771.
 Owned PostgreSQL 17.8 plus 22 migrations: 249 HTTP passes; InMemory: 248
 passes and one native-FK-only non-applicable case. Built runtimes each pass
 six live cases / 5,474 assertions; exact build/source hashes are retained.
-Eight pre-existing readOnly expectation failures reproduce on the committed
-base and remain visible for consolidation. No pending peer package was read
+Eight pre-existing readOnly expectation failures reproduced on that source
+base; parentdf3ca957 and integratedbd82e681 subsequently closed them. No pending peer package was read
 or merged; common-attribute PATCH/admission/query and P3b remain separate.
 See [RCA](docs/SCIM_PUT_ENTRY_PRESERVATION_RCA.md) for independent review closure.
 

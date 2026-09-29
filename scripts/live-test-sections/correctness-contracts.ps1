@@ -6,6 +6,24 @@ function Invoke-ScimCorrectnessContractTests {
 
     $base = $BaseUrl.TrimEnd('/')
     $token = ([string]$Headers.Authorization) -replace '^Bearer\s+', ''
+    $script:currentSection = '9z-DE: Binding-qualified Uniqueness'
+    $oldBase = $env:SCIM_LIVE_BASE_URL
+    $oldToken = $env:SCIM_LIVE_TOKEN
+    try {
+        $env:SCIM_LIVE_BASE_URL = $base
+        $env:SCIM_LIVE_TOKEN = $token
+        $result = & node (Join-Path $PSScriptRoot 'binding-uniqueness.cjs')
+        if ($LASTEXITCODE -ne 0) { throw 'Binding uniqueness contract process failed.' }
+        $receipt = $result | ConvertFrom-Json -ErrorAction Stop
+        Test-Result -Success ($receipt.modes -eq 2 -and $receipt.assertions -eq 126 -and $receipt.endpointCollectionUnchanged) `
+            -Message "9z-DE: $($receipt.assertions) binding-qualified uniqueness, admission, query and cleanup assertions"
+    } catch {
+        Test-Result -Success $false -Message "9z-DE: binding uniqueness failed: $($_.Exception.Message)"
+    } finally {
+        $env:SCIM_LIVE_BASE_URL = $oldBase
+        $env:SCIM_LIVE_TOKEN = $oldToken
+    }
+
     . "$PSScriptRoot\search-contract.ps1"
     Invoke-ScimSearchContractTests -BaseUrl $base -Headers $Headers
 

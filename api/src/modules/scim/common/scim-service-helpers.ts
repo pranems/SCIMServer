@@ -31,7 +31,7 @@ import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-pars
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
-import { compileUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import { compileEffectiveUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
@@ -1196,7 +1196,7 @@ export class ScimSchemaHelpers {
 
   getUniquenessPolicy(endpointId?: string): UniquenessPolicy {
     try {
-      return compileUniquenessPolicy(this.getSchemaDefinitions(endpointId));
+      return compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(endpointId));
     } catch (error) {
       if (error instanceof RepositoryError && error.code === 'INVALID_VALUE') {
         throw createScimError({ status: 400, scimType: 'invalidValue', detail: error.message });

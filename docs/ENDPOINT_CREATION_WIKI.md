@@ -31,6 +31,14 @@ preserves the declaration and applies common semantics only to core usage.
 Admin rejection of conflicting **core-only** declarations is an explicit
 provider choice; RFC precedence itself does not prescribe an admin API.
 
+**C0 local admission update, not deployed:** `uniqueness:server` must be
+supported for the declared type and stored path. Boolean/dateTime/binary and
+whole-complex promises are rejected before endpoint creation or profile
+publication; supported scalar leaves remain available. Shared schemas retain
+their extension declarations while common core fields use RFC semantics.
+Omitting optional `schemaExtensions` means an empty list; sending null or a
+non-array is an error. [Integration evidence and exact boundaries](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
+
 ---
 
 ## Table of Contents

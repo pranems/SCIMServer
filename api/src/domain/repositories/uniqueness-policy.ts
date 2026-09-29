@@ -1,5 +1,6 @@
 import { RepositoryError } from '../errors/repository-error';
 import type { SchemaAttributeDefinition, SchemaDefinition } from '../validation/validation-types';
+import { effectiveCommonAttributes } from '../validation/common-attributes';
 
 // RFC 7643 sections 2.3.2/5/6/8: boolean, dateTime, binary and complex have no uniqueness.
 const SCALAR_TYPES = ['string', 'reference', 'integer', 'decimal'] as const;
@@ -15,6 +16,14 @@ export interface UniqueAttribute {
   readonly caseExact: boolean;
 }
 export type UniquenessPolicy = readonly UniqueAttribute[];
+
+/** Bind common characteristics before checking storage capabilities; keep shared declarations intact. */
+export function compileEffectiveUniquenessPolicy(schemas: readonly SchemaDefinition[]): UniquenessPolicy {
+  return compileUniquenessPolicy(schemas.map(schema => {
+    const core = schema.isCoreSchema ?? schema.id.toLowerCase().startsWith('urn:ietf:params:scim:schemas:core:');
+    return { ...schema, isCoreSchema: core, attributes: effectiveCommonAttributes(schema.attributes, core) };
+  }));
+}
 
 /** Compile only the schemas attached to this resource type, never the endpoint's union. */
 export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): UniquenessPolicy {

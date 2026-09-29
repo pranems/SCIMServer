@@ -19,7 +19,7 @@ export const COMMON_ID = {
 
 export const COMMON_META = {
   name: 'meta', type: 'complex', multiValued: false, required: false,
-  mutability: 'readOnly', returned: 'default',
+  mutability: 'readOnly', returned: 'default', uniqueness: 'none',
   subAttributes: [
     { name: 'resourceType', type: 'string', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default' },
     { name: 'created', type: 'dateTime', multiValued: false, required: false, mutability: 'readOnly', returned: 'default' },

@@ -9,6 +9,7 @@
 
 | If you want to... | Read |
 |---|---|
+| Understand shared-schema uniqueness admission and runtime binding precedence without changing default externalId duplicates | [Binding-qualified integration](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29), [receipt](evidence/scim-binding-uniqueness-integration-20260929.json) |
 | Diagnose Entra without disabling strict validation; review 19 default-running compatibility cases and separate both-strict-mode flag proof | [SCIM_ENTRA_COMPATIBILITY.md](SCIM_ENTRA_COMPATIBILITY.md), [integrated receipt](evidence/scim-flags-default-corpus-20260929/validation.json) |
 | Trace custom-payload writer proof and the subsequently closed generic equality failures | [Original authority evidence](evidence/scim-custom-authority-integration-20260929/validation.json), [query/write/schema closure](evidence/scim-query-authority-integration-20260929/validation.json) |
 | Verify binding-local common id/meta/externalId semantics without reopening the integrated PATCH/PUT fixes | [Common-context integration evidence](evidence/scim-common-context-integration-20260929/validation.json) |

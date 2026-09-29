@@ -20,6 +20,7 @@ import { validateAttributeTightenOnly } from './tighten-only-validator';
 import { RFC_SCHEMA_ATTRIBUTE_MAPS } from './rfc-baseline';
 import { validateSchemaDeclarations } from './schema-declaration-validator';
 import { isCommonAttributeName } from '../../../domain/validation/common-attributes';
+import { validateUniquenessCapabilities } from './uniqueness-admission';
 
 // ─── Validation Result ──────────────────────────────────────────────────
 
@@ -201,6 +202,8 @@ export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileV
 
   // Structural validation
   allErrors.push(...validateStructure(profile));
+
+  if (allErrors.length === 0) allErrors.push(...validateUniquenessCapabilities(profile));
 
   if (allErrors.length > 0) {
     return { valid: false, errors: allErrors };

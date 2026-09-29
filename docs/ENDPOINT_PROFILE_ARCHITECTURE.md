@@ -26,6 +26,16 @@
 
 ## Overview
 
+**C0 local uniqueness bridge, not deployed:** structural validation is followed
+by per-ResourceType uniqueness capability compilation. Core-only raw promises
+are checked before common normalization; schemas shared with an extension keep
+their raw declaration, and the effective core view uses RFC common
+characteristics. Both admission and runtime delegate to the same storage
+compiler, so the type/represented-path capability list cannot drift between
+them. The view adapter does not alter the stored profile. Omitted optional
+extension lists are normalized on copied ResourceTypes before validation
+consumers iterate them. [Design, RED/GREEN and parity receipt](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
+
 **P7a implementation note (local, not deployed):** the existing profile
 pipeline validates raw declarations before expansion, then expanded
 declarations before tighten-only/structural checks. This prevents malformed

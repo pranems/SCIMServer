@@ -142,6 +142,68 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I50 | Documentation coupling / Low | F4 rejected the retention increment because the existing PATCH guide was unchanged | The source package documented itself and schema customization, but the shared PATCH preservation imports also changed | Update the bound PATCH guide with reserved type capacity, restoration stability, distinct value identities and PATCH-only append intent. The existing source-coupling gate identified the exact files; no gate weakening or version-only workaround | Documentation coupling / same | Shared behavior changes require the existing consumer guide as well as a new feature doc; retain the working F4 binding |
 | C0-I51 | Canonical ownership/path reconciliation / Medium | Parent89810f0c targeted the original retained-entries file while an earlier committed parallel-source integration used attribute-values | Delivery/ownership notes arrived after that integration; blind application would create two implementations or drop later work | Preserve parent matcher unchanged in retained-entries, restore original consumers and make attribute-values forwarding-only. Parent84/1764 live expansion passes alongside prior contracts:428units/305IM/306PG HTTP/164main live checks per backend. No repeated414 cherry-pick or history rewrite | Parent handoff/net-delta review / before merge | Keep one implementation and truthful chronology. C0-I48's original defect is greedy stealing; reservation stability/null guards are hazards addressed by that new design, not two extra original b21 defects |
 
+### Binding-qualified uniqueness bridge, 2026-09-29
+
+- **C0-I52 - integration / High.** P7 accepted a schema shared as core and
+  extension, while P3b compiled its raw numeric/MV common declarations on core
+  writes and returned 400. Applying the common view alone still retained raw
+  scalar `meta.uniqueness:server` on the effective complex metadata object.
+  A discriminating compiler test and both strict-mode HTTP writes reproduced
+  the problem before production edits. Runtime binding normalization now
+  delegates to the existing common helper before the sole storage compiler;
+  common metadata explicitly has `uniqueness:none`. The extension retains its
+  original typed policy. Focused compiler and core/extension HTTP controls
+  confirm the correction, including exact-case common values and independent
+  extension collisions. Earliest possible detection: combined-schema unit;
+  actual detection: the same integration RED. Prevention: shared-URN tests
+  must carry explicit promises, not only default-none attributes.
+- **C0-I53 - admission / High.** Unsupported Boolean/dateTime/binary/complex
+  server promises were accepted at profile creation, then rejected on writes.
+  Five admission unit REDs and four HTTP 201-instead-of-400 REDs exposed the
+  missing consumer. Admission now compiles each resource type's core and
+  extension binding through the same storage capability table before
+  publication. Core-only raw computed promises remain rejected; a shared
+  declaration is not globally rewritten. Earliest/actual detection: profile
+  admission unit. Prevention: compile-capability positive and negative
+  controls accompany profile publication and update tests.
+- **C0-I54 - input boundary / Medium.** Omitting optional `schemaExtensions`
+  passed declaration checks, then threw from tighten-only iteration. The
+  omission unit reproduced that TypeError. Expansion now assigns an empty
+  array on its copied resource type, while null/object/string remain exact
+  declaration failures. Earliest/actual detection: admission unit.
+- **C0-I55 - test/tooling friction / Low.** New typed fixtures initially
+  omitted the internal required resource-type description and inferred a
+  union too narrow for an optional uniqueness field. Explicit fixture types
+  corrected compilation without casts masking invalid data. An admission
+  test also assumed `scimType:invalidValue`, then assumed a native Nest
+  envelope; the observed existing admin mapper emits SCIM status/detail and
+  diagnostics without scimType for generic BadRequest. The test now asserts
+  that exact existing boundary instead of changing production error policy.
+  These were harness failures, not behavior REDs. Missing owned Jest tooling
+  used the permitted read-only junction only after MODULE_NOT_FOUND; editor
+  adapters remained unavailable. Earliest/actual detection: compiler/HTTP.
+
+- **C0-I56 - harness aggregation / Low.** The copied PostgreSQL wrapper
+  expected164 main checks after the new live section increased the actual
+  total to165. All320 HTTP and165 live checks passed, but the wrapper failed
+  before its final endpoint-inventory comparison. The failed original
+  receipt is preserved. After correcting the expected count, only the new126
+  live assertions and inventory comparison were replayed on a fresh guarded
+  PostgreSQL17.8 instance with22 migrations; both passed. No repeated320-test
+  run was needed. Both exact containers and API processes were removed.
+  Earliest detection: wrapper configuration review; actual detection:
+  post-live aggregation. Prevention: the checked-in live wiring test locks
+  both modes and the measured126 assertion count, and receipts distinguish
+  check-level success from wrapper completion.
+
+**Test/gate improvement: applied.** Per-binding promise tests and admission
+publication checks close the original blind spots. **Design/architecture
+disposition: accepted.** A thin effective-view adapter and a small admission
+consumer reuse one capability compiler; no second type/represented-path table,
+new persistence abstraction, or competing PATCH implementation was introduced.
+This entry records confirmed fixes immediately; full-session transcript
+reconciliation and final C0 acceptance remain separate.
+
 For C0-I50, an explicit BaseRef compares committed `BaseRef...HEAD`, not
 unstaged edits. The second pre-commit check therefore correctly still saw
 the old committed range. Working-tree freshness passed after the prose fix;

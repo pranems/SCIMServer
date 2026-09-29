@@ -70,6 +70,7 @@ foreach ($failedIds in @(@('role-owned'), @('main-owned'), @('role-owned', 'main
       'retained-entry-put.cjs',
       'Invoke-ScimAtomicUniquenessTests -BaseUrl',
       'common-externalid-patch.cjs',
+      'binding-uniqueness.cjs',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
@@ -107,5 +108,11 @@ foreach ($failedIds in @(@('role-owned'), @('main-owned'), @('role-owned', 'main
     expect(source.includes('put-preservation.cjs')).toBe(true);
     expect(source.includes('$receipt.cases -eq 6 -and $receipt.assertions -eq 5474')).toBe(true);
     expect(source.includes('9z-DD')).toBe(true);
+  });
+
+  it('locks both binding modes and the measured uniqueness admission assertion count', () => {
+    const source = read(section);
+    expect(source).toContain('$receipt.modes -eq 2 -and $receipt.assertions -eq 126');
+    expect(source).toContain('9z-DE');
   });
 });

@@ -8,6 +8,15 @@
 
 ## 1. What this document is
 
+**C0 local source update, not deployed:** profile creation and profile edits
+now reject unsupported uniqueness promises through the same capability
+compiler used by resource writes. This does not depend on
+StrictSchemaValidation. Shared core/extension schemas use binding-local common
+characteristics, and default-none externalId duplicates remain permitted.
+Omitted optional schemaExtensions lists become empty; explicit malformed lists
+are rejected. Existing live preset captures below are unchanged. See
+[the combined-source proof](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
+
 **Local source update (P7a), not a deployment:** malformed schema declarations
 are rejected independently of `StrictSchemaValidation`. Strict mode gates
 resource type/format/cardinality checks; required fields, required extension

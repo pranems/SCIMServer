@@ -22,7 +22,7 @@ accepted; it is not acceptance of later packages or the remaining 82-case ledger
 
 - [x] ✅ COMPLETED: Shared PUT/PATCH retained-entry matcher and focused RED/GREEN tests.
 - [x] ✅ COMPLETED: Independent review finding reproduced and corrected with stable typed occurrence allocation.
-- [ ] C0: integrate the bounded fix and its exact-source receipts; reconcile unrelated baseline readOnly expectations separately.
+- [x] ✅ COMPLETED: Integrated bounded retention evidence and parent reservation89810f0c; parentdf3ca957 separately reconciled the eight baseline expectations.
 
 The goal is to make SCIM requests behave correctly and consistently for Users,
 Groups, and custom resource types on both PostgreSQL and InMemory.
@@ -2117,6 +2117,76 @@ shared fixture and require their actual84/1764 main-entry result.
 consumers restored, compatibility shim only, one matching algorithm and no
 PATCH intent semantics added to PUT. Other P7b/common-policy/admission/
 coordination/performance and final82-case artifact acceptance remain open.
+
+### 11.31 Binding-qualified uniqueness runtime and admission, 2026-09-29
+
+**Local combined-source correction on208de365; not a release or deployment.**
+P7's common-attribute view and P3b's raw declaration compiler were individually
+correct but not connected. A shared schema with numeric/MV `id` and
+`externalId`, string `meta`, and explicit server uniqueness could be admitted
+for extension use but reject valid core writes. Even applying the P7 helper
+initially retained scalar meta's server uniqueness on the effective complex
+metadata object. The new core descriptor explicitly defaults metadata
+uniqueness to none.
+
+The small `compileEffectiveUniquenessPolicy` adapter resolves the **actual
+resource-type binding** through `effectiveCommonAttributes` before delegating
+to the unchanged `compileUniquenessPolicy`. That compiler remains the one
+supported-type and represented-path table. Generic create/replace/PATCH and
+User/Group helpers share the adapter; repository transactions, expectedVersion,
+Group aggregates and endpoint barriers were not changed.
+
+Profile admission now invokes that same compiler per ResourceType after
+structural validation. A core-only raw declaration must itself make a supported
+promise; a shared core/extension declaration retains its raw extension policy
+and obtains RFC common precedence only for core usage. This is explicit
+provider admission policy, not an RFC-mandated administration API. Global
+uniqueness and unsupported Boolean/dateTime/binary/whole-complex server
+promises fail before publication. String/integer/decimal/reference supported
+leaves, including supported multi-valued leaves, remain accepted. An existing
+stored profile is not silently rewritten or claimed revalidated by this work.
+
+Top-level externalId remains String/single-valued/exact on all resource types.
+Default-none duplicates remain allowed. An explicitly configured server
+constraint is only this product's endpoint/resource-type/schema-path namespace,
+not provisioning-client-domain or global uniqueness. Extension homonyms
+retain their own type, cardinality and comparison policy. Omitted optional
+`schemaExtensions` is normalized to an empty list in a copied ResourceType;
+explicit null/object/string values are declaration errors, not500s.
+
+| Outcome | Discriminating proof |
+|---|---|
+| Shared declaration is not globally rewritten | Unit deep equality and admin read after both binding writes |
+| Core common values compile and persist | Both strict modes, real generated id/meta and exact externalId conflict controls |
+| Extension policy remains independent | Numeric/MV id/externalId and string meta collisions each return409; cross-RT values coexist |
+| Query uses the same meaning as writes | Core exact-case and namespaced numeric equality return the exact owner IDs |
+| Unsupported promises never publish | Exact400 admin envelope; endpoint inventory and existing profile/ETag unchanged |
+| Optional-list omission is safe | Unit plus HTTP omitted-list positive; null/object/string negative controls |
+| Conditional/aggregate/common-PATCH behavior survives | P3/P4/common-externalId combined HTTP suites on both backends |
+| Main live path actually executes the helper | RED wiring regression, distinct9z-DE,126 assertions in both strict modes and owned cleanup |
+
+**Evidence:**7 initial unit REDs and6 HTTP REDs;383 primary units,8 final
+wiring checks;317 primary InMemory HTTP plus focused9 after adding one
+omission case (318 distinct),320 PostgreSQL HTTP with no pending/TODO, actual
+PostgreSQL17.8 and22 migrations. Both built runtimes executed165 main live
+checks including126 new assertions. A copied PostgreSQL harness still
+expected164 checks and failed *after* all165 passed; that original receipt
+remains failed. A focused owned-PostgreSQL replay then passed126 assertions
+and the previously unreached final inventory comparison. Both containers and
+all exact owned PIDs were removed. Build passed; lint0 errors/30 warnings,
+identical to committed baseline. [Exact-source receipt](evidence/scim-binding-uniqueness-integration-20260929.json).
+
+**Self-improvement: applied.** Combined shared-schema tests must contain
+explicit policies, not merely default-none declarations, and admission must
+exercise the runtime capability compiler. **Design/architecture disposition:
+accepted.** Thin view/admission consumers reuse existing policy and validation
+seams; no second table, generic transaction framework or PATCH fork.
+
+**Still open:** worker2f90's namespace-only strict PATCH, evolving required
+extensions and returned:request work; broader characteristic overlays,
+profile-revision coordination, candidate-materialization performance and the
+original82-case/164-backend acceptance ledger. This checkpoint does not update
+that frozen ledger or claim an authoritative release matrix.
 
 ## 12. Architecture and self-improvement decisions
 

@@ -248,7 +248,7 @@ export function expandAuthentication(auth: ProfileAuthentication): ProfileAuthen
 }
 
 export function expandProfile(input: ShorthandProfileInput): EndpointProfile {
-  const resourceTypes = input.resourceTypes ?? [];
+  const resourceTypes = (input.resourceTypes ?? []).map(rt => ({ ...rt, schemaExtensions: rt.schemaExtensions ?? [] }));
   const extensionSchemas = new Set(resourceTypes.flatMap(rt => (rt.schemaExtensions ?? []).map(ext => ext.schema)));
   // 1. Expand schemas
   const expandedSchemas = (input.schemas ?? []).map(s => expandSchema(s, extensionSchemas.has(s.id)));
