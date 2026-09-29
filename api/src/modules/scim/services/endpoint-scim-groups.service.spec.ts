@@ -152,6 +152,18 @@ describe('EndpointScimGroupsService', () => {
   });
 
   describe('createGroupForEndpoint', () => {
+    it('does not persist a Group if member resolution fails', async () => {
+      mockUserRepo.findByScimIds.mockRejectedValueOnce(new Error('member lookup unavailable'));
+      mockGroupRepo.create.mockResolvedValue(mockGroup);
+      await expect(service.createGroupForEndpoint({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'No partial Group',
+        members: [{ value: mockUser.scimId }],
+      }, 'http://localhost:3000/scim', mockEndpoint.id)).rejects.toThrow();
+      expect(mockGroupRepo.create).not.toHaveBeenCalled();
+      expect(mockGroupRepo.addMembers).not.toHaveBeenCalled();
+    });
+
     it('should create a group for a specific endpoint', async () => {
       const createDto: CreateGroupDto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
@@ -177,7 +189,8 @@ describe('EndpointScimGroupsService', () => {
         expect.objectContaining({
           displayName: createDto.displayName,
           endpointId: mockEndpoint.id,
-        })
+        }),
+        [],
       );
     });
 
@@ -216,6 +229,10 @@ describe('EndpointScimGroupsService', () => {
 
       expect(result.members).toHaveLength(1);
       expect(result.members![0].value).toBe(mockUser.scimId);
+      expect(mockGroupRepo.create).toHaveBeenCalledWith(expect.any(Object), [
+        { userId: mockUser.id, value: mockUser.scimId, display: 'Test User', type: null },
+      ]);
+      expect(mockGroupRepo.addMembers).not.toHaveBeenCalled();
       expect(mockUserRepo.findByScimIds).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Array));
     });
 
@@ -1364,7 +1381,8 @@ describe('EndpointScimGroupsService', () => {
       expect(mockGroupRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           externalId: 'ext-grp-001',
-        })
+        }),
+        [],
       );
       expect(result.externalId).toBe('ext-grp-001');
     });

@@ -2,7 +2,7 @@
 
 > **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
-> **Version:** 0.55.35 - **Updated:** 2026-09-18
+> **Version:** 0.55.35 - **Updated:** 2026-09-28
 > **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
@@ -1996,18 +1996,31 @@ Returns same ListResponse as GET with filter.
 
 Create a group.
 
+**Aggregate persistence (P4, locally validated; release integration pending):**
+the Group and initial members are saved together. A member lookup or storage
+failure leaves no partial Group, so a corrected request can be retried.
+PUT/PATCH failures preserve scalar fields, payload, version and members;
+P3's version checks still apply. See
+[Group transaction evidence and limits](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md).
+
 ```http
-POST /scim/endpoints/a1b2c3d4-.../Groups HTTP/1.1
+POST /scim/endpoints/10000000-0000-4000-a000-000000000001/Groups HTTP/1.1
 Host: localhost:8080
 Authorization: Bearer changeme-scim
 Content-Type: application/scim+json
 
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
   "displayName": "Engineering",
   "members": [
-    { "value": "f47ac10b-..." },
-    { "value": "a83bc20e-..." }
+    {
+      "value": "20000000-0000-4000-a000-000000000001"
+    },
+    {
+      "value": "20000000-0000-4000-a000-000000000002"
+    }
   ]
 }
 ```
@@ -2016,25 +2029,31 @@ Content-Type: application/scim+json
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-  "id": "g1234567-...",
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "id": "30000000-0000-4000-a000-000000000001",
   "displayName": "Engineering",
   "members": [
-    { "value": "f47ac10b-...", "display": "jane.doe@example.com", "type": "User" },
-    { "value": "a83bc20e-...", "display": "john.smith@example.com", "type": "User" }
+    {
+      "value": "20000000-0000-4000-a000-000000000001"
+    },
+    {
+      "value": "20000000-0000-4000-a000-000000000002"
+    }
   ],
   "meta": {
     "resourceType": "Group",
     "created": "2026-04-24T10:00:00.000Z",
     "lastModified": "2026-04-24T10:00:00.000Z",
-    "location": "http://localhost:8080/scim/v2/endpoints/a1b2c3d4-.../Groups/g1234567-...",
-    "version": "W/\"1\""
+    "location": "http://localhost:8080/scim/v2/endpoints/10000000-0000-4000-a000-000000000001/Groups/30000000-0000-4000-a000-000000000001",
+    "version": "W/\"v1\""
   }
 }
 ```
 
 - `displayName` required, unique per endpoint (409 on conflict)
-- Member `value` must reference existing user IDs in the same endpoint
+- Local member values are resolved within the endpoint. Unresolved values remain external members with no internal User link; this route does not require every value to identify an existing local User.
 
 ---
 

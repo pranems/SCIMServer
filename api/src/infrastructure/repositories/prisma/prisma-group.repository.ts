@@ -63,24 +63,41 @@ function toGroupWithMembers(resource: Record<string, unknown>): GroupWithMembers
   };
 }
 
+function toMemberData(groupId: string, members: MemberCreateInput[]): Prisma.ResourceMemberCreateManyInput[] {
+  return members.map((m) => ({
+    groupResourceId: groupId,
+    memberResourceId: m.userId,
+    value: m.value,
+    type: m.type,
+    display: m.display,
+    createdAt: new Date(),
+  }));
+}
+
 @Injectable()
 export class PrismaGroupRepository implements IGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: GroupCreateInput): Promise<GroupRecord> {
+  async create(input: GroupCreateInput, members: MemberCreateInput[] = []): Promise<GroupRecord> {
     try {
-      const created = await this.prisma.scimResource.create({
-        data: {
-          resourceType: 'Group',
-          scimId: input.scimId,
-          externalId: input.externalId,
-          displayName: input.displayName,
-          active: input.active ?? true,  // Settings v7: Groups default active=true
-          payload: JSON.parse(input.rawPayload),   // domain string → JSONB
-          meta: input.meta,
-          endpoint: { connect: { id: input.endpointId } },
-        },
-      });
+      const data: Prisma.ScimResourceCreateInput = {
+        resourceType: 'Group',
+        scimId: input.scimId,
+        externalId: input.externalId,
+        displayName: input.displayName,
+        active: input.active ?? true,  // Settings v7: Groups default active=true
+        payload: JSON.parse(input.rawPayload),   // domain string → JSONB
+        meta: input.meta,
+        endpoint: { connect: { id: input.endpointId } },
+      };
+      if (members.length > 0) {
+        return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+          const created = await tx.scimResource.create({ data });
+          await tx.resourceMember.createMany({ data: toMemberData(created.id, members) });
+          return toGroupRecord(created);
+        }, { maxWait: 10000, timeout: 30000 });
+      }
+      const created = await this.prisma.scimResource.create({ data });
       return toGroupRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `Group create(${input.scimId})`);
@@ -221,14 +238,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     if (members.length === 0) return;
     try {
       await this.prisma.resourceMember.createMany({
-        data: members.map((m) => ({
-          groupResourceId: groupId,
-          memberResourceId: m.userId,
-          value: m.value,
-          type: m.type,
-          display: m.display,
-          createdAt: new Date(),
-        })),
+        data: toMemberData(groupId, members),
       });
     } catch (error) {
       throw wrapPrismaError(error, `Group addMembers(${groupId})`);
@@ -263,14 +273,7 @@ export class PrismaGroupRepository implements IGroupRepository {
 
         if (members.length > 0) {
           await tx.resourceMember.createMany({
-            data: members.map((m) => ({
-              groupResourceId: groupId,
-              memberResourceId: m.userId,
-              value: m.value,
-              type: m.type,
-              display: m.display,
-              createdAt: new Date(),
-            })),
+            data: toMemberData(groupId, members),
           });
         }
       },

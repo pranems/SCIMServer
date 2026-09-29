@@ -834,6 +834,16 @@ These deployments are retired and not live. Any tooling, doc, or script referenc
 - Follow existing patterns: `Test-Result -Success <bool> -Message <string>`, `Invoke-RestMethod`, `$scimBase`, `$headers`
 
 ### Gate-Strategy Self-Improvement Loop
+
+**Aggregate integrity rule (P4, 2026-09-28).** For a resource stored across
+multiple rows or maps, test late native/injected write failures against the
+complete stored state: scalar fields, payload, version, timestamps and child
+row ids. An error status alone does not prove rollback. Also test a concurrent
+reader: atomic writers are insufficient if an await between component reads
+can mix versions. Keep InMemory checks, staging and publication synchronous.
+See [Group aggregate evidence](../docs/SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md)
+and pattern PA-10 in the engineering lessons.
+
 After every commit that exposes a new bug class (parity gap, prompt-injection vector, RFC ambiguity, test-rot pattern, etc.), update THIS section to add the corresponding gate. The formal engine for this loop is `gateStrategySelfAudit` (Stage X.1) for general drift and `securityBestPracticesIntake` (Stage X.2) for security-landscape changes. Manual updates here are still valid for fast-turn cases; both prompts aggregate them on their periodic runs.
 
 Examples of standing rules that originated from real failures:

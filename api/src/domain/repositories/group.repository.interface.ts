@@ -18,8 +18,8 @@ import type {
 } from '../models/group.model';
 
 export interface IGroupRepository {
-  /** Create a new group (without members) and return the record. */
-  create(input: GroupCreateInput): Promise<GroupRecord>;
+  /** Atomically create a Group and its initial members; failure publishes neither. */
+  create(input: GroupCreateInput, members?: MemberCreateInput[]): Promise<GroupRecord>;
 
   /** Find a group by SCIM id within an endpoint (without members). */
   findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null>;

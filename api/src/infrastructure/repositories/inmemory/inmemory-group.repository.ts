@@ -24,13 +24,17 @@ import type {
 } from '../../../domain/models/group.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
   private readonly groups: Map<string, GroupRecord> = new Map();
   private readonly members: Map<string, MemberRecord> = new Map();
 
-  async create(input: GroupCreateInput): Promise<GroupRecord> {
+  async create(input: GroupCreateInput, members: MemberCreateInput[] = []): Promise<GroupRecord> {
+    if (this.findGroup(input.endpointId, input.scimId)) {
+      throw new RepositoryError('CONFLICT', 'Group SCIM id already exists in this endpoint.');
+    }
     const now = new Date();
     const record: GroupRecord = {
       id: randomUUID(),
@@ -45,22 +49,21 @@ export class InMemoryGroupRepository implements IGroupRepository {
       createdAt: now,
       updatedAt: now,
     };
+    const initialMembers = this.stageMembers(record.id, members, now);
     this.groups.set(record.id, record);
+    for (const member of initialMembers) this.members.set(member.id, member);
     return { ...record };
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null> {
-    const normalizedScimId = scimId.toLowerCase();
-    for (const group of this.groups.values()) {
-      if (group.endpointId === endpointId && group.scimId.toLowerCase() === normalizedScimId) {
-        return { ...group };
-      }
-    }
-    return null;
+    const group = this.findGroup(endpointId, scimId);
+    return group ? { ...group } : null;
   }
 
   async findWithMembers(endpointId: string, scimId: string): Promise<GroupWithMembers | null> {
-    const group = await this.findByScimId(endpointId, scimId);
+    // Read both maps in the same turn: an await here can mix old scalar state
+    // with new membership even when writers publish atomically.
+    const group = this.findGroup(endpointId, scimId);
     if (!group) return null;
     return {
       ...group,
@@ -159,18 +162,11 @@ export class InMemoryGroupRepository implements IGroupRepository {
   }
 
   async addMembers(groupId: string, members: MemberCreateInput[]): Promise<void> {
-    for (const m of members) {
-      const record: MemberRecord = {
-        id: randomUUID(),
-        groupId,
-        userId: m.userId,
-        value: m.value,
-        type: m.type,
-        display: m.display,
-        createdAt: new Date(),
-      };
-      this.members.set(record.id, record);
-    }
+    if (members.length === 0) return;
+    assertWritePrecondition(this.groups.get(groupId));
+    const existing = this.getMembersForGroup(groupId);
+    const staged = this.stageMembers(groupId, members, new Date(), new Set(existing.map((m) => m.value)));
+    for (const member of staged) this.members.set(member.id, member);
   }
 
   async updateGroupWithMembers(
@@ -187,9 +183,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     const updated: GroupRecord = {
       ...existing, ...data, version: existing.version + 1, updatedAt: now,
     };
-    const replacement = members.map((m): MemberRecord => ({
-      ...m, id: randomUUID(), groupId, createdAt: now,
-    }));
+    const replacement = this.stageMembers(groupId, members, now);
 
     this.groups.set(groupId, updated);
     for (const [memberId, member] of this.members) {
@@ -205,6 +199,30 @@ export class InMemoryGroupRepository implements IGroupRepository {
   clear(): void {
     this.groups.clear();
     this.members.clear();
+  }
+
+  private findGroup(endpointId: string, scimId: string): GroupRecord | null {
+    const normalizedScimId = scimId.toLowerCase();
+    for (const group of this.groups.values()) {
+      if (group.endpointId === endpointId && group.scimId.toLowerCase() === normalizedScimId) return group;
+    }
+    return null;
+  }
+
+  private stageMembers(
+    groupId: string, members: MemberCreateInput[], now: Date, values = new Set<string>(),
+  ): MemberRecord[] {
+    return members.map((m) => {
+      const record: MemberRecord = {
+        id: randomUUID(), groupId, userId: m.userId, value: m.value,
+        type: m.type, display: m.display, createdAt: now,
+      };
+      if (values.has(record.value)) {
+        throw new RepositoryError('CONFLICT', 'Group member value already exists.');
+      }
+      values.add(record.value);
+      return record;
+    });
   }
 
   private getMembersForGroup(groupId: string): MemberRecord[] {

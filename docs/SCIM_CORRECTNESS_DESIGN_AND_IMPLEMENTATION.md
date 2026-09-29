@@ -263,6 +263,13 @@ Keep reference lookups outside a long-held transaction where safe, but verify
 any constraint that can race at the actual commit boundary. After failure,
 scalar values, payload, members and version must all match the original state.
 
+**P4 implementation:** [Group aggregate transactions](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md).
+The create port accepts initial members; the service resolves them before
+persistence. Prisma uses one transaction and InMemory stages all members
+before publishing either map. InMemory also reads the aggregate without an
+intervening await, preventing old scalar fields with new members. No new
+schema or Group-name uniqueness guarantee is introduced.
+
 ### 6.3 Uniqueness
 
 Keep PostgreSQL's username constraint. Add equivalent atomic InMemory
@@ -398,7 +405,7 @@ combined checkpoint has its own counts in section 11.1.
 | P2 | In progress separately | Await parent-supplied commit; pending diffs are not part of this assembly |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Awaiting explicit disposition | Schema-driven, Group and custom-name atomic uniqueness need a separate design or accepted scope decision; P3 does not claim these guarantees and C0 is not unblocked |
-| P4 | In progress separately | Await parent-supplied commit; native and injected member failures remain acceptance checks |
+| P4 | Integrated; combined validation pending | `212a6b92` aggregate writes: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md); raw-error integration check remains required |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | P7a integrated; focused combined validation passed | [Declaration, scalar/cardinality and POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md). Ordered PATCH integration still waits for P2; unsupported server uniqueness/reference/deep-compatibility promises remain explicit follow-up work |

@@ -62,11 +62,18 @@ historical execution record, not the current branch or priority authority.
 - [x] ✅ COMPLETED P3 local implementation and focused dual-backend validation.
 - [ ] Parent consolidation: release metadata, independent review and full applicable matrix.
 - [ ] P3b: separately design schema-driven and Group/custom-name atomic uniqueness.
-- [ ] P4 remains separately assigned; no Group-create rollback guarantee is claimed here.
+- [x] ✅ COMPLETED P4 Group aggregate persistence: initial members commit with the Group; InMemory validates/stages writes and reads a consistent snapshot. [Implementation](docs/SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md) and [execution RCA](docs/SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md).
+
+| Date | Summary |
+|---|---|
+| 2026-09-28 | P4 local validation: 205 Group unit tests; PostgreSQL 17.8 111 HTTP tests and InMemory 110 HTTP tests plus one native-FK N/A. Both include P3 and Group lifecycle/parity controls. All 22 migrations replayed on owned disposable storage; no shared source/estate, version or lockfile changes. Integration/release remains parent-owned. |
 
 Assistant memory: an initial If-Match read is not a persistence condition.
 Pass the validated condition to the real write, preserve wildcard existence,
 and assert stored versions and winner values under deterministic barriers.
+Group create must include initial members in the repository operation, not a
+later append. A read-side await can still tear an otherwise atomic InMemory
+aggregate; read scalar and member state in one turn.
 
 ### Workspace Tenant Isolation (CRITICAL - read before any `az` command)
 

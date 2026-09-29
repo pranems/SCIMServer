@@ -105,8 +105,8 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (31)
-    "A Test/gate integrity" : 9
+    title Patterns by category (32)
+    "A Test/gate integrity" : 10
     "B Environment/deploy" : 4
     "C Framework/middleware" : 4
     "D Security at sinks" : 2
@@ -130,6 +130,7 @@ The most dangerous class: a gate that is GREEN but proves nothing. Every pattern
 | **PA-7** | **The process's own stdout is an unasserted signal channel - read it during live runs** | Two defects (a dead code path and an audit-log destruction vector) were emitting `prisma:error ... invalid input syntax for type uuid` on almost every request, through a full 1,368-assertion live run, with **every gate green**. Neither was found by a gate; both were found by scrolling the server log | No gate in this repo asserts on server stdout, so any failure the application **catches and logs** is invisible by construction. During a live run, capture the server output (`... *>&1 \| Tee-Object -FilePath <log>`) and **count driver/framework error lines**; treat a non-zero count as a finding even when every assertion passes. Report the count before and after a fix (here: **5 -> 0**) - it is a measured outcome, not an impression | (convention; candidate for a live-gate check) | 2026-07-30 log-uuid chain |
 | **PA-8** | **Prove a new live-test section is a real gate by running it against the unfixed build** | A section can be written, run once against the fixed code, and pass - which proves only that it does not crash. A section that would pass either way is decoration | Before trusting a new live section, run it against a deliberately reverted build and confirm (a) the intended assertions FAIL, and (b) the surrounding assertions still PASS, so it fails for the right reason and only that reason. Here 9z-CC failed exactly T3+T4 (`found 0 resolved of 2`) with T1/T2/T5 green | (convention; precedent 9z-CA, repeated for 9z-CC) | 2026-07-30 |
 | **PA-9** | **Eventually durable writes need a shared force-flush poll** | A custom-resource E2E queried RequestLog immediately after DELETE. InMemory passed because writes are synchronous; Prisma returned an empty list because rows are buffered and enqueued after the response | Assertions over just-produced durable logs must use `waitForLogRow()`, which force-flushes and polls a structural predicate to a deadline. Immediate reads and fixed sleeps are both false-green/flake generators | Shared helper [log-wait.helper.ts](../../api/test/e2e/helpers/log-wait.helper.ts) | v0.55.29 CRO-21 |
+| **PA-10** | Prove aggregate rollback and snapshot consistency | An error left a partial Group; an InMemory read mixed an old name/version with new members across an await | Compare complete stored state after native/injected late failure; test a deterministic read/write interleaving and failed-writer version preservation | Group aggregate integrity rule and permanent unit/HTTP tests | [P4 G1-G3](../SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md) |
 
 ### Category B - Cross-environment and deployment drift
 
@@ -226,6 +227,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PA-6 (vacuous RED from a permissive test double) | 2 (both in the 2026-07-30 log-uuid chain: `findUnique`, `createMany`) | convention + negative controls in both specs; promote to a rule on a 3rd sighting |
 | PA-7 (unasserted stdout / caught-and-logged failures) | 2 (dead fallback + audit-batch loss, both invisible to a 1,368-assertion green run) | convention; candidate live-gate check (count driver-error lines during a live run) |
 | PA-8 (prove a live section against the unfixed build) | 2 (9z-CA 2026-07-30, 9z-CC 2026-07-30) | convention; promote if a decorative section ever ships |
+| PA-10 (aggregate rollback and snapshot consistency) | 1 high-severity Group partial-create escape, plus a deterministic torn-read regression | YES - aggregate integrity rule and stored-state tests |
 | PB-1 (env value table) | 1 | YES (convention recorded) |
 | PB-3 (diagnose the configured endpoint, not an overridden one) | 2 (same symptom misdiagnosed twice: 2026-07-29 "machine-wide block", 2026-07-30 "registry blocked") | YES - Rule N2 in the npm supply-chain policy doc; both memory and the two committed docs corrected |
 | PC-1 (contract-shaping middleware) | 2 (I-03, I-04) | convention; revisit if a 3rd escape |

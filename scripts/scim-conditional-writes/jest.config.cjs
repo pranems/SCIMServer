@@ -17,7 +17,9 @@ module.exports = {
   ...original,
   rootDir: API,
   roots: [path.join(API, "test", "e2e")],
-  testRegex: "(conditional-writes|etag-conditional)\\.e2e-spec\\.ts$",
+  testRegex: process.env.PERSISTENCE_TEST_SUITE === "group-transactions"
+    ? "(group-aggregate|group-lifecycle|group-parity-gaps|conditional-writes|etag-conditional)\\.e2e-spec\\.ts$"
+    : "(conditional-writes|etag-conditional)\\.e2e-spec\\.ts$",
   moduleFileExtensions: [...original.moduleFileExtensions, "cjs"],
   modulePaths: [path.join(API, "node_modules")],
   globalSetup: path.join(__dirname, "global-setup.cjs"),

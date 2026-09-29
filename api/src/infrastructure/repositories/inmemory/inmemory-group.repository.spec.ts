@@ -260,7 +260,7 @@ describe('InMemoryGroupRepository', () => {
 
     it('should cascade-delete associated members', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, [makeMemberInput(), makeMemberInput({ userId: 'u2' })]);
+      await repo.addMembers(group.id, [makeMemberInput(), makeMemberInput({ userId: 'u2', value: 'u2' })]);
 
       await repo.delete(group.id);
 
@@ -354,8 +354,8 @@ describe('InMemoryGroupRepository', () => {
     it('should assign unique ids to each member', async () => {
       const group = await repo.create(makeGroupInput());
       await repo.addMembers(group.id, [
-        makeMemberInput({ userId: 'u1' }),
-        makeMemberInput({ userId: 'u2' }),
+        makeMemberInput({ userId: 'u1', value: 'u1' }),
+        makeMemberInput({ userId: 'u2', value: 'u2' }),
       ]);
 
       const withMembers = await repo.findWithMembers(endpointId, group.scimId);
@@ -407,8 +407,8 @@ describe('InMemoryGroupRepository', () => {
         group.id,
         { displayName: 'Updated' },
         [
-          makeMemberInput({ userId: 'new-u1', display: 'NewMember1' }),
-          makeMemberInput({ userId: 'new-u2', display: 'NewMember2' }),
+          makeMemberInput({ userId: 'new-u1', value: 'new-u1', display: 'NewMember1' }),
+          makeMemberInput({ userId: 'new-u2', value: 'new-u2', display: 'NewMember2' }),
         ],
       );
 

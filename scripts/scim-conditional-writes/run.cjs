@@ -15,6 +15,8 @@ const {
 } = require("./safety.cjs");
 sourceGuard();
 assert.equal(process.argv.length, 2, "No external database or arguments accepted.");
+const suite = process.env.PERSISTENCE_TEST_SUITE ?? "conditional-writes";
+assert.ok(["conditional-writes", "group-transactions"].includes(suite), "Unknown persistence suite.");
 delete process.env.DATABASE_URL;
 const { Client } = require(path.join(API, "node_modules", "pg"));
 const run = crypto.randomBytes(8).toString("hex");
@@ -22,7 +24,7 @@ const password = crypto.randomBytes(36).toString("base64url");
 const output = path.join(
   ROOT,
   "test-results",
-  "conditional-writes",
+  suite,
   `postgres-${run}`,
 );
 fs.mkdirSync(output, { recursive: true });
@@ -155,6 +157,8 @@ async function main() {
   }
   assert.ok(ready, "Task PostgreSQL did not become ready.");
   receipt.beforeMigration = await databaseGuard({ marker: false });
+  if (suite === "group-transactions")
+    assert.match(receipt.beforeMigration.server.version, /^PostgreSQL 17\.8 /);
   process.env.PG_ANALYSIS_SYSTEM_ID =
     receipt.beforeMigration.server.system_identifier;
   const client = new Client({ connectionString: url });
@@ -243,6 +247,9 @@ async function main() {
       path.join(API, "test", "e2e", "conditional-writes.e2e-spec.ts"),
       path.join(API, "test", "e2e", "etag-conditional.e2e-spec.ts"),
     ];
+    if (suite === "group-transactions")
+      tests.push(...["group-aggregate", "group-lifecycle", "group-parity-gaps"]
+        .map((name) => path.join(API, "test", "e2e", `${name}.e2e-spec.ts`)));
     assert.deepEqual(JSON.parse(listing.stdout).sort(), [...tests].sort());
     const exitCode = command(`${backend}-corpus`, [
       jest,
@@ -268,6 +275,7 @@ async function main() {
       exitCode,
       passed: result.numPassedTests,
       failed: result.numFailedTests,
+      skipped: result.numPendingTests,
       failedSuites: result.numFailedTestSuites,
       setupFailedSuites: result.numRuntimeErrorTestSuites,
       file: path.relative(ROOT, resultPath),

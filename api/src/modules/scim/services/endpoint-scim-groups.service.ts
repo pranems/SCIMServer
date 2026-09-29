@@ -167,19 +167,10 @@ export class EndpointScimGroupsService {
 
     let group;
     try {
-      group = await this.groupRepo.create(input);
+      const memberInputs = await this.resolveMemberInputs(dto.members ?? [], endpointId);
+      group = await this.groupRepo.create(input, memberInputs);
     } catch (error) {
       handleRepositoryError(error, 'create group', this.logger, LogCategory.SCIM_GROUP, { displayName: dto.displayName, endpointId });
-    }
-
-    const members = dto.members ?? [];
-    if (members.length > 0) {
-      const memberInputs = await this.resolveMemberInputs(members, endpointId);
-      try {
-        await this.groupRepo.addMembers(String(group.id), memberInputs);
-      } catch (error) {
-        handleRepositoryError(error, 'add members to group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
-      }
     }
 
     const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
