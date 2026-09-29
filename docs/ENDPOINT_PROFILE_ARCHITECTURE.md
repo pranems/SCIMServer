@@ -34,6 +34,12 @@ extension requiredness is carried into schema validation caches. Global
 uniqueness is rejected as unsupported rather than ranked as a locally
 enforceable promise. See [P7a](SCIM_P7A_PROFILE_VALIDATION.md) for exact boundaries.
 
+`global` is valid in RFC 7643; its rejection is this server's supported-capability
+policy. Because `mergeProfilePartial` validates the entire merged profile,
+even a settings-only profile edit rejects an old stored global declaration.
+Reads and top-level endpoint edits without a `profile` block are not automatic
+profile migrations. See [the exact behavior matrix](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy).
+
 Every endpoint has a **profile** that fully defines its SCIM behavior. A profile is the single source of truth for:
 
 1. **What schemas** are available (attributes, types, characteristics)

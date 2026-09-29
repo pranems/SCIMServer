@@ -1,0 +1,75 @@
+{
+  "sourceSha256": "c8ca019625df36b354e524a34a51352b4c8f53241834613c61ff1e58d6a97759",
+  "method": "Read-only calls to compiled validateAndExpandProfile, SchemaValidator.collectUniqueAttributes and buildCharacteristicsCache",
+  "scope": "Synthetic string server-uniqueness declarations; no repository mutation",
+  "cases": [
+    {
+      "shape": "core single scalar serial",
+      "profileAccepted": true,
+      "legacyDescriptors": 1,
+      "cachedDescriptors": 1
+    },
+    {
+      "shape": "extension single scalar serial",
+      "profileAccepted": true,
+      "legacyDescriptors": 1,
+      "cachedDescriptors": 1
+    },
+    {
+      "shape": "core multivalued simple aliases",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "extension multivalued simple aliases",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "single complex contact.value child",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "extension multivalued complex contacts.value child",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "extension scalar id",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "extension scalar userName",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "extension scalar displayName",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    },
+    {
+      "shape": "extension scalar externalId",
+      "profileAccepted": true,
+      "legacyDescriptors": 0,
+      "cachedDescriptors": 0
+    }
+  ],
+  "classification": "Two collected controls and eight accepted-but-uncollected cases. Not passing conformance tests for the gap cases.",
+  "owner": "P3b",
+  "nonrequirements": [
+    "No speculative external referential-integrity implementation",
+    "No raw JSON lexical reconstruction feature merely because parsed tokens normalize",
+    "No invented uniqueness semantics for Boolean, binary, dateTime or complex values",
+    "global keyword rejection is provider capability policy, not an RFC mandate"
+  ]
+}

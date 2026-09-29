@@ -2,7 +2,10 @@
 // only the explicit-target HTTP contract through runP7Contract.
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
-const { testGuard } = require("./p1-validation/safety.cjs");
+const fs = require("node:fs");
+const path = require("node:path");
+const Module = require("node:module");
+const { API, testGuard } = require("./p1-validation/safety.cjs");
 
 async function runLiveP7(baseUrl, secret) {
   await testGuard();
@@ -17,6 +20,12 @@ async function runP7Contract(baseUrl, secret) {
   const base = new URL(baseUrl);
   assert.ok(["http:", "https:"].includes(base.protocol));
   assert.ok(secret);
+  const fixture = path.join(API, "test", "e2e", "helpers", "profile-p7-readonly.fixture.ts");
+  const loaded = new Module(fixture, module);
+  loaded._compile(require(path.join(API, "node_modules", "typescript")).transpileModule(fs.readFileSync(fixture, "utf8"), {
+    compilerOptions: { module: require(path.join(API, "node_modules", "typescript")).ModuleKind.CommonJS },
+  }).outputText, fixture);
+  const { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } = loaded.exports;
   let assertions = 0;
   const eq = (actual, expected) => { assert.deepEqual(actual, expected); assertions++; };
   const http = async (method, route, body) => {
@@ -36,6 +45,7 @@ async function runP7Contract(baseUrl, secret) {
       const core = resource === "Widget" ? "urn:example:core:2.0:Widget" : `urn:ietf:params:scim:schemas:core:2.0:${resource}`;
       const primary = resource === "User" ? "userName" : "displayName";
       const attrs = [
+        recursiveReadOnlyAttribute(),
         { name: "fixed", type: "string", mutability: "immutable" },
         { name: "serverOwned", type: "integer", mutability: "readOnly" },
         { name: "encoded", type: "binary" }, { name: "link", type: "reference" },
@@ -52,7 +62,7 @@ async function runP7Contract(baseUrl, secret) {
         ],
         resourceTypes: [{ id: resource, name: resource, endpoint: `/${resource}s`, schema: core,
           schemaExtensions: [{ schema: EXT, required: true }] }],
-        settings: { StrictSchemaValidation: strict },
+        settings: { StrictSchemaValidation: strict, RfcCompliantSubAttributes: false },
         serviceProviderConfig: { etag: { supported: true } },
       };
       const endpoint = await http("POST", "/scim/admin/endpoints", { name: `p7-live-${crypto.randomUUID()}`, profile });
@@ -104,7 +114,29 @@ async function runP7Contract(baseUrl, secret) {
             eq((await http("GET", item)).body, before.body);
           }
         }
-        observed.push({ resource, strict, create: created.status, replace: replacement.status, immutableError: rejected.body.scimType });
+        const nestedInput = { ...input, [primary]: `recursive-${crypto.randomUUID()}`,
+          nested: recursiveReadOnlyInput(), [EXT]: { requiredValue: "present", nested: recursiveReadOnlyInput(false) } };
+        const nestedCreated = await http("POST", route, nestedInput);
+        eq(nestedCreated.status, 201);
+        eq(nestedCreated.body.nested, recursiveReadOnlyExpected());
+        eq(nestedCreated.body[EXT].nested, recursiveReadOnlyExpected());
+        const nestedItem = `${route}/${nestedCreated.body.id}`;
+        const nestedReplaced = await http("PUT", nestedItem, nestedInput);
+        eq(nestedReplaced.status, 200);
+        eq(nestedReplaced.body.nested, recursiveReadOnlyExpected());
+        eq(nestedReplaced.body[EXT].nested, recursiveReadOnlyExpected());
+        const nestedRead = await http("GET", nestedItem);
+        eq(nestedRead.body.nested, recursiveReadOnlyExpected());
+        eq(nestedRead.body[EXT].nested, recursiveReadOnlyExpected());
+        const missing = structuredClone(nestedInput);
+        delete missing.nested.records[0].details[0].open;
+        const failedNested = await http("PUT", nestedItem, missing);
+        eq(failedNested.status, 400);
+        eq(failedNested.body.scimType, "invalidValue");
+        eq(typeof failedNested.body.detail, "string");
+        eq((await http("GET", nestedItem)).body, nestedRead.body);
+        observed.push({ resource, strict, create: created.status, replace: replacement.status,
+          immutableError: rejected.body.scimType, recursiveReadOnly: "passed" });
       } finally {
         eq((await http("DELETE", admin)).status, 204);
       }

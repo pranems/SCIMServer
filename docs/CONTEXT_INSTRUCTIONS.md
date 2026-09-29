@@ -23,6 +23,14 @@ passes and owned backend/live evidence. It does not close P7 ordered-PATCH
 integration or remaining uniqueness/reference/deep-compatibility questions.
 No product version, lockfile, push or deployment changed.
 
+The separate recursive readOnly follow-up closes the nested-complex
+compatibility POST/PUT gap: 1,517 focused units and, per backend, 67 HTTP /
+228 live assertions. [Characteristic status](SCIM_P7_CHARACTERISTIC_STATUS.md)
+records exact unsupported server-uniqueness shapes for P3b and the intentional
+global-uniqueness capability policy. P7 remains open until final P2 integration.
+Do not treat optional external referential integrity or raw JSON token
+reconstruction as automatically required features.
+
 P1 correctness work is implemented locally on the isolated implementation
 branch, not on a deployment. [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md)
 records the typed-path contract, 1,476 focused unit / 65 HTTP passes and owned

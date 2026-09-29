@@ -13,6 +13,7 @@
 | Understand schema-aware filtering, typed sorting, hidden-field projection, page limits and custom ETag consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
 | Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
 | Understand P7a schema declaration, scalar/cardinality and POST/PUT correctness with owned backend proof | [SCIM_P7A_PROFILE_VALIDATION.md](SCIM_P7A_PROFILE_VALIDATION.md) |
+| Distinguish remaining characteristic promises from optional behavior, including the P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
 | Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
 | Understand atomic If-Match writes, User uniqueness parity and verified two-backend races | [SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md) |
 | Use JSON search arrays, legacy string compatibility and scalar SCIM validation errors | [SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md) |

@@ -61,9 +61,10 @@ Known RFC shorthand still expands from the existing baseline. Custom
 attributes retain omission defaults: string, single-valued, not required,
 case-insensitive, readWrite, returned default and uniqueness none.
 
-`global` uniqueness cannot be promised by scanning one local endpoint.
-This package rejects that unsupported declaration rather than pretending a
-local duplicate check establishes a global guarantee.
+`global` is a valid RFC keyword. Rejecting it is this provider's intentional
+supported-capability policy, not an RFC mandate. A local duplicate scan does
+not establish a global guarantee. See the
+[capability matrix and stored-profile edit implications](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy).
 
 ## Value rules
 
@@ -206,15 +207,28 @@ P7 is **not complete**. P7a does not claim:
 * Atomic concurrent uniqueness for custom attributes, or support for every
   multi-valued/sub-attribute server-uniqueness declaration. Those existing
   gaps need the persistence packages and remaining P7 promise review.
-* Mandatory referential integrity or full semantic enforcement of every
-  `referenceTypes` declaration. The existing optional local-reference
-  policies remain distinct from URI syntax.
-* Raw JSON lexical integer checks after parsing: `1e2` and `100` become the
-  same JavaScript number. This package does not add a second raw JSON parser.
-* Full recursive readOnly stripping for the non-RFC nested-complex
-  compatibility mode. RFC-supported scalar and simple-child shapes are
-  covered here; deeper compatibility behavior remains in the P7 follow-up.
+* External referential integrity is optional, not an automatically missing
+  requirement. Explicit `referenceTypes` promises need a separate concrete
+  assessment; do not implement speculative external lookups.
+* Raw JSON lexical reconstruction is not itself a feature requirement.
+  Integer value/encoding rules belong at the relevant parser/serializer
+  boundary; no second raw JSON parser is proposed.
+* The [recursive readOnly follow-up](SCIM_P7_CHARACTERISTIC_STATUS.md#4-recursive-readonly-follow-up)
+  now closes POST/PUT stripping in the existing nested-complex compatibility
+  mode. Its separate evidence is recorded below.
 * Migration/repair of already stored malformed profiles or resources.
+
+### Recursive readOnly follow-up to 8e42f15f
+
+The fallback collector now records deep parent paths. The existing stripping
+helper walks those paths segment by segment through objects and arrays,
+matching the recursive cache. Literal dotted keys are not mistaken for nested
+objects. P2 ordered PATCH execution is unchanged.
+
+Follow-up gates: 1,517 focused unit tests; 67 HTTP tests and 228 local-live
+assertions per backend; PostgreSQL 17.8 with all 22 migrations and InMemory.
+See [the follow-up receipt](evidence/scim-p7-20260928/recursive-readonly.json)
+and [the remaining characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md).
 
 ## Standards and design disposition
 

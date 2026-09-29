@@ -3,6 +3,7 @@ import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { randomUUID } from 'crypto';
+import { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } from './helpers/profile-p7-readonly.fixture';
 
 const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
 const EXT = 'urn:example:params:scim:schemas:extension:p7:2.0:Test';
@@ -55,6 +56,7 @@ describe('P7 declaration and POST/PUT contracts', () => {
       : `urn:ietf:params:scim:schemas:core:2.0:${resource}`;
     const primary = resource === 'User' ? 'userName' : 'displayName';
     const attrs = [
+      recursiveReadOnlyAttribute(),
       ...shapes.flatMap(([name, type]) => [
         { name, type, multiValued: false }, { name: `${name}List`, type, multiValued: true },
       ]),
@@ -85,7 +87,7 @@ describe('P7 declaration and POST/PUT contracts', () => {
             ],
             resourceTypes: [{ id: resource, name: resource, description: 'P7', endpoint: `/${resource}s`, schema: core,
               schemaExtensions: [{ schema: EXT, required: true }] }],
-            settings: { StrictSchemaValidation: strict, AllowAndCoerceBooleanStrings: false },
+            settings: { StrictSchemaValidation: strict, AllowAndCoerceBooleanStrings: false, RfcCompliantSubAttributes: false },
             serviceProviderConfig: { etag: { supported: true } },
           } }).expect(201);
           endpoints.push(response.body.id);
@@ -120,6 +122,49 @@ describe('P7 declaration and POST/PUT contracts', () => {
           expect(replaced.body.children).toEqual(created.body.children);
         });
 
+          it('recursively ignores readOnly input on POST and PUT in nested-complex compatibility mode', async () => {
+            const input = { ...body(), nested: recursiveReadOnlyInput(),
+              [EXT]: { requiredValue: 'present', nested: recursiveReadOnlyInput([]) } };
+            const created = await scim('post', base).send(input).expect(201);
+            expect(created.body.nested).toEqual(recursiveReadOnlyExpected());
+            expect(created.body[EXT].nested).toEqual(recursiveReadOnlyExpected());
+            const replaced = await scim('put', `${base}/${created.body.id}`).send(input).expect(200);
+            expect(replaced.body.nested).toEqual(recursiveReadOnlyExpected());
+            expect(replaced.body[EXT].nested).toEqual(recursiveReadOnlyExpected());
+            const read = await scim('get', `${base}/${created.body.id}`).expect(200);
+            expect(read.body.nested).toEqual(recursiveReadOnlyExpected());
+            expect(read.body[EXT].nested).toEqual(recursiveReadOnlyExpected());
+            if (strict) {
+              const bad = structuredClone(input);
+              delete (bad.nested.records[0].details[0] as { open?: string }).open;
+              const rejected = await scim('put', `${base}/${created.body.id}`).send(bad).expect(400);
+              error(rejected.body, 'invalidValue');
+              expect(rejected.body[DIAG].attributePaths).toContain('nested.records[0].details[0].open');
+              expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(read.body);
+            }
+          });
+
+          it('retains deep server-owned values on PUT after a profile changes them to readOnly', async () => {
+            const originalProfile = (await admin('get', `/${endpointId}`).expect(200)).body.profile;
+            const seedProfile = structuredClone(originalProfile);
+            for (const schema of seedProfile.schemas) {
+              schema.attributes = schema.attributes.map((a: { name: string }) =>
+                a.name === 'nested' ? recursiveReadOnlyAttribute('readWrite') : a);
+            }
+            let id: string;
+            try {
+              await admin('patch', `/${endpointId}`).send({ profile: seedProfile }).expect(200);
+              const seed = { ...body(), nested: recursiveReadOnlyInput(7),
+                [EXT]: { requiredValue: 'present', nested: recursiveReadOnlyInput(9) } };
+              id = (await scim('post', base).send(seed).expect(201)).body.id;
+            } finally {
+              await admin('patch', `/${endpointId}`).send({ profile: originalProfile }).expect(200);
+            }
+            const replaced = await scim('put', `${base}/${id}`).send({ ...body(), nested: recursiveReadOnlyInput(false),
+              [EXT]: { requiredValue: 'present', nested: recursiveReadOnlyInput({ wrong: true }) } }).expect(200);
+            expect(replaced.body.nested).toEqual(recursiveReadOnlyInput(7));
+            expect(replaced.body[EXT].nested).toEqual(recursiveReadOnlyInput(9));
+          });
         it('preserves immutable state on omitted PUT input or rejects the replacement without mutation', async () => {
           const input = { ...body(), fixed: 'first', [EXT]: { requiredValue: 'present', fixed: 'ext-first' } };
           const created = await scim('post', base).send(input).expect(201);

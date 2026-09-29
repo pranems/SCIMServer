@@ -1570,42 +1570,34 @@ export class SchemaValidator {
     const coreSubAttrs = new Map<string, Set<string>>();
     const extensionSubAttrs = new Map<string, Map<string, Set<string>>>();
 
-    for (const schema of schemas) {
-      if (isCoreSchema(schema)) {
-        for (const attr of schema.attributes) {
-          if (attr.mutability === 'readOnly') {
-            core.add(attr.name.toLowerCase());
-          } else if (attr.subAttributes) {
-            // R-MUT-2: Collect readOnly sub-attrs within non-readOnly parents
-            for (const sub of attr.subAttributes) {
-              if (sub.mutability === 'readOnly') {
-                const parentKey = attr.name.toLowerCase();
-                if (!coreSubAttrs.has(parentKey)) {
-                  coreSubAttrs.set(parentKey, new Set());
-                }
-                coreSubAttrs.get(parentKey)!.add(sub.name.toLowerCase());
-              }
-            }
+    const collect = (
+      attributes: readonly SchemaAttributeDefinition[],
+      top: Set<string>,
+      nested: Map<string, Set<string>>,
+      parent = '',
+    ): void => {
+      for (const attr of attributes) {
+        const name = attr.name.toLowerCase();
+        if (attr.mutability === 'readOnly') {
+          if (!parent) top.add(name);
+          else {
+            if (!nested.has(parent)) nested.set(parent, new Set());
+            nested.get(parent)!.add(name);
           }
         }
+        if (attr.mutability !== 'readOnly' && attr.subAttributes) {
+          collect(attr.subAttributes, top, nested, parent ? `${parent}.${name}` : name);
+        }
+      }
+    };
+
+    for (const schema of schemas) {
+      if (isCoreSchema(schema)) {
+        collect(schema.attributes, core, coreSubAttrs);
       } else {
         const extSet = new Set<string>();
         const extSubMap = new Map<string, Set<string>>();
-        for (const attr of schema.attributes) {
-          if (attr.mutability === 'readOnly') {
-            extSet.add(attr.name.toLowerCase());
-          } else if (attr.subAttributes) {
-            for (const sub of attr.subAttributes) {
-              if (sub.mutability === 'readOnly') {
-                const parentKey = attr.name.toLowerCase();
-                if (!extSubMap.has(parentKey)) {
-                  extSubMap.set(parentKey, new Set());
-                }
-                extSubMap.get(parentKey)!.add(sub.name.toLowerCase());
-              }
-            }
-          }
-        }
+        collect(schema.attributes, extSet, extSubMap);
         if (extSet.size > 0) {
           extensions.set(schema.id, extSet);
         }

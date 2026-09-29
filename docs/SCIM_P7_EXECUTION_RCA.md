@@ -26,6 +26,28 @@ Ordered PATCH and cross-package integration remain separate.
 
 ## Design disposition
 
+### Recursive readOnly follow-up to 8e42f15f
+
+| Issue | Type / severity | Confirmed mechanism and fix | Prevention / detection |
+| --- | --- | --- | --- |
+| Nested readOnly values survived POST/PUT | Correctness / high | The cache already stored deep parent paths but stripping looked up the whole dotted path as one payload key; the fallback collector stopped after one child level. The collector now recurses, and one segment-aware walker resolves real objects/arrays before stripping. | Ten unit REDs and six HTTP REDs; 1,517 focused unit tests and 12 focused HTTP tests GREEN. Matrix covers cached/fallback, objects/arrays, cores/extensions, case-insensitive names and literal dotted keys. |
+| HTTP tests initially registered inside an existing test callback | Test harness / low | The first filtered invocation discovered only 55 old tests and skipped them all. Moved the new tests into the describe block before trusting the gate. | No skipped run counted as RED/GREEN. Discovery now finds 67 tests, including all 12 new cases. |
+| Shared fixture objects hid warning-path assertions | Test correctness / medium | In the object/object matrix cell the core and extension referenced the same object, unlike JSON input. Stripping the core mutated the extension fixture before its turn. | Clone every fixture branch, including expected unrelated namespace data; assert exact preserved values and warning counts independently. |
+| Fallback collector recursed under an already readOnly parent | Regression / low | The first refactor collected redundant child metadata, changing an existing collector contract. | Stop fallback collection below wholly stripped readOnly parents, retaining the old contract without losing deep writable-parent coverage. Existing regression suite stays unchanged and GREEN. |
+
+The follow-up's guarded run passed 67 HTTP tests and 228 live assertions per
+backend on PostgreSQL 17.8 (22 migrations) and InMemory. The exact container
+was removed and both runtime PIDs stopped. The two changed production files
+were self-reviewed against cached/fallback metadata contracts and the new
+object/array/literal-key cases; no open finding remains.
+
+Follow-up reconciliation used all visible turns and retained RED/GREEN,
+compile, lint, safety, and backend artifacts. The skipped first HTTP selector
+is expressly excluded as evidence. Full parent-transcript reconciliation
+remains with the integration session because its transcript path is not
+available here. The existing Mermaid 0.0.0 discovery warning recurred and was
+not “fixed” by an invalid dependency repin.
+
 Applied: declaration structure checks stay inside the existing profile pipeline;
 scalar formats stay pure and shared by SchemaValidator. No second payload
 validation engine, repository abstraction, or new profile policy is introduced.

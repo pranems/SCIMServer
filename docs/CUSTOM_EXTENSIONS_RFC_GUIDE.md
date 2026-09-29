@@ -6,6 +6,10 @@
 > adds declaration/type/cardinality checks, required extension enforcement,
 > readonly POST/PUT ignoring, and immutable PUT preservation. `global`
 > uniqueness is rejected as an unsupported provider promise.
+> This rejection is an intentional capability policy, not an RFC requirement.
+> [The follow-up matrix](SCIM_P7_CHARACTERISTIC_STATUS.md) explains existing
+> profile edits, supported nested readOnly stripping, and actual uniqueness
+> gaps separately from optional referential-integrity behavior.
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026

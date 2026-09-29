@@ -5,6 +5,11 @@
 > **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.
 > They are not yet merged or deployed. Omitted RFC defaults remain supported.
+> The [recursive readOnly follow-up and capability matrix](SCIM_P7_CHARACTERISTIC_STATUS.md)
+> covers nested-complex compatibility mode without changing its flag/default.
+> `global` remains a valid RFC keyword; rejection here is a provider policy.
+> Editing any profile subblock revalidates the full stored profile, including
+> old global declarations.
 
 > **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types

@@ -138,7 +138,7 @@ async function main() {
     save();
     assert.equal(exit, 0, `${backend} HTTP tests failed`);
     assert.equal(result.numFailedTests, 0);
-    assert.ok(result.numPassedTests >= (IS_P7 ? 55 : 24), "Missing permanent package cases");
+    assert.ok(result.numPassedTests >= (IS_P7 ? 67 : 24), "Missing permanent package cases");
     lane.live = await smoke(backend);
     save();
   }

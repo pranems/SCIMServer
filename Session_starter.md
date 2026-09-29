@@ -40,12 +40,14 @@ materializes candidates; green correctness tests do not prove unchanged cost.
 | Date | Summary |
 | --- | --- |
 | 2026-09-29 | P4 integration proved its deferred raw-error issue was not closed by P5's scalar normalization. A separate mapped-server-error boundary correction now masks private detail while preserving status, diagnostics and logged cause; two unit/two HTTP REDs turned GREEN. This was the error-boundary checkpoint; completed P4 integration is recorded above. |
+| 2026-09-28 | P7 recursive readOnly follow-up closes POST/PUT stripping through supported nested-complex compatibility objects/arrays. Focused units: 1,517; per backend HTTP: 67; live: 228; PostgreSQL 17.8 with 22 migrations and InMemory. [Characteristic status](docs/SCIM_P7_CHARACTERISTIC_STATUS.md) separates optional behavior, global capability policy and exact P3b uniqueness gaps. P7 remains open for final P2 integration. |
 | 2026-09-28 | P7a declaration, scalar/cardinality and POST/PUT correctness implemented on `fix/scim-profile-validation-20260928`, based on P1 `3ecaba55`. Focused units: 1,507. Owned PostgreSQL/InMemory HTTP and local-live evidence, boundaries and remaining PATCH integration are in [P7a](docs/SCIM_P7A_PROFILE_VALIDATION.md). No versions, locks, push or deployment changed. |
 | 2026-09-28 | P1 typed PATCH paths implemented in isolated `fix/scim-correctness-p1-20260928`; focused 1,476 unit and 65 HTTP tests pass, plus owned PostgreSQL/InMemory and local-live proof. See [P1 implementation](docs/SCIM_P1_IMPLEMENTATION.md). No merge/deploy; central release metadata remains pending. |
 
 - [x] ✅ COMPLETED: P1 native Boolean selector and malformed-path repair, with permanent regression tests.
 - [x] ✅ COMPLETED: P7a bounded declaration/scalar/POST/PUT implementation and owned runtime proof; P7 as a whole remains open.
-- [ ] P7b: integrate ordered PATCH after P2 and resolve remaining supported uniqueness/reference/deep-compatibility promises.
+- [x] ✅ COMPLETED: Recursive POST/PUT readOnly stripping in the existing nested-complex compatibility mode, with cached/fallback and both-backend proof.
+- [ ] P7b: final P2 integration and concrete remaining characteristic promises; P3b owns identified server-uniqueness enforcement gaps. External referential integrity/raw token reconstruction are not speculative feature requirements.
 - [ ] P2: operation transitions, append/all-match behavior, primary/required/immutable policies.
 - [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.
 

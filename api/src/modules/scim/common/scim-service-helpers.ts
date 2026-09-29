@@ -606,8 +606,8 @@ export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
  * readWrite and is never stripped. `schemas` is a reserved structural key and is
  * also never stripped.
  *
- * Sub-attribute stripping (e.g. manager.displayName inside readWrite parent) is
- * deferred to Phase 2.
+ * Parent paths also cover the existing nested-complex compatibility mode.
+ * Each declared segment is resolved against real objects, never a dotted key.
  *
  * @param payload           - The request body (mutated in place)
  * @param schemaDefinitions - Core + extension schema definitions
@@ -623,105 +623,40 @@ export function stripReadOnlyAttributes(
   const { core, extensions, coreSubAttrs, extensionSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
 
-  // Strip core readOnly attributes (case-insensitive)
-  for (const key of Object.keys(payload)) {
-    // Never strip 'schemas' - it's structural, not a user attribute
-    if (key.toLowerCase() === 'schemas') continue;
-
-    if (core.has(key.toLowerCase())) {
-      delete payload[key];
-      stripped.push(key);
+  const stripAt = (value: unknown, segments: string[], index: number, names: Set<string>, path: string): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) stripAt(item, segments, index, names, `${path}[]`);
+      return;
     }
-  }
-
-  // R-MUT-2: Strip readOnly sub-attributes within readWrite core parents
-  for (const [parentLower, subSet] of coreSubAttrs) {
-    const parentKey = Object.keys(payload).find(k => k.toLowerCase() === parentLower);
-    if (!parentKey) continue;
-
-    const parentVal = payload[parentKey];
-    if (parentVal === null || parentVal === undefined) continue;
-
-    // Handle single complex object
-    if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
-      const obj = parentVal as Record<string, unknown>;
-      for (const subKey of Object.keys(obj)) {
-        if (subSet.has(subKey.toLowerCase())) {
-          delete obj[subKey];
-          stripped.push(`${parentKey}.${subKey}`);
-        }
+    if (!value || typeof value !== 'object') return;
+    const obj = value as Record<string, unknown>;
+    if (index < segments.length) {
+      const key = Object.keys(obj).find(k => k.toLowerCase() === segments[index]);
+      if (key !== undefined) stripAt(obj[key], segments, index + 1, names, path ? `${path}.${key}` : key);
+      return;
+    }
+    for (const key of Object.keys(obj)) {
+      if (!path && key.toLowerCase() === 'schemas') continue;
+      if (names.has(key.toLowerCase())) {
+        delete obj[key];
+        stripped.push(path ? `${path}.${key}` : key);
       }
     }
-    // Handle multi-valued (array of complex objects)
-    if (Array.isArray(parentVal)) {
-      for (const item of parentVal) {
-        if (typeof item === 'object' && item !== null) {
-          const obj = item as Record<string, unknown>;
-          for (const subKey of Object.keys(obj)) {
-            if (subSet.has(subKey.toLowerCase())) {
-              delete obj[subKey];
-              stripped.push(`${parentKey}[].${subKey}`);
-            }
-          }
-        }
-      }
-    }
-  }
+  };
 
-  // Strip readOnly attributes inside extension URN blocks
-  for (const [urn, readOnlySet] of extensions) {
-    // Find the extension block in the payload (case-insensitive URN matching)
+  stripAt(payload, [], 0, core, '');
+  for (const [parent, names] of coreSubAttrs) stripAt(payload, parent.split('.'), 0, names, '');
+
+  for (const urn of new Set([...extensions.keys(), ...extensionSubAttrs.keys()])) {
     const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
     if (!urnKey) continue;
-
     const extObj = payload[urnKey];
     if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
 
-    for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-      if (readOnlySet.has(extKey.toLowerCase())) {
-        delete (extObj as Record<string, unknown>)[extKey];
-        stripped.push(`${urnKey}.${extKey}`);
-      }
-    }
-  }
-
-  // R-MUT-2: Strip readOnly sub-attrs within readWrite extension parents
-  for (const [urn, subMap] of extensionSubAttrs) {
-    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
-    if (!urnKey) continue;
-
-    const extObj = payload[urnKey];
-    if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
-
-    for (const [parentLower, subSet] of subMap) {
-      const parentKey = Object.keys(extObj as Record<string, unknown>).find(k => k.toLowerCase() === parentLower);
-      if (!parentKey) continue;
-
-      const parentVal = (extObj as Record<string, unknown>)[parentKey];
-      if (parentVal === null || parentVal === undefined) continue;
-
-      if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
-        const obj = parentVal as Record<string, unknown>;
-        for (const subKey of Object.keys(obj)) {
-          if (subSet.has(subKey.toLowerCase())) {
-            delete obj[subKey];
-            stripped.push(`${urnKey}.${parentKey}.${subKey}`);
-          }
-        }
-      }
-      if (Array.isArray(parentVal)) {
-        for (const item of parentVal) {
-          if (typeof item === 'object' && item !== null) {
-            const obj = item as Record<string, unknown>;
-            for (const subKey of Object.keys(obj)) {
-              if (subSet.has(subKey.toLowerCase())) {
-                delete obj[subKey];
-                stripped.push(`${urnKey}.${parentKey}[].${subKey}`);
-              }
-            }
-          }
-        }
-      }
+    const top = extensions.get(urn);
+    if (top) stripAt(extObj, [], 0, top, urnKey);
+    for (const [parent, names] of extensionSubAttrs.get(urn) ?? []) {
+      stripAt(extObj, parent.split('.'), 0, names, urnKey);
     }
   }
 
