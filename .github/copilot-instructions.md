@@ -957,3 +957,11 @@ prove that a same-named custom attribute is restricted to the column's type:
 generic SCIM resources emit rawPayload. Compare and persist the representation
 clients observe, retaining server-owned id semantics, and test numeric/MV
 custom attributes whose names collide with builtin convenience fields.
+
+Before applying that custom-payload rule, classify RFC common attributes.
+RFC 7643 section 3.1 applies to ALL extended resource types and its listed
+characteristics override older schema entries. Top-level externalId remains a
+single case-exact String with client-defined value; permissive current admission
+does not make numeric/MV common externalId valid. A namespaced extension
+externalId is independent. Keep default non-uniqueness and provisioning-domain
+scope distinct from any explicitly declared product uniqueness policy.

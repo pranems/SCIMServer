@@ -22,6 +22,7 @@
 | U14 | Representation completeness / medium | P7 adapter inventory / initial adapter inventory | Builtin Group members discard all additional child fields, not only `$ref`; treating other declared leaves as absent silently ignored a promise. Three RED controls exposed extra child skips and an overbroad builtin-URN suffix check. Require the exact represented Group relation leaves and full builtin URN identity; preserve extension/custom-core member paths. |
 | U15 | Representation authority / high | P7 response-source correction / initial response-contract inventory | Generic response emits rawPayload, not promoted convenience columns. Initial P3b wrongly imposed builtin displayName/active shapes on custom cores and overlaid their valid values with null/Boolean columns. Three unit and seven HTTP RED controls per backend prove the regression. Generic repositories now explicitly compare rawPayload plus authoritative id; generic immutable reconstruction also matches response. |
 | U16 | Compatibility boundary / medium | Parent integration decision / accepted custom-schema inventory | The U15 fix still constrained generic custom externalId by the builtin/common string assumption. Parent confirmed the accepted rawPayload schema contract must be preserved, with query pushdown checked separately by C0/P6. Two unit/seven HTTP RED cases per backend now require numeric/MV externalId preservation and competing ownership; builtin User/Group string constraints remain. |
+| U17 | Standards precedence / high | Parent RFC section 3.1 correction / initial common-attribute analysis | U16's parent-approved compatibility decision was wrong: common externalId is a String with caseExact true across all extended types, and common characteristics override older schema declarations. Restore that policy for declared uniqueness, move arbitrary numeric/MV homonym tests to extension namespace, and leave P7 responsible for admission/general runtime gaps. |
 
 ## Why the fix works
 
@@ -80,6 +81,17 @@ Explicit GETs before and after PUT/PATCH prove public raw values survive
 round trips for both custom names. Build, policy lint 0/0 and independent
 review pass. [Final compatibility receipt](evidence/scim-uniqueness-externalid-20260929.json).
 Query filtering/sorting probes are assigned to C0/P6, not duplicated here.
+**U16's top-level externalId interpretation is superseded by U17**, not a
+current product capability claim. Its evidence remains historical.
+
+U17 confirmed correction: `postgres-0bd156a6ad977c92`, 654 units, PostgreSQL
+170 HTTP and InMemory 168 plus two N/A, all live assertions and 22 migrations.
+Three RED controls prove common type/cardinality and caseExact precedence
+before implementation. Build, policy lint 0/0 and independent review pass.
+[Final common-attribute receipt](evidence/scim-uniqueness-common-20260929.json).
+Prevention: distinguish ordinary custom-core attributes from common attributes
+whose RFC characteristics take precedence, and never elevate permissive
+current admission behavior into proof of standards validity.
 
 The issue list was reconciled against the available execution outputs and
 review reports for this worktree, separating missing-tool/setup/registration

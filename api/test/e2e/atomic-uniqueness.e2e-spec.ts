@@ -44,6 +44,7 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
   async function endpoint(
     customName: Record<string, unknown> = { type: 'string', uniqueness: 'server' },
     customAttributes: Record<string, unknown>[] = [],
+    extensionAttributes: Record<string, unknown>[] = [],
   ) {
     const res = await http('post', '/scim/admin/endpoints', {
       name: `atomic-${randomUUID()}`,
@@ -73,6 +74,7 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
             { name: 'enabled', type: 'boolean' },
             { name: 'instant', type: 'dateTime' },
             { name: 'binary', type: 'binary' },
+            ...extensionAttributes,
           ] },
         ],
         resourceTypes: routes.map((route) => ({
@@ -287,7 +289,7 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
       expect((await http('post', base(ep, route), body(route, { badge: 'shared' }, 'shared'))).status).toBe(201);
     }
   });
-  for (const attribute of ['displayName', 'externalId']) for (const definition of [
+  for (const attribute of ['displayName', 'extensionExternalId']) for (const definition of [
     { type: 'integer', multiValued: false },
     { type: 'string', multiValued: true },
   ]) {
@@ -295,62 +297,85 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
       it(`custom core ${attribute} ${definition.type} MV=${definition.multiValued}: competing ${verb} follows payload, not the column`, async () => {
         const field = { ...definition, uniqueness: 'server' };
         const ep = attribute === 'displayName' ? await endpoint(field)
-          : await endpoint({ type: 'string' }, [{ name: attribute, ...field }]);
+          : await endpoint({ type: 'string' }, [], [{ name: 'externalId', ...field }]);
         const value = definition.multiValued ? ['shared', 'other'] : 42;
-        const valueBody = (value: unknown) => ({ schemas: [DEVICE, EXT], displayName: randomUUID(), [attribute]: value, [EXT]: {} });
+        const valueBody = (value: unknown) => attribute === 'displayName'
+          ? { schemas: [DEVICE, EXT], displayName: value, [EXT]: {} }
+          : { schemas: [DEVICE, EXT], displayName: randomUUID(), [EXT]: { externalId: value } };
+        const readValue = (payload: Record<string, unknown>) => attribute === 'displayName' ? payload.displayName
+          : (payload[EXT] as Record<string, unknown>).externalId;
+        const patchPath = attribute === 'displayName' ? attribute : `${EXT}:externalId`;
         const initial = verb === 'post' ? [] : await Promise.all([0, 1].map((i) =>
           http('post', base(ep, 'Devices'), valueBody(definition.multiValued ? [`initial-${i}`] : i))));
         initial.forEach((r) => expect(r.status).toBe(201));
         for (const r of initial) {
           const read = await http('get', `${base(ep, 'Devices')}/${r.body.id}`);
           expect(read.status).toBe(200);
-          expect(read.body[attribute]).toEqual(r.body[attribute]);
+          expect(readValue(read.body)).toEqual(readValue(r.body));
         }
         const result = await compete('Devices', verb, () => Promise.all([0, 1].map((i) =>
           http(verb, verb === 'post' ? base(ep, 'Devices') : `${base(ep, 'Devices')}/${initial[i].body.id}`,
-            verb === 'patch' ? { schemas: [PATCH], Operations: [{ op: 'replace', path: attribute, value }] }
+            verb === 'patch' ? { schemas: [PATCH], Operations: [{ op: 'replace', path: patchPath, value }] }
               : valueBody(value)))));
         expect(result.map((r) => r.status).sort()).toEqual([verb === 'post' ? 201 : 200, 409]);
         conflict(result.find((r) => r.status === 409)!);
         const winner = result.find((r) => r.status !== 409)!;
-        expect(winner.body[attribute]).toEqual(value);
+        expect(readValue(winner.body)).toEqual(value);
         const read = await http('get', `${base(ep, 'Devices')}/${winner.body.id}`);
         expect(read.status).toBe(200);
-        expect(read.body[attribute]).toEqual(value);
+        expect(readValue(read.body)).toEqual(value);
         const stored = await rows(ep, 'Devices');
-        expect(stored.filter((r) => JSON.stringify((JSON.parse(r.rawPayload) as Record<string, unknown>)[attribute]) === JSON.stringify(value))).toHaveLength(1);
+        expect(stored.filter((r) => JSON.stringify(readValue(JSON.parse(r.rawPayload) as Record<string, unknown>)) === JSON.stringify(value))).toHaveLength(1);
         expect(stored.map((r) => r.version).sort()).toEqual(verb === 'post' ? [1] : [1, 2]);
       });
     }
     it(`custom core ${attribute} ${definition.type} MV=${definition.multiValued}: none permits repeated values`, async () => {
       const field = { ...definition, uniqueness: 'none' };
       const ep = attribute === 'displayName' ? await endpoint(field)
-        : await endpoint({ type: 'string' }, [{ name: attribute, ...field }]);
+        : await endpoint({ type: 'string' }, [], [{ name: 'externalId', ...field }]);
       const value = definition.multiValued ? ['shared'] : 42;
       for (const _owner of [0, 1]) {
-        const res = await http('post', base(ep, 'Devices'), { schemas: [DEVICE, EXT], displayName: randomUUID(), [attribute]: value, [EXT]: {} });
+        const payload = attribute === 'displayName' ? { schemas: [DEVICE, EXT], displayName: value, [EXT]: {} }
+          : { schemas: [DEVICE, EXT], displayName: randomUUID(), [EXT]: { externalId: value } };
+        const res = await http('post', base(ep, 'Devices'), payload);
         expect(res.status).toBe(201);
-        expect(res.body[attribute]).toEqual(value);
+        expect(attribute === 'displayName' ? res.body.displayName : (res.body[EXT] as Record<string, unknown>).externalId).toEqual(value);
       }
     });
   }
-  it.each(['displayName', 'externalId'])('custom immutable numeric %s preserves the public payload during self replacement', async (attribute) => {
+  it.each(['displayName', 'extensionExternalId'])('custom immutable numeric %s preserves the public payload during self replacement', async (attribute) => {
     const field = { type: 'integer', uniqueness: 'server', mutability: 'immutable' };
     const ep = attribute === 'displayName' ? await endpoint(field)
-      : await endpoint({ type: 'string' }, [{ name: attribute, ...field }]);
-    const original = { schemas: [DEVICE, EXT], displayName: 'unchanged', [attribute]: 42, [EXT]: {} };
+      : await endpoint({ type: 'string' }, [], [{ name: 'externalId', ...field }]);
+    const original = attribute === 'displayName' ? { schemas: [DEVICE, EXT], displayName: 42, [EXT]: {} }
+      : { schemas: [DEVICE, EXT], displayName: 'unchanged', [EXT]: { externalId: 42 } };
+    const readValue = (payload: Record<string, unknown>) => attribute === 'displayName' ? payload.displayName
+      : (payload[EXT] as Record<string, unknown>).externalId;
     const created = await http('post', base(ep, 'Devices'), original);
     expect(created.status).toBe(201);
     const replaced = await http('put', `${base(ep, 'Devices')}/${created.body.id}`, original);
     expect(replaced.status).toBe(200);
-    expect(replaced.body[attribute]).toBe(42);
+    expect(readValue(replaced.body)).toBe(42);
     const read = await http('get', `${base(ep, 'Devices')}/${created.body.id}`);
     expect(read.status).toBe(200);
-    expect(read.body[attribute]).toBe(42);
-    const changed = await http('put', `${base(ep, 'Devices')}/${created.body.id}`, { ...original, [attribute]: 43 });
+    expect(readValue(read.body)).toBe(42);
+    const changed = await http('put', `${base(ep, 'Devices')}/${created.body.id}`,
+      attribute === 'displayName' ? { ...original, displayName: 43 } : { ...original, [EXT]: { externalId: 43 } });
     expect(changed.status).toBe(400);
     expect(changed.body.scimType).toBe('mutability');
     expect((await rows(ep, 'Devices'))[0].version).toBe(2);
+  });
+  it.each(routes)('%s common externalId preserves exact strings and default non-uniqueness', async (route) => {
+    const ep = await endpoint();
+    for (const _owner of [0, 1]) {
+      const created = await http('post', base(ep, route), { ...body(route, {}), externalId: 'Client-Exact-Value' });
+      expect(created.status).toBe(201);
+      expect(created.body.externalId).toBe('Client-Exact-Value');
+      const read = await http('get', `${base(ep, route)}/${created.body.id}`);
+      expect(read.status).toBe(200);
+      expect(read.body.externalId).toBe('Client-Exact-Value');
+    }
+    expect(await rows(ep, route)).toHaveLength(2);
   });
   it.each(['active', 'userName'])('custom core %s is a typed payload value, not a builtin column policy', async (attribute) => {
     const ep = await endpoint({ type: 'string' }, [{ name: attribute, type: 'integer', uniqueness: 'server' }]);

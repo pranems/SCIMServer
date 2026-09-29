@@ -77,7 +77,8 @@ reserves each distinct value, not an ordered array or an entire complex object.
 | Boolean, dateTime, binary | These types have no uniqueness under RFC 7643 sections 2.3.2, 2.3.5 and 2.3.6. `server` declarations are inconsistent and fail closed; ordinary repeated values without the declaration remain accepted. |
 | Multi-valued scalar | Any overlap with another owner's values conflicts. Empty arrays reserve nothing. |
 | Scalar child of complex SV or MV | Walk the declared parent shape and compare each scalar leaf. Works in core or extension schemas. |
-| Custom-core `displayName`, `externalId`, `userName`, `active` | Follow the accepted custom schema and persisted public payload, not the builtin fields' types or convenience columns. Numeric/MV displayName/externalId and numeric active/userName retain their existing custom contract. |
+| Custom-core `displayName`, `userName`, `active` | Follow the accepted custom schema and persisted public payload, not builtin types or convenience columns. Numeric/MV displayName and numeric active/userName retain their custom contract. |
+| Common top-level `externalId` | RFC 7643 section 3.1 applies to every resource type: single string, caseExact true, readWrite, provisioning-client scoped. No server uniqueness is added by default. Namespaced extension externalId is independent and may use supported custom types. |
 | Null or absent | No reservation. Removal/null releases a previous value; unchanged self-values do not conflict. |
 | Inactive / soft-deleted resource | Remains an owner until the stored record or value is removed, preserving existing policy. |
 | Case-aliased keys on a constrained path | Rejected with 400 / invalidValue; JSONB key ordering must not change the meaning of a checked value. |
@@ -102,7 +103,7 @@ whether an operator may relax the Group baseline; P3b does not change it.
 | Uniqueness on boolean, dateTime or binary | Inconsistent with their RFC type definitions, not an invitation to add bespoke equality. Remove the characteristic; repeated values are legitimate. |
 | Core `meta`, `schemas`, builtin User `groups` | Unsupported: these structural, computed or inverse-membership values are not authoritatively owned by this resource writer. |
 | Builtin Group `members` children other than `value`, `type`, `display` | Unsupported: the relation adapter does not store `$ref` or arbitrary additional children. Those three supported leaves must be single-valued strings/references under multi-valued `members`. |
-| Builtin User/Group promoted string fields with incompatible shapes; server `id` | Builtin adapters require compatible string shapes; id is generated from scimId. This restriction does not apply to accepted custom-core displayName/externalId/userName/active or same-named extensions. |
+| Builtin User/Group promoted string fields with incompatible shapes; common `id` and `externalId` | Builtin adapters and common attributes require compatible string shapes; id is generated from scimId. Ordinary custom-core displayName/userName/active and namespaced extension homonyms do not inherit builtin restrictions. |
 | Unknown scalar type | Unsupported. Do not publish a constraint whose equality cannot be evaluated. |
 | Malformed value in a unique field with strict validation off | Rejected with 400 / invalidValue. Disabling general strict validation does not disable a promised uniqueness invariant. |
 
@@ -119,14 +120,25 @@ storage representation, not mutability/returned characteristics, determines
 whether the uniqueness policy can be evaluated. Intrinsic core `id` is read
 from authoritative `scimId`, never from `rawPayload.id`.
 
-**Custom compatibility decision:** this change preserves the accepted generic
-schema-validated rawPayload contract, including numeric/MV custom-core
-`externalId`. It does not reinterpret that custom declaration as the builtin
-User/Group externalId solely because the storage table has a string convenience
-column. This is an existing product compatibility choice, not a claim that the
-RFC common attribute's published definition changed. Consolidation owns query
-filter/sort probes: column pushdown is valid only when its representation
-faithfully matches the resolved schema. The uniqueness package does not alter
+**Common-attribute precedence correction:** an intermediate parent decision
+treated numeric/MV top-level externalId like a freely defined custom attribute.
+That decision is superseded by RFC 7643 section 3.1: common characteristics
+apply to extended resource types and take precedence over older schema entries.
+P3b rejects inconsistent declared-unique externalId shapes and uses exact string
+equality even if older metadata says caseExact false. P7 owns registration and
+general runtime enforcement of the common attribute when no uniqueness policy
+is present. Ordinary repeated externalId strings still succeed.
+
+The common attribute's RFC baseline does not require server uniqueness.
+If a legacy explicit `server` policy reaches this repository, it is evaluated
+as the documented product namespace constraint, not advertised as a global
+or provisioning-client-domain uniqueness guarantee. Admission/normalization of
+such contradictory common declarations is a P7/consolidation decision.
+
+Generic displayName/active and namespaced extension externalId remain
+payload-authoritative; no column-convenience restriction is imposed on them.
+Consolidation owns query filter/sort probes: column pushdown is valid only when
+its representation faithfully matches the resolved schema. P3b does not alter
 query pushdown or claim those separate cross-package gates are complete.
 
 Pre-existing duplicate or malformed unique values are not repaired automatically.
@@ -204,9 +216,9 @@ data analysis and replay evidence, not an unreviewed optimization here.
 
 ## Evidence and reproduction
 
-Final compatibility run: **`postgres-806b7a07a49c9a38`**. [Sanitized durable receipt](evidence/scim-uniqueness-externalid-20260929.json)
+Final standards-corrected run: **`postgres-0bd156a6ad977c92`**. [Sanitized durable receipt](evidence/scim-uniqueness-common-20260929.json)
 records the exact API/scripts hash and cleanup identity. Focused unit:
-**651 passed / 10 suites**. HTTP: **167 PostgreSQL passed**, **165 InMemory
+**654 passed / 10 suites**. HTTP: **170 PostgreSQL passed**, **168 InMemory
 passed plus two N/A** (native foreign key and independent database pools).
 Each backend also runs **21 new uniqueness live assertions**, plus the existing
 33 conditional and 69 Group aggregate live assertions.
@@ -225,10 +237,11 @@ The custom-payload follow-up adds competing POST/PUT/PATCH for numeric/MV
 custom displayName, duplicate-permitting `none` controls, custom active/userName
 values and immutable numeric self-replacement. Changed-source lint is unchanged
 at 0 errors / 26 warnings; independent review reports no significant issue.
-The final externalId compatibility gate extends the same numeric/MV
-POST/PUT/PATCH races and explicit POST-to-GET-to-write-to-GET preservation to
-both custom displayName and externalId. Changed policy lint is 0/0; independent
-review reports no significant issue.
+The final common-attribute gate checks exact common externalId strings and
+default duplicate acceptance on all families. Numeric/MV POST/PUT/PATCH races
+and POST-to-GET-to-write-to-GET preservation apply to custom displayName and
+**extension-namespaced** externalId, not invalid common externalId shapes.
+Changed policy lint is 0/0; independent review reports no significant issue.
 The [initial receipt](evidence/scim-uniqueness-20260928.json) remains preserved
 for audit history rather than rewritten as if it tested the corrected policy.
 
@@ -262,6 +275,9 @@ change belongs to this package.
 
 [RFC 7643 section 2.2](https://www.rfc-editor.org/rfc/rfc7643#section-2.2)
 defines `none`, `server`, `global`, defaults and caseExact.
+[Section 3.1](https://www.rfc-editor.org/rfc/rfc7643#section-3.1) defines
+common attributes on all resource types and their precedence over older schema
+definitions, including externalId's string type and exact-case semantics.
 [Section 2.3](https://www.rfc-editor.org/rfc/rfc7643#section-2.3)
 limits which types have uniqueness and makes references intrinsically case
 exact; those restrictions take precedence over generic characteristic defaults.

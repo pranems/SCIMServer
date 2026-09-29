@@ -33,8 +33,8 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
           const type = attr.type ?? 'string';
           if (!isScalarType(type)) throw new RepositoryError('INVALID_VALUE', 'Unsupported uniqueness declaration type.');
           const root = path[0].name.toLowerCase();
-          const promotedType = root === 'id' ? 'string'
-            : (builtinUser || builtinGroup) && ['displayname', 'externalid'].includes(root) ? 'string'
+          const promotedType = ['id', 'externalid'].includes(root) ? 'string'
+            : (builtinUser || builtinGroup) && root === 'displayname' ? 'string'
               : (builtinUser || builtinGroup) && root === 'active' ? 'boolean'
               : builtinUser && root === 'username' ? 'string' : undefined;
           const computed = root === 'meta' || root === 'schemas' ||
@@ -47,7 +47,10 @@ export function compileUniquenessPolicy(schemas: readonly SchemaDefinition[]): U
               (path.length !== 1 || path[0].multiValued || (attr.type ?? 'string') !== promotedType)))) {
             throw new RepositoryError('INVALID_VALUE', 'Unsupported uniqueness declaration on a computed or incompatible promoted core attribute.');
           }
-          result.push({ schemaUrn: core ? null : schema.id, path, type, caseExact: type === 'reference' || (attr.caseExact ?? false) });
+          result.push({
+            schemaUrn: core ? null : schema.id, path, type,
+            caseExact: type === 'reference' || (core && root === 'externalid') || (attr.caseExact ?? false),
+          });
         }
         if (attr.subAttributes) walk(attr.subAttributes, path);
       }

@@ -130,12 +130,15 @@ references are intrinsically exact. The final adapter follow-up rejects only
 unrepresented builtin Group member leaves, not same-named extensions.
 Generic resources use public rawPayload authority, preserving custom numeric/MV
 displayName and other same-named custom fields instead of imposing builtin types.
-Latest source-package evidence: 648 units, 158 PostgreSQL HTTP and 156 InMemory
-plus two database-only N/A. Earlier 646/147/145 counts remain historical;
-these source counts are not the combined counts above or admission closure.
-The later651/167/165 source checkpoint4ba9373c used an incorrect common
-externalId interpretation. It is retained only with corrective child2d2da4e1,
+Common top-level externalId is a single case-exact String under RFC 7643
+section 3.1 across all resource types; namespaced extension externalId remains
+independent. Numeric/MV custom displayName and extension externalId are covered.
+Latest corrected source evidence:654 units,170 PostgreSQL HTTP and168
+InMemory plus two database-only N/A. Earlier648/158/156 counts remain
+historical; the651/167/165 checkpoint4ba9373c is SUPERSEDED by2d2da4e1,
 not independently accepted. The final corrected pair must pass merged proof.
+C0/P6 own representation-aware filter/sort pushdown validation for those names.
+P7 common runtime is integrated; shared-policy admission remains parent/C0 work.
 
 P4 Group aggregate transactions are locally validated on top of P3 conditional
 writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory

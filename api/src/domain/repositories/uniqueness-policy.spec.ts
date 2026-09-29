@@ -125,18 +125,34 @@ describe('typed uniqueness policy', () => {
   it.each([
     { name: 'displayName', type: 'integer' },
     { name: 'displayName', type: 'string', multiValued: true },
-    { name: 'externalId', type: 'integer' },
-    { name: 'externalId', type: 'string', multiValued: true },
     { name: 'active', type: 'integer' },
   ])('custom core values keep their published payload representation: %j', (attr) => {
     expect(policy(attr, true)).toHaveLength(1);
   });
-  it.each(['User', 'Group'])('builtin %s externalId remains a string-shaped field', (family) => {
+  it.each([
+    'urn:ietf:params:scim:schemas:core:2.0:User',
+    'urn:ietf:params:scim:schemas:core:2.0:Group',
+    'urn:example:Device',
+  ])('common externalId remains a string-shaped field in %s', (id) => {
     expect(() => compileUniquenessPolicy([{
-      id: `urn:ietf:params:scim:schemas:core:2.0:${family}`, isCoreSchema: true, attributes: [
+      id, isCoreSchema: true, attributes: [
         { name: 'externalId', type: 'integer', required: false, multiValued: false, uniqueness: 'server' },
       ],
     }])).toThrow('Unsupported uniqueness declaration');
+  });
+  it('common externalId is single-valued despite older conflicting metadata', () => {
+    expect(() => policy({ name: 'externalId', multiValued: true }, true)).toThrow('Unsupported uniqueness declaration');
+  });
+  it('common externalId is case exact despite older conflicting metadata', () => {
+    const unique = policy({ name: 'externalId', caseExact: false }, true);
+    expect(unique[0].caseExact).toBe(true);
+    expect(() => assertUnique(unique, { externalId: 'ClientValue' }, [{ externalId: 'clientvalue' }])).not.toThrow();
+  });
+  it.each([
+    { name: 'externalId', type: 'integer' },
+    { name: 'externalId', type: 'string', multiValued: true },
+  ])('namespaced extension externalId remains independent %j', (attr) => {
+    expect(policy(attr)).toHaveLength(1);
   });
   it('payload mode preserves custom promoted-name values while server id remains authoritative', () => {
     const payload = uniquenessPayload({

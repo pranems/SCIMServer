@@ -246,6 +246,7 @@ aggregate; read scalar and member state in one turn.
 | 2026-09-29 | P3b adapter follow-up rejects unrepresented builtin Group member leaves while preserving extension/custom-core `members.$ref`. Builtin exclusions require exact RFC URNs. RED three units; GREEN 646 units, PostgreSQL 147 HTTP and InMemory 145 plus two N/A, same live assertions. |
 | 2026-09-29 | P3b custom-payload correction: generic response/rawPayload is authoritative, not convenience columns. Preserve numeric/MV displayName and numeric active/userName; immutable self-PUT agrees with public state. RED three units/seven HTTP per backend; GREEN 648 units, PostgreSQL 158 HTTP, InMemory 156 plus two N/A. |
 | 2026-09-29 | Parent-directed custom externalId compatibility closure preserves accepted numeric/MV schema values too. Explicit POST/GET/PUT/PATCH/GET outcomes and races pass: 651 units, PostgreSQL 167 HTTP, InMemory 165 plus two N/A. C0/P6 own query filtering/sorting pushdown probes, not part of this write guarantee. |
+| 2026-09-29 | Standards correction supersedes the preceding externalId decision: RFC 7643 section 3.1 makes common externalId a single case-exact String on every resource type. Arbitrary numeric/MV tests belong to namespaced extension externalId, not top-level. Final 654 units, PostgreSQL 170 HTTP, InMemory 168 plus two N/A. P7 owns admission/general runtime common-attribute gaps. |
 
 Assistant memory: case-insensitive attribute lookup must reject ambiguous
 aliases before JSONB can reorder keys; schema identity comes from the resolved
