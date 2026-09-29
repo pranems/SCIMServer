@@ -1,0 +1,54 @@
+{
+  "status": "validated",
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "newCasesPerBackend": 5,
+  "newCaseExecutions": 10,
+  "newChecksPerBackend": 57,
+  "newChecksTotal": 114,
+  "setupFailures": 0,
+  "newBackendResults": {
+    "inmemory": {
+      "passed": 4,
+      "behaviorFailed": 1
+    },
+    "prisma": {
+      "passed": 4,
+      "behaviorFailed": 1
+    }
+  },
+  "uniqueCombinedCasesPerBackend": 82,
+  "uniqueCombinedCaseExecutions": 164,
+  "combinedChecks": 771,
+  "originalCasesPerBackend": 77,
+  "original77EvidenceArtifactsByteIdentical": true,
+  "original77CaseBodiesByteIdenticalWithoutRegistration": true,
+  "migrationsReplayed": 22,
+  "exactRemovedContainerId": "e5fb2241d170769d22d0211e5bc77a6bde13f45a15e96c751946ded6a17bf9ea",
+  "liveCalls": 0,
+  "productionChanges": false,
+  "parentReportIndexSessionEdits": false,
+  "commitsCreated": 0,
+  "artifactValidation": {
+    "newJsonArtifactsParsed": 5,
+    "combinedCsvRows": 82,
+    "combinedIdsUnique": true,
+    "credentialAndJwtScan": "passed",
+    "original77ArtifactHashes": "unchanged",
+    "newCjsSyntax": "passed",
+    "allHarnessCjsFilesSyntaxChecked": 9,
+    "existingPrettierCheck": "passed"
+  },
+  "documentation": {
+    "scopedFreshnessAndLinks": "passed",
+    "documents": 2,
+    "newMermaidBlocks": 0,
+    "remainingPermutationLimitsExplicit": true
+  },
+  "cleanup": {
+    "exactContainerIdAbsent": true,
+    "testDatabaseMarkerAbsent": true,
+    "taskDependencyJunctionRemoved": true,
+    "sharedDependencySentinelUnchanged": true,
+    "taskGeneratedPrismaClientRemoved": true
+  }
+}

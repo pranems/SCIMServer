@@ -1,0 +1,45 @@
+{
+  "files": [
+    {
+      "path": "api/src/domain/validation/schema-validator.ts",
+      "physicalLines": 1864
+    },
+    {
+      "path": "api/src/modules/scim/common/scim-service-helpers.ts",
+      "physicalLines": 1787
+    },
+    {
+      "path": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+      "physicalLines": 1355
+    },
+    {
+      "path": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+      "physicalLines": 712
+    },
+    {
+      "path": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+      "physicalLines": 757
+    },
+    {
+      "path": "api/src/domain/patch/user-patch-engine.ts",
+      "physicalLines": 576
+    },
+    {
+      "path": "api/src/domain/patch/group-patch-engine.ts",
+      "physicalLines": 507
+    },
+    {
+      "path": "api/src/domain/patch/generic-patch-engine.ts",
+      "physicalLines": 343
+    },
+    {
+      "path": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "physicalLines": 887
+    },
+    {
+      "path": "api/src/modules/endpoint/services/endpoint.service.ts",
+      "physicalLines": 1126
+    }
+  ],
+  "interpretation": "Physical line count signals concentration, not a standalone defect criterion."
+}

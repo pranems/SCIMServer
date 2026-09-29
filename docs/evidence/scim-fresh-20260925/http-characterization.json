@@ -1,0 +1,130 @@
+{
+  "baseline": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "expectedFailingNormativeChecks": true,
+  "responseContractReview": {
+    "observationId": "H2",
+    "findingId": "F17",
+    "status": "verified-open",
+    "severity": "medium",
+    "confidence": "high",
+    "observedDetailType": "array",
+    "observedDetailItems": 2,
+    "expectedDetailContract": "If present, detail is a scalar human-readable message string, not an array of framework validation messages.",
+    "standards": [
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc7644.txt",
+        "section": "3.12",
+        "basis": "SCIM error responses use the defined attributes; detail is an optional detailed human-readable message."
+      },
+      {
+        "url": "https://www.rfc-editor.org/rfc/rfc7643.txt",
+        "section": "2.2",
+        "basis": "The default SCIM attribute data type is string; the error message definition does not declare detail as a multi-valued list."
+      }
+    ],
+    "source": "api/src/modules/scim/filters/scim-exception.filter.ts:127",
+    "mechanism": "The non-SCIM HttpException wrapper assigns raw.message directly to detail; a Nest validation message array survives unchanged.",
+    "separateFromF09": "Even when a request legitimately fails validation, its error envelope must have the correct detail type. Fixing acceptance of valid .search arrays alone does not cover this error path.",
+    "correctFields": [
+      "status is the string 400",
+      "absence of optional scimType is not itself a violation"
+    ],
+    "evidenceReuse": "Derived from the retained H2 response; no extra HTTP request or new HTTP test."
+  },
+  "observations": [
+    {
+      "id": "H1",
+      "expectedStatus": 200,
+      "input": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+        ],
+        "Operations": [
+          {
+            "op": "replace",
+            "path": "urn:example:extension:2.0:Analysis:contacts[primary eq true].value",
+            "value": "new"
+          }
+        ]
+      },
+      "actualStatus": 400,
+      "response": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": "Schema validation failed: urn:example:extension:2.0:Analysis.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:example:extension:2.0:Analysis'.; urn:example:extension:2.0:Analysis.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:example:extension:2.0:Analysis'.",
+        "scimType": "invalidSyntax",
+        "status": "400",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "requestId": "89e181a2-01af-4276-aec6-e586b38797f8",
+          "endpointId": "8a46f5fe-b5f2-493c-a1a1-e0aa4094872e",
+          "triggeredBy": "StrictSchemaValidation",
+          "errorCode": "VALIDATION_SCHEMA",
+          "logsUrl": "/scim/endpoints/8a46f5fe-b5f2-493c-a1a1-e0aa4094872e/logs/recent?requestId=89e181a2-01af-4276-aec6-e586b38797f8",
+          "operation": "patch",
+          "attributePaths": [
+            "urn:example:extension:2.0:Analysis.contacts[primary eq true]",
+            "urn:example:extension:2.0:Analysis.contacts[primary eq true]"
+          ],
+          "attributePath": "urn:example:extension:2.0:Analysis.contacts[primary eq true]",
+          "activeConfig": {
+            "StrictSchemaValidation": true
+          }
+        }
+      }
+    },
+    {
+      "id": "H2",
+      "expectedStatus": 200,
+      "input": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+        ],
+        "attributes": [
+          "userName"
+        ]
+      },
+      "actualStatus": 400,
+      "response": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": [
+          "attributes parameter is too long (max 2000 characters).",
+          "attributes must be a string"
+        ],
+        "status": "400",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "requestId": "fc183667-81b0-42ed-8f35-297a3e01d720",
+          "endpointId": "8a46f5fe-b5f2-493c-a1a1-e0aa4094872e",
+          "logsUrl": "/scim/endpoints/8a46f5fe-b5f2-493c-a1a1-e0aa4094872e/logs/recent?requestId=fc183667-81b0-42ed-8f35-297a3e01d720"
+        }
+      }
+    },
+    {
+      "id": "H3",
+      "expectedStatus": 200,
+      "input": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+        ],
+        "attributes": [
+          "label"
+        ]
+      },
+      "actualStatus": 500,
+      "response": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": "Internal server error",
+        "status": "500",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "requestId": "219c2224-22cd-45c0-b3cd-550cc5a97731",
+          "endpointId": "8a46f5fe-b5f2-493c-a1a1-e0aa4094872e",
+          "logsUrl": "/scim/endpoints/8a46f5fe-b5f2-493c-a1a1-e0aa4094872e/logs/recent?requestId=219c2224-22cd-45c0-b3cd-550cc5a97731"
+        }
+      }
+    }
+  ]
+}

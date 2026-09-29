@@ -1,0 +1,1338 @@
+{
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "backend": "prisma",
+  "identity": {
+    "container": {
+      "id": "e5fb2241d170769d22d0211e5bc77a6bde13f45a15e96c751946ded6a17bf9ea",
+      "name": "scim-fresh-pg-e1a910bb0ce3cc16",
+      "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+      "run": "e1a910bb0ce3cc16",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "host": "127.0.0.1",
+      "port": 49300,
+      "database": "scim_fresh_e1a910bb0ce3cc16",
+      "mounts": [],
+      "tmpfs": {
+        "/var/lib/postgresql/data": "rw"
+      },
+      "network": "bridge"
+    },
+    "server": {
+      "database": "scim_fresh_e1a910bb0ce3cc16",
+      "username": "fresh_runner",
+      "cluster_name": "scim-fresh-e1a910bb0ce3cc16",
+      "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "server_address": "172.17.0.2/32",
+      "server_port": 5432,
+      "system_identifier": "7690763074934681635"
+    },
+    "http": {
+      "address": {
+        "address": "::",
+        "family": "IPv6",
+        "port": 49448
+      },
+      "health": "ok",
+      "readinessVerified": true
+    }
+  },
+  "plannedCases": [
+    {
+      "id": "ALIAS-BULK-SUCCESS",
+      "title": "Direct and Bulk User mutation produce the same stored values",
+      "mode": "HTTP direct versus Bulk + persisted readback"
+    },
+    {
+      "id": "ALIAS-BULK-ATOMICITY",
+      "title": "Failed embedded PATCH is atomic while another Bulk operation succeeds",
+      "mode": "HTTP direct failure control versus Bulk + persisted state"
+    },
+    {
+      "id": "ALIAS-BULK-DISABLED",
+      "title": "Bulk must not bypass the endpoint's disabled PATCH capability",
+      "mode": "HTTP discovery + direct guard control + Bulk persisted readback"
+    },
+    {
+      "id": "ALIAS-ME-USER",
+      "title": "Synthetic OAuth /Me and direct User routes access and mutate the same user",
+      "mode": "real local OAuth helper + HTTP alias + persisted readback"
+    },
+    {
+      "id": "ALIAS-DISCOVERY-REFLECTION",
+      "title": "Discovery reflects endpoint schema/capability changes and hide/restore setting",
+      "mode": "HTTP admin changes + before/after public discovery + persisted profile"
+    }
+  ],
+  "summary": {
+    "cases": 5,
+    "passed": 4,
+    "behaviorFailed": 1,
+    "setupFailed": 0,
+    "notApplicable": 0,
+    "checksPassed": 54,
+    "checksFailed": 3
+  },
+  "results": [
+    {
+      "id": "ALIAS-BULK-SUCCESS",
+      "title": "Direct and Bulk User mutation produce the same stored values",
+      "mode": "HTTP direct versus Bulk + persisted readback",
+      "backend": "prisma",
+      "checks": [
+        {
+          "claim": "direct mutation positive control",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "Bulk envelope accepted",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "embedded PATCH success",
+          "passed": true,
+          "actual": "200",
+          "expected": "200"
+        },
+        {
+          "claim": "both GETs succeed",
+          "passed": true,
+          "actual": [
+            200,
+            200
+          ],
+          "expected": [
+            200,
+            200
+          ]
+        },
+        {
+          "claim": "both intended values read back",
+          "passed": true,
+          "actual": [
+            "same-result",
+            "same-result"
+          ],
+          "expected": [
+            "same-result",
+            "same-result"
+          ]
+        },
+        {
+          "claim": "both active values read back",
+          "passed": true,
+          "actual": [
+            false,
+            false
+          ],
+          "expected": [
+            false,
+            false
+          ]
+        },
+        {
+          "claim": "alias stored extension equals direct",
+          "passed": true,
+          "actual": {
+            "text": "same-result"
+          },
+          "expected": {
+            "text": "same-result"
+          }
+        },
+        {
+          "claim": "both store the expected value",
+          "passed": true,
+          "actual": [
+            "same-result",
+            "same-result"
+          ],
+          "expected": [
+            "same-result",
+            "same-result"
+          ]
+        },
+        {
+          "claim": "both version increments",
+          "passed": true,
+          "actual": [
+            2,
+            2
+          ],
+          "expected": [
+            2,
+            2
+          ]
+        },
+        {
+          "claim": "Bulk reported version matches GET ETag",
+          "passed": true,
+          "actual": "W/\"v2\"",
+          "expected": "W/\"v2\""
+        }
+      ],
+      "observations": {
+        "directWrite": {
+          "status": 200,
+          "etag": "W/\"v2\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "same-result"
+            },
+            "id": "337f84d1-7db4-410e-ab9e-3ca5b2172c91",
+            "userName": "synthetic-2",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.011Z",
+              "lastModified": "2026-09-29T01:29:50.053Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/4624076c-b890-4bc5-ba61-a4ec5b5858d6/Users/337f84d1-7db4-410e-ab9e-3ca5b2172c91",
+              "version": "W/\"v2\""
+            }
+          }
+        },
+        "bulkWrite": {
+          "status": 200,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+            ],
+            "Operations": [
+              {
+                "method": "PATCH",
+                "version": "W/\"v2\"",
+                "location": "http://127.0.0.1:49448/scim/v2/endpoints/4624076c-b890-4bc5-ba61-a4ec5b5858d6/Users/fd067e43-0ef0-4da0-bd2f-a62b9859508d",
+                "status": "200"
+              }
+            ]
+          }
+        },
+        "directRead": {
+          "status": 200,
+          "etag": "W/\"v2\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "same-result"
+            },
+            "id": "337f84d1-7db4-410e-ab9e-3ca5b2172c91",
+            "userName": "synthetic-2",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.011Z",
+              "lastModified": "2026-09-29T01:29:50.053Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/4624076c-b890-4bc5-ba61-a4ec5b5858d6/Users/337f84d1-7db4-410e-ab9e-3ca5b2172c91",
+              "version": "W/\"v2\""
+            }
+          }
+        },
+        "aliasRead": {
+          "status": 200,
+          "etag": "W/\"v2\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "same-result"
+            },
+            "id": "fd067e43-0ef0-4da0-bd2f-a62b9859508d",
+            "userName": "synthetic-3",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.029Z",
+              "lastModified": "2026-09-29T01:29:50.068Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/4624076c-b890-4bc5-ba61-a4ec5b5858d6/Users/fd067e43-0ef0-4da0-bd2f-a62b9859508d",
+              "version": "W/\"v2\""
+            }
+          }
+        },
+        "directStored": {
+          "id": "fd4e4d8e-825a-4eb0-891a-eef7dd19b0d4",
+          "scimId": "337f84d1-7db4-410e-ab9e-3ca5b2172c91",
+          "version": 2,
+          "payload": {
+            "urn:example:extension:2.0:Matrix": {
+              "text": "same-result"
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-2",
+          "active": false,
+          "databaseReadConfirmed": true
+        },
+        "aliasStored": {
+          "id": "5ecffb67-df43-4cef-a9b8-661cf98377d8",
+          "scimId": "fd067e43-0ef0-4da0-bd2f-a62b9859508d",
+          "version": 2,
+          "payload": {
+            "urn:example:extension:2.0:Matrix": {
+              "text": "same-result"
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-3",
+          "active": false,
+          "databaseReadConfirmed": true
+        }
+      },
+      "status": "passed"
+    },
+    {
+      "id": "ALIAS-BULK-ATOMICITY",
+      "title": "Failed embedded PATCH is atomic while another Bulk operation succeeds",
+      "mode": "HTTP direct failure control versus Bulk + persisted state",
+      "backend": "prisma",
+      "checks": [
+        {
+          "claim": "direct error control",
+          "passed": true,
+          "actual": [
+            400,
+            "noTarget"
+          ],
+          "expected": [
+            400,
+            "noTarget"
+          ]
+        },
+        {
+          "claim": "direct failed PATCH rolled back",
+          "passed": true,
+          "actual": {
+            "text": "before",
+            "items": [
+              {
+                "type": "home",
+                "value": "unchanged"
+              }
+            ]
+          },
+          "expected": {
+            "text": "before",
+            "items": [
+              {
+                "type": "home",
+                "value": "unchanged"
+              }
+            ]
+          }
+        },
+        {
+          "claim": "Bulk remains a successful envelope",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "individual error and success statuses",
+          "passed": true,
+          "actual": [
+            "400",
+            "200"
+          ],
+          "expected": [
+            "400",
+            "200"
+          ]
+        },
+        {
+          "claim": "embedded PATCH error retained",
+          "passed": true,
+          "actual": "noTarget",
+          "expected": "noTarget"
+        },
+        {
+          "claim": "failed target payload rolled back",
+          "passed": true,
+          "actual": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before",
+              "items": [
+                {
+                  "type": "home",
+                  "value": "unchanged"
+                }
+              ]
+            }
+          },
+          "expected": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before",
+              "items": [
+                {
+                  "type": "home",
+                  "value": "unchanged"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "claim": "failed target version unchanged",
+          "passed": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "claim": "failed target GET ETag unchanged",
+          "passed": true,
+          "actual": "W/\"v1\"",
+          "expected": "W/\"v1\""
+        },
+        {
+          "claim": "subsequent independent operation commits",
+          "passed": true,
+          "actual": "other-committed",
+          "expected": "other-committed"
+        },
+        {
+          "claim": "subsequent operation increments its own version",
+          "passed": true,
+          "actual": 2,
+          "expected": 2
+        }
+      ],
+      "observations": {
+        "directFailureControl": {
+          "status": 400,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:api:messages:2.0:Error"
+            ],
+            "detail": "Filter type eq \"missing\" did not match any value in extension urn:example:extension:2.0:Matrix:items.",
+            "scimType": "noTarget",
+            "status": "400",
+            "urn:scimserver:api:messages:2.0:Diagnostics": {
+              "requestId": "f02b9938-4335-41fe-9808-baf7fe36adf2",
+              "endpointId": "6c0c72ac-066c-48ce-b33f-5f14d9938875",
+              "triggeredBy": "PatchEngine",
+              "errorCode": "VALIDATION_PATCH",
+              "logsUrl": "/scim/endpoints/6c0c72ac-066c-48ce-b33f-5f14d9938875/logs/recent?requestId=f02b9938-4335-41fe-9808-baf7fe36adf2",
+              "operation": "patch",
+              "failedOperationIndex": 1,
+              "failedPath": "urn:example:extension:2.0:Matrix:items[type eq \"missing\"].value",
+              "failedOp": "replace"
+            }
+          }
+        },
+        "bulk": {
+          "status": 200,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+            ],
+            "Operations": [
+              {
+                "method": "PATCH",
+                "status": "400",
+                "response": {
+                  "schemas": [
+                    "urn:ietf:params:scim:api:messages:2.0:Error"
+                  ],
+                  "scimType": "noTarget",
+                  "detail": "Filter type eq \"missing\" did not match any value in extension urn:example:extension:2.0:Matrix:items.",
+                  "status": "400"
+                }
+              },
+              {
+                "method": "PATCH",
+                "version": "W/\"v2\"",
+                "location": "http://127.0.0.1:49448/scim/v2/endpoints/6c0c72ac-066c-48ce-b33f-5f14d9938875/Users/92a7d39c-5d5c-413e-926e-7577acd4ae44",
+                "status": "200"
+              }
+            ]
+          }
+        },
+        "targetBefore": {
+          "id": "862e6a1c-ab2b-40e9-9d6d-9f3f849ab6ef",
+          "scimId": "7a8e8b34-6539-4ff3-b053-d75ef59c85a9",
+          "version": 1,
+          "payload": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before",
+              "items": [
+                {
+                  "type": "home",
+                  "value": "unchanged"
+                }
+              ]
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-6",
+          "active": true,
+          "databaseReadConfirmed": true
+        },
+        "targetAfter": {
+          "id": "862e6a1c-ab2b-40e9-9d6d-9f3f849ab6ef",
+          "scimId": "7a8e8b34-6539-4ff3-b053-d75ef59c85a9",
+          "version": 1,
+          "payload": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before",
+              "items": [
+                {
+                  "type": "home",
+                  "value": "unchanged"
+                }
+              ]
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-6",
+          "active": true,
+          "databaseReadConfirmed": true
+        },
+        "otherAfter": {
+          "id": "6b5a0535-e41e-4a65-8fd0-a1e1de86a8c3",
+          "scimId": "92a7d39c-5d5c-413e-926e-7577acd4ae44",
+          "version": 2,
+          "payload": {
+            "urn:example:extension:2.0:Matrix": {
+              "text": "other-committed"
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-7",
+          "active": true,
+          "databaseReadConfirmed": true
+        },
+        "targetGet": {
+          "status": 200,
+          "etag": "W/\"v1\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before",
+              "items": [
+                {
+                  "type": "home",
+                  "value": "unchanged"
+                }
+              ]
+            },
+            "id": "7a8e8b34-6539-4ff3-b053-d75ef59c85a9",
+            "userName": "synthetic-6",
+            "active": true,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.160Z",
+              "lastModified": "2026-09-29T01:29:50.160Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/6c0c72ac-066c-48ce-b33f-5f14d9938875/Users/7a8e8b34-6539-4ff3-b053-d75ef59c85a9",
+              "version": "W/\"v1\""
+            }
+          }
+        }
+      },
+      "status": "passed"
+    },
+    {
+      "id": "ALIAS-BULK-DISABLED",
+      "title": "Bulk must not bypass the endpoint's disabled PATCH capability",
+      "mode": "HTTP discovery + direct guard control + Bulk persisted readback",
+      "backend": "prisma",
+      "checks": [
+        {
+          "claim": "discovery advertises PATCH disabled",
+          "passed": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "claim": "discovery advertises Bulk enabled",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "claim": "direct PATCH guard control rejects",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "claim": "direct target remains unchanged",
+          "passed": true,
+          "actual": "before",
+          "expected": "before"
+        },
+        {
+          "claim": "Bulk envelope is available",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "embedded disabled PATCH rejected",
+          "passed": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "claim": "alias target remains unchanged",
+          "passed": false,
+          "actual": "blocked",
+          "expected": "before"
+        },
+        {
+          "claim": "alias target version remains unchanged",
+          "passed": false,
+          "actual": 2,
+          "expected": 1
+        }
+      ],
+      "observations": {
+        "discovery": {
+          "status": 200,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"
+            ],
+            "documentationUri": "https://github.com/pranems/SCIMServer",
+            "patch": {
+              "supported": false
+            },
+            "bulk": {
+              "supported": true,
+              "maxOperations": 30,
+              "maxPayloadSize": 1000000
+            },
+            "filter": {
+              "supported": true,
+              "maxResults": 50
+            },
+            "changePassword": {
+              "supported": false
+            },
+            "sort": {
+              "supported": true
+            },
+            "etag": {
+              "supported": true
+            },
+            "authenticationSchemes": [
+              {
+                "type": "oauthbearertoken",
+                "name": "OAuth Bearer Token",
+                "description": "Authentication scheme using the OAuth Bearer Token Standard",
+                "specUri": "https://www.rfc-editor.org/info/rfc6750",
+                "documentationUri": "https://github.com/pranems/SCIMServer#authentication",
+                "primary": true
+              }
+            ],
+            "meta": {
+              "resourceType": "ServiceProviderConfig",
+              "location": "/ServiceProviderConfig"
+            }
+          }
+        },
+        "directGuardControl": {
+          "status": 501,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:api:messages:2.0:Error"
+            ],
+            "detail": "PATCH is not supported by this endpoint (serviceProviderConfig.patch.supported = false).",
+            "scimType": "notImplemented",
+            "status": "501",
+            "urn:scimserver:api:messages:2.0:Diagnostics": {
+              "requestId": "d40171d3-7594-4b2a-ab39-611d18d5bb8e",
+              "endpointId": "db735341-c4d8-47b5-a0cf-b5201d900280",
+              "triggeredBy": "patch.supported",
+              "errorCode": "CAPABILITY_NOT_SUPPORTED",
+              "logsUrl": "/scim/endpoints/db735341-c4d8-47b5-a0cf-b5201d900280/logs/recent?requestId=d40171d3-7594-4b2a-ab39-611d18d5bb8e"
+            }
+          }
+        },
+        "bulk": {
+          "status": 200,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+            ],
+            "Operations": [
+              {
+                "method": "PATCH",
+                "version": "W/\"v2\"",
+                "location": "http://127.0.0.1:49448/scim/v2/endpoints/db735341-c4d8-47b5-a0cf-b5201d900280/Users/1fa4b7a7-9bd7-4881-8948-e6ca7df09ea6",
+                "status": "200"
+              }
+            ]
+          }
+        },
+        "directStored": {
+          "id": "e27f95a0-20ad-4a7b-815a-e188b5a785cf",
+          "scimId": "0d68c660-8291-482c-a6df-f74b5681b2a1",
+          "version": 1,
+          "payload": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before"
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-9",
+          "active": true,
+          "databaseReadConfirmed": true
+        },
+        "aliasStored": {
+          "id": "0abf6087-dfa9-4336-8aef-16a70228d021",
+          "scimId": "1fa4b7a7-9bd7-4881-8948-e6ca7df09ea6",
+          "version": 2,
+          "payload": {
+            "urn:example:extension:2.0:Matrix": {
+              "text": "blocked"
+            }
+          },
+          "displayName": null,
+          "userName": "synthetic-10",
+          "active": true,
+          "databaseReadConfirmed": true
+        }
+      },
+      "status": "behavior-failed"
+    },
+    {
+      "id": "ALIAS-ME-USER",
+      "title": "Synthetic OAuth /Me and direct User routes access and mutate the same user",
+      "mode": "real local OAuth helper + HTTP alias + persisted readback",
+      "backend": "prisma",
+      "checks": [
+        {
+          "claim": "OAuth direct-read positive control",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "OAuth direct-read matches created User",
+          "passed": true,
+          "actual": "d32f3d08-b1a9-4bec-a232-716cace76572",
+          "expected": "d32f3d08-b1a9-4bec-a232-716cace76572"
+        },
+        {
+          "claim": "Me resolves same User",
+          "passed": true,
+          "actual": [
+            200,
+            "d32f3d08-b1a9-4bec-a232-716cace76572"
+          ],
+          "expected": [
+            200,
+            "d32f3d08-b1a9-4bec-a232-716cace76572"
+          ]
+        },
+        {
+          "claim": "shared secret does not invent a Me identity",
+          "passed": true,
+          "actual": 404,
+          "expected": 404
+        },
+        {
+          "claim": "direct OAuth mutation control",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "Me sees direct mutation",
+          "passed": true,
+          "actual": [
+            "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "direct",
+            false
+          ],
+          "expected": [
+            "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "direct",
+            false
+          ]
+        },
+        {
+          "claim": "Me mutation succeeds",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "direct and Me final GETs succeed",
+          "passed": true,
+          "actual": [
+            200,
+            200
+          ],
+          "expected": [
+            200,
+            200
+          ]
+        },
+        {
+          "claim": "direct sees Me mutation",
+          "passed": true,
+          "actual": "via-me",
+          "expected": "via-me"
+        },
+        {
+          "claim": "Me sees its mutation",
+          "passed": true,
+          "actual": "via-me",
+          "expected": "via-me"
+        },
+        {
+          "claim": "Me version equals direct User ETag",
+          "passed": true,
+          "actual": "W/\"v3\"",
+          "expected": "W/\"v3\""
+        },
+        {
+          "claim": "same stored User has final value",
+          "passed": true,
+          "actual": [
+            "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "via-me",
+            false
+          ],
+          "expected": [
+            "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "via-me",
+            false
+          ]
+        },
+        {
+          "claim": "two mutations increment same User version",
+          "passed": true,
+          "actual": 3,
+          "expected": 3
+        }
+      ],
+      "observations": {
+        "syntheticAuth": {
+          "subject": "e2e-client",
+          "helper": "getAuthToken/createTestApp",
+          "tokenPersistedInEvidence": false,
+          "helperTraceRedacted": true
+        },
+        "directInitial": {
+          "status": 200,
+          "etag": "W/\"v1\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": true,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.389Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v1\""
+            }
+          }
+        },
+        "meInitial": {
+          "status": 200,
+          "etag": "W/\"v1\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "before"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": true,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.389Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v1\""
+            }
+          }
+        },
+        "legacyMe": {
+          "status": 404,
+          "etag": null,
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:api:messages:2.0:Error"
+            ],
+            "detail": "The /Me endpoint requires OAuth authentication with a JWT token whose \"sub\" claim matches a SCIM User's userName.",
+            "scimType": "noTarget",
+            "status": "404",
+            "urn:scimserver:api:messages:2.0:Diagnostics": {
+              "requestId": "cfd2127b-330a-4779-a8b9-2baf71831e69",
+              "endpointId": "ff439f4a-6588-455b-bc89-f4dbc7e99daf",
+              "errorCode": "RESOURCE_NOT_FOUND",
+              "logsUrl": "/scim/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/logs/recent?requestId=cfd2127b-330a-4779-a8b9-2baf71831e69"
+            }
+          }
+        },
+        "directWrite": {
+          "status": 200,
+          "etag": "W/\"v2\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "direct"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.454Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v2\""
+            }
+          }
+        },
+        "meAfterDirect": {
+          "status": 200,
+          "etag": "W/\"v2\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "direct"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.454Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v2\""
+            }
+          }
+        },
+        "meWrite": {
+          "status": 200,
+          "etag": "W/\"v3\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "via-me"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.480Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v3\""
+            }
+          }
+        },
+        "directFinal": {
+          "status": 200,
+          "etag": "W/\"v3\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "via-me"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.480Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v3\""
+            }
+          }
+        },
+        "meFinal": {
+          "status": 200,
+          "etag": "W/\"v3\"",
+          "body": {
+            "schemas": [
+              "urn:ietf:params:scim:schemas:core:2.0:User",
+              "urn:example:extension:2.0:Matrix"
+            ],
+            "urn:example:extension:2.0:Matrix": {
+              "text": "via-me"
+            },
+            "id": "d32f3d08-b1a9-4bec-a232-716cace76572",
+            "userName": "e2e-client",
+            "active": false,
+            "meta": {
+              "resourceType": "User",
+              "created": "2026-09-29T01:29:50.389Z",
+              "lastModified": "2026-09-29T01:29:50.480Z",
+              "location": "http://127.0.0.1:49448/scim/v2/endpoints/ff439f4a-6588-455b-bc89-f4dbc7e99daf/Users/d32f3d08-b1a9-4bec-a232-716cace76572",
+              "version": "W/\"v3\""
+            }
+          }
+        },
+        "stored": {
+          "id": "ddeaa089-b396-4367-a8fa-fad798afea6c",
+          "scimId": "d32f3d08-b1a9-4bec-a232-716cace76572",
+          "version": 3,
+          "payload": {
+            "urn:example:extension:2.0:Matrix": {
+              "text": "via-me"
+            }
+          },
+          "displayName": null,
+          "userName": "e2e-client",
+          "active": false,
+          "databaseReadConfirmed": true
+        }
+      },
+      "status": "passed"
+    },
+    {
+      "id": "ALIAS-DISCOVERY-REFLECTION",
+      "title": "Discovery reflects endpoint schema/capability changes and hide/restore setting",
+      "mode": "HTTP admin changes + before/after public discovery + persisted profile",
+      "backend": "prisma",
+      "checks": [
+        {
+          "claim": "initial discovery positive control",
+          "passed": true,
+          "actual": [
+            200,
+            200,
+            200
+          ],
+          "expected": [
+            200,
+            200,
+            200
+          ]
+        },
+        {
+          "claim": "new attribute initially absent",
+          "passed": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "claim": "initial PATCH capability",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "claim": "profile change accepted",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "new attribute discovered",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "claim": "new schema discovered",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "claim": "new ResourceType discovered",
+          "passed": true,
+          "actual": "/AliasProbes",
+          "expected": "/AliasProbes"
+        },
+        {
+          "claim": "new PATCH capability reflected",
+          "passed": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "claim": "changed setting reflected in admin profile",
+          "passed": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "claim": "changed profile persisted",
+          "passed": true,
+          "actual": [
+            false,
+            false,
+            true
+          ],
+          "expected": [
+            false,
+            false,
+            true
+          ]
+        },
+        {
+          "claim": "new route operational positive control",
+          "passed": true,
+          "actual": 201,
+          "expected": 201
+        },
+        {
+          "claim": "new route retains value",
+          "passed": true,
+          "actual": "synthetic-discovery",
+          "expected": "synthetic-discovery"
+        },
+        {
+          "claim": "discovery hide/restore updates accepted",
+          "passed": true,
+          "actual": [
+            200,
+            200
+          ],
+          "expected": [
+            200,
+            200
+          ]
+        },
+        {
+          "claim": "all endpoint discovery routes hidden",
+          "passed": true,
+          "actual": [
+            404,
+            404,
+            404
+          ],
+          "expected": [
+            404,
+            404,
+            404
+          ]
+        },
+        {
+          "claim": "discovery restored",
+          "passed": true,
+          "actual": 200,
+          "expected": 200
+        },
+        {
+          "claim": "schema change retained after restore",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        }
+      ],
+      "observations": {
+        "before": {
+          "statuses": [
+            200,
+            200,
+            200
+          ],
+          "extensionAttributes": [
+            "text",
+            "requiredText",
+            "immutableSerial",
+            "caseToken",
+            "hidden",
+            "onRequest",
+            "items",
+            "singlestring",
+            "multistring",
+            "singleboolean",
+            "multiboolean",
+            "singleinteger",
+            "multiinteger",
+            "singledecimal",
+            "multidecimal",
+            "singledateTime",
+            "multidateTime",
+            "singlebinary",
+            "multibinary",
+            "singlereference",
+            "multireference",
+            "singlecomplex",
+            "multicomplex"
+          ],
+          "resourceTypes": [
+            {
+              "name": "User",
+              "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+              "endpoint": "/Users"
+            },
+            {
+              "name": "Group",
+              "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+              "endpoint": "/Groups"
+            },
+            {
+              "name": "Device",
+              "schema": "urn:example:custom:Device",
+              "endpoint": "/Devices"
+            }
+          ],
+          "patchSupported": true,
+          "strictSchemaValidation": true
+        },
+        "after": {
+          "statuses": [
+            200,
+            200,
+            200,
+            200,
+            200
+          ],
+          "extensionAttributes": [
+            "text",
+            "requiredText",
+            "immutableSerial",
+            "caseToken",
+            "hidden",
+            "onRequest",
+            "items",
+            "singlestring",
+            "multistring",
+            "singleboolean",
+            "multiboolean",
+            "singleinteger",
+            "multiinteger",
+            "singledecimal",
+            "multidecimal",
+            "singledateTime",
+            "multidateTime",
+            "singlebinary",
+            "multibinary",
+            "singlereference",
+            "multireference",
+            "singlecomplex",
+            "multicomplex",
+            "discoveryAdded"
+          ],
+          "resourceTypes": [
+            {
+              "name": "User",
+              "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+              "endpoint": "/Users"
+            },
+            {
+              "name": "Group",
+              "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+              "endpoint": "/Groups"
+            },
+            {
+              "name": "Device",
+              "schema": "urn:example:custom:Device",
+              "endpoint": "/Devices"
+            },
+            {
+              "name": "AliasProbe",
+              "schema": "urn:example:custom:AliasProbe",
+              "endpoint": "/AliasProbes"
+            }
+          ],
+          "patchSupported": false,
+          "strictSchemaValidation": false,
+          "storedProfile": {
+            "source": "PostgreSQL Endpoint.profile",
+            "strictSchemaValidation": false,
+            "patchSupported": false,
+            "newSchemaPresent": true
+          },
+          "createdCustomResource": {
+            "status": 201,
+            "etag": "W/\"v1\"",
+            "body": {
+              "schemas": [
+                "urn:example:custom:AliasProbe"
+              ],
+              "id": "add05145-c235-4d1a-b8d5-76a79f69d388",
+              "label": "synthetic-discovery",
+              "meta": {
+                "resourceType": "AliasProbe",
+                "created": "2026-09-29T01:29:50.592Z",
+                "lastModified": "2026-09-29T01:29:50.592Z",
+                "location": "http://127.0.0.1:49448/scim/v2/endpoints/b9ae3ff1-2a6e-4ad8-a91e-39f33554e52b/AliasProbes/add05145-c235-4d1a-b8d5-76a79f69d388",
+                "version": "W/\"v1\""
+              }
+            }
+          }
+        },
+        "hideRestore": {
+          "updateStatuses": [
+            200,
+            200
+          ],
+          "hiddenStatuses": [
+            404,
+            404,
+            404
+          ],
+          "restoredStatus": 200
+        }
+      },
+      "status": "passed"
+    }
+  ],
+  "method": "Existing Nest E2E bootstrap, real HTTP, real repositories; Prisma rows additionally compared with actual JSONB. Seams/faults explicitly labeled."
+}

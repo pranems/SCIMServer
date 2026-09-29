@@ -1,0 +1,416 @@
+# SCIM correctness: design, implementation, and progress
+
+> **Status:** Implementation authorized; work packages are tracked below
+>
+> **Last verified:** 2026-09-28
+>
+> **Starting source:** `ccde1d5d6b5129dd943c6e848989c668a0d00d7a`, version `0.55.35`
+>
+> **Evidence:** [Independent report](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md),
+> [82-case database comparison](evidence/scim-fresh-20260925/postgres-20260928-expanded.summary.json),
+> and [reproduction instructions](evidence/scim-fresh-20260925/repro-postgres/README.md).
+
+## 1. What we are delivering
+
+The goal is to make SCIM requests behave correctly and consistently for Users,
+Groups, and custom resource types on both PostgreSQL and InMemory.
+
+The first release fixes the reported Boolean PATCH path. Later releases correct
+operation behavior, conditional writes, Group transactions, search, capability
+checks, profile validation, and endpoint lifecycle behavior. We will share the
+code that interprets the protocol without hiding the real differences between
+the resources or databases.
+
+This is not one large rewrite. Each work package needs its own failing test,
+implementation, validation evidence, documentation, and commit. A package is
+not complete merely because another package's tests passed.
+
+### What is not authorized by this implementation request
+
+* No automatic change to live endpoint settings or stored customer resources.
+* No automatic replay of the original PATCH.
+* No customer-production promotion.
+* No replacement of dependencies or lockfiles through an unapproved registry.
+* No new SCIM protocol such as cursor pagination or security events.
+
+Local disposable PostgreSQL testing is authorized. Remote publication,
+reviewed merge, deployment, and data repair remain explicit checkpoints rather
+than an implied consequence of a local test passing.
+
+## 2. Why these changes are needed
+
+The database comparison executed 82 cases per backend and 771 assertions.
+It demonstrated incorrect behavior, not just missing tests:
+
+| Problem | Consequence | Design response |
+|---|---|---|
+| Different code interprets the same PATCH path differently | A valid selector becomes a literal property name | One typed path representation |
+| Three engines implement similar mutations differently | `add` can replace a list; selected updates change only one match | Shared operation primitives, then a shared executor |
+| State is checked only before or after the whole PATCH | Required, immutable and primary rules can be wrong between operations | Validate each transition in request order |
+| If-Match is checked before an unconditional write | Two clients with the same version can both save | Conditional repository writes |
+| InMemory lacks database constraints and transactions | Duplicate or partially written resources | Explicit atomic map operations and contract tests |
+| Capabilities are checked only in some controllers | Bulk or custom routes can bypass a disabled capability | Shared application-level checks |
+| Querying uses response-shaped data | Hidden attributes disappear before filtering | Separate internal resource data from response projection |
+
+The earlier evidence files stay unchanged. Implementation results are new
+evidence; they must not overwrite the record of the failing product.
+
+## 3. The intended architecture
+
+```mermaid
+flowchart TB
+    HTTP["HTTP controllers, Bulk and Me"] --> CONTEXT["Endpoint and ResourceType context"]
+    CONTEXT --> APP["SCIM application use case"]
+    APP --> PATH["Typed path and filter parser"]
+    PATH --> RESOLVE["Schema-aware target resolver"]
+    RESOLVE --> EXEC["Pure attribute mutation executor"]
+    EXEC --> RULES["Per-operation validation and final checks"]
+    RULES --> ADAPTER["User, Group or custom-resource adapter"]
+    ADAPTER --> PORT["Existing repository interface"]
+    PORT --> PG["Prisma and PostgreSQL"]
+    PORT --> MEM["InMemory maps"]
+    PG --> RESULT["Committed resource"]
+    MEM --> RESULT
+    RESULT --> RESPONSE["Metadata, returned policy and projection"]
+```
+
+The application service coordinates the work. The parser and executor do not
+read environment variables, look up credentials, issue database queries, or
+publish events. Repositories do not interpret SCIM filter text.
+
+Keep existing repository interfaces and dependency-injection tokens:
+
+* [IUserRepository](../api/src/domain/repositories/user.repository.interface.ts)
+* [IGroupRepository](../api/src/domain/repositories/group.repository.interface.ts)
+* [IGenericResourceRepository](../api/src/domain/repositories/generic-resource.repository.interface.ts)
+* [RepositoryModule](../api/src/infrastructure/repositories/repository.module.ts)
+
+Do not introduce a universal repository with a growing resource-type switch.
+Use composition rather than a controller/service inheritance hierarchy.
+
+### Resource-specific responsibilities
+
+| Resource | Responsibilities that stay outside the generic executor |
+|---|---|
+| User | Promoted database fields, username uniqueness, active-state policy, computed groups, User events, and `/Me` subject resolution |
+| Group | Member references, deduplication, member-operation settings, and atomic Group-plus-member persistence |
+| Custom resource | Dynamic core schema, extension bindings, registered route, optional query columns, and resource events |
+| Endpoint administration | Profile merge/replacement rules, schema registration, credentials, cache refresh and cascade cleanup; this is not Resource PatchOp |
+
+## 4. Path interpretation and ordered PATCH execution
+
+### 4.1 Parse syntax once; resolve matches at each operation
+
+The path parser produces an immutable structure describing the namespace,
+attribute, optional predicate and optional sub-attribute. It must preserve
+typed predicate values and the original operation index for diagnostics.
+
+The following is a proposed interface shape, not an existing implementation:
+
+```typescript
+type PatchPath =
+  | { kind: 'resource' }
+  | {
+      kind: 'attribute';
+      schemaUrn?: string;
+      attribute: string;
+      subAttribute?: string;
+    }
+  | {
+      kind: 'selection';
+      schemaUrn?: string;
+      attribute: string;
+      predicate: FilterNode;
+      subAttribute?: string;
+    };
+```
+
+Use the existing filter parser/evaluator where its behavior is proven by tests.
+Do not assume it already handles every escape, numeric representation,
+attribute spelling, or namespace correctly. Add targeted grammar tests before
+extending or relocating it. Keep compatibility re-exports when moving pure
+code out of the HTTP module tree.
+
+**Parsing once is not selecting once.** If operation 1 adds an entry,
+operation 2 must be able to select that entry. Resolve values against the
+current working resource at each step.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as Application service
+    participant E as Executor
+    participant R as Repository
+    C->>A: PATCH and optional If-Match
+    A->>R: Load scoped resource
+    R-->>A: Resource and version
+    A->>A: Validate envelope and compile paths
+    loop Each operation in order
+        A->>E: Current working state and compiled operation
+        E->>E: Resolve selection, validate, apply and normalize
+        E-->>A: New working state or precise error
+    end
+    alt Every operation succeeds
+        A->>R: Save with expected version when supplied
+        R-->>A: Committed record or conflict
+        A-->>C: Projected committed resource
+    else Any operation fails
+        A-->>C: SCIM error with operation index
+        Note over A,R: No mutation is persisted
+    end
+```
+
+### 4.2 Required operation rules
+
+| Rule | Implementation requirement |
+|---|---|
+| Native Boolean/number/null predicates | Keep literal types; do not require string quotes |
+| Invalid bracket syntax | Explicit path/filter error; never a literal property or silent success |
+| Multi-valued `add` | Preserve existing values and append/merge according to the selected target |
+| Filtered replacement | Update all matches; zero-match replacement returns `noTarget` |
+| Complex replacement | Preserve unspecified sub-attributes as the PATCH rules require |
+| Required removal | Reject the operation that unassigns a required attribute |
+| Immutable values | Check against the current working state, including earlier operations |
+| Primary handoff | When an operation selects a new primary, clear the others before the next operation |
+| Whole-request failure | Discard working state, including all earlier operations |
+| Hidden values | Keep internal state separate from the response view |
+
+### 4.3 Compatibility decisions
+
+Do not silently turn a refactor into a change to every endpoint:
+
+* Keep quoted-Boolean support where it exists, with schema-aware conversion.
+  Correct string values that happen to equal `"true"` remain strings.
+* Support documented Entra Group remove value arrays through a compatibility
+  normalizer; do not treat them as ordinary RFC remove syntax.
+* Keep current zero-match Group-member idempotency until its policy is tested.
+  RFC text and examples are not completely consistent here.
+* Filtered add with no match needs a named policy. Preserve the proven
+  equality-discriminator case; do not invent objects from arbitrary compound
+  predicates.
+* Do not add a new flag just to avoid fixing malformed path storage.
+* Changes to literal dotted-key behavior, primary policies, requiredness and
+  response status are behavior changes. Document their impact and cover
+  existing presets before changing their defaults.
+
+## 5. Schema characteristics and response rules
+
+Use the effective endpoint schema, including published characteristics and
+applicable RFC defaults. Read a characteristic from the resolved target rather
+than finding it by a bare sub-attribute name shared by unrelated extensions.
+
+| Characteristic | Where it is checked |
+|---|---|
+| `type`, `multiValued` | Schema registration, request values, selected elements and resulting shape |
+| `required` | Create/replace requirements and individual removal transitions |
+| `mutability` | Operation-specific readOnly, immutable and writeOnly behavior |
+| `caseExact` | Predicate comparison, case preservation and the chosen uniqueness equality rule |
+| `returned` | Write response and GET/list/search projection, after permitted filtering |
+| `uniqueness` | Supported scope checked atomically where promised |
+| `canonicalValues` | Provider restriction if enabled; not an automatic closed enum from the RFC |
+| `referenceTypes` | URI/reference type checks and scoped local referential-integrity policy |
+| Extension `required` | ResourceType binding, distinct from required fields inside that extension |
+| `primary` | Per-operation list normalization; not a separate schema characteristic |
+
+All eight types and both single/multi-valued forms remain in the test inventory.
+Simple multi-valued children are not forbidden complex nesting. The Schema
+discovery resource has its documented structural exception.
+
+POST and PUT ignore client readOnly values under their rules. PATCH normally
+rejects incompatible mutations; explicit ignore settings are compatibility.
+Required checks and normalizers must run on the same candidate state that will
+be saved, not a discarded temporary copy.
+
+Response rules:
+
+* A 200 PATCH response is compared to a later GET only for common visible
+  attributes after projection. A valid 204 has no body.
+* `returned:request` can differ between write responses and ordinary GET.
+* Always suppress writeOnly and `returned:never` values.
+* SCIM errors have string `status` and optional string `detail`; structured
+  lists belong in the diagnostic extension.
+* Do not put secrets or raw predicate values in new diagnostic logs.
+
+## 6. Persistence design
+
+### 6.1 Conditional update and delete
+
+Extend each aggregate's existing write port with an optional expected version.
+When supplied, PostgreSQL's update/delete predicate includes the version and
+resource scope. InMemory checks and replaces/deletes the map entry in one
+synchronous operation. A mismatch becomes the same typed repository conflict
+on either backend and is mapped to HTTP 412.
+
+Without a client condition, preserve the documented existing write policy.
+Do not add hidden retries that reinterpret a client's intended selection.
+If a retry is required by a later design, re-read and reapply deliberately.
+
+### 6.2 Group transactions
+
+Group create plus members and Group update plus members are aggregate writes.
+PostgreSQL must perform each in a transaction. InMemory must validate/stage
+the new Group and member collection before publishing either.
+
+Keep reference lookups outside a long-held transaction where safe, but verify
+any constraint that can race at the actual commit boundary. After failure,
+scalar values, payload, members and version must all match the original state.
+
+### 6.3 Uniqueness
+
+Keep PostgreSQL's username constraint. Add equivalent atomic InMemory
+enforcement, including update and simultaneous create. Service prechecks can
+improve diagnostics but cannot be the sole protection.
+
+For Group or schema-driven uniqueness, define the actual namespace and equality
+rule before adding constraints. A local scan cannot promise global uniqueness.
+Database migrations, if needed, require existing-data analysis and independent
+replay tests; do not silently delete conflicting rows.
+
+## 7. Reads, discovery, capabilities, and endpoint lifecycle
+
+```mermaid
+flowchart LR
+    Q["GET or JSON search"] --> S["Resolve endpoint and schema"]
+    S --> P["Validate capability and build query"]
+    P --> D["Repository candidates"]
+    D --> F["Permitted filter on internal data"]
+    F --> O["Typed ordering and full match count"]
+    O --> PAGE["Pagination"]
+    PAGE --> OUT["Response projection"]
+```
+
+* JSON `.search` uses arrays for requested/excluded attributes; URL query
+  parameters use their own parser. A compatibility string form must be
+  explicit, not the only accepted form.
+* Query filters validate the predicate relative to its parent namespace.
+* Check whether filtering a hidden attribute is allowed before using internal
+  values; never make secret search possible as a side effect.
+* Do not cap candidates before residual filtering/counting unless correctness
+  is preserved. Do not sort numbers as strings.
+* Capability checks belong at a reusable application boundary that direct
+  controllers, Bulk and `/Me` cannot bypass.
+* Discovery and execution use the same resolved profile. Discovery collections
+  retain their special RFC query behavior.
+* Endpoint deletion defines all owned records and preserves audit history as
+  intended. Test both backends, including credentials in the lifecycle package.
+* Cross-process cache freshness needs a measured guarantee. Prefer an
+  authoritative persisted revision check for PostgreSQL requests over an
+  indefinite process-local cache. Benchmark the extra read; do not introduce
+  a distributed cache dependency merely to solve this problem.
+
+## 8. Work packages and completion checks
+
+| ID | Outcome | Depends on | Tests that must turn green |
+|---|---|---|---|
+| D0 | Commit reviewed design, independent analysis and sanitized evidence | None | Docs, JSON/CSV, links, rendered diagrams, safety guard syntax |
+| P1 | Safe, typed PATCH path interpretation on all resource families | D0 | `INC-*`, native/quoted/compound/number selectors, invalid-path no-write cases |
+| P2 | Correct shared operation semantics and ordered transitions | P1 | Multi-value add, all matches, required/immutable/primary, selected-object shape |
+| P3 | Atomic version and uniqueness enforcement | D0 | Same-version barriers, sequential If-Match, duplicate create/update on both backends |
+| P4 | Atomic Group create/update plus members | P3 contract if shared | Native constraints and injected failure rollback, no partial create |
+| P5 | JSON search arrays and well-formed errors | D0 | User/Group/custom `.search`, genuine invalid DTO with scalar error detail |
+| P6 | Consistent query limits, sorting and capability checks | P1 query seam, P5 | `READ-FILTER-*`, typed sort, hidden fields, direct/Bulk/Me capability checks |
+| P7 | Schema/profile validation and supported characteristic promises | P2 | Bad schema type/cardinality, reference/binary/date inputs, required extension and readOnly behavior |
+| P8 | Endpoint cleanup and cross-process cache consistency | P3 if conditional admin writes | Cascade/orphan checks and two-reader freshness with stated bound |
+| P9 | Honest compatibility/settings documentation and tests | Relevant packages | Modern/legacy Entra corpus, all registered settings reachable and accurately described |
+| C0 | Consolidate independent evidence and reviewed release readiness | P1-P9 | Applicable static/unit/HTTP/backend/live/browser/CI gates on the same tip |
+
+Work packages may be split further if one needs an independent migration or
+behavior decision. A split is recorded here; it is not silently omitted.
+
+## 9. Test-driven workflow and validation gates
+
+For every implementation:
+
+1. Write a failing test against the intended behavior. Record the actual
+   failing assertion; a missing module or failed fixture is not the required RED.
+2. Make the smallest complete fix for that work package.
+3. Rerun the exact test and its neighboring compatibility tests.
+4. Add HTTP contract coverage and a live-test section for externally visible
+   behavior. Smoke-run that section against an owned local node before
+   consolidation.
+5. Run the same relevant behavior with actual Prisma/PostgreSQL and InMemory.
+   Database ownership checks must run before migrations or destructive setup.
+6. Review error handling, logging, RFC interpretation, test completeness and
+   architectural impact.
+7. Record evidence, update the implementation/RCA docs and user-facing guide,
+   then commit a coherent change.
+
+| Gate | Development lane | Consolidation/release lane |
+|---|---|---|
+| API build and lint | Changed package, compare warning baseline | Complete API gates |
+| Unit tests | Targeted related suites in one invocation | Applicable full unit suite |
+| HTTP tests | Relevant routes, outputs and error shapes | API E2E on both backends |
+| Database | Task-owned PostgreSQL, relevant behavior | Fresh migration replay plus backend contracts |
+| Live HTTP | New/changed section on owned local runtime | Local node and Docker evidence |
+| Web/Playwright | Required if a UI surface changes | Browser tests against applicable build; inspect visual diffs |
+| Docs | JSON, references, content and diagrams | Freshness and source coupling |
+| Review | Changed-code self-review and specialist review where required | Independent review and exact-tip CI |
+| Deployment | Not part of local iteration | Explicitly initiated pipeline, same image digest; customer approval separate |
+
+Use the existing runners, not a parallel testing framework. Do not rerun an
+unchanged full suite solely because documentation changed. Do not bypass hooks,
+lower a gate, or call a setup failure a product failure.
+
+The historical analysis harness refuses changed production input on purpose.
+Promote its useful cases into permanent tests. Any adapted implementation
+harness records the new source tip and new expected results separately; it must
+retain the task-owned database guards.
+
+## 10. Commit, release, and rollback rules
+
+* D0 includes the independent report, sanitized machine-readable evidence,
+  opt-in reproducers, design, RCA ledger, INDEX and session context.
+* Exclude ignored execution logs, generated clients, dependency links, HTML
+  build output, local credentials and disposable database state.
+* Preserve the earlier documentation commit in its separate worktree.
+* Begin implementation in a fresh context/worktree from the design commit.
+* Use ordinary new commits with the required trailers. Never amend, force-push,
+  rewrite the preserved evidence, or bypass verification.
+* Record version/test changes accurately. Release version/lockfile updates
+  follow the approved public-runner workflow; local corporate lockfile
+  regeneration is not a shortcut.
+* Reviewed PRs and exact-tip CI gate merge. A successful local commit is not
+  described as merged, deployed, or production-ready.
+* Roll back code independently from data repair. New parser behavior must not
+  automatically reinterpret already-stored malformed keys.
+
+## 11. Progress tracker
+
+Statuses mean: **pending**, **in progress**, **implemented**, **validated**,
+**committed**, or **blocked with a named reason**. The final two states do not
+mean merged or deployed.
+
+| Package | Status | Evidence / next action |
+|---|---|---|
+| D0 | Validated; committing | 53 new docs/evidence/reproducer files reviewed; 22 JSON artifacts parse; 140 relative links resolve; 10 diagrams render in both themes; content/freshness and safety controls pass |
+| P1 | Pending | First implementation package after D0 |
+| P2 | Pending | Depends on stable typed path contract |
+| P3 | Pending | Actual database barriers are already available as baseline evidence |
+| P4 | Pending | Native and injected member failures already reproduce |
+| P5 | Pending | Valid search arrays and invalid error detail already reproduce |
+| P6 | Pending | Custom/Bulk capability controls already reproduce |
+| P7 | Pending | Verify each current schema promise before changing enforcement |
+| P8 | Pending | Cleanup plus cache-freshness implementation requires explicit contracts |
+| P9 | Pending | Follow changed behavior; preserve legitimate compatibility |
+| C0 | Pending | Do not mark complete while a package or applicable gate is unresolved |
+
+**Current overall progress:** design/evidence validated for the baseline commit;
+0 implementation packages completed. This section is updated at package boundaries. Detailed
+issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
+## 12. Architecture and self-improvement decisions
+
+| Decision | Disposition and reason |
+|---|---|
+| Shared path representation | Applied in this design: one demonstrated input currently has inconsistent interpretations |
+| Shared mutation primitives, then executor | Planned: three real implementations justify reuse |
+| Resource-specific repository ports | Retained: Group membership is a real aggregate difference |
+| General-purpose Unit of Work or policy DSL | Rejected: not needed for the first fixes |
+| All-CRUD rewrite in one change | Rejected: obscures behavior and rollback |
+| Backend-specific failure tests | Required: the measured storage differences cannot be proved with one mock |
+| Plain-language evidence | Applied: explain the outcome before using test IDs or internal terminology |
+| Existence-only tests | Rejected: each acceptance check must assert stored values, returned shape or a real failure outcome |
+
+Relevant standards are traced in [report section 6](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md#6-standards-and-microsoft-entra-interpretation).
+RFC 7643/7644 and accepted errata define the base behavior; Entra-specific
+wrappers and optional policies are not silently relabeled as RFC requirements.

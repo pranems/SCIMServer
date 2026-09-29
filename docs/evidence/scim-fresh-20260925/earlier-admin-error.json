@@ -1,0 +1,87 @@
+{
+  "logId": "7282fa8e-66cc-4805-baf1-734fe208516f",
+  "retrievedAt": "2026-09-26T03:27:42.8698813Z",
+  "retrieval": {
+    "method": "GET",
+    "path": "/scim/admin/logs/7282fa8e-66cc-4805-baf1-734fe208516f",
+    "status": 200,
+    "estateResolution": "canary-prod via scripts/scim-estates.json",
+    "scope": "One previously identified log; no wider history search",
+    "requestBodyTruncated": false,
+    "responseBodyTruncated": false
+  },
+  "record": {
+    "createdAt": "2026-09-24T21:03:41.929Z",
+    "method": "PATCH",
+    "url": "/scim/admin/endpoints/64b5f7bb-f4f7-4ec6-872b-352ecd498890",
+    "status": 400,
+    "durationMs": 83,
+    "requestId": "d6227c03-1386-4533-9094-b8eab4d66604"
+  },
+  "requestExcerpt": {
+    "topLevelKeys": [
+      "id",
+      "name",
+      "displayName",
+      "profile",
+      "active",
+      "scimBasePath",
+      "createdAt",
+      "updatedAt",
+      "_links"
+    ],
+    "profileKeys": [
+      "schemas",
+      "settings",
+      "resourceTypes",
+      "serviceProviderConfig"
+    ],
+    "settingsKeys": [
+      "PrimaryEnforcement",
+      "StrictSchemaValidation"
+    ],
+    "PrimaryEnforcement": "reject",
+    "targetDefinition": {
+      "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+      "attribute": "displayName",
+      "uniqueness": "none"
+    }
+  },
+  "responseExcerpt": {
+    "schemaEnvelopeKeyPresent": true,
+    "status": "400",
+    "scimTypePresent": false,
+    "detailNormalized": "Profile validation failed: Cannot loosen 'uniqueness' from 'server' to 'none' on 'displayName' (urn:ietf:params:scim:schemas:core:2.0:Group). Only tightening is permitted (none -> server -> global).",
+    "normalization": "Only the two arrow characters in the public validation message are transcribed as ASCII arrows.",
+    "diagnosticsPresent": true,
+    "diagnosticsErrorCodePresent": false,
+    "diagnosticsTriggeredByPresent": false
+  },
+  "classification": {
+    "kind": "admin-profile-tighten-only-rejection",
+    "confidence": "high",
+    "status": "explained by retained response and unchanged validator source",
+    "baselineValue": "server",
+    "providedValue": "none",
+    "relationshipToLaterIncident": "Separate admin profile-policy rejection; not a Boolean valuePath parse failure.",
+    "policyBoundary": "The server baseline comes from product schema definitions, not a requirement that RFC 7643 Group.displayName must be unique.",
+    "stateBoundary": "The baseline named in the error is not proof of the previously stored endpoint profile. Source validation precedes persistence; no live write or database-state experiment was performed."
+  },
+  "sourceReferences": [
+    "api/src/modules/scim/discovery/scim-schemas.constants.ts:439",
+    "api/src/modules/scim/endpoint-profile/rfc-baseline.ts:60",
+    "api/src/modules/scim/endpoint-profile/tighten-only-validator.ts:127",
+    "api/src/modules/scim/endpoint-profile/endpoint-profile.service.ts:95",
+    "api/src/modules/endpoint/services/endpoint.service.ts:797"
+  ],
+  "sourceIdentityCheck": {
+    "incident": "c10f9ea83822a50650c2b2867ceff9eeaa46c545",
+    "analysis": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+    "unchangedFiles": [
+      "api/src/modules/scim/endpoint-profile/tighten-only-validator.ts",
+      "api/src/modules/scim/endpoint-profile/rfc-baseline.ts",
+      "api/src/modules/scim/endpoint-profile/endpoint-profile.service.ts"
+    ]
+  },
+  "privacy": "Only the reported endpoint/log identifiers, structural keys, schema attribute identity, and public validation keywords are retained. No credential, private name, or private profile snapshot is stored."
+}

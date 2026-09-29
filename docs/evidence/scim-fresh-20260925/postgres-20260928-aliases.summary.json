@@ -1,0 +1,283 @@
+{
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "scope": "Five non-overlapping alias/discovery cases; original 77-case evidence preserved.",
+  "run": {
+    "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+    "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+    "run": "e1a910bb0ce3cc16",
+    "startedAt": "2026-09-29T01:28:20.841Z",
+    "output": "test-results\\fresh-analysis\\postgres-20260928-e1a910bb0ce3cc16",
+    "status": "complete",
+    "backendResults": [
+      {
+        "backend": "inmemory",
+        "exitCode": 1,
+        "cases": 5,
+        "passed": 4,
+        "behaviorFailed": 1,
+        "setupFailed": 0,
+        "notApplicable": 0,
+        "checksPassed": 54,
+        "checksFailed": 3,
+        "file": "test-results\\fresh-analysis\\postgres-20260928-e1a910bb0ce3cc16\\inmemory.json"
+      },
+      {
+        "backend": "prisma",
+        "exitCode": 1,
+        "cases": 5,
+        "passed": 4,
+        "behaviorFailed": 1,
+        "setupFailed": 0,
+        "notApplicable": 0,
+        "checksPassed": 54,
+        "checksFailed": 3,
+        "file": "test-results\\fresh-analysis\\postgres-20260928-e1a910bb0ce3cc16\\prisma.json"
+      }
+    ],
+    "cleanup": {
+      "exactContainerId": "e5fb2241d170769d22d0211e5bc77a6bde13f45a15e96c751946ded6a17bf9ea",
+      "removed": true,
+      "persistentVolumesCreated": 0,
+      "customNetworksCreated": 0
+    },
+    "selectedCases": [
+      "ALIAS-BULK-SUCCESS",
+      "ALIAS-BULK-ATOMICITY",
+      "ALIAS-BULK-DISABLED",
+      "ALIAS-ME-USER",
+      "ALIAS-DISCOVERY-REFLECTION"
+    ],
+    "dockerServerVersion": "29.6.2",
+    "image": "postgres:17-alpine",
+    "container": {
+      "id": "e5fb2241d170769d22d0211e5bc77a6bde13f45a15e96c751946ded6a17bf9ea",
+      "name": "scim-fresh-pg-e1a910bb0ce3cc16",
+      "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+      "run": "e1a910bb0ce3cc16",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "host": "127.0.0.1",
+      "port": 49300,
+      "database": "scim_fresh_e1a910bb0ce3cc16",
+      "mounts": [],
+      "tmpfs": {
+        "/var/lib/postgresql/data": "rw"
+      },
+      "network": "bridge"
+    },
+    "beforeMigration": {
+      "container": {
+        "id": "e5fb2241d170769d22d0211e5bc77a6bde13f45a15e96c751946ded6a17bf9ea",
+        "name": "scim-fresh-pg-e1a910bb0ce3cc16",
+        "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+        "run": "e1a910bb0ce3cc16",
+        "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+        "host": "127.0.0.1",
+        "port": 49300,
+        "database": "scim_fresh_e1a910bb0ce3cc16",
+        "mounts": [],
+        "tmpfs": {
+          "/var/lib/postgresql/data": "rw"
+        },
+        "network": "bridge"
+      },
+      "server": {
+        "database": "scim_fresh_e1a910bb0ce3cc16",
+        "username": "fresh_runner",
+        "cluster_name": "scim-fresh-e1a910bb0ce3cc16",
+        "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+        "server_address": "172.17.0.2/32",
+        "server_port": 5432,
+        "system_identifier": "7690763074934681635"
+      }
+    },
+    "migrationExit": 0,
+    "migrations": [
+      {
+        "migration_name": "20260223000000_postgresql_baseline",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260223203811_externalid_citext_case_insensitive",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260223225049_add_endpoint_schema",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260225123401_add_deleted_at_soft_delete",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260225181836_externalid_citext_to_text",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260225232117_add_endpoint_resource_type",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260227013947_add_endpoint_credential",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260313031330_add_endpoint_profile",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260409235323_remove_uniqueness_displayname_externalid",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260416025138_add_requestlog_perf_indexes",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260430120000_resource_member_unique_value",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260707000000_add_jwks_host_allowlist",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260707100000_add_credential_dek",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260707110000_add_secret_retention_and_server_settings",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260717120000_add_requestlog_requestid",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260721180000_add_requestlog_auth_summary",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260722120000_add_requestlog_auth_decision",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260724000000_drop_requestlog_endpoint_fk",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260827200000_add_credential_keyed_lookup",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260916035422_add_endpoint_credential_type_active_index",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260923020356_split_per_endpoint_credentials_enablement",
+        "finished": true,
+        "rolled_back": false
+      },
+      {
+        "migration_name": "20260924000000_endpoint_name_case_insensitive",
+        "finished": true,
+        "rolled_back": false
+      }
+    ],
+    "extensions": [
+      {
+        "extname": "citext",
+        "extversion": "1.6"
+      },
+      {
+        "extname": "pg_trgm",
+        "extversion": "1.6"
+      },
+      {
+        "extname": "pgcrypto",
+        "extversion": "1.3"
+      },
+      {
+        "extname": "plpgsql",
+        "extversion": "1.0"
+      },
+      {
+        "extname": "uuid-ossp",
+        "extversion": "1.1"
+      }
+    ],
+    "finishedAt": "2026-09-29T01:30:07.382Z"
+  },
+  "backendSummary": {
+    "inmemory": {
+      "cases": 5,
+      "passed": 4,
+      "behaviorFailed": 1,
+      "setupFailed": 0,
+      "notApplicable": 0,
+      "checksPassed": 54,
+      "checksFailed": 3
+    },
+    "prisma": {
+      "cases": 5,
+      "passed": 4,
+      "behaviorFailed": 1,
+      "setupFailed": 0,
+      "notApplicable": 0,
+      "checksPassed": 54,
+      "checksFailed": 3
+    }
+  },
+  "priorEvidenceHashes": {
+    "postgres-20260928.cases.csv": "508f12850eb8f8f251d5efee29bf1d6387682ea0e6fd23311df9efb349322c10",
+    "postgres-20260928.inmemory.json": "fd7deab44e3ae956078b0cfe2827ee19da1490eec445eed22bc952df20b265bc",
+    "postgres-20260928.md": "68fb51149c54ec4be3d33de4db8229212c0982cfc1b7675412b9cdafb4f69d8d",
+    "postgres-20260928.migration-d14af7fea23f1faf.txt": "9ddac3280a4b70ae06ce7050222343efca99461f6cc8e9ba7042b9e7ee1dfab6",
+    "postgres-20260928.migration-d603fa1ad9198156.txt": "f20ca5f0d9632e4f2d163797e737158fc79519ebffd008fd3886cb9c4af7e3de",
+    "postgres-20260928.prisma.json": "532e0028feddebb6b01ba0c4c7cbc9e4b8231a6ba2a1c221b0dbb99bd7aa855b",
+    "postgres-20260928.summary.json": "765e967a3bd6b7fb0d7fd766729abf3fd7f60409509752750c90b225c4c01d64",
+    "postgres-20260928.validation.json": "4e5c0e9641c43f8e2d367b9b63e3fd477079ad306c37622532c179def3a761a8"
+  },
+  "priorHarnessPreservation": {
+    "original77BodiesUnchanged": true,
+    "change": "Only an additive external case-registration block in dual-backend.spec.cjs.",
+    "originalFileSha256AfterRemovingRegistration": "9ce04d6dbbaf8715000823ad50bbb85bdaf618674df16da748c54c40a01a2cc2",
+    "note": "Original receipt hashes remain historical snapshots; no original evidence artifact was rewritten."
+  },
+  "currentHarnessHashes": {
+    "alias-cases.cjs": "45678fc0b22aa6d9245dee841cd21e6bad318c0b7b71babb68e850e384783a60",
+    "build-alias-evidence.cjs": "54f9e636c7c61997d1a38243c516acd181e9534c3a6482c7857df49fbb41471a",
+    "build-evidence.cjs": "0aad6018c078b1f18d59c106aee633e55dc10ee526f5b19eb829c4edc1d8b0c3",
+    "check-safety.cjs": "dfe91fbf53180ee1016d7f67854e786fa92d4bb8f98013273aa0e6f76a34e3af",
+    "dual-backend.spec.cjs": "f50a16b4d2f4b7a66336a3820e2fe5128ced11073e1cbdf4a1577e18cb17ad05",
+    "global-setup.cjs": "9961fe7c2f606dc2ebc1be2866c0a595cee6829bde50beab9eadc67d99114be0",
+    "jest.config.cjs": "270307f5519769017b9ea7e733b7dc205c1194c1c355759a50612a180fdfb460",
+    "run.cjs": "53379cedd7d87f4d4d1e9448649dbcf159f60b4e386d057ef32f04e59ae09e39",
+    "safety.cjs": "7c0bdc02d703be72e70088f7019072a1702c3b19d6b9a96757d6b649013d3efe"
+  },
+  "remainingLimits": [
+    "Bulk Group/custom targets, forward or cyclic bulkId references, and failOnErrors thresholds above zero were not added.",
+    "/Me PUT/DELETE, unrelated subjects, token classes, and authorization combinations were not added.",
+    "Discovery reflection is one live local app per backend, not proof of distributed cache invalidation.",
+    "No live/customer calls, real accounts, full conformance, or production fix."
+  ]
+}

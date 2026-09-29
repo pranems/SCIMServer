@@ -1,0 +1,687 @@
+{
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "originalCasesPerBackend": 77,
+  "appendedCasesPerBackend": 5,
+  "uniqueCasesPerBackend": 82,
+  "totalUniqueCaseExecutions": 164,
+  "originalSummary": "postgres-20260928.summary.json",
+  "appendedSummary": "postgres-20260928-aliases.summary.json",
+  "backendSummary": {
+    "inmemory": {
+      "cases": 82,
+      "passed": 27,
+      "behaviorFailed": 54,
+      "setupFailed": 0,
+      "notApplicable": 1,
+      "checksPassed": 281,
+      "checksFailed": 103
+    },
+    "prisma": {
+      "cases": 82,
+      "passed": 28,
+      "behaviorFailed": 54,
+      "setupFailed": 0,
+      "notApplicable": 0,
+      "checksPassed": 289,
+      "checksFailed": 98
+    }
+  },
+  "cases": [
+    {
+      "id": "INC-STRICT",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "INC-LENIENT",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CRUD-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "SEARCH-ARRAY-Users",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "TYPES-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CRUD-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "SEARCH-ARRAY-Groups",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "TYPES-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CRUD-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "SEARCH-ARRAY-Devices",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "TYPES-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "MV-ADD-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "MV-ADD-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "MV-ADD-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "VP-STRING",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "VP-BOOLEAN",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "VP-QUOTED-BOOLEAN",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "VP-COMPOUND",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "VP-NUMBER",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "VP-MULTIMATCH",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "READ-FILTER-TYPED",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "REQUIRED-REMOVE-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-SEQUENCE-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-REMOVE-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-PUT-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "REQUIRED-REMOVE-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-SEQUENCE-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-REMOVE-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-PUT-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "REQUIRED-REMOVE-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-SEQUENCE-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-REMOVE-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "IMMUTABLE-PUT-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "PRIMARY-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CASEEXACT-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "RETURNED-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "PRIMARY-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CASEEXACT-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "RETURNED-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "PRIMARY-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CASEEXACT-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "RETURNED-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAPABILITIES-Users",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "LIMIT-Users",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAPABILITIES-Groups",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "LIMIT-Groups",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAPABILITIES-Devices",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "LIMIT-Devices",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CUSTOM-NUMERIC-SORT",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CUSTOM-ETAG-OFF",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAS-Users-WIRE",
+      "mode": "plain concurrent HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAS-Users-BARRIER",
+      "mode": "HTTP + deterministic real-repository pre-write barrier",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAS-Groups-WIRE",
+      "mode": "plain concurrent HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAS-Groups-BARRIER",
+      "mode": "HTTP + deterministic real-repository pre-write barrier",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAS-Devices-WIRE",
+      "mode": "plain concurrent HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CAS-Devices-BARRIER",
+      "mode": "HTTP + deterministic real-repository pre-write barrier",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "UNIQUE-WIRE",
+      "mode": "plain concurrent HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "UNIQUE-BARRIER",
+      "mode": "HTTP + deterministic real-repository pre-create barrier",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "GROUP-NATIVE-ROLLBACK",
+      "mode": "direct real repository; native duplicate-member constraint",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "GROUP-HTTP-FAULT",
+      "mode": "HTTP; explicitly injected persistence failure, real storage",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "ENDPOINT-CASCADE",
+      "mode": "HTTP + direct persisted orphan check",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "ENDPOINT-CACHE",
+      "mode": "two real service caches over same PostgreSQL; not two processes",
+      "evidenceGroup": "original77",
+      "inmemory": "not-applicable",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CUSTOM-PATCH-DISABLED",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "TYPED-READ-CONTROL",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CORE-MV-ADD",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CORE-BOOLEAN-PATH",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "MULTIMATCH-REMOVE",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "NO-PATH-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "ETAG-CONTROL-Users",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CARDINALITY-NEGATIVE-Users",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "NO-PATH-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "ETAG-CONTROL-Groups",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CARDINALITY-NEGATIVE-Groups",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "NO-PATH-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "ETAG-CONTROL-Devices",
+      "mode": "HTTP + persisted readback",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "CARDINALITY-NEGATIVE-Devices",
+      "mode": "HTTP",
+      "evidenceGroup": "original77",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "GROUP-POST-FAULT",
+      "mode": "HTTP; injected member-insert failure, real storage",
+      "evidenceGroup": "original77",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928"
+    },
+    {
+      "id": "ALIAS-BULK-SUCCESS",
+      "mode": "HTTP direct versus Bulk + persisted readback",
+      "evidenceGroup": "appended-aliases",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928-aliases"
+    },
+    {
+      "id": "ALIAS-BULK-ATOMICITY",
+      "mode": "HTTP direct failure control versus Bulk + persisted state",
+      "evidenceGroup": "appended-aliases",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928-aliases"
+    },
+    {
+      "id": "ALIAS-BULK-DISABLED",
+      "mode": "HTTP discovery + direct guard control + Bulk persisted readback",
+      "evidenceGroup": "appended-aliases",
+      "inmemory": "behavior-failed",
+      "prisma": "behavior-failed",
+      "evidenceFilePrefix": "postgres-20260928-aliases"
+    },
+    {
+      "id": "ALIAS-ME-USER",
+      "mode": "real local OAuth helper + HTTP alias + persisted readback",
+      "evidenceGroup": "appended-aliases",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928-aliases"
+    },
+    {
+      "id": "ALIAS-DISCOVERY-REFLECTION",
+      "mode": "HTTP admin changes + before/after public discovery + persisted profile",
+      "evidenceGroup": "appended-aliases",
+      "inmemory": "passed",
+      "prisma": "passed",
+      "evidenceFilePrefix": "postgres-20260928-aliases"
+    }
+  ]
+}

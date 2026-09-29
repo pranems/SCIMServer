@@ -1,14 +1,16 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
-> **Version:** 0.55.35 - **Updated:** 2026-09-24
+> **Version:** 0.55.35 - **Updated:** 2026-09-28
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
 
 | If you want to... | Read |
 |---|---|
+| Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
+| Understand the reported PATCH failure, real PostgreSQL/InMemory differences, RFC and attribute checks, and the step-by-step fix plan | [SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md) |
 | Understand the portable endpoint boundary, discovery translation, effective authentication state, APIs, DB mappings, and target UX | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) |
 | Create and edit User, Group, and custom resources from endpoint schemas | [PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md](PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md) |
 | Understand synchronized profile forms, runtime tabs, endpoint SPC, and the AI agent example | [PROFILE_AUTHORITATIVE_RESOURCE_UI.md](PROFILE_AUTHORITATIVE_RESOURCE_UI.md) |

@@ -1,0 +1,135 @@
+{
+  "sourceBase": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "status": "validated",
+  "reusedSelectedBaselineEvidence": {
+    "unitSuites": 12,
+    "unitPassed": 974,
+    "httpSuites": 9,
+    "httpPassed": 179,
+    "reason": "Original production code, assertions, and test selectors are unchanged."
+  },
+  "durableHarness": {
+    "directory": "docs/evidence/scim-fresh-20260925/repro",
+    "observations": 50,
+    "unchangedObservationsCompared": 49,
+    "unchangedObservationMismatches": 0,
+    "ignoredVolatileComparisonFields": [
+      "id",
+      "created",
+      "lastModified",
+      "location",
+      "createdAt",
+      "updatedAt"
+    ],
+    "p44": {
+      "fixture": "Minimal synthetic schema; no private profile input",
+      "strictStatus": "400",
+      "strictStoredTargets": "unchanged",
+      "lenientGoogleTargets": "all three updated",
+      "lenientActualContact": "unchanged",
+      "lenientLiteralBracketKey": "present with replacement value",
+      "originalLiveSchemaEvidenceOverwritten": false
+    },
+    "normativeHttp": {
+      "selectedFiles": 1,
+      "tests": 3,
+      "expectedExitCode": 1,
+      "actualExitCode": 1,
+      "expectedStatuses": [
+        200,
+        200,
+        200
+      ],
+      "actualStatuses": [
+        400,
+        400,
+        500
+      ],
+      "log": "test-results/fresh-analysis/repro-http-red-verified.log"
+    },
+    "historicalParser": {
+      "snapshots": 6,
+      "structurallyIdenticalToRetainedArtifact": true
+    },
+    "normalDiscovery": {
+      "unitFiles": 174,
+      "e2eFiles": 97,
+      "analysisOnlyFiles": 0
+    }
+  },
+  "toolingIssues": [
+    {
+      "issue": "PowerShell SCIM media-type response arrived as byte array",
+      "resolution": "Decode UTF-8 before JSON parsing and assert the requested log ID."
+    },
+    {
+      "issue": "Extra global TypeScript hook and ESM config loading interfered with existing Jest setup",
+      "resolution": "Use a CJS analysis config that transpiles only the pinned config module and leaves global source transforms to Jest."
+    },
+    {
+      "issue": "Changing cwd during config loading selected the default unit project",
+      "unintendedRun": {
+        "unitSuites": 174,
+        "unitTestsPassed": 5192,
+        "countedAsRedProbeEvidence": false
+      },
+      "resolution": "Preserve Jest cwd; assert exactly one expected discovered file and pass it explicitly before RED execution."
+    }
+  ],
+  "documentationAndSyntax": {
+    "scopedFreshnessAndLinks": {
+      "documents": 2,
+      "exitCode": 0,
+      "scope": [
+        "docs/SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md",
+        "docs/evidence/scim-fresh-20260925/repro/README.md"
+      ]
+    },
+    "existingContentAudit": {
+      "documents": 26,
+      "exitCode": 0
+    },
+    "jsonArtifactsParsed": 12,
+    "cjsSyntaxChecksPassed": 7,
+    "powershellSyntaxCheck": "passed",
+    "unchangedMermaidEvidence": "Original three diagrams parse and render in both themes; reused, not rerun.",
+    "unrelatedBaselineLinks": "Not changed; Session_starter scoped recheck still reports exactly the same three pre-existing missing links."
+  },
+  "referencePartitionVerification": {
+    "classifier": "repro/reference-kind.cjs",
+    "classifierCasesPassed": 20,
+    "settings": 37,
+    "reclassifiedReferences": 63,
+    "distinctReclassifiedTestFiles": 10,
+    "productionReferences": 176,
+    "testReferences": 432,
+    "remainingMisclassifications": 0,
+    "referencesConserved": true,
+    "nonReferenceSettingMetadataUnchanged": true,
+    "csvJsonPartitionsMatch": true,
+    "evidenceLevel": "Lexical references only; not runtime or discovery proof."
+  },
+  "h2ResponseContractVerification": {
+    "finding": "F17",
+    "evidence": "http-characterization.json",
+    "detailType": "array",
+    "detailItems": 2,
+    "absentOrStringAssertion": "fails on retained H2 response",
+    "newHttpRequests": 0,
+    "newHttpTests": 0,
+    "productFixApplied": false
+  },
+  "safety": {
+    "backend": "inmemory",
+    "databaseUrl": "inert loopback port 1, no credential",
+    "liveWrites": 0,
+    "privateProfileInputs": 0,
+    "productionChanges": false,
+    "dependencyManifestChanges": false,
+    "commitsCreated": 0,
+    "temporaryToolingJunctionRemoved": true,
+    "sharedDependencySentinelUnchanged": true,
+    "generatedPrismaClientRemoved": true,
+    "e2eDatabaseMarkerAbsentAfterTeardown": true
+  }
+}
