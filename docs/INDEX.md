@@ -22,6 +22,7 @@
 | Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
 | Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |
 | Verify common externalId precedence across User, Group and custom cores without overrestricting extension names | [SCIM_P7_COMMON_EXTERNAL_ID.md](SCIM_P7_COMMON_EXTERNAL_ID.md) |
+| Understand common id/meta precedence and schemas shared as core and extension without definition mutation | [SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md) |
 | Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
 | Understand atomic If-Match writes, User uniqueness parity and verified two-backend races | [SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md) |
 | Use JSON search arrays, legacy string compatibility and scalar SCIM validation errors | [SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md) |

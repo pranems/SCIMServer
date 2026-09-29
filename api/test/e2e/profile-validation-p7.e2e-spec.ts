@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import type { Server } from 'node:http';
 import { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } from './helpers/profile-p7-readonly.fixture';
 import { effectiveCharacteristic, type SchemaAttribute } from './helpers/schema-characteristics.helper';
+import { commonContextProfile, SHARED_COMMON_SCHEMA, OTHER_COMMON_SCHEMA } from './helpers/profile-p7-common-context.fixture';
 
 const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
 const EXT = 'urn:example:params:scim:schemas:extension:p7:2.0:Test';
@@ -51,6 +52,63 @@ describe('P7 declaration and POST/PUT contracts', () => {
   afterAll(async () => {
     for (const id of endpoints) await admin('delete', `/${id}`);
     await app.close();
+  });
+
+  it.each([true, false])('honors common contract by resource binding without mutating a shared extension schema, strict=%s', async strict => {
+    const profile = commonContextProfile(strict);
+    const ep = await admin('post').send({ name: `p7-common-context-${randomUUID()}`, profile }).expect(201);
+    endpoints.push(ep.body.id);
+    expect(ep.body.profile.schemas[0].attributes).toEqual(profile.schemas[0].attributes);
+    const base = `/scim/endpoints/${ep.body.id}`;
+    const coreBody = { schemas: [SHARED_COMMON_SCHEMA], externalId: 'Client-AbC',
+      id: ['spoof'], meta: 'not-server-meta', displayName: [7, 9], active: 'custom' };
+    const created = await scim('post', `${base}/Shareds`).send(coreBody).expect(201);
+    expect(typeof created.body.id).toBe('string');
+    expect(created.body.id).not.toBe('spoof');
+    expect(created.body.meta).toMatchObject({ resourceType: 'Shared', location: expect.stringContaining(`/Shareds/${created.body.id}`) });
+    expect(created.body.externalId).toBe('Client-AbC');
+    expect(created.body.displayName).toEqual([7, 9]);
+    expect(created.body.active).toBe('custom');
+    for (const key of Object.keys(created.body)) expect(['schemas', 'id', 'meta', 'externalId', 'displayName', 'active']).toContain(key);
+    for (const key of Object.keys(created.body.meta)) expect(['resourceType', 'created', 'lastModified', 'location', 'version']).toContain(key);
+    const replaced = await scim('put', `${base}/Shareds/${created.body.id}`)
+      .send({ ...coreBody, id: { bad: true }, meta: [1, 2], externalId: 'Client-New' }).expect(200);
+    expect(replaced.body.id).toBe(created.body.id);
+    expect(replaced.body.meta.created).toBe(created.body.meta.created);
+    expect(replaced.body.externalId).toBe('Client-New');
+    const rejected = await scim('put', `${base}/Shareds/${created.body.id}`).send({ ...coreBody, externalId: [7] }).expect(400);
+    error(rejected.body, 'invalidValue');
+    expect((await scim('get', `${base}/Shareds/${created.body.id}`).expect(200)).body).toEqual(replaced.body);
+    const independent = { externalId: [11, 13], id: [17, 19], meta: 'independent', displayName: [23], active: 'ext' };
+    const extBody = { schemas: [OTHER_COMMON_SCHEMA, SHARED_COMMON_SCHEMA], label: 'other', [SHARED_COMMON_SCHEMA]: independent };
+    const extCreated = await scim('post', `${base}/Others`).send(extBody).expect(201);
+    expect(extCreated.body[SHARED_COMMON_SCHEMA]).toEqual(independent);
+    for (const key of Object.keys(extCreated.body)) expect(['schemas', 'id', 'meta', 'label', SHARED_COMMON_SCHEMA]).toContain(key);
+    const extPut = await scim('put', `${base}/Others/${extCreated.body.id}`).send(extBody).expect(200);
+    expect(extPut.body[SHARED_COMMON_SCHEMA]).toEqual(independent);
+    expect((await admin('get', `/${ep.body.id}`).expect(200)).body.profile.schemas[0].attributes).toEqual(profile.schemas[0].attributes);
+  });
+
+  it.each([true, false])('ignores id/meta without custom-core declarations, strict=%s', async strict => {
+    const core = 'urn:example:core:2.0:UnlistedCommon';
+    const ep = await admin('post').send({ name: `p7-unlisted-common-${randomUUID()}`, profile: {
+      schemas: [{ id: core, name: 'Unlisted', attributes: [{ name: 'label', type: 'string' }] }],
+      resourceTypes: [{ id: 'Unlisted', name: 'Unlisted', endpoint: '/Unlisteds', schema: core, schemaExtensions: [] }],
+      settings: { StrictSchemaValidation: strict },
+    } }).expect(201);
+    endpoints.push(ep.body.id);
+    const route = `/scim/endpoints/${ep.body.id}/Unlisteds`;
+    const created = await scim('post', route).send({ schemas: [core], label: 'ok', ID: [42], META: 'spoof' }).expect(201);
+    expect(created.body.ID).toBeUndefined();
+    expect(created.body.META).toBeUndefined();
+    expect(created.body.meta.resourceType).toBe('Unlisted');
+    expect(typeof created.body.id).toBe('string');
+    const replaced = await scim('put', `${route}/${created.body.id}`)
+      .send({ schemas: [core], label: 'new', ID: { fake: true }, META: 42 }).expect(200);
+    expect(replaced.body.ID).toBeUndefined();
+    expect(replaced.body.META).toBeUndefined();
+    expect(replaced.body.id).toBe(created.body.id);
+    expect(replaced.body.meta.created).toBe(created.body.meta.created);
   });
 
   it('keeps custom-core displayName and active schema-driven while enforcing common externalId', async () => {

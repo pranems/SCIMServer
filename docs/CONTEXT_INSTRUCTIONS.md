@@ -41,11 +41,21 @@ separate. Legacy global uniqueness
 can block unrelated profile-subblock edits because merged profiles are fully
 revalidated; do not silently downgrade the declaration or call it RFC-invalid.
 
+P7's [common binding-context follow-up](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md)
+protects generic id/meta and prevents core semantics from mutating independent
+extension uses of shared schemas. Admin rejection of core-only conflicts is
+provider policy; runtime common precedence is the RFC requirement. Generic
+meta timestamps now come from authoritative record fields. Source regression:
+1,698 tests,108 HTTP and472 live assertions per backend. Combined context
+validation is pending; the existing common-PATCH and PUT retention fixes
+are preserved, not reopened by this source snapshot.
+
 P7's [common externalId follow-up](SCIM_P7_COMMON_EXTERNAL_ID.md) corrects
 admission/runtime behavior for all resource cores using RFC 7643 3.1, not
 column convenience. Namespaced externalId and custom displayName/active
-remain independent. Focused regression: 1,687 tests. P7 remains open for
-completed-candidate PATCH integration. This source package did not fix PUT
+remain independent. Source regression: 1,687 tests. That original source
+package did not include completed-candidate PATCH integration, now supplied
+by `4a0ac7d5`. The source package also did not fix PUT
 duplicate/anonymous retention; assembly separately fixed and verified that
 behavior in `b21e44cb`, retaining the neutral matcher.
 

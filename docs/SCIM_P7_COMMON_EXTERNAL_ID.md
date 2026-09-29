@@ -11,6 +11,12 @@ backends, not merged to master or deployed. PUT one-to-one retention was
 already fixed and independently verified in `b21e44cb`; it is not reopened
 by this common-attribute source-package handoff.
 
+**Later context refinement:** [Common attribute binding rules](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md)
+extend this correction to id/meta and preserve a schema also used as an
+extension. Read the admission statements below as applying to **core-only**
+schemas; shared declarations retain their extension meaning while runtime
+common precedence applies to the core binding.
+
 ## 1. The standard, not the storage column, decides the contract
 
 [RFC 7643 3.1](https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1)
@@ -44,7 +50,7 @@ would also be incorrect.
 
 | Boundary | Observed defect | Correction |
 | --- | --- | --- |
-| Profile admission | A custom core could explicitly declare integer/MV externalId, caseExact false or non-readWrite mutability | Reject the conflicting core declaration with an actionable common-attribute explanation |
+| Profile admission | A custom core could explicitly declare integer/MV externalId, caseExact false or non-readWrite mutability | Reject conflicting core-only declarations as operator policy; preserve shared core/extension declarations with per-binding runtime precedence |
 | Profile shorthand | An explicit custom-core `{name: externalId}` retained generic omission defaults | Expand its common characteristics without injecting restrictions into independent extension names |
 | Shared value validation | externalId was a reserved-key bypass | Validate its original JSON value as a single string in both strict modes |
 | User HTTP DTO | Implicit String conversion turned numeric/Boolean externalId into strings before validation | Keep its value unknown at the DTO boundary, then validate in the shared domain layer |
@@ -122,9 +128,12 @@ policy belongs to the separate P3b contract.
 
 ## 4. Profiles already in storage
 
-There is no silent database migration. A new conflicting declaration fails
-admin validation. On a later profile edit, the existing full-merged-profile
-validation also finds a conflicting old declaration before saving.
+There is no silent database migration. A new conflicting core-only declaration
+fails admin validation by provider policy, not because RFC 7643 mandates an
+admin rejection. On a later profile edit, full-merged-profile validation
+also finds conflicting old core-only declarations. A schema used as an
+extension is preserved rather than rewritten globally; its core binding
+still applies common precedence.
 
 Meanwhile runtime internal definitions apply the common String/SV/caseExact/
 readWrite precedence rather than treating obsolete core metadata as authority.

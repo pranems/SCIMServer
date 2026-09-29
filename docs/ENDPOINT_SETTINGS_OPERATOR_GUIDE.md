@@ -27,6 +27,11 @@ non-string top-level identifiers in both strict modes. This is an RFC 7643
 3.1 common contract, not a new flag/default or a blanket rule for custom
 attributes that happen to share a promoted column name.
 
+There is also no setting that makes top-level id/meta client-owned on custom
+resources. [The common binding contract](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md)
+ignores those inputs even with strict validation off while preserving
+independent extension fields, including schemas shared across resource types.
+
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 
 The Settings tab renders **all 37 server-registered endpoint settings**:

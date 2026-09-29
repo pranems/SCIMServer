@@ -29,7 +29,7 @@ import type {
   ValidationResult,
 } from './validation-types';
 import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
-import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, validateCommonAttributeValues } from './common-attributes';
+import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, effectiveCommonAttributes, validateCommonAttributeValues } from './common-attributes';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -1611,7 +1611,7 @@ export class SchemaValidator {
 
     for (const schema of schemas) {
       if (isCoreSchema(schema)) {
-        collect(schema.attributes.map(attr => effectiveCommonAttribute(attr, true)), core, coreSubAttrs);
+        collect(effectiveCommonAttributes(schema.attributes, true), core, coreSubAttrs);
       } else {
         const extSet = new Set<string>();
         const extSubMap = new Map<string, Set<string>>();
@@ -1692,7 +1692,7 @@ export class SchemaValidator {
 
       // Build attribute definition lookups
       if (isCore) {
-        for (const attr of schema.attributes) {
+        for (const attr of effectiveCommonAttributes(schema.attributes, true)) {
           coreAttrMap.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
         }
         if (!coreAttrMap.has('externalid')) coreAttrMap.set('externalid', COMMON_EXTERNAL_ID);
@@ -1786,7 +1786,7 @@ export class SchemaValidator {
         }
       };
 
-      walkAttrs(schema.attributes, topParent, true);
+      walkAttrs(effectiveCommonAttributes(schema.attributes, isCore), topParent, true);
     }
 
     // ─── Build readOnlyCollected from readOnlyByParent ───────────────

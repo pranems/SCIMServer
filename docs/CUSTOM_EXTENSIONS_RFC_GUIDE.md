@@ -13,6 +13,9 @@
 > **Common-attribute correction:** top-level externalId follows RFC 7643 3.1
 > even on custom resources; extension-namespaced externalId remains governed
 > by its own schema. See [the admission/runtime proof](SCIM_P7_COMMON_EXTERNAL_ID.md).
+> This includes a schema used as a core in one ResourceType and an extension
+> in another: [common semantics are resolved per binding](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md),
+> not inferred solely from a URN prefix or applied to every namespaced homonym.
 
 > **Audience:** operators and integrators defining schema extensions on top of SCIM core resources (`User`, `Group`, or custom resource types) for an endpoint of this server.
 > **Author:** Schema-conformance task, May 28, 2026

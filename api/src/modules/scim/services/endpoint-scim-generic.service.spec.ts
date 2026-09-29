@@ -202,6 +202,19 @@ describe('EndpointScimGenericService', () => {
   // ─── getResource ──────────────────────────────────────────────────────
 
   describe('getResource', () => {
+    it('uses authoritative stored timestamps instead of stale pre-write meta JSON', async () => {
+      mockGenericRepo.findByScimId.mockResolvedValue({
+        ...mockGenericRecord,
+        createdAt: new Date('2025-01-01T00:00:00.123Z'),
+        updatedAt: new Date('2025-01-02T00:00:00.456Z'),
+      });
+      const result = await service.getResource('scim-dev-001', baseUrl, endpointId, deviceResourceType);
+      expect(result.meta).toMatchObject({
+        created: '2025-01-01T00:00:00.123Z',
+        lastModified: '2025-01-02T00:00:00.456Z',
+      });
+    });
+
     it('should return a SCIM resource by scimId', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
 

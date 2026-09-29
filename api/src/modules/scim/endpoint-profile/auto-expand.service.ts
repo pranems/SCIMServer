@@ -25,7 +25,7 @@ import {
   PROJECT_AUTO_INJECT_ATTRIBUTES,
 } from './rfc-baseline';
 import { isUnsafeObjectKey } from '../../../security/safe-object-key';
-import { COMMON_EXTERNAL_ID } from '../../../domain/validation/common-attributes';
+import { COMMON_EXTERNAL_ID, isCommonAttributeName } from '../../../domain/validation/common-attributes';
 // Settings v7: SCIM_CORE_GROUP_SCHEMA import removed (D7 Group active removed)
 
 // ─── Expand a single attribute ──────────────────────────────────────────
@@ -37,7 +37,9 @@ import { COMMON_EXTERNAL_ID } from '../../../domain/validation/common-attributes
 function expandAttribute(
   partial: Partial<ScimSchemaAttribute>,
   schemaId: string,
+  extensionUse = false,
 ): ScimSchemaAttribute {
+  if (extensionUse && partial.name && isCommonAttributeName(partial.name)) return partial as ScimSchemaAttribute;
   const attrMap = RFC_SCHEMA_ATTRIBUTE_MAPS.get(schemaId);
   if (!attrMap || !partial.name) {
     // Unknown schema or no name - return as-is (custom attribute)
@@ -76,7 +78,7 @@ function stripUndefined(obj: Record<string, any>): Record<string, any> {
  * Expand a shorthand schema into a full ScimSchemaDefinition.
  * Handles "all" shorthand and partial attribute expansion.
  */
-function expandSchema(input: ShorthandSchemaInput): ScimSchemaDefinition {
+function expandSchema(input: ShorthandSchemaInput, extensionUse = false): ScimSchemaDefinition {
   let attributes: ScimSchemaAttribute[];
 
   if (input.attributes === 'all') {
@@ -91,7 +93,7 @@ function expandSchema(input: ShorthandSchemaInput): ScimSchemaDefinition {
     attributes = [...allAttrs] as ScimSchemaAttribute[];
   } else if (Array.isArray(input.attributes)) {
     // Expand each partial attribute
-    attributes = input.attributes.map(a => expandAttribute(a, input.id));
+    attributes = input.attributes.map(a => expandAttribute(a, input.id, extensionUse));
   } else {
     // No attributes (extension schema - passthrough storage)
     attributes = [];
@@ -111,7 +113,7 @@ function expandSchema(input: ShorthandSchemaInput): ScimSchemaDefinition {
  * Ensure RFC-required and project-default attributes are present on a schema.
  * Adds missing attributes from the RFC baseline without overriding existing ones.
  */
-function autoInjectAttributes(schema: ScimSchemaDefinition): ScimSchemaDefinition {
+function autoInjectAttributes(schema: ScimSchemaDefinition, extensionUse = false): ScimSchemaDefinition {
   const existingNames = new Set(schema.attributes.map(a => a.name.toLowerCase()));
   const attrMap = RFC_SCHEMA_ATTRIBUTE_MAPS.get(schema.id);
   const toInject: ScimSchemaAttribute[] = [];
@@ -120,6 +122,7 @@ function autoInjectAttributes(schema: ScimSchemaDefinition): ScimSchemaDefinitio
   const required = RFC_REQUIRED_ATTRIBUTES.get(schema.id);
   if (required) {
     for (const name of required) {
+      if (extensionUse && isCommonAttributeName(name)) continue;
       if (!existingNames.has(name.toLowerCase()) && attrMap) {
         const baseline = attrMap.get(name.toLowerCase());
         if (baseline) {
@@ -133,6 +136,7 @@ function autoInjectAttributes(schema: ScimSchemaDefinition): ScimSchemaDefinitio
   // 2. Project defaults: externalId, meta (on all core schemas with baselines)
   if (attrMap) {
     for (const name of PROJECT_AUTO_INJECT_ATTRIBUTES) {
+      if (extensionUse && isCommonAttributeName(name)) continue;
       if (!existingNames.has(name.toLowerCase())) {
         const baseline = attrMap.get(name.toLowerCase());
         if (baseline) {
@@ -244,17 +248,18 @@ export function expandAuthentication(auth: ProfileAuthentication): ProfileAuthen
 }
 
 export function expandProfile(input: ShorthandProfileInput): EndpointProfile {
+  const resourceTypes = input.resourceTypes ?? [];
+  const extensionSchemas = new Set(resourceTypes.flatMap(rt => (rt.schemaExtensions ?? []).map(ext => ext.schema)));
   // 1. Expand schemas
-  const expandedSchemas = (input.schemas ?? []).map(s => expandSchema(s));
+  const expandedSchemas = (input.schemas ?? []).map(s => expandSchema(s, extensionSchemas.has(s.id)));
 
   // 2. Auto-inject required/project-default attributes
-  const injectedSchemas = expandedSchemas.map(s => autoInjectAttributes(s));
+  const injectedSchemas = expandedSchemas.map(s => autoInjectAttributes(s, extensionSchemas.has(s.id)));
 
   // 3. Resource types (already fully defined in presets/input)
-  const resourceTypes = input.resourceTypes ?? [];
   const coreSchemas = new Set(resourceTypes.map(rt => rt.schema));
   for (const schema of injectedSchemas) {
-    if (!coreSchemas.has(schema.id)) continue;
+    if (!coreSchemas.has(schema.id) || extensionSchemas.has(schema.id)) continue;
     schema.attributes = schema.attributes.map(attr => attr.name.toLowerCase() === 'externalid'
       ? { ...COMMON_EXTERNAL_ID, ...attr } : attr);
   }

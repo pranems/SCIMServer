@@ -20,12 +20,17 @@ async function runP7Contract(baseUrl, secret) {
   const base = new URL(baseUrl);
   assert.ok(["http:", "https:"].includes(base.protocol));
   assert.ok(secret);
-  const fixture = path.join(API, "test", "e2e", "helpers", "profile-p7-readonly.fixture.ts");
-  const loaded = new Module(fixture, module);
-  loaded._compile(require(path.join(API, "node_modules", "typescript")).transpileModule(fs.readFileSync(fixture, "utf8"), {
-    compilerOptions: { module: require(path.join(API, "node_modules", "typescript")).ModuleKind.CommonJS },
-  }).outputText, fixture);
-  const { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } = loaded.exports;
+  const ts = require(path.join(API, "node_modules", "typescript"));
+  const loadFixture = name => {
+    const fixture = path.join(API, "test", "e2e", "helpers", name);
+    const loaded = new Module(fixture, module);
+    loaded._compile(ts.transpileModule(fs.readFileSync(fixture, "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText, fixture);
+    return loaded.exports;
+  };
+  const { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } = loadFixture("profile-p7-readonly.fixture.ts");
+  const { commonContextProfile, SHARED_COMMON_SCHEMA, OTHER_COMMON_SCHEMA } = loadFixture("profile-p7-common-context.fixture.ts");
   let assertions = 0;
   const eq = (actual, expected) => { assert.deepEqual(actual, expected); assertions++; };
   const http = async (method, route, body) => {
@@ -169,6 +174,48 @@ async function runP7Contract(baseUrl, secret) {
       } finally {
         eq((await http("DELETE", admin)).status, 204);
       }
+    }
+  }
+  for (const strict of [false, true]) {
+    const profile = commonContextProfile(strict);
+    const endpoint = await http("POST", "/scim/admin/endpoints", { name: `p7-common-context-${crypto.randomUUID()}`, profile });
+    eq(endpoint.status, 201);
+    const admin = `/scim/admin/endpoints/${endpoint.body.id}`;
+    const route = `/scim/endpoints/${endpoint.body.id}`;
+    try {
+      eq(endpoint.body.profile.schemas[0].attributes, profile.schemas[0].attributes);
+      const core = { schemas: [SHARED_COMMON_SCHEMA], externalId: "Client-AbC", ID: [42], META: "spoof",
+        displayName: [7, 9], active: "custom" };
+      const created = await http("POST", `${route}/Shareds`, core);
+      eq(created.status, 201);
+      eq(created.body.ID, undefined);
+      eq(created.body.META, undefined);
+      eq(typeof created.body.id, "string");
+      eq(created.body.externalId, "Client-AbC");
+      eq(created.body.meta.resourceType, "Shared");
+      eq(created.body.displayName, [7, 9]);
+      eq(created.body.active, "custom");
+      const item = `${route}/Shareds/${created.body.id}`;
+      const replaced = await http("PUT", item, { ...core, id: { fake: true }, meta: [1], externalId: "Client-New" });
+      eq(replaced.status, 200);
+      eq(replaced.body.id, created.body.id);
+      eq(replaced.body.meta.created, created.body.meta.created);
+      eq(replaced.body.externalId, "Client-New");
+      const rejected = await http("PUT", item, { ...core, externalId: [7] });
+      eq(rejected.status, 400);
+      eq(rejected.body.scimType, "invalidValue");
+      eq((await http("GET", item)).body, replaced.body);
+      const independent = { externalId: [11, 13], id: [17], meta: "extension", displayName: [19], active: "ext" };
+      const extension = { schemas: [OTHER_COMMON_SCHEMA, SHARED_COMMON_SCHEMA], label: "other", [SHARED_COMMON_SCHEMA]: independent };
+      const extCreated = await http("POST", `${route}/Others`, extension);
+      eq(extCreated.status, 201);
+      eq(extCreated.body[SHARED_COMMON_SCHEMA], independent);
+      const extPut = await http("PUT", `${route}/Others/${extCreated.body.id}`, extension);
+      eq(extPut.status, 200);
+      eq(extPut.body[SHARED_COMMON_SCHEMA], independent);
+      eq((await http("GET", admin)).body.profile.schemas[0].attributes, profile.schemas[0].attributes);
+    } finally {
+      eq((await http("DELETE", admin)).status, 204);
     }
   }
   return { assertions, observed, endpointCleanup: "deleted" };

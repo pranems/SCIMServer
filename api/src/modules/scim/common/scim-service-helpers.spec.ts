@@ -254,7 +254,7 @@ describe('ScimSchemaHelpers', () => {
 
       const dto = { schemas: [CORE_URN, EXT_URN] };
       const result = helpers.buildSchemaDefinitions(dto, 'ep-1');
-      expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, extDef]);
+      expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, { ...extDef, isCoreSchema: false }]);
     });
 
     it('should return empty array when no schemas registered', () => {
@@ -396,7 +396,7 @@ describe('ScimSchemaHelpers', () => {
       });
       mockRegistry.getExtensionUrns.mockReturnValue([EXT_URN]);
       const result = helpers.getSchemaDefinitions('ep-1');
-      expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, extDef]);
+      expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, { ...extDef, isCoreSchema: false }]);
     });
   });
 

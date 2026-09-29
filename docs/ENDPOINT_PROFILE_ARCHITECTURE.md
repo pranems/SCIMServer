@@ -46,6 +46,13 @@ baselines. Its shorthand expands common characteristics, and obsolete core
 definitions cannot turn client-owned identifiers readOnly. Namespaced
 extension attributes remain independent. [Implementation and evidence](SCIM_P7_COMMON_EXTERNAL_ID.md).
 
+The [binding-context follow-up](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md) extends
+common precedence to id/meta. Core-only conflicting declarations are rejected
+as an admin policy; schemas used as extensions are preserved and receive
+common overrides only in a core runtime binding. Neither expansion nor
+tighten-only checks globally rewrite their common-looking extension fields.
+Explicit internal extension roles replace URN-prefix guesses.
+
 Every endpoint has a **profile** that fully defines its SCIM behavior. A profile is the single source of truth for:
 
 1. **What schemas** are available (attributes, types, characteristics)

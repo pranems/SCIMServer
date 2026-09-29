@@ -25,6 +25,12 @@ resource: it is a common String/single-valued/caseExact/readWrite attribute.
 An externalId inside an extension has its own independent definition.
 See [the standards correction](SCIM_P7_COMMON_EXTERNAL_ID.md).
 
+Top-level id/meta remain server-owned if omitted from a custom-core schema.
+For a schema shared as core and extension, the [binding-aware policy](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md)
+preserves the declaration and applies common semantics only to core usage.
+Admin rejection of conflicting **core-only** declarations is an explicit
+provider choice; RFC precedence itself does not prescribe an admin API.
+
 ---
 
 ## Table of Contents

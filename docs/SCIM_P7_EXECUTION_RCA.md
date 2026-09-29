@@ -26,6 +26,32 @@ Ordered PATCH and cross-package integration remain separate.
 
 ## Design disposition
 
+### Common id/meta and schema-binding context follow-up to 8e8aa72e
+
+| Issue | Type / severity | Confirmed mechanism and fix | Prevention / detection |
+| --- | --- | --- | --- |
+| Earlier numeric/MV top-level externalId reasoning was wrong | Standards reasoning / high | It confused the ability to retain rawPayload with permission to redefine a common attribute. RFC 7643 3.1 applies to every extended resource and overrides older core declarations. | Recorded correction: top-level externalId is common; extension externalId is independent. The prior common-externalId commit carries original-type RED/GREEN tests. This follow-up preserves those tests and checks binding context. |
+| Common id/meta depended on custom declarations | Correctness / high | Generic cores with absent/conflicting definitions could retain mixed-case ID/META input or apply caller mutability rules. | Internal core characteristics always include common id/meta; input is ignored and authoritative output remains server-owned. Nine domain and four HTTP REDs captured before this follow-up's production edits. |
+| A schema's core use contaminated its extension use | Context/compatibility / high | Admission and expansion treated any core binding as a global property of the schema. Extension builders also relied on a URN prefix to infer core semantics. | Apply common semantics per resource binding; mark extension definitions isCoreSchema false explicitly. Preserve shared definitions; skip common baseline rewrite/tighten-only handling for extension-capable schemas. Added one further known-schema RED before that correction. |
+| Generic metadata created timestamp changed on first PUT | Correctness / medium | Create's serialized meta timestamp preceded the repository's actual createdAt by a millisecond; PUT used createdAt, so created appeared to change. | A deterministic unit RED with intentionally different meta/record times locks authority. Responses now derive created/lastModified from record timestamps, matching builtin resources. |
+| Common meta location lost caseExact in the first normalization draft | Regression / medium | The new common metadata descriptor omitted a characteristic already carried by the existing schema. | Existing cached/fallback caseExact regressions caught it; location retains caseExact true. No expectation was weakened. |
+| Explicit extension role changed helper snapshots | Test maintenance / low | Two helper tests expected an omitted role marker even though explicit false is needed for core-shaped extension URNs. | Update exact expected internal definitions to include isCoreSchema false; public profile/resource allowlists verify the marker does not leak. |
+| Diagnostic formatting added one lint warning | Static analysis / low | Generic String(common[key]) could stringify an object according to the static type. | JSON.stringify makes the fixed characteristic representation explicit. Final lint returns to the measured 0 errors/34 warnings. |
+
+Final proof: 1,698 focused units; 108 HTTP tests and 472 live assertions per
+backend on PostgreSQL 17.8 (all 22 migrations) and InMemory. Exact source
+fingerprint matches the tested source. Owned endpoints, runtimes and container
+were cleaned up. The 26-document freshness/content gates and 23 dual-theme
+diagram renders passed. Existing renderer-version discovery still reports
+0.0.0; no invalid dependency repin was attempted.
+
+Reconciliation covered visible context-follow-up turns plus retained
+RED/GREEN/regression/lint/backend logs. No unavailable full-parent-transcript
+scan is claimed. Self-review confirmed common role markers stay internal,
+shared schema attributes are never mutated by runtime cache construction,
+and admission rejection is documented as provider policy rather than
+misattributed to an RFC admin requirement.
+
 ### Common externalId follow-up to 892b74ba
 
 | Issue | Type / severity | Confirmed mechanism and fix | Prevention / detection |

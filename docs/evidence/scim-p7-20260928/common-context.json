@@ -1,0 +1,90 @@
+{
+  "package": "P7 common id/meta and schema binding context",
+  "base": "8e8aa72e2a92d3389ea6fd4d72cf8c129c849e69",
+  "branch": "fix/scim-profile-validation-20260928",
+  "sourceSha256": "f57a01bd06b0d810c01e80bdc48a4c8936ed9d528681bf9a9a56236bbd5a331e",
+  "sourceFileCount": 555,
+  "status": "locally-validated-not-pushed-or-deployed",
+  "red": {
+    "initialDomainFailed": 9,
+    "initialDomainPriorControlsPassed": 14,
+    "initialHttpFailed": 4,
+    "additionalKnownSchemaContextFailed": 1,
+    "additionalTimestampAuthorityFailed": 1,
+    "artifacts": [
+      "test-results/p7-common-context/unit-red.json",
+      "test-results/p7-common-context/http-red.json",
+      "test-results/p7-common-context/known-context-red.log",
+      "test-results/p7-common-context/timestamp-red.log"
+    ]
+  },
+  "focusedRegression": {
+    "suites": 25,
+    "passed": 1698,
+    "failed": 0,
+    "artifact": "test-results/p7-common-context/regression.json"
+  },
+  "backendRun": {
+    "startedAt": "2026-09-29T07:07:17.555Z",
+    "artifact": "test-results/p7/backends-30b457398ac733be/run.json",
+    "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+    "postgres": {
+      "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "versionNum": 170008,
+      "database": "scim_p1_30b457398ac733be",
+      "clusterName": "scim-p1-30b457398ac733be",
+      "systemIdentifier": "7690850470457090083",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "migrationsAppliedAndVerified": 22
+    },
+    "backends": [
+      {
+        "backend": "inmemory",
+        "httpPassed": 108,
+        "httpFailed": 0,
+        "liveAssertions": 472,
+        "runtimePid": 38080,
+        "runtimeStopped": true,
+        "endpointsDeleted": true
+      },
+      {
+        "backend": "prisma",
+        "httpPassed": 108,
+        "httpFailed": 0,
+        "liveAssertions": 472,
+        "runtimePid": 476,
+        "runtimeStopped": true,
+        "endpointsDeleted": true
+      }
+    ],
+    "cleanup": {
+      "exactContainerId": "828d7c9793631ed3cc2305e4994a23c9c40352207edfe61a7682c3a49b4f2205",
+      "removed": true
+    }
+  },
+  "gates": {
+    "build": "passed",
+    "productionLintErrors": 0,
+    "productionLintWarningsBefore": 34,
+    "productionLintWarningsAfter": 34,
+    "mermaid": "23 blocks in touched docs rendered in light and dark under strict security",
+    "docFreshness": "passed: 26 documents",
+    "docContent": "passed: 26 documents",
+    "review": "Self-review covered binding-role propagation, cache/fallback common precedence, immutable shared declarations, core-only admission policy and timestamp authority. Existing regression gates caught and corrected a missing meta.location caseExact characteristic. No open finding within this bounded change.",
+    "rendererWarning": "Existing built-in discovery reports Mermaid 0.0.0; pinned 11.15.0 Chromium rendering passed. No repin."
+  },
+  "scope": {
+    "profileAdmissionPolicy": "Reject explicit common conflicts on core-only schemas as provider policy; preserve extension-capable shared declarations and apply common precedence only to core bindings.",
+    "orderedPatchExecutionChanged": false,
+    "atomicUniquenessChanged": false,
+    "newFlagsOrDefaultToggles": false,
+    "versionsOrLockfilesChanged": false,
+    "liveEstateOrSharedDatabaseAccess": false,
+    "p7Complete": false,
+    "remaining": [
+      "Final P2 integration, including common-attribute PATCH checks on the complete evolving candidate.",
+      "Previously confirmed PUT duplicate/anonymous one-to-one retention blocker, owned by integration.",
+      "No claim that every common-attribute query/serialization policy has been exhaustively redesigned."
+    ]
+  }
+}

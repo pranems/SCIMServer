@@ -14,6 +14,10 @@
 > caseExact true and readWrite on every resource core, including custom
 > types. A namespaced extension externalId is independent. Custom-core
 > displayName/active are not restricted by storage-column types.
+> [Binding-aware common id/meta](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md) are
+> server-owned even when omitted/conflicting in a custom core. A schema also
+> used as an extension is preserved; common overrides apply to its core use
+> only, not globally to the shared declaration.
 
 > **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types

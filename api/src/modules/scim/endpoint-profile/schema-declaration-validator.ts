@@ -1,5 +1,5 @@
 import type { ProfileValidationError } from './endpoint-profile.service';
-import { COMMON_EXTERNAL_ID } from '../../../domain/validation/common-attributes';
+import { COMMON_EXTERNAL_ID, COMMON_ID, COMMON_META } from '../../../domain/validation/common-attributes';
 
 const KEYWORDS: Record<string, readonly string[]> = {
   type: ['string', 'boolean', 'decimal', 'integer', 'dateTime', 'reference', 'complex', 'binary'],
@@ -21,6 +21,9 @@ export function validateSchemaDeclarations(input: unknown): ProfileValidationErr
     errors.push({ code, detail: `${path}: ${detail}` });
   const coreSchemas = new Set(object(input) && Array.isArray(input.resourceTypes)
     ? input.resourceTypes.filter(object).map(rt => rt.schema) : []);
+  const extensionSchemas = new Set(object(input) && Array.isArray(input.resourceTypes)
+    ? input.resourceTypes.filter(object).flatMap(rt => Array.isArray(rt.schemaExtensions)
+      ? rt.schemaExtensions.filter(object).map(ext => ext.schema) : []) : []);
   const attributes = (value: unknown, path: string, coreRoot = false): void => {
     if (!Array.isArray(value)) { fail(path, 'must be an array of attribute definitions.'); return; }
     const seen = new Set<string>();
@@ -48,10 +51,13 @@ export function validateSchemaDeclarations(input: unknown): ProfileValidationErr
           fail(`${here}.${key}`, 'must be an array of strings.');
         }
       }
-      if (coreRoot && typeof attr.name === 'string' && attr.name.toLowerCase() === 'externalid') {
-        for (const key of ['type', 'multiValued', 'caseExact', 'mutability'] as const) {
-          if (attr[key] !== undefined && attr[key] !== COMMON_EXTERNAL_ID[key]) {
-            fail(`${here}.${key}`, `must be ${String(COMMON_EXTERNAL_ID[key])} for the common externalId attribute (RFC 7643 3.1).`);
+      if (coreRoot && typeof attr.name === 'string') {
+        const common = ({ externalid: COMMON_EXTERNAL_ID, id: COMMON_ID, meta: COMMON_META } as Record<string, Record<string, unknown>>)[attr.name.toLowerCase()];
+        const keys = attr.name.toLowerCase() === 'externalid'
+          ? ['type', 'multiValued', 'caseExact', 'mutability'] : ['type', 'multiValued', 'caseExact', 'mutability', 'returned'];
+        for (const key of keys) {
+          if (common && common[key] !== undefined && attr[key] !== undefined && attr[key] !== common[key]) {
+            fail(`${here}.${key}`, `must be ${JSON.stringify(common[key])} for common ${attr.name} (RFC 7643 3.1).`);
           }
         }
       }
@@ -74,7 +80,7 @@ export function validateSchemaDeclarations(input: unknown): ProfileValidationErr
         if (typeof schema[key] !== 'string' || !schema[key].length) fail(`${here}.${key}`, 'must be a non-empty string.');
       }
       if (schema.attributes !== undefined && schema.attributes !== 'all') {
-        attributes(schema.attributes, `${here}.attributes`, coreSchemas.has(schema.id));
+        attributes(schema.attributes, `${here}.attributes`, coreSchemas.has(schema.id) && !extensionSchemas.has(schema.id));
       }
     }
   }

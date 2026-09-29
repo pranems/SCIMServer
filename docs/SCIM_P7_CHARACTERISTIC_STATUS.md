@@ -11,6 +11,7 @@ readOnly follow-up is a separate commit.
 | Concern | Classification | Status and next action |
 | --- | --- | --- |
 | Common top-level externalId on every resource core | RFC-defined contract, not column policy | [Common externalId correction](SCIM_P7_COMMON_EXTERNAL_ID.md): String/SV/caseExact true/readWrite, including custom resources; extension names remain independent |
+| Common id/meta and dual core/extension schema use | Verified follow-up | [Context-aware common precedence](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md): ignore client id/meta, retain authoritative metadata, preserve shared extension definitions, explicitly mark binding roles |
 | Valid declaration shapes, type/Boolean/keyword checks, omitted defaults | Implemented P7a contract | Profile validation checks raw and expanded declarations. Existing defaults are unchanged. |
 | Scalar and array/child cardinality under strict validation | Implemented P7a contract | Values use the existing SchemaValidator; strict-off behavior remains a deliberate compatibility choice. |
 | POST/PUT readOnly at supported RFC depths | Implemented P7a contract | Ignore input, preserve server-owned state on PUT, and normalize only client-writable input. |

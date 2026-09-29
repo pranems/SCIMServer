@@ -925,7 +925,7 @@ export class ScimSchemaHelpers {
     const extUrns = this.schemaRegistry.getExtensionUrns();
     for (const urn of extUrns) {
       const ext = this.schemaRegistry.getSchema(urn);
-      if (ext) schemas.push(ext as SchemaDefinition);
+      if (ext) schemas.push({ ...ext, isCoreSchema: false } as SchemaDefinition);
     }
     return schemas;
   }
@@ -1171,10 +1171,11 @@ export class ScimSchemaHelpers {
           schemas.push({
             id: profileExt.id,
             attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+            isCoreSchema: false,
           });
         } else {
           const globalExt = this.schemaRegistry.getSchema(urn);
-          if (globalExt) schemas.push(globalExt as SchemaDefinition);
+          if (globalExt) schemas.push({ ...globalExt, isCoreSchema: false } as SchemaDefinition);
         }
       }
     }

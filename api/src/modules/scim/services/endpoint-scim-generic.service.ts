@@ -755,6 +755,8 @@ export class EndpointScimGenericService {
 
     // Ensure version is current
     meta.version = `W/"v${record.version}"`;
+    meta.created = record.createdAt.toISOString();
+    meta.lastModified = record.updatedAt.toISOString();
 
     // GEN-04: Parent-context-aware boolean sanitization on output
     const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
@@ -1203,11 +1205,12 @@ export class EndpointScimGenericService {
           schemas.push({
             id: profileExt.id,
             attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+            isCoreSchema: false,
           });
         } else {
           const extSchema = this.schemaRegistry.getSchema(urn);
           if (extSchema) {
-            schemas.push(extSchema as SchemaDefinition);
+            schemas.push({ ...extSchema, isCoreSchema: false } as SchemaDefinition);
           }
         }
       }
