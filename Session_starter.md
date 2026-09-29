@@ -19,12 +19,13 @@ P5's identical helper contract and P2/P7 selector/minimum guards are preserved.
 **P3b core assembled:** `de05e67b` -> `1d37e7b8` adds atomic uniqueness
 repository policies. Build, 524 focused units, 382 distinct InMemory HTTP
 cases (two native-DB skips) and 136 bounded built-live checks pass.
-**Acceptance remains blocked:** six no-write probes expose unsupported-type
-and generic promoted-column policy/reconstruction discrepancies; P3b owns
-the correction, not P7's common-externalId work.
-P3b also confirmed reference values must compare case-exactly (RFC 7643
-2.3.7). A new owner follow-up will correct that and unsupported uniqueness
-types; no acceptance is claimed before its SHA and proof arrive.
+**RFC correction integrated:** `cefb540b` -> `1f0a024a` rejects unsupported
+unique types and compares references exactly. Build, 211 focused units,
+167 InMemory HTTP cases (one native-DB skip), seven no-write controls and
+the 21-assertion built-local smoke pass.
+**Acceptance remains blocked:** the three generic promoted-column
+restriction/candidate-authority probes remain unresolved with P3b, separately
+from P7's common-externalId work. Prior receipts remain historical.
 
 **Latest integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
@@ -94,6 +95,7 @@ supersedes the earlier unrestricted custom-core externalId assumption.
 - [x] ✅ COMPLETED: P2 core `7113ee86` -> `2242860d`; public deepEqual/P7 seams preserved, `9z-CZ` runs ordered PATCH, and verified I02 is default-running.
 - [x] ✅ COMPLETED: Separate PUT retention correction shares P2's matcher through a neutral domain seam, with `9z-DA` live coverage.
 - [x] ✅ COMPLETED: P3b core assembled with P3/P4/P8 guards intact; `9z-DB` runs the original 21 string-MV uniqueness assertions plus endpoint cleanup.
+- [x] ✅ COMPLETED: P3b RFC follow-up `cefb540b` integrated as `1f0a024a`; supported types/references corrected without claiming generic representation closure.
 - [ ] Close P3b's documented unsupported-type/generic-authority acceptance hold before claiming promised uniqueness complete.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.

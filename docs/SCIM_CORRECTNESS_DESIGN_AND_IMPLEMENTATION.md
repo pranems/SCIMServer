@@ -411,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Core/RFC correction integrated; generic representation hold OPEN | `de05e67b` -> `1d37e7b8` plus `cefb540b` restrict supported scalar uniqueness and make references exact. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). New combined validation is pending; custom-core promoted-column restrictions/reconstruction remain with P3b, distinct from P7 common externalId |
+| P3b | Core/RFC correction integrated and focused checks passed; generic representation hold OPEN | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`. Supported unique scalar types/references are corrected. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Three no-write generic promoted-column restrictions/reconstruction probes remain unresolved, distinct from P7 common externalId |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
@@ -1382,6 +1382,47 @@ Logs are in `test-results/scim-integration-p9-hardening/`.
 not only an earlier marker-absence check.
 **Design disposition: accepted.** Reuse the existing optional pin seam; apply
 the wrapper only to its owned harness instead of changing ordinary test behavior.
+
+### 11.18 P3b RFC type-applicability follow-up
+
+Only follow-up `cefb540be4f979f7019e99131f8b3f5e6759002a` was appended, as
+`1f0a024a`; `de05e67b` was already integrated and not repeated. The corrected
+runtime policy supports String/integer/decimal/reference scalar leaves and
+MV elements. Explicit server uniqueness on Boolean/dateTime/binary/complex
+fails with INVALID_VALUE rather than gaining invented normalized comparisons.
+References are case-exact by type, even if the schema omitted or contradicted
+`caseExact`. Legitimate nonunique values remain accepted.
+
+| Focused integration check | Result |
+|---|---|
+| API build | PASS |
+| Policy, mapped error, CAS and Group aggregate units | 5 suites / 211 passed |
+| Corrected atomic-uniqueness/P7/CAS/endpoint-deletion HTTP | 4 suites / 167 passed; one native PostgreSQL-only control skipped on InMemory |
+| Changed policy/tests lint | 0 errors / 0 warnings |
+| Built-local scoped smoke | Original 21 String/MV assertions plus endpoint cleanup pass; two reported checks, unchanged pre-existing endpoint collection, owned API stopped |
+| Compiled no-write checks | Four excluded types reject; three reference caseExact configurations retain distinct case-sensitive values and reject identical references |
+| Generic representation checks | Three earlier generic restrictions/overlays still reproduce and remain OPEN |
+
+The source package's corrected **640 units / 144 PostgreSQL HTTP /
+142 InMemory HTTP plus two native N/A** counts remain in its
+[new RFC receipt](evidence/scim-uniqueness-rfc-20260929.json).
+The original 638/142/140 receipt is historical, not rewritten into the new
+source proof. This integration increment used explicit InMemory/inert URL
+and built-local smoke only; it makes no new integrated PostgreSQL claim.
+Logs are in `test-results/scim-integration-p3b-rfc/`.
+
+The corrected fixture declares Boolean/dateTime/binary nonunique and proves
+repeats are allowed; acceptance checks must not keep relying on the earlier
+inconsistent server declarations. P7 owns admission consistency. The generic
+custom-core displayName/active column restrictions and candidate overlays
+are untouched by this RFC commit and remain separately assigned to P3b.
+No broad uniqueness/C0, deployment or data-repair closure is implied.
+
+**Assurance improvement: applied.** Type-specific characteristic applicability
+is checked before choosing equality semantics, with both rejection and
+legitimate-no-constraint controls.
+**Design disposition: accepted.** Remove unsupported comparison branches;
+retain the existing typed policy and repository transaction seams.
 
 ## 12. Architecture and self-improvement decisions
 
