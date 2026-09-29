@@ -6,11 +6,11 @@
 
 **Audience:** integrators wiring a SCIM client (Microsoft Entra ID, Okta, custom), operators configuring endpoint profiles, and contributors changing PATCH code.
 
-**Status:** living reference. The P1 typed-path behavior below was verified on the
-isolated implementation branch with both local persistence backends, not deployed.
-Other operation-policy sections retain older behavior notes. See
-[P1 implementation and limits](SCIM_P1_IMPLEMENTATION.md) before interpreting
-this guide as an all-PATCH conformance claim.
+**Status:** living reference. P1 typed paths and P2 shared ordered execution
+were verified on isolated implementation branches with both local persistence
+backends, not deployed. See [P1](SCIM_P1_IMPLEMENTATION.md) and
+[P2 behavior, compatibility and evidence](SCIM_P2_IMPLEMENTATION.md). This is
+not an all-PATCH or whole-roadmap conformance claim.
 
 **P1 typed paths:** native Boolean, number and null predicates, quoted-Boolean
 compatibility, compound/presence filters and JSON escapes share one parser across
@@ -18,8 +18,15 @@ Users, Groups, custom cores and extensions. Invalid, nested or repeated bracket
 syntax returns 400 `invalidPath` with a zero-based failing operation index,
 regardless of `StrictSchemaValidation`. It never falls back to a literal key.
 Each selector sees the current working state produced by earlier operations.
-`caseExact` applies per predicate leaf and namespace. Primary handoff, append,
-all-match updates and required/immutable transitions remain P2 work.
+`caseExact` applies per predicate leaf and namespace.
+
+**P2 operation semantics:** all three resource adapters use one executor.
+Multi-valued add appends, including one-element and no-path forms; filtered
+replace/remove affects all matches. Required/immutable transitions are checked
+after every operation, even with strict validation disabled. New primary
+selection clears the old primary before the next operation. Expanded no-path
+readOnly targets and namespace clearing respect the configured ignore/reject
+policy. See the P2 guide for the explicitly retained compatibility boundaries.
 
 **RFC references:**
 - [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
@@ -140,6 +147,9 @@ sequenceDiagram
     Svc->>Svc: coerce booleans (if flag), strip readOnly (matrix)
     Svc->>Svc: pre-op schema validation (strict)
     Svc->>Eng: apply(operations, state, config)
+    loop Every operation in order
+        Eng->>Eng: resolve target, apply, hand off primary, validate transition
+    end
     Eng-->>Svc: { payload, extractedFields }
     Svc->>Svc: post-PATCH validate (scoped to touched), primary + immutable checks
     Svc->>Repo: update (bumps meta.version)
@@ -218,9 +228,12 @@ Per [RFC 7644 §3.5.2.1-3](https://datatracker.ietf.org/doc/html/rfc7644#section
 |------|-------------|-------------|-----------|
 | `add` | Add a value; if the target exists, replace it; if multi-valued, append | Not a legal addend; ambiguous | Permissive: `[null]` elements in a multi-valued array are rejected 400 `invalidValue` (F4) |
 | `replace` | Replace the value at the target; if path omitted, merge the value object into the resource; complex value merges sub-attributes and leaves unspecified ones unchanged | **Unassign** the target (functionally equivalent to remove on that path) | `replace path=name value={familyName:null}` clears only `familyName` and preserves siblings (F1 merge, Entra/Okta de-facto). `replace path=members value=null` empties a Group (F2) |
-| `remove` | Remove the value at `path`; `path` required; value-path filter removes matching elements | `value` is irrelevant and ignored | Bare `remove path` on a value-path that matches nothing -> 400 `noTarget` (F3, RFC MUST). Required attribute removal -> 400 `mutability`/`invalidValue` |
+| `remove` | Remove the value at `path`; `path` required; value-path filter removes matching elements | Group Entra removal arrays are explicit compatibility | Ordinary zero-match selectors retain 400 `noTarget`; Group-member zero-match remove is idempotent compatibility. The RFC prose/example tension is not presented as a universal MUST. Required removal -> 400 `invalidValue` |
 
-Special multi-valued rule (RFC 7644 §3.5.2): setting any element's `primary` to `true` forces every other element's `primary` to `false`. SCIMServer applies this via the `PrimaryEnforcement` setting ([§6.7](#67-primaryenforcement)).
+Special multi-valued rule (RFC 7644 §3.5.2): selecting a new `primary:true`
+clears the previous primary during that operation, before the next selector.
+`PrimaryEnforcement` ([§6.7](#67-primaryenforcement)) still handles multiple
+explicit primary values supplied together; it does not disable handoff.
 
 The complete null-handling design (F1-F9) lives in [PATCH_NULL_HANDLING_RFC_COMPLIANCE.md](PATCH_NULL_HANDLING_RFC_COMPLIANCE.md).
 
@@ -293,11 +306,13 @@ Governs only the spec-ambiguous bare `remove path=members` (no filter, no value)
 
 ## 7. Users PATCH
 
-Engine: [user-patch-engine.ts](../api/src/domain/patch/user-patch-engine.ts). Dispatch order inside add/replace: column-promoted fields -> extension URN -> value-path -> verbose dot-notation -> simple/complex merge -> no-path merge.
+Adapter: [user-patch-engine.ts](../api/src/domain/patch/user-patch-engine.ts).
+The shared executor resolves typed paths before User promoted-field hooks,
+then applies ordinary scalar/complex/list mutations and transition checks.
 
 ### 7.1 Column-promoted fields
 
-`active`, `userName`, `displayName`, `externalId` are promoted to first-class DB columns and handled before generic path logic. Consequences:
+`active`, `userName`, `displayName`, `externalId` are promoted to first-class DB columns after typed target resolution. Consequences:
 - `replace active=false` toggles activation (subject to `UserSoftDeleteEnabled`).
 - `remove userName` -> 400 (required attribute, RFC 7643 §4.1).
 - `replace userName` updates the joining property (Entra "Update joining property").
@@ -445,6 +460,10 @@ Rename the group:
 
 `remove displayName` -> 400 (required for Group, RFC 7643 §4.2). Member entries with `value:null` are rejected 400 (F4). Duplicate members are de-duplicated.
 
+P2 also accepts `add displayName` and ordinary schema-declared Group
+attributes through the shared executor. Member-specific settings remain in
+the Group adapter; they do not govern unrelated extension attributes.
+
 ---
 
 ## 9. Custom extension attributes PATCH
@@ -548,14 +567,15 @@ No-path merge works identically:
 
 ```mermaid
 flowchart LR
-    Eng["PATCH engine output<br/>{ payload, extractedFields }"] --> Svc["Service"]
+    Step["Shared executor: each ordered transition"] --> Eng["PATCH engine output<br/>{ payload, extractedFields }"]
+    Eng --> Svc["Service"]
     Svc --> PostV["Post-PATCH validation<br/>(scoped to touched attrs)<br/>primary + immutable checks"]
     PostV --> Repo{"Backend"}
     Repo -->|Prisma| PG["PostgreSQL row:<br/>promoted columns (userName,<br/>displayName, active, externalId)<br/>+ JSONB payload"]
     Repo -->|InMemory| MEM["In-process map<br/>(parity with Prisma)"]
     PG --> Meta["meta.version bumped<br/>meta.lastModified updated"]
     MEM --> Meta
-    Meta --> ETag["ETag header reflects<br/>new W/\"vN\""]
+    Meta --> ETag["ETag header reflects<br/>new W/#quot;vN#quot;"]
 ```
 
 Persistence facts:
@@ -629,7 +649,13 @@ ETag: W/"v2"
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
   "title": "Engineer",
-  "emails": [ { "type": "work", "value": "ada@example.com", "primary": true } ],
+  "emails": [
+    {
+      "type": "work",
+      "value": "ada@example.com",
+      "primary": true
+    }
+  ],
   "id": "a7b38150-b14b-4499-a813-b6b2859c4bc1",
   "userName": "ada-1484436637@example.com",
   "displayName": "Ada Lovelace",

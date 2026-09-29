@@ -273,6 +273,11 @@ export class EndpointScimGroupsService {
       }
     }
 
+    if (getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS)) {
+      coercePatchOpBooleans(dto.Operations, this.schemaHelpers.getBooleansByParent(endpointId),
+        this.schemaHelpers.getCoreSchemaUrnLower(endpointId));
+    }
+
     // V2: Pre-PATCH validation - validate each operation value against schema definitions
     if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
@@ -282,14 +287,6 @@ export class EndpointScimGroupsService {
         (resultPayloadPlaceholder.schemas as string[]).push(urn);
       }
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
-
-      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-      if (coerceEnabled) {
-        const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
-        const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
-        coercePatchOpBooleans(dto.Operations, boolMap, coreUrnLower);
-      }
 
       for (const [opIndex, op] of dto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
@@ -325,7 +322,22 @@ export class EndpointScimGroupsService {
           members: this.memberRecordsToDtos(group.members),
           rawPayload: parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
         },
-        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns, caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId) },
+        {
+          allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns,
+          caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId),
+          strictSchema: strictSchemaEnabled,
+          ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
+          onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),
+          schemaDefinitions: this.schemaHelpers.buildSchemaDefinitions({ schemas: [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns] }, endpointId),
+          normalize: (candidate, operation) => {
+            candidate.schemas = [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns.filter(urn => urn in candidate)];
+            this.schemaHelpers.coerceBooleansByParentIfEnabled(candidate, endpointId, endpointConfig);
+            this.schemaHelpers.enforcePrimaryConstraint(candidate, endpointId, endpointConfig);
+            this.schemaHelpers.validatePayloadSchema(
+              scopePatchPayloadToTouched(candidate, [operation], extensionUrns), endpointId, endpointConfig, 'patch',
+            );
+          },
+        },
       );
     } catch (err) {
       if (err instanceof PatchError) {

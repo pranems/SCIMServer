@@ -3,18 +3,27 @@ const path = require("node:path");
 const cp = require("node:child_process");
 const crypto = require("node:crypto");
 const assert = require("node:assert/strict");
-const { ROOT, API, OWNER, IS_P7, IS_P9, docker, sourceGuard, containerGuard, databaseGuard } = require("./safety.cjs");
+const { ROOT, API, OWNER, IS_P2, IS_P7, IS_P9, docker, sourceGuard, containerGuard, databaseGuard } = require("./safety.cjs");
 
 const source = sourceGuard();
 const { Client } = require(path.join(API, "node_modules", "pg"));
 const run = crypto.randomBytes(8).toString("hex");
 const password = crypto.randomBytes(36).toString("base64url");
-const output = path.join(ROOT, "test-results", IS_P9 ? "p9" : IS_P7 ? "p7" : "p1", `backends-${run}`);
+const output = path.join(ROOT, "test-results", IS_P9 ? "p9" : IS_P7 ? "p7" : IS_P2 ? "p2" : "p1", `backends-${run}`);
 fs.mkdirSync(output, { recursive: true });
 process.env.P1_SOURCE_SHA256 = source.sourceSha256;
 process.env.PG_ANALYSIS_RUN = run;
 process.env.PG_ANALYSIS_OUTPUT = output;
 const receipt = { source, owner: OWNER, run, startedAt: new Date().toISOString(), backends: [], cleanup: {} };
+function buildIdentity() {
+  const directory = path.join(API, "dist");
+  const files = fs.readdirSync(directory, { recursive: true }).filter(file => file.endsWith(".js")).sort();
+  assert.ok(files.includes("main.js"), "Build the owned API before live validation");
+  const hash = crypto.createHash("sha256");
+  for (const file of files) { hash.update(file); hash.update(fs.readFileSync(path.join(directory, file))); }
+  return { node: process.version, fileCount: files.length, sha256: hash.digest("hex") };
+}
+receipt.build = buildIdentity();
 const clean = text => String(text).split(password).join("[REDACTED]")
   .replace(/postgres(?:ql)?:\/\/[^@\s"']+@/gi, "postgresql://[REDACTED]@");
 const save = () => fs.writeFileSync(path.join(output, "run.json"), JSON.stringify(receipt, null, 2));
@@ -66,6 +75,10 @@ async function smoke(backend) {
       : IS_P7
       ? await require("../live-test-p7.cjs").runLiveP7(`http://127.0.0.1:${port}`, secret)
       : await require("../live-test-p1.cjs").runLiveP1(`http://127.0.0.1:${port}`, secret);
+    if (IS_P2) {
+      const p2 = await require("../live-test-p2.cjs").runLiveP2(`http://127.0.0.1:${port}`, secret);
+      return { p1: result, p2, assertions: result.assertions + p2.assertions, pid: runtime.pid, port, runtimeStopped: true };
+    }
     return { ...result, pid: runtime.pid, port, runtimeStopped: true };
   } finally {
     const exited = new Promise(resolve => runtime.once("exit", resolve));
@@ -140,11 +153,12 @@ async function main() {
     save();
     assert.equal(exit, 0, `${backend} HTTP tests failed`);
     assert.equal(result.numFailedTests, 0);
-    assert.ok(result.numPassedTests >= (IS_P9 ? 17 : IS_P7 ? 67 : 24), "Missing permanent package cases");
+    assert.ok(result.numPassedTests >= (IS_P9 ? 17 : IS_P7 ? 67 : IS_P2 ? 201 : 24), "Missing permanent package cases");
     lane.live = await smoke(backend);
     save();
   }
   sourceGuard();
+  assert.deepEqual(buildIdentity(), receipt.build, "Built runtime changed during validation");
   receipt.status = "passed";
 }
 main().catch(error => {

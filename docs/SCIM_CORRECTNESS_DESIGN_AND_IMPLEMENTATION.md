@@ -402,7 +402,7 @@ combined checkpoint has its own counts in section 11.1.
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | In progress separately | Await parent-supplied commit. Closure includes I02/I03 as default-running regressions and effective quoted-active coercion policy; see 11.12. Pending diffs are not part of this assembly |
+| P2 | Core integrated; combined validation pending | Frozen `7113ee86`: [shared executor and source receipts](SCIM_P2_IMPLEMENTATION.md), 1,522 units / 201 HTTP and 170 built-live assertions per backend. Combined P7/P3/P4 checks, default-running I02/I03 and effective quoted-active coercion still require closure; see 11.12 |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Active parent-assigned worker | Promised schema-uniqueness closure is in progress; no new commit supplied for assembly. P3 alone does not claim these guarantees and C0 is not unblocked |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
@@ -1128,7 +1128,7 @@ admission implementation is introduced here.
 | Decision | Disposition and reason |
 |---|---|
 | Shared path representation | Applied in this design: one demonstrated input currently has inconsistent interpretations |
-| Shared mutation primitives, then executor | Planned: three real implementations justify reuse |
+| Shared mutation primitives, then executor | Applied in P2: three concrete resource adapters use one ordered executor |
 | Resource-specific repository ports | Retained: Group membership is a real aggregate difference |
 | General-purpose Unit of Work or policy DSL | Rejected: not needed for the first fixes |
 | All-CRUD rewrite in one change | Rejected: obscures behavior and rollback |

@@ -965,7 +965,7 @@ export class SchemaValidator {
   /**
    * Deep equality comparison for SCIM attribute values.
    */
-  private static deepEqual(a: unknown, b: unknown): boolean {
+  static deepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     if (a === null || b === null) return false;
     if (typeof a !== typeof b) return false;
@@ -1228,13 +1228,9 @@ export class SchemaValidator {
                   });
                 }
               }
-              this.validateAttributes(
-                val as Record<string, unknown>,
-                extSchema.attributes,
-                key,
-                { strictMode: false, mode: 'patch' },
-                errors,
-              );
+              for (const [child, incoming] of Object.entries(val)) {
+                errors.push(...this.validatePatchOperationValue(op, `${key}:${child}`, incoming, schemas, preBuiltMaps).errors);
+              }
             }
             continue;
           }
@@ -1249,7 +1245,8 @@ export class SchemaValidator {
               });
               continue;
             }
-            this.validateAttribute(key, val, attrDef, { strictMode: false, mode: 'patch' }, errors);
+            this.validateAttribute(key, opLower === 'add' ? this.patchAddShape(val, attrDef) : val,
+              attrDef, { strictMode: false, mode: 'patch' }, errors);
           }
         }
       }
@@ -1295,10 +1292,16 @@ export class SchemaValidator {
         return { valid: true, errors: [] };
       }
 
+      const targetDef = parsed.kind === 'selection' && !parsed.subAttribute ? { ...attrDef, multiValued: false } : attrDef;
+      const selectedGroupSingleton = parsed.kind === 'selection' && !parsed.schemaUrn &&
+        parsed.attribute.toLowerCase() === 'members' && !parsed.subAttribute &&
+        schemas.some(s => s.id.toLowerCase() === 'urn:ietf:params:scim:schemas:core:2.0:group') &&
+        Array.isArray(value) && value.length === 1;
+      const targetValue = selectedGroupSingleton ? value[0] : value;
       this.validateAttribute(
         path,
-        value,
-        attrDef,
+        opLower === 'add' ? this.patchAddShape(targetValue, targetDef) : targetValue,
+        targetDef,
         { strictMode: false, mode: 'patch' },
         errors,
       );
@@ -1308,6 +1311,19 @@ export class SchemaValidator {
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  private static patchAddShape(value: unknown, def: SchemaAttributeDefinition): unknown {
+    if (value == null) return value;
+    if (def.multiValued) {
+      return (Array.isArray(value) ? value : [value]).map(item =>
+        this.patchAddShape(item, { ...def, multiValued: false }));
+    }
+    if (def.type !== 'complex' || typeof value !== 'object' || Array.isArray(value)) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => {
+      const sub = def.subAttributes?.find(a => a.name.toLowerCase() === key.toLowerCase());
+      return [key, sub ? this.patchAddShape(child, sub) : child];
+    }));
   }
 
   /**

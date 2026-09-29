@@ -52,6 +52,21 @@ describe('Manager PATCH String Coercion (E2E)', () => {
 
   // ───────────── Add Manager with raw string (Entra ID style) ─────────────
 
+  it('P2 remove ignores a stray manager string instead of assigning it', async () => {
+    const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+    const url = `${basePath}/Users/${created.id}`;
+    await scimPatch(app, url, token, patchOp([{ op: 'add', path: MANAGER_PATH, value: 'old-manager' }])).expect(200);
+    const result = await scimPatch(app, url, token, patchOp([{ op: 'remove', path: MANAGER_PATH, value: 'new-manager' }])).expect(200);
+    expect(result.body[ENT_URN]?.manager).toBeUndefined();
+    expect((await scimGet(app, url, token).expect(200)).body[ENT_URN]?.manager).toBeUndefined();
+  });
+  it('P2 expands no-path manager shorthand through the same value adapter', async () => {
+    const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+    const url = `${basePath}/Users/${created.id}`;
+    await scimPatch(app, url, token, patchOp([{ op: 'add', value: { [MANAGER_PATH]: 'manager' } }])).expect(200);
+    expect((await scimGet(app, url, token).expect(200)).body[ENT_URN].manager).toEqual({ value: 'manager' });
+  });
+
   describe('PATCH add manager with raw string value', () => {
     it('should accept raw string for manager add (Entra ID compat)', async () => {
       const user = validUser();

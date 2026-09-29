@@ -336,6 +336,17 @@ describe('EndpointScimUsersController', () => {
     });
 
     describe('PATCH /endpoints/:endpointId/Users/:id', () => {
+      it('P2 forwards append then selection in the supplied order', async () => {
+        const dto: PatchUserDto = { schemas: [PATCH], Operations: [
+          { op: 'add', path: 'emails', value: { type: 'work', value: 'new@example.test' } },
+          { op: 'replace', path: 'emails[type eq "work"].primary', value: true },
+        ] };
+        const result = { schemas: [], id: 'user', userName: 'synthetic', emails: [{ type: 'work', value: 'new@example.test', primary: true }], meta: {} };
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.patchUserForEndpoint.mockResolvedValue(result);
+        expect(await controller.updateUser('endpoint-1', 'user', dto, mockRequest)).toEqual(result);
+        expect(mockUsersService.patchUserForEndpoint.mock.calls[0][1]).toEqual(dto);
+      });
       it('P1 forwards the four typed selectors intact and returns the service values', async () => {
         const dto = { schemas: [PATCH], Operations: incidentOperations() };
         const expected = { schemas: [], id: 'synthetic', ...incidentExpected(), meta: {} };

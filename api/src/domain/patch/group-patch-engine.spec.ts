@@ -208,9 +208,8 @@ describe('GroupPatchEngine', () => {
       expect(result.members.map(m => m.value)).toContain('user-3');
     });
 
-    it('should throw on unsupported add path', () => {
-      expect(() => apply([{ op: 'add', path: 'displayName', value: 'x' }]))
-        .toThrow(PatchError);
+    it('should add a single-valued Group attribute using shared PATCH semantics', () => {
+      expect(apply([{ op: 'add', path: 'displayName', value: 'x' }]).displayName).toBe('x');
     });
 
     it('should throw on add without value', () => {

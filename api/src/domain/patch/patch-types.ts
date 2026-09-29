@@ -8,6 +8,8 @@
  * @see RFC 7644 §3.5.2 for PATCH operation semantics
  */
 
+import type { PatchExecutionOptions } from './patch-executor';
+
 // ─── PATCH Operation ─────────────────────────────────────────────────────────
 
 /** A single SCIM PATCH operation (RFC 7644 §3.5.2) */
@@ -23,7 +25,7 @@ export interface PatchOperation {
 // ─── PATCH Config ────────────────────────────────────────────────────────────
 
 /** Configuration flags that control PATCH engine behavior */
-export interface PatchConfig {
+export interface PatchConfig extends PatchExecutionOptions {
   /** Enable dot-notation path resolution (e.g., name.givenName) */
   verbosePatch: boolean;
   /** Extension URNs registered for this endpoint (for PATCH path resolution) */
@@ -33,7 +35,7 @@ export interface PatchConfig {
 }
 
 /** Configuration flags for group member PATCH behavior */
-export interface GroupMemberPatchConfig {
+export interface GroupMemberPatchConfig extends PatchExecutionOptions {
   /** Allow adding multiple members in a single PATCH operation */
   allowMultiMemberAdd: boolean;
   /** Allow removing multiple members in a single PATCH operation */

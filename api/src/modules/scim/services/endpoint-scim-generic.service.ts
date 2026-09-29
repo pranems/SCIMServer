@@ -60,6 +60,7 @@ import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
+import { readResolvedProperty } from '../utils/scim-patch-path';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { buildGenericFilter } from '../filters/apply-scim-filter';
@@ -476,17 +477,14 @@ export class EndpointScimGenericService {
       }
     }
 
-    // GEN-03/04: Pre-PATCH boolean coercion + validation for strict mode
+    if (getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS)) {
+      coercePatchOpBooleans(patchDto.Operations, this.getBooleansByParentForRT(resourceType, endpointId),
+        this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase());
+    }
+
+    // GEN-03/04: Pre-PATCH validation for strict mode
     if (strictSchemaEnabled) {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-
-      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-      if (coerceEnabled) {
-        const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
-        const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
-        coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
-      }
 
       // GEN-01: Pre-PATCH validation - validate each operation value against schema
       for (const [opIndex, op] of patchDto.Operations.entries()) {
@@ -530,6 +528,21 @@ export class EndpointScimGenericService {
       payload, extensionUrns,
       this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactPaths,
       resourceType.schema,
+      {
+        strictSchema: strictSchemaEnabled,
+        ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
+        onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),
+        schemaDefinitions: this.getSchemaDefinitions(resourceType, endpointId),
+        normalize: (candidate, operation) => {
+          candidate.schemas = [resourceType.schema, ...extensionUrns.filter(urn => urn in candidate)];
+          this.coerceBooleanStringsIfEnabled(candidate, resourceType, endpointId, config);
+          this.enforcePrimaryConstraint(candidate, resourceType, endpointId, config);
+          this.validatePayloadSchema(
+            scopePatchPayloadToTouched(candidate, [operation], extensionUrns, resourceType.schema),
+            resourceType, endpointId, config, 'patch',
+          );
+        },
+      },
     );
 
     try {
@@ -566,16 +579,12 @@ export class EndpointScimGenericService {
 
     const patchedPayload = patchEngine.getResult();
 
-    // Extract updated top-level fields from patched payload.
-    // GAP-1 fix: Detect field removal - when key is absent after patch, the field
-    // was removed. Use 'in' check to distinguish "removed" (absent) from "unchanged"
-    // (still present). Fallback to existing only when the field was NOT part of the patch.
-    const externalId = 'externalId' in patchedPayload
-      ? (typeof patchedPayload.externalId === 'string' ? patchedPayload.externalId : null)
-      : existing.externalId;
-    const displayName = 'displayName' in patchedPayload
-      ? (typeof patchedPayload.displayName === 'string' ? patchedPayload.displayName : null)
-      : existing.displayName;
+    // The completed payload is authoritative, including unassignment. Retaining
+    // an old nullable query column after removal disagrees with the saved resource.
+    const externalValue = readResolvedProperty(patchedPayload, 'externalId');
+    const displayValue = readResolvedProperty(patchedPayload, 'displayName');
+    const externalId = typeof externalValue === 'string' ? externalValue : null;
+    const displayName = typeof displayValue === 'string' ? displayValue : null;
     const active = patchedPayload.active !== undefined
       ? patchedPayload.active !== false
       : existing.active;

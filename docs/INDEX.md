@@ -12,11 +12,13 @@
 | Diagnose Entra without disabling strict validation; review native/legacy HTTP evidence | [SCIM_ENTRA_COMPATIBILITY.md](SCIM_ENTRA_COMPATIBILITY.md) |
 | Distinguish all 37 settings' actual behavior, inert controls, and unit/HTTP/live gaps | [SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) |
 | Review P9 execution issues and unresolved integration contracts | [SCIM_P9_EXECUTION_RCA.md](SCIM_P9_EXECUTION_RCA.md) |
-| Understand the typed PATCH-path repair, exact incident, backend proof and remaining P2 limits | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
+| Understand the typed PATCH-path repair and exact incident | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
 | Understand schema-aware filtering, typed sorting, hidden-field projection, page limits and custom ETag consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
 | Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
 | Understand P7a schema declaration, scalar/cardinality and POST/PUT correctness with owned backend proof | [SCIM_P7A_PROFILE_VALIDATION.md](SCIM_P7A_PROFILE_VALIDATION.md) |
 | Distinguish remaining characteristic promises from optional behavior, including the P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
+| Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
+| Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |
 | Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
 | Understand atomic If-Match writes, User uniqueness parity and verified two-backend races | [SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md) |
 | Use JSON search arrays, legacy string compatibility and scalar SCIM validation errors | [SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md) |

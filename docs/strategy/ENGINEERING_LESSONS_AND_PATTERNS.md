@@ -194,6 +194,20 @@ How the agent learns reliably across compaction boundaries.
 
 ### Category F - Design and architecture (structural drift)
 
+**P2 ordered-mutation lesson (2026-09-28): preserve operation intent, not just
+normalized values.** A schema-aware sanitizer returning a bare array loses
+whether that array means append input or the surviving state of a
+null-unassignment. A helper that runs correctly at a direct target can also
+fail when invoked through an enclosing complex object. P2's independent
+reviews found both repeatedly. Carry operation context through recursion and
+consume any internal intent representation before persistence. Permanent
+tests must cross operation (`add`/`replace`/remove/null), target form
+(direct/no-path/selected/enclosing complex), and policy (strict/ignore).
+Retained array identities must be paired one-to-one, including duplicate and
+anonymous entries; never repeatedly select the first matching old entry.
+Applied in [P2](../SCIM_P2_IMPLEMENTATION.md) with exact persisted-payload
+and atomic-failure tests, not a new speculative policy framework.
+
 Structural decay that a correctness-only gate never sees; only an explicit design/architecture look finds it.
 
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |

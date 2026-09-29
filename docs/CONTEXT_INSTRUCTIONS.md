@@ -42,6 +42,16 @@ global-uniqueness capability policy. P7 remains open until final P2 integration.
 Do not treat optional external referential integrity or raw JSON token
 reconstruction as automatically required features.
 
+P2 shared ordered PATCH execution is implemented on isolated
+`fix/scim-patch-semantics-20260928`, based on P1 `3ecaba55`. The three
+resource adapters share target resolution, append/all-match mutations,
+readOnly policy and per-operation required/immutable/primary transitions.
+See [P2 implementation and evidence](SCIM_P2_IMPLEMENTATION.md) and
+[P2 RCA](SCIM_P2_EXECUTION_RCA.md). Its source package did not implement P3
+conditional writes, P7 validation, or P8 lifecycle changes; combined checks
+belong to this integration branch.
+No product version, locks or deployment changed.
+
 P1 correctness work is implemented locally on the isolated implementation
 branch, not on a deployment. [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md)
 records the typed-path contract, 1,476 focused unit / 65 HTTP passes and owned

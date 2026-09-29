@@ -5,7 +5,10 @@ import {
 import type { SelectionPatchPath } from './patch-path';
 import { PatchError } from './patch-error';
 
-/** Shared selection mechanics; existing engines still own operation policies. */
+/**
+ * Legacy P1 compatibility export. Resource engines use PatchExecutor instead.
+ * Retained for historical consumers and the pinned P1 negative-control runner.
+ */
 export function applyPatchSelection(
   payload: Record<string, unknown>,
   parsed: SelectionPatchPath,
@@ -20,9 +23,8 @@ export function applyPatchSelection(
     ? target as Record<string, unknown> : {};
   const expression = valuePathExpression(parsed);
   let next: Record<string, unknown>;
-  if (op === 'add' && createOnMiss) {
-    next = addValuePathEntry(local, expression, value, caseExact);
-  } else {
+  if (op === 'add' && createOnMiss) next = addValuePathEntry(local, expression, value, caseExact);
+  else {
     const result = op === 'remove'
       ? removeValuePathEntry(local, expression, caseExact)
       : applyValuePathUpdate(local, expression, value, caseExact);

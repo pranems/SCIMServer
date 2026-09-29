@@ -1,53 +1,10 @@
-/**
- * Group PATCH Engine (Phase 5)
- *
- * Pure domain class that applies SCIM PATCH operations to a group's in-memory state.
- * Zero NestJS / Prisma / DB dependencies - takes plain data in, returns plain data out.
- *
- * Responsibilities:
- *   - Operation dispatch (add / replace / remove) for groups
- *   - Member management: add, remove, replace (including multi-member config enforcement)
- *   - Display field updates: displayName, externalId
- *   - Deduplication of member lists
- *
- * The calling service handles: DB load, member resolution, DB save, meta generation.
- *
- * @see RFC 7644 §3.5.2 - Modifying with PATCH
- */
-
-import type {
-  PatchOperation,
-  GroupMemberPatchConfig,
-  GroupPatchResult,
-  GroupMemberDto,
-} from './patch-types';
-
-import {
-  isExtensionPath,
-  parseExtensionPath,
-  applyExtensionUpdate,
-  removeExtensionAttribute,
-  resolveNoPathValue,
-  isExtensionValuePath,
-  applyExtensionValuePathUpdate,
-  removeExtensionValuePathEntry,
-  pruneEmptyExtensions,
-  findInvalidMultiValuedElement,
-} from '../../modules/scim/utils/scim-patch-path';
-
+import type { PatchOperation, GroupMemberPatchConfig, GroupPatchResult, GroupMemberDto } from './patch-types';
+import { PatchExecutor } from './patch-executor';
 import { PatchError } from './patch-error';
-import { parsePatchPath, patchAttributePath } from './patch-path';
-import { applyPatchSelection } from './patch-selection';
+import { matchesPatchSelection, parsePatchPath } from './patch-path';
+import { objectValue } from './patch-values';
+import { readResolvedProperty as read, withResolvedProperty as put } from '../../modules/scim/utils/scim-patch-path';
 
-/**
- * Keys that must never appear in user-supplied objects to prevent
- * prototype-pollution attacks (V19).
- */
-const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
-// ─── Input State ─────────────────────────────────────────────────────────────
-
-/** Current group state provided by the service before PATCH application */
 export interface GroupPatchState {
   displayName: string;
   externalId: string | null;
@@ -55,470 +12,103 @@ export interface GroupPatchState {
   rawPayload: Record<string, unknown>;
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
-
+/** Group member policy and DTO adapter; ordinary attribute mutations are shared. */
 export class GroupPatchEngine {
-  /**
-   * Apply an array of SCIM PATCH operations to the given group state.
-   *
-   * @param operations  - SCIM PatchOperation[] from the request DTO
-   * @param state       - Current group values (from DB record + members)
-   * @param config      - Group member PATCH config flags
-   * @returns           - Updated display fields + member list
-   * @throws PatchError - On invalid op / path / value
-   */
-  static apply(
-    operations: PatchOperation[],
-    state: GroupPatchState,
-    config: GroupMemberPatchConfig,
-  ): GroupPatchResult {
-    let { displayName, externalId } = state;
-    let members = [...state.members];
-    let rawPayload = { ...state.rawPayload };
-
-    for (let i = 0; i < operations.length; i++) {
-      let operation = operations[i];
-      const op = operation.op?.toLowerCase();
-      if (!op || !['add', 'replace', 'remove'].includes(op)) {
-        throw new PatchError(
-          400,
-          `Patch operation '${operation.op}' is not supported.`,
-          'invalidValue',
-          { operationIndex: i, path: operation.path, op: operation.op },
-        );
-      }
-
-      try {
-        const parsed = operation.path ? parsePatchPath(operation.path, config.extensionUrns) : undefined;
-        if (parsed?.kind === 'selection') {
-          if (!parsed.schemaUrn && parsed.attribute.toLowerCase() === 'members') {
-            if (op !== 'remove' && parsed.subAttribute?.toLowerCase() === 'value' &&
-                (typeof operation.value !== 'string' || !operation.value)) {
-              throw new PatchError(400, 'Member value must be a non-empty string.', 'invalidValue');
-            }
-            // Retain Entra's explicit member-removal array compatibility.
-            if (op === 'remove' && Array.isArray(operation.value) && operation.value.length > 0) {
-              members = GroupPatchEngine.handleRemove(operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers);
-              continue;
-            }
-            const value = !parsed.subAttribute && Array.isArray(operation.value) && operation.value.length === 1
-              ? operation.value[0] : operation.value;
-            const memberCaseExact = new Set(config.caseExactPaths);
-            if (memberCaseExact.has('value')) memberCaseExact.add('members.value');
-            const result = applyPatchSelection(
-              { members }, parsed, op, value, memberCaseExact, false, op === 'remove',
-            );
-            members = GroupPatchEngine.ensureUniqueMembers(
-              (result.members as unknown[]).map(m => GroupPatchEngine.toMemberDto(m)),
-            );
-          } else {
-            rawPayload = applyPatchSelection(rawPayload, parsed, op, operation.value, config.caseExactPaths);
-          }
-          continue;
-        }
-        if (parsed) {
-          operation = { ...operation, path: `${parsed.schemaUrn ? `${parsed.schemaUrn}:` : ''}${patchAttributePath(parsed)}` };
-        }
-        switch (op) {
-          case 'replace': {
-            const result = GroupPatchEngine.handleReplace(
-              operation, displayName, externalId, members, rawPayload, config,
-            );
-            displayName = result.displayName;
-            externalId = result.externalId;
-            members = result.members;
-            rawPayload = result.rawPayload;
-            break;
-          }
-          case 'add':
-            // Check for extension path first; otherwise delegate to member-only handler
-            if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
-              const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
-              if (extParsed) {
-                if (isExtensionValuePath(extParsed)) {
-                  // F7: extension valuePath add does not raise noTarget (creates on no-match per addValuePathEntry semantics).
-                  // Group's add path here goes through applyExtensionValuePathUpdate which DOES raise noTarget.
-                  // For Group, valuePath-extension add without a prior matching element falls back to engine-level error
-                  // to keep parity with non-extension behavior. We route via applyExtensionValuePathUpdate and translate.
-                  const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
-                  const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
-                  const inner = applyExtensionValuePathUpdate({ ...rawPayload }, extParsed, operation.value, vpCaseExact);
-                  if (!inner.matched) {
-                    throw new PatchError(
-                      400,
-                      `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
-                      'noTarget',
-                    );
-                  }
-                  rawPayload = inner.payload;
-                  break;
-                }
-                // F4: validate multi-valued array elements for add
-                if (Array.isArray(operation.value)) {
-                  const bad = findInvalidMultiValuedElement(operation.value);
-                  if (bad) {
-                    throw new PatchError(
-                      400,
-                      `Multi-valued attribute ${extParsed.schemaUrn}:${extParsed.attributePath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
-                      'invalidValue',
-                    );
-                  }
-                }
-                rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
-                break;
-              }
-            }
-            members = GroupPatchEngine.handleAdd(
-              operation, members, config.allowMultiMemberAdd,
-            );
-            break;
-          case 'remove': {
-            // GAP-1: Column-promoted field remove handlers (RFC 7644 §3.5.2.2)
-            const removePath = operation.path?.toLowerCase();
-            if (removePath === 'displayname') {
-              throw new PatchError(
-                400,
-                "Cannot remove required attribute 'displayName'. displayName is required for Group resources (RFC 7643 §4.2).",
-                'invalidValue',
-              );
-            }
-            if (removePath === 'externalid') {
-              externalId = null;
-              break;
-            }
-            // Check for extension path first; otherwise delegate to member-only handler
-            if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
-              const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
-              if (extParsed) {
-                if (isExtensionValuePath(extParsed)) {
-                  // F7: extension valuePath remove -> noTarget on zero-match
-                  const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
-                  const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
-                  const inner = removeExtensionValuePathEntry({ ...rawPayload }, extParsed, vpCaseExact);
-                  if (!inner.matched) {
-                    throw new PatchError(
-                      400,
-                      `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
-                      'noTarget',
-                    );
-                  }
-                  rawPayload = inner.payload;
-                  break;
-                }
-                rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
-                break;
-              }
-            }
-            members = GroupPatchEngine.handleRemove(
-              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
-            );
-            break;
+  static apply(operations: PatchOperation[], state: GroupPatchState, config: GroupMemberPatchConfig): GroupPatchResult {
+    let noPathKeys = new Set<string>();
+    const exact = new Set(config.caseExactPaths);
+    if (exact.has('value')) exact.add('members.value');
+    const executor = new PatchExecutor({
+      ...state.rawPayload, displayName: state.displayName, externalId: state.externalId, members: state.members,
+    }, {
+      ...config, caseExactPaths: exact,
+      normalize: (candidate, operation) => {
+        candidate.members = this.ensureUniqueMembers(((candidate.members ?? []) as unknown[]).map(m => this.toMemberDto(m)));
+        config.normalize?.(candidate, operation);
+      },
+    }, {
+      normalizeOperation: input => {
+        let operation = input;
+        noPathKeys = new Set(!input.path && objectValue(input.value) ? Object.keys(input.value).map(k => k.toLowerCase()) : []);
+        if (!operation.path) {
+          if (operation.op.toLowerCase() === 'replace' && typeof operation.value === 'string') {
+            operation = { ...operation, path: 'displayName' };
+          } else if (operation.op.toLowerCase() === 'add' &&
+            (Array.isArray(operation.value) || (objectValue(operation.value) && 'value' in operation.value))) {
+            operation = { ...operation, path: 'members' };
           }
         }
-      } catch (err) {
-        if (err instanceof PatchError && err.operationIndex === undefined) {
-          throw new PatchError(err.status, err.message, err.scimType, {
-            operationIndex: i, path: operation.path, op: operation.op,
-          });
+        if (operation.path) {
+          const path = parsePatchPath(operation.path, config.extensionUrns);
+          if (!path.schemaUrn && path.attribute.toLowerCase() === 'members' && path.kind === 'selection' &&
+            !path.subAttribute && Array.isArray(operation.value) && operation.value.length === 1 &&
+            operation.op.toLowerCase() !== 'remove') operation = { ...operation, value: operation.value[0] };
         }
-        throw err;
-      }
-    }
-
-    // F5: prune extension namespace keys that became empty after PATCH so the
-    // URN is naturally dropped from schemas[] when the response is projected
-    // (RFC 7643 S3.3: extension is "in use" only when at least one attribute is assigned).
-    if (config.extensionUrns && config.extensionUrns.length > 0) {
-      pruneEmptyExtensions(rawPayload, config.extensionUrns);
-    }
-    return { displayName, externalId, payload: rawPayload, members };
+        return operation;
+      },
+      mutate: (candidate, path, operation) => {
+        if (path.schemaUrn) return undefined;
+        const key = path.attribute.toLowerCase();
+        const op = operation.op;
+        if (!noPathKeys.has(key) && !['displayname', 'externalid', 'members', 'id'].includes(key) &&
+          !config.schemaDefinitions?.some(s => s.isCoreSchema && s.attributes.some(a => a.name.toLowerCase() === key)) &&
+          operation.path && !objectValue(read(candidate, key))) {
+          throw new PatchError(400, `Patch path '${operation.path}' is not supported.`, 'invalidPath');
+        }
+        if (key === 'externalid' && !path.subAttribute && path.kind !== 'selection') {
+          return put(candidate, 'externalId', typeof operation.value === 'string' && op !== 'remove' ? operation.value : null);
+        }
+        if (key === 'displayname' && !path.subAttribute) {
+          if (op === 'remove') throw new PatchError(400, 'Cannot remove required displayName.', 'invalidValue');
+          if (typeof operation.value !== 'string') throw new PatchError(400, 'displayName requires a string value.', 'invalidValue');
+        }
+        if (key !== 'members') return undefined;
+        const members = read(candidate, 'members') as GroupMemberDto[] ?? [];
+        if (op === 'add' && !path.subAttribute && path.kind !== 'selection') {
+          const incoming = Array.isArray(operation.value) ? operation.value : [operation.value];
+          if (!config.allowMultiMemberAdd && incoming.length > 1) {
+            throw new PatchError(400, 'Adding multiple members in a single operation is not allowed.', 'invalidValue');
+          }
+          incoming.forEach(m => this.toMemberDto(m));
+        }
+        if (op === 'replace' && path.kind !== 'selection' && !path.subAttribute &&
+            operation.value !== null && !Array.isArray(operation.value)) {
+          throw new PatchError(400, 'Replace operation for members requires an array value (or null to clear).', 'invalidValue');
+        }
+        if (op !== 'remove') return undefined;
+        // Entra compatibility: explicit value arrays override the selector.
+        if (Array.isArray(operation.value) && operation.value.length > 0) {
+          if (!config.allowMultiMemberRemove && operation.value.length > 1) {
+            throw new PatchError(400, 'Removing multiple members in a single operation is not allowed.', 'invalidValue');
+          }
+          const values = new Set(operation.value.map(m => this.toMemberDto(m).value));
+          return put(candidate, 'members', members.filter(m => !values.has(m.value)));
+        }
+        if (path.kind === 'selection') {
+          // Named compatibility: zero-match Group-member remove is idempotent.
+          if (!members.some(m => matchesPatchSelection(path, m as unknown as Record<string, unknown>, exact))) return candidate;
+          return undefined;
+        }
+        if (!config.allowRemoveAllMembers && !path.subAttribute) {
+          throw new PatchError(400, 'Removing all members via path=members is not allowed.', 'invalidValue');
+        }
+        return undefined;
+      },
+    });
+    operations.forEach(op => executor.apply(op));
+    const result = executor.getResult();
+    const { displayName, externalId, members, ...payload } = result;
+    delete payload.schemas;
+    delete payload.meta;
+    return { displayName: displayName as string, externalId: externalId as string ?? null, members: members as GroupMemberDto[], payload };
   }
-
-  // ─── Replace ─────────────────────────────────────────────────────────
-
-  private static handleReplace(
-    operation: PatchOperation,
-    currentDisplayName: string,
-    currentExternalId: string | null,
-    members: GroupMemberDto[],
-    rawPayload: Record<string, unknown>,
-    config: GroupMemberPatchConfig,
-  ): { displayName: string; externalId: string | null; members: GroupMemberDto[]; rawPayload: Record<string, unknown> } {
-    const path = operation.path?.toLowerCase();
-    const originalPath = operation.path;
-
-    // No path - value is either a string (displayName) or an object with attribute(s)
-    if (!path) {
-      if (typeof operation.value === 'string') {
-        return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
-      }
-      if (typeof operation.value === 'object' && operation.value !== null) {
-        const obj = Object.fromEntries(
-          Object.entries(operation.value as Record<string, unknown>).map(([key, value]) => [
-            key.toLowerCase() === 'displayname'
-              ? 'displayName'
-              : key.toLowerCase() === 'externalid'
-                ? 'externalId'
-                : key.toLowerCase() === 'members'
-                  ? 'members'
-                  : key,
-            value,
-          ]),
-        );
-        let newDisplayName = currentDisplayName;
-        let newExternalId = currentExternalId;
-        let newMembers = members;
-
-        if (typeof obj.displayName === 'string') {
-          newDisplayName = obj.displayName;
-        }
-        if ('externalId' in obj) {
-          newExternalId = typeof obj.externalId === 'string' ? obj.externalId : null;
-        }
-        if (Array.isArray(obj.members)) {
-          newMembers = (obj.members as unknown[]).map(m => GroupPatchEngine.toMemberDto(m));
-          newMembers = GroupPatchEngine.ensureUniqueMembers(newMembers);
-        }
-
-        // Store any other attributes in rawPayload (resolves extension URN keys)
-        const updateObj: Record<string, unknown> = {};
-        for (const [key, val] of Object.entries(obj)) {
-          // Skip well-known fields and dangerous/reserved keys (V19, V20)
-          if (key !== 'displayName' && key !== 'externalId' && key !== 'members' && key !== 'schemas' && key !== 'meta' && !DANGEROUS_KEYS.has(key)) {
-            updateObj[key] = val;
-          }
-        }
-        const updatedPayload = resolveNoPathValue({ ...rawPayload }, updateObj, config.extensionUrns);
-
-        return { displayName: newDisplayName, externalId: newExternalId, members: newMembers, rawPayload: updatedPayload };
-      }
-      throw new PatchError(
-        400,
-        'Replace operation requires a string or object value.',
-        'invalidValue',
-      );
-    }
-
-    if (path === 'displayname') {
-      if (typeof operation.value !== 'string') {
-        throw new PatchError(
-          400,
-          'Replace operation for displayName requires a string value.',
-          'invalidValue',
-        );
-      }
-      return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
-    }
-
-    if (path === 'externalid') {
-      const newExtId = typeof operation.value === 'string' ? operation.value : null;
-      return { displayName: currentDisplayName, externalId: newExtId, members, rawPayload };
-    }
-
-    if (path === 'members') {
-      // F2: explicit null -> empty the members array (RFC 7644 S3.5.2.3 explicit unassign).
-      // The PatchOpAllowRemoveAllMembers flag governs only the spec-ambiguous bare
-      // `remove path=members` form (see handleRemove); explicit `replace path=members value=null`
-      // is unambiguous client intent and must always work.
-      if (operation.value === null) {
-        return {
-          displayName: currentDisplayName,
-          externalId: currentExternalId,
-          members: [],
-          rawPayload,
-        };
-      }
-      if (!Array.isArray(operation.value)) {
-        throw new PatchError(
-          400,
-          'Replace operation for members requires an array value (or null to clear).',
-          'invalidValue',
-        );
-      }
-      // F4: reject null elements in the members array
-      const bad = findInvalidMultiValuedElement(operation.value);
-      if (bad) {
-        throw new PatchError(
-          400,
-          `Group members array contains an invalid element at index ${bad.index}: ${bad.reason}.`,
-          'invalidValue',
-        );
-      }
-      const normalized = (operation.value as unknown[]).map(m => GroupPatchEngine.toMemberDto(m));
-      return {
-        displayName: currentDisplayName,
-        externalId: currentExternalId,
-        members: GroupPatchEngine.ensureUniqueMembers(normalized),
-        rawPayload,
-      };
-    }
-
-    // Extension URN-prefixed path (e.g., urn:...:CustomExt:myAttr)
-    if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
-      const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
-      if (extParsed) {
-        if (isExtensionValuePath(extParsed)) {
-          // F7: extension valuePath replace -> noTarget on zero-match
-          const vpFilterPath = `${extParsed.valuePath.attribute.toLowerCase()}.${extParsed.valuePath.filterAttribute.toLowerCase()}`;
-          const vpCaseExact = config.caseExactPaths?.has(vpFilterPath) ?? false;
-          const inner = applyExtensionValuePathUpdate({ ...rawPayload }, extParsed, operation.value, vpCaseExact);
-          if (!inner.matched) {
-            throw new PatchError(
-              400,
-              `Filter ${extParsed.valuePath.filterAttribute} ${extParsed.valuePath.filterOperator} "${extParsed.valuePath.filterValue}" did not match any value in extension ${extParsed.schemaUrn}:${extParsed.valuePath.attribute}.`,
-              'noTarget',
-            );
-          }
-          return { displayName: currentDisplayName, externalId: currentExternalId, members, rawPayload: inner.payload };
-        }
-        // F4: validate multi-valued array elements
-        if (Array.isArray(operation.value)) {
-          const bad = findInvalidMultiValuedElement(operation.value);
-          if (bad) {
-            throw new PatchError(
-              400,
-              `Multi-valued attribute ${extParsed.schemaUrn}:${extParsed.attributePath} contains an invalid element at index ${bad.index}: ${bad.reason}.`,
-              'invalidValue',
-            );
-          }
-        }
-        const updatedPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
-        return { displayName: currentDisplayName, externalId: currentExternalId, members, rawPayload: updatedPayload };
-      }
-    }
-
-    throw new PatchError(
-      400,
-      `Patch path '${operation.path ?? ''}' is not supported.`,
-      'invalidPath',
-    );
-  }
-
-  // ─── Add ─────────────────────────────────────────────────────────────
-
-  private static handleAdd(
-    operation: PatchOperation,
-    members: GroupMemberDto[],
-    allowMultiMemberAdd: boolean,
-  ): GroupMemberDto[] {
-    const path = operation.path?.toLowerCase();
-    if (path && path !== 'members') {
-      throw new PatchError(
-        400,
-        `Add operation path '${operation.path ?? ''}' is not supported.`,
-        'invalidPath',
-      );
-    }
-
-    if (!operation.value) {
-      throw new PatchError(
-        400,
-        'Add operation for members requires a value.',
-        'invalidValue',
-      );
-    }
-
-    const value = Array.isArray(operation.value) ? operation.value : [operation.value];
-
-    // F4: reject null/undefined elements (more informative than the per-element toMemberDto check)
-    const bad = findInvalidMultiValuedElement(value);
-    if (bad) {
-      throw new PatchError(
-        400,
-        `Group members array contains an invalid element at index ${bad.index}: ${bad.reason}.`,
-        'invalidValue',
-      );
-    }
-
-    if (!allowMultiMemberAdd && value.length > 1) {
-      throw new PatchError(
-        400,
-        'Adding multiple members in a single operation is not allowed. ' +
-        'Each member must be added in a separate PATCH operation. ' +
-        'To enable multi-member add, set endpoint config flag "MultiOpPatchRequestAddMultipleMembersToGroup" to "True".',
-        'invalidValue',
-      );
-    }
-
-    const newMembers = value.map(m => GroupPatchEngine.toMemberDto(m));
-    return GroupPatchEngine.ensureUniqueMembers([...members, ...newMembers]);
-  }
-
-  // ─── Remove ──────────────────────────────────────────────────────────
-
-  private static handleRemove(
-    operation: PatchOperation,
-    members: GroupMemberDto[],
-    allowMultiMemberRemove: boolean,
-    allowRemoveAllMembers: boolean,
-  ): GroupMemberDto[] {
-    const path = operation.path?.toLowerCase();
-
-    // Value array with members to remove
-    if (operation.value && Array.isArray(operation.value) && operation.value.length > 0) {
-      if (!allowMultiMemberRemove && operation.value.length > 1) {
-        throw new PatchError(
-          400,
-          'Removing multiple members in a single operation is not allowed. ' +
-          'Each member must be removed in a separate PATCH operation. ' +
-          'To enable multi-member remove, set endpoint config flag "MultiOpPatchRequestRemoveMultipleMembersFromGroup" to "True".',
-          'invalidValue',
-        );
-      }
-
-      const membersToRemove = new Set<string>();
-      for (const item of operation.value as unknown[]) {
-        if (item && typeof item === 'object' && 'value' in item) {
-          membersToRemove.add((item as { value: string }).value);
-        }
-      }
-      return members.filter(m => !membersToRemove.has(m.value));
-    }
-
-    // path=members without value - remove all members
-    if (path === 'members') {
-      if (!allowRemoveAllMembers) {
-        throw new PatchError(
-          400,
-          'Removing all members via path=members is not allowed. ' +
-          'Specify members to remove using a value array or path filter like members[value eq "user-id"]. ' +
-          'To enable remove-all, set endpoint config flag "PatchOpAllowRemoveAllMembers" to "True".',
-          'invalidValue',
-        );
-      }
-      return [];
-    }
-
-    throw new PatchError(
-      400,
-      `Remove operation path '${operation.path ?? ''}' is not supported for groups.`,
-      'invalidPath',
-    );
-  }
-
-  // ─── Member utilities ────────────────────────────────────────────────
-
   static toMemberDto(member: unknown): GroupMemberDto {
-    if (!member || typeof member !== 'object' || !('value' in member)) {
-      throw new PatchError(
-        400,
-        'Member object must include a value property.',
-        'invalidValue',
-      );
+    if (!objectValue(member) || typeof read(member, 'value') !== 'string' || !read(member, 'value')) {
+      throw new PatchError(400, 'Member object must include a non-empty string value property.', 'invalidValue');
     }
-    const typed = member as { value: string; display?: string; type?: string };
-    return {
-      value: typed.value,
-      display: typed.display,
-      type: typed.type,
-    };
+    return { value: read(member, 'value') as string, display: read(member, 'display') as string, type: read(member, 'type') as string };
   }
-
   static ensureUniqueMembers(members: GroupMemberDto[]): GroupMemberDto[] {
-    const seen = new Map<string, GroupMemberDto>();
-    for (const member of members) {
-      seen.set(member.value, member);
-    }
-    return Array.from(seen.values());
+    return Array.from(new Map(members.map(m => [m.value, m])).values());
   }
 }

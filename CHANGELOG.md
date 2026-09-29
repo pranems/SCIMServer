@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed - P2 isolated implementation, not released
+- Shared ordered PATCH executor for Users, Groups and custom resources:
+  multi-valued append, all-match selection, selected-object validation,
+  current-state required/immutable enforcement, primary handoff and resolved
+  readOnly compatibility. Resource hooks and existing repository ports remain.
+  No version or lockfile change. Detailed RED/GREEN counts, owned backend/live
+  receipts and independent-review fixes:
+  [P2 implementation](docs/SCIM_P2_IMPLEMENTATION.md).
+  Validation: 1,522 targeted unit tests, 201 HTTP and 170 built-live
+  assertions on each owned backend, PostgreSQL 17.8 and InMemory; build and
+  focused lint pass, 9 diagrams rendered in both themes. No web surface,
+  migration, deployment or release-version change.
+
 ### Changed
 - **P9 local compatibility evidence (no version change).** Removed blanket strict-off Entra startup/settings advice; corrected inert request-secret and fixed credential-visibility descriptions. Reconciled all 37 settings with outcome-based evidence and explicit gaps. Added 6 unit guidance/inventory checks and 17 shared HTTP/live cases: 411 distinct focused unit tests pass; PostgreSQL 17.8 with 22 migrations and InMemory each pass 17 HTTP and 17 built-live cases / 1,104 assertions. Two executed, failing P2 integration cases remain explicit TODOs. Build and scoped lint pass (0 errors, 6 existing warnings); diagram renders in both themes. No UI, optional default, dependency, lockfile, push or deployment change. See [P9](docs/SCIM_ENTRA_COMPATIBILITY.md).
 - **CI action pins refreshed.** Image build/publish workflows now use `docker/login-action` 4.6.0, `docker/setup-buildx-action` 4.4.1, and `docker/build-push-action` 7.4.0; CodeQL uses 4.38.1; docs freshness uses the same `actions/checkout` 7.0.1 pin as the other workflows. Every reference remains full-SHA pinned with a release comment. No workflow inputs, permissions, product code, package graph, or deployed estate changed.
