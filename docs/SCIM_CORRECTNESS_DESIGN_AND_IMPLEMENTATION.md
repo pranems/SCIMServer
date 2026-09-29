@@ -846,7 +846,8 @@ similarly named suite:
 | Exact four-operation incident, strict ON and OFF | Round-trip all four intended values, persisted readback, no literal bracket/dotted corruption, and a late-operation failure proving the whole stored resource/version is unchanged | B: reconcile exact integrated cases |
 | Supported direct, Bulk, `/Me` and custom CRUD paths | Explicit operation/resource/route inventory, real response values and stored outcomes, capability-enabled/disabled behavior, documented unsupported combinations | B: P2/P7/P9 and route reconciliation remain open |
 | All registered settings | Derive the registry inventory from the integrated source; map each key's documented policy, relevant enforcement tests and untested interactions. Do not infer coverage from registration or UI presence | B: registry-to-evidence reconciliation pending |
-| Generic custom fields sharing promoted names | For schema-valid numeric/MV custom-core displayName/externalId and extension homonyms, verify POST -> GET -> PUT/PATCH -> GET plus filtering/typed sorting against rawPayload authority. Distinguish builtin User/Group constraints; pushdown is valid only when its column faithfully represents the resolved schema | B: P3b owns tightly coupled reconstruction; integration owns cross-package probes; no name-only admission restriction authorized |
+| Generic custom fields sharing promoted names | For schema-valid custom-core displayName/active and extension homonyms, verify POST -> GET -> PUT/PATCH -> GET plus filtering/typed sorting against rawPayload authority. Distinguish builtin User/Group constraints; pushdown is valid only when its column faithfully represents the resolved schema | B: P3b owns tightly coupled reconstruction; integration owns cross-package probes; no storage-column-driven admission restriction authorized |
+| Common externalId versus extension homonyms | Top-level externalId is the RFC common single-valued String, caseExact true and readWrite across all resource types; contradictory older schema declarations do not redefine it. Test common string behavior and invalid numeric/MV inputs separately from valid schema-defined extension-namespaced externalId types/cardinalities | B: P7 owns common-attribute admission/runtime gap verification; integration owns final cross-package proof. This corrects the earlier parent generalization, not a column-convenience restriction |
 | Attribute characteristics | Core/extension namespace, scalar/MV/complex-child, required/readOnly/immutable/returned/caseExact/uniqueness boundaries, defaults when omitted, provider restrictions and compatibility consequences | B: P3b/P7/P9 and characteristic reconciliation pending |
 | Controlled races and Group rollback | Deterministic same-condition races at real mutation boundaries on both backends; complete scalar/payload/member/version/timestamp rollback and no partial create or success event | B: reconcile P3/P4/P8c with final tip |
 | Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b focused proof exists; exact-case/final-tip reconciliation remains pending |
@@ -1070,6 +1071,57 @@ explicit promotion-to-default gate after their fixes.
 **Design disposition: accepted.** Preserve the shared corpus and existing
 configuration policy boundaries; no parallel legacy parser or speculative
 compatibility framework is introduced by this requirement.
+
+### 11.13 Standards correction: common externalId is not a custom-core field
+
+The parent corrected the earlier generic `externalId` generalization after
+checking [RFC 7643 sections 3 and 3.1](https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1).
+Common attributes apply to every resource, including extended/custom resource
+types, and their listed common characteristics take precedence over conflicting
+older schema definitions. Top-level `externalId` is a single-valued String,
+`caseExact:true`, `mutability:readWrite`, scoped to the provisioning client.
+Its being preserved in `rawPayload` does not make a numeric/MV common
+declaration standards-compliant.
+
+| Attribute identity | Correct integration contract |
+|---|---|
+| Generic custom-core displayName or active | Follow the resolved custom schema; old string/Boolean convenience columns do not impose builtin semantics |
+| Builtin User/Group attributes | Preserve the actual builtin/schema constraints, not assumptions based only on property spelling |
+| Top-level externalId on any resource type | Enforce the RFC common characteristics for standards reasons, not because a promoted column happens to be String |
+| Extension-namespaced externalId/displayName/active | Treat each registered namespace independently; apply its valid custom type/cardinality/characteristics without a common-name shortcut |
+
+This supersedes the earlier statement that numeric/MV **custom-core
+externalId** should automatically round-trip merely because the older response
+retained raw JSON. The warning against restricting **displayName/active** by
+storage representation remains valid. No new global/server uniqueness promise
+is inferred solely from `externalId` being a common attribute.
+
+P7 owns verification and any narrowly required common-attribute admission or
+runtime correction. P3b retains ownership of atomic uniqueness and its tightly
+coupled candidate reconstruction; it must use the standards-correct attribute
+identity rather than treating every promoted-name occurrence alike. Integration
+does not duplicate either production fix.
+
+The cross-package acceptance probes must separate:
+
+1. Valid custom-core displayName/active shapes through POST/GET/PUT/PATCH/GET,
+   filtering and sorting without lossy column overlays/pushdown.
+2. Common top-level externalId's effective String/single-value/caseExact/
+   readWrite contract, including contradictory declaration and numeric/MV
+   input controls under the reviewed P7 policy.
+3. Extension externalId homonyms with valid custom scalar/MV types through
+   the same persistence/query paths, proving common-attribute rules do not
+   bleed into an extension namespace.
+
+These are pending probes, not newly verified runtime outcomes. The parent
+owns the standards-correction RCA; this section updates the shared contract
+and test plan so the superseded premise cannot guide further implementation.
+No live data or profile was rewritten by this correction.
+**Assurance improvement: applied.** Resolve RFC common-attribute precedence
+before inferring supported contracts from historical storage behavior.
+**Design disposition: accepted.** Keep schema identity and authoritative
+representation separate from convenience-column layout; no new parallel
+admission implementation is introduced here.
 
 ## 12. Architecture and self-improvement decisions
 

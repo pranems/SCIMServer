@@ -45,6 +45,13 @@ it has not cleaned historical live JSON. The final handoff must include the
 [operator-approved backup/dry-run/repair plan](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1111-concurrent-deletion-follow-up-and-separate-data-repair-boundary).
 No live scan, backup, replay, repair or deployment is authorized here.
 
+**Standards correction:** common top-level `externalId` remains RFC String,
+single-valued, caseExact and readWrite across custom resource types; P7 owns
+verification/correction of actual admission/runtime gaps. Custom-core
+displayName/active and extension-namespaced homonyms still follow their resolved
+schemas, not convenience columns. The [corrected contract](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1113-standards-correction-common-externalid-is-not-a-custom-core-field)
+supersedes the earlier unrestricted custom-core externalId assumption.
+
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
 - [x] ✅ COMPLETED: P8c `8eb2f162` integrated as `2c0536ef`; conditional endpoint writes use `9z-CT`.
