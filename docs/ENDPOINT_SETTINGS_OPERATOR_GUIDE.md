@@ -50,6 +50,21 @@ flowchart LR
 
 ---
 
+### When another application instance sees a saved setting
+
+With the P8a freshness implementation, a PostgreSQL-backed endpoint lookup
+checks the current database row before using its cached profile. A request
+whose lookup starts after the save commits sees the saved profile, including
+when a different application process handled the save. Unchanged profiles
+reuse their derived schema indexes. A database failure is an error, not
+permission to continue with a stale profile.
+
+This guarantee concerns new endpoint lookups; it does not cancel requests
+already in progress. InMemory remains local to one application instance and
+does not replicate between processes. See
+[the implementation and measured evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md).
+This is an implementation-branch addition, not a claim that P8a is deployed.
+
 ## 2. The controls, by category
 
 ### 2.1 Validation and schema

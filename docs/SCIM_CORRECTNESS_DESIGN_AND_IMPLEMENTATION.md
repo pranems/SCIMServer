@@ -402,13 +402,14 @@ combined checkpoint has its own counts in section 11.1.
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Partly integrated | P6a capability boundary integrated: 69 HTTP tests on each backend, 346 unit tests, 7 local live checks and independent review; P6b query/projection/sort/limit work remains separate |
 | P7 | In progress separately | Await P7a commit and remaining schema promises |
-| P8 | In progress separately | Parent owns P8a source; cleanup/cache contracts are not claimed integrated |
+| P8 | Partly integrated | P8a authoritative reads and snapshot fingerprints integrated from `39841319`; source evidence: 163 units, 18 HTTP tests and 7 live checks per backend, including two PostgreSQL-backed Node processes. [Freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8b cleanup and conditional-admin-write guarantees remain separate |
 | P9 | Pending | Follow changed behavior; preserve legitimate compatibility |
 | C0 | Initial assembly verified | Section 11.1 only; final matrix/release readiness waits for remaining packages |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3, P5, and P6a are implemented and locally validated in their source worktrees,
-and integrated here. Focused initial validation passed; final combined matrix,
+P1, P3, P5, P6a and P8a are implemented and locally validated in their source worktrees,
+and integrated here. The pre-P8a checkpoint passed; focused P8a integration
+validation is pending. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).

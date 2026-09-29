@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > **Updated:** 2026-09-18
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -480,11 +480,22 @@ the endpoint still had its previous single resource type.
 
 ### When the change takes effect
 
-Immediately, on the next SCIM request. There is no restart and no TTL. After a successful
-PATCH the service replaces the cached endpoint object synchronously, which discards the
-lazily-built `_schemaCaches`, then fires `profileChangeListener` and broadcasts
-`ENDPOINT_UPDATED` on SSE. Discovery (`/Schemas`, `/ResourceTypes`), schema validation and
-characteristic enforcement all read the new profile on the very next call.
+On the process handling the PATCH, the service replaces the cached endpoint,
+discards its lazily-built `_schemaCaches`, fires `profileChangeListener` and
+broadcasts `ENDPOINT_UPDATED` on SSE.
+
+The P8a implementation also handles a different PostgreSQL-backed process:
+every new endpoint lookup reads the authoritative row. A changed snapshot
+refreshes that process's schema overlay and logging settings; an unchanged
+snapshot retains its derived indexes. A lookup started after the save commits
+sees the new row. Reads already in progress are not cancelled. This removes the
+previous indefinite cross-process cache staleness without adding a TTL or broker.
+Database failure is surfaced rather than hidden by the cached profile.
+
+See [P8a evidence and limits](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) for
+two-application HTTP tests, two-process PostgreSQL live checks and the measured
+extra query cost. P8a is not yet deployed. InMemory is still instance-local;
+the historical verification below does not prove replication between processes.
 
 ### Live verification of this section
 

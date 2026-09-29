@@ -117,6 +117,20 @@ endpoint collection was byte-for-byte equal before and after the run, and the
 owned API process was stopped. Both original P1/P3 standalone entry points
 still reject unowned inputs before network/database access.
 
+## P8a issues
+
+| ID | Type / severity | Symptom | Root cause | Resolution and why it works | Earliest possible / actual detection | Prevention / status |
+|---|---|---|---|---|---|---|
+| P8-I01 | Test contract / Medium | Old endpoint unit fixtures failed after authoritative reads replaced cache-only reads | They expected no database access and used non-UUID IDs with UUID-lookup mocks | Use valid IDs and model the saved database row; 120 unit tests pass without weakening response assertions | Unit fixture review / focused unit run | A persistent cache test must distinguish database state from cached state |
+| P8-I02 | Test correctness / Low | The first HTTP rename case returned 200 at the old name | Endpoint names are not an editable admin property; the test assumed an unsupported update | Exercise supported displayName and active updates through HTTP; retain the direct external-rename cache test at service level | DTO inspection / HTTP | Assert the actual endpoint update contract before choosing fixtures |
+| P8-I03 | Harness authentication / Low | All three two-reader PostgreSQL cases returned 401 before exercising freshness | Each test application generated its own temporary OAuth signing key; the writer's token was not valid on the reader | Acquire a token from each application. Both backend HTTP runs pass 18/18; PostgreSQL used two independent application instances and replayed 22 migrations | Two-app harness setup / PostgreSQL HTTP | Independent apps need separate test tokens or an explicitly shared signing key; never bypass authentication to test freshness |
+| P8-I04 | Product correctness / High | Statistics still succeeded for a cached endpoint deleted by another writer | The statistics entry point used its own cache-only existence check | Resolve the endpoint through the authoritative read before counting. A dedicated regression changed from a resolved response to the expected 404 | Cache-consumer review / focused unit RED | Cover alternate endpoint entry points as well as ordinary item/list requests |
+| P8-I05 | Environment / Low | Initial unit commands could not find Jest, then the generated Prisma client | A fresh worktree does not contain installed dependencies or generated code | Link only existing tooling after the missing-dependency failure and generate the client from this worktree's schema with an inert URL | First validation command / first validation command | Setup errors are not TDD RED; record the subsequent behavioral failure separately |
+| P8-I06 | Documentation / Low | Coupled freshness gate rejected the package | The first documentation pass updated the operator guide but missed the profile architecture document bound to the endpoint service | Update its timing guarantee and distinguish historical single-instance evidence from new two-process evidence; coupled freshness passes | Source-to-doc mapping / existing F4 gate | Existing coupling gate worked; no new gate is needed |
+| P8-I07 | Harness readiness / Low | First local health call received connection refused | The detached server was still starting when the caller probed it | Verify readiness before smoke testing; the two-process PostgreSQL harness uses a bounded health wait and fails if its owned server exits | Server setup / first health call | A running process is not yet a ready HTTP server |
+| P8-I08 | Tooling / Low | Two guessed paths did not exist and symbol lookup could not resolve the sibling worktree | The controller has a different filename, no shared InMemory database file exists, and the language provider did not accept the sibling-worktree reference | Use file discovery and scoped source search instead of inventing a shared storage object | File discovery / attempted read | No product change; repository boundaries must be verified from actual declarations |
+| P8-I09 | Test typing / Low | Lint rejected two list assertions, including the first attempted matcher rewrite | Supertest response bodies and nested asymmetric matcher assignments are typed as `any` | Validate the body as `unknown` and require an actual endpoint array before checking its contents. Final focused HTTP and lint checks pass | Static analysis / targeted lint | Test HTTP boundaries with real type guards rather than casts or weakened lint rules |
+
 ## Entry checklist
 
 For each new issue record:
@@ -156,3 +170,17 @@ regression tests are required before production edits.
 
 **Design disposition:** retain narrow work packages and resource repository
 boundaries. No new infrastructure dependency is justified by this ledger.
+
+### P8a transcript reconciliation
+
+The parent session's complete `events.jsonl` was scanned through the P8a
+documentation checks (15,894 events at that checkpoint), rather than relying
+only on the compacted conversation. The scan correlated tool starts and results,
+selected endpoint-worktree executions, and checked both error signals and
+diagnosis terms such as `root cause`, `stale` and `no-op`.
+The P8 entries above cover the confirmed setup, contract, HTTP, product and
+documentation issues. Source/doc quotations, search echoes, and earlier
+packages' 401 discussions were excluded as non-issues for P8a.
+
+This is a package-scoped reconciliation, not a claim that every still-running
+implementation package or its separate transcript has been reconciled.

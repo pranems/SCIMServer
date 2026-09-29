@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Endpoint, Prisma } from '../../../generated/prisma/client';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { isUuid } from '../../../shared/uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
@@ -149,6 +150,7 @@ export class EndpointService implements OnModuleInit {
   // Writes go to DB first (Prisma) or directly (InMemory), then update cache.
   private readonly cacheById = new Map<string, CachedEndpoint>();
   private readonly cacheByName = new Map<string, CachedEndpoint>();
+  private readonly cacheFingerprints = new Map<string, string>();
 
   /** Callback for registry hydration on profile changes */
   private profileChangeListener?: ProfileChangeListener;
@@ -239,11 +241,42 @@ export class EndpointService implements OnModuleInit {
   private cacheSet(ep: CachedEndpoint): void {
     this.cacheById.set(ep.id, ep);
     this.cacheByName.set(ep.name.toLowerCase(), ep);
+    this.cacheFingerprints.set(ep.id, this.endpointFingerprint(ep));
   }
 
   private cacheDelete(ep: CachedEndpoint): void {
     this.cacheById.delete(ep.id);
     this.cacheByName.delete(ep.name.toLowerCase());
+    this.cacheFingerprints.delete(ep.id);
+  }
+
+  private endpointFingerprint(ep: CachedEndpoint): string {
+    const { _schemaCaches: _runtimeCaches, ...profile } = ep.profile ?? {};
+    return createHash('sha256')
+      .update(JSON.stringify({ ...ep, profile }))
+      .digest('hex');
+  }
+
+  private observePersistentEndpoint(endpoint: Endpoint): CachedEndpoint {
+    const fresh = this.toCached(endpoint);
+    const previous = this.cacheById.get(fresh.id);
+    if (previous && this.cacheFingerprints.get(fresh.id) === this.endpointFingerprint(fresh)) {
+      return previous;
+    }
+    if (previous) this.cacheDelete(previous);
+    this.cacheSet(fresh);
+    this.syncEndpointLogLevel(fresh.id, fresh.profile?.settings);
+    this.syncEndpointFileLogging(fresh.id, fresh.name, fresh.profile?.settings);
+    this.profileChangeListener?.(fresh.id, fresh.profile ?? null);
+    return fresh;
+  }
+
+  private forgetPersistentEndpoint(endpoint: CachedEndpoint | undefined): void {
+    if (!endpoint) return;
+    this.cacheDelete(endpoint);
+    this.scimLogger.clearEndpointLevel(endpoint.id);
+    this.scimLogger.disableEndpointFileLogging(endpoint.id);
+    this.profileChangeListener?.(endpoint.id, null);
   }
 
   // ─── Profile Summary Builder ────────────────────────────────────────
@@ -502,53 +535,31 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpoint(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
-    // Try cache by ID first, then by name
     const cached = this.cacheById.get(endpointId.toLowerCase()) ?? this.cacheByName.get(endpointId.toLowerCase());
-    if (cached) return this.toResponse(cached, view);
-
-    // Cache miss - try DB (Prisma only; InMemory is always in cache)
     if (this.isInMemoryBackend) {
+      if (cached) return this.toResponse(cached, view);
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
 
-    let endpoint: Endpoint | null = null;
-
-    // Try by ID first (UUID format)
-    try {
-      endpoint = await this.prisma.endpoint.findUnique({
-        where: { id: endpointId }
+    let endpoint = isUuid(endpointId)
+      ? await this.prisma.endpoint.findUnique({ where: { id: endpointId } })
+      : null;
+    if (!endpoint) {
+      endpoint = await this.prisma.endpoint.findFirst({
+        where: { name: { equals: endpointId, mode: 'insensitive' } },
       });
-    } catch (e) {
-      // ID lookup failed (e.g., invalid UUID) - will try by name below
-      this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint ID lookup failed, trying by name', { endpointId, error: (e as Error).message });
     }
-
-    // Fallback: try by name (allows using endpoint name in SCIM URLs)
     if (!endpoint) {
-      try {
-        endpoint = await this.prisma.endpoint.findFirst({
-          where: { name: { equals: endpointId, mode: 'insensitive' } }
-        });
-      } catch (e) {
-        // Name lookup also failed
-        this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint name lookup failed', { endpointId, error: (e as Error).message });
-      }
-    }
-
-    if (!endpoint) {
+      this.forgetPersistentEndpoint(cached);
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
-
-    const ce = this.toCached(endpoint);
-    this.cacheSet(ce); // warm cache for next time
-    return this.toResponse(ce, view);
+    return this.toResponse(this.observePersistentEndpoint(endpoint), view);
   }
 
   async getEndpointByName(name: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
     const cached = this.cacheByName.get(name.toLowerCase());
-    if (cached) return this.toResponse(cached, view);
-
     if (this.isInMemoryBackend) {
+      if (cached) return this.toResponse(cached, view);
       throw new NotFoundException(`Endpoint with name "${name}" not found`);
     }
 
@@ -557,24 +568,21 @@ export class EndpointService implements OnModuleInit {
     });
 
     if (!endpoint) {
+      this.forgetPersistentEndpoint(cached);
       throw new NotFoundException(`Endpoint with name "${name}" not found`);
     }
 
-    const ce = this.toCached(endpoint);
-    this.cacheSet(ce);
-    return this.toResponse(ce, view);
+    return this.toResponse(this.observePersistentEndpoint(endpoint), view);
   }
 
   async listEndpoints(active?: boolean, view: 'full' | 'summary' = 'summary'): Promise<EndpointListResponse> {
     let items: CachedEndpoint[];
 
-    // If cache is warmed, serve from cache
-    if (this.cacheById.size > 0 || this.isInMemoryBackend) {
+    if (this.isInMemoryBackend) {
       const all = [...this.cacheById.values()];
       items = active === undefined ? all : all.filter(ep => ep.active === active);
       items = items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     } else {
-      // Fallback: load from DB (first call before cache is warmed)
       const where: Prisma.EndpointWhereInput = {};
       if (active !== undefined) {
         where.active = active;
@@ -585,11 +593,13 @@ export class EndpointService implements OnModuleInit {
         orderBy: { createdAt: 'desc' }
       });
 
-      items = endpoints.map(e => {
-        const ce = this.toCached(e);
-        this.cacheSet(ce);
-        return ce;
-      });
+      items = endpoints.map(e => this.observePersistentEndpoint(e));
+      if (active === undefined) {
+        const existingIds = new Set(items.map(ep => ep.id));
+        for (const cached of this.cacheById.values()) {
+          if (!existingIds.has(cached.id)) this.forgetPersistentEndpoint(cached);
+        }
+      }
     }
 
     return {
@@ -909,15 +919,8 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpointStats(endpointId: string): Promise<EndpointStatsResponse> {
-    // Verify endpoint exists (via cache)
-    if (!this.cacheById.has(endpointId)) {
-      if (this.isInMemoryBackend) {
-        throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
-      }
-      // Try DB
-      const ep = await this.prisma.endpoint.findUnique({ where: { id: endpointId } });
-      if (!ep) throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
-    }
+    const endpoint = await this.getEndpoint(endpointId);
+    endpointId = endpoint.id;
 
     if (this.isInMemoryBackend) {
       // Use repository layer to count actual resources (not hardcoded zeros)
