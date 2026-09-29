@@ -157,6 +157,24 @@ retained, and no P8b deletion/cleanup implementation is imported.
 
 ## Entry checklist
 
+### P6b confirmed corrections
+
+| ID | Type / severity | Symptom | Root cause | Resolution and why it works | Earliest possible / actual detection | Prevention / status |
+|---|---|---|---|---|---|---|
+| P6b-I01 | Environment / Low | Jest missing; client generation then required DATABASE_URL | Fresh worktree has no dependencies and Prisma configuration requires a URL even for generation | After the failed runner attempt, linked approved existing API tooling and generated only this worktree's client with a nonconnecting loopback URL | Runner setup / same | Missing dependencies are not behavioral RED; no lockfile or shared-target modification |
+| P6b-I02 | Fixture / Low | User/Group creation returned 400, then Group returned 409 before query assertions | Strict minimal schemas omitted DTO-default active/members; Group uniqueness rejected case-only duplicate display names | Added the actual default fields and distinct names, then reran baseline: 24 behavior failures, no fixture failures | Fixture authoring / first RED runs | Positive fixture creation is mandatory; setup failures are recorded separately |
+| P6b-I03 | Read correctness / High | Hidden filters returned zero instead of three, numeric ordering used text, extension predicates lost their namespace | List services queried response-projected values; fixed column sorting and flattened caseExact paths lacked schema context | Shared request-scoped read plan authorizes qualified paths, filters internal values, orders/counts/pages, then calls existing safe output mappers; initial 32 HTTP tests and 110 unit tests pass | Unit/HTTP assertions / focused RED | Matrix includes all three resource families, GET and string-form JSON search, two colliding extension namespaces and output key checks |
+| P6b-I04 | Profile consistency / Medium | Custom PUT/PATCH/DELETE returned 428 although ETag was disabled | Custom calls omitted the resolved profile argument to enforceIfMatch | Pass the profile to all three calls; disabled ETag ignores absent/stale conditions, enabled mode retains 428/412/current-version behavior | HTTP contract / focused RED | Keep discovery/header/write behavior in one profile test; atomic write races remain P3 |
+| P6b-I05 | Test contract / Low | Initial assertion expected meta.version to disappear with ETag disabled | Existing policy disables conditional HTTP behavior, not the resource's informational version | Test header suppression and actual write outcomes rather than inventing a mandatory metadata prohibition | Contract review / first RED review | Preserve documented optional metadata policy |
+| P6b-I06 | Type checking / Low | New common-attribute definitions failed TypeScript build | Internal SchemaAttributeDefinition requires explicit required/multiValued fields | Supply RFC defaults for synthetic common attributes; API build now passes | API build / same | Typed schema fixtures and production build remain independent gates |
+| P6b-I07 | Output correctness / High | Hidden child values survived without a hidden top-level sibling | Output traversal was gated on the presence of a top-level never-returned set | Traverse children independently; the exact unit payload changed from leaking two secret keys to containing only visible values, and HTTP checks cover all resource families | Unit / boundary review | Nested-only schemas are an explicit negative control; production output assembly precedes suppression |
+| P6b-I08 | Query edge / Medium | Primitive lists did not sort and null comparisons targeted nonnullable columns | Sort traversal treated every primary/first value as an object; push-down assumed null was accepted by every database column | Preserve scalar list values, require a named complex child, and evaluate null comparisons after fetching candidates | Unit / boundary review | Separate simple-list, complex-child and nonnullable-null tests; PostgreSQL HTTP covers User null comparisons |
+| P6b-I09 | Fixture / Low | Neighboring generic service tests rejected query fields; additional HTTP fixtures rejected profile updates | Old mocks omitted custom schemas entirely; profile schema arrays replace rather than merge by ID | Register the schema only for query tests and send the complete schema array when changing characteristics | Fixture authoring / neighboring tests | Mocks must model published query metadata; retain unrelated schemas in replacement arrays |
+| P6b-I10 | Tooling / Low | First live readiness probe failed while the API was running | Used `/health` without the application's `/scim` prefix | Read the actual controller/bootstrap contract and probe `/scim/health`; owned local smoke then passed 32 checks | Harness authoring / same | Health paths are verified from source, not inferred |
+| P6b-I11 | Standards/test policy / Medium | Draft test accepted a complex sort parent without a scalar child | Confused multi-valued primary selection with permission to infer a complex child | RFC 7644 section 3.4.2.3 requires the child path; reject bare complex parents and test `entries.value` instead | Standards review / focused review | Read the normative clause before treating a convenient shorthand as required behavior |
+| P6b-I12 | Tooling / Low | New test lint rejected unsafe Supertest bodies; documentation rendering initially skipped | HTTP library body type is any; root/web tooling was absent after cleanup | Assert object bodies through a typed test helper; restore frozen documentation/browser dependencies after the real missing-tool result | Static gate / same | A skipped renderer is not a render pass; no shared dependency targets or lockfiles are modified |
+| P6b-I13 | Documentation diagnostics / Low | Link scan found three old Session references; renderer discovery reported editor version 0.0.0 | Historical Session text names removed tests/ignored settings; available renderer metadata cannot establish a matching bundle version | Compare against starting HEAD, record the existing links, and render with pinned 11.15.0 without changing dependency pins or editor state | Documentation gate / same | No new broken links accepted; historical cleanup and editor-version discovery remain outside P6b |
+
 For each new issue record:
 
 1. Type and severity.
@@ -188,6 +206,20 @@ with zero failed test assertions, and three pre-existing Session links.
 Final P3 matrix `postgres-69bf7bf777debff5`: 55/55 HTTP tests on each backend,
 33 live assertions on each owned runtime, 22 migrations replayed on PostgreSQL
 17.8, exact owned container cleanup verified. Final unit count: 692/692.
+
+**P6b provenance:** reconciled the worktree's complete retained P6b runner,
+build, lint, setup, HTTP and smoke logs using failure-signal and diagnosis
+passes. The session did not supply `VSCODE_TARGET_SESSION_LOG`; no full
+external conversation-transcript reconciliation is claimed. Import/setup
+failures, mock/profile fixture failures, the incorrect metadata assertion,
+and the non-SCIM health route were excluded from behavioral RED counts.
+Final focused evidence is 616 unit tests, 156 HTTP tests per backend and 32
+live checks per backend. All owned API processes and exact database
+containers were stopped/removed.
+
+The doc render passed with pinned Mermaid 11.15.0 in both themes, but renderer
+discovery reported the editor's version as `0.0.0`. That environment diagnostic
+is recorded, not "fixed" by changing the pin to an invalid version.
 
 **Test/gate disposition:** historical failure evidence is retained; permanent
 regression tests are required before production edits.

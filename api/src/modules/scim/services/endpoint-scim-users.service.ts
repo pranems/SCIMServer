@@ -25,6 +25,7 @@ import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean } from '../../endpoint/endpoint
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { buildUserFilter } from '../filters/apply-scim-filter';
 import { resolveUserSortParams } from '../common/scim-sort.util';
+import { createReadQuery } from '../common/scim-read-query';
 import { UserPatchEngine } from '../../../domain/patch/user-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import { SchemaValidator } from '../../../domain/validation';
@@ -181,57 +182,26 @@ export class EndpointScimUsersService {
     // Gap 6: clamp to the per-endpoint filter.maxResults (RFC 7644 §3.4.2.4),
     // falling back to the global MAX_COUNT when the profile does not set it.
     const maxResults = resolveNumericLimit(this.endpointContext.getProfile?.(), (s) => s.filter?.maxResults, MAX_COUNT);
-    if (count > maxResults) {
-      count = maxResults;
-    }
-
     this.logger.info(LogCategory.SCIM_USER, 'List users', { filter, startIndex, count, endpointId });
-
-    let filterResult;
-    try {
-      filterResult = buildUserFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch (e) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: filter },
-      });
-    }
-
-    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
-    if (filter) {
-      this.schemaHelpers.validateFilterPaths(filter, endpointId);
-    }
-
-    // Fetch users from DB (repository handles endpointId scoping)
-    const sortParams = resolveUserSortParams(sortBy, sortOrder);
+    const query = createReadQuery(
+      { filter, startIndex, count, sortBy, sortOrder },
+      this.schemaHelpers.getSchemaDefinitions(endpointId), maxResults, buildUserFilter,
+    );
+    // External capability checks stay in controllers: Me also uses this lookup.
     const allDbUsers = await this.userRepo.findAll(
       endpointId,
-      filterResult.dbWhere,
-      sortParams,
+      query.dbWhere,
+      resolveUserSortParams(),
     );
-
-    // Build SCIM resources and apply in-memory filter if needed
-    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
-
-    if (filterResult.inMemoryFilter) {
-      resources = resources.filter(filterResult.inMemoryFilter);
-    }
-
-    const totalResults = resources.length;
-    const skip = Math.max(startIndex - 1, 0);
-    const take = Math.max(Math.min(count, maxResults), 0);
-    const paginatedResources = resources.slice(skip, skip + take);
-
-    this.logger.debug(LogCategory.SCIM_USER, 'List users result', { totalResults, returned: paginatedResources.length, endpointId });
-
+    const page = query.page(
+      allDbUsers,
+      user => this.toInternalUserResource(user, baseUrl, endpointId),
+      user => this.toScimUserResource(user, baseUrl, endpointId),
+    );
+    this.logger.debug(LogCategory.SCIM_USER, 'List users result', { totalResults: page.totalResults, returned: page.itemsPerPage, endpointId });
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
-      totalResults,
-      startIndex,
-      itemsPerPage: paginatedResources.length,
-      Resources: paginatedResources
+      ...page,
     };
   }
 
@@ -632,6 +602,19 @@ export class EndpointScimUsersService {
   }
 
   private toScimUserResource(user: UserRecord, baseUrl: string, endpointId?: string): ScimUserResource {
+    const resource = this.toInternalUserResource(user, baseUrl, endpointId);
+    const visibleExtUrns = stripNeverReturnedFromPayload(
+      resource,
+      this.schemaHelpers.getNeverReturnedByParent(endpointId),
+      this.schemaHelpers.getCoreSchemaUrnLower(endpointId),
+      this.schemaHelpers.getExtensionUrns(endpointId),
+    );
+    resource.schemas = [SCIM_CORE_USER_SCHEMA, ...visibleExtUrns];
+    stripInternalResponseFields(resource);
+    return resource;
+  }
+
+  private toInternalUserResource(user: UserRecord, baseUrl: string, endpointId?: string): ScimUserResource {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
@@ -642,12 +625,8 @@ export class EndpointScimUsersService {
     const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
     sanitizeBooleanStringsByParent(rawPayload, boolMap, coreUrnLower);
 
-    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
-    const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
-    const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
-    const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA, ...visibleExtUrns];
-    stripInternalResponseFields(rawPayload);
+    const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA, ...extensionUrns];
 
     // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
     // (e.g., a client-supplied "id" in the POST body must never override scimId)

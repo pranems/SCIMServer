@@ -884,3 +884,14 @@ Examples of standing rules that originated from real failures:
 - **DPoP (RFC 9449) for endpoint credentials** - sender-constrained tokens; tightens our bearer-token model. Low priority at current scale.
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**
+
+## Schema-aware query regression rule (2026-09-28, P6b)
+
+When changing list/filter/sort/projection code, test all affected resource
+families with two namespaces sharing a field name but conflicting caseExact
+rules. Authorize operands before evaluating internal values, count and page
+before response projection, and never enable writeOnly filtering as a
+side effect. Include a hidden child without a hidden top-level sibling,
+typed sort outcomes, missing values and count zero. Preserve internal `/Me`
+lookup when external filtering is disabled. Assert actual rows/order/totals
+and forbidden output keys, not only HTTP success.

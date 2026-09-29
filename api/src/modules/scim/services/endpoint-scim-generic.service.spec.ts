@@ -16,6 +16,7 @@ import { SCIM_EVENTS } from '../../stats/scim-events';
 describe('EndpointScimGenericService', () => {
   let service: EndpointScimGenericService;
   let eventEmitter: EventEmitter2;
+  let registry: ScimSchemaRegistry;
 
   const endpointId = 'ep-gen-1';
   const baseUrl = 'http://localhost:6000/scim';
@@ -115,7 +116,18 @@ describe('EndpointScimGenericService', () => {
 
     service = module.get<EndpointScimGenericService>(EndpointScimGenericService);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+    registry = module.get(ScimSchemaRegistry);
   });
+
+  function registerQuerySchema() {
+    const original = registry.getSchema.bind(registry);
+    jest.spyOn(registry, 'getSchema').mockImplementation(urn => urn === deviceResourceType.schema ? {
+      id: urn, name: 'Device', description: 'Registered query fixture',
+      attributes: ['displayName', 'serialNumber'].map(name => ({
+        name, type: 'string', multiValued: false, required: false,
+      })),
+    } : original(urn));
+  }
 
   afterEach(() => {
     jest.resetAllMocks();
@@ -559,6 +571,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Sorting in LIST ──────────────────────────────────────────────────
 
   describe('listResources - sorting', () => {
+    beforeEach(registerQuerySchema);
     it('should sort by displayName ascending by default', async () => {
       const records = [
         { ...mockGenericRecord, id: 'r3', scimId: 's3', displayName: 'Charlie', rawPayload: JSON.stringify({ displayName: 'Charlie' }) },
@@ -819,6 +832,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Filter parsing in LIST ───────────────────────────────────────────
 
   describe('listResources - filter parsing', () => {
+    beforeEach(registerQuerySchema);
     it('should pass displayName eq filter to repository with Prisma case-insensitive match', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
@@ -906,7 +920,7 @@ describe('EndpointScimGenericService', () => {
       );
     });
 
-    it('should push externalId ne (not equal, case-sensitive) to DB', async () => {
+    it('should retain missing externalId candidates for SCIM ne evaluation', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       await service.listResources(
@@ -919,7 +933,7 @@ describe('EndpointScimGenericService', () => {
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        { externalId: { not: 'ext-999' } },
+        {},
       );
     });
 
@@ -1005,11 +1019,11 @@ describe('EndpointScimGenericService', () => {
         deviceResourceType,
       );
 
-      // fetchAll = true → repository called with no dbFilter
+      // An empty typed filter fetches all candidates before residual evaluation.
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        undefined,
+        {},
       );
       // In-memory filter applied on SCIM representation
       expect(result.totalResults).toBe(1);

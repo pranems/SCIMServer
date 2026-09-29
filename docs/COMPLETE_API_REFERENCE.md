@@ -1821,11 +1821,25 @@ Authorization: Bearer changeme-scim
 |-------|------|---------|-------------|
 | `filter` | string | (none) | SCIM filter expression (RFC 7644 S3.4.2.2) |
 | `startIndex` | number | 1 | 1-based pagination index |
-| `count` | number | 100 | Results per page (max 1000) |
-| `sortBy` | string | (none) | Attribute to sort by |
+| `count` | number | 100 | Results per page, capped by profile `filter.maxResults`; fallback `SCIM_MAX_COUNT` is 200. Zero returns only the full match count. |
+| `sortBy` | string | (none) | Published scalar attribute path, including qualified extensions; complex fields require a child path, e.g. `emails.value`. Unknown or writeOnly paths return 400 `invalidValue`. |
 | `sortOrder` | string | `ascending` | `ascending` or `descending` |
 | `attributes` | string | (none) | Comma-separated attributes to include |
 | `excludedAttributes` | string | (none) | Comma-separated attributes to exclude |
+
+Users, Groups and custom collections evaluate permitted filters before output
+projection. `returned:never` fields remain hidden even when explicitly
+requested, and writeOnly fields cannot be queried. Numeric/dateTime values
+sort by type; strings honor that exact namespace's `caseExact`. Multi-valued
+sort paths select the primary item, otherwise the first; missing values sort
+last ascending and first descending. `totalResults` counts all matches before
+paging. GET and the existing string-form JSON `.search` use the same read plan.
+See [query semantics and implementation evidence](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md).
+
+Custom PUT/PATCH/DELETE use the same ETag capability profile as discovery:
+`etag.supported: false` disables If-Match enforcement, including RequireIfMatch.
+The informational resource version may remain in metadata. Enabled ETag
+retains the existing 428/412 checks.
 
 **Response (200 OK):**
 

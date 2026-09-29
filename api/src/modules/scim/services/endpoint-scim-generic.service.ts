@@ -36,7 +36,6 @@ import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
 // assertIfMatch replaced by enforceIfMatch for RequireIfMatch 428 parity
 import {
-  DEFAULT_COUNT,
   MAX_COUNT,
   SCIM_LIST_RESPONSE_SCHEMA,
   SCIM_PATCH_SCHEMA,
@@ -63,8 +62,9 @@ import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
-import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import { buildGenericFilter } from '../filters/apply-scim-filter';
+import { createReadQuery } from '../common/scim-read-query';
+import { resolveNumericLimit } from '../common/capability-resolver';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 import { enforceFilterSupported, enforcePatchSupported, enforceSortSupported } from '../common/capability-enforcement';
 
@@ -293,71 +293,20 @@ export class EndpointScimGenericService {
     enforceFilterSupported(profile, params.filter);
     enforceSortSupported(profile, params.sortBy);
     this.scimLogger.info(LogCategory.SCIM_RESOURCE, `List ${resourceType.name}`, { endpointId, filter: params.filter });
-    const startIndex = Math.max(params.startIndex ?? 1, 1);
-    const count = Math.min(Math.max(params.count ?? DEFAULT_COUNT, 0), MAX_COUNT);
-
-    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
-    if (params.filter) {
-      this.validateFilterAttributePaths(params.filter, resourceType, endpointId);
-    }
-
-    // RFC 7644 §3.4.2.2: Full AST-based filter with DB push-down + in-memory fallback
-    const caseExactAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactPaths;
-    let filterResult: ReturnType<typeof buildGenericFilter>;
-    try {
-      filterResult = buildGenericFilter(params.filter, caseExactAttrs);
-    } catch (e) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: params.filter },
-      });
-    }
-
-    let records = await this.genericRepo.findAll(
+    const maxResults = resolveNumericLimit(profile, s => s.filter?.maxResults, MAX_COUNT);
+    const query = createReadQuery(params, this.getSchemaDefinitions(resourceType, endpointId), maxResults, buildGenericFilter);
+    const records = await this.genericRepo.findAll(
       endpointId,
       resourceType.name,
-      filterResult.fetchAll ? undefined : filterResult.dbWhere,
+      query.dbWhere,
     );
-
-    // Convert to SCIM representation for in-memory filtering + response
-    let resources = records.map((r) => this.toScimResponse(r, resourceType));
-
-    // Apply in-memory filter when the filter couldn't be fully pushed to DB
-    if (filterResult.inMemoryFilter) {
-      resources = resources.filter(filterResult.inMemoryFilter);
-    }
-
-    // In-memory sort for generic resources (RFC 7644 §3.4.2.3)
-    if (params.sortBy) {
-      const sortField = params.sortBy.toLowerCase();
-      const direction = params.sortOrder === 'descending' ? -1 : 1;
-      // Map SCIM attribute names to record fields
-      const fieldMap: Record<string, string> = {
-        id: 'id',
-        externalid: 'externalId',
-        displayname: 'displayName',
-        'meta.created': 'meta.created',
-        'meta.lastmodified': 'meta.lastModified',
-      };
-      const mappedField = fieldMap[sortField] ?? sortField;
-      resources.sort((a, b) => {
-        const va = String(this.resolveNestedValue(a, mappedField) ?? '');
-        const vb = String(this.resolveNestedValue(b, mappedField) ?? '');
-        return va.localeCompare(vb) * direction;
-      });
-    }
-
-    const totalResults = resources.length;
-    const pageResources = resources.slice(startIndex - 1, startIndex - 1 + count);
-
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
-      totalResults,
-      startIndex,
-      itemsPerPage: pageResources.length,
-      Resources: pageResources,
+      ...query.page(
+        records,
+        record => this.toInternalResource(record, resourceType),
+        record => this.toScimResponse(record, resourceType),
+      ),
     };
   }
 
@@ -792,6 +741,22 @@ export class EndpointScimGenericService {
     record: GenericResourceRecord,
     resourceType: ScimResourceType,
   ): Record<string, unknown> {
+    const resource = this.toInternalResource(record, resourceType);
+    const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
+    const visibleExtUrns = stripNeverReturnedFromPayload(
+      resource, cache?.neverReturnedByParent ?? new Map(),
+      cache?.coreSchemaUrn ?? resourceType.schema.toLowerCase(),
+      resourceType.schemaExtensions.map(e => e.schema),
+    );
+    resource.schemas = [resourceType.schema, ...visibleExtUrns];
+    stripInternalResponseFields(resource);
+    return resource;
+  }
+
+  private toInternalResource(
+    record: GenericResourceRecord,
+    resourceType: ScimResourceType,
+  ): Record<string, unknown> {
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(record.rawPayload);
@@ -821,13 +786,8 @@ export class EndpointScimGenericService {
     const boolMap = this.getBooleansByParentForRT(resourceType, record.endpointId);
     sanitizeBooleanStringsByParent(payload, boolMap, coreUrnLower);
 
-    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
-    const neverByParent = cache?.neverReturnedByParent ?? new Map();
     const extSchemaUrns = resourceType.schemaExtensions.map(e => e.schema);
-    const visibleExtUrns = stripNeverReturnedFromPayload(payload, neverByParent, coreUrnLower, extSchemaUrns);
-    const schemas: string[] = [resourceType.schema, ...visibleExtUrns];
-
-    stripInternalResponseFields(payload);
+    const schemas: string[] = [resourceType.schema, ...extSchemaUrns];
     delete payload.id;
     delete payload.meta;
     delete payload.schemas;
@@ -1304,62 +1264,4 @@ export class EndpointScimGenericService {
     return this.getSchemaCacheForRT(resourceType, endpointId)?.requestReturnedByParent ?? new Map();
   }
 
-  /**
-   * Validate that attribute paths in a filter expression are known to the
-   * schema definitions for this resource type (RFC 7644 §3.4.2.2).
-   */
-  private validateFilterAttributePaths(
-    filter: string,
-    resourceType: ScimResourceType,
-    endpointId: string,
-  ): void {
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    if (schemaDefs.length === 0) return;
-
-    let ast;
-    try {
-      ast = parseScimFilter(filter);
-    } catch (err) {
-      // Syntax errors are handled by buildGenericFilter in the caller
-      if (process.env.NODE_ENV !== 'test') {
-        console.debug?.('[generic-service] Filter parse failed in validateFilterAttributePaths:', (err as Error).message);
-      }
-      return;
-    }
-    const paths = extractFilterPaths(ast);
-    if (paths.length === 0) return;
-
-    const result = SchemaValidator.validateFilterAttributePaths(paths, schemaDefs,
-      this.getAttrMapsForRT(resourceType, endpointId),
-    );
-    if (!result.valid) {
-      const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Filter validation failed: ${details}`,
-        diagnostics: {
-          errorCode: 'VALIDATION_FILTER',
-          triggeredBy: 'StrictSchemaValidation',
-          attributePaths: result.errors.map((e) => e.path),
-          activeConfig: { StrictSchemaValidation: true },
-          filterExpression: filter,
-        },
-      });
-    }
-  }
-
-  /**
-   * Resolve a potentially nested dotted path on an object.
-   * E.g. resolveNestedValue(obj, 'meta.created') → obj.meta.created
-   */
-  private resolveNestedValue(obj: Record<string, unknown>, path: string): unknown {
-    const parts = path.split('.');
-    let current: unknown = obj;
-    for (const part of parts) {
-      if (current == null || typeof current !== 'object') return undefined;
-      current = (current as Record<string, unknown>)[part];
-    }
-    return current;
-  }
 }

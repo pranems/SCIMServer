@@ -175,6 +175,17 @@ Structural decay that a correctness-only gate never sees; only an explicit desig
 | **PF-2** | Render the authoritative effective state, not a writable shadow | Connect displayed and wrote flat auth flags while `profile.authentication.methods[]` could override them in the runtime resolver; a switch could persist successfully yet leave enforcement unchanged | A control for a layered setting must consume the same effective resolver as enforcement. If another source wins, show provenance and disable the local write path. Tests need conflicting values so the precedence assertion discriminates | Rule R11: authoritative effective control state | v0.55.24 UX-2 2026-09-17 |
 | **PF-3** | Policy-sensitive shared state needs policy-sensitive identity | JWKS cache, single-flight, stale fallback, refresh, and unknown-kid state were keyed only by URI while 11 endpoint-specific controls changed whether that state was admissible. A lenient endpoint could seed two keys for 24 h and a stricter endpoint would reuse them despite `maxKeys:1` or a 60 s TTL | Every policy dimension that changes admissibility, lifetime, capacity, retry, or security posture must participate in shared-state identity. Test at least two tenants/endpoints with the same resource identity and conflicting policies; same-policy tests cannot expose cross-policy leakage | Rule R12: policy-sensitive shared-state identity | v0.55.32 EP-09 2026-09-24 |
 
+**P6b application of PF-3 and PD-1 (2026-09-28):** a field name is not a
+complete policy identity. Flattening two schema-qualified `code` fields
+applied one namespace's caseExact to the other. Similarly, response-shaped
+data is not a valid substitute for authorized internal query operands.
+Keep schema/parent identity through query evaluation, then enforce output
+suppression at the final assembled-resource boundary. Tests must include
+colliding namespaces and a hidden child with no hidden top-level sibling.
+The [query implementation](../SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) supplies
+the unit, HTTP and two-backend controls; the standing query regression rule
+turns this lesson into a required assertion class.
+
 ### Category G - Configuration and operational defaults (a silent default is not a decision)
 
 The class of defect where nothing is *wrong* in the code, but a number was never actually chosen - it was inherited, assumed, or left implicit. No correctness gate fires, because the code does exactly what it says.
@@ -214,7 +225,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PE-4 (workflow boundary = session boundary) | 1 measured high-cost session plus exact 91:1 token sample | YES - AI-Efficient Change Delivery Rule and handoff template |
 | PE-5 (coherent rollback unit) | 1 measured W3.5 release boundary | YES - AI-Efficient Change Delivery Rule; apply before every PR |
 | PF-2 (authoritative effective control state) | 1 high-severity latent security-configuration defect | YES - immediate (R11) |
-| PF-3 (policy-sensitive shared-state identity) | 1 high-severity latent cross-endpoint policy bypass | YES - immediate (R12) |
+| PF-3 (policy-sensitive shared-state identity) | 2 policy-identity collisions: cross-endpoint JWKS policy and P6b schema namespace caseExact | YES - R12 plus schema-aware query regression rule |
 | PG-1 (env-dependent value = clamped setting) | 1 (multi-site: pool, body limits, log buffer, pagination) | scheduled (W1.7); promote to a rule after the 2nd sighting |
 | PG-2 (assert the library default you depend on) | 1 (medium-sev: Prisma v7 dropped the pool acquire timeout) | scheduled (unit lock with W1.7a) |
 | PG-3 (knob name must match what it bounds) | 1 (medium-sev: `REQUEST_TIMEOUT_MS` does not bound requests) | scheduled (W1.7b) |

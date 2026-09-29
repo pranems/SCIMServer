@@ -182,7 +182,16 @@ function buildFilterResult(
   columnMap: ColumnMap,
   caseExactAttrs?: Set<string>,
 ): { dbWhere: Record<string, unknown>; inMemoryFilter?: (r: Record<string, unknown>) => boolean; fetchAll: boolean } {
-  const dbClause = tryPushToDb(ast, columnMap);
+  // A schema can override the column's default equality. CITEXT cannot express
+  // caseExact equality (especially ne); fall back before it drops candidates.
+  const mismatched = (node: FilterNode): boolean => {
+    if (node.type === 'logical') return mismatched(node.left) || mismatched(node.right);
+    if (node.type !== 'compare' || !caseExactAttrs) return false;
+    const mapped = columnMap[node.attrPath.toLowerCase()];
+    if (!mapped || !['citext', 'text', 'varchar'].includes(mapped.type)) return false;
+    return caseExactAttrs.has(node.attrPath.toLowerCase()) !== (mapped.type === 'text');
+  };
+  const dbClause = mismatched(ast) ? null : tryPushToDb(ast, columnMap);
   if (dbClause) {
     return { dbWhere: dbClause, fetchAll: false };
   }

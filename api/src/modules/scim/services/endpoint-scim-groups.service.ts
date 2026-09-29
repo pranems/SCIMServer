@@ -30,6 +30,7 @@ import type { PatchGroupDto } from '../dto/patch-group.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import { buildGroupFilter } from '../filters/apply-scim-filter';
 import { resolveGroupSortParams } from '../common/scim-sort.util';
+import { createReadQuery } from '../common/scim-read-query';
 import { GroupPatchEngine } from '../../../domain/patch/group-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import { SchemaValidator } from '../../../domain/validation';
@@ -210,57 +211,25 @@ export class EndpointScimGroupsService {
     // Gap 6: clamp to the per-endpoint filter.maxResults (RFC 7644 §3.4.2.4),
     // falling back to the global MAX_COUNT when the profile does not set it.
     const maxResults = resolveNumericLimit(this.endpointContext.getProfile?.(), (s) => s.filter?.maxResults, MAX_COUNT);
-    if (count > maxResults) {
-      count = maxResults;
-    }
-
     this.logger.info(LogCategory.SCIM_GROUP, 'List groups', { filter, startIndex, count, endpointId });
-
-    let filterResult;
-    try {
-      filterResult = buildGroupFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch (e) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: filter },
-      });
-    }
-
-    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
-    if (filter) {
-      this.schemaHelpers.validateFilterPaths(filter, endpointId);
-    }
-
-    // Fetch groups from DB (repository handles endpointId scoping + member include)
-    const sortParams = resolveGroupSortParams(sortBy, sortOrder);
+    const query = createReadQuery(
+      { filter, startIndex, count, sortBy, sortOrder },
+      this.schemaHelpers.getSchemaDefinitions(endpointId), maxResults, buildGroupFilter,
+    );
     const allGroups = await this.groupRepo.findAllWithMembers(
       endpointId,
-      filterResult.dbWhere,
-      sortParams,
+      query.dbWhere,
+      resolveGroupSortParams(),
     );
-
-    // Build SCIM resources and apply in-memory filter if needed
-    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
-
-    if (filterResult.inMemoryFilter) {
-      resources = resources.filter(filterResult.inMemoryFilter);
-    }
-
-    const totalResults = resources.length;
-    const skip = Math.max(startIndex - 1, 0);
-    const take = Math.max(Math.min(count, maxResults), 0);
-    const paginatedResources = resources.slice(skip, skip + take);
-
-    this.logger.debug(LogCategory.SCIM_GROUP, 'List groups result', { totalResults, returned: paginatedResources.length, endpointId });
-
+    const page = query.page(
+      allGroups,
+      group => this.toInternalGroupResource(group, baseUrl, endpointId),
+      group => this.toScimGroupResource(group, baseUrl, endpointId),
+    );
+    this.logger.debug(LogCategory.SCIM_GROUP, 'List groups result', { totalResults: page.totalResults, returned: page.itemsPerPage, endpointId });
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
-      totalResults,
-      startIndex,
-      itemsPerPage: paginatedResources.length,
-      Resources: paginatedResources
+      ...page,
     };
   }
 
@@ -676,6 +645,19 @@ export class EndpointScimGroupsService {
   }
 
   private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
+    const resource = this.toInternalGroupResource(group, baseUrl, endpointId);
+    const visibleExtUrns = stripNeverReturnedFromPayload(
+      resource,
+      this.schemaHelpers.getNeverReturnedByParent(endpointId),
+      this.schemaHelpers.getCoreSchemaUrnLower(endpointId),
+      this.schemaHelpers.getExtensionUrns(endpointId),
+    );
+    resource.schemas = [SCIM_CORE_GROUP_SCHEMA, ...visibleExtUrns];
+    stripInternalResponseFields(resource);
+    return resource;
+  }
+
+  private toInternalGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.', diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
@@ -697,12 +679,8 @@ export class EndpointScimGroupsService {
     // Remove schemas from rawPayload - we build it dynamically below (G19 / FP-1)
     delete rawPayload.schemas;
 
-    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
-    const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
-    const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
-    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA, ...visibleExtUrns];
-    stripInternalResponseFields(rawPayload);
+    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns];
 
     return {
       schemas,

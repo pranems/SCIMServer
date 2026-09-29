@@ -16134,6 +16134,17 @@ Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -Foregrou
 Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 
 # ============================================
+# TEST SECTION 9z-CP: SCHEMA-AWARE QUERY SEMANTICS
+$script:currentSection = "9z-CP: Query Semantics"
+try {
+    $queryChecks = @(& (Join-Path $PSScriptRoot 'test-scim-query-semantics.ps1') -BaseUrl $baseUrl -Token $Token)
+    foreach ($check in $queryChecks) {
+        Test-Result -Success $check.Success -Message "9z-CP: $($check.Message)"
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-CP: query semantics smoke failed: $($_.Exception.Message)"
+}
+
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

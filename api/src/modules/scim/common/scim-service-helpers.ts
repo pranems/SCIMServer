@@ -509,17 +509,15 @@ export function stripNeverReturnedFromPayload(
 ): string[] {
   // ─── Core top-level + sub-attr stripping ───
   const coreNever = neverByParent.get(coreUrnLower);
-  if (coreNever) {
-    for (const key of Object.keys(payload)) {
-      if (coreNever.has(key.toLowerCase())) {
-        delete payload[key];
-        continue;
-      }
-      // Sub-attrs within complex/multi-valued parents
-      const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
-      if (subNever && subNever.size > 0) {
-        stripSubAttrs(payload[key], subNever);
-      }
+  for (const key of Object.keys(payload)) {
+    if (coreNever?.has(key.toLowerCase())) {
+      delete payload[key];
+      continue;
+    }
+    // Hidden children do not require a hidden attribute at the parent level.
+    const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
+    if (subNever && subNever.size > 0) {
+      stripSubAttrs(payload[key], subNever);
     }
   }
 
@@ -542,9 +540,9 @@ export function stripNeverReturnedFromPayload(
     payload[urn] = extObj;
 
     const extNever = neverByParent.get(urnLower);
-    if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+    if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
       for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-        if (extNever.has(extKey.toLowerCase())) {
+        if (extNever?.has(extKey.toLowerCase())) {
           delete (extObj as Record<string, unknown>)[extKey];
           continue;
         }

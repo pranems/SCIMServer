@@ -400,7 +400,7 @@ combined checkpoint has its own counts in section 11.1.
 | P3b | Deferred with explicit scope | Schema-driven, Group and custom-name atomic uniqueness need a separate design; P3 does not claim these guarantees |
 | P4 | In progress separately | Await parent-supplied commit; native and injected member failures remain acceptance checks |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
-| P6 | Partly integrated | P6a capability boundary integrated: 69 HTTP tests on each backend, 346 unit tests, 7 local live checks and independent review; P6b query/projection/sort/limit work remains separate |
+| P6 | Integrated; combined validation pending | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | In progress separately | Await P7a commit and remaining schema promises |
 | P8 | Partly integrated | P8a authoritative reads/fingerprints from `39841319`: [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8c conditional admin PATCH from `8eb2f162`: [CAS and single-snapshot token evidence](ENDPOINT_WRITE_CONCURRENCY.md), 172 units, 32 HTTP and 8 live checks per backend. P8b repository cleanup remains separate |
 | P9 | Pending | Follow changed behavior; preserve legitimate compatibility |
