@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const scripts = resolve(__dirname, '../../../../../scripts');
@@ -6,6 +7,43 @@ const read = (file: string): string => readFileSync(resolve(scripts, file), 'utf
 const section = 'live-test-sections/correctness-contracts.ps1';
 
 describe('integrated correctness live coverage', () => {
+  it('attempts both owned query fixture cleanups even when either deletion fails', () => {
+    const command = `
+$ErrorActionPreference = 'Stop'
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:SCIM_QUERY_CLEANUP_FILE, [ref]$null, [ref]$null)
+$statement = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[0]
+$text = $statement.Finally.Extent.Text
+$cleanup = [scriptblock]::Create($text.Substring(1, $text.Length - 2))
+$roleEndpointId = 'role-owned'
+$endpointId = 'main-owned'
+function Add-QueryCheck { param($Success, $Message); if (-not $Success) { throw 'Unexpected absence result' } }
+foreach ($failedIds in @(@('role-owned'), @('main-owned'), @('role-owned', 'main-owned'))) {
+    $script:deleted = [Collections.Generic.List[string]]::new()
+    $script:failures = $failedIds
+    function Invoke-QueryRequest {
+        param($Method, $Path, $Body)
+        if ($Method -eq 'DELETE') {
+            $id = $Path.Split('/')[-1]
+            $script:deleted.Add($id)
+            if ($id -in $script:failures) { throw 'Injected owned cleanup failure' }
+            return @{ Status = 204 }
+        }
+        return @{ Status = 404 }
+    }
+    $caught = $false
+    try { & $cleanup } catch { $caught = $true }
+    if (-not $caught -or $script:deleted.Count -ne 2 -or 'role-owned' -notin $script:deleted -or 'main-owned' -notin $script:deleted) {
+        throw 'Both owned endpoints must receive a cleanup attempt'
+    }
+}
+'all cleanup attempts verified'
+`;
+    expect(execFileSync('pwsh', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      env: { ...process.env, SCIM_QUERY_CLEANUP_FILE: resolve(scripts, 'test-scim-query-semantics.ps1') },
+    }).trim()).toBe('all cleanup attempts verified');
+  });
+
   it('invokes the shared correctness section before the main runner cleanup', () => {
     const main = read('live-test.ps1');
     expect(main.includes('Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers')).toBe(true);

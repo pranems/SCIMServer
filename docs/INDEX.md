@@ -10,7 +10,7 @@
 | If you want to... | Read |
 |---|---|
 | Diagnose Entra without disabling strict validation; review 19 default-running compatibility cases and separate both-strict-mode flag proof | [SCIM_ENTRA_COMPATIBILITY.md](SCIM_ENTRA_COMPATIBILITY.md), [integrated receipt](evidence/scim-flags-default-corpus-20260929/validation.json) |
-| Distinguish verified custom-payload uniqueness writes from outstanding generic equality/admission blockers | [Integrated custom-authority evidence](evidence/scim-custom-authority-integration-20260929/validation.json) |
+| Trace custom-payload writer proof and the subsequently closed generic equality failures | [Original authority evidence](evidence/scim-custom-authority-integration-20260929/validation.json), [query/write/schema closure](evidence/scim-query-authority-integration-20260929/validation.json) |
 | Verify binding-local common id/meta/externalId semantics without reopening the integrated PATCH/PUT fixes | [Common-context integration evidence](evidence/scim-common-context-integration-20260929/validation.json) |
 | Review the corrected common-externalId uniqueness state separately from its superseded source interpretation | [Corrective-pair evidence](evidence/scim-common-uniqueness-integration-20260929/validation.json) |
 | Distinguish all 37 settings' actual behavior, inert controls, and unit/HTTP/live gaps | [SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) |

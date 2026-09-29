@@ -14,12 +14,12 @@ release metadata, exact-tip CI and deployment remain parent-owned.
 > The original six no-write probes remain historical evidence. Follow-up
 > `cefb540b` corrects unsupported-type uniqueness and reference exactness.
 > The fourth correction removes the numeric/MV custom-core restrictions and
-> generic candidate overlays. Combined write/transaction checks pass, but
-> independent numeric displayName equality filters still fail through an
-> unsafe convenience-column hint. Admission/profile coordination also remain
-> separate; do not treat writer GREEN as full resource acceptance. See the
-> [current integrated evidence](evidence/scim-custom-authority-integration-20260929/validation.json)
-> and [checkpoint11.23](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1123-fourth-p3b-correction-and-separate-read-probes-2026-09-29).
+> generic candidate overlays. The initially measured numeric displayName
+> equality failures are now closed by [separate query/write/schema proof](evidence/scim-query-authority-integration-20260929/validation.json),
+> not inferred from writer GREEN. Admission/profile coordination and final
+> characteristic/performance/artifact acceptance remain separate.
+> [Checkpoint11.23](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1123-fourth-p3b-correction-and-separate-read-probes-2026-09-29)
+> preserves the original read failure rather than rewriting its receipt.
 
 **Integrated RFC correction, not a full acceptance claim:** reference values are inherently
 case-exact under [RFC 7643 section 2.3.7](https://www.rfc-editor.org/rfc/rfc7643.html#section-2.3.7).

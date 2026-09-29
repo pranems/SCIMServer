@@ -9,6 +9,7 @@ $base = $BaseUrl.TrimEnd('/')
 $headers = @{ Authorization = "Bearer $Token" }
 $results = [System.Collections.Generic.List[object]]::new()
 $endpointId = $null
+$roleEndpointId = $null
 $extension = 'urn:live:query:Extension'
 $search = 'urn:ietf:params:scim:api:messages:2.0:SearchRequest'
 $fixtures = @(
@@ -175,12 +176,67 @@ try {
         }
         Add-QueryCheck ($ordered.Status -eq 200 -and $ordered.Body.Resources[0].id -eq $typedResource.Body.id) "Common externalId $method caseExact sort precedes lowercase and missing values"
     }
+    $roleCore = 'urn:live:query-binding:Host'
+    $roleExtension = 'urn:ietf:params:scim:schemas:core:2.0:User'
+    $roleEndpoint = Invoke-QueryRequest POST '/scim/admin/endpoints' @{
+        name = "live-query-binding-$([Guid]::NewGuid().ToString('N'))"
+        profile = @{
+            schemas = @(
+                @{ id = $roleCore; name = 'Host'; attributes = @(@{ name = 'label'; type = 'string' }) }
+                @{ id = $roleExtension; name = 'UserShapeExtension'; attributes = @(
+                    @{ name = 'userName'; type = 'string' }
+                    @{ name = 'externalId'; type = 'integer'; multiValued = $true }
+                ) }
+            )
+            resourceTypes = @(@{
+                id = 'Host'; name = 'Host'; endpoint = '/Hosts'; schema = $roleCore
+                schemaExtensions = @(@{ schema = $roleExtension; required = $false })
+            })
+            serviceProviderConfig = @{ filter = @{ supported = $true; maxResults = 100 }; sort = @{ supported = $true } }
+            settings = @{ StrictSchemaValidation = $true; logFileEnabled = $false }
+        }
+    }
+    if ($roleEndpoint.Status -ne 201 -or -not $roleEndpoint.Body.id) { throw 'Could not create query binding fixture' }
+    $roleEndpointId = $roleEndpoint.Body.id
+    $roleBase = "/scim/endpoints/$roleEndpointId/Hosts"
+    $high = Invoke-QueryRequest POST $roleBase @{
+        schemas = @($roleCore, $roleExtension); label = 'high'; externalId = 'Core-A'
+        $roleExtension = @{ userName = 'extension-high'; externalId = @(7, 11) }
+    }
+    $low = Invoke-QueryRequest POST $roleBase @{
+        schemas = @($roleCore, $roleExtension); label = 'low'; externalId = 'Core-B'
+        $roleExtension = @{ userName = 'extension-low'; externalId = @(2) }
+    }
+    if ($high.Status -ne 201 -or $low.Status -ne 201) { throw 'Could not seed query binding fixture' }
+    Add-QueryCheck (@($high.Body.$roleExtension.externalId).Count -eq 2 -and $high.Body.$roleExtension.externalId[1] -eq 11 -and $low.Body.$roleExtension.externalId[0] -eq 2) 'Explicit extension binding preserves numeric/MV values under an RFC core URI'
+    $roleFilter = "${roleExtension}:externalId eq 11"
+    foreach ($method in @('GET', 'POST')) {
+        $response = if ($method -eq 'GET') {
+            Invoke-QueryRequest GET "${roleBase}?filter=$([Uri]::EscapeDataString($roleFilter))" $null
+        } else {
+            Invoke-QueryRequest POST "$roleBase/.search" @{ schemas = @($search); filter = $roleFilter }
+        }
+        Add-QueryCheck ($response.Status -eq 200 -and $response.Body.totalResults -eq 1 -and $response.Body.Resources[0].id -eq $high.Body.id) "Explicit extension binding $method filter uses the namespaced value"
+    }
+    $roleSort = Invoke-QueryRequest GET "${roleBase}?sortBy=$([Uri]::EscapeDataString("${roleExtension}:externalId"))&sortOrder=ascending&count=1" $null
+    Add-QueryCheck ($roleSort.Status -eq 200 -and $roleSort.Body.totalResults -eq 2 -and $roleSort.Body.Resources[0].id -eq $low.Body.id) 'Explicit extension binding sorts numerically before pagination'
+    $commonExact = Invoke-QueryRequest GET "${roleBase}?filter=$([Uri]::EscapeDataString('externalId eq "core-a"'))" $null
+    Add-QueryCheck ($commonExact.Status -eq 200 -and $commonExact.Body.totalResults -eq 0) 'Core common externalId remains exact beside the independent extension'
 } finally {
-    if ($endpointId) {
-        $deleted = Invoke-QueryRequest DELETE "/scim/admin/endpoints/$endpointId" $null
-        if ($deleted.Status -ne 204) { throw "Query smoke cleanup failed: HTTP $($deleted.Status)" }
-        $gone = Invoke-QueryRequest GET "/scim/admin/endpoints/$endpointId" $null
-        Add-QueryCheck ($gone.Status -eq 404) 'Exact owned query endpoint removed and absence verified'
+    try {
+        if ($roleEndpointId) {
+            $deleted = Invoke-QueryRequest DELETE "/scim/admin/endpoints/$roleEndpointId" $null
+            if ($deleted.Status -ne 204) { throw "Query binding cleanup failed: HTTP $($deleted.Status)" }
+            $gone = Invoke-QueryRequest GET "/scim/admin/endpoints/$roleEndpointId" $null
+            Add-QueryCheck ($gone.Status -eq 404) 'Exact owned query binding endpoint removed and absence verified'
+        }
+    } finally {
+        if ($endpointId) {
+            $deleted = Invoke-QueryRequest DELETE "/scim/admin/endpoints/$endpointId" $null
+            if ($deleted.Status -ne 204) { throw "Query smoke cleanup failed: HTTP $($deleted.Status)" }
+            $gone = Invoke-QueryRequest GET "/scim/admin/endpoints/$endpointId" $null
+            Add-QueryCheck ($gone.Status -eq 404) 'Exact owned query endpoint removed and absence verified'
+        }
     }
 }
 

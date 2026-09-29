@@ -1,0 +1,128 @@
+{
+  "scope": "Corrected P6c query/write/schema integration, including explicit binding-role regression; not final C0",
+  "verifiedAt": "2026-09-29",
+  "sources": [
+    {
+      "source": "f77786c4eb746eaf51a49d00d99a3cab9b258be0",
+      "integrated": "09b59b43973f1bff91a59cd143ab19e77e97838a",
+      "scope": "Representation-aware candidate selection; initial numeric common-externalId interpretation superseded"
+    },
+    {
+      "source": "2aa96f0be959f10db30d61132114cca5b7fe9bcf",
+      "integrated": "8f3510a863eb0a73cc5c4f6ed92db6ed9b802aaa",
+      "scope": "Final all-core common externalId String/SV/exact policy and independent extension homonyms"
+    }
+  ],
+  "sourceSha256": "63624db8175807bb18a6d3c24fa35b7bfc8f84717d85f66299f9bcbaf84ba61c",
+  "fingerprintMethod": "Sorted tracked/nonignored api/src, api/test and scripts path plus bytes; includes the subsequently committed integration role correction",
+  "finalSourceSha256": "68389790d48cf6c41dc258f05a5c5a9242aea1163530628d5e3d14d629d283a2",
+  "postPgDelta": {
+    "files": [
+      "api/src/modules/scim/common/live-correctness-wiring.spec.ts",
+      "scripts/test-scim-query-semantics.ps1"
+    ],
+    "change": "Fault-test both owned fixture cleanup attempts and protect the original cleanup with nested finally",
+    "verification": "One cleanup RED before correction; six wiring/cleanup units GREEN and52 focused built-local query outcomes GREEN afterward",
+    "apiProductionTypeScriptAndHttpSourceChanged": false,
+    "atRunProjectionVerified": true,
+    "projectionDetail": "Restore saved at-run script bytes and original wiring test with its CRLF checkout representation; exact original source fingerprint reproduced"
+  },
+  "integrationRegression": {
+    "cause": "Boolean OR treated explicit isCoreSchema:false as absent and let an RFC core-URI inference replace extension binding semantics",
+    "red": {
+      "unit": 2,
+      "http": 2
+    },
+    "fix": "Nullish role fallback in both schema walking and common qualified-alias construction",
+    "checks": "Namespaced numeric/MV filtering, numeric sort/pagination, unchanged root common exact strings and explicit cleanup"
+  },
+  "build": "passed",
+  "unit": {
+    "suites": 5,
+    "passed": 273,
+    "failed": 0
+  },
+  "additionalCleanupUnits": {
+    "suites": 1,
+    "passed": 6,
+    "failed": 0
+  },
+  "lint": {
+    "files": 6,
+    "errors": 0,
+    "warnings": 2,
+    "rulesRelaxed": false
+  },
+  "http": {
+    "suites": [
+      "query-semantics",
+      "query-binding-context",
+      "atomic-uniqueness",
+      "profile-validation-p7",
+      "common-externalid-patch",
+      "retained-entry-put",
+      "conditional-writes"
+    ],
+    "inmemory": {
+      "passed": 398,
+      "failed": 0,
+      "nativeOnlySkipped": 1
+    },
+    "postgresql": {
+      "passed": 399,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    },
+    "transport": "Jest/Nest listeners, distinct from built-runtime proof"
+  },
+  "builtLive": {
+    "artifact": "Local build output node api/dist/main.js; not an immutable published image",
+    "mainSharedChecksPerBackend": 163,
+    "queryChecksPerBackend": 52,
+    "queryCountAccounting": "46 corrected source checks plus six integration binding-role/cleanup checks",
+    "section": "9z-CU, preserving existing 9z-CP capability assignment",
+    "additionalQueryWriteSchemaProbePerBackend": {
+      "scenarios": 5,
+      "passed": 45,
+      "failed": 0
+    },
+    "closedPriorFailure": "Integer scalar/MV displayName equality now returns the exact stored resource on both backends, rather than InMemory empty200/PostgreSQL500",
+    "priorRedReceipt": "../scim-custom-authority-integration-20260929/validation.json",
+    "ownedRuntimesStopped": true,
+    "endpointInventoriesUnchanged": true
+  },
+  "ownership": {
+    "postgresRun": "20efbf543e62a0a2",
+    "freshLoopbackTmpfsIdentityVerified": true,
+    "pinnedBootstrap": true,
+    "inheritedDatabaseUrlUsed": false,
+    "exactOwnedContainerRemoved": true
+  },
+  "preserved": [
+    "Fixed common externalId contract on every core, without numeric/MV common positives",
+    "Independent extension characteristics and explicit false role",
+    "Schema declarations are not globally rewritten",
+    "P3b write authority and conditional persistence",
+    "P7 common-PATCH checks and neutral retained-entry matcher",
+    "Existing page/projection/capability behavior"
+  ],
+  "limits": [
+    "Previously measured numeric displayName query failures and the reproduced role bug are closed, not every possible characteristic/query combination",
+    "Candidate materialization performance remains a separate gate",
+    "Whole-namespace strict PATCH, old expectation reconciliation, admission/profile coordination and malformed-profile omission remain separate",
+    "Original82-case/164-backend ledger and final exact-artifact matrix remain open"
+  ],
+  "documentation": {
+    "contentAndFreshnessCouplingDocsPassed": 26,
+    "literalJsonBlocksParsed": 42,
+    "newRelativeLinksResolved": 8,
+    "diagramEdits": 0,
+    "originalCaseLedgerUnchanged": true
+  },
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

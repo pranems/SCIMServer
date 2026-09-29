@@ -121,12 +121,15 @@ P7 admission and P8 profile-revision coordination remain separate packages.
 Source follow-up `704d701f`, integrated as `7001d194`, corrects generic
 promoted-column assumptions. Focused combined write/transaction checks pass:
 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared live checks per
-backend. The independent five-shape probe passes43/45 outcomes: CRUD,
-uniqueness and sorting pass, but numeric scalar/MV displayName equality
-returns empty200 on InMemory and500 on PostgreSQL. Its String-column
-pushdown is not a faithful representation. [Integrated evidence and
-boundaries](evidence/scim-custom-authority-integration-20260929/validation.json).
-Admission and profile coordination remain separate acceptance items.
+backend. Its original independent probe had43/45 passing outcomes, with
+numeric scalar/MV displayName equality returning empty200/500. That
+[historical failure](evidence/scim-custom-authority-integration-20260929/validation.json)
+is now closed by the corrected P6c pair plus explicit binding-role fix.
+[New query/write/schema proof](evidence/scim-query-authority-integration-20260929/validation.json):
+45/45 additional probe outcomes per backend,398 InMemory/399 PostgreSQL
+HTTP and163 shared live checks/backend including52 query outcomes.
+Admission, profile coordination and broader P7b/characteristic acceptance
+remain separate; this is not the final matrix.
 See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
 P7 common externalId and P3b uniqueness policies have separate owners.
 The RFC follow-up limits unique types to string/integer/decimal/reference;

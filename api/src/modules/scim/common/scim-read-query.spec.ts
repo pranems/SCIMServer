@@ -62,6 +62,31 @@ function page(params: ReadQueryParams, rows: Record<string, unknown>[], limit = 
 }
 
 describe('Shared read query plan', () => {
+  it.each(['filter', 'sort'] as const)(
+    'honors an explicit extension binding for an RFC core URI during %s',
+    (operation) => {
+      const extension = 'urn:ietf:params:scim:schemas:core:2.0:User';
+      const definitions: SchemaDefinition[] = [
+        { id: CORE, isCoreSchema: true, attributes: [attr('code')] },
+        { id: extension, isCoreSchema: false, attributes: [
+          attr('externalId', { type: 'integer', multiValued: true }),
+        ] },
+      ];
+      const rows = [
+        { id: 'high', externalId: 'Core-A', [extension]: { externalId: [7, 11] } },
+        { id: 'low', externalId: 'Core-B', [extension]: { externalId: [2] } },
+      ];
+      const params = operation === 'filter'
+        ? { filter: `${extension}:externalId eq 11` }
+        : { sortBy: `${extension}:externalId`, sortOrder: 'ascending' as const };
+      const query = createReadQuery(params, definitions, 100, buildGenericFilter);
+      expect(query.dbWhere).toEqual({});
+      expect(query.page(rows, (row) => row, (row) => row).Resources).toEqual(
+        operation === 'filter' ? [rows[0]] : [rows[1], rows[0]],
+      );
+    },
+  );
+
   it.each(['displayName', 'active'])(
     'retains numeric and multi-valued %s candidates instead of using a string column',
     (name) => {

@@ -418,8 +418,8 @@ combined checkpoint has its own counts in section 11.1.
 | P7 | Four source commits assembled; focused context overlaps verified | `8d5915ba` -> `e80da689`; binding-local common views and authoritative timestamps preserve existing PATCH/retention fixes.754 units,537 InMemory/538 PostgreSQL HTTP and143 live checks/backend including472 P7 assertions pass. Namespace-only, prior eight expectations and broader query/admission acceptance remain open; section11.24 |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.26; superseded source conflict resolved only by its corrective child. Original82-case/backend ledger and query/admission/P7b/performance/artifact holds unchanged |
-| P6c/P6d | Corrected source pair assembled; merged probe pending | `f77786c4` / `2aa96f0b` retain representation-safe hints while correcting common externalId to String/SV/exact and placing typed homonyms in extension namespaces. Source106 units/97 HTTP/46 live per backend remains distinct from integrated proof. No acceptance of the initial numeric-common interpretation |
+| C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.27; measured numeric-displayName and explicit-role query failures now closed. Original82-case/backend ledger, broader P7b/characteristic/admission/coordination/performance/artifact acceptance remain open |
+| P6c/P6d | Corrected source pair and cross-package query regression verified | `f77786c4` -> `09b59b43`, `2aa96f0b` -> `8f3510a8`; explicit-false role fix follows2unit/2HTTP REDs.398IM/399PG HTTP,52query live and45/45typed authority outcomes/backend. Initial numeric-common interpretation superseded, not accepted; section11.27 |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -1939,6 +1939,52 @@ conflict that isolated GREEN could not settle; only the corrected net state
 received integrated evidence. **Design/architecture disposition: accepted.**
 Reuse the existing compiler and common/runtime seams; no duplicate table,
 schema restriction or implicit uniqueness default was added.
+
+### 11.27 Query/write/schema integration, 2026-09-29
+
+Source `f77786c4` and its corrective child `2aa96f0b` are retained in order
+as `09b59b43` and `8f3510a8`. The final source policy checks type/cardinality
+before scalar-column pushdown and fixes common externalId String/SV/exact
+semantics while retaining independent extension homonyms. No runtime was
+validated on the first source's mistaken numeric-common interpretation.
+
+The merged P7 binding contract exposed one additional read bug: `false || URI`
+treated an explicitly extension-bound RFC core URI as core. Two unit and two
+HTTP tests failed on actual namespace matches/order before nullish fallback
+replaced boolean OR in both role consumers. Undefined-role inference remains
+for existing callers; explicit true/false is authoritative. No global schema
+rewrite, second planner or schema-type ban was introduced.
+
+| Final focused check | Measured result |
+|---|---|
+| Build / lint | API build passes; touched query/test files use unchanged lint rules |
+| Query/common/cache/policy units | Five suites,273 passed |
+| Wiring/cleanup regression | Six passed; injected role-only/main-only/both cleanup failures prove both owned endpoints receive deletion attempts |
+| HTTP | Seven suites:398 InMemory plus one native-only skip;399 PostgreSQL17.8, zero pending/TODO, all22 migrations |
+| Main built-runtime entry |163 checks/backend, including52 query outcomes (46 source plus six integration role/cleanup checks) |
+| Original generic authority probe |45/45 per backend: CRUD/readback/uniqueness/sort plus all five equality cases now pass |
+| Namespace proof | RFC core URI used as extension retains numeric/MV filter/sort semantics; root common externalId remains exact; GET and string-form search covered |
+| Receipt | [New integrated evidence](evidence/scim-query-authority-integration-20260929/validation.json) |
+
+C0-I38's integer scalar/MV displayName filter failures are closed by this
+measured proof, not by an assumption about successful writes. Its earlier
+43/45 receipt remains historical. The new binding-role failure is C0-I44.
+The helper remains reachable through the shared main runner at9z-CU without
+colliding with9z-CP capability checks. Both owned fixture endpoints are
+removed, even if either individual cleanup throws.
+
+Final review strengthened only the cleanup failure path and its regression
+after the PostgreSQL run. A focused52-outcome built-local rerun and the
+production-finally fault test cover that delta. The receipt records both
+fingerprints; API production TypeScript/HTTP source is byte-identical.
+
+**Test/gate improvement: applied.** Assert actual namespace IDs, order and
+typed values, and fault-test cleanup of every owned fixture.
+**Design/architecture disposition: accepted.** Honor explicit context in
+the existing planner and reuse the existing representation guard. Broader
+characteristic combinations, whole-namespace strict PATCH, prior expectation
+reconciliation, admission/profile coordination, performance and exact
+packaged-artifact/82-case acceptance remain independent.
 
 ## 12. Architecture and self-improvement decisions
 

@@ -7,6 +7,24 @@
 >
 > **Starting commit:** `a801935866e06c2c3907bc6fad92683f6b4f98e3`
 
+**Current integration:** the corrected P6c pair is preserved as
+`f77786c4` -> `09b59b43`, then `2aa96f0b` -> `8f3510a8`.
+Only the final fixed-common-externalId policy is accepted. An additional
+merged regression found URI inference overriding explicit extension roles:
+two unit/two HTTP REDs now require explicit `isCoreSchema:false` to win over
+the fallback in both ordinary and common-qualified query paths.
+
+[Integrated query/write/schema receipt](evidence/scim-query-authority-integration-20260929/validation.json)
+records398 InMemory/399 PostgreSQL HTTP,52 query live outcomes and45/45
+additional typed authority outcomes per backend. The earlier numeric/MV
+displayName false-negative/500 is closed. A standard core URI bound as an
+extension now filters/sorts its own numeric/MV homonym, while top-level
+common externalId stays an exact String. The source's46 live checks are
+historical; six integration role/cleanup checks bring the shared helper to52.
+In this assembly, query coverage remains at9z-CU;9z-CP remains the already
+assigned capability section. Existing helper behavior and owned cleanup are
+retained. Full C0 acceptance and candidate-materialization cost remain open.
+
 ## What changes for a client
 
 Users, Groups and custom resources now use the same schema-aware read plan.

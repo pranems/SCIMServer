@@ -83,13 +83,17 @@ InMemory HTTP plus four native-only skips, 308 PostgreSQL17.8 HTTP after
 22 migrations, and 143 main shared built-live checks per backend.
 [Separate integrated evidence](docs/evidence/scim-custom-authority-integration-20260929/validation.json).
 
-**Acceptance remains blocked:** the additional generic read probe passes
-43/45 outcomes per backend, including CRUD, uniqueness and sorting, but
-numeric scalar/MV displayName equality still uses an incompatible
-convenience-column hint. InMemory returns200/empty; PostgreSQL returns500.
-Do not turn valid schema shapes into an admission ban to hide this.
-Uniqueness admission/profile coordination and P7 context remain separate
-holds. A malformed profile omitting schemaExtensions also returns500;
+**Measured query hold resolved:** P6c source`f77786c4` / `2aa96f0b` is
+integrated as`09b59b43` / `8f3510a8`, with an additional explicit-role fix.
+The original five-shape probe now passes45/45 on both backends, including
+the formerly failing numeric/MV displayName filters. Two unit/two HTTP REDs
+also closed the RFC-core-URI-as-extension query bug. Combined proof:
+273 query/common/policy units plus6 wiring/cleanup units;398 InMemory HTTP
+plus one native-only skip;399 PostgreSQL17.8 HTTP after22 migrations;
+163 main live checks/backend including52 query outcomes.
+[Query/write/schema proof](docs/evidence/scim-query-authority-integration-20260929/validation.json).
+Uniqueness admission/profile coordination and broader P7b remain separate
+holds. A malformed profile omitting schemaExtensions also returned500;
 its normalize-versus-400 policy belongs to the remaining P7b validation.
 P3b's owner has no further source edits pending. Earlier receipts remain
 historical; the new runtime write proof is not complete generic acceptance.
@@ -167,7 +171,8 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P7 common externalId source plus original-value/completed-PATCH integration; `9z-CV` has 426 assertions and new `9z-DC` has 66 cases / 718 assertions.
 - [x] ✅ COMPLETED: P8b exact six-route interrupted-create errors integrated with current transactions; `9z-CX` now supplies 16 checks.
 - [x] ✅ COMPLETED: P3b fourth source `704d701f` -> `7001d194`; generic write authority verified with current P3/P4/P7/P8 seams on both backends.
-- [ ] Close numeric/MV displayName query failures, uniqueness admission and profile-revision coordination before C0.
+- [x] ✅ COMPLETED: Measured numeric/MV displayName equality failures and explicit extension-role query regression, with real query/write/schema parity proof.
+- [ ] Close remaining characteristic/query coverage, uniqueness admission and profile-revision coordination before C0.
 - [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
 - [ ] Close remaining P7b namespace-only/characteristic-query boundaries and old expectations, plus profile-revision coordination before C0.
@@ -178,6 +183,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-29 | Corrected P6c pair integrated09b59b43/8f3510a8. Query/write/schema probe improves43/45->45/45 per backend; explicit-false role regression fixed after2unit/2HTTP REDs.273 scoped units+6 wiring/cleanup units,398IM/399PG HTTP and163main live checks/backend pass. Query helper now52 outcomes; CP capability/CU query mapping retained. Remaining C0 acceptance is separate. |
 | 2026-09-29 | Preserved superseded4ba9373c/corrective2d2da4e1 consecutively asd93d1a0d/43b01c4e. Only corrected final state tested:176units,367InMemory/369PostgreSQL HTTP,143shared live checks/backend. All-core common externalId String/SV/exact semantics and defaultnone retained; namespaced homonyms independent. Prior hold and bad receipt remain historical, not standalone acceptance. |
 | 2026-09-29 | Held `4ba9373c` without cherry-picking: its numeric/MV custom-core externalId permission contradicts the current RFC common-attribute contract. Source GREEN is not contract acceptance. No runtime/tests/defaults changed; all accepted package sequences remain assembled, with the conflicting source explicitly excluded pending parent reconciliation. |
 | 2026-09-29 | P7 context source `8d5915ba` integrated as `e80da689`, preserving common-PATCH validation and neutral retention.754 units,537 InMemory/538 PostgreSQL HTTP,143 shared live checks/backend including472 P7 assertions pass. Source/live count wiring was RED then GREEN; imported HTTP wire metadata typing corrected without changing assertions. Other C0 holds remain explicit. |

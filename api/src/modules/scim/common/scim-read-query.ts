@@ -72,7 +72,7 @@ export function createReadQuery(
   const attributes = new Map<string, Attribute>();
   const coreExact = new Set<string>();
   for (const schema of schemas) {
-    const core = schema.isCoreSchema || /:core:2\.0:(User|Group)$/i.test(schema.id);
+    const core = schema.isCoreSchema ?? /:core:2\.0:(User|Group)$/i.test(schema.id);
     const walk = (defs: readonly SchemaAttributeDefinition[], path: string[], denied: boolean) => {
       for (const definition of defs) {
         const segments = [...path, definition.name];
@@ -123,7 +123,7 @@ export function createReadQuery(
       };
       attributes.set(name.toLowerCase(), entry);
       for (const schema of schemas.filter(
-        (s) => s.isCoreSchema || /:core:2\.0:(User|Group)$/i.test(s.id),
+        (s) => s.isCoreSchema ?? /:core:2\.0:(User|Group)$/i.test(s.id),
       )) {
         attributes.set(`${schema.id}:${name}`.toLowerCase(), entry);
       }
