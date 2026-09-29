@@ -1,6 +1,7 @@
 {
   "package": "P4 Group aggregate transactions",
   "branch": "fix/scim-group-transactions-20260928",
+  "implementationCommit": "212a6b929683c3d853e23ec84f56310536941c3a",
   "baseCommit": "41c5b8c52ece0d8b48042c754cbdefa68624248f",
   "p3ImplementationCommit": "0aae30775a2888ff4bc6e67636d51ab234e717a5",
   "finalRun": "postgres-5a349052c937bd39",

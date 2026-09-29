@@ -21,6 +21,7 @@ databases are owned disposable containers.
 | G9 | Environment / Low | The real Mermaid gate reported missing Playwright in the fresh worktree. Exit zero meant SKIP, not a render. | Restore this worktree's existing web dependencies with `npm ci --ignore-scripts` only after the missing-tool result. No package versions or lockfiles changed. | Diagram gate / same |
 | G10 | Test typing / Low | Jest accepted a spy callback whose inferred parameters ESLint treated as unsafe `any`. A combined shell command ended with the successful build's status although the lint summary contained four errors. | Type both callback parameters explicitly; run the lint ratchet independently and verify its zero result. Final lint is zero errors and 52 unchanged warnings across nine files. Preserve each gate result rather than treating a command chain's last exit as proof of all gates. | Focused lint / same |
 | G11 | Renderer provenance / Low | The built-in Mermaid discovery reports version `0.0.0`, although the pinned gate is 11.15.0. | Render all seven diagrams in actual Chromium under both strict themes, but do not claim viewer-version equality or install `0.0.0`. This is unchanged P3 environment metadata, not a diagram failure. | Diagram gate / same |
+| G12 | Process / Low | Separate `git commit -m` arguments put a blank line between the two required trailer strings. Both strings are present, but `git interpret-trailers --parse` recognizes only the last paragraph. | Preserve the already-created ordinary commit; do not amend. Pass the handoff's two trailers in one newline-separated message argument and verify both with the Git parser. | Post-commit verification / message construction |
 
 G1-G4 fixes were confirmed by **205 passing tests in four targeted unit
 suites**. G1's real PostgreSQL and HTTP evidence passed in run
@@ -68,7 +69,7 @@ printed logs were excluded from recurrence counts; zero-valued
 `setupFailedSuites` fields and the deliberate InMemory FK skip were verified
 and dismissed as non-failures. Three real patch-context failures and the
 renderer warning are retained rather than lost to summary compression.
-The final documentation/commit checks add no unrecorded implementation issue.
+The subsequent post-commit check added G12; it found no new implementation issue.
 Cleanup also removed the owned root/API tool junctions (without traversing
 their shared targets), the owned web dependency restore, generated Prisma
 client, API build and scratch lint driver. Sanitized ignored logs and evidence

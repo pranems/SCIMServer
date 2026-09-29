@@ -63,6 +63,7 @@ historical execution record, not the current branch or priority authority.
 - [ ] Parent consolidation: release metadata, independent review and full applicable matrix.
 - [ ] P3b: separately design schema-driven and Group/custom-name atomic uniqueness.
 - [x] ✅ COMPLETED P4 Group aggregate persistence: initial members commit with the Group; InMemory validates/stages writes and reads a consistent snapshot. [Implementation](docs/SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md) and [execution RCA](docs/SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md).
+- P4 implementation commit: `212a6b929683c3d853e23ec84f56310536941c3a`. The committed API/scripts hash matches the final dual-backend receipt; owned containers, tool junctions and generated files are removed.
 
 | Date | Summary |
 |---|---|

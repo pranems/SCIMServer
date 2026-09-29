@@ -4,6 +4,10 @@
 
 **Status:** P4 implemented and locally validated. Not merged, released or deployed.
 
+**Implementation commit:** `212a6b929683c3d853e23ec84f56310536941c3a`.
+The follow-up handoff records this immutable identity and verified cleanup;
+it does not change production code or validation inputs.
+
 ## What an operator should expect
 
 A Group is stored as a resource row plus separate member rows. Those rows
