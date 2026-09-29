@@ -411,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Core/RFC/Group-adapter changes integrated; focused revalidation pending | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`, plus `6dc2bc63` exact builtin identity/represented member leaves. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Generic promoted-column restrictions/reconstruction and registration/discovery admission remain independent OPEN holds |
+| P3b | Core/RFC/Group-adapter changes integrated and focused checks passed | `de05e67b` -> `1d37e7b8`, `cefb540b` -> `1f0a024a`, `6dc2bc63` -> `3766e9f4`. Exact builtin identity/member-shape controls pass. [Source report](SCIM_UNIQUENESS_IMPLEMENTATION.md). Three generic representation probes and registration/discovery admission remain independent OPEN holds |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
@@ -1639,6 +1639,43 @@ in race tests; never silently drop transaction inputs or policy arguments.
 **Design disposition: accepted.** Missing-parent classification remains in a
 small create-only helper and typed error, not a broad global FK rewrite; the
 existing transaction, exception and conditional-write boundaries are preserved.
+
+### 11.21 P3b represented Group-member follow-up
+
+Only `6dc2bc63ff353f7acc00ff1f91917d2f56ea4080` was appended, as
+`3766e9f4`; both preceding uniqueness commits were already integrated.
+Builtin User/Group identity now requires exact RFC core URNs and a core
+binding. Builtin Group member server-uniqueness promises are limited to
+represented single-valued String/reference `value`, `type` and `display`
+leaves under multi-valued members. Unsupported relation leaves/shapes fail
+closed; independent custom/extension homonyms are preserved.
+
+| Focused integrated check | Result |
+|---|---|
+| API build | PASS |
+| Policy/aggregate/repository/lifecycle/error units | 6 suites / 144 passed |
+| Atomic uniqueness, Group aggregate and deletion-error HTTP | 3 suites / 102 passed on explicit InMemory; four native-only controls skipped |
+| Changed policy/regression lint | 0 errors / 0 warnings |
+| Compiled no-write controls | 14 passed: represented leaves/types, rejected unsupported shapes, custom suffix URNs and explicit extension role even with builtin URN spelling |
+| Scoped built-local live | Original 21 String/MV assertions plus endpoint cleanup pass; existing endpoint inventory unchanged and owned API stopped |
+| Separate generic representation probes | Three still reproduce; this commit does not close them |
+
+Source-package evidence remains **646 units / 147 PostgreSQL HTTP /
+145 InMemory HTTP plus two native N/A**, in
+[its new receipt](evidence/scim-uniqueness-members-20260929.json).
+Earlier RFC and initial receipts remain historical checkpoints. This local
+increment did not run a new integrated PostgreSQL matrix or claim endpoint-
+wide/global uniqueness. Logs are in `test-results/scim-integration-p3b-members/`.
+
+The P3b worker reports no further source edits underway. Generic custom
+displayName/active column restrictions and candidate overlays, declaration/
+discovery admission, profile-revision coordination and final case-level
+acceptance remain explicitly separate parent-owned dispositions.
+**Assurance improvement: applied.** Determine enforceability from the exact
+binding and stored relation shape, not a URI suffix or attribute spelling.
+**Design disposition: accepted for this narrow correction.** The existing
+typed policy/transaction interfaces remain unchanged; no broad schema ban
+or new admission implementation was introduced.
 
 ## 12. Architecture and self-improvement decisions
 

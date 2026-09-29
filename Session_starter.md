@@ -50,9 +50,10 @@ follow-up ownership or parent disposition, separately from P7 common externalId.
 Prior receipts remain historical. Uniqueness admission is also unclosed;
 do not assume P7 fixed it. P3b's runtime 400 is not registration proof. Do not convert a
 convenience-column mismatch into a blanket custom-schema admission ban.
-P3b has resumed a separate narrow follow-up for exact builtin Group member
-leaf/type support and full-RFC-URN identity checks. Await its committed proof;
-it does not imply closure of generic candidate authority or admission.
+P3b's narrow Group-adapter follow-up is integrated: `6dc2bc63` -> `3766e9f4`.
+Build, 144 units, 102 InMemory HTTP cases (four native-only skips), 14
+no-write identity/shape controls and the 21-assertion built-local smoke pass.
+Generic candidate authority and admission remain separate open holds.
 
 **Latest integration fix:** shared one-to-one matching closes the confirmed
 PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP

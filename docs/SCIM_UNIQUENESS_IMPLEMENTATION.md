@@ -36,6 +36,11 @@ no additional edits underway; remaining admission and candidate-authority
 items therefore require explicit parent ownership/disposition rather than an
 assumption that either worker has completed them.
 
+**Group-adapter increment integrated:** `6dc2bc63` is assembled as `3766e9f4`.
+Exact builtin identity and represented member-leaf checks pass the focused
+integration controls described in [section 11.21 of the tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1121-p3b-represented-group-member-follow-up).
+This does not remove the independent generic-field and admission holds above.
+
 ## Client-visible outcome
 
 Two different resources cannot acquire the same declared unique value by
