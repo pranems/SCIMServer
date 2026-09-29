@@ -1,6 +1,6 @@
 # SCIM correctness: design, implementation, and progress
 
-> **Status:** Implementation authorized; work packages are tracked below
+> **Status:** Local implementation and acceptance complete; final exact-tip gates pending
 >
 > **Last verified:** 2026-09-29
 >
@@ -8,6 +8,9 @@
 >
 > **Evidence:** [Independent report](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md),
 > [82-case database comparison](evidence/scim-fresh-20260925/postgres-20260928-expanded.summary.json),
+> [current 164-disposition ledger](evidence/scim-current-acceptance-20260929/validation.json),
+> [characteristic reconciliation](SCIM_CHARACTERISTIC_RECONCILIATION.md),
+> [query performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md),
 > and [reproduction instructions](evidence/scim-fresh-20260925/repro-postgres/README.md).
 
 ## 1. What we are delivering
@@ -772,7 +775,14 @@ task-owned implementation harness recording a new source identity and
 ownership-verified database. Link old case ID to new test ID explicitly;
 similar test names and suite membership do not establish equivalence.
 
-#### Original-case reconciliation
+#### Original-case reconciliation - pre-execution ledger
+
+The table below preserves the blocking state recorded before the current-source
+run. It is superseded, not rewritten, by the per-case/per-backend
+[164-disposition ledger](evidence/scim-current-acceptance-20260929/validation.json)
+recorded in section 11.34. The historical `B` cells remain useful evidence of
+what was not yet proved at this planning checkpoint; they are not the current
+release disposition.
 
 Until case-specific evidence is attached, `Pending` below means no per-case
 disposition has been accepted. Existing package receipts remain available
@@ -2272,6 +2282,66 @@ framework is introduced.
 candidate-materialization performance, the original82-case/164-backend ledger
 and final exact-tip release assurance. No release, deployment, live repair,
 version, migration or lockfile change is claimed.
+
+### 11.34 Current-source case, characteristic, and performance closure, 2026-09-29
+
+The immutable 82-case corpus is unchanged. A task-owned wrapper verifies its
+normalized hashes, requires the consolidation branch and clean API source,
+replays all22 migrations on owned PostgreSQL17.8, and maps only three
+architecture-evolution seams:
+
+1. `INC-STRICT` now follows its successful round-trip assertions when the valid
+   request returns200; its historical rejection-preservation branch remains
+   active if the request regresses.
+2. InMemory Group PATCH fault injection now targets
+   `updateGroupWithMembers`, the aggregate mutation boundary that replaced
+   separate member publication.
+3. InMemory Group POST fault injection now targets aggregate `create` for the
+   same reason.
+
+The unadapted calibration produced no setup failure and isolated only those
+three stale assertions/seams. Focused RED/GREEN then passed3/3 on each
+backend. The complete run produced81 passes plus the documented cross-instance
+cache non-applicability on InMemory and82 passes on PostgreSQL:164 backend
+dispositions,769 passed assertions and0 failed assertions. PostgreSQL replayed
+all22 migrations and the exact disposable container was removed. Structured
+evidence:
+[validation.json](evidence/scim-current-acceptance-20260929/validation.json).
+
+Broader characteristic reconciliation mapped declaration/default, type,
+cardinality, namespace, adapter, strict mode, required, mutability, returned,
+caseExact, uniqueness, primary, and retained-entry combinations to current
+permanent tests and backend receipts. No new production defect was found and no
+exhaustive Cartesian claim is made. See
+[SCIM_CHARACTERISTIC_RECONCILIATION.md](SCIM_CHARACTERISTIC_RECONCILIATION.md).
+
+The candidate-materialization assessment used50,000 custom Device resources.
+Indexed displayName equality transferred1 row at2.190ms p50. A residual numeric
+predicate with0.02% selectivity transferred all50,000 rows /20,077,781 bytes,
+then evaluated50,000 internal candidates before returning5 of10 matches:
+401.049ms database-fetch p50 and23.203ms service-page p50. Page-size limits do
+not cap this work. The behavior is correct and measured; schema-resolved JSONB
+pushdown is a separate optimization contract, not a speculative correctness
+change. See
+[SCIM_QUERY_PERFORMANCE_ASSESSMENT.md](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md).
+
+| Mandatory overlay | Final local disposition |
+|---|---|
+| Exact incident, direct/Bulk/`/Me`/custom paths | Passed in the current 82-case ledger and permanent typed PATCH/P7b suites |
+| All registered settings and compatibility defaults | Existing 37-setting evidence plus default-running 19-case compatibility corpus retained |
+| Promoted-name authority and common externalId | Integrated query/common-context/binding-qualified tests passed in the guarded matrix |
+| Attribute characteristics | Complete enumerated mapping; no remaining characteristic blocker |
+| Controlled races and Group rollback | Current wire/barrier cases, aggregate fault cases, and profile-revision race suite passed |
+| Endpoint cleanup, freshness, concurrent deletion contract | Current case ledger plus P8 focused guarded tests passed |
+| P6b resource cost | Measured and documented without an unchanged-cost claim |
+| Built-runtime exact-tip proof | Remains the final separate local gate; no deployment claim |
+
+**Assurance improvement: applied.** Historical inputs stay immutable while a
+hash-guarded adapter names each current-architecture change and preserves raw
+calibration evidence. Performance records scaling inputs and work, not only
+elapsed time. **Design/architecture disposition: accepted.** The adapter and
+benchmark are task-owned assurance tools; product seams remain unchanged and a
+new query optimizer is deferred until it has its own semantic contract.
 
 ## 12. Architecture and self-improvement decisions
 

@@ -228,6 +228,38 @@ remains a consolidation gate, not a claimed completed check.
   detection: affected-unit gate. Prevention: a new commit-boundary dependency
   must be represented in both request-context and persistence test doubles;
   do not weaken exact argument assertions globally.
+- **C0-I60 - current-source harness isolation / Low.** The first 82-case
+  calibration replayed all22 migrations but every case stopped in setup
+  because Jest reloaded the historical `safety.cjs` inside its own module
+  registry. Pre-populating Node's `require.cache` reached the runner/config
+  process but not transformed test modules. A task-owned Jest config now maps
+  only the corpus's relative safety import to the current guard; the historical
+  source and guard remain byte-normalized/hash-verified. The failed container
+  was exact-ID removed. Earliest detection: a one-case Jest discovery/smoke;
+  actual detection: first full calibration. Prevention: the safety check now
+  verifies both the Node preload and Jest module mapper before database work.
+- **C0-I61 - historical assertion seam drift / Medium.** The first exercised
+  current-source corpus produced three InMemory and one PostgreSQL behavior
+  failures from two non-product causes. `INC-STRICT` correctly returned200 and
+  persisted all four values, while the historical branch still asserted the
+  preservation state of its old rejection. Two InMemory Group fault cases
+  replaced `addMembers`, a seam no longer called after aggregate
+  create/update was introduced. The current adapter chooses success readback
+  only when the incident response is200 and moves fault injection to
+  `create`/`updateGroupWithMembers`; permanent typed PATCH and late-stage
+  aggregate tests independently lock the behavior. Focused3/3 per backend and
+  full164 dispositions/769 assertions then passed. Earliest/actual detection:
+  current-source case calibration. Prevention: preserve the immutable corpus,
+  name every adapter, and fail transformation if an expected seam changes.
+- **C0-I62 - benchmark fixture arithmetic / Low.** The first 50,000-row
+  performance run measured both paths but failed its final count assertion:
+  values0 through49,999 with `cost gt 49,990` yield9 matches, not the declared
+  10. The fixture now uses `ge 49,990`, preserving the intended10-row,
+  0.02%-selective boundary. The failed receipt is retained locally; the clean
+  rerun replayed22 migrations, completed all samples, and exact-ID removed its
+  container. Earliest/actual detection: benchmark outcome assertion.
+  Prevention: benchmark fixtures assert seed size, transferred rows, candidate
+  callbacks, total matches and returned page before publishing measurements.
 
 **Test/gate improvement: applied.** Per-binding promise tests and admission
 publication checks close the original blind spots. **Design/architecture

@@ -6,7 +6,7 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
-**Current C0 profile-revision checkpoint, 2026-09-29 (local, not deployed):**
+**Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
 profile admission. One schema can remain numeric/MV under an extension
 binding while core id/externalId/meta use RFC characteristics. The original
@@ -30,9 +30,19 @@ state on both backends. Affected units pass611 tests; the guarded lane passes
 571 HTTP cases/backend plus built P7b153/905 and P7a472 assertions/backend.
 PostgreSQL17.8 replayed22 migrations and exact cleanup passed. See
 [profile revision design](docs/SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
-Broader characteristic reconciliation, performance, the final82-case ledger
-and exact-tip release assurance remain open. No version, lockfile, release or
-deployment was changed.
+The immutable82-case corpus now has164 current-source backend dispositions:
+InMemory81 pass plus one documented cross-instance cache N/A; PostgreSQL82
+pass;769 assertions and0 failures. Broader characteristic overlays map to
+current permanent tests with no new product defect. The50,000-row query
+benchmark measures the known residual boundary: a0.02%-selective numeric
+predicate transfers/materializes50,000 candidates (20.1MB,401ms local fetch
+p50) before returning5 rows, versus1 candidate/2.19ms for indexed equality.
+This is a documented scaling trade-off, not an inferred unchanged-cost claim.
+Only final exact-tip gates and clean handoff remain. No version, lockfile,
+release or deployment was changed. See
+[characteristic reconciliation](docs/SCIM_CHARACTERISTIC_RECONCILIATION.md),
+[performance assessment](docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md), and the
+[164-disposition evidence](docs/evidence/scim-current-acceptance-20260929/validation.json).
 
 **Historical bounded PUT source receipt, 2026-09-29:** Based only on committed combined
 snapshot `5581e6b7`, [PUT entry preservation](docs/SCIM_PUT_ENTRY_PRESERVATION.md)

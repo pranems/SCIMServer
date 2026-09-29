@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-09-29T23:46:09.840Z",
+  "source": {
+    "head": "7332fdbcc70762a8f5ace4c5a63c67b00582eb87",
+    "branch": "integrate/scim-correctness-20260928",
+    "productTreeClean": true,
+    "fingerprint": {
+      "files": 626,
+      "sha256": "50ac27bca9580d8b415c44449100bb06bbc90c3904ea36ab9f8f6efb87c6150f"
+    },
+    "buildFingerprint": {
+      "files": 257,
+      "sha256": "56c6d58c08691a18e0dfe0d41d01a954b33d45d166fc31c3101a8cb083731fc2"
+    }
+  },
+  "method": {
+    "runner": "scripts/scim-performance/run.cjs",
+    "runtime": "v24.13.0",
+    "database": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "dataset": "50,000 custom Device rows in disposable PostgreSQL, payload cost values 0 through 49,999, one indexed displayName target, and a residual numeric predicate selecting 10 rows.",
+    "samples": "Two warmups plus nine PostgreSQL fetch samples; three warmups plus fifteen service-page samples.",
+    "interpretation": "Latency values characterize this local machine and are not a release SLO. Candidate counts, rows transferred, bytes, query-plan work, and selectivity establish the scaling shape."
+  },
+  "measurements": {
+    "dataset": {
+      "resourceType": "Device",
+      "rows": 50000,
+      "targetDisplayName": "device-049999",
+      "residualFilter": "cost ge 49990",
+      "expectedResidualMatches": 10
+    },
+    "seed": {
+      "rows": 50000,
+      "elapsedMs": 3816.3939
+    },
+    "postgresql": {
+      "exactPlan": {
+        "planningTimeMs": 0.952,
+        "executionTimeMs": 0.205,
+        "actualRows": 1,
+        "nodes": [
+          "Sort",
+          "Index Scan"
+        ],
+        "sharedHitBlocks": 8,
+        "sharedReadBlocks": 0
+      },
+      "residualFetchPlan": {
+        "planningTimeMs": 0.149,
+        "executionTimeMs": 63.025,
+        "actualRows": 50000,
+        "nodes": [
+          "Gather Merge",
+          "Sort",
+          "Seq Scan"
+        ],
+        "sharedHitBlocks": 3983,
+        "sharedReadBlocks": 0
+      },
+      "exactFetch": {
+        "rowsTransferred": 1,
+        "latency": {
+          "samples": 9,
+          "minMs": 1.8262,
+          "p50Ms": 2.1895,
+          "p95Ms": 2.5348,
+          "p99Ms": 2.5348,
+          "maxMs": 2.5348
+        }
+      },
+      "residualFetch": {
+        "rowsTransferred": 50000,
+        "serializedBytes": 20077781,
+        "latency": {
+          "samples": 9,
+          "minMs": 353.9851,
+          "p50Ms": 401.0486,
+          "p95Ms": 478.8013,
+          "p99Ms": 478.8013,
+          "maxMs": 478.8013
+        }
+      }
+    },
+    "service": {
+      "exactPushdown": {
+        "candidateRows": 1,
+        "totalResults": 1,
+        "returned": 1,
+        "latency": {
+          "samples": 15,
+          "minMs": 0.0032,
+          "p50Ms": 0.0106,
+          "p95Ms": 0.0462,
+          "p99Ms": 0.0462,
+          "maxMs": 0.0462
+        }
+      },
+      "residualNumeric": {
+        "candidateRows": 50000,
+        "totalResults": 10,
+        "returned": 5,
+        "selectivity": 0.0002,
+        "latency": {
+          "samples": 15,
+          "minMs": 20.1073,
+          "p50Ms": 23.203,
+          "p95Ms": 36.2305,
+          "p99Ms": 36.2305,
+          "maxMs": 36.2305
+        },
+        "maxRssBeforeKiB": 433500,
+        "maxRssAfterKiB": 433996
+      },
+      "materializationRatio": 50000
+    }
+  },
+  "assessment": {
+    "outcome": "Residual filtering is correct but its service and transfer cost scales with endpoint candidate cardinality rather than page size.",
+    "boundedAtRows": 50000,
+    "optimizationDecision": "No production optimization is included in correctness consolidation. A future change may push schema-resolved JSONB predicates while preserving full-result counting and filter semantics."
+  },
+  "cleanup": {
+    "exactContainerId": "703be9ff1fbc81c4e0121f00bfc8bfb3a00991d69c5764804efb5ea6bf4f9aaa",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  },
+  "rawLocalArtifact": {
+    "directory": "test-results\\scim-performance\\710e9d6d70230806",
+    "receiptSha256": "469f9dc52786882a49816c6dfece293cdd5934d052ca1ecc7c949dffee087cf2"
+  }
+}

@@ -9,7 +9,7 @@
 
 ## Active Delivery Process
 
-**Current C0 profile-revision checkpoint, not deployed:** common attribute normalization now
+**Current C0 local-acceptance checkpoint, not deployed:** common attribute normalization now
 feeds runtime uniqueness compilation per ResourceType, and admission uses the
 same compiler before profile publication. Shared declarations are unchanged;
 core-only unsupported computed promises remain admission errors. Omitted
@@ -25,8 +25,16 @@ cross the request/repository commit boundary: nine controlled User, Group and
 custom create/replace/delete races return sanitized409 with complete
 non-mutation on both backends. Affected units pass611 tests and the expanded
 guarded lane passes571 HTTP cases/backend. [Design and evidence](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
-Performance, broader characteristic reconciliation and final C0 acceptance
-remain open.
+The immutable82-case corpus now has164 current-source dispositions:81 pass
+plus one explicit cache N/A on InMemory,82 pass on PostgreSQL,769 assertions
+and0 failures. Broader characteristic overlays are mapped to permanent tests
+without a Cartesian-coverage claim. The50,000-row query benchmark records the
+known residual cost boundary:50,000 candidates and20.1MB transferred for a
+0.02%-selective custom numeric filter,401ms local fetch p50 and23ms service
+p50. Only the final exact-tip matrix and clean handoff remain.
+[Characteristic mapping](SCIM_CHARACTERISTIC_RECONCILIATION.md),
+[performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md), and
+[case evidence](evidence/scim-current-acceptance-20260929/validation.json).
 
 **Corrected source pair:** `4ba9373c` was held for violating the common
 externalId contract. Corrective child `2d2da4e1` restores all-core String/SV

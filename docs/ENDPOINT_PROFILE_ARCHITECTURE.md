@@ -2,7 +2,7 @@
 
 > **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
-> **Updated:** 2026-09-18
+> **Updated:** 2026-09-29
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 >
 > **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines the portability boundary, discovery translation, authentication provenance, API/DB ownership, and target UX. This document remains authoritative for current profile expansion and PATCH merge semantics.
@@ -14,6 +14,7 @@
 - [Overview](#overview)
 - [Profile Structure](#profile-structure)
 - [Profile Creation Flow](#profile-creation-flow)
+- [Profile Revision and Write Coordination](#profile-revision-and-write-coordination)
 - [Built-In Presets](#built-in-presets)
 - [Auto-Expand Engine](#auto-expand-engine)
 - [Tighten-Only Validation](#tighten-only-validation)
@@ -201,6 +202,25 @@ sequenceDiagram
     ES-->>EC: EndpointResponse
     EC-->>Op: 201 Created
 ```
+
+---
+
+## Profile Revision and Write Coordination
+
+Resource writes are validated against a request-scoped endpoint profile
+snapshot. The service derives a canonical SHA-256 revision from that snapshot
+and forwards it to the repository mutation boundary. PostgreSQL mutations and
+profile updates acquire the same transaction-scoped advisory lock; InMemory
+repositories compare against the synchronously published current revision.
+If the profile changed after validation, the mutation is rejected with HTTP
+409 and diagnostic code `PROFILE_REVISION_CHANGED`. No resource row, member
+change, version increment, or success event is published.
+
+The revision is not an operator-managed profile field and does not alter the
+stored profile or discovery response. It is an internal coordination token.
+See [SCIM_PROFILE_REVISION_WRITE_COORDINATION.md](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md)
+for the lock ordering, canonicalization rules, error contract, and dual-backend
+evidence.
 
 ---
 

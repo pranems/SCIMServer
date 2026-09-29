@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Verified - current SCIM acceptance, characteristics, and query cost
+- Reuse the immutable82-case corpus through a hash-guarded current-source
+  adapter without changing historical inputs or evidence. Final local results
+  are81 pass plus one documented cross-instance cache N/A on InMemory and82
+  pass on PostgreSQL:164 dispositions,769 assertions,0 failures, PostgreSQL
+  17.8, all22 migrations, and exact disposable-container cleanup. Reconcile
+  declaration/default, type/cardinality, namespace, adapter, strict-mode,
+  required, mutability, returned, caseExact, uniqueness, primary, and retained
+  entry combinations to permanent tests; no new product defect was found.
+  Measure the50,000-row residual-query boundary instead of inferring cost from
+  functional GREEN: an indexed equality transfers1 row at2.190ms local p50,
+  while a0.02%-selective custom numeric filter transfers50,000 rows/20.1MB at
+  401.049ms fetch p50 and evaluates50,000 candidates at23.203ms service p50.
+  No migration, version, lockfile, deployment, live-data, or speculative query
+  optimizer change.
+  [Acceptance and characteristic evidence](docs/SCIM_CHARACTERISTIC_RECONCILIATION.md)
+  and [performance assessment](docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md).
+
 ### Fixed - endpoint profile revision write coordination, not released
 - Resource writes now carry the content revision of the endpoint profile used
   for validation. PostgreSQL profile updates and resource commits share an

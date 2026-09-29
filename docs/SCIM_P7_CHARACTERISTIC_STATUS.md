@@ -1,10 +1,13 @@
 # P7 characteristic status and the P3b uniqueness handoff
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
-**Status:** P7 remains open until final P2 integration. This document describes
-local source, not a deployment. P7a was accepted at `8e42f15f`; the recursive
-readOnly follow-up is a separate commit.
+**Status:** Historical P7/P3b handoff, now superseded for local acceptance by
+[SCIM_CHARACTERISTIC_RECONCILIATION.md](SCIM_CHARACTERISTIC_RECONCILIATION.md).
+P7a, recursive readOnly, retained-entry preservation, P7b PATCH schema
+contracts, and binding-qualified uniqueness are integrated and reconciled on
+the current local source. This document retains the original gap analysis and
+provider-policy distinctions; it is not a deployment claim.
 
 ## 1. Do not confuse a broken promise with a missing optional feature
 
@@ -18,7 +21,7 @@ readOnly follow-up is a separate commit.
 | POST/PUT readOnly in nested-complex compatibility mode | Previously promised-but-broken; fixed in this follow-up | Recursive stripping works through real objects and arrays with or without a cache. No new flag or default change. |
 | PUT readOnly/immutable state on duplicate or anonymous array entries | [Local combined-source correction](SCIM_PUT_ENTRY_PRESERVATION.md) | One neutral matcher shared with PATCH; type-capacity reservation and stable occurrence fallback, recursive immutable comparison. Does not close unrelated P7/P3b acceptance rows. |
 | Required attributes and ResourceType-required extensions on POST/PUT | Implemented P7a contract | Checks run in both strict modes, independent of optional extension attributes. |
-| Required/immutable/primary transitions in ordered PATCH | Required integration work | P2 owns execution; P7 stays open until combined tests pass. |
+| Required/immutable/primary transitions in ordered PATCH | Integrated and reconciled | P7b uses the shared P2 executor; combined core/extension, strict-mode, persistence, and response tests pass. |
 | returned:request on POST/PUT, namespace isolation | Implemented P7a contract | Only defined client-supplied values count as implicit requests. PATCH integration remains separate. |
 | canonicalValues closed-enum enforcement | Optional provider policy, not a missing requirement | RFC 7643 2.3.1 permits restrictions, but does not require them. This server currently treats canonicalValues as suggestions. No new enum flag is proposed. |
 | Reference URI syntax | Implemented P7a contract | Invalid URI syntax fails strict validation. A URI check does not prove target existence. |
@@ -26,7 +29,7 @@ readOnly follow-up is a separate commit.
 | Published referenceTypes restrictions | Separate schema-promise assessment | An explicit type restriction and target existence are different questions. Current declarations are structurally checked; exact semantic enforcement needs a concrete contract/test, not speculative external lookups. |
 | Integer/decimal values after JSON parsing | Implemented value check | Integers are finite whole numbers; decimals are finite. The RFC has JSON encoding rules, but reconstructing discarded lexical tokens is not itself an implementation requirement. Assess parser/serializer behavior at the boundary before proposing any parser change. |
 | uniqueness:global | Intentional unsupported-capability policy | A valid RFC keyword is rejected by this provider at profile write. This is not an RFC-mandated rejection. See section 3. |
-| Accepted uniqueness:server declarations skipped or scanned non-atomically | Actual capability gaps | Exact shapes and source/test pointers are in section 2. P3b owns the persistence/enforcement decision. |
+| Accepted uniqueness:server declarations skipped or scanned non-atomically | Closed in current local source | Binding-qualified compilation, admission, repository commit enforcement, and deterministic races cover supported declarations. Section 2 is the historical handoff inventory. |
 | Uniqueness on Boolean, binary, dateTime or complex values | Inconsistent declaration, not a demand for a new comparison feature | RFC 7643 says these types have no uniqueness. Do not treat accepting such metadata as a requirement to invent object/binary/date uniqueness semantics. |
 
 ## 2. Exact server-uniqueness shapes for P3b

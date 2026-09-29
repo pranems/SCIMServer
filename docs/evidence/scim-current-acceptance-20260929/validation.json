@@ -1,0 +1,1590 @@
+{
+  "generatedAt": "2026-09-29T23:40:22.196Z",
+  "source": {
+    "head": "7332fdbcc70762a8f5ace4c5a63c67b00582eb87",
+    "branch": "integrate/scim-correctness-20260928",
+    "productTreeClean": true
+  },
+  "immutableCorpus": {
+    "casesPerBackend": 82,
+    "normalizedSha256": {
+      "dual-backend.spec.cjs": "f50a16b4d2f4b7a66336a3820e2fe5128ced11073e1cbdf4a1577e18cb17ad05",
+      "alias-cases.cjs": "45678fc0b22aa6d9245dee841cd21e6bad318c0b7b71babb68e850e384783a60",
+      "run.cjs": "53379cedd7d87f4d4d1e9448649dbcf159f60b4e386d057ef32f04e59ae09e39",
+      "safety.cjs": "7c0bdc02d703be72e70088f7019072a1702c3b19d6b9a96757d6b649013d3efe"
+    },
+    "source": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+  },
+  "currentSourceAdapter": {
+    "directory": "scripts/scim-acceptance-current",
+    "adaptations": [
+      {
+        "caseId": "INC-STRICT",
+        "reason": "A valid strict-mode request now succeeds, so the current adapter executes the success readback branch. The historical rejection-preservation branch remains active if the response regresses to non-200.",
+        "supportingTest": "api/test/e2e/typed-patch-path.e2e-spec.ts"
+      },
+      {
+        "caseId": "GROUP-HTTP-FAULT",
+        "backend": "inmemory",
+        "reason": "Fault injection moved from the obsolete addMembers seam to the aggregate updateGroupWithMembers mutation boundary.",
+        "supportingTest": "api/src/infrastructure/repositories/inmemory/group-aggregate.spec.ts"
+      },
+      {
+        "caseId": "GROUP-POST-FAULT",
+        "backend": "inmemory",
+        "reason": "Fault injection moved from the obsolete addMembers seam to the aggregate create mutation boundary.",
+        "supportingTest": "api/src/infrastructure/repositories/inmemory/group-aggregate.spec.ts"
+      }
+    ]
+  },
+  "environment": {
+    "node": "v24.13.0",
+    "dockerServerVersion": "29.6.2",
+    "postgresVersion": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "migrationCount": 22,
+    "migrationNames": [
+      "20260223000000_postgresql_baseline",
+      "20260223203811_externalid_citext_case_insensitive",
+      "20260223225049_add_endpoint_schema",
+      "20260225123401_add_deleted_at_soft_delete",
+      "20260225181836_externalid_citext_to_text",
+      "20260225232117_add_endpoint_resource_type",
+      "20260227013947_add_endpoint_credential",
+      "20260313031330_add_endpoint_profile",
+      "20260409235323_remove_uniqueness_displayname_externalid",
+      "20260416025138_add_requestlog_perf_indexes",
+      "20260430120000_resource_member_unique_value",
+      "20260707000000_add_jwks_host_allowlist",
+      "20260707100000_add_credential_dek",
+      "20260707110000_add_secret_retention_and_server_settings",
+      "20260717120000_add_requestlog_requestid",
+      "20260721180000_add_requestlog_auth_summary",
+      "20260722120000_add_requestlog_auth_decision",
+      "20260724000000_drop_requestlog_endpoint_fk",
+      "20260827200000_add_credential_keyed_lookup",
+      "20260916035422_add_endpoint_credential_type_active_index",
+      "20260923020356_split_per_endpoint_credentials_enablement",
+      "20260924000000_endpoint_name_case_insensitive"
+    ]
+  },
+  "backendSummaries": [
+    {
+      "backend": "inmemory",
+      "cases": 82,
+      "passed": 81,
+      "behaviorFailed": 0,
+      "setupFailed": 0,
+      "notApplicable": 1,
+      "checksPassed": 383,
+      "checksFailed": 0,
+      "rawSha256": "b8c29ee11a11f040140d60d4e55370a789c780308660aa41f4dbd276555f62d5"
+    },
+    {
+      "backend": "prisma",
+      "cases": 82,
+      "passed": 82,
+      "behaviorFailed": 0,
+      "setupFailed": 0,
+      "notApplicable": 0,
+      "checksPassed": 386,
+      "checksFailed": 0,
+      "rawSha256": "ae224933735eca011d852ca93e5fddc954cd7ff3314d3f175894d2c14bea9a4c"
+    }
+  ],
+  "totals": {
+    "dispositions": 164,
+    "passed": 163,
+    "acceptedNotApplicable": 1,
+    "checksPassed": 769,
+    "checksFailed": 0
+  },
+  "cleanup": {
+    "exactContainerId": "98358b331eb80cf590ae3131143d30ef9443ba618d6190124f2122ca7028f8db",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  },
+  "rawLocalArtifact": {
+    "directory": "test-results\\fresh-analysis\\postgres-20260928-4a409d776bcde04c",
+    "runSha256": "6d64c3037f5c607af9aecba2f6ec2ade786cb8d351b51bb5ba6f54a6bff78dd5"
+  },
+  "dispositions": [
+    {
+      "caseId": "INC-STRICT",
+      "title": "Four incident operations; strict=true",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 6,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "INC-LENIENT",
+      "title": "Four incident operations; strict=false",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 6,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CRUD-Users",
+      "title": "Users ordinary create/get/list/search/filter/sort/PUT/PATCH/DELETE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 12,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "SEARCH-ARRAY-Users",
+      "title": "Users attributes array and error envelope",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPES-Users",
+      "title": "Users eight native types x single/multi cardinality",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 32,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CRUD-Groups",
+      "title": "Groups ordinary create/get/list/search/filter/sort/PUT/PATCH/DELETE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 12,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "SEARCH-ARRAY-Groups",
+      "title": "Groups attributes array and error envelope",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPES-Groups",
+      "title": "Groups eight native types x single/multi cardinality",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 32,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CRUD-Devices",
+      "title": "Devices ordinary create/get/list/search/filter/sort/PUT/PATCH/DELETE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 12,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "SEARCH-ARRAY-Devices",
+      "title": "Devices attributes array and error envelope",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPES-Devices",
+      "title": "Devices eight native types x single/multi cardinality",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 32,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MV-ADD-Users",
+      "title": "Users multi-valued extension add preserves prior values",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MV-ADD-Groups",
+      "title": "Groups multi-valued extension add preserves prior values",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MV-ADD-Devices",
+      "title": "Devices multi-valued extension add preserves prior values",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-STRING",
+      "title": "extension valuePath STRING",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-BOOLEAN",
+      "title": "extension valuePath BOOLEAN",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-QUOTED-BOOLEAN",
+      "title": "extension valuePath QUOTED-BOOLEAN",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-COMPOUND",
+      "title": "extension valuePath COMPOUND",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-NUMBER",
+      "title": "extension valuePath NUMBER",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-MULTIMATCH",
+      "title": "extension valuePath MULTIMATCH",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "READ-FILTER-TYPED",
+      "title": "Boolean, number, compound read filters",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "REQUIRED-REMOVE-Users",
+      "title": "Users REQUIRED-REMOVE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-SEQUENCE-Users",
+      "title": "Users IMMUTABLE-SEQUENCE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-REMOVE-Users",
+      "title": "Users IMMUTABLE-REMOVE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-PUT-Users",
+      "title": "Users IMMUTABLE-PUT",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "REQUIRED-REMOVE-Groups",
+      "title": "Groups REQUIRED-REMOVE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-SEQUENCE-Groups",
+      "title": "Groups IMMUTABLE-SEQUENCE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-REMOVE-Groups",
+      "title": "Groups IMMUTABLE-REMOVE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-PUT-Groups",
+      "title": "Groups IMMUTABLE-PUT",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "REQUIRED-REMOVE-Devices",
+      "title": "Devices REQUIRED-REMOVE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-SEQUENCE-Devices",
+      "title": "Devices IMMUTABLE-SEQUENCE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-REMOVE-Devices",
+      "title": "Devices IMMUTABLE-REMOVE",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-PUT-Devices",
+      "title": "Devices IMMUTABLE-PUT",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "PRIMARY-Users",
+      "title": "Users primary selection handoff",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CASEEXACT-Users",
+      "title": "Users caseExact read and PATCH selector",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "RETURNED-Users",
+      "title": "Users hidden attribute filtering and projection",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "PRIMARY-Groups",
+      "title": "Groups primary selection handoff",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CASEEXACT-Groups",
+      "title": "Groups caseExact read and PATCH selector",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "RETURNED-Groups",
+      "title": "Groups hidden attribute filtering and projection",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "PRIMARY-Devices",
+      "title": "Devices primary selection handoff",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CASEEXACT-Devices",
+      "title": "Devices caseExact read and PATCH selector",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "RETURNED-Devices",
+      "title": "Devices hidden attribute filtering and projection",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAPABILITIES-Users",
+      "title": "Users profile disables PATCH/filter/sort/ETag",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "LIMIT-Users",
+      "title": "Users profile maxResults limits page",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAPABILITIES-Groups",
+      "title": "Groups profile disables PATCH/filter/sort/ETag",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "LIMIT-Groups",
+      "title": "Groups profile maxResults limits page",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAPABILITIES-Devices",
+      "title": "Devices profile disables PATCH/filter/sort/ETag",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "LIMIT-Devices",
+      "title": "Devices profile maxResults limits page",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CUSTOM-NUMERIC-SORT",
+      "title": "Custom integer sort is numeric",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CUSTOM-ETAG-OFF",
+      "title": "Custom write ignores RequireIfMatch when ETag capability is off",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Users-WIRE",
+      "title": "Users two writers with the same If-Match",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Users-BARRIER",
+      "title": "Users two writers with the same If-Match",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Groups-WIRE",
+      "title": "Groups two writers with the same If-Match",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Groups-BARRIER",
+      "title": "Groups two writers with the same If-Match",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Devices-WIRE",
+      "title": "Devices two writers with the same If-Match",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Devices-BARRIER",
+      "title": "Devices two writers with the same If-Match",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "UNIQUE-WIRE",
+      "title": "Concurrent same-userName creation",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "UNIQUE-BARRIER",
+      "title": "Concurrent same-userName creation",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "GROUP-NATIVE-ROLLBACK",
+      "title": "Group aggregate DB constraint failure is atomic",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "GROUP-HTTP-FAULT",
+      "title": "Group PATCH preserves aggregate on membership persistence failure",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ENDPOINT-CASCADE",
+      "title": "Endpoint DELETE removes User/Group/custom stored resources",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ENDPOINT-CACHE",
+      "title": "Two EndpointService instances observe persisted profile changes",
+      "backend": "inmemory",
+      "disposition": "accepted-not-applicable",
+      "checksPassed": 0,
+      "checksFailed": 0,
+      "reason": "Independent InMemory endpoint services do not share a persistence store; no cross-process parity claim.",
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CUSTOM-PATCH-DISABLED",
+      "title": "Custom PATCH disabled without a masking ETag requirement",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPED-READ-CONTROL",
+      "title": "Native Boolean core and custom numeric read-filter controls",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 6,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CORE-MV-ADD",
+      "title": "User core emails add appends rather than replaces",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CORE-BOOLEAN-PATH",
+      "title": "User core native Boolean selector changes selected value",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MULTIMATCH-REMOVE",
+      "title": "Filtered sub-attribute removal affects every selected value",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "NO-PATH-Users",
+      "title": "Users pathless add and scalar replace",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ETAG-CONTROL-Users",
+      "title": "Users sequential stale/missing If-Match checks",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CARDINALITY-NEGATIVE-Users",
+      "title": "Users wrong scalar/cardinality rejection",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "NO-PATH-Groups",
+      "title": "Groups pathless add and scalar replace",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ETAG-CONTROL-Groups",
+      "title": "Groups sequential stale/missing If-Match checks",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CARDINALITY-NEGATIVE-Groups",
+      "title": "Groups wrong scalar/cardinality rejection",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "NO-PATH-Devices",
+      "title": "Devices pathless add and scalar replace",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ETAG-CONTROL-Devices",
+      "title": "Devices sequential stale/missing If-Match checks",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CARDINALITY-NEGATIVE-Devices",
+      "title": "Devices wrong scalar/cardinality rejection",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "GROUP-POST-FAULT",
+      "title": "Group POST member failure does not leave a partial group",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-BULK-SUCCESS",
+      "title": "Direct and Bulk User mutation produce the same stored values",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 10,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-BULK-ATOMICITY",
+      "title": "Failed embedded PATCH is atomic while another Bulk operation succeeds",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 10,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-BULK-DISABLED",
+      "title": "Bulk must not bypass the endpoint's disabled PATCH capability",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 8,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-ME-USER",
+      "title": "Synthetic OAuth /Me and direct User routes access and mutate the same user",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 13,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-DISCOVERY-REFLECTION",
+      "title": "Discovery reflects endpoint schema/capability changes and hide/restore setting",
+      "backend": "inmemory",
+      "disposition": "passed",
+      "checksPassed": 16,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "INC-STRICT",
+      "title": "Four incident operations; strict=true",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 6,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "INC-LENIENT",
+      "title": "Four incident operations; strict=false",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 6,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CRUD-Users",
+      "title": "Users ordinary create/get/list/search/filter/sort/PUT/PATCH/DELETE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 12,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "SEARCH-ARRAY-Users",
+      "title": "Users attributes array and error envelope",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPES-Users",
+      "title": "Users eight native types x single/multi cardinality",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 32,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CRUD-Groups",
+      "title": "Groups ordinary create/get/list/search/filter/sort/PUT/PATCH/DELETE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 12,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "SEARCH-ARRAY-Groups",
+      "title": "Groups attributes array and error envelope",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPES-Groups",
+      "title": "Groups eight native types x single/multi cardinality",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 32,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CRUD-Devices",
+      "title": "Devices ordinary create/get/list/search/filter/sort/PUT/PATCH/DELETE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 12,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "SEARCH-ARRAY-Devices",
+      "title": "Devices attributes array and error envelope",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPES-Devices",
+      "title": "Devices eight native types x single/multi cardinality",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 32,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MV-ADD-Users",
+      "title": "Users multi-valued extension add preserves prior values",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MV-ADD-Groups",
+      "title": "Groups multi-valued extension add preserves prior values",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MV-ADD-Devices",
+      "title": "Devices multi-valued extension add preserves prior values",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-STRING",
+      "title": "extension valuePath STRING",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-BOOLEAN",
+      "title": "extension valuePath BOOLEAN",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-QUOTED-BOOLEAN",
+      "title": "extension valuePath QUOTED-BOOLEAN",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-COMPOUND",
+      "title": "extension valuePath COMPOUND",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-NUMBER",
+      "title": "extension valuePath NUMBER",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "VP-MULTIMATCH",
+      "title": "extension valuePath MULTIMATCH",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "READ-FILTER-TYPED",
+      "title": "Boolean, number, compound read filters",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "REQUIRED-REMOVE-Users",
+      "title": "Users REQUIRED-REMOVE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-SEQUENCE-Users",
+      "title": "Users IMMUTABLE-SEQUENCE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-REMOVE-Users",
+      "title": "Users IMMUTABLE-REMOVE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-PUT-Users",
+      "title": "Users IMMUTABLE-PUT",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "REQUIRED-REMOVE-Groups",
+      "title": "Groups REQUIRED-REMOVE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-SEQUENCE-Groups",
+      "title": "Groups IMMUTABLE-SEQUENCE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-REMOVE-Groups",
+      "title": "Groups IMMUTABLE-REMOVE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-PUT-Groups",
+      "title": "Groups IMMUTABLE-PUT",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "REQUIRED-REMOVE-Devices",
+      "title": "Devices REQUIRED-REMOVE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-SEQUENCE-Devices",
+      "title": "Devices IMMUTABLE-SEQUENCE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-REMOVE-Devices",
+      "title": "Devices IMMUTABLE-REMOVE",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "IMMUTABLE-PUT-Devices",
+      "title": "Devices IMMUTABLE-PUT",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "PRIMARY-Users",
+      "title": "Users primary selection handoff",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CASEEXACT-Users",
+      "title": "Users caseExact read and PATCH selector",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "RETURNED-Users",
+      "title": "Users hidden attribute filtering and projection",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "PRIMARY-Groups",
+      "title": "Groups primary selection handoff",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CASEEXACT-Groups",
+      "title": "Groups caseExact read and PATCH selector",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "RETURNED-Groups",
+      "title": "Groups hidden attribute filtering and projection",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "PRIMARY-Devices",
+      "title": "Devices primary selection handoff",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CASEEXACT-Devices",
+      "title": "Devices caseExact read and PATCH selector",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "RETURNED-Devices",
+      "title": "Devices hidden attribute filtering and projection",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAPABILITIES-Users",
+      "title": "Users profile disables PATCH/filter/sort/ETag",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "LIMIT-Users",
+      "title": "Users profile maxResults limits page",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAPABILITIES-Groups",
+      "title": "Groups profile disables PATCH/filter/sort/ETag",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "LIMIT-Groups",
+      "title": "Groups profile maxResults limits page",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAPABILITIES-Devices",
+      "title": "Devices profile disables PATCH/filter/sort/ETag",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "LIMIT-Devices",
+      "title": "Devices profile maxResults limits page",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CUSTOM-NUMERIC-SORT",
+      "title": "Custom integer sort is numeric",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CUSTOM-ETAG-OFF",
+      "title": "Custom write ignores RequireIfMatch when ETag capability is off",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 1,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Users-WIRE",
+      "title": "Users two writers with the same If-Match",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Users-BARRIER",
+      "title": "Users two writers with the same If-Match",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Groups-WIRE",
+      "title": "Groups two writers with the same If-Match",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Groups-BARRIER",
+      "title": "Groups two writers with the same If-Match",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Devices-WIRE",
+      "title": "Devices two writers with the same If-Match",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CAS-Devices-BARRIER",
+      "title": "Devices two writers with the same If-Match",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "UNIQUE-WIRE",
+      "title": "Concurrent same-userName creation",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "UNIQUE-BARRIER",
+      "title": "Concurrent same-userName creation",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "GROUP-NATIVE-ROLLBACK",
+      "title": "Group aggregate DB constraint failure is atomic",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "GROUP-HTTP-FAULT",
+      "title": "Group PATCH preserves aggregate on membership persistence failure",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 4,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ENDPOINT-CASCADE",
+      "title": "Endpoint DELETE removes User/Group/custom stored resources",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ENDPOINT-CACHE",
+      "title": "Two EndpointService instances observe persisted profile changes",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CUSTOM-PATCH-DISABLED",
+      "title": "Custom PATCH disabled without a masking ETag requirement",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "TYPED-READ-CONTROL",
+      "title": "Native Boolean core and custom numeric read-filter controls",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 6,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CORE-MV-ADD",
+      "title": "User core emails add appends rather than replaces",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CORE-BOOLEAN-PATH",
+      "title": "User core native Boolean selector changes selected value",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "MULTIMATCH-REMOVE",
+      "title": "Filtered sub-attribute removal affects every selected value",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "NO-PATH-Users",
+      "title": "Users pathless add and scalar replace",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ETAG-CONTROL-Users",
+      "title": "Users sequential stale/missing If-Match checks",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CARDINALITY-NEGATIVE-Users",
+      "title": "Users wrong scalar/cardinality rejection",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "NO-PATH-Groups",
+      "title": "Groups pathless add and scalar replace",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ETAG-CONTROL-Groups",
+      "title": "Groups sequential stale/missing If-Match checks",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CARDINALITY-NEGATIVE-Groups",
+      "title": "Groups wrong scalar/cardinality rejection",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "NO-PATH-Devices",
+      "title": "Devices pathless add and scalar replace",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 5,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ETAG-CONTROL-Devices",
+      "title": "Devices sequential stale/missing If-Match checks",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "CARDINALITY-NEGATIVE-Devices",
+      "title": "Devices wrong scalar/cardinality rejection",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 3,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "GROUP-POST-FAULT",
+      "title": "Group POST member failure does not leave a partial group",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 2,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-BULK-SUCCESS",
+      "title": "Direct and Bulk User mutation produce the same stored values",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 10,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-BULK-ATOMICITY",
+      "title": "Failed embedded PATCH is atomic while another Bulk operation succeeds",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 10,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-BULK-DISABLED",
+      "title": "Bulk must not bypass the endpoint's disabled PATCH capability",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 8,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-ME-USER",
+      "title": "Synthetic OAuth /Me and direct User routes access and mutate the same user",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 13,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    },
+    {
+      "caseId": "ALIAS-DISCOVERY-REFLECTION",
+      "title": "Discovery reflects endpoint schema/capability changes and hide/restore setting",
+      "backend": "prisma",
+      "disposition": "passed",
+      "checksPassed": 16,
+      "checksFailed": 0,
+      "permanentCase": "docs/evidence/scim-fresh-20260925/repro-postgres/dual-backend.spec.cjs"
+    }
+  ]
+}
