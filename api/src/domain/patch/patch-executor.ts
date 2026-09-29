@@ -1,7 +1,7 @@
 import { SchemaValidator } from '../validation/schema-validator';
 import type { SchemaDefinition, SchemaAttributeDefinition as Attribute } from '../validation/validation-types';
 import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, validateCommonAttributeValues } from '../validation/common-attributes';
-import { parsePatchPath, matchesPatchSelection, type ParsedPatchPath } from './patch-path';
+import { parsePatchTarget, matchesPatchSelection, type ParsedPatchPath } from './patch-path';
 import { PatchError } from './patch-error';
 import type { PatchOperation } from './patch-types';
 import {
@@ -19,8 +19,6 @@ export interface PatchExecutionOptions {
   extensionUrns?: readonly string[];
   coreUrn?: string;
   caseExactPaths?: ReadonlySet<string>;
-  /** User-only historical VerbosePatchSupported=false behavior, not selector fallback. */
-  literalDottedPaths?: boolean;
   literalUnregisteredUrns?: boolean;
   /** Historical User core equality-selector synthesis, not universal RFC semantics. */
   synthesizeCoreEqualityAdd?: boolean;
@@ -106,9 +104,7 @@ export class PatchExecutor {
   }
 
   private parse(path: string): ParsedPatchPath {
-    const namespace = this.options.extensionUrns?.find(u => u.toLowerCase() === path.toLowerCase());
-    return namespace ? { kind: 'attribute', schemaUrn: namespace, attribute: '' }
-      : parsePatchPath(path, this.options.extensionUrns, this.options.coreUrn);
+    return parsePatchTarget(path, this.options.extensionUrns, this.options.coreUrn);
   }
 
   private atPath(payload: Record<string, unknown>, operation: PatchOperation): Record<string, unknown> {
@@ -174,8 +170,7 @@ export class PatchExecutor {
       const value = this.value(read(payload, operation.path!), operation);
       return value === undefined ? omit(payload, operation.path!) : put(payload, operation.path!, value);
     }
-    const literal = this.options.literalDottedPaths && !parsed.schemaUrn && parsed.kind !== 'selection';
-    const key = literal && parsed.subAttribute ? `${parsed.attribute}.${parsed.subAttribute}` : def?.name ?? parsed.attribute;
+    const key = def?.name ?? parsed.attribute;
     const old = read(local, key);
     if (parsed.schemaUrn && parsed.kind !== 'selection' && !parsed.subAttribute &&
       (operation.value === '' || (objectValue(operation.value) && Object.keys(operation.value).length === 1 &&
@@ -219,7 +214,7 @@ export class PatchExecutor {
         });
         next = handoffPrimary(next as unknown[], primaries);
       }
-    } else if (parsed.subAttribute && !literal) {
+    } else if (parsed.subAttribute) {
       const segments = parsed.subAttribute.split('.');
       next = Array.isArray(old)
         ? old.map(entry => this.child(objectValue(entry) ? entry : {}, segments, operation, def?.subAttributes))

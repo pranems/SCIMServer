@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
-> **Version:** 0.55.35 - **Updated:** September 28, 2026
+> **Version:** 0.55.35 - **Updated:** September 29, 2026
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)
 > 37 registered settings: 20 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 other typed values. `PersistRequestSecrets` is inert and `CredentialSecretVisibility` supports only `always`. See the [behavioral evidence and explicit coverage gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) and [Entra compatibility guide](SCIM_ENTRA_COMPATIBILITY.md). Registry membership is not evidence of enforcement.
 > 6 value types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
@@ -592,6 +592,14 @@ Output normalization is separate, and the legacy `active` PATCH extractor is
 not fully gated by this switch on the P7a/P1 base. See
 [E02-E05 and the integration limits](SCIM_ENTRA_COMPATIBILITY.md).
 
+P2 follow-up: OFF rejects quoted User `active` in PATCH even when strict
+schema validation is OFF; the promoted-field adapter cannot silently
+override the setting. ON (the unchanged default) retains recognized legacy
+quoted values. Native booleans are always accepted subject to other policy,
+and string-typed extension attributes named `active` remain strings. Legacy
+`{ "active": "False" }` operation-value wrappers remain available in lenient
+mode only when coercion is enabled.
+
 ---
 
 ### PrimaryEnforcement
@@ -755,11 +763,13 @@ When enabled, supports dot-notation PATCH paths:
 }
 ```
 
-Enable it for documented Entra dotted User paths too. Dotted sub-attribute
-paths are standard SCIM syntax, not a different protocol. On the P7a/P1 base,
-disabling this setting can preserve a literal dotted key rather than updating
-the intended nested field; that unsafe boundary is tracked as P9 I03, not
-recommended compatibility behavior.
+For Users, OFF rejects explicit core dotted paths with 400 `invalidPath` and
+no write; they are never persisted as literal keys. Complex values targeting
+`name`, no-path objects (including legacy dotted keys), registered extension
+paths and typed selectors remain supported. Group/custom adapters do not use
+this User-specific gate. The default remains OFF.
+Enable it for documented Entra explicit dotted User paths; this is not a
+client-brand switch. These are local implementation results, not a deployment.
 
 ---
 

@@ -17,6 +17,19 @@ export interface SelectionPatchPath extends Omit<AttributePatchPath, 'kind'> {
 }
 
 export type ParsedPatchPath = AttributePatchPath | SelectionPatchPath;
+
+/** Whole registered namespaces are mutation targets, not attribute suffixes. */
+export function parsePatchTarget(
+  path: string,
+  extensionUrns: readonly string[] = [],
+  coreUrn?: string,
+): ParsedPatchPath {
+  const namespace = typeof path === 'string'
+    ? extensionUrns.find(u => u.toLowerCase() === path.toLowerCase()) : undefined;
+  return namespace ? { kind: 'attribute', schemaUrn: namespace, attribute: '' }
+    : parsePatchPath(path, extensionUrns, coreUrn);
+}
+
 const CORE_URNS = [
   'urn:ietf:params:scim:schemas:core:2.0:User',
   'urn:ietf:params:scim:schemas:core:2.0:Group',

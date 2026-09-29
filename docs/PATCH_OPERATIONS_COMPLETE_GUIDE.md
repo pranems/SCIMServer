@@ -1,6 +1,6 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.35`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
@@ -43,6 +43,12 @@ than being silently cleared by a promoted-field adapter. This does not run
 complete POST/PUT required checks on partial PATCH views, and extension
 externalId fields retain their own declared types. See
 [the common-value proof](SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate).
+
+**2026-09-29 flag follow-up:** explicit core dotted User paths now reject
+without a write when `VerbosePatchSupported=false`; no-path dotted objects
+remain supported. `AllowAndCoerceBooleanStrings=false` now also prevents
+promoted User `active` string coercion with strict validation off. The
+existing ON setting remains the explicit legacy-string compatibility mode.
 
 **RFC references:**
 - [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
@@ -87,7 +93,10 @@ What the RFC actually defines is a single envelope whose `Operations[]` can expr
 | Complex value on the parent | `{ "op":"replace", "path":"name", "value":{ "familyName":"Lovelace" } }` | §3.5.2.3 |
 | No-path object merge | `{ "op":"replace", "value":{ "displayName":"Ada", "title":"Engineer" } }` | §3.5.2.1 / §3.5.2.3 |
 
-All three are valid and **none of them errors**. The server applies whichever shape the client sends. The only place SCIMServer adds a configurable behavior is the `VerbosePatchSupported` flag, which gates **core dot-notation path resolution on Users/Groups** - see [§6](#6-modes-and-settings-that-change-patch-behavior). That single flag is the entire surface area behind the "verbose" terminology.
+All three are protocol shapes, but SCIMServer's explicit core dotted User
+paths are gated by `VerbosePatchSupported`. OFF rejects that explicit path
+form rather than storing malformed keys; the complex-parent and no-path
+forms remain available. See [§6](#6-modes-and-settings-that-change-patch-behavior).
 
 ```mermaid
 flowchart LR
@@ -205,32 +214,40 @@ Rules enforced ([patch-user.dto.ts](../api/src/modules/scim/dto/patch-user.dto.t
 
 ## 4. The five path forms (RFC 7644 §3.10)
 
-The `path` ABNF is `PATH = attrPath / valuePath [subAttr]` where `attrPath = [URI ":"] ATTRNAME *1subAttr` and `subAttr = "." ATTRNAME`. Because `ATTRNAME` cannot contain a dot, a dotted token can only mean a sub-attribute. Syntax is parsed by [patch-path.ts](../api/src/domain/patch/patch-path.ts); mutations use [scim-patch-path.ts](../api/src/modules/scim/utils/scim-patch-path.ts).
+The `path` ABNF is `PATH = attrPath / valuePath [subAttr]` where `attrPath = [URI ":"] ATTRNAME *1subAttr` and `subAttr = "." ATTRNAME`. Because `ATTRNAME` cannot contain a dot, a dotted token can only mean a sub-attribute. Syntax and namespace targets use [patch-path.ts](../api/src/domain/patch/patch-path.ts); mutations use the shared [patch-executor.ts](../api/src/domain/patch/patch-executor.ts).
 
 | # | Form | Example `path` | Resolves to |
 |---|------|---------------|-------------|
 | 1 | Simple attribute | `"displayName"` | top-level attribute (complex value merges per §3.5.2.3) |
-| 2 | Dot-notation sub-attribute | `"name.givenName"` | nested sub-attribute (Users/Groups: gated by `VerbosePatchSupported`; custom types: always) |
+| 2 | Dot-notation sub-attribute | `"name.givenName"` | nested sub-attribute; explicit core User paths require verbose support, while other declared targets resolve normally |
 | 3 | Value-path filter | `"emails[type eq \"work\"].value"` | the matching element's sub-attribute (always resolved) |
 | 4 | Extension URN | `"urn:...:enterprise:2.0:User:department"` | attribute inside the extension namespace (always resolved when URN registered) |
 | 5 | No-path | omit `path` | `value` object merged into the resource root |
 
 ```mermaid
 flowchart TD
-    P["PATCH op with path?"] -->|no path| NP["No-path merge<br/>resolveNoPathValue"]
+    P["PATCH op with path?"] -->|no path| NP["Expand no-path object keys"]
+    NP --> PARSE
     P -->|has path| PARSE["Typed path parser"]
     PARSE -->|"invalid syntax"| ERR["400 invalidPath"]
     PARSE -->|"selection"| VPH["Full predicate evaluation<br/>against current working state"]
-    PARSE -->|"attribute"| COL{"column-promoted?<br/>active/userName/<br/>displayName/externalId"}
+    PARSE -->|"attribute"| GATE{"Explicit core dotted User path<br/>and verbose OFF?"}
+    GATE -->|"yes"| ERR
+    GATE -->|"no"| COL{"Resource adapter<br/>promoted field?"}
     COL -->|yes| COLH["update promoted field"]
     COL -->|no| EXT{"isExtensionPath?<br/>(URN registered)"}
     EXT -->|yes| EXTH["extension namespace<br/>(always resolved)"]
-    EXT -->|no| DOT{"path has '.'<br/>AND VerbosePatch on?"}
-    DOT -->|yes| DOTH["nested sub-attribute<br/>applyDotNotation"]
-    DOT -->|no| SIMP["simple key<br/>mergeComplexAttribute"]
+    EXT -->|no| DOT{"Has sub-attribute?"}
+    DOT -->|yes| DOTH["Shared nested mutation"]
+    DOT -->|no| SIMP["Shared scalar or complex merge"]
 ```
 
-**Critical default behavior (form 2 on Users/Groups):** with `VerbosePatchSupported = false` (the default), a core dot-path such as `name.givenName` is **not** an error - it is stored as a literal flat top-level key `"name.givenName"`, and the real nested `name.givenName` is left unchanged. Microsoft Entra sends dot-notation by default in its "verbose" PATCH, so endpoints serving Entra core sub-attribute updates should set this flag `true`. See [§6.1](#61-verbosepatchsupported) for the full treatment. Note that no-path object merges (form 5) resolve dotted keys regardless of the flag via `resolveNoPathValue`.
+**Critical default behavior (explicit form 2 on Users):** with
+`VerbosePatchSupported=false`, a core path such as `name.givenName` returns
+400 `invalidPath` and writes nothing. Set the flag true for clients sending
+explicit granular core paths. No-path object merges (form 5) resolve dotted
+keys regardless of the flag, as do registered extension paths and selectors.
+This intentional follow-up replaces the earlier literal-key behavior.
 
 **Case and key safety:** SCIM attribute names are case-insensitive. The PATCH engines resolve each incoming segment to the casing already present in the resource, so `Status`, `status`, and mixed-case value-path segments update one canonical property rather than creating duplicates. Resolved updates and removals rebuild objects from validated entry lists instead of assigning or deleting an arbitrary property name. `__proto__`, `constructor`, and `prototype` are rejected before reconstruction. This immutable shape removes the remote-property-injection sink while preserving canonical casing.
 
@@ -261,26 +278,31 @@ These are per-endpoint profile settings (`profile.settings.<Flag>`), set at endp
 
 | Setting | Default | Affects PATCH how |
 |---------|---------|-------------------|
-| `VerbosePatchSupported` | `false` | Gates core dot-notation path resolution on Users/Groups (form 2) |
+| `VerbosePatchSupported` | `false` | Gates explicit core dot-notation paths on Users: OFF rejects, ON resolves nested values |
 | `StrictSchemaValidation` | `true` | readOnly PATCH ops -> 400; type validation on op values; undeclared extension URNs rejected |
 | `IgnoreReadOnlyAttributesInPatch` | `false` | When strict is on, silently strip readOnly ops instead of 400 |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Add a warning extension URN to the response listing stripped readOnly attrs |
 | `MultiMemberPatchOpForGroupEnabled` | `true` | Allow add/remove of multiple Group members in a single op |
 | `PatchOpAllowRemoveAllMembers` | `false` | Allow bare `remove path=members` (clear all) |
 | `RequireIfMatch` | `false` | Require `If-Match` on PATCH (missing -> 428) |
-| `AllowAndCoerceBooleanStrings` | `true` | Coerce `"True"/"False"` string values to booleans in PATCH op values + filters |
+| `AllowAndCoerceBooleanStrings` | `true` | Coerce recognized quoted Boolean operation values; OFF rejects quoted promoted User active even in lenient mode. P1 quoted-Boolean predicate compatibility is separate |
 | `PrimaryEnforcement` | `passthrough` | How multiple `primary:true` in a multi-valued PATCH value is handled |
 | `UserSoftDeleteEnabled` | `true` | `replace active=false` deactivates (vs 400 when off) |
 
 ### 6.1 VerbosePatchSupported
 
-Gates form-2 core dot-notation on Users and Groups. Custom resource types ignore the flag and always resolve dots as nested.
+Gates explicit form-2 core dot-notation on Users. Group and custom resource
+adapters do not use this User-only capability gate.
 
 | `{ "op":"replace", "path":"name.givenName", "value":"Jane" }` | `VerbosePatchSupported: true` | `VerbosePatchSupported: false` (default) |
 |---|---|---|
-| Result | `name.givenName` set to `Jane`; `name.familyName` preserved | Flat key `"name.givenName": "Jane"` stored at root; nested `name.givenName` unchanged. No error. |
+| Result | `name.givenName` set to `Jane`; `name.familyName` preserved | 400 `invalidPath`; entire PATCH fails atomically, with no literal key or version change |
 
-RFC-correct alternatives that work regardless of the flag: complex value (`path:"name", value:{givenName:"Jane"}`) or no-path merge.
+Supported alternatives that work regardless of the flag: complex value
+(`path:"name", value:{givenName:"Jane"}`), a no-path object (including the
+legacy dotted-key form), registered extension paths and typed selectors.
+This is an intentional correction to earlier literal-key persistence, not a
+change to the flag's default.
 
 ### 6.2 StrictSchemaValidation
 
@@ -338,9 +360,15 @@ then applies ordinary scalar/complex/list mutations and transition checks.
 Replace a single-valued attribute:
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "replace", "path": "title", "value": "Senior Engineer" }
+    {
+      "op": "replace",
+      "path": "title",
+      "value": "Senior Engineer"
+    }
   ]
 }
 ```
@@ -348,9 +376,15 @@ Replace a single-valued attribute:
 Update a work email value via value-path (works regardless of VerbosePatch):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "replace", "path": "emails[type eq \"work\"].value", "value": "ada@example.com" }
+    {
+      "op": "replace",
+      "path": "emails[type eq \"work\"].value",
+      "value": "ada@example.com"
+    }
   ]
 }
 ```
@@ -358,9 +392,15 @@ Update a work email value via value-path (works regardless of VerbosePatch):
 Disable a user (Entra deprovision):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "replace", "path": "active", "value": false }
+    {
+      "op": "replace",
+      "path": "active",
+      "value": false
+    }
   ]
 }
 ```
@@ -368,7 +408,9 @@ Disable a user (Entra deprovision):
 No-path multi-attribute merge (preserves untouched attributes):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "replace",
@@ -384,12 +426,16 @@ No-path multi-attribute merge (preserves untouched attributes):
 Update a sub-attribute the RFC-portable way (no flag needed):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "replace",
       "path": "name",
-      "value": { "familyName": "Lovelace" }
+      "value": {
+        "familyName": "Lovelace"
+      }
     }
   ]
 }
@@ -398,9 +444,15 @@ Update a sub-attribute the RFC-portable way (no flag needed):
 Same change, dot-notation (requires `VerbosePatchSupported: true` to nest on Users):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "replace", "path": "name.familyName", "value": "Lovelace" }
+    {
+      "op": "replace",
+      "path": "name.familyName",
+      "value": "Lovelace"
+    }
   ]
 }
 ```
@@ -416,14 +468,20 @@ Engine: [group-patch-engine.ts](../api/src/domain/patch/group-patch-engine.ts). 
 Add members (multi-member needs `MultiMemberPatchOpForGroupEnabled`, default on):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "add",
       "path": "members",
       "value": [
-        { "value": "user-id-1" },
-        { "value": "user-id-2" }
+        {
+          "value": "user-id-1"
+        },
+        {
+          "value": "user-id-2"
+        }
       ]
     }
   ]
@@ -433,9 +491,14 @@ Add members (multi-member needs `MultiMemberPatchOpForGroupEnabled`, default on)
 Remove one member by value-path filter:
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "remove", "path": "members[value eq \"user-id-1\"]" }
+    {
+      "op": "remove",
+      "path": "members[value eq \"user-id-1\"]"
+    }
   ]
 }
 ```
@@ -443,13 +506,17 @@ Remove one member by value-path filter:
 Replace the entire member list:
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "replace",
       "path": "members",
       "value": [
-        { "value": "user-id-3" }
+        {
+          "value": "user-id-3"
+        }
       ]
     }
   ]
@@ -467,9 +534,15 @@ Clear all members:
 Rename the group:
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "replace", "path": "displayName", "value": "Engineering" }
+    {
+      "op": "replace",
+      "path": "displayName",
+      "value": "Engineering"
+    }
   ]
 }
 ```
@@ -489,7 +562,9 @@ Extension attributes live under a schema URN namespace (for example the enterpri
 Set an enterprise attribute (granular path form):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "replace",
@@ -503,7 +578,9 @@ Set an enterprise attribute (granular path form):
 Set a manager (Entra reference-attribute pattern):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "add",
@@ -517,7 +594,9 @@ Set a manager (Entra reference-attribute pattern):
 No-path merge into an extension namespace (Entra also sends this shape):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "replace",
@@ -552,11 +631,24 @@ Key differences from Users/Groups:
 Examples (resourceType `Devices`):
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
-    { "op": "replace", "path": "displayName", "value": "Lab Printer 2" },
-    { "op": "add", "path": "location.building", "value": "B12" },
-    { "op": "remove", "path": "tags[value eq \"retired\"]" }
+    {
+      "op": "replace",
+      "path": "displayName",
+      "value": "Lab Printer 2"
+    },
+    {
+      "op": "add",
+      "path": "location.building",
+      "value": "B12"
+    },
+    {
+      "op": "remove",
+      "path": "tags[value eq \"retired\"]"
+    }
   ]
 }
 ```
@@ -564,7 +656,9 @@ Examples (resourceType `Devices`):
 No-path merge works identically:
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "replace",
@@ -626,7 +720,9 @@ Per [RFC 7644 §3.12](https://datatracker.ietf.org/doc/html/rfc7644#section-3.12
 Example error body:
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
   "status": "400",
   "scimType": "noTarget",
   "detail": "Filter type eq \"home\" did not match any value in emails."
@@ -714,10 +810,10 @@ If the stored version is `W/"v2"`, the server returns 412 `versionMismatch`. Wit
 | Simple `replace path=attr` | Merge/replace | Merge/replace | Merge/replace |
 | Complex `replace path=parent value={...}` | Sub-attr merge | Sub-attr merge | Sub-attr merge |
 | No-path `replace value={...}` | Merge into resource | Merge into resource | Merge into resource |
-| Dot-notation `name.givenName` nests? | Only if `VerbosePatchSupported` | Only if `VerbosePatchSupported` | **Always** |
+| Explicit core dot-notation nests? | ON resolves; OFF rejects | Shared nested resolution for declared targets | Shared nested resolution for declared targets |
 | Typed value-path selection | Core and extension arrays | Members and extension arrays | Core and extension arrays |
 | Extension URN path | Yes (always) | Yes (always) | Yes |
-| readOnly op (strict on, ignore off) | 400 `mutability` | 400 `mutability` | n/a (no built-in readOnly) |
+| readOnly op (strict on, ignore off) | 400 `mutability` | 400 `mutability` | 400 `mutability` when effective schema declares readOnly |
 | Multi-member single op | n/a | `MultiMemberPatchOpForGroupEnabled` | n/a |
 | Clear all members | n/a | null/[] always; bare remove needs flag | n/a |
 | Success response | 200 + body | 200 + body | 200 + body |

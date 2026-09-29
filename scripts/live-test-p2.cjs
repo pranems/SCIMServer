@@ -88,6 +88,73 @@ async function runP2Contract(baseUrl, secret) {
       eq((await http("DELETE", `/scim/admin/endpoints/${endpoint.body.id}`)).status, 204);
     }
   }
-  return { assertions, families: ["Users", "Groups", "Devices"], strictModes: [true, false] };
+  for (const strict of [true, false]) {
+    for (const coerce of [true, false]) {
+      const profile = structuredClone(f.typedPatchProfile(strict));
+      profile.settings.VerbosePatchSupported = false;
+      profile.settings.AllowAndCoerceBooleanStrings = coerce;
+      const endpoint = await http("POST", "/scim/admin/endpoints", {
+        name: `p2-flags-live-${require("node:crypto").randomUUID()}`, profile,
+      });
+      eq(endpoint.status, 201);
+      try {
+        const route = `/scim/endpoints/${endpoint.body.id}/Users`;
+        const created = await http("POST", route, {
+          schemas: [f.USER], userName: `p2-${require("node:crypto").randomUUID()}`, active: true,
+          name: { givenName: "Given", familyName: "Before" },
+          emails: [{ value: "old@example.test", type: "home", primary: true }],
+        });
+        eq(created.status, 201);
+        const url = `${route}/${created.body.id}`;
+        const appended = await http("PATCH", url, { schemas: [f.PATCH], Operations: [
+          { op: "add", path: "emails", value: [{ value: "new@example.test", type: "work", primary: true }] },
+        ] });
+        eq(appended.status, 200);
+        eq(appended.body.emails, [
+          { value: "old@example.test", type: "home", primary: false },
+          { value: "new@example.test", type: "work", primary: true },
+        ]);
+        const blocked = await http("PATCH", url, { schemas: [f.PATCH], Operations: [
+          { op: "replace", path: "displayName", value: "must-not-persist" },
+          { op: "replace", path: "name.familyName", value: "wrong" },
+        ] });
+        eq(blocked.status, 400);
+        eq(blocked.body.scimType, "invalidPath");
+        eq(blocked.body[f.DIAGNOSTICS].failedOperationIndex, 1);
+        const unchanged = await http("GET", url);
+        eq(unchanged.body, appended.body);
+        eq(unchanged.etag, appended.etag);
+        eq(Object.hasOwn(unchanged.body, "name.familyName"), false);
+        const pathless = await http("PATCH", url, { schemas: [f.PATCH], Operations: [
+          { op: "replace", value: { "name.familyName": "After" } },
+        ] });
+        eq(pathless.status, 200);
+        eq(pathless.body.name, { givenName: "Given", familyName: "After" });
+        eq(Object.hasOwn(pathless.body, "name.familyName"), false);
+        const quoted = await http("PATCH", url, { schemas: [f.PATCH], Operations: [
+          { op: "replace", path: "active", value: "False" },
+        ] });
+        eq(quoted.status, coerce ? 200 : 400);
+        const afterQuoted = await http("GET", url);
+        if (coerce) eq(afterQuoted.body.active, false);
+        else {
+          eq(quoted.body.scimType, "invalidValue");
+          eq(afterQuoted.body, pathless.body);
+          eq(afterQuoted.etag, pathless.etag);
+        }
+        const native = await http("PATCH", url, { schemas: [f.PATCH], Operations: [
+          { op: "replace", path: "active", value: false },
+        ] });
+        eq(native.status, 200);
+        eq((await http("GET", url)).body.active, false);
+      } finally {
+        eq((await http("DELETE", `/scim/admin/endpoints/${endpoint.body.id}`)).status, 204);
+      }
+    }
+  }
+  return {
+    assertions, families: ["Users", "Groups", "Devices"], strictModes: [true, false],
+    defaultRunningCompatibilityCases: ["I02", "I03", "E17", "active-coercion-flag"],
+  };
 }
 module.exports = { runLiveP2, runP2Contract };

@@ -1,6 +1,6 @@
 # P2: shared, ordered SCIM PATCH execution
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-09-29
 
 **Status:** Implemented and locally validated, with independent finding closure. Not pushed,
 merged, released, or deployed. Product manifests remain `0.55.35`.
@@ -151,7 +151,7 @@ sequenceDiagram
 | Immutable complex equality | Uses structural equality, not JSON property order |
 | `primary` | New explicit primary clears other entries before the next operation, including equality-synthesized User entries |
 | `PrimaryEnforcement` | Existing reject/normalize/passthrough policy still handles multiple explicit primaries in one supplied value; it does not disable ordinary handoff |
-| User `VerbosePatchSupported` | Existing non-selector dotted-key compatibility retained; malformed selectors never use this fallback |
+| User `VerbosePatchSupported` | Follow-up: OFF rejects explicit core dotted paths; ON resolves them. Legacy no-path dotted objects remain supported; no literal-dotted mutation fallback remains |
 | Group member settings | Multi-member add/remove limits and bare remove-all gate retained; replacement with null still explicitly clears members |
 | Zero-match remove | Ordinary selectors retain `noTarget`; Group-member remove retains named idempotency compatibility |
 | Filtered add with no match | Only existing User-core simple-equality synthesis retained. Extension/custom/compound no-match paths are not invented into objects |
@@ -176,6 +176,49 @@ equality-discriminator synthesis is compatibility behavior, not a claim that
 arbitrary predicates define a creatable object.
 
 ## Evidence and reproduction
+
+### P9 integration flag follow-up
+
+The operator-authorized 2026-09-29 follow-up corrects two initially retained
+compatibility defects without new flags or default changes:
+
+* I03: explicit core dotted User paths reject with indexed 400 `invalidPath`
+  when `VerbosePatchSupported=false`. No-path dotted objects (E17), registered
+  extension paths and selectors remain supported.
+* Promoted User `active` now honors `AllowAndCoerceBooleanStrings` even with
+  strict validation off. OFF rejects recognized quoted values; ON preserves
+  legacy conversion. Native Boolean values and string-typed extension
+  homonyms are unaffected.
+* I02 append-primary, I03 rejection and E17 pathless compatibility are ordinary
+  tests in `patch-compatibility-flags.e2e-spec.ts` and the guarded live runner,
+  with no environment opt-in. The parent must promote the corresponding P9
+  corpus cases from integration TODOs after verifying the merged branch.
+
+Initial follow-up evidence: 9/18 domain cases and 12/30 HTTP cases failed
+before production edits. GREEN: 18/18 domain, 30/30 HTTP and 1,540/1,540
+targeted unit tests. Independent review added three numeric-version namespace
+regressions, confirmed RED and fixed by sharing namespace-aware target parsing.
+Final proof:
+
+| Follow-up evidence | Result |
+| --- | --- |
+| API build / focused lint | Passed; 0 errors / 58 warnings before and after |
+| Focused unit suites | 22 suites / 1,543 passed |
+| Owned HTTP backend suites | 7 suites / 234 passed per backend |
+| Built live requests | 246 assertions per backend, including default-running I02/I03/E17 and active-flag cases |
+| Database | Actual PostgreSQL 17.8, all 22 migrations replayed; InMemory independently tested |
+| Independent review | One finding reproduced/fixed; bounded closure passed |
+| Cleanup | Both owned API processes stopped; exact labeled PostgreSQL container removed |
+
+Retained [follow-up RED/GREEN receipt](evidence/scim-p2-flags-20260929/red-green.json)
+and [backend/build receipt](evidence/scim-p2-flags-20260929/backend-validation.json).
+Source/test/runner SHA-256:
+`59f1140801bdcb2ce5a21467dc8b5d3b0f848aeb9e3b347779d742798e0585ac`.
+Built JavaScript SHA-256:
+`9464655864d9f6b534950ce9a1871699a4cbf3234d4201dd96df7c4535956b15`.
+The original package's hashes below remain historical facts.
+
+### Original package evidence
 
 | Evidence layer | Result |
 | --- | --- |

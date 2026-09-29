@@ -42,6 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Behavior and evidence](docs/SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries).
 
 ### Fixed - P2 isolated implementation, not released
+- **P9 flag-contract follow-up:** explicit core dotted User PATCH with verbose
+  support OFF now rejects atomically instead of storing literal dotted keys.
+  Legacy no-path dotted requests remain nested-resolving. Quoted User active
+  honors the coercion setting even with strict validation OFF; ON keeps
+  explicit legacy compatibility. No new flags/default/version changes.
+  Initial RED: 9 domain and 12 HTTP failures; independent namespace-target
+  regression RED: 3. Final unit count: 1,522 -> 1,543, all passing.
+  HTTP: 201 -> 234/backend; built live: 170 -> 246/backend, actual PostgreSQL
+  17.8 and InMemory. Build/lint and bounded independent closure pass;
+  exact source/build fingerprints and cleanup are retained in the P2 guide.
 - Shared ordered PATCH executor for Users, Groups and custom resources:
   multi-valued append, all-match selection, selected-object validation,
   current-state required/immutable enforcement, primary handoff and resolved

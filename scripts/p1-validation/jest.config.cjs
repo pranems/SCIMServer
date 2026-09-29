@@ -24,7 +24,7 @@ module.exports = {
     transform: { '^.+\\.(t|j)s$': [path.join(__dirname, "baseline-transform.cjs"), { tsconfig: { allowJs: true } }] },
   } : {}),
   testRegex: IS_P9 ? "entra-compatibility\\.e2e-spec\\.ts$" : IS_P7 ? "profile-validation-p7\\.e2e-spec\\.ts$" : IS_P2
-    ? "(typed-patch-path|ordered-patch|advanced-patch|manager-patch-string-coercion|patch-null-handling|patch-untouched-attribute-validation)\\.e2e-spec\\.ts$"
+    ? "(typed-patch-path|ordered-patch|advanced-patch|manager-patch-string-coercion|patch-null-handling|patch-untouched-attribute-validation|patch-compatibility-flags)\\.e2e-spec\\.ts$"
     : "typed-patch-path\\.e2e-spec\\.ts$",
   globalSetup: path.join(__dirname, "setup.cjs"),
   reporters: ["default"],

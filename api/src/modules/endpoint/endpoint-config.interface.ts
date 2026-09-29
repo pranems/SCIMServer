@@ -17,9 +17,10 @@ export const ENDPOINT_CONFIG_FLAGS = {
 
   /**
    * When true, enables verbose PATCH support with dot-notation path resolution.
-   * Paths like "name.givenName" are resolved into nested objects instead of flat keys.
-   * When false (default), dot-notation paths are stored as literal top-level keys.
-   * Enable for documented Entra dotted User paths too. This is not a client-brand switch.
+   * Explicit User paths like "name.givenName" resolve to nested objects.
+   * When false (default), explicit core dotted User paths are rejected without a write.
+   * Legacy no-path objects, registered extension paths and selectors remain supported.
+   * Enable for documented Entra explicit dotted User paths; this is not a client-brand switch.
    */
   VERBOSE_PATCH_SUPPORTED: 'VerbosePatchSupported',
 

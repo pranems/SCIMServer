@@ -495,6 +495,7 @@ export class EndpointScimUsersService {
         },
         {
           verbosePatch, extensionUrns, caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId),
+          allowAndCoerceBooleanStrings: getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS),
           strictSchema: strictSchemaEnabled,
           ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
           onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),

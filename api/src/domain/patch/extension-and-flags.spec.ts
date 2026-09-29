@@ -110,14 +110,13 @@ describe('PatchConfig flag combinations (UserPatchEngine)', () => {
       expect(result.payload[CUSTOM_URN_A]).toBeUndefined();
     });
 
-    it('should treat dot-notation as literal key (verbosePatch=false)', () => {
+    it('should reject explicit dot-notation instead of persisting a literal key (verbosePatch=false)', () => {
       const ops: PatchOperation[] = [
         { op: 'replace', path: 'name.givenName', value: 'Literal' },
       ];
-      const result = UserPatchEngine.apply(ops, makeUserState(), config);
-      expect(result.payload['name.givenName']).toBe('Literal');
-      const name = result.payload.name as Record<string, unknown>;
-      expect(name.givenName).toBe('John'); // unchanged
+      const input = makeUserState();
+      expect(() => UserPatchEngine.apply(ops, input, config)).toThrow(PatchError);
+      expect(input).toEqual(makeUserState());
     });
   });
 

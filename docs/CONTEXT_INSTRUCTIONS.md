@@ -57,6 +57,13 @@ global-uniqueness capability policy. P7 remains open until final P2 integration.
 Do not treat optional external referential integrity or raw JSON token
 reconstruction as automatically required features.
 
+2026-09-29 P2 follow-up intentionally removes verbose-disabled explicit User
+literal dotted writes (400/no-write instead) and makes quoted promoted-active
+values honor `AllowAndCoerceBooleanStrings` even in lenient mode. Existing
+no-path/extension compatibility is preserved. P9 integration cases now have
+default-running P2 HTTP/live regressions; the parent still owns converting
+the sibling P9 corpus TODOs after merging.
+
 P2 shared ordered PATCH execution is implemented on isolated
 `fix/scim-patch-semantics-20260928`, based on P1 `3ecaba55`. The three
 resource adapters share target resolution, append/all-match mutations,

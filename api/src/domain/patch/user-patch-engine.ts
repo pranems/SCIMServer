@@ -1,5 +1,6 @@
 import { PatchExecutor } from './patch-executor';
 import { PatchError } from './patch-error';
+import { parsePatchTarget } from './patch-path';
 import type { PatchOperation, PatchConfig, UserPatchResult } from './patch-types';
 import { objectValue } from './patch-values';
 import { KNOWN_EXTENSION_URNS } from '../../modules/scim/common/scim-constants';
@@ -25,9 +26,17 @@ export class UserPatchEngine {
       externalId: state.externalId, active: state.active,
     }, {
       ...config, extensionUrns: config.extensionUrns ?? KNOWN_EXTENSION_URNS,
-      literalDottedPaths: !config.verbosePatch, literalUnregisteredUrns: true, synthesizeCoreEqualityAdd: true,
+      literalUnregisteredUrns: true, synthesizeCoreEqualityAdd: true,
     }, {
       normalizeOperation: operation => {
+        // The legacy no-path object form remains supported regardless of this
+        // explicit-path capability. Disabled paths must never become stored keys.
+        if (operation.path && !config.verbosePatch) {
+          const parsed = parsePatchTarget(operation.path, config.extensionUrns ?? KNOWN_EXTENSION_URNS);
+          if (parsed.kind === 'attribute' && !parsed.schemaUrn && parsed.subAttribute) {
+            throw new PatchError(400, 'Explicit core sub-attribute PATCH paths require VerbosePatchSupported.', 'invalidPath');
+          }
+        }
         return !operation.path && objectValue(operation.value)
         ? { ...operation, value: this.normalizeObjectKeys(Object.fromEntries(
           Object.entries(operation.value).filter(([key]) => !['id', 'meta', 'schemas'].includes(key.toLowerCase())),
@@ -44,7 +53,8 @@ export class UserPatchEngine {
           if (remove) throw new PatchError(400, "Cannot remove required attribute 'userName'.", 'invalidValue');
           return put(payload, 'userName', this.extractStringValue(operation.value, 'userName'));
         }
-        if (key === 'active') return put(payload, 'active', remove ? false : this.extractBooleanValue(operation.value));
+        if (key === 'active') return put(payload, 'active', remove ? false
+          : this.extractBooleanValue(operation.value, config.allowAndCoerceBooleanStrings ?? true));
         if (key === 'displayname' || key === 'externalid') {
           const canonical = key === 'displayname' ? 'displayName' : 'externalId';
           return remove ? omit(payload, canonical) : put(payload, canonical, this.extractNullableStringValue(operation.value, canonical));
@@ -82,10 +92,10 @@ export class UserPatchEngine {
   static extractNullableStringValue(value: unknown, attribute: string): string | null {
     return value == null ? null : this.extractStringValue(value, attribute);
   }
-  static extractBooleanValue(value: unknown): boolean {
+  static extractBooleanValue(value: unknown, allowStringCoercion = true): boolean {
     const input = objectValue(value) && 'active' in value ? value.active : value;
     if (typeof input === 'boolean') return input;
-    if (typeof input === 'string' && /^(true|false)$/i.test(input)) return input.toLowerCase() === 'true';
+    if (allowStringCoercion && typeof input === 'string' && /^(true|false)$/i.test(input)) return input.toLowerCase() === 'true';
     throw new PatchError(400, 'Patch operation requires boolean value for active.', 'invalidValue');
   }
   static stripReservedAttributes(payload: Record<string, unknown>): Record<string, unknown> {

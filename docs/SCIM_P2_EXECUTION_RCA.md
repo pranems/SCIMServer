@@ -30,6 +30,38 @@ cleaned up. Six independent finding rounds produced 15 addressed findings;
 the final bounded preservation-intent closure confirmed the last
 reproduction and previous null/add controls. This does not certify C0.
 
+## P9 flag-contract follow-up (2026-09-29)
+
+| Issue | Type / severity | Confirmed symptom and cause | Fix and prevention | Detection / earliest |
+| --- | --- | --- | --- | --- |
+| P2-19 | Compatibility flag / High | P9 I03 found explicit User `name.familyName` with `VerbosePatchSupported=false` returned 200 and stored a literal key. P2 initially retained that legacy behavior, which the operator then explicitly authorized correcting. | Reject explicit non-selector core dotted User paths with 400 `invalidPath` when the capability is off. Keep no-path object, registered-extension and selector forms supported. No new flag or default change. Ordinary-running I03 tests assert payload/version rollback and no literal key. | P9 corpus / flag-by-path-form unit |
+| P2-20 | Compatibility flag / High | The promoted active adapter unconditionally converted quoted booleans, even when `AllowAndCoerceBooleanStrings=false` and strict validation was off. Service prevalidation had hidden the bypass in strict mode. | Pass the effective flag into the User adapter. OFF rejects quoted active in direct, qualified, no-path and legacy-wrapper forms; ON retains recognized-string compatibility. Native booleans and string-typed extension homonyms are unchanged. Permanent tests cross strict/coercion/path-form axes. | P9 source review / adapter option matrix |
+| P2-21 | Path-form distinction / Medium | The first shared executor applied User's literal-dotted mode to expanded no-path keys too, regressing P9 E17's previously working shape. | Remove literal-dotted mutation entirely; enforce the capability on explicit operation paths in the User normalization hook only. Expanded no-path keys continue through typed nested mutation. This follows the existing compatibility boundary rather than treating all dotted text as the same request shape. | Follow-up RED HTTP / path-form compatibility matrix |
+| P2-22 | Namespace target policy / Medium | Independent review found the new User capability gate parsed an exact registered extension namespace ending in `1.0` as an attribute path and rejected add/replace/remove with verbose OFF. Three permanent domain controls failed. | Share `parsePatchTarget` between capability checking and execution. Exact case-insensitive registered namespaces resolve identically before the unchanged P1 grammar fallback. Three ordinary HTTP controls preserve previously working lenient namespace operations; broader strict namespace prevalidation stays with P7b. | Independent review / extension-target flag matrix |
+
+Before production edits, follow-up tests produced **9 failed / 9 passed
+domain checks** and **12 failed / 18 passed HTTP checks**. After corrections,
+all initial 18 domain and 30 HTTP cases passed, within **1,540 targeted unit tests**.
+The first unit attempt failed TypeScript compilation because the future flag
+was passed as an excess literal property; it is excluded from the RED counts.
+Three old tests expecting literal-key storage were changed intentionally to
+assert indexed rejection and no write. I02, I03 and E17 coverage is ordinary
+default-running HTTP/live coverage, not an environment-gated TODO.
+
+Design disposition: **applied**. Capability and Boolean compatibility policy
+stay in the existing User adapter/service seam; the shared executor no longer
+contains a literal-dotted write branch. Repository interfaces and all generic
+typed/MV attribute behavior are unchanged. P9's sibling corpus toggle must
+also be removed by the integrating owner once the merged run passes.
+
+Final follow-up evidence: **1,543 unit tests across 22 suites**, **234 HTTP
+tests across 7 suites per backend**, and **246 built-live assertions per
+backend** (P1 58, P2 188) passed on InMemory and actual PostgreSQL 17.8.
+All 22 migrations replayed. Final independent closure found no directly
+caused high-confidence issue in the bounded follow-up. Focused lint stayed
+at 0 errors / 58 warnings; build passed. All owned runtimes and the exact
+labeled container were removed.
+
 ## Prevention and architecture disposition
 
 Applied: one domain mutation executor with schema-aware target tests shared

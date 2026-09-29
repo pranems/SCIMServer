@@ -1108,7 +1108,7 @@ describe('EndpointScimUsersService', () => {
         expect(storedPayload['name.familyName']).toBeUndefined();
       });
 
-      it('should store dot-notation as flat keys when VerbosePatchSupported is disabled', async () => {
+      it('should reject dot-notation without a write when VerbosePatchSupported is disabled', async () => {
         const patchDto: PatchUserDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -1134,19 +1134,15 @@ describe('EndpointScimUsersService', () => {
 
         // No config for VerbosePatch (flag defaults to false), but explicit StrictSchemaValidation OFF
         const config: EndpointConfig = { StrictSchemaValidation: 'False' };
-        await service.patchUserForEndpoint(
+        await expect(service.patchUserForEndpoint(
           mockUser.scimId,
           patchDto,
           'http://localhost:3000/scim',
           mockEndpoint.id,
           config
-        );
-
-        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
-        // Without the flag, dot-notation is stored as a flat key
-        expect(storedPayload['name.givenName']).toBe('Lysanne');
-        // Original name object should remain unchanged
-        expect(storedPayload.name.givenName).toBe('Ruthe');
+        )).rejects.toMatchObject({ response: { status: '400', scimType: 'invalidPath' } });
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+        expect(JSON.parse(userWithName.rawPayload).name.givenName).toBe('Ruthe');
       });
 
       it('should create nested object when parent does not exist', async () => {

@@ -1,0 +1,211 @@
+{
+  "package": "P2 flag-contract follow-up",
+  "base": "7113ee866b6b2a039e8cb332943dae48f9027682",
+  "source": {
+    "base": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+    "head": "7113ee866b6b2a039e8cb332943dae48f9027682",
+    "sourceSha256": "59f1140801bdcb2ce5a21467dc8b5d3b0f848aeb9e3b347779d742798e0585ac",
+    "fileCount": 553
+  },
+  "build": {
+    "node": "v24.13.0",
+    "fileCount": 235,
+    "sha256": "9464655864d9f6b534950ce9a1871699a4cbf3234d4201dd96df7c4535956b15"
+  },
+  "red": {
+    "unit": {
+      "passed": 9,
+      "failed": 9,
+      "skipped": 0,
+      "suites": 1,
+      "failures": [
+        {
+          "name": "P2 flag contract follow-up I03 rejects explicit core dotted add when verbose is disabled",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected constructor: PatchError\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up I03 rejects explicit core dotted replace when verbose is disabled",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected constructor: PatchError\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up I03 rejects explicit core dotted remove when verbose is disabled",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected constructor: PatchError\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up rejects core-qualified dotted paths through the same verbose policy",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected constructor: PatchError\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up E17 preserves pathless dotted and extension compatibility, verbose=false",
+          "assertion": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 1\n+ Received  + 1\n\n  Object {\n-   \"familyName\": \"After\",\n+   \"familyName\": \"Before\",\n    \"givenName\": \"Given\",\n  }"
+        },
+        {
+          "name": "P2 flag contract follow-up coercion OFF rejects quoted active in path form",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected substring: \"boolean\"\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up coercion OFF rejects quoted active in qualified form",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected substring: \"boolean\"\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up coercion OFF rejects quoted active in pathless form",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected substring: \"boolean\"\n\nReceived function did not throw"
+        },
+        {
+          "name": "P2 flag contract follow-up coercion OFF rejects quoted active in legacy wrapper form",
+          "assertion": "Error: expect(received).toThrow(expected)\n\nExpected substring: \"boolean\"\n\nReceived function did not throw"
+        }
+      ]
+    },
+    "http": {
+      "passed": 18,
+      "failed": 12,
+      "skipped": 0,
+      "suites": 1,
+      "failures": [
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=true I03 rejects explicit dotted add atomically when verbose is OFF",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=true I03 rejects explicit dotted replace atomically when verbose is OFF",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=true I03 rejects explicit dotted remove atomically when verbose is OFF",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=true E17 pathless dotted and registered-URN keys still resolve when verbose is OFF",
+          "assertion": "Error: expected 200 \"OK\", got 400 \"Bad Request\""
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false I03 rejects explicit dotted add atomically when verbose is OFF",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false I03 rejects explicit dotted replace atomically when verbose is OFF",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false I03 rejects explicit dotted remove atomically when verbose is OFF",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false E17 pathless dotted and registered-URN keys still resolve when verbose is OFF",
+          "assertion": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 1\n+ Received  + 1\n\n  Object {\n-   \"familyName\": \"After\",\n+   \"familyName\": \"Before\",\n    \"givenName\": \"Given\",\n  }"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false coercion OFF rejects quoted active path and makes no write",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false coercion OFF rejects quoted active qualified and makes no write",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts strict=false coercion OFF rejects quoted active pathless and makes no write",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        },
+        {
+          "name": "P2 default-running Entra integration and flag contracts legacy wrapper obeys explicit coercion setting even in lenient mode, coerce=false",
+          "assertion": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 400\nReceived: 200"
+        }
+      ]
+    },
+    "review": {
+      "passed": 0,
+      "failed": 3,
+      "skipped": 18,
+      "suites": 1,
+      "failures": [
+        {
+          "name": "P2 flag contract follow-up keeps exact numeric-version extension namespace add independent of verbose",
+          "assertion": "PatchError: Invalid PATCH path: Invalid attribute name or sub-attribute."
+        },
+        {
+          "name": "P2 flag contract follow-up keeps exact numeric-version extension namespace replace independent of verbose",
+          "assertion": "PatchError: Invalid PATCH path: Invalid attribute name or sub-attribute."
+        },
+        {
+          "name": "P2 flag contract follow-up keeps exact numeric-version extension namespace remove independent of verbose",
+          "assertion": "PatchError: Invalid PATCH path: Invalid attribute name or sub-attribute."
+        }
+      ]
+    }
+  },
+  "green": {
+    "passed": 1543,
+    "failed": 0,
+    "skipped": 0,
+    "suites": 22,
+    "failures": []
+  },
+  "lint": {
+    "baseline": {
+      "files": 9,
+      "errors": 0,
+      "warnings": 58
+    },
+    "current": {
+      "files": 10,
+      "errors": 0,
+      "warnings": 58
+    }
+  },
+  "review": {
+    "findings": 1,
+    "closed": 1,
+    "status": "bounded closure passed; C0/P7b integration remain separate"
+  },
+  "defaultRunningCases": [
+    "I02",
+    "I03",
+    "E17",
+    "active-coercion-flag",
+    "numeric-version-extension-namespace"
+  ],
+  "changes": {
+    "versions": false,
+    "lockfiles": false,
+    "newFlags": false,
+    "flagDefaults": false,
+    "pushed": false,
+    "deployed": false
+  },
+  "documentation": {
+    "mermaidDiagrams": 9,
+    "themes": [
+      "default",
+      "dark"
+    ],
+    "literalJsonBlocks": 29,
+    "rendererWarning": "Local built-in metadata0.0.0; actual pinned11.15.0 browser rendering passed"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "Session_starter.md",
+    "api/src/domain/patch/extension-and-flags.spec.ts",
+    "api/src/domain/patch/patch-compatibility-flags.spec.ts",
+    "api/src/domain/patch/patch-executor.ts",
+    "api/src/domain/patch/patch-path.ts",
+    "api/src/domain/patch/patch-types.ts",
+    "api/src/domain/patch/user-patch-engine.spec.ts",
+    "api/src/domain/patch/user-patch-engine.ts",
+    "api/src/modules/endpoint/endpoint-config.interface.ts",
+    "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+    "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+    "api/test/e2e/patch-compatibility-flags.e2e-spec.ts",
+    "docs/CONTEXT_INSTRUCTIONS.md",
+    "docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md",
+    "docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md",
+    "docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md",
+    "docs/SCIM_P2_EXECUTION_RCA.md",
+    "docs/SCIM_P2_IMPLEMENTATION.md",
+    "docs/evidence/scim-p2-flags-20260929/backend-validation.json",
+    "docs/evidence/scim-p2-flags-20260929/red-green.json",
+    "scripts/live-test-p2.cjs",
+    "scripts/p1-validation/jest.config.cjs",
+    "scripts/p1-validation/run.cjs"
+  ]
+}
