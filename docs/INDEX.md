@@ -9,6 +9,7 @@
 
 | If you want to... | Read |
 |---|---|
+| Understand the typed PATCH-path repair, exact incident, backend proof and remaining P2 limits | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
 | Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
 | Understand the reported PATCH failure, real PostgreSQL/InMemory differences, RFC and attribute checks, and the step-by-step fix plan | [SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md) |
 | Understand the portable endpoint boundary, discovery translation, effective authentication state, APIs, DB mappings, and target UX | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) |

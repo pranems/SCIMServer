@@ -1,0 +1,37 @@
+{
+  "package": "P1",
+  "content": {
+    "command": "npm run docs:content",
+    "result": "passed",
+    "documents": 26
+  },
+  "freshnessAndCoupling": {
+    "command": "pwsh -NoProfile -File scripts\\audit-doc-freshness.ps1 -BaseRef cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e -Quiet",
+    "result": "passed",
+    "documents": 26
+  },
+  "targetedLinksAndFreshness": {
+    "command": "pwsh -NoProfile -File scripts\\audit-doc-freshness.ps1 -ManifestPath test-results\\p1\\doc-manifest.json -SkipCoupling -Quiet",
+    "result": "passed",
+    "documents": 7
+  },
+  "json": {
+    "method": "JSON.parse on every literal JSON fence in the seven changed documentation files and every retained P1 JSON artifact",
+    "fences": 17,
+    "result": "passed"
+  },
+  "mermaid": {
+    "command": "npm run docs:mermaid:render -- docs\\SCIM_P1_IMPLEMENTATION.md docs\\PATCH_OPERATIONS_COMPLETE_GUIDE.md",
+    "result": "passed",
+    "diagrams": 6,
+    "themes": 2,
+    "securityLevel": "strict",
+    "version": "11.15.0",
+    "warning": "Built-in editor renderer discovery reports 0.0.0; exact editor parity unverified. No dependency changes made."
+  },
+  "diffCheck": {
+    "command": "git diff --check",
+    "result": "passed"
+  },
+  "provenanceLimit": "VSCODE_TARGET_SESSION_LOG is not configured; parent integration retains host-level full-transcript reconciliation."
+}

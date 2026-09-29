@@ -26,6 +26,7 @@ import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristics
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
+import { parsePatchPath, patchAttributePath, type ParsedPatchPath } from '../../../domain/patch/patch-path';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
@@ -292,6 +293,7 @@ export function coercePatchOpBooleans(
 export function computeTouchedPatchKeys(
   operations: ReadonlyArray<{ op: string; path?: string; value?: unknown }>,
   extensionUrns: readonly string[],
+  coreUrn?: string,
 ): Set<string> {
   const touched = new Set<string>();
   const urnsLower = extensionUrns.map((u) => ({ urn: u, lower: u.toLowerCase() }));
@@ -300,18 +302,15 @@ export function computeTouchedPatchKeys(
     const path = typeof op.path === 'string' ? op.path.trim() : '';
     if (path.length > 0) {
       const pathLower = path.toLowerCase();
-      // URN-prefixed path -> the touched top-level key is the extension URN block.
       const matchedUrn = urnsLower.find(
-        (u) => pathLower === u.lower || pathLower.startsWith(`${u.lower}:`),
+        (u) => pathLower === u.lower,
       );
       if (matchedUrn) {
         touched.add(matchedUrn.urn);
         continue;
       }
-      // Simple / sub-attr / valuePath -> top-level attribute is the segment
-      // before the first '.' (sub-attr) or '[' (value filter).
-      const firstSegment = path.split(/[.[]/, 1)[0];
-      if (firstSegment) touched.add(firstSegment);
+      const parsed = parsePatchPath(path, extensionUrns, coreUrn);
+      touched.add(parsed.schemaUrn ?? parsed.attribute);
       continue;
     }
     // No-path operation: the value object's keys are the touched attributes/URNs.
@@ -336,8 +335,9 @@ export function scopePatchPayloadToTouched(
   resultPayload: Record<string, unknown>,
   operations: ReadonlyArray<{ op: string; path?: string; value?: unknown }>,
   extensionUrns: readonly string[],
+  coreUrn?: string,
 ): Record<string, unknown> {
-  const touched = computeTouchedPatchKeys(operations, extensionUrns);
+  const touched = computeTouchedPatchKeys(operations, extensionUrns, coreUrn);
   const reduced: Record<string, unknown> = {};
   if ('schemas' in resultPayload) {
     reduced.schemas = resultPayload.schemas;
@@ -382,8 +382,13 @@ function coerceScalarPatchValue(
   const lower = value.toLowerCase();
   if (lower !== 'true' && lower !== 'false') return undefined;
 
-  // Strip value filters: emails[type eq "work"].primary -> emails.primary
-  const cleanPath = path.replace(/\[.*?\]/g, '');
+  let cleanPath: string;
+  try {
+    const parsed = parsePatchPath(path, [], coreUrnLower);
+    cleanPath = `${parsed.schemaUrn ? `${parsed.schemaUrn}:` : ''}${patchAttributePath(parsed)}`;
+  } catch {
+    return undefined; // The engine/validator emits the indexed syntax error.
+  }
   const cleanLower = cleanPath.toLowerCase();
 
   let parentPath: string;
@@ -747,8 +752,14 @@ export function stripReadOnlyPatchOps(
 
   for (const op of operations) {
     if (op.path) {
-      // Path-based operation - resolve the target attribute
-      const targetAttr = resolvePathToAttrName(op.path, extensionSchemaMap);
+      let parsed: ParsedPatchPath;
+      try {
+        parsed = parsePatchPath(op.path, [...extensionSchemaMap.keys()], schemaDefinitions.find(s => s.isCoreSchema)?.id);
+      } catch {
+        filtered.push(op); // Malformed paths must reach indexed error reporting.
+        continue;
+      }
+      const targetAttr = parsed.attribute;
 
       // NEVER strip operations targeting 'id' - let G8c hard-reject
       if (targetAttr.toLowerCase() === 'id') {
@@ -757,15 +768,15 @@ export function stripReadOnlyPatchOps(
       }
 
       // Check if the target is a readOnly core attribute
-      if (core.has(targetAttr.toLowerCase())) {
+      if (!parsed.schemaUrn && core.has(targetAttr.toLowerCase())) {
         stripped.push(targetAttr);
         continue; // Skip this operation
       }
 
       // R-MUT-2: Check if path targets a readOnly sub-attr (e.g., "manager.displayName")
-      const cleanPath = op.path.replace(/\[.*?\]/g, '');
+      const cleanPath = patchAttributePath(parsed);
       const dotIdx = cleanPath.indexOf('.');
-      if (dotIdx !== -1) {
+      if (!parsed.schemaUrn && dotIdx !== -1) {
         const parentName = cleanPath.substring(0, dotIdx).toLowerCase();
         const subName = cleanPath.substring(dotIdx + 1).split('.')[0].toLowerCase();
         const readOnlySubs = coreSubAttrs.get(parentName);
@@ -779,8 +790,8 @@ export function stripReadOnlyPatchOps(
       let isReadOnly = false;
       for (const [urn, readOnlySet] of extensions) {
         // Extension path: "urn:...:attrName" or just "attrName" in extension block
-        if (op.path.toLowerCase().startsWith(urn.toLowerCase())) {
-          const remainder = op.path.slice(urn.length + 1).replace(/\[.*?\]/g, '').split('.')[0];
+        if (parsed.schemaUrn?.toLowerCase() === urn.toLowerCase()) {
+          const remainder = parsed.attribute;
           if (remainder && readOnlySet.has(remainder.toLowerCase())) {
             stripped.push(`${urn}.${remainder}`);
             isReadOnly = true;
@@ -867,24 +878,6 @@ export function stripReadOnlyPatchOps(
  * Strips value filters and sub-attribute paths.
  * Handles extension URN-prefixed paths.
  */
-function resolvePathToAttrName(
-  path: string,
-  extensionSchemas: Map<string, SchemaDefinition>,
-): string {
-  // Strip value filters like [value eq "abc"]
-  const clean = path.replace(/\[.*?\]/g, '');
-
-  // Extension URN prefix
-  for (const [urnLower] of extensionSchemas) {
-    if (clean.toLowerCase().startsWith(urnLower + ':') || clean.toLowerCase().startsWith(urnLower + '.')) {
-      const remainder = clean.slice(urnLower.length + 1);
-      return remainder.split('.')[0] || clean;
-    }
-  }
-
-  // Core attribute - first segment
-  return clean.split('.')[0];
-}
 
 // ─── Schema-Aware Helpers (parameterized by core schema URN) ────────────────
 

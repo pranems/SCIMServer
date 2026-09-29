@@ -3,11 +3,17 @@
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.35
 > **Last Updated**: September 24, 2026
-> **Last verified:** 2026-09-24
+> **Last verified:** 2026-09-28
 
 ---
 
 ## Active Delivery Process
+
+P1 correctness work is implemented locally on the isolated implementation
+branch, not on a deployment. [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md)
+records the typed-path contract, 1,476 focused unit / 65 HTTP passes and owned
+backend/live evidence. Keep P2 operation semantics separate. Version and
+CHANGELOG coordination remain the parent integration gate.
 
 Use [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
 for change sizing, validation lanes, commit/push/PR/merge/deploy ownership,

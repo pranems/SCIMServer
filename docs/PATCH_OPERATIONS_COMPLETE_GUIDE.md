@@ -1,12 +1,25 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.35`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
 **Audience:** integrators wiring a SCIM client (Microsoft Entra ID, Okta, custom), operators configuring endpoint profiles, and contributors changing PATCH code.
 
-**Status:** living reference. Last source-verified 2026-06-23 against `master` (v0.53.x) and a live run on the dev deployment.
+**Status:** living reference. The P1 typed-path behavior below was verified on the
+isolated implementation branch with both local persistence backends, not deployed.
+Other operation-policy sections retain older behavior notes. See
+[P1 implementation and limits](SCIM_P1_IMPLEMENTATION.md) before interpreting
+this guide as an all-PATCH conformance claim.
+
+**P1 typed paths:** native Boolean, number and null predicates, quoted-Boolean
+compatibility, compound/presence filters and JSON escapes share one parser across
+Users, Groups, custom cores and extensions. Invalid, nested or repeated bracket
+syntax returns 400 `invalidPath` with a zero-based failing operation index,
+regardless of `StrictSchemaValidation`. It never falls back to a literal key.
+Each selector sees the current working state produced by earlier operations.
+`caseExact` applies per predicate leaf and namespace. Primary handoff, append,
+all-match updates and required/immutable transitions remain P2 work.
 
 **RFC references:**
 - [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
@@ -166,7 +179,7 @@ Rules enforced ([patch-user.dto.ts](../api/src/modules/scim/dto/patch-user.dto.t
 
 ## 4. The five path forms (RFC 7644 §3.10)
 
-The `path` ABNF is `PATH = attrPath / valuePath [subAttr]` where `attrPath = [URI ":"] ATTRNAME *1subAttr` and `subAttr = "." ATTRNAME`. Because `ATTRNAME` cannot contain a dot, a dotted token can only mean a sub-attribute. SCIMServer resolves the following five concrete forms (source: [scim-patch-path.ts](../api/src/modules/scim/utils/scim-patch-path.ts), engine dispatch in [user-patch-engine.ts](../api/src/domain/patch/user-patch-engine.ts#L215)):
+The `path` ABNF is `PATH = attrPath / valuePath [subAttr]` where `attrPath = [URI ":"] ATTRNAME *1subAttr` and `subAttr = "." ATTRNAME`. Because `ATTRNAME` cannot contain a dot, a dotted token can only mean a sub-attribute. Syntax is parsed by [patch-path.ts](../api/src/domain/patch/patch-path.ts); mutations use [scim-patch-path.ts](../api/src/modules/scim/utils/scim-patch-path.ts).
 
 | # | Form | Example `path` | Resolves to |
 |---|------|---------------|-------------|
@@ -179,13 +192,14 @@ The `path` ABNF is `PATH = attrPath / valuePath [subAttr]` where `attrPath = [UR
 ```mermaid
 flowchart TD
     P["PATCH op with path?"] -->|no path| NP["No-path merge<br/>resolveNoPathValue"]
-    P -->|has path| COL{"column-promoted?<br/>active/userName/<br/>displayName/externalId"}
+    P -->|has path| PARSE["Typed path parser"]
+    PARSE -->|"invalid syntax"| ERR["400 invalidPath"]
+    PARSE -->|"selection"| VPH["Full predicate evaluation<br/>against current working state"]
+    PARSE -->|"attribute"| COL{"column-promoted?<br/>active/userName/<br/>displayName/externalId"}
     COL -->|yes| COLH["update promoted field"]
     COL -->|no| EXT{"isExtensionPath?<br/>(URN registered)"}
     EXT -->|yes| EXTH["extension namespace<br/>(always resolved)"]
-    EXT -->|no| VP{"isValuePath?<br/>contains [ ]"}
-    VP -->|yes| VPH["filter match<br/>noTarget on zero-match<br/>(replace/remove)"]
-    VP -->|no| DOT{"path has '.'<br/>AND VerbosePatch on?"}
+    EXT -->|no| DOT{"path has '.'<br/>AND VerbosePatch on?"}
     DOT -->|yes| DOTH["nested sub-attribute<br/>applyDotNotation"]
     DOT -->|no| SIMP["simple key<br/>mergeComplexAttribute"]
 ```
@@ -273,7 +287,7 @@ Governs only the spec-ambiguous bare `remove path=members` (no filter, no value)
 
 ### 6.8 RequireIfMatch and AllowAndCoerceBooleanStrings
 
-`RequireIfMatch` makes `If-Match` mandatory on PATCH (missing -> 428; mismatch -> 412 regardless of this flag). `AllowAndCoerceBooleanStrings` (default on) coerces `"True"`/`"False"` string op values to native booleans before validation/storage, including inside value-path filter literals - important for Entra interop.
+`RequireIfMatch` makes `If-Match` mandatory on PATCH (missing -> 428; mismatch -> 412 regardless of this flag). `AllowAndCoerceBooleanStrings` (default on) coerces `"True"`/`"False"` string operation values to native booleans. Selector compatibility is separate: a quoted Boolean matches an actual Boolean without converting string-typed attributes.
 
 ---
 
@@ -659,7 +673,7 @@ If the stored version is `W/"v2"`, the server returns 412 `versionMismatch`. Wit
 | Complex `replace path=parent value={...}` | Sub-attr merge | Sub-attr merge | Sub-attr merge |
 | No-path `replace value={...}` | Merge into resource | Merge into resource | Merge into resource |
 | Dot-notation `name.givenName` nests? | Only if `VerbosePatchSupported` | Only if `VerbosePatchSupported` | **Always** |
-| Value-path `emails[type eq "x"].value` | Yes | members[value eq] | Yes |
+| Typed value-path selection | Core and extension arrays | Members and extension arrays | Core and extension arrays |
 | Extension URN path | Yes (always) | Yes (always) | Yes |
 | readOnly op (strict on, ignore off) | 400 `mutability` | 400 `mutability` | n/a (no built-in readOnly) |
 | Multi-member single op | n/a | `MultiMemberPatchOpForGroupEnabled` | n/a |
@@ -679,6 +693,9 @@ Defaults summary: `VerbosePatchSupported=false`, `StrictSchemaValidation=true`, 
 | Group PATCH engine | [group-patch-engine.ts](../api/src/domain/patch/group-patch-engine.ts) / [.spec.ts](../api/src/domain/patch/group-patch-engine.spec.ts) |
 | Generic PATCH engine | [generic-patch-engine.ts](../api/src/domain/patch/generic-patch-engine.ts) / [.spec.ts](../api/src/domain/patch/generic-patch-engine.spec.ts) |
 | Path resolution utilities | [scim-patch-path.ts](../api/src/modules/scim/utils/scim-patch-path.ts) |
+| P1 typed syntax and consumers | [patch-path.spec.ts](../api/src/domain/patch/patch-path.spec.ts), [typed-patch-path.spec.ts](../api/src/domain/patch/typed-patch-path.spec.ts) |
+| P1 permanent HTTP and repository readback | [typed-patch-path.e2e-spec.ts](../api/test/e2e/typed-patch-path.e2e-spec.ts) |
+| P1 owned backend and live proof | [run.cjs](../scripts/p1-validation/run.cjs), [live-test-p1.cjs](../scripts/live-test-p1.cjs) |
 | Flag x extension combinations | [extension-and-flags.spec.ts](../api/src/domain/patch/extension-and-flags.spec.ts) |
 | Config flags | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) |
 | Users controller / service | [endpoint-scim-users.controller.ts](../api/src/modules/scim/controllers/endpoint-scim-users.controller.ts) / [endpoint-scim-users.service.ts](../api/src/modules/scim/services/endpoint-scim-users.service.ts) |

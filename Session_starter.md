@@ -6,6 +6,14 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
+| Date | Summary |
+| --- | --- |
+| 2026-09-28 | P1 typed PATCH paths implemented in isolated `fix/scim-correctness-p1-20260928`; focused 1,476 unit and 65 HTTP tests pass, plus owned PostgreSQL/InMemory and local-live proof. See [P1 implementation](docs/SCIM_P1_IMPLEMENTATION.md). No merge/deploy; central release metadata remains pending. |
+
+- [x] ✅ COMPLETED: P1 native Boolean selector and malformed-path repair, with permanent regression tests.
+- [ ] P2: operation transitions, append/all-match behavior, primary/required/immutable policies.
+- [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.
+
 The current shipped baseline is `master` v0.55.35. Use
 [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](docs/strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
 for the operating process and [REMAINING_WORK_REGISTER.md](docs/auth/REMAINING_WORK_REGISTER.md)

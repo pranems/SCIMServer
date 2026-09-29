@@ -11,6 +11,7 @@ import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import { SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
+import { GOOGLE, CONTOSO, PATCH, incidentPayload, incidentOperations, incidentExpected } from '../../../../test/e2e/helpers/typed-patch-fixtures';
 
 describe('EndpointScimUsersService', () => {
   let service: EndpointScimUsersService;
@@ -350,6 +351,37 @@ describe('EndpointScimUsersService', () => {
   });
 
   describe('patchUserForEndpoint', () => {
+    it('P1 persists the exact four-op incident only after every selector succeeds', async () => {
+      jest.spyOn(service['schemaHelpers'], 'getExtensionUrns').mockReturnValue([GOOGLE, CONTOSO]);
+      const user = { ...mockUser, rawPayload: JSON.stringify(incidentPayload()) };
+      mockUserRepo.findByScimId.mockResolvedValueOnce(user);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
+      mockUserRepo.update.mockImplementationOnce(async (_id, update) => ({ ...user, ...update, version: 2 }));
+      await service.patchUserForEndpoint(user.scimId,
+        { schemas: [PATCH], Operations: incidentOperations() }, 'http://localhost/scim', user.endpointId,
+        { StrictSchemaValidation: 'False', VerbosePatchSupported: 'True' });
+      const written = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
+      expect(written[GOOGLE]).toEqual(incidentExpected()[GOOGLE]);
+      expect(written[CONTOSO]).toEqual(incidentExpected()[CONTOSO]);
+      expect(JSON.parse(user.rawPayload)).toEqual(incidentPayload());
+      expect(mockUserRepo.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('P1 rejects operation 3 without calling persistence after earlier valid changes', async () => {
+      jest.spyOn(service['schemaHelpers'], 'getExtensionUrns').mockReturnValue([GOOGLE, CONTOSO]);
+      mockUserRepo.findByScimId.mockResolvedValueOnce({ ...mockUser, rawPayload: JSON.stringify(incidentPayload()) });
+      const operations = incidentOperations();
+      operations[3].path = `${CONTOSO}:contacts[primary xx true].value`;
+      await expect(service.patchUserForEndpoint(mockUser.scimId,
+        { schemas: [PATCH], Operations: operations }, 'http://localhost/scim', mockUser.endpointId,
+        { StrictSchemaValidation: 'False', VerbosePatchSupported: 'True' },
+      )).rejects.toMatchObject({ response: {
+        scimType: 'invalidPath',
+        [SCIM_DIAGNOSTICS_URN]: { failedOperationIndex: 3, failedPath: operations[3].path, failedOp: 'replace' },
+      } });
+      expect(mockUserRepo.update).not.toHaveBeenCalled();
+    });
+
     it('should update user active status within endpoint', async () => {
       const patchDto: PatchUserDto = {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],

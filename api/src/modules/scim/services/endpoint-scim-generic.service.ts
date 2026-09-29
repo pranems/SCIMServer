@@ -583,7 +583,11 @@ export class EndpointScimGenericService {
     }
 
     const extensionUrns = resourceType.schemaExtensions.map(e => e.schema);
-    const patchEngine = new GenericPatchEngine(payload, extensionUrns);
+    const patchEngine = new GenericPatchEngine(
+      payload, extensionUrns,
+      this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactPaths,
+      resourceType.schema,
+    );
 
     try {
       for (let i = 0; i < patchDto.Operations.length; i++) {
@@ -657,6 +661,7 @@ export class EndpointScimGenericService {
         resultPayload,
         patchDto.Operations,
         extensionUrns,
+        resourceType.schema,
       );
       this.validatePayloadSchema(patchValidationPayload, resourceType, endpointId, config, 'patch');
 

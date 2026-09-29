@@ -383,7 +383,7 @@ mean merged or deployed.
 | Package | Status | Evidence / next action |
 |---|---|---|
 | D0 | Validated; committing | 53 new docs/evidence/reproducer files reviewed; 22 JSON artifacts parse; 140 relative links resolve; 10 diagrams render in both themes; content/freshness and safety controls pass |
-| P1 | Pending | First implementation package after D0 |
+| P1 | Validated locally | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Pending | Depends on stable typed path contract |
 | P3 | Pending | Actual database barriers are already available as baseline evidence |
 | P4 | Pending | Native and injected member failures already reproduce |
@@ -395,7 +395,7 @@ mean merged or deployed.
 | C0 | Pending | Do not mark complete while a package or applicable gate is unresolved |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-0 implementation packages completed. This section is updated at package boundaries. Detailed
+P1 implemented and locally validated; P2-P9 remain pending. This section is updated at package boundaries. Detailed
 issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
 
 ## 12. Architecture and self-improvement decisions

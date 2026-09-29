@@ -3,10 +3,10 @@
  *
  * Applies RFC 7644 §3.5.2 PATCH operations to a generic SCIM resource payload.
  *
- * This engine is intentionally simpler than the User/Group patch engines:
+ * Resource-specific behavior stays here; typed selections use the shared parser:
  *   - Operates directly on the JSONB payload object
  *   - Supports add, replace, remove operations
- *   - Supports dot-notation path resolution for nested attributes
+ *   - Supports dot-notation and typed valuePath resolution
  *   - Extension URN paths resolved via extensionUrns list (COLON separator)
  *   - No type-specific member management
  *   - No read-only pre-validation (custom types have no built-in schema constraints)
@@ -18,6 +18,8 @@
  *   const result = engine.getResult();
  */
 import { PatchError } from './patch-error';
+import { parsePatchPath, patchAttributePath } from './patch-path';
+import { applyPatchSelection } from './patch-selection';
 import {
   isExtensionPath,
   parseExtensionPath,
@@ -63,12 +65,17 @@ interface PatchOperation {
 
 export class GenericPatchEngine {
   private payload: Record<string, unknown>;
-  private readonly extensionUrns: readonly string[];
+  private readonly extensionUrns: string[];
 
-  constructor(payload: Record<string, unknown>, extensionUrns?: readonly string[]) {
+  constructor(
+    payload: Record<string, unknown>,
+    extensionUrns?: readonly string[],
+    private readonly caseExactPaths?: ReadonlySet<string>,
+    private readonly coreUrn?: string,
+  ) {
     // Deep clone to avoid mutating the original
     this.payload = JSON.parse(JSON.stringify(payload));
-    this.extensionUrns = extensionUrns ?? [];
+    this.extensionUrns = [...(extensionUrns ?? [])];
   }
 
   /**
@@ -81,6 +88,16 @@ export class GenericPatchEngine {
 
     if (!op) {
       throw new PatchError(400, 'PATCH operation must have an "op" field.', 'invalidValue');
+    }
+
+    if (operation.path) {
+      const parsed = parsePatchPath(operation.path, this.extensionUrns, this.coreUrn);
+      if (parsed.schemaUrn && !this.extensionUrns.includes(parsed.schemaUrn)) this.extensionUrns.push(parsed.schemaUrn);
+      if (parsed.kind === 'selection' && ['add', 'replace', 'remove'].includes(op)) {
+        this.payload = applyPatchSelection(this.payload, parsed, op, operation.value, this.caseExactPaths);
+        return;
+      }
+      operation = { ...operation, path: `${parsed.schemaUrn ? `${parsed.schemaUrn}:` : ''}${patchAttributePath(parsed)}` };
     }
 
     switch (op) {

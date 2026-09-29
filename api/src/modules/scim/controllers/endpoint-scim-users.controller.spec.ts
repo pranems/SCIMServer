@@ -7,6 +7,7 @@ import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage'
 import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
+import { PATCH, incidentOperations, incidentExpected } from '../../../../test/e2e/helpers/typed-patch-fixtures';
 
 describe('EndpointScimUsersController', () => {
   let controller: EndpointScimUsersController;
@@ -321,6 +322,15 @@ describe('EndpointScimUsersController', () => {
     });
 
     describe('PATCH /endpoints/:endpointId/Users/:id', () => {
+      it('P1 forwards the four typed selectors intact and returns the service values', async () => {
+        const dto = { schemas: [PATCH], Operations: incidentOperations() };
+        const expected = { schemas: [], id: 'synthetic', ...incidentExpected(), meta: {} };
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.patchUserForEndpoint.mockResolvedValue(expected);
+        const result = await controller.updateUser('endpoint-1', 'synthetic', dto, mockRequest);
+        expect(mockUsersService.patchUserForEndpoint.mock.calls[0][1]).toEqual(dto);
+        expect(result).toEqual(expected);
+      });
       it('should patch a user in specific endpoint', async () => {
         const patchDto: PatchUserDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],

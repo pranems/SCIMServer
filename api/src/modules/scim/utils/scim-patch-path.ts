@@ -11,6 +11,9 @@
  *       "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
  */
 import { KNOWN_EXTENSION_URNS } from '../common/scim-constants';
+import { parsePatchPath, matchesPatchSelection, type SelectionPatchPath } from '../../../domain/patch/patch-path';
+import type { FilterNode, ScimCompareOp } from '../filters/scim-filter-parser';
+import { PatchError } from '../../../domain/patch/patch-error';
 
 // CWE-1321 / js/remote-property-injection - prototype pollution sink barrier.
 // The engines call guardPrototypePollution() at parse-time, so in practice
@@ -86,8 +89,10 @@ export interface ValuePathExpression {
   filterAttribute: string;
   /** The filter operator, e.g. "eq" */
   filterOperator: string;
-  /** The filter comparison value, e.g. "work" */
-  filterValue: string;
+  /** Typed comparison literal; absent for presence or a compound predicate. */
+  filterValue?: string | number | boolean | null;
+  predicate?: FilterNode;
+  schemaUrn?: string;
   /** The sub-attribute after the dot, e.g. "value". May be undefined if path ends at bracket. */
   subAttribute?: string;
 }
@@ -147,7 +152,7 @@ export function isExtensionValuePath(
  * @example isValuePath("displayName") → false
  */
 export function isValuePath(path: string): boolean {
-  return path.includes('[') && path.includes(']');
+  return path.includes('[') || path.includes(']');
 }
 
 /**
@@ -162,20 +167,22 @@ export function isValuePath(path: string): boolean {
  *   // → { attribute: "addresses", filterAttribute: "type", filterOperator: "eq", filterValue: "work", subAttribute: "streetAddress" }
  */
 export function parseValuePath(path: string): ValuePathExpression | null {
-  // Pattern: attribute[filterAttr op "filterValue"].subAttribute
-  // The sub-attribute is optional (path may end at the closing bracket)
-  const regex = /^(\w+)\[(\w+)\s+(eq|ne|co|sw|ew|gt|ge|lt|le)\s+"([^"]+)"\](?:\.(\w+))?$/i;
-  const match = path.match(regex);
-  if (!match) {
-    return null;
-  }
+  if (!isValuePath(path)) return null;
+  const parsed = parsePatchPath(path);
+  if (parsed.kind !== 'selection') return null;
+  return valuePathExpression(parsed);
+}
 
+export function valuePathExpression(parsed: SelectionPatchPath): ValuePathExpression {
+  const leaf = parsed.predicate.type === 'compare' ? parsed.predicate : undefined;
   return {
-    attribute: match[1],
-    filterAttribute: match[2],
-    filterOperator: match[3].toLowerCase(),
-    filterValue: match[4],
-    subAttribute: match[5] ?? undefined,
+    attribute: parsed.attribute,
+    filterAttribute: leaf?.attrPath ?? '',
+    filterOperator: leaf?.op ?? '',
+    filterValue: leaf?.value,
+    subAttribute: parsed.subAttribute,
+    ...(leaf ? {} : { predicate: parsed.predicate }),
+    ...(parsed.schemaUrn ? { schemaUrn: parsed.schemaUrn } : {}),
   };
 }
 
@@ -188,7 +195,7 @@ export function parseValuePath(path: string): ValuePathExpression | null {
 export function isExtensionPath(path: string, extensionUrns?: readonly string[]): boolean {
   const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
   const lowerPath = path.toLowerCase();
-  return urns.some((urn) => lowerPath.startsWith(urn.toLowerCase() + ':'));
+  return urns.some((urn) => lowerPath.startsWith(urn.toLowerCase() + ':') || lowerPath.startsWith(urn.toLowerCase() + '.'));
 }
 
 /**
@@ -217,49 +224,19 @@ export function parseExtensionPath(
   path: string,
   extensionUrns?: readonly string[],
 ): ExtensionPathExpression | ExtensionValuePathExpression | null {
-  const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
-  const lowerPath = path.toLowerCase();
-  for (const urn of urns) {
-    const prefix = urn.toLowerCase() + ':';
-    if (!lowerPath.startsWith(prefix)) continue;
-    // preserve original casing for the attribute (RFC 7643 §2.1)
-    const remainder = path.slice(prefix.length);
-    if (remainder.length === 0) continue;
-
-    // F7: valuePath form. parseValuePath returns null if the bracket form is
-    // malformed; in that case we fall back to the flat-path interpretation
-    // (literal remainder as attributePath) so the existing behavior is
-    // preserved for unparseable bracket expressions.
-    if (remainder.includes('[')) {
-      const vp = parseValuePath(remainder);
-      if (vp) {
-        return { schemaUrn: urn, valuePath: vp };
-      }
-      // Fall through to flat-path treatment
-    }
-
-    // F6: dotted form. The first '.' splits attributePath from subAttribute.
-    // URNs (which contain dots in version segments like "2.0") have already
-    // been stripped at this point so the dot must be a SCIM sub-attribute
-    // separator.
-    const dotIdx = remainder.indexOf('.');
-    if (dotIdx > 0 && dotIdx < remainder.length - 1) {
-      return {
-        schemaUrn: urn,
-        attributePath: remainder.slice(0, dotIdx),
-        subAttribute: remainder.slice(dotIdx + 1),
-      };
-    }
-
-    // Flat form (pre-F6 behavior)
-    return { schemaUrn: urn, attributePath: remainder };
-  }
-  return null;
+  if (!isExtensionPath(path, extensionUrns)) return null;
+  const parsed = parsePatchPath(path, extensionUrns ?? KNOWN_EXTENSION_URNS);
+  if (!parsed.schemaUrn) return null;
+  if (parsed.kind === 'selection') return { schemaUrn: parsed.schemaUrn, valuePath: valuePathExpression(parsed) };
+  return {
+    schemaUrn: parsed.schemaUrn, attributePath: parsed.attribute,
+    ...(parsed.subAttribute ? { subAttribute: parsed.subAttribute } : {}),
+  };
 }
 
 /**
- * Checks whether a single record matches a simple SCIM filter expression.
- * Only `eq` is fully supported. String comparison respects `caseExact`:
+ * Compatibility wrapper around the full SCIM filter evaluator.
+ * String comparison respects `caseExact`:
  * when `caseExact` is true, comparison is case-sensitive; otherwise case-insensitive.
  *
  * Boolean-aware: When comparing a boolean actual value against a string filter
@@ -274,33 +251,27 @@ export function matchesFilter(
   item: Record<string, unknown>,
   filterAttribute: string,
   filterOperator: string,
-  filterValue: string,
+  filterValue: string | number | boolean | null | undefined,
   caseExact = false,
 ): boolean {
-  // RFC 7643 §2.1: attribute names are case-insensitive - find the key regardless of casing
-  const lowerAttr = filterAttribute.toLowerCase();
-  const actual = Object.entries(item).find(([k]) => k.toLowerCase() === lowerAttr)?.[1];
+  return matchesPatchSelection({
+    kind: 'selection', attribute: '',
+    predicate: { type: 'compare', attrPath: filterAttribute, op: filterOperator as ScimCompareOp, value: filterValue },
+  }, item, caseExact);
+}
 
-  switch (filterOperator) {
-    case 'eq': {
-      if (typeof actual === 'string' && typeof filterValue === 'string') {
-        return caseExact
-          ? actual === filterValue
-          : actual.toLowerCase() === filterValue.toLowerCase();
-      }
-      // Boolean-to-string comparison: `true` eq "True" → match
-      if (typeof actual === 'boolean') {
-        return String(actual).toLowerCase() === filterValue.toLowerCase();
-      }
-      return String(actual) === String(filterValue);
-    }
-    default:
-      // For unsupported operators, fall back to strict equality
-      if (typeof actual === 'boolean') {
-        return String(actual).toLowerCase() === filterValue.toLowerCase();
-      }
-      return String(actual) === String(filterValue);
-  }
+function matchesValuePath(
+  item: Record<string, unknown>,
+  parsed: ValuePathExpression,
+  caseExact: boolean | ReadonlySet<string>,
+): boolean {
+  return matchesPatchSelection({
+    ...parsed, kind: 'selection',
+    predicate: parsed.predicate ?? {
+      type: 'compare', attrPath: parsed.filterAttribute,
+      op: parsed.filterOperator as ScimCompareOp, value: parsed.filterValue,
+    },
+  }, item, caseExact);
 }
 
 /**
@@ -330,7 +301,7 @@ export function applyValuePathUpdate(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
   value: unknown,
-  caseExact = false,
+  caseExact: boolean | ReadonlySet<string> = false,
 ): ValuePathOpResult {
   // Validate keys at entry so a prototype-polluting attribute name throws
   // BEFORE any property reads (reading `rawPayload['__proto__']` would resolve
@@ -345,13 +316,7 @@ export function applyValuePathUpdate(
 
   const matchIdx = arr.findIndex((item: unknown) => {
     if (typeof item !== 'object' || item === null) return false;
-    return matchesFilter(
-      item as Record<string, unknown>,
-      parsed.filterAttribute,
-      parsed.filterOperator,
-      parsed.filterValue,
-      caseExact,
-    );
+    return matchesValuePath(item as Record<string, unknown>, parsed, caseExact);
   });
 
   if (matchIdx < 0) {
@@ -378,7 +343,7 @@ export function applyValuePathUpdate(
 export function removeValuePathEntry(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
-  caseExact = false,
+  caseExact: boolean | ReadonlySet<string> = false,
 ): ValuePathOpResult {
   // See applyValuePathUpdate: entry-validate to throw before any read.
   safePropertyKey(parsed.attribute);
@@ -391,13 +356,7 @@ export function removeValuePathEntry(
   if (parsed.subAttribute) {
     const matchIdx = arr.findIndex((item: unknown) => {
       if (typeof item !== 'object' || item === null) return false;
-      return matchesFilter(
-        item as Record<string, unknown>,
-        parsed.filterAttribute,
-        parsed.filterOperator,
-        parsed.filterValue,
-        caseExact,
-      );
+      return matchesValuePath(item as Record<string, unknown>, parsed, caseExact);
     });
     if (matchIdx < 0) {
       return { matched: false, payload: rawPayload };
@@ -411,13 +370,7 @@ export function removeValuePathEntry(
   const beforeLen = arr.length;
   const filtered = arr.filter((item: unknown) => {
     if (typeof item !== 'object' || item === null) return true;
-    return !matchesFilter(
-      item as Record<string, unknown>,
-      parsed.filterAttribute,
-      parsed.filterOperator,
-      parsed.filterValue,
-      caseExact,
-    );
+    return !matchesValuePath(item as Record<string, unknown>, parsed, caseExact);
   });
   return {
     matched: filtered.length < beforeLen,
@@ -438,27 +391,23 @@ export function addValuePathEntry(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
   value: unknown,
-  caseExact = false,
+  caseExact: boolean | ReadonlySet<string> = false,
 ): Record<string, unknown> {
   // See applyValuePathUpdate: entry-validate to throw before any read.
   safePropertyKey(parsed.attribute);
-  safePropertyKey(parsed.filterAttribute);
+  if (parsed.filterAttribute) safePropertyKey(parsed.filterAttribute);
   if (parsed.subAttribute) safePropertyKey(parsed.subAttribute);
   let arr = readResolvedProperty(rawPayload, parsed.attribute) as unknown[] | undefined;
 
   if (!Array.isArray(arr)) {
     arr = [];
+  } else {
+    arr = [...arr];
   }
 
   const matchIdx = arr.findIndex((item: unknown) => {
     if (typeof item !== 'object' || item === null) return false;
-    return matchesFilter(
-      item as Record<string, unknown>,
-      parsed.filterAttribute,
-      parsed.filterOperator,
-      parsed.filterValue,
-      caseExact,
-    );
+    return matchesValuePath(item as Record<string, unknown>, parsed, caseExact);
   });
 
   if (matchIdx >= 0) {
@@ -469,6 +418,10 @@ export function addValuePathEntry(
         : value;
     });
   } else {
+    // Only a simple equality supplies an unambiguous creation template.
+    if (parsed.predicate || parsed.filterOperator !== 'eq') {
+      throw new PatchError(400, 'A non-equality selector did not match an existing value.', 'noTarget');
+    }
     // Create new element with filter criteria and the value
     let newEntry = withResolvedProperty({}, parsed.filterAttribute, parsed.filterValue);
     if (parsed.subAttribute) newEntry = withResolvedProperty(newEntry, parsed.subAttribute, value);
@@ -504,25 +457,22 @@ export function applyExtensionUpdate(
   parsed: ExtensionPathExpression,
   value: unknown
 ): Record<string, unknown> {
-  const ext = (rawPayload[parsed.schemaUrn] as Record<string, unknown>) ?? {};
+  let ext = (readResolvedProperty(rawPayload, parsed.schemaUrn) as Record<string, unknown>) ?? {};
 
   // F6: dotted form. Update only the named sub-attribute of the complex parent,
   // using F1 merge semantics so a null incoming value deletes only that
   // sub-key and preserves siblings of the parent complex.
   if (parsed.subAttribute) {
-    const parent = ext[parsed.attributePath];
+    const parent = readResolvedProperty(ext, parsed.attributePath);
     const parentObj: Record<string, unknown> =
       typeof parent === 'object' && parent !== null && !Array.isArray(parent)
         ? { ...(parent as Record<string, unknown>) }
         : {};
-    if (value === null || value === undefined) {
-      delete parentObj[safePropertyKey(parsed.subAttribute)];
-    } else {
-      parentObj[safePropertyKey(parsed.subAttribute)] = value;
-    }
-    ext[safePropertyKey(parsed.attributePath)] = parentObj;
-    rawPayload[parsed.schemaUrn] = { ...ext };
-    return rawPayload;
+    const next = value === null || value === undefined
+      ? withoutResolvedProperty(parentObj, parsed.subAttribute)
+      : withResolvedProperty(parentObj, parsed.subAttribute, value);
+    ext = withResolvedProperty(ext, parsed.attributePath, next);
+    return withResolvedProperty(rawPayload, parsed.schemaUrn, ext);
   }
 
   // RFC 7644 §3.5.2.3: If the target attribute value is set to the attribute's
@@ -530,22 +480,19 @@ export function applyExtensionUpdate(
   // Detect "empty" values: null, undefined, "", or an object whose only key is
   // "value" set to null / "".
   if (isEmptyScimValue(value)) {
-    delete ext[safePropertyKey(parsed.attributePath)];
-    rawPayload[parsed.schemaUrn] = { ...ext };
-    return rawPayload;
+    return withResolvedProperty(rawPayload, parsed.schemaUrn, withoutResolvedProperty(ext, parsed.attributePath));
   }
 
   // Complex attributes like 'manager' should be stored as objects.
   // When a string value is provided, wrap it as {value: string} per SCIM spec
   // (manager is a complex attribute with a 'value' sub-attribute).
   if (parsed.attributePath.toLowerCase() === 'manager' && typeof value === 'string') {
-    ext[safePropertyKey(parsed.attributePath)] = { value };
+    ext = withResolvedProperty(ext, parsed.attributePath, { value });
   } else {
-    ext[safePropertyKey(parsed.attributePath)] = value;
+    ext = withResolvedProperty(ext, parsed.attributePath, value);
   }
 
-  rawPayload[parsed.schemaUrn] = { ...ext };
-  return rawPayload;
+  return withResolvedProperty(rawPayload, parsed.schemaUrn, ext);
 }
 
 /**
@@ -600,20 +547,19 @@ export function removeExtensionAttribute(
   rawPayload: Record<string, unknown>,
   parsed: ExtensionPathExpression
 ): Record<string, unknown> {
-  const ext = rawPayload[parsed.schemaUrn];
+  const ext = readResolvedProperty(rawPayload, parsed.schemaUrn);
   if (typeof ext === 'object' && ext !== null) {
-    const copy = { ...(ext as Record<string, unknown>) };
+    let copy = { ...(ext as Record<string, unknown>) };
     if (parsed.subAttribute) {
-      const parent = copy[parsed.attributePath];
+      const parent = readResolvedProperty(copy, parsed.attributePath);
       if (typeof parent === 'object' && parent !== null && !Array.isArray(parent)) {
         const parentCopy = { ...(parent as Record<string, unknown>) };
-        delete parentCopy[safePropertyKey(parsed.subAttribute)];
-        copy[safePropertyKey(parsed.attributePath)] = parentCopy;
+        copy = withResolvedProperty(copy, parsed.attributePath, withoutResolvedProperty(parentCopy, parsed.subAttribute));
       }
     } else {
-      delete copy[safePropertyKey(parsed.attributePath)];
+      copy = withoutResolvedProperty(copy, parsed.attributePath);
     }
-    rawPayload[parsed.schemaUrn] = copy;
+    return withResolvedProperty(rawPayload, parsed.schemaUrn, copy);
   }
   return rawPayload;
 }
@@ -635,19 +581,18 @@ export function applyExtensionValuePathUpdate(
   rawPayload: Record<string, unknown>,
   parsed: ExtensionValuePathExpression,
   value: unknown,
-  caseExact = false,
+  caseExact: boolean | ReadonlySet<string> = false,
 ): ValuePathOpResult {
-  const ext = rawPayload[parsed.schemaUrn];
+  const ext = readResolvedProperty(rawPayload, parsed.schemaUrn);
   if (typeof ext !== 'object' || ext === null || Array.isArray(ext)) {
     return { matched: false, payload: rawPayload };
   }
   const extObj = { ...(ext as Record<string, unknown>) };
-  const inner = applyValuePathUpdate(extObj, parsed.valuePath, value, caseExact);
+  const inner = applyValuePathUpdate(extObj, { ...parsed.valuePath, schemaUrn: parsed.schemaUrn }, value, caseExact);
   if (!inner.matched) {
     return { matched: false, payload: rawPayload };
   }
-  rawPayload[parsed.schemaUrn] = inner.payload;
-  return { matched: true, payload: rawPayload };
+  return { matched: true, payload: withResolvedProperty(rawPayload, parsed.schemaUrn, inner.payload) };
 }
 
 /**
@@ -658,19 +603,18 @@ export function applyExtensionValuePathUpdate(
 export function removeExtensionValuePathEntry(
   rawPayload: Record<string, unknown>,
   parsed: ExtensionValuePathExpression,
-  caseExact = false,
+  caseExact: boolean | ReadonlySet<string> = false,
 ): ValuePathOpResult {
-  const ext = rawPayload[parsed.schemaUrn];
+  const ext = readResolvedProperty(rawPayload, parsed.schemaUrn);
   if (typeof ext !== 'object' || ext === null || Array.isArray(ext)) {
     return { matched: false, payload: rawPayload };
   }
   const extObj = { ...(ext as Record<string, unknown>) };
-  const inner = removeValuePathEntry(extObj, parsed.valuePath, caseExact);
+  const inner = removeValuePathEntry(extObj, { ...parsed.valuePath, schemaUrn: parsed.schemaUrn }, caseExact);
   if (!inner.matched) {
     return { matched: false, payload: rawPayload };
   }
-  rawPayload[parsed.schemaUrn] = inner.payload;
-  return { matched: true, payload: rawPayload };
+  return { matched: true, payload: withResolvedProperty(rawPayload, parsed.schemaUrn, inner.payload) };
 }
 
 /**

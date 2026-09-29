@@ -541,7 +541,7 @@ export class EndpointScimUsersService {
           active: user.active,
           rawPayload,
         },
-        { verbosePatch, extensionUrns },
+        { verbosePatch, extensionUrns, caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId) },
       );
     } catch (err) {
       if (err instanceof PatchError) {

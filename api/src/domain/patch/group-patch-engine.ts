@@ -36,6 +36,8 @@ import {
 } from '../../modules/scim/utils/scim-patch-path';
 
 import { PatchError } from './patch-error';
+import { parsePatchPath, patchAttributePath } from './patch-path';
+import { applyPatchSelection } from './patch-selection';
 
 /**
  * Keys that must never appear in user-supplied objects to prevent
@@ -75,7 +77,7 @@ export class GroupPatchEngine {
     let rawPayload = { ...state.rawPayload };
 
     for (let i = 0; i < operations.length; i++) {
-      const operation = operations[i];
+      let operation = operations[i];
       const op = operation.op?.toLowerCase();
       if (!op || !['add', 'replace', 'remove'].includes(op)) {
         throw new PatchError(
@@ -87,6 +89,36 @@ export class GroupPatchEngine {
       }
 
       try {
+        const parsed = operation.path ? parsePatchPath(operation.path, config.extensionUrns) : undefined;
+        if (parsed?.kind === 'selection') {
+          if (!parsed.schemaUrn && parsed.attribute.toLowerCase() === 'members') {
+            if (op !== 'remove' && parsed.subAttribute?.toLowerCase() === 'value' &&
+                (typeof operation.value !== 'string' || !operation.value)) {
+              throw new PatchError(400, 'Member value must be a non-empty string.', 'invalidValue');
+            }
+            // Retain Entra's explicit member-removal array compatibility.
+            if (op === 'remove' && Array.isArray(operation.value) && operation.value.length > 0) {
+              members = GroupPatchEngine.handleRemove(operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers);
+              continue;
+            }
+            const value = !parsed.subAttribute && Array.isArray(operation.value) && operation.value.length === 1
+              ? operation.value[0] : operation.value;
+            const memberCaseExact = new Set(config.caseExactPaths);
+            if (memberCaseExact.has('value')) memberCaseExact.add('members.value');
+            const result = applyPatchSelection(
+              { members }, parsed, op, value, memberCaseExact, false, op === 'remove',
+            );
+            members = GroupPatchEngine.ensureUniqueMembers(
+              (result.members as unknown[]).map(m => GroupPatchEngine.toMemberDto(m)),
+            );
+          } else {
+            rawPayload = applyPatchSelection(rawPayload, parsed, op, operation.value, config.caseExactPaths);
+          }
+          continue;
+        }
+        if (parsed) {
+          operation = { ...operation, path: `${parsed.schemaUrn ? `${parsed.schemaUrn}:` : ''}${patchAttributePath(parsed)}` };
+        }
         switch (op) {
           case 'replace': {
             const result = GroupPatchEngine.handleReplace(
@@ -178,7 +210,7 @@ export class GroupPatchEngine {
               }
             }
             members = GroupPatchEngine.handleRemove(
-              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers, config.caseExactPaths,
+              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
             );
             break;
           }
@@ -419,7 +451,6 @@ export class GroupPatchEngine {
     members: GroupMemberDto[],
     allowMultiMemberRemove: boolean,
     allowRemoveAllMembers: boolean,
-    caseExactPaths?: Set<string>,
   ): GroupMemberDto[] {
     const path = operation.path?.toLowerCase();
 
@@ -442,20 +473,6 @@ export class GroupPatchEngine {
         }
       }
       return members.filter(m => !membersToRemove.has(m.value));
-    }
-
-    // Targeted removal: members[value eq "user-id"]
-    // Use original path (not lowercased) to preserve filter value casing for G7 caseExact
-    const memberPathMatch = operation.path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
-    if (memberPathMatch) {
-      const valueToRemove = memberPathMatch[1];
-      // G7: Use caseExact from schema cache for value comparison
-      // members[].value has no explicit caseExact → defaults to case-insensitive
-      const isCaseExact = caseExactPaths?.has('value') ?? false;
-      if (isCaseExact) {
-        return members.filter(m => m.value !== valueToRemove);
-      }
-      return members.filter(m => m.value.toLowerCase() !== valueToRemove.toLowerCase());
     }
 
     // path=members without value - remove all members

@@ -45,6 +45,8 @@ import type {
 } from './patch-types';
 
 import { PatchError } from './patch-error';
+import { parsePatchPath, patchAttributePath } from './patch-path';
+import { applyPatchSelection } from './patch-selection';
 
 // ─── Input State ─────────────────────────────────────────────────────────────
 
@@ -142,10 +144,19 @@ export class UserPatchEngine {
         );
       }
 
-      const originalPath = operation.path;
-      const path = originalPath?.toLowerCase();
-
       try {
+        const parsed = operation.path ? parsePatchPath(operation.path, config.extensionUrns) : undefined;
+        if (parsed?.kind === 'selection') {
+          rawPayload = applyPatchSelection(
+            rawPayload, parsed, op, operation.value, config.caseExactPaths,
+            op === 'add' && !parsed.schemaUrn,
+          );
+          continue;
+        }
+        const originalPath = parsed
+          ? `${parsed.schemaUrn ? `${parsed.schemaUrn}:` : ''}${patchAttributePath(parsed)}`
+          : operation.path;
+        const path = originalPath?.toLowerCase();
         if (op === 'add' || op === 'replace') {
           ({ userName, displayName, externalId, active, rawPayload } =
             UserPatchEngine.applyAddOrReplace(

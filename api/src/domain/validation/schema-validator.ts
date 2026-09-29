@@ -40,6 +40,8 @@ const RESERVED_KEYS = new Set([
   'meta',
 ]);
 
+import { parsePatchPath, type ParsedPatchPath } from '../patch/patch-path';
+
 /**
  * Determine whether a schema definition represents the core schema for a resource type.
  * Core schema attributes live at the top level of the SCIM payload.
@@ -153,15 +155,6 @@ export class SchemaValidator {
         if (!extSchema) {
           // Unknown extension URN in strict mode → already handled by enforceStrictSchemaValidation
           continue;
-        }
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-          this.validateAttributes(
-            value as Record<string, unknown>,
-            extSchema.attributes,
-            key,
-            options,
-            errors,
-          );
         }
         continue;
       }
@@ -1245,12 +1238,18 @@ export class SchemaValidator {
     }
 
     // Resolve the path to its attribute definition
-    const attrDef = this.resolvePatchPath(path, coreAttributes, extensionSchemas);
+    let parsed: ParsedPatchPath;
+    try {
+      parsed = parsePatchPath(path, [...extensionSchemas.keys()], schemas.find(isCoreSchema)?.id);
+    } catch (error) {
+      return { valid: false, errors: [{ path, message: (error as Error).message, scimType: 'invalidPath' }] };
+    }
+    const attrDef = this.resolvePatchPath(parsed, coreAttributes, extensionSchemas);
 
     // G8c: Also check if the ROOT attribute in the path chain is readOnly.
     // e.g. "groups[value eq \"x\"].display" - `groups` is readOnly, so the
     // entire sub-path is unreachable for client writes.
-    const rootAttrDef = this.resolveRootAttribute(path, coreAttributes, extensionSchemas);
+    const rootAttrDef = this.resolveRootAttribute(parsed, coreAttributes, extensionSchemas);
 
     if (rootAttrDef?.mutability === 'readOnly') {
       errors.push({
@@ -1303,29 +1302,24 @@ export class SchemaValidator {
    *  - "attrName[filter].subAttr" → sub-attribute via value filter
    */
   private static resolvePatchPath(
-    path: string,
+    path: ParsedPatchPath,
     coreAttributes: Map<string, SchemaAttributeDefinition>,
     extensionSchemas: Map<string, SchemaDefinition>,
   ): SchemaAttributeDefinition | undefined {
-    // Strip value filter (e.g., emails[type eq "work"].value → emails.value)
-    const cleanPath = path.replace(/\[.*?\]/g, '');
-
-    // Check for extension URN prefix
     for (const [urn, schema] of extensionSchemas) {
-      if (cleanPath.startsWith(urn + ':') || cleanPath.startsWith(urn + '.')) {
-        const remainder = cleanPath.slice(urn.length + 1);
+      if (path.schemaUrn?.toLowerCase() === urn.toLowerCase()) {
         const extAttrMap = new Map<string, SchemaAttributeDefinition>();
         for (const a of schema.attributes) {
           extAttrMap.set(a.name.toLowerCase(), a);
         }
-        if (!remainder) return undefined;
-        const segments = remainder.split('.');
+        const segments = [path.attribute, ...(path.subAttribute?.split('.') ?? [])];
         return this.walkAttributePath(segments, extAttrMap);
       }
     }
 
     // Core attribute path
-    const segments = cleanPath.split('.');
+    if (path.schemaUrn) return undefined;
+    const segments = [path.attribute, ...(path.subAttribute?.split('.') ?? [])];
     return this.walkAttributePath(segments, coreAttributes);
   }
 
@@ -1713,6 +1707,10 @@ export class SchemaValidator {
           // ─── CaseExact ───
           if (attr.caseExact === true) {
             addTo(caseExactByParent, parentKey, nameLower);
+            if (!isCore) {
+              const relative = parentKey === topParent ? nameLower : `${parentKey.slice(topParent.length + 1)}.${nameLower}`;
+              caseExactPaths.add(`${topParent}:${relative}`);
+            }
             // Also build dotted path for filter consumer convenience
             // Strip the leading URN prefix for the flat caseExactPaths set
             if (allSchemaUrns.has(parentKey)) {
@@ -1838,27 +1836,19 @@ export class SchemaValidator {
   // ─── G8c: PATCH path utilities ────────────────────────────────────
 
   private static resolveRootAttribute(
-    path: string,
+    path: ParsedPatchPath,
     coreAttributes: Map<string, SchemaAttributeDefinition>,
     extensionSchemas: Map<string, SchemaDefinition>,
   ): SchemaAttributeDefinition | undefined {
-    // Strip value filters
-    const cleanPath = path.replace(/\[.*?\]/g, '');
-
-    // Extension URN prefix → root is the first extension attribute
     for (const [urn, schema] of extensionSchemas) {
-      if (cleanPath.startsWith(urn + ':') || cleanPath.startsWith(urn + '.')) {
-        const remainder = cleanPath.slice(urn.length + 1);
-        if (!remainder) return undefined;
-        const rootName = remainder.split('.')[0];
+      if (path.schemaUrn?.toLowerCase() === urn.toLowerCase()) {
         return schema.attributes.find(
-          a => a.name.toLowerCase() === rootName.toLowerCase(),
+          a => a.name.toLowerCase() === path.attribute.toLowerCase(),
         );
       }
     }
 
     // Core attribute - first segment
-    const rootName = cleanPath.split('.')[0];
-    return coreAttributes.get(rootName.toLowerCase());
+    return path.schemaUrn ? undefined : coreAttributes.get(path.attribute.toLowerCase());
   }
 }

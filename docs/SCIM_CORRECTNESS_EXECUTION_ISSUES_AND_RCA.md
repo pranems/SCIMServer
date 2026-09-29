@@ -19,6 +19,10 @@ rewritten as implementation success.
 
 ## Entries
 
+P1 confirmed implementation issues and their detection-stage analysis are in
+[SCIM_P1_EXECUTION_RCA.md](SCIM_P1_EXECUTION_RCA.md). The original entries below
+remain the design-preparation record.
+
 | ID | Type / severity | Symptom | Root cause | Resolution and why it works | Earliest possible / actual detection | Prevention / status |
 |---|---|---|---|---|---|---|
 | I01 | Tooling / Low | Knowledge-graph overlay cannot be produced | This worktree has no `.understand-anything/knowledge-graph.json` | Use actual Git/source/tests as evidence; do not invent graph nodes | Intake / intake | Optional graph generation remains separate; not a product blocker |

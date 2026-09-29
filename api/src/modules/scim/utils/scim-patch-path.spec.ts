@@ -121,12 +121,12 @@ describe('scim-patch-path utilities', () => {
       expect(result!.filterOperator).toBe('eq');
     });
 
-    it('should return null for malformed bracket expression', () => {
-      expect(parseValuePath('emails[type eq work].value')).toBeNull();
+    it('should reject malformed bracket expressions rather than returning a fallback', () => {
+      expect(() => parseValuePath('emails[type eq work].value')).toThrow('Invalid PATCH path');
     });
 
-    it('should return null for missing closing bracket', () => {
-      expect(parseValuePath('emails[type eq "work".value')).toBeNull();
+    it('should reject a missing closing bracket', () => {
+      expect(() => parseValuePath('emails[type eq "work".value')).toThrow('Invalid PATCH path');
     });
   });
 
@@ -232,14 +232,14 @@ describe('scim-patch-path utilities', () => {
       expect(matchesFilter({}, 'type', 'eq', 'work')).toBe(false);
     });
 
-    it('should coerce non-string values to string for comparison', () => {
-      expect(matchesFilter({ count: 5 }, 'count', 'eq', '5')).toBe(true);
+    it('should preserve numeric comparison types', () => {
+      expect(matchesFilter({ count: 5 }, 'count', 'eq', '5')).toBe(false);
+      expect(matchesFilter({ count: 5 }, 'count', 'eq', 5)).toBe(true);
     });
 
-    it('should fall back to strict string equality for unsupported operators', () => {
-      // 'sw' is not explicitly implemented, falls back to String(actual) === String(filterValue)
+    it('should use starts-with semantics, not an equality fallback', () => {
       expect(matchesFilter({ type: 'work' }, 'type', 'sw', 'work')).toBe(true);
-      expect(matchesFilter({ type: 'work' }, 'type', 'sw', 'wo')).toBe(false);
+      expect(matchesFilter({ type: 'work' }, 'type', 'sw', 'wo')).toBe(true);
     });
 
     it('should handle null attribute value', () => {
@@ -278,10 +278,10 @@ describe('scim-patch-path utilities', () => {
       expect(matchesFilter({ primary: false }, 'primary', 'eq', 'True')).toBe(false);
     });
 
-    it('should handle boolean in unsupported operator fallback', () => {
-      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'true')).toBe(true);
-      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'True')).toBe(true);
-      expect(matchesFilter({ primary: false }, 'primary', 'sw', 'false')).toBe(true);
+    it('should not apply string operators to Boolean values', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'true')).toBe(false);
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'True')).toBe(false);
+      expect(matchesFilter({ primary: false }, 'primary', 'sw', 'false')).toBe(false);
     });
 
     // ─── caseExact-aware filtering (RFC 7643 §2.2) ──────────────────
@@ -1095,13 +1095,8 @@ describe('scim-patch-path utilities', () => {
       expect(vp.subAttribute).toBe('value');
     });
 
-    it('should return null when valuePath inside extension is malformed', () => {
-      const result = parseExtensionPath(`${URN}:aliases[invalid`, [URN]);
-      // Falls back to flat (literal attributePath) - intentional: behavior matches
-      // the pre-F7 behavior for unparseable bracket expressions inside an
-      // extension path; engines treat it as a flat extension attribute.
-      expect(result).not.toBeNull();
-      expect(isExtensionValuePath(result!)).toBe(false);
+    it('should reject malformed extension selectors without a literal-key fallback', () => {
+      expect(() => parseExtensionPath(`${URN}:aliases[invalid`, [URN])).toThrow('Invalid PATCH path');
     });
 
     it('isExtensionValuePath returns false for flat/dotted extension paths', () => {
