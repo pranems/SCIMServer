@@ -411,14 +411,14 @@ combined checkpoint has its own counts in section 11.1.
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
 | P2 | Authorized flags integrated and focused dual-backend proof passed | `29b3b2c6` -> `8d2110d1`; 356 HTTP cases/backend preserve ordered/common/P7 overlaps. Quoted active and explicit dotted User controls pass both strict modes; P2 built-live188/backend. Namespace-only strict prevalidation and final C0 remain separate; section 11.22 |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
-| P3b | Four source commits integrated; write/transaction checks pass, query hold measured | `704d701f` -> `7001d194`; 245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared live checks/backend pass. Extra probe43/45: numeric/MV displayName filters fail differently by backend. Source proof remains648/158/156 plus two native N/A. Section11.23 distinguishes writer closure from query/admission/profile coordination |
+| P3b | Four accepted source commits integrated; conflicting fifth held | Accepted chain ends `704d701f` -> `7001d194`, with measured write/query boundaries in11.23. `4ba9373c` is not imported: numeric/MV common externalId contradicts the authoritative all-core String contract. Source GREEN does not approve that policy; section11.25 |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | Four source commits assembled; focused context overlaps verified | `8d5915ba` -> `e80da689`; binding-local common views and authoritative timestamps preserve existing PATCH/retention fixes.754 units,537 InMemory/538 PostgreSQL HTTP and143 live checks/backend including472 P7 assertions pass. Namespace-only, prior eight expectations and broader query/admission acceptance remain open; section11.24 |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Supplied source assembly complete; acceptance remains open | Checkpoints through11.24; original82-case/backend ledger unchanged. Numeric/MV displayName filtering, malformed profile omission, P7b characteristics/query/test/namespace, uniqueness admission/profile coordination and performance/artifact acceptance remain open |
+| C0 | Accepted source assembly complete; conflicting source and acceptance remain open | Checkpoints through11.25; original82-case/backend ledger unchanged. `4ba9373c` held; query/admission/P7b/performance/artifact decisions remain explicit. No final matrix or publication |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -1862,6 +1862,40 @@ the actual published metadata instead of weakening assertions.
 **Design/architecture disposition: accepted.** Context views, PATCH value
 checks and shared retention remain separate cohesive concerns in existing
 seams; no global profile rewrite or duplicate matcher was introduced.
+
+### 11.25 Held externalId relaxation, not imported, 2026-09-29
+
+Committed source `4ba9373c509f6305c7f67cf082ce78bf03b6ae37`, child of
+`704d701f`, was supplied after the completed source-assembly handoff.
+It is **held and has not been cherry-picked**. Inspection was limited to
+committed content; no pending sibling diff was read or edited.
+
+Its `compileUniquenessPolicy` change removes externalId from the all-core
+String guard and applies that guard only to builtin User/Group. New positive
+controls then permit numeric/MV top-level externalId on generic cores.
+That is not the accepted distinction: [RFC7643 sections3/3.1](https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1) common externalId
+is String/SV/caseExact/readWrite on **every** resource core. Only an
+extension-namespaced homonym is independently typed. Custom displayName and
+active are not common attributes and retain their valid schema-defined types.
+
+The source author timestamp is01:22, before the parent's authoritative06:06
+checkpoint and explicit later approval of the `6fbd1770` clarification.
+Its source-only GREEN receipt cannot replace that contract. No new runtime
+test was needed to establish the contradictory code change; the existing
+common-value negative controls are retained, not weakened to accept it.
+
+**Disposition: held for parent reconciliation.** The accepted P3b chain
+remains the first four commits through `704d701f`. Do not silently cherry-pick
+the fifth, relabel its invalid common-value positives as extension tests, or
+add numeric common-externalId query support. Future coordinated compiler/
+admission work must resolve common views per ResourceType binding before
+checking policy, while preserving the shared declaration's extension use.
+
+**Self-improvement: applied.** Admission to the integration branch depends
+on the current accepted contract, not a stale handoff's approval wording or
+passing implementation tests. **Design disposition: accepted.** No extra
+validator, schema rewrite, default change or runtime edit is introduced by
+this hold. Existing verification and source fingerprints remain unchanged.
 
 ## 12. Architecture and self-improvement decisions
 

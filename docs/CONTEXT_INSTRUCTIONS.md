@@ -9,6 +9,13 @@
 
 ## Active Delivery Process
 
+**Unaccepted source:** `4ba9373c` was inspected but not imported. It limits
+the common externalId String guard to builtin User/Group and introduces
+numeric/MV custom-core positives, contrary to the current authoritative
+all-core common contract. Accepted P3b source stops at `704d701f`.
+Extension homonyms remain independently typed; no blanket custom-field
+restriction is introduced. See [held-source decision](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1125-held-externalid-relaxation-not-imported-2026-09-29).
+
 The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
 P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
 owns current combined results; the records below are source-package evidence,
