@@ -17,6 +17,10 @@ and completed-candidate checks now pass 973 units, 392 HTTP cases/backend,
 Actual owned PostgreSQL 17.8 replayed 22 migrations and was removed; APIs
 stopped with unchanged endpoint inventories. [Separate proof](docs/evidence/scim-common-patch-20260929/validation.json).
 This is not full C0 or generic query/uniqueness representation closure.
+P7 now owns a separate parent-requested follow-up for common id/meta and
+schemas used in both core and extension roles. The assembly already keeps
+generic extension `isCoreSchema:false` plus required-binding metadata; preserve
+those on merge. No shared-schema role or id/meta closure is claimed yet.
 
 **P9 harness hardening integrated:** `8679e90f` -> `2c5067a4`. P9 now pins the
 verified URL through bootstrap; the shared runner clears inherited URLs and

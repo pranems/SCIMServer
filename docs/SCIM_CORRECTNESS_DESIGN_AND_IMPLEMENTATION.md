@@ -1553,6 +1553,35 @@ full-resource requiredness. **Design disposition: applied.** One pure
 common-value checker serves POST/PUT and PATCH; resource adapters remain
 small, required-check boundaries and protocol defaults stay unchanged.
 
+#### Pending P7 binding-context and id/meta follow-up
+
+The parent assigned P7 a separate focused follow-up on top of `8e8aa72e`.
+It must verify common top-level id/meta precedence and a schema used as a
+core by one ResourceType and as an extension by another. A schema's global
+membership in a set of core IDs is not sufficient to decide every use.
+Strict declaration syntax checks remain, while effective common overrides
+belong only to the actual core binding; the separate extension declaration
+and extension homonyms must not be mutated or rejected by that core use.
+Top-level id/meta remain server-generated/ignored input even with older
+conflicting declarations. No atomic-uniqueness or ordered-PATCH implementation
+is assigned to this follow-up.
+
+The assembled generic schema builder already preserves
+`isCoreSchema:false` **and** `required:ext.required` for extension bindings
+(from the P3b/P7 merge). That existing fix must survive the new merge; it does
+not prove all private builders, shared-role admission/expansion or id/meta
+paths are correct. A registered extension URI containing `:core:` needs an
+explicit role, not prefix-based inference.
+
+P7 owns RED-first implementation and committed evidence; integration will
+reconcile it with public deepEqual, neutral retained-entry matching, the
+common-value PATCH checker and repository policies. No pending P7 tree is
+read or changed here. These controls remain open before C0.
+**Assurance disposition: applied:** record binding-specific positive and
+negative controls rather than inferring correctness from a schema name.
+**Design disposition: accepted:** reuse explicit schema-role metadata, not a
+second parser or endpoint-global common-attribute mutation.
+
 ## 12. Architecture and self-improvement decisions
 
 | Decision | Disposition and reason |
