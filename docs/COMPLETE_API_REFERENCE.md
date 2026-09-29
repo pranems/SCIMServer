@@ -1855,10 +1855,13 @@ sort by type; strings honor that exact namespace's `caseExact`. Multi-valued
 sort paths select the primary item, otherwise the first; missing values sort
 last ascending and first descending. `totalResults` counts all matches before
 paging. GET and the existing string-form JSON `.search` use the same read plan.
-For custom numeric or multi-valued attributes named `displayName` or
-`externalId`, filtering uses the schema-typed payload value rather than an
-incompatible optional string query column. This includes presence and
-compound predicates; qualified and unqualified paths agree.
+For custom numeric or multi-valued attributes named `displayName` or `active`,
+filtering uses the schema-typed payload value rather than an incompatible
+optional query column. Common top-level `externalId` is always a single-valued
+string with caseExact comparison and ordering on every ResourceType (RFC 7643
+section 3.1). An extension-qualified `externalId` is independent and follows
+its extension's declared type, cardinality and caseExact. Presence and compound
+predicates preserve these namespace distinctions.
 See [query semantics and implementation evidence](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md).
 
 Custom PUT/PATCH/DELETE use the same ETag capability profile as discovery:

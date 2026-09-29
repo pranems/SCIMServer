@@ -1,5 +1,9 @@
 import type { SchemaAttributeDefinition, SchemaDefinition } from '../../../domain/validation';
-import { buildGenericFilter, buildUserFilter } from '../filters/apply-scim-filter';
+import {
+  buildGenericFilter,
+  buildGroupFilter,
+  buildUserFilter,
+} from '../filters/apply-scim-filter';
 import { createReadQuery, type ReadQueryParams } from './scim-read-query';
 import { stripNeverReturnedFromPayload } from './scim-service-helpers';
 
@@ -58,12 +62,12 @@ function page(params: ReadQueryParams, rows: Record<string, unknown>[], limit = 
 }
 
 describe('Shared read query plan', () => {
-  it.each(['displayName', 'externalId'])(
+  it.each(['displayName', 'active'])(
     'retains numeric and multi-valued %s candidates instead of using a string column',
     (name) => {
       for (const definition of [
-        attr(name, { type: 'integer', caseExact: name === 'externalId' }),
-        attr(name, { multiValued: true, caseExact: name === 'externalId' }),
+        attr(name, { type: 'integer' }),
+        attr(name, { multiValued: true }),
       ]) {
         const definitions: SchemaDefinition[] = [
           { id: CORE, isCoreSchema: true, attributes: [definition] },
@@ -84,6 +88,89 @@ describe('Shared read query plan', () => {
       }
     },
   );
+
+  it.each([buildUserFilter, buildGroupFilter, buildGenericFilter])(
+    '%p applies fixed common externalId caseExact independently of extension homonyms',
+    (build) => {
+      const definitions: SchemaDefinition[] = [
+        { id: CORE, isCoreSchema: true, attributes: [attr('externalId', { caseExact: false })] },
+        { id: EXT, attributes: [attr('externalId', { caseExact: false })] },
+      ];
+      const rows = [
+        { id: 'upper', externalId: 'Z', [EXT]: { externalId: 'Z' } },
+        { id: 'lower', externalId: 'a', [EXT]: { externalId: 'a' } },
+      ];
+      for (const path of ['externalId', `${CORE}:externalId`]) {
+        const exact = createReadQuery({ filter: `${path} eq "z"` }, definitions, 100, build);
+        expect(
+          exact.page(
+            rows,
+            (r) => r,
+            (r) => r,
+          ).Resources,
+        ).toEqual([]);
+        const sort = createReadQuery({ sortBy: path }, definitions, 100, build);
+        expect(
+          sort.page(
+            rows,
+            (r) => r,
+            (r) => r,
+          ).Resources,
+        ).toEqual(rows);
+      }
+      const extension = createReadQuery(
+        { filter: `${EXT}:externalId eq "z"` },
+        definitions,
+        100,
+        build,
+      );
+      expect(
+        extension.page(
+          rows,
+          (r) => r,
+          (r) => r,
+        ).Resources,
+      ).toEqual([rows[0]]);
+    },
+  );
+
+  it.each([
+    { type: 'integer', multiValued: false, value: 2, literal: '2' },
+    { type: 'string', multiValued: true, value: ['other', 'needle'], literal: '"needle"' },
+  ])('preserves independent extension externalId $type/$multiValued semantics', (shape) => {
+    const definitions: SchemaDefinition[] = [
+      { id: CORE, isCoreSchema: true, attributes: [] },
+      { id: EXT, attributes: [attr('externalId', shape)] },
+    ];
+    const rows = [{ externalId: 'common-string', [EXT]: { externalId: shape.value } }];
+    const query = createReadQuery(
+      { filter: `${EXT}:externalId eq ${shape.literal}` },
+      definitions,
+      100,
+      buildGenericFilter,
+    );
+    expect(query.dbWhere).toEqual({});
+    expect(
+      query.page(
+        rows,
+        (r) => r,
+        (r) => r,
+      ).Resources,
+    ).toEqual(rows);
+  });
+
+  it('does not remove an existing writeOnly denial when enforcing common externalId shape', () => {
+    const definitions: SchemaDefinition[] = [
+      {
+        id: CORE,
+        isCoreSchema: true,
+        attributes: [attr('externalId', { mutability: 'writeOnly' })],
+      },
+    ];
+    expect(() =>
+      createReadQuery({ filter: 'externalId pr' }, definitions, 100, buildGenericFilter),
+    ).toThrow();
+  });
 
   it('keeps string-column push-down for compatible scalar custom attributes', () => {
     for (const name of ['displayName', 'externalId']) {

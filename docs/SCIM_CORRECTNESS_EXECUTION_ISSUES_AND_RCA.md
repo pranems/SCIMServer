@@ -296,6 +296,7 @@ consumers; repository boundaries, defaults and live-data policy are unchanged.
 | P6b-I12 | Tooling / Low | New test lint rejected unsafe Supertest bodies; documentation rendering initially skipped | HTTP library body type is any; root/web tooling was absent after cleanup | Assert object bodies through a typed test helper; restore frozen documentation/browser dependencies after the real missing-tool result | Static gate / same | A skipped renderer is not a render pass; no shared dependency targets or lockfiles are modified |
 | P6b-I13 | Documentation diagnostics / Low | Link scan found three old Session references; renderer discovery reported editor version 0.0.0 | Historical Session text names removed tests/ignored settings; available renderer metadata cannot establish a matching bundle version | Compare against starting HEAD, record the existing links, and render with pinned 11.15.0 without changing dependency pins or editor state | Documentation gate / same | No new broken links accepted; historical cleanup and editor-version discovery remain outside P6b |
 | P6b-I14 | Cross-package query correctness / High | Custom numeric/multi-valued displayName and externalId returned zero matches through unqualified equality/presence queries, while their payload values existed | Candidate push-down used a fixed string column selected by attribute name; P6b supplied caseExact but not the resolved type/cardinality. Null promoted columns discarded payload-backed candidates before the correct evaluator ran | The read plan now passes explicit schema shapes to the existing builders, which reject incompatible column push-down for the whole expression. RED was two unit cases and four HTTP cases; GREEN focused InMemory is 100 unit, 92 HTTP, 40 live checks | Cross-package representation review / sibling P3 coordination after initial P6b validation | Test common promoted names with custom numeric and multi-valued schemas, plus compatible scalar controls. Persistence reconstruction remains P3-owned; this follow-up changes no writes |
+| P6b-I15 | Standards/test correctness / High | P6c wrongly treated common top-level externalId as customizable numeric/MV; generic string externalId queries also matched the wrong case when explicitly declared without caseExact | Query design generalized custom core attributes without first applying RFC 7643 section 3.1's fixed common-attribute contract. A schema declaration overrode the helper's fallback-only caseExact default | P6d fixes common externalId to string/SV/caseExact in the read plan, retaining writeOnly denial and independent extension semantics. Replace invalid top-level numeric/MV acceptance fixtures with extension homonyms and custom displayName/active controls. Confirmed RED: 3 unit and 1 HTTP wrong-case result; GREEN: 106 unit, 97 InMemory HTTP, 46 owned local live checks | Standards contract before fixture design / parent RFC correction after P6c commit | Common RFC attributes are checked before schema-driven generalization; use namespaced homonyms for custom type/cardinality tests. P3 owns write policy and P7 owns admission; historical P6c commit/receipts remain, but their invalid acceptance claims are superseded |
 
 ### P8b confirmed issues
 
@@ -390,6 +391,16 @@ was removed by exact identity and both APIs stopped. The retained
 unit tests, API build and the unchanged two-warning lint baseline passed.
 No persistence changes were imported from P3. This is focused follow-up
 evidence, not full cross-package consolidation or full-transcript proof.
+
+**P6d/P6b-I15 correction confirmation:** historical P6c acceptance evidence
+for numeric/MV common externalId is superseded by the fixed RFC contract.
+The corrected fixtures, read normalization and extension controls passed
+106 unit tests, 97 HTTP tests per backend and 46 live checks per backend.
+Owned PostgreSQL 17.8 replayed 22 migrations and exact container
+`97473ee0d9e51f4c1a323633f54f62ca1e10ae916e6a843a3c6d96bb17f5fd54`
+was removed. Retained `test-results/p6d/` logs show only the intentional
+three unit and one HTTP wrong-case RED assertions, not setup failures.
+API build, zero-finding changed-file lint and documentation gates passed.
 
 **Test/gate disposition:** historical failure evidence is retained; permanent
 regression tests are required before production edits.

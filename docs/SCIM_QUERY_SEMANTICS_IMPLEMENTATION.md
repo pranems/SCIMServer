@@ -203,12 +203,14 @@ No inherited/shared/live database, cloud deployment, or data repair was used.
 
 ### P6c follow-up: a published name does not guarantee column equivalence
 
-Coordination with the independent P3 representation work exposed a missing
-cross-package control. A custom schema can define `displayName` or `externalId`
-as numeric or multi-valued. Their complete values are in `rawPayload`, while
-the optional promoted query column is a scalar string and can be null.
-Pushing `externalId pr` or `displayName eq 2` into that string column can
-discard a matching resource before the internal evaluator sees it.
+**Historical result, corrected by P6d below:** P6c correctly identified that
+custom `displayName` can be numeric or multi-valued, with values held in
+`rawPayload` rather than its optional scalar string query column. It
+incorrectly generalized this permission to common top-level `externalId`.
+RFC 7643 section 3.1 fixes common externalId to a single-valued caseExact
+string for every ResourceType. Only an extension-qualified homonym is
+independent. The historical P6c commit and receipts are retained for RCA,
+not treated as proof that numeric/MV common externalId acceptance is valid.
 
 The read plan now supplies each resolved attribute's type and cardinality to
 the existing filter builder. The builder pushes a mapped comparison only
@@ -218,21 +220,25 @@ qualified paths retain the existing residual behavior. Compatible scalar
 strings and built-in Boolean columns still use the existing indexed path.
 There is no new repository port and no change to POST/PUT/PATCH persistence.
 
-For example, a custom resource containing `displayName: 2` and
-`externalId: ["other", "needle"]` must match all of these:
+The corrected example is a custom resource containing `displayName: 2`,
+common `externalId: "Z"` and `urn:live:query:Extension` containing an
+independent `externalId: ["other", "needle"]`. It matches all of these:
 
 ```text
 displayName eq 2
-externalId eq "needle"
-displayName pr and externalId pr
-externalId co "eed"
+externalId eq "Z"
+urn:live:query:Extension:externalId eq "needle"
+displayName pr and urn:live:query:Extension:externalId pr
+urn:live:query:Extension:externalId co "eed"
 ```
 
 The follow-up tests assert matching IDs, scalar/list payload values,
 unqualified/qualified equivalence, compound AND/OR, count zero, and the
 unchanged compatible string push-down. RED on `cc3ccdbc` was **2 unit tests
-and 4 HTTP tests**, with valid POST fixtures and actual zero-match errors.
-Focused GREEN is **100 unit tests, 92 HTTP tests per backend, and 40 live
+and 4 HTTP tests**, with successfully created POST fixtures and actual
+zero-match errors. The top-level externalId fixtures were subsequently
+identified as standards-invalid and replaced in P6d.
+Historical focused GREEN was **100 unit tests, 92 HTTP tests per backend, and 40 live
 checks per backend**. Actual PostgreSQL 17.8 replayed 22 migrations under the
 same task-owned identity guards; the exact container and both owned API
 processes were removed/stopped. API build passed. Changed-file lint is
@@ -246,11 +252,46 @@ overwrite original P6b results. The current-tip harness validates the changed
 source and excludes the standard destructive E2E teardown.
 
 The live helper remains section **9z-CP**; no sibling's section IDs changed.
-P3 owns representation preservation and schema validation on writes.
+P3 owns write policy and preservation; P7 owns common-attribute admission.
 Cross-package integration and release validation remain parent-owned.
 **Design disposition accepted:** explicit schema shape is a narrow extension
 of the existing filter-builder input, not another query framework. The
 filter compiler still has one responsibility and the three services share it.
+
+### P6d correction: common externalId is fixed, extension homonyms are not
+
+The read plan now enforces the
+[RFC 7643 section 3.1](https://www.rfc-editor.org/rfc/rfc7643.html#section-3.1)
+shape for common `externalId`: string, single-valued, caseExact. This also
+applies to core-qualified aliases and to an existing profile declaration
+that omits or weakens caseExact. Existing writeOnly query denial is preserved.
+No write admission or mutation code changes in this P6 follow-up.
+
+The new regression creates valid string values `"Z"` and `"a"`. Common
+`externalId eq "z"` must return no matches and ascending sort must return
+`"Z"` before `"a"`. An extension `externalId` with caseExact false can still
+match `"z"` against `"Z"`. Separate extension tests cover numeric and
+multi-valued externalId values, filtering and sorting. Custom displayName
+and active continue to use their declared types and payload representation.
+
+Confirmed RED on `f77786c4`: **3 unit failures and 1 HTTP failure**, all
+actual wrong-case matches, not fixture failures. Focused GREEN:
+**106 unit tests, 97 HTTP tests per backend, 46 live checks per backend**.
+The owned PostgreSQL 17.8 database replayed 22 migrations; exact container
+cleanup and both API shutdowns were verified. API build and changed-file
+lint passed with zero errors/warnings. Content/freshness, literal JSON,
+relative links and both diagrams in two themes passed; the earlier
+editor-version-detection diagnostic is unchanged. P6c's invalid
+top-level externalId tests were replaced, not silently renamed as valid.
+
+Receipts are under `test-results/p6d/`. Section **9z-CP** remains unchanged.
+The parent must integrate the P3/P7 corrections and rerun the applicable
+combined admission, write and query matrix; no sibling commits were merged.
+
+**Test/design improvement applied:** common-attribute contracts precede
+schema customization. Tests that demonstrate implementation acceptance do
+not establish standards validity. The narrow read normalization reuses the
+existing common-attribute map and preserves namespace-aware query semantics.
 
 The [P6 tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#11-progress-tracker)
 and [P6b RCA entries](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#p6b-confirmed-corrections)

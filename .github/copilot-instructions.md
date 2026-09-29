@@ -930,6 +930,10 @@ When schema-defined fields reuse promoted column names, test numeric and
 multi-valued representations as well as scalar strings. A database prefilter
 must be equivalent to the resolved type/cardinality; a later correct residual
 evaluator cannot recover candidates that a lossy prefilter already removed.
+Check fixed RFC common-attribute contracts before generalizing schema
+customization: top-level externalId is string, single-valued and caseExact
+for every ResourceType (RFC 7643 section 3.1). Numeric/multi-valued externalId
+tests must use an extension-qualified homonym, never the common attribute.
 
 ## Atomic Invariant Representation Rule (P3b, 2026-09-28)
 

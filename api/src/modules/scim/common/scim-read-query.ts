@@ -96,7 +96,8 @@ export function createReadQuery(
     };
     walk(schema.attributes, [], false);
   }
-  // Common server-managed attributes are queryable even when absent from a profile.
+  // Common attributes exist even without a declaration. RFC 7643 section 3.1
+  // fixes top-level externalId to a single caseExact string for every ResourceType.
   for (const [name, type, exact] of [
     ['id', 'string', true],
     ['externalId', 'string', true],
@@ -106,11 +107,19 @@ export function createReadQuery(
     ['meta.location', 'reference', true],
     ['meta.version', 'string', true],
   ] as const) {
-    if (!attributes.has(name.toLowerCase())) {
+    const declared = attributes.get(name.toLowerCase());
+    if (!declared || name === 'externalId') {
       const entry = {
         path: name.split('.'),
-        definition: { name, type, caseExact: exact, multiValued: false, required: false },
-        denied: false,
+        definition: {
+          ...declared?.definition,
+          name,
+          type,
+          caseExact: exact,
+          multiValued: false,
+          required: false,
+        },
+        denied: declared?.denied ?? false,
       };
       attributes.set(name.toLowerCase(), entry);
       for (const schema of schemas.filter(

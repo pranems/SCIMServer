@@ -145,17 +145,19 @@ describe('Schema-aware query semantics (P6b)', () => {
   });
 
   it.each([
-    ['displayName', 'integer', false],
-    ['displayName', 'string', true],
-    ['externalId', 'integer', false],
-    ['externalId', 'string', true],
+    ['displayName', CUSTOM, 'integer', false],
+    ['displayName', CUSTOM, 'string', true],
+    ['active', CUSTOM, 'integer', false],
+    ['active', CUSTOM, 'string', true],
+    ['externalId', EXT, 'integer', false],
+    ['externalId', EXT, 'string', true],
   ] as const)(
-    'queries custom %s with type=%s multiValued=%s without a lossy string-column prefilter',
-    async (name, type, multiValued) => {
+    'queries %s in %s with type=%s multiValued=%s without a lossy prefilter',
+    async (name, namespace, type, multiValued) => {
       await scimPatch(app, `/scim/admin/endpoints/${endpointId}`, token, {
         profile: {
           schemas: profileSchemas.map((schema) =>
-            schema.id !== CUSTOM
+            schema.id !== namespace
               ? schema
               : {
                   ...schema,
@@ -174,28 +176,32 @@ describe('Schema-aware query semantics (P6b)', () => {
         },
       }).expect(200);
       const ids: string[] = [];
+      const path = namespace === CUSTOM ? name : `${namespace}:${name}`;
+      const alias = namespace === CUSTOM ? `${CUSTOM}:${name}` : path.toUpperCase();
       const values = multiValued ? [['other', 'needle'], ['elsewhere'], []] : [2, 10, undefined];
       for (const [index, value] of values.entries()) {
+        const data = namespace === CUSTOM ? { [name]: value } : { [namespace]: { [name]: value } };
         const created = await scimPost(app, `${base}/QueryWidgets`, token, {
-          schemas: [CUSTOM],
+          schemas: [CUSTOM, EXT],
           rank: index,
-          [name]: value,
+          externalId: `common-${index}`,
+          ...data,
         }).expect(201);
         ids.push(jsonBody(created).id);
-        expect(created.body).toMatchObject(value === undefined ? {} : { [name]: value });
+        expect(created.body).toMatchObject(value === undefined ? {} : data);
       }
       const literal = multiValued ? '"needle"' : '2';
       const filters = [
-        [`${name} eq ${literal}`, [ids[0]]],
-        [`${CUSTOM}:${name} eq ${literal}`, [ids[0]]],
-        [`${name} pr`, ids.slice(0, 2)],
-        [`${name} eq ${literal} or rank eq 1`, ids.slice(0, 2)],
-        [`${name} pr and rank eq 0`, [ids[0]]],
+        [`${path} eq ${literal}`, [ids[0]]],
+        [`${alias} eq ${literal}`, [ids[0]]],
+        [`${path} pr`, ids.slice(0, 2)],
+        [`${path} eq ${literal} or rank eq 1`, ids.slice(0, 2)],
+        [`${path} pr and rank eq 0`, [ids[0]]],
         ...(multiValued
           ? [
-              [`${name} co "eed"`, [ids[0]]],
-              [`${name} sw "need"`, [ids[0]]],
-              [`${name} ew "dle"`, [ids[0]]],
+              [`${path} co "eed"`, [ids[0]]],
+              [`${path} sw "need"`, [ids[0]]],
+              [`${path} ew "dle"`, [ids[0]]],
             ]
           : []),
       ] as [string, string[]][];
@@ -206,10 +212,15 @@ describe('Schema-aware query semantics (P6b)', () => {
           expect(jsonBody(result).totalResults).toBe(expectedIds.length);
           expect(jsonBody(result).Resources.map((r) => r.id)).toEqual(expectedIds);
         }
-        const zero = await query('QueryWidgets', method, { filter: `${name} pr`, count: 0 });
+        const zero = await query('QueryWidgets', method, { filter: `${path} pr`, count: 0 });
         expect(zero.status).toBe(200);
         expect(zero.body).toMatchObject({ totalResults: 2, Resources: [], itemsPerPage: 0 });
       }
+      const sorted = await query('QueryWidgets', 'GET', { sortBy: path });
+      expect(sorted.status).toBe(200);
+      expect(jsonBody(sorted).Resources.map((r) => r.id)).toEqual(
+        multiValued ? [ids[1], ids[0], ids[2]] : ids,
+      );
     },
   );
 
@@ -260,6 +271,42 @@ describe('Schema-aware query semantics (P6b)', () => {
   }
 
   describe.each(fixtures)('$route', (f) => {
+    it('uses common externalId string caseExact for filtering and sorting despite a bare profile declaration', async () => {
+      await scimPatch(app, `/scim/admin/endpoints/${endpointId}`, token, {
+        profile: {
+          schemas: profileSchemas.map((s) =>
+            s.id === f.schema || s.id === EXT
+              ? { ...s, attributes: [...s.attributes, { name: 'externalId', type: 'string' }] }
+              : s,
+          ),
+        },
+      }).expect(200);
+      const ids: string[] = [];
+      for (const value of ['Z', 'a']) {
+        const created = await scimPost(app, `${base}/${f.route}`, token, {
+          schemas: [f.schema, EXT],
+          ...(f.name === 'User' ? { userName: `external-${value}` } : {}),
+          displayName: `external-${value}`,
+          externalId: value,
+          [EXT]: { externalId: value },
+        }).expect(201);
+        ids.push(jsonBody(created).id);
+      }
+      for (const method of ['GET', 'POST']) {
+        for (const path of ['externalId', `${f.schema}:externalId`]) {
+          const wrongCase = await query(f.route, method, { filter: `${path} eq "z"` });
+          expect(wrongCase.status).toBe(200);
+          expect(jsonBody(wrongCase).Resources).toEqual([]);
+          const exact = await query(f.route, method, { filter: `${path} eq "Z"` });
+          expect(jsonBody(exact).Resources.map((r) => r.id)).toEqual([ids[0]]);
+          const ordered = await query(f.route, method, { sortBy: path });
+          expect(jsonBody(ordered).Resources.map((r) => r.id)).toEqual(ids);
+        }
+        const extension = await query(f.route, method, { filter: `${EXT}:externalId eq "z"` });
+        expect(jsonBody(extension).Resources.map((r) => r.id)).toEqual([ids[0]]);
+      }
+    });
+
     it.each(['GET', 'POST'])(
       '%s filters internal hidden/request fields before count, page and projection',
       async (method) => {

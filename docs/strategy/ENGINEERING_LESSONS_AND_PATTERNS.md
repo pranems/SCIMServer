@@ -271,6 +271,11 @@ custom numeric or multi-valued attributes can reuse a promoted string-column
 name. Query push-down must carry the resolved type/cardinality rather than
 infer storage equivalence from that name. Residual evaluation cannot recover
 matches already discarded by a lossy candidate query.
+The subsequent P6d correction limits that generalization to customizable
+attributes: RFC 7643 section 3.1 fixes common externalId to string/SV/caseExact
+on every ResourceType. Only an extension-qualified homonym is independently
+customizable. A test proving current acceptance is not proof that the
+accepted input is standards-valid; read the common-attribute contract first.
 
 ### Category G - Configuration and operational defaults (a silent default is not a decision)
 

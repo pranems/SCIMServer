@@ -128,25 +128,52 @@ try {
             if ($_.id -eq $fixtures[2].schema) {
                 @{ id = $_.id; name = $_.name; attributes = @(
                     @{ name = 'displayName'; type = 'integer' }
-                    @{ name = 'externalId'; type = 'string'; multiValued = $true; caseExact = $true }
+                    @{ name = 'externalId'; type = 'string' }
+                ) }
+            } elseif ($_.id -eq $extension) {
+                @{ id = $_.id; name = $_.name; attributes = @(
+                    @{ name = 'externalId'; type = 'string'; multiValued = $true; caseExact = $false }
                 ) }
             } else { $_ }
         }) }
     }
     if ($shapes.Status -ne 200) { throw 'Could not set custom query representation fixture' }
     $typedResource = Invoke-QueryRequest POST "$scim/QueryWidgets" @{
-        schemas = @($fixtures[2].schema); displayName = 2; externalId = @('other', 'needle')
+        schemas = @($fixtures[2].schema, $extension); displayName = 2; externalId = 'Z'
+        $extension = @{ externalId = @('other', 'needle') }
     }
     if ($typedResource.Status -ne 201) { throw "Custom representation fixture failed: HTTP $($typedResource.Status)" }
-    foreach ($filter in @('displayName eq 2', 'externalId eq "needle"', 'displayName pr and externalId pr', 'externalId co "eed"')) {
+    $secondResource = Invoke-QueryRequest POST "$scim/QueryWidgets" @{
+        schemas = @($fixtures[2].schema); displayName = 10; externalId = 'a'
+    }
+    if ($secondResource.Status -ne 201) { throw "Common externalId sort fixture failed: HTTP $($secondResource.Status)" }
+    foreach ($filter in @('displayName eq 2', "${extension}:externalId eq `"needle`"", "displayName pr and ${extension}:externalId pr", "${extension}:externalId co `"eed`"")) {
         foreach ($method in @('GET', 'POST')) {
             $response = if ($method -eq 'GET') {
                 Invoke-QueryRequest GET "$scim/QueryWidgets?filter=$([Uri]::EscapeDataString($filter))" $null
             } else {
                 Invoke-QueryRequest POST "$scim/QueryWidgets/.search" @{ schemas = @($search); filter = $filter }
             }
-            Add-QueryCheck ($response.Status -eq 200 -and $response.Body.totalResults -eq 1 -and $response.Body.Resources[0].id -eq $typedResource.Body.id -and $response.Body.Resources[0].displayName -eq 2 -and @($response.Body.Resources[0].externalId).Count -eq 2) "Custom $method representation-aware filter: $filter"
+            Add-QueryCheck ($response.Status -eq 200 -and $response.Body.totalResults -eq 1 -and $response.Body.Resources[0].id -eq $typedResource.Body.id -and $response.Body.Resources[0].displayName -eq 2 -and $response.Body.Resources[0].externalId -ceq 'Z' -and @($response.Body.Resources[0].$extension.externalId).Count -eq 2) "Custom $method representation-aware filter: $filter"
         }
+    }
+    foreach ($method in @('GET', 'POST')) {
+        foreach ($value in @('Z', 'z')) {
+            $filter = "externalId eq `"$value`""
+            $response = if ($method -eq 'GET') {
+                Invoke-QueryRequest GET "$scim/QueryWidgets?filter=$([Uri]::EscapeDataString($filter))" $null
+            } else {
+                Invoke-QueryRequest POST "$scim/QueryWidgets/.search" @{ schemas = @($search); filter = $filter }
+            }
+            $expected = if ($value -ceq 'Z') { 1 } else { 0 }
+            Add-QueryCheck ($response.Status -eq 200 -and $response.Body.totalResults -eq $expected) "Common externalId $method caseExact match: $value"
+        }
+        $ordered = if ($method -eq 'GET') {
+            Invoke-QueryRequest GET "$scim/QueryWidgets?sortBy=externalId" $null
+        } else {
+            Invoke-QueryRequest POST "$scim/QueryWidgets/.search" @{ schemas = @($search); sortBy = 'externalId' }
+        }
+        Add-QueryCheck ($ordered.Status -eq 200 -and $ordered.Body.Resources[0].id -eq $typedResource.Body.id) "Common externalId $method caseExact sort precedes lowercase and missing values"
     }
 } finally {
     if ($endpointId) {
