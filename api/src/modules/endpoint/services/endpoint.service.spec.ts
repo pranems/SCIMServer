@@ -29,31 +29,39 @@ describe('EndpointService', () => {
   };
 
   beforeEach(async () => {
+    const prismaTransactionClient = {
+      endpoint: {
+        findUnique: jest.fn().mockResolvedValue(mockEndpoint),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      scimResource: {
+        count: jest.fn(),
+      },
+      resourceMember: {
+        count: jest.fn(),
+      },
+      requestLog: {
+        count: jest.fn(),
+      },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    const prismaMock = {
+      ...prismaTransactionClient,
+      $transaction: jest.fn((
+        callback: (client: typeof prismaTransactionClient) => Promise<unknown>,
+      ) => callback(prismaTransactionClient)),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointService,
         { provide: ENDPOINT_LIFECYCLE_REPOSITORY, useClass: PrismaEndpointLifecycleRepository },
         {
           provide: PrismaService,
-          useValue: {
-            endpoint: {
-              findUnique: jest.fn().mockResolvedValue(mockEndpoint),
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-              delete: jest.fn(),
-            },
-            scimResource: {
-              count: jest.fn(),
-            },
-            resourceMember: {
-              count: jest.fn(),
-            },
-            requestLog: {
-              count: jest.fn(),
-            },
-          },
+          useValue: prismaMock,
         },
         {
           provide: ScimLogger,

@@ -2230,6 +2230,49 @@ coordination, candidate-materialization performance, the original82-case/
 164-backend ledger and final exact-tip release assurance. This checkpoint does
 not change release metadata or authorize publication, deployment or repair.
 
+### 11.33 Omitted extension-list and profile-revision closure, 2026-09-29
+
+The omitted `schemaExtensions` item was a proof gap, not another production
+defect. The admitted profile already normalizes the optional property to an
+empty list. The permanent HTTP case now proves endpoint-scoped ResourceTypes
+list/item discovery publishes `schemaExtensions: []`, then performs custom
+POST, GET, PUT, PATCH and DELETE without a TypeError or 500. Explicit null,
+object and string containers still return 400 without changing profile state
+or its endpoint token.
+
+Profile revision coordination was a real race. The focused RED paused User,
+Group and custom creates after validation, changed the endpoint profile, then
+resumed the repository call. All three returned 201 and published rows.
+Repository writes now receive the canonical content revision captured in
+request context. PostgreSQL uses one endpoint advisory lock for profile
+updates and resource transactions; InMemory extends its existing endpoint
+write guard. The expanded GREEN proves create, replace and delete for all
+three resource types: nine stale operations return sanitized 409 and preserve
+complete stored state.
+
+Affected units pass611 tests in10 suites. API build and lint pass with0 errors
+and the unchanged515-warning ceiling. The guarded lane passes571 HTTP tests
+per backend with no failed/pending cases, plus built P7b153/905 and P7a472
+assertions per backend. PostgreSQL17.8 replayed22 migrations. Source
+fingerprint:
+`499e06389e887394d3f427ab43b7d232f48272452b718ed594476a35dd88c39c`.
+The exact container and both owned runtimes were removed.
+
+[Design and contract](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md) and
+[validation receipt](evidence/scim-profile-revision-20260929/validation.json).
+
+**Self-improvement: applied.** Controlled interleaving now asserts the public
+error and exact non-mutation rather than only checking that a race returned
+non-success. **Design/architecture disposition: applied.** The existing
+request context, repository transactions and InMemory endpoint guard gain one
+shared revision value; no second repository hierarchy or speculative lock
+framework is introduced.
+
+**Still open:** broader characteristic reconciliation,
+candidate-materialization performance, the original82-case/164-backend ledger
+and final exact-tip release assurance. No release, deployment, live repair,
+version, migration or lockfile change is claimed.
+
 ## 12. Architecture and self-improvement decisions
 
 | Decision | Disposition and reason |

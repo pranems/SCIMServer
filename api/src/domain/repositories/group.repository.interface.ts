@@ -10,6 +10,7 @@
  */
 import type { ExpectedVersion } from './write-precondition';
 import type { UniquenessPolicy } from './uniqueness-policy';
+import type { ProfileRevision } from './profile-revision';
 import type {
   GroupRecord,
   GroupWithMembers,
@@ -20,7 +21,7 @@ import type {
 
 export interface IGroupRepository {
   /** Atomically create a Group and its initial members; failure publishes neither. */
-  create(input: GroupCreateInput, members?: MemberCreateInput[], uniqueness?: UniquenessPolicy): Promise<GroupRecord>;
+  create(input: GroupCreateInput, members?: MemberCreateInput[], uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<GroupRecord>;
 
   /** Find a group by SCIM id within an endpoint (without members). */
   findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null>;
@@ -42,10 +43,10 @@ export interface IGroupRepository {
   ): Promise<GroupWithMembers[]>;
 
   /** Update a group by its internal storage ID. */
-  update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy): Promise<GroupRecord>;
+  update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<GroupRecord>;
 
   /** Delete a group by its internal storage ID. */
-  delete(id: string, expectedVersion?: ExpectedVersion): Promise<void>;
+  delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void>;
 
   /**
    * Check for displayName uniqueness within an endpoint (case-insensitive).
@@ -68,7 +69,7 @@ export interface IGroupRepository {
   ): Promise<GroupRecord | null>;
 
   /** Append members atomically; callers must explicitly supply the resource policy. */
-  addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy): Promise<void>;
+  addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<void>;
 
   /**
    * Atomically update group fields and replace all members.
@@ -80,5 +81,6 @@ export interface IGroupRepository {
     members: MemberCreateInput[],
     expectedVersion?: ExpectedVersion,
     uniqueness?: UniquenessPolicy,
+    profileRevision?: ProfileRevision,
   ): Promise<void>;
 }

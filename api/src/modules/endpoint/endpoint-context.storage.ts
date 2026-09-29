@@ -3,12 +3,15 @@ import { AsyncLocalStorage } from 'async_hooks';
 import type { Request, Response } from 'express';
 import type { EndpointConfig } from './endpoint-config.interface';
 import type { EndpointProfile } from '../scim/endpoint-profile/endpoint-profile.types';
+import { endpointProfileRevision, type ProfileRevision } from '../../domain/repositories/profile-revision';
 
 export interface EndpointContext {
   endpointId: string;
   baseUrl: string;
   /** Full endpoint profile - the single runtime source of truth */
   profile?: EndpointProfile;
+  /** Content revision of the profile snapshot used to validate this request. */
+  profileRevision?: ProfileRevision;
   /** Runtime config flags - derived from profile.settings at context setup time */
   config?: EndpointConfig;
   /** Accumulated warnings for the current request (e.g. stripped readOnly attributes) */
@@ -38,7 +41,7 @@ export class EndpointContextStorage {
    * This is the preferred API - the context is automatically cleaned up.
    */
   run<T>(context: EndpointContext, fn: () => T): T {
-    return this.storage.run(context, fn);
+    return this.storage.run(this.withProfileRevision(context), fn);
   }
 
   /**
@@ -66,11 +69,13 @@ export class EndpointContextStorage {
       existing.endpointId = context.endpointId;
       existing.baseUrl = context.baseUrl;
       existing.profile = context.profile;
+      existing.profileRevision = context.profileRevision
+        ?? (context.endpointId ? endpointProfileRevision(context.profile) : undefined);
       existing.config = context.config ?? context.profile?.settings as EndpointConfig;
       // Do NOT reset warnings - they may have been accumulated before setContext
     } else {
       this.storage.enterWith({
-        ...context,
+        ...this.withProfileRevision(context),
         config: context.config ?? context.profile?.settings as EndpointConfig,
       });
     }
@@ -95,6 +100,15 @@ export class EndpointContextStorage {
   /** Get the full endpoint profile from context */
   getProfile(): EndpointProfile | undefined {
     return this.storage.getStore()?.profile;
+  }
+
+  getProfileRevision(): ProfileRevision | undefined {
+    return this.storage.getStore()?.profileRevision;
+  }
+
+  private withProfileRevision(context: EndpointContext): EndpointContext {
+    if (!context.endpointId || context.profileRevision !== undefined) return context;
+    return { ...context, profileRevision: endpointProfileRevision(context.profile) };
   }
 
   /**

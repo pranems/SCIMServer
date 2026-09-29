@@ -20,6 +20,8 @@ import type { IUserRepository } from '../../../domain/repositories/user.reposito
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
 import { USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointLifecycleRepository } from '../../../domain/repositories/endpoint-lifecycle.repository.interface';
+import { endpointProfileRevision } from '../../../domain/repositories/profile-revision';
+import { withEndpointProfileLock } from '../../../infrastructure/repositories/prisma/prisma-profile-revision';
 import {
   SCIM_EVENTS,
   type ScimEndpointEventPayload,
@@ -245,6 +247,7 @@ export class EndpointService implements OnModuleInit {
     this.cacheById.set(ep.id, ep);
     this.cacheByName.set(ep.name.toLowerCase(), ep);
     this.cacheFingerprints.set(ep.id, this.endpointFingerprint(ep));
+    this.lifecycle.recordProfileRevision?.(ep.id, endpointProfileRevision(ep.profile));
   }
 
   private cacheDelete(ep: CachedEndpoint): void {
@@ -715,7 +718,7 @@ export class EndpointService implements OnModuleInit {
 
     let dbUpdated: Endpoint;
     try {
-      dbUpdated = await this.prisma.endpoint.update({
+      const update = (client: Prisma.TransactionClient | PrismaService) => client.endpoint.update({
         where,
         data: {
           displayName: dto.displayName,
@@ -724,6 +727,9 @@ export class EndpointService implements OnModuleInit {
           active: dto.active
         }
       });
+      dbUpdated = dto.profile
+        ? await withEndpointProfileLock(this.prisma, endpointId, update)
+        : await update(this.prisma);
     } catch (error) {
       if (ifMatch && ifMatch !== '*' && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         rejectEndpointIfMatch(await this.getEndpoint(endpointId), ifMatch);

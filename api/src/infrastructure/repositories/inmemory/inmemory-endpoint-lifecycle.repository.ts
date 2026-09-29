@@ -7,6 +7,7 @@ import { InMemoryGenericResourceRepository } from './inmemory-generic-resource.r
 import { InMemoryEndpointCredentialRepository } from './inmemory-endpoint-credential.repository';
 import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
 import type { EndpointDeletionStep } from './endpoint-deletion-step';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 @Injectable()
 export class InMemoryEndpointLifecycleRepository implements IEndpointLifecycleRepository {
@@ -17,6 +18,10 @@ export class InMemoryEndpointLifecycleRepository implements IEndpointLifecycleRe
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY) private readonly credentials: InMemoryEndpointCredentialRepository,
     private readonly writes: InMemoryEndpointWriteGuard,
   ) {}
+
+  recordProfileRevision(endpointId: string, revision: ProfileRevision): void {
+    this.writes.recordProfileRevision(endpointId, revision);
+  }
 
   // No await between preparation, commit, rollback and the write barrier.
   // A yielded sequence of destructive async deletes is not a transaction.

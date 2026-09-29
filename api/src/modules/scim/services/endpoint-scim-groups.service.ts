@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
+import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import type {
   GroupWithMembers,
@@ -161,7 +162,12 @@ export class EndpointScimGroupsService {
     let group;
     try {
       const memberInputs = await this.resolveMemberInputs(dto.members ?? [], endpointId);
-      group = await this.groupRepo.create(input, memberInputs, this.schemaHelpers.getUniquenessPolicy(endpointId));
+      group = await this.groupRepo.create(
+        input,
+        memberInputs,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'create group', this.logger, LogCategory.SCIM_GROUP, { displayName: dto.displayName, endpointId });
     }
@@ -393,7 +399,8 @@ export class EndpointScimGroupsService {
           ...parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
           lastModified: new Date().toISOString()
         })
-      }, memberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
+      }, memberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, 'patch group (transaction)', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -481,7 +488,8 @@ export class EndpointScimGroupsService {
           ...meta,
           lastModified: now.toISOString()
         })
-      }, replaceMemberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
+      }, replaceMemberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, 'replace group (transaction)', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
@@ -524,7 +532,11 @@ export class EndpointScimGroupsService {
     }
 
     try {
-      await this.groupRepo.delete(group.id, expectedVersion);
+      await this.groupRepo.delete(
+        group.id,
+        expectedVersion,
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }

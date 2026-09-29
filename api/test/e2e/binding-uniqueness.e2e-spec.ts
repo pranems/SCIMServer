@@ -115,6 +115,31 @@ describe('binding-qualified uniqueness at admission and resource HTTP boundaries
     expect(ep.status).toBe(201);
     endpoints.push(ep.body.id);
     expect(ep.body.profile.resourceTypes[0].schemaExtensions).toEqual([]);
+    const base = `/scim/v2/endpoints/${ep.body.id}`;
+    const discovered = await http('get', `${base}/ResourceTypes`);
+    expect(discovered.status).toBe(200);
+    expect(discovered.body.Resources.find(resourceType => resourceType.id === 'Shared'))
+      .toMatchObject({ schema: SHARED, schemaExtensions: [] });
+    const discoveredOne = await http('get', `${base}/ResourceTypes/Shared`);
+    expect(discoveredOne.status).toBe(200);
+    expect(discoveredOne.body).toMatchObject({ id: 'Shared', schema: SHARED, schemaExtensions: [] });
+    const created = await http('post', `${base}/Shareds`, {
+      schemas: [SHARED], externalId: 'omitted-extension-crud', displayName: [1],
+    });
+    expect(created.status).toBe(201);
+    const item = `${base}/Shareds/${created.body.id}`;
+    expect((await http('get', item)).body).toMatchObject({
+      id: created.body.id, externalId: 'omitted-extension-crud', displayName: [1],
+    });
+    expect((await http('put', item, {
+      schemas: [SHARED], externalId: 'omitted-extension-put', displayName: [2],
+    })).body).toMatchObject({ id: created.body.id, externalId: 'omitted-extension-put', displayName: [2] });
+    expect((await http('patch', item, {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: 'externalId', value: 'omitted-extension-patch' }],
+    })).body).toMatchObject({ id: created.body.id, externalId: 'omitted-extension-patch', displayName: [2] });
+    expect((await http('delete', item)).status).toBe(204);
+    expect((await http('get', item)).status).toBe(404);
     const before = await http('get', `/scim/admin/endpoints/${ep.body.id}`);
     for (const schemaExtensions of [null, {}, 'invalid']) {
       Reflect.set(profile.resourceTypes[0], 'schemaExtensions', schemaExtensions);

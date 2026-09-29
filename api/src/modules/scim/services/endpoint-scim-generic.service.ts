@@ -20,6 +20,7 @@ import { compileEffectiveUniquenessPolicy } from '../../../domain/repositories/u
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
+import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import type {
   GenericResourceRecord,
   GenericResourceCreateInput,
@@ -227,7 +228,11 @@ export class EndpointScimGenericService {
 
     let record;
     try {
-      record = await this.genericRepo.create(input, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)));
+      record = await this.genericRepo.create(
+        input,
+        compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, `create ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -392,7 +397,8 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(payload),
         meta: JSON.stringify(metaObj),
-      }, expectedVersion, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)));
+      }, expectedVersion, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -634,7 +640,8 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(patchedPayload),
         meta: JSON.stringify(metaObj),
-      }, expectedVersion, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)));
+      }, expectedVersion, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -693,7 +700,11 @@ export class EndpointScimGenericService {
     }
 
     try {
-      await this.genericRepo.delete(existing.id, expectedVersion);
+      await this.genericRepo.delete(
+        existing.id,
+        expectedVersion,
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }

@@ -28,6 +28,7 @@ import { RepositoryError } from '../../../domain/errors/repository-error';
 import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
 import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
@@ -46,7 +47,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     };
   }
 
-  async create(input: GroupCreateInput, members: MemberCreateInput[] = [], uniqueness: UniquenessPolicy = []): Promise<GroupRecord> {
+  async create(input: GroupCreateInput, members: MemberCreateInput[] = [], uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
     if (this.findGroup(input.endpointId, input.scimId)) {
       throw new RepositoryError('CONFLICT', 'Group SCIM id already exists in this endpoint.');
     }
@@ -66,7 +67,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     };
     const initialMembers = this.stageMembers(record.id, members, now);
     this.assertUnique(uniqueness, record, initialMembers);
-    this.writes.assertWritable(input.endpointId);
+    this.writes.assertWritable(input.endpointId, profileRevision);
     this.groups.set(record.id, record);
     for (const member of initialMembers) this.members.set(member.id, member);
     return { ...record };
@@ -121,7 +122,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     }));
   }
 
-  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<GroupRecord> {
+  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
     const existing = this.groups.get(id);
     assertWritePrecondition(existing, expectedVersion);
     // Phase 7: Increment version for ETag-based concurrency control
@@ -132,12 +133,15 @@ export class InMemoryGroupRepository implements IGroupRepository {
       updatedAt: new Date(),
     };
     this.assertUnique(uniqueness, updated, this.getMembersForGroup(id), id);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.groups.set(id, updated);
     return { ...updated };
   }
 
-  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
-    assertWritePrecondition(this.groups.get(id), expectedVersion);
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
+    const existing = this.groups.get(id);
+    assertWritePrecondition(existing, expectedVersion);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.groups.delete(id);
     // Cascade: remove associated members
     for (const [memberId, member] of this.members) {
@@ -179,14 +183,14 @@ export class InMemoryGroupRepository implements IGroupRepository {
     return null;
   }
 
-  async addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy): Promise<void> {
+  async addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<void> {
     if (members.length === 0) return;
     const group = this.groups.get(groupId);
     assertWritePrecondition(group);
     const existing = this.getMembersForGroup(groupId);
     const staged = this.stageMembers(groupId, members, new Date(), new Set(existing.map((m) => m.value)));
     this.assertUnique(uniqueness, group, [...existing, ...staged], groupId);
-    this.writes.assertWritable(group.endpointId);
+    this.writes.assertWritable(group.endpointId, profileRevision);
     for (const member of staged) this.members.set(member.id, member);
   }
 
@@ -196,6 +200,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     members: MemberCreateInput[],
     expectedVersion?: ExpectedVersion,
     uniqueness: UniquenessPolicy = [],
+    profileRevision?: ProfileRevision,
   ): Promise<void> {
     const existing = this.groups.get(groupId);
     assertWritePrecondition(existing, expectedVersion);
@@ -207,6 +212,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     };
     const replacement = this.stageMembers(groupId, members, now);
     this.assertUnique(uniqueness, updated, replacement, groupId);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
 
     this.groups.set(groupId, updated);
     for (const [memberId, member] of this.members) {

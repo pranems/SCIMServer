@@ -19,6 +19,7 @@ import type { ExpectedVersion } from '../../../domain/repositories/write-precond
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
 import { wrapEndpointCreateError } from './endpoint-create-error';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 /** Maps a ScimResource row to the GenericResourceRecord domain type. */
 function toGenericRecord(resource: Record<string, unknown>): GenericResourceRecord {
@@ -44,7 +45,7 @@ function toGenericRecord(resource: Record<string, unknown>): GenericResourceReco
 export class PrismaGenericResourceRepository implements IGenericResourceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: GenericResourceCreateInput, uniqueness: UniquenessPolicy = []): Promise<GenericResourceRecord> {
+  async create(input: GenericResourceCreateInput, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GenericResourceRecord> {
     try {
       const created = await withUniqueWrite(this.prisma, uniqueness, input, input, (tx) => tx.scimResource.create({
         data: {
@@ -57,7 +58,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
           meta: input.meta,
           endpoint: { connect: { id: input.endpointId } },
         },
-      }), { representation: 'payload' });
+      }), { representation: 'payload', expectedProfileRevision: profileRevision });
       return toGenericRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
       throw await wrapEndpointCreateError(error, `GenericResource create(${input.scimId})`, input.endpointId, this.prisma);
@@ -101,7 +102,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     }
   }
 
-  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<GenericResourceRecord> {
+  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GenericResourceRecord> {
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
       prismaData.payload = JSON.parse(data.rawPayload);
@@ -112,18 +113,18 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
       const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
-      }), { representation: 'payload' });
+      }), { representation: 'payload', expectedProfileRevision: profileRevision });
       return toGenericRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `GenericResource update(${id})`, expectedVersion);
     }
   }
 
-  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     try {
-      await this.prisma.scimResource.delete({
+      await withUniqueWrite(this.prisma, [], { id, expectedVersion }, {}, tx => tx.scimResource.delete({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
-      });
+      }), { expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `GenericResource delete(${id})`, expectedVersion);
     }

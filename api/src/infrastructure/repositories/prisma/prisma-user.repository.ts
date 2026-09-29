@@ -22,6 +22,7 @@ import type { ExpectedVersion } from '../../../domain/repositories/write-precond
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
 import { wrapEndpointCreateError } from './endpoint-create-error';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
@@ -48,7 +49,7 @@ function toUserRecord(resource: Record<string, unknown>): UserRecord {
 export class PrismaUserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: UserCreateInput, uniqueness: UniquenessPolicy = []): Promise<UserRecord> {
+  async create(input: UserCreateInput, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<UserRecord> {
     try {
       const created = await withUniqueWrite(this.prisma, uniqueness, { endpointId: input.endpointId, resourceType: 'User' }, input, (tx) => tx.scimResource.create({
         data: {
@@ -62,7 +63,7 @@ export class PrismaUserRepository implements IUserRepository {
           meta: input.meta,
           endpoint: { connect: { id: input.endpointId } },
         },
-      }));
+      }), { expectedProfileRevision: profileRevision });
       return toUserRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
       throw await wrapEndpointCreateError(error, `User create(${input.scimId})`, input.endpointId, this.prisma);
@@ -107,7 +108,7 @@ export class PrismaUserRepository implements IUserRepository {
     }
   }
 
-  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<UserRecord> {
+  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<UserRecord> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
@@ -120,18 +121,18 @@ export class PrismaUserRepository implements IUserRepository {
       const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
-      }));
+      }), { expectedProfileRevision: profileRevision });
       return toUserRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `User update(${id})`, expectedVersion);
     }
   }
 
-  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     try {
-      await this.prisma.scimResource.delete({
+      await withUniqueWrite(this.prisma, [], { id, expectedVersion }, {}, tx => tx.scimResource.delete({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
-      });
+      }), { expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `User delete(${id})`, expectedVersion);
     }

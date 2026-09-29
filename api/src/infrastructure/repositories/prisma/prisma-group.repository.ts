@@ -24,6 +24,7 @@ import { wrapEndpointCreateError } from './endpoint-create-error';
 import { isValidUuid } from './uuid-guard';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 /** Maps a ScimResource row (with JSONB payload) to the GroupRecord domain type. */
 function toGroupRecord(resource: Record<string, unknown>): GroupRecord {
@@ -81,7 +82,7 @@ function toMemberData(groupId: string, members: MemberCreateInput[]): Prisma.Res
 export class PrismaGroupRepository implements IGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: GroupCreateInput, members: MemberCreateInput[] = [], uniqueness: UniquenessPolicy = []): Promise<GroupRecord> {
+  async create(input: GroupCreateInput, members: MemberCreateInput[] = [], uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
     try {
       const data: Prisma.ScimResourceCreateInput = {
         resourceType: 'Group',
@@ -98,7 +99,7 @@ export class PrismaGroupRepository implements IGroupRepository {
           const created = await tx.scimResource.create({ data });
           if (members.length > 0) await tx.resourceMember.createMany({ data: toMemberData(created.id, members) });
           return toGroupRecord(created);
-        }, { members, transaction: members.length > 0 });
+        }, { members, transaction: members.length > 0, expectedProfileRevision: profileRevision });
     } catch (error) {
       throw await wrapEndpointCreateError(error, `Group create(${input.scimId})`, input.endpointId, this.prisma);
     }
@@ -156,7 +157,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     }
   }
 
-  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = []): Promise<GroupRecord> {
+  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
@@ -169,18 +170,18 @@ export class PrismaGroupRepository implements IGroupRepository {
       const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
         data: prismaData as Prisma.ScimResourceUpdateInput,
-      }));
+      }), { expectedProfileRevision: profileRevision });
       return toGroupRecord(updated as unknown as Record<string, unknown>);
     } catch (error) {
       throw wrapPrismaError(error, `Group update(${id})`, expectedVersion);
     }
   }
 
-  async delete(id: string, expectedVersion?: ExpectedVersion): Promise<void> {
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     try {
-      await this.prisma.scimResource.delete({
+      await withUniqueWrite(this.prisma, [], { id, expectedVersion }, {}, tx => tx.scimResource.delete({
         where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
-      });
+      }), { expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `Group delete(${id})`, expectedVersion);
     }
@@ -234,12 +235,12 @@ export class PrismaGroupRepository implements IGroupRepository {
     }
   }
 
-  async addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy): Promise<void> {
+  async addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<void> {
     if (members.length === 0) return;
     try {
       await withUniqueWrite(this.prisma, uniqueness, { id: groupId }, {}, async (tx) => {
         await tx.resourceMember.createMany({ data: toMemberData(groupId, members) });
-      }, { members, appendMembers: true });
+      }, { members, appendMembers: true, expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `Group addMembers(${groupId})`);
     }
@@ -251,6 +252,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     members: MemberCreateInput[],
     expectedVersion?: ExpectedVersion,
     uniqueness: UniquenessPolicy = [],
+    profileRevision?: ProfileRevision,
   ): Promise<void> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
@@ -278,7 +280,7 @@ export class PrismaGroupRepository implements IGroupRepository {
           });
         }
       },
-      { members, transaction: true },
+      { members, transaction: true, expectedProfileRevision: profileRevision },
     ).catch((error) => {
       throw wrapPrismaError(error, `Group updateGroupWithMembers(${groupId})`, expectedVersion);
     });

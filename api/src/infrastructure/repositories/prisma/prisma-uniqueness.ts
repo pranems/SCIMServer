@@ -2,6 +2,8 @@ import type { PrismaService } from '../../../modules/prisma/prisma.service';
 import type { Prisma } from '../../../generated/prisma/client';
 import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
+import { assertEndpointProfileRevision } from './prisma-profile-revision';
 
 type Candidate = {
   rawPayload?: string; scimId?: string; externalId?: string | null;
@@ -14,6 +16,7 @@ interface UniqueWriteOptions {
   transaction?: boolean;
   appendMembers?: boolean;
   representation?: 'columns' | 'payload';
+  expectedProfileRevision?: ProfileRevision;
 }
 
 /**
@@ -28,8 +31,14 @@ export async function withUniqueWrite<T>(
   write: (tx: Prisma.TransactionClient) => Promise<T>,
   options: UniqueWriteOptions = {},
 ): Promise<T> {
-  const { members, transaction = false, appendMembers = false, representation = 'columns' } = options;
-  if (policy.length === 0) {
+  const {
+    members,
+    transaction = false,
+    appendMembers = false,
+    representation = 'columns',
+    expectedProfileRevision,
+  } = options;
+  if (policy.length === 0 && expectedProfileRevision === undefined) {
     return transaction ? prisma.$transaction(write, { maxWait: 10000, timeout: 30000 }) : write(prisma);
   }
   return prisma.$transaction(async (tx) => {
@@ -41,6 +50,8 @@ export async function withUniqueWrite<T>(
     } else {
       scope = { endpointId: target.endpointId, resourceType: target.resourceType };
     }
+    await assertEndpointProfileRevision(tx, scope.endpointId, expectedProfileRevision);
+    if (policy.length === 0) return write(tx);
     const namespace = JSON.stringify(['scim-uniqueness', scope.endpointId, scope.resourceType]);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${namespace}, 0))`;
     const resources = await tx.scimResource.findMany({ where: scope, include: { membersAsGroup: true } });

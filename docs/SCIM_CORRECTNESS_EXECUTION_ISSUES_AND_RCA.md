@@ -195,6 +195,39 @@ remains a consolidation gate, not a claimed completed check.
   post-live aggregation. Prevention: the checked-in live wiring test locks
   both modes and the measured126 assertion count, and receipts distinguish
   check-level success from wrapper completion.
+- **C0-I57 - write coordination / High.** A User, Group or custom write could
+  validate against profile P1, pause, then commit successfully after endpoint
+  profile P2 was published. The request context carried the profile but no
+  commit-time revision, and repository transactions coordinated resource
+  versions/uniqueness without coordinating endpoint profile state. Three
+  controlled create races returned 201 before the fix. A canonical profile
+  revision now crosses the existing repository ports. PostgreSQL resource
+  transactions and profile updates share one endpoint advisory lock;
+  InMemory checks the revision in its synchronous endpoint write guard.
+  Expanded create/replace/delete proof is9/9 per backend and verifies exact
+  non-mutation. Earliest/actual detection: controlled repository barrier.
+  Prevention: every schema-validated write path carries the profile revision
+  and the race suite covers every resource adapter and write operation.
+- **C0-I58 - race harness / Low.** The first new HTTP spec had three setup
+  defects before behavioral RED: a malformed embedded authorization fixture,
+  a union-method spy signature that did not compile, and a lazy Supertest
+  request that never reached the paused repository. Reuse the test token
+  helper, spy through an explicit unknown-argument boundary, and attach a
+  promise continuation before awaiting the barrier. The corrected RED was
+  three 201 responses instead of expected409. Earliest/actual detection:
+  focused TypeScript/Jest run. Prevention: setup failures are not behavior
+  RED; prove the barrier was reached before classifying a concurrency result.
+- **C0-I59 - unit harness compatibility / Medium.** The first affected-unit
+  run failed194 tests because lightweight service-context mocks did not expose
+  the new revision getter. After that correction,53 tests still failed because
+  exact repository-call assertions observed an extra undefined argument and
+  the endpoint Prisma mock lacked the new transaction seam. Optional tuple
+  forwarding preserves direct-test call shapes when no request revision
+  exists, while the endpoint fixture now executes transactions against its
+  existing shared mock client. All611 affected tests pass. Earliest/actual
+  detection: affected-unit gate. Prevention: a new commit-boundary dependency
+  must be represented in both request-context and persistence test doubles;
+  do not weaken exact argument assertions globally.
 
 **Test/gate improvement: applied.** Per-binding promise tests and admission
 publication checks close the original blind spots. **Design/architecture

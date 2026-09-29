@@ -70,6 +70,21 @@ export function handleRepositoryError(
         diagnostics: { errorCode: 'PRECONDITION_VERSION_MISMATCH' },
       });
     }
+    if (error.code === 'PROFILE_CHANGED') {
+      logger.debug(logCategory, 'Resource write rejected after endpoint profile change', {
+        operation,
+        errorCode: error.code,
+        ...context,
+      });
+      throw createScimError({
+        status: 409,
+        detail: 'Endpoint profile changed while the resource write was in progress. Read the current endpoint schema and retry.',
+        diagnostics: {
+          errorCode: 'PROFILE_REVISION_CHANGED',
+          triggeredBy: 'configuration',
+        },
+      });
+    }
     logger.error(logCategory, `Repository failure: ${operation}`, error.cause ?? error, {
       operation,
       errorCode: error.code,

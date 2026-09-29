@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed - endpoint profile revision write coordination, not released
+- Resource writes now carry the content revision of the endpoint profile used
+  for validation. PostgreSQL profile updates and resource commits share an
+  endpoint-scoped transaction lock; InMemory uses its existing synchronous
+  write guard. A profile change that wins the race causes a sanitized 409
+  `PROFILE_REVISION_CHANGED` response and no User, Group aggregate, or custom
+  resource mutation. Nine create/replace/delete races pass on each backend.
+  The same guarded lane closes omitted-`schemaExtensions` discovery and custom
+  CRUD coverage: 571 HTTP cases/backend, 611 affected units, P7b 153/905 and
+  P7a 472 built-runtime assertions/backend, PostgreSQL 17.8 with 22 migrations,
+  and exact cleanup. No migration, version, lockfile, deployment, or data
+  repair change.
+  [Design and evidence](docs/SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
+
 ### Verified - exact interrupted-create errors in the integration assembly
 - P8b follow-up `d8441f46` integrates with P3/P3b/P4/P8c as `6a52ae32`.
   Six interrupted resource/credential creates return sanitized 404 while

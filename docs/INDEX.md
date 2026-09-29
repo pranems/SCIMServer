@@ -23,6 +23,7 @@
 | Trace the original one-to-one PUT/PATCH retention correction | [Original preservation](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries) and [focused proof](evidence/scim-retained-put-20260929/validation.json) |
 | Preserve reserved type capacity, restoration stability and nested immutable state | [Additional PUT preservation](SCIM_PUT_ENTRY_PRESERVATION.md) and [execution RCA](SCIM_PUT_ENTRY_PRESERVATION_RCA.md) |
 | Understand whole-namespace PATCH validation, evolving required/immutable contracts and returned:request responses | [SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) |
+| Understand how endpoint profile changes coordinate with in-flight User, Group, and custom resource writes | [SCIM_PROFILE_REVISION_WRITE_COORDINATION.md](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md) |
 | Distinguish remaining characteristic promises from optional behavior, including the P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
 | Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
 | Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |

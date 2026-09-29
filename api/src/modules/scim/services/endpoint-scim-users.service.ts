@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import type { UserRecord, UserCreateInput, UserUpdateInput } from '../../../domain/models/user.model';
 import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -141,7 +142,11 @@ export class EndpointScimUsersService {
 
     let created: UserRecord;
     try {
-      created = await this.userRepo.create(input, this.schemaHelpers.getUniquenessPolicy(endpointId));
+      created = await this.userRepo.create(
+        input,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'create user', this.logger, LogCategory.SCIM_USER, { userName: dto.userName, endpointId });
     }
@@ -229,7 +234,13 @@ export class EndpointScimUsersService {
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, updatedData, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
+      updatedUser = await this.userRepo.update(
+        user.id,
+        updatedData,
+        expectedVersion,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'patch user', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -307,7 +318,13 @@ export class EndpointScimUsersService {
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, data, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId));
+      updatedUser = await this.userRepo.update(
+        user.id,
+        data,
+        expectedVersion,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'replace user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
@@ -349,7 +366,11 @@ export class EndpointScimUsersService {
     const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     try {
-      await this.userRepo.delete(user.id, expectedVersion);
+      await this.userRepo.delete(
+        user.id,
+        expectedVersion,
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }

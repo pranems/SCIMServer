@@ -6,7 +6,7 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
-**Current C0 P7b assembly checkpoint, 2026-09-29 (local, not deployed):**
+**Current C0 profile-revision checkpoint, 2026-09-29 (local, not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
 profile admission. One schema can remain numeric/MV under an extension
 binding while core id/externalId/meta use RFC characteristics. The original
@@ -21,8 +21,17 @@ P7b153 cases/905 assertions and P7a472 assertions. PostgreSQL17.8 replayed22
 migrations; endpoint inventory was unchanged and exact owned runtimes/container
 were removed. See
 [checkpoint11.31](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
-Broader characteristic overlays, profile-revision coordination, performance
-and final82-case acceptance remain open. No version, lockfile, release or
+P7b is integrated. Omitted `schemaExtensions` now has discovery plus complete
+custom CRUD proof and remains normalized to `[]`; malformed supplied containers
+remain400. Profile revision coordination now prevents User, Group aggregate
+and custom create/replace/delete from committing after their validation
+profile changes. Nine controlled races return sanitized409 and preserve stored
+state on both backends. Affected units pass611 tests; the guarded lane passes
+571 HTTP cases/backend plus built P7b153/905 and P7a472 assertions/backend.
+PostgreSQL17.8 replayed22 migrations and exact cleanup passed. See
+[profile revision design](docs/SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
+Broader characteristic reconciliation, performance, the final82-case ledger
+and exact-tip release assurance remain open. No version, lockfile, release or
 deployment was changed.
 
 **Historical bounded PUT source receipt, 2026-09-29:** Based only on committed combined

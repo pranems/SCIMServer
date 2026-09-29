@@ -9,7 +9,7 @@
 
 ## Active Delivery Process
 
-**Current C0 P7b assembly, not deployed:** common attribute normalization now
+**Current C0 profile-revision checkpoint, not deployed:** common attribute normalization now
 feeds runtime uniqueness compilation per ResourceType, and admission uses the
 same compiler before profile publication. Shared declarations are unchanged;
 core-only unsupported computed promises remain admission errors. Omitted
@@ -19,8 +19,14 @@ returned:request presence are integrated without replacing the accepted
 binding, query, retention or transaction seams. Focused assembly evidence is
 184 overlap units and553 HTTP cases per backend. Built runtimes each pass
 P7b153/905 plus P7a472 assertions. PostgreSQL17.8 replayed22 migrations and
-exact owned cleanup passed. Profile-revision/performance, broader
-characteristics and final C0 acceptance remain open.
+exact owned cleanup passed. Omitted `schemaExtensions` additionally has
+ResourceTypes discovery and complete custom CRUD proof. Profile revisions now
+cross the request/repository commit boundary: nine controlled User, Group and
+custom create/replace/delete races return sanitized409 with complete
+non-mutation on both backends. Affected units pass611 tests and the expanded
+guarded lane passes571 HTTP cases/backend. [Design and evidence](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
+Performance, broader characteristic reconciliation and final C0 acceptance
+remain open.
 
 **Corrected source pair:** `4ba9373c` was held for violating the common
 externalId contract. Corrective child `2d2da4e1` restores all-core String/SV

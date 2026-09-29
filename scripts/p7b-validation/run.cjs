@@ -150,7 +150,8 @@ async function main() {
     } finally { await client.end(); }
   }
   const suites = ['patch-schema-contract', 'common-externalid-patch', 'ordered-patch',
-    'patch-compatibility-flags', 'profile-validation-p7', 'patch-untouched-attribute-validation'];
+    'patch-compatibility-flags', 'profile-validation-p7', 'patch-untouched-attribute-validation',
+    'binding-uniqueness', 'profile-revision-coordination'];
   for (const backend of databaseUrl ? ['inmemory', 'prisma'] : ['inmemory']) {
     process.env.PERSISTENCE_BACKEND = backend;
     process.env.DATABASE_URL = backend === 'prisma' ? databaseUrl : INERT;

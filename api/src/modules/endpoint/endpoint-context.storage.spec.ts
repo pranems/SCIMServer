@@ -1,4 +1,5 @@
 import { EndpointContextStorage } from './endpoint-context.storage';
+import { endpointProfileRevision } from '../../domain/repositories/profile-revision';
 
 describe('EndpointContextStorage', () => {
   let storage: EndpointContextStorage;
@@ -18,7 +19,10 @@ describe('EndpointContextStorage', () => {
       storage.setContext(context);
       const result = storage.getContext();
 
-      expect(result).toEqual(context);
+      expect(result).toEqual({
+        ...context,
+        profileRevision: endpointProfileRevision(undefined),
+      });
     });
 
     it('should return undefined when no context is set', () => {
