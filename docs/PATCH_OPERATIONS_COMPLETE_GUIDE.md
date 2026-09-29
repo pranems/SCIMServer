@@ -28,6 +28,13 @@ selection clears the old primary before the next operation. Expanded no-path
 readOnly targets and namespace clearing respect the configured ignore/reject
 policy. See the P2 guide for the explicitly retained compatibility boundaries.
 
+**Shared retention identity:** the integrated PUT follow-up now uses the same
+operation-neutral one-to-one entry matcher as PATCH preservation and immutable
+transitions. Duplicate `value` fields are disambiguated by `type` and consumed
+once; anonymous occurrences retain their order. This extraction preserves
+PATCH behavior and fixes PUT copying one server-owned value into several
+entries. See [the retained-entry proof](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries).
+
 **RFC references:**
 - [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
 - [RFC 7644 §3.5.2.1 - Add](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.1) / [§3.5.2.2 - Remove](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.2) / [§3.5.2.3 - Replace](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.3)

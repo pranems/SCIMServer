@@ -1,0 +1,63 @@
+{
+  "scope": "One-to-one retained-entry preservation across PUT and PATCH, not final C0",
+  "baseHead": "5581e6b73d8ba9fd206ddf92fa303c96c90ba610",
+  "testedWorkingTreeSha256": "97e217e6eda0b515ae40f8e2916fbd594402a0213ec04f128f3ddda74d8d7239",
+  "sourceHashScope": "Sorted git ls-files -co --exclude-standard for api/src, api/test and scripts; path plus file bytes",
+  "sourceFileCount": 703,
+  "builtRuntimeSha256": "6c613309898389bc6aadc85064d2a1dda47f0cb662c6eca8adb23c01e7f98a37",
+  "buildHashScope": "Sorted relative .js paths and bytes under api/dist; measured after the focused run",
+  "buildFileCount": 247,
+  "red": {
+    "unitFailed": 9,
+    "unitPositiveControls": 7,
+    "httpFailed": 48,
+    "httpPositiveControls": 12,
+    "liveWiringFailed": 2
+  },
+  "green": {
+    "newUnitCases": 16,
+    "newHttpCasesPerBackend": 60,
+    "focusedHttpCasesPerBackend": 289,
+    "liveCasesPerBackend": 60,
+    "liveAssertionsPerBackend": 1260,
+    "inmemoryCombinedLiveReportedChecks": 134,
+    "apiBuild": "passed",
+    "lintErrors": 0,
+    "lintWarnings": 1
+  },
+  "postgresql": {
+    "versionNumber": 170008,
+    "version": "17.8",
+    "migrations": 22,
+    "run": "a47fc055e7669465",
+    "containerId": "0b2ef0a87906e910348e1a1b9a2a8cbc3047253c7ea4518c35c1d1be9c2c428f",
+    "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+    "exactOwnedContainerRemoved": true,
+    "builtRuntimePid": 48380,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true,
+    "rawReceipt": "test-results/scim-integration-retained-put/postgres-a47fc055e7669465/receipt.json"
+  },
+  "inmemory": {
+    "database": "explicit inert URL, no database connected",
+    "builtRuntimePid": 65000,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true
+  },
+  "openNeighboringBaseline": {
+    "suite": "api/src/domain/validation/extension-flags-validation.spec.ts",
+    "failed": 8,
+    "passed": 68,
+    "sameFailuresConfirmedWithUntouchedValidatorAtBaseHead": true,
+    "currentCombinedUnitPassed": 1324,
+    "currentCombinedUnitFailed": 8,
+    "disposition": "P7 test reconciliation remains blocking; not caused or hidden by this matcher fix"
+  },
+  "limits": [
+    "No final authoritative C0 matrix or deployment",
+    "No live-data repair or shared database access",
+    "No new uniqueness, common-attribute, or PATCH policy",
+    "Original 82-case/backend ledger still requires independent reconciliation",
+    "Local built-runtime proof does not replace final exact-artifact release proof"
+  ]
+}

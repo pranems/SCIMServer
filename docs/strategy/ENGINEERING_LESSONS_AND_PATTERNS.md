@@ -208,6 +208,17 @@ anonymous entries; never repeatedly select the first matching old entry.
 Applied in [P2](../SCIM_P2_IMPLEMENTATION.md) with exact persisted-payload
 and atomic-failure tests, not a new speculative policy framework.
 
+**Cross-operation recurrence, 2026-09-29:** PATCH had that matcher while PUT
+still used first-match lookup and its immutable check used last-value lookup.
+Nine unit and 48 HTTP REDs confirmed state reassignment. The matcher now
+lives in an operation-neutral domain module used by all three consumers.
+Any change to retained complex-entry identity must run both PUT and PATCH
+controls for duplicate value/type combinations, anonymous occurrences and
+removed/added entries. Do not infer unique identity from a non-unique `value`.
+[Focused dual-backend proof](../evidence/scim-retained-put-20260929/validation.json)
+and actual stored/readback assertions enforce this rule without coupling the
+validator to a PATCH implementation.
+
 Structural decay that a correctness-only gate never sees; only an explicit design/architecture look finds it.
 
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |

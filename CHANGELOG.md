@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed - retained-entry PUT preservation, integration only
+- PUT no longer assigns one duplicate complex entry's server-owned data to
+  multiple entries. PUT preparation, immutable validation and PATCH retention
+  share one operation-neutral, occurrence-consuming matcher. New RED evidence:
+  9 unit and 48 HTTP failures. All 16 new units and 60 new HTTP cases pass;
+  focused HTTP totals are 289/backend, with 60 built-live cases / 1,260 assertions
+  per backend on owned InMemory and PostgreSQL 17.8 after 22 migrations.
+  Eight unrelated legacy P7 expectation failures reproduce on committed HEAD
+  and remain open, so no full-suite GREEN or final C0 claim is made.
+  No version, lockfile, deployment or live-data repair change.
+  [Behavior and evidence](docs/SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries).
+
 ### Fixed - P2 isolated implementation, not released
 - Shared ordered PATCH executor for Users, Groups and custom resources:
   multi-valued append, all-match selection, selected-object validation,

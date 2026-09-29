@@ -895,6 +895,15 @@ Examples of standing rules that originated from real failures:
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**
 
+## Retained-entry cross-operation regression rule (2026-09-29)
+
+Changes to preservation/matching of multi-valued complex entries MUST cover
+both PUT and PATCH: duplicate values with differing types reordered, equal
+value/type occurrences consumed once, anonymous entries, additions/removals,
+and readOnly/immutable server-state readback. A `value` is not implicitly
+unique. Share the operation-neutral matcher rather than maintaining first-
+and last-match variants or importing PATCH execution into SchemaValidator.
+
 ## Schema-aware query regression rule (2026-09-28, P6b)
 
 When changing list/filter/sort/projection code, test all affected resource

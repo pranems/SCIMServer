@@ -408,7 +408,7 @@ combined checkpoint has its own counts in section 11.1.
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | P7a/readOnly plus P2 overlap verified locally; common-attribute follow-up open | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Public deepEqual, selected-value/cardinality, explicit PUT mode and recursive preservation coexist in passing local checks. Common externalId/RFC3.1 and final dual-backend acceptance remain open |
+| P7 | P7a/P2 overlap and retained-entry fix verified in focused lanes; other follow-ups open | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md), [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md), and retained-entry receipt in 11.15. Common externalId/RFC3.1, eight baseline expectation mismatches and final case-level acceptance remain open |
 | P8 | P8a/P8b/P8c integrated; concurrent-error follow-up active | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) proves cleanup/retained audit behavior. Its original worker owns exact missing-parent error normalization for raced User/Group/custom/applicable credential routes on both backends; genuine DB faults and P3 conditional 412 remain distinct |
 | P9 | Integrated; 18 default cases verified locally, I03 open | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). P2 core resolves I02, now default-running in HTTP/live. I03 remains an executed RED and active-coercion controls remain an explicit gap; original P9 receipts are unchanged |
 | C0 | Incremental assembly verified only | Checkpoints through 11.14; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. I02 is default-verified locally; no full matrix until I03/active coercion, final P7/common attributes, P3b/compatibility and concurrent FK-error normalization close |
@@ -1183,6 +1183,69 @@ unconditional default regression; unresolved probes retain explicit REDs.
 **Design disposition: accepted.** Ordered mutation remains in the shared
 executor while validation modes, resource hooks and conditional persistence
 retain their separate responsibilities.
+
+### 11.15 Retained-entry PUT preservation fix
+
+The P7 owner found a concrete preservation defect after the preceding gates:
+reordering `[{value:same,type:work,server:work-owned},
+{value:same,type:home,server:home-owned}]` into home/work order could preserve
+`work-owned` twice. The original PUT implementation repeatedly found the first
+matching value; its immutable comparator instead retained the last same-value
+record. Anonymous entries were paired by absolute array index. These were
+competing identity rules, not safe retention.
+
+This integration owns the focused fix, coordinated with the P7 worker so no
+parallel PUT matcher is introduced. P2's one-to-one matching algorithm is now
+in `api/src/domain/retained-entries.ts`, a dependency-free, operation-neutral
+module. PUT preparation, immutable comparison and PATCH readOnly/immutable
+paths use that single seam. The former PATCH export remains available for
+compatibility. SchemaValidator does not import a PATCH implementation, avoiding
+the cycle that would result from importing patch-values (which uses
+SchemaValidator). Public deepEqual and all existing validation signatures stay.
+
+Five scenarios run in core and extension namespaces, all three actual resource
+adapters, strict ON/OFF, and readOnly/immutable modes: duplicate values with
+different types reordered, identical value/type occurrence consumption,
+anonymous entries, additions/removals and case-insensitive identity field names.
+HTTP tests repeat PUT, verify version progression and GET, and read the stored
+payload; new occurrences must not receive already-consumed server state.
+An explicit immutable-change unit control still rejects reassignment.
+
+| Gate | Evidence |
+|---|---|
+| RED before production edits | 9 unit failures / 7 positive controls; 48 HTTP failures / 12 positive controls |
+| New targeted unit outcome | All 16 checks pass |
+| Nearby unit run | 21 suites: 1,324 passes / 8 pre-existing failures; not reported as all GREEN |
+| Baseline confirmation of the eight failures | Same 8 failures / 68 passes against untouched validator source at `5581e6b7`, supplied through an ignored Jest overlay without changing production or historical guards |
+| InMemory HTTP | 289 passes across retention, P7 profile, P2 ordered PATCH and P3 conditional writes |
+| PostgreSQL HTTP | Same 289 passes on verified PostgreSQL 17.8 after all 22 migrations |
+| Focused built-runtime live | 60 cases / 1,260 assertions per backend; exact before/after endpoint collection equality |
+| Main live wiring | `9z-DA`; two route/section REDs precede hookup; combined InMemory built-local section reports 134 checks |
+| Build/lint | API build passes; 0 lint errors / 1 existing warning across seven changed source/test files |
+| Cleanup | Owned InMemory/PG API processes stopped and exact newly created PG container removed |
+
+Portable [sanitized proof](evidence/scim-retained-put-20260929/validation.json)
+records the tested source fingerprint, runtime identity and scoped receipt.
+Full artifacts are under `test-results/scim-integration-retained-put/`.
+No inherited database URL was used: the new task-owned harness rejects markers,
+checks container labels/port/database/user/cluster/system identity, uses TCP
+readiness and pins the checked URL at test bootstrap. Earlier evidence and
+guards remain unchanged. This focused proof is not the authoritative C0 matrix.
+
+**Eight neighboring test expectations remain blocking:** three expect
+canonical-value rejection, three expect malformed extension blocks to be
+silently skipped, and two expect readOnly POST/PUT input rejection. They
+conflict with accepted P7 behavior and fail on the untouched baseline as well.
+They are reported to the P7 owner for explicit reconciliation; this change
+does not weaken them or silently call them passed.
+
+**Assurance improvement: applied.** Duplicate values are not unique identities;
+both preservation and validation must consume prior occurrences once, with
+controls for missing/added/anonymous values and actual stored readback.
+**Design disposition: applied.** Extract one small operation-neutral helper
+for three real consumers rather than copy a matcher or couple SchemaValidator
+back to PATCH execution. No schema admission, uniqueness rule, default,
+required-PATCH partial-view rule or live-data repair was added.
 
 ## 12. Architecture and self-improvement decisions
 

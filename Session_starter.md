@@ -10,6 +10,14 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
+**Latest integration fix:** shared one-to-one matching closes the confirmed
+PUT duplicate/anonymous-entry preservation defect. RED: 9 unit/48 HTTP
+failures; GREEN: all 16 new units, 289 targeted HTTP cases per backend and
+60 built-live cases / 1,260 assertions per backend on owned InMemory and
+PostgreSQL 17.8 (22 migrations). [Receipt](docs/evidence/scim-retained-put-20260929/validation.json).
+Eight broader neighboring P7 expectations fail identically on untouched
+committed source and remain explicit test-reconciliation blockers.
+
 P2 core is now integrated: build and 1,229 combined units pass; a new
 default-discovery test adds one distinct pass (1,230 total). Initial combined
 HTTP is **327 passed / 1 blocking I03 failure / 1 PostgreSQL-only skip**.
@@ -62,6 +70,8 @@ supersedes the earlier unrestricted custom-core externalId assumption.
 - [x] ✅ COMPLETED: P8b `88b96c74` -> `39a58c9a` and `2db239a9` -> `9178d60c`; deletion checks use `9z-CX`, preserving integrated P8a `9z-CS` and P8c `9z-CT`.
 - [x] ✅ COMPLETED: P9 `109a1099` -> `3ddd8a1b`; bounded compatibility coverage uses `9z-CY`. I02/I03 were executed, not relabeled as supported passes.
 - [x] ✅ COMPLETED: P2 core `7113ee86` -> `2242860d`; public deepEqual/P7 seams preserved, `9z-CZ` runs ordered PATCH, and verified I02 is default-running.
+- [x] ✅ COMPLETED: Separate PUT retention correction shares P2's matcher through a neutral domain seam, with `9z-DA` live coverage.
+- [ ] Reconcile the eight pre-existing extension-flags-validation expectations with the accepted P7 contract; do not suppress or count them GREEN.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
 - [ ] Close P2's I03/active-coercion follow-up, final P7/common-attribute validation, P3b/compatibility and concurrent FK-error boundaries before C0.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.

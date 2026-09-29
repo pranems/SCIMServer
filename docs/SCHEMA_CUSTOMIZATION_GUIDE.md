@@ -17,6 +17,13 @@
 
 ### Pending release: PATCH validation uses typed paths
 
+**PUT retention is separately verified:** repeated complex entries can carry
+different server-owned values even when their `value` fields match. The
+integrated [one-to-one retention fix](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries)
+preserves each entry's readOnly or omitted immutable state once, including
+type-based reordering, anonymous occurrences, additions and removals.
+No live data repair or new schema admission restriction is implied.
+
 The [P1 path repair](SCIM_P1_IMPLEMENTATION.md) is locally integrated and
 validated, but this checkpoint does not deploy it. User, Group and custom
 resource PATCH now share syntax interpretation with schema validation.

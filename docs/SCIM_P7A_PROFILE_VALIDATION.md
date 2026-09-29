@@ -69,6 +69,43 @@ and [compatibility/policy summary](SCIM_ENTRA_COMPATIBILITY.md).
 
 ## Value rules
 
+### Integrated PUT preservation of repeated complex entries
+
+The 2026-09-29 integration found a separate retained-entry bug after the
+recursive readOnly fix: reordering two entries with the same `value` but
+different `type` could copy the first entry's server-owned value into both.
+`prepareReplacement` used an unconsumed first match; immutable comparison
+used a last-value map. Earlier P7 GREEN counts did not prove this case.
+
+PUT preparation, immutable comparison and P2 PATCH preservation now share
+one operation-neutral matcher in `api/src/domain/retained-entries.ts`.
+It matches each prior occurrence at most once, uses `type` to disambiguate
+repeated values, and keeps anonymous occurrences in their own sequence.
+New entries do not inherit a removed or already-consumed entry's server data.
+This is deterministic retention matching, not a new uniqueness requirement.
+The helper has no HTTP, repository, PATCH-executor or SchemaValidator dependency;
+public `SchemaValidator.deepEqual` remains unchanged.
+
+| Permanent control | Outcome |
+|---|---|
+| Equal values, different types, reordered | `home` retains home-owned state; `work` retains work-owned state |
+| Equal value/type repeated, with an extra occurrence | Each old occurrence consumed once; the added occurrence receives no copied server state |
+| Anonymous entries interleaved with removed/added identified entries | Anonymous state follows anonymous occurrence order, not absolute array index |
+| Distinct removal and addition | Only the retained identity keeps server state |
+| Mixed-case `value`/`type` keys | Attribute-name resolution remains case-insensitive |
+| Omitted immutable data | Preparation and immutable checks agree on the same retained pair; explicit changes remain rejected |
+
+RED: 9 unit and 48 HTTP failures, with 7 unit/12 HTTP positive controls.
+GREEN: all 16 new unit checks and 60 HTTP cases pass. The latter exercise
+User/Group/custom core and extension attributes, strict ON/OFF, readOnly and
+immutable modes, repeated PUT, version progression, GET and repository
+readback. Focused neighboring HTTP coverage totals **289 passes per backend**;
+PostgreSQL was actual 17.8 with all 22 migrations on a new task-owned database.
+The new live section runs **60 cases / 1,260 assertions** against owned built
+local runtimes and retains exact endpoint cleanup. See the
+[integration reconciliation](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1115-retained-entry-put-preservation-fix)
+for evidence boundaries and unrelated still-blocking checks.
+
 | Type | Value validation |
 | --- | --- |
 | string | JSON string; canonical suggestions do not change or reject its case |

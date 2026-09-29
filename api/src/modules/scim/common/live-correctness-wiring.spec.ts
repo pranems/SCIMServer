@@ -29,6 +29,7 @@ describe('integrated correctness live coverage', () => {
       'test-scim-endpoint-deletion.ps1',
       'entra-compatibility.cjs',
       'ordered-patch.cjs',
+      'retained-entry-put.cjs',
     ]) {
       expect(source.includes(invocation)).toBe(true);
     }
@@ -40,10 +41,10 @@ describe('integrated correctness live coverage', () => {
     const main = read('live-test.ps1');
     const search = read('live-test-sections/search-contract.ps1');
     const source = existsSync(resolve(scripts, section)) ? read(section) : main;
-    const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-C[O-Z]):/g)]
+    const sections = [...`${main}\n${source}\n${search}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-(?:C[O-Z]|D[A-Z])):/g)]
       .map((match) => match[1]);
     expect(new Set(sections).size).toBe(sections.length);
-    expect(sections.length).toBeGreaterThanOrEqual(12);
+    expect(sections.length).toBeGreaterThanOrEqual(13);
   });
 
   it('requires the expanded recursive readOnly live contract', () => {

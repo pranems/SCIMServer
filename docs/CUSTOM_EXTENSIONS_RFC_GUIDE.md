@@ -27,6 +27,14 @@
 
 ### Pending release: typed extension PATCH paths
 
+**PUT retained-state correction, integrated but not deployed:** when an
+extension contains repeated complex values, preserving readOnly/omitted
+immutable children must not copy one old entry's server data to several
+new entries. The shared [P7 retention contract](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries)
+consumes prior occurrences once, disambiguates by `type`, and keeps anonymous
+occurrence order. It does not add uniqueness restrictions or change RFC
+defaults.
+
 The [P1 implementation](SCIM_P1_IMPLEMENTATION.md) is locally integrated, not
 deployed. It interprets an extension path such as
 `urn:contoso:scim:schemas:extension:contacts:2.0:User:contacts[primary eq true].value`

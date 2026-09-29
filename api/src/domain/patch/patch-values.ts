@@ -1,7 +1,10 @@
 import type { SchemaAttributeDefinition as Attribute } from '../validation/validation-types';
 import { SchemaValidator } from '../validation/schema-validator';
 import { PatchError } from './patch-error';
+import { retainedEntries } from '../retained-entries';
 import { readResolvedProperty as read, withResolvedProperty as put, withoutResolvedProperty as omit } from '../../modules/scim/utils/scim-patch-path';
+
+export { retainedEntries } from '../retained-entries';
 
 export const objectValue = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -12,27 +15,6 @@ export const attribute = (attributes: readonly Attribute[] | undefined, key: str
 const REPLACEMENT_STATE = Symbol('patch-replacement-state');
 /** Preserved server state is replacement state, never client append input. */
 export const replacementState = (value: unknown): Record<symbol, unknown> => ({ [REPLACEMENT_STATE]: value });
-
-/** Pair retained identities once each; type disambiguates duplicate values.
- * Anonymous entries have only occurrence order, not a fabricated global ID.
- */
-export function retainedEntries(before: unknown[], after: unknown[]): (Record<string, unknown> | undefined)[] {
-  const buckets = new Map<unknown, Record<string, unknown>[]>();
-  for (const entry of before.filter(objectValue)) {
-    const value = read(entry, 'value');
-    const bucket = buckets.get(value) ?? [];
-    bucket.push(entry);
-    buckets.set(value, bucket);
-  }
-  return after.map(entry => {
-    if (!objectValue(entry)) return undefined;
-    const bucket = buckets.get(read(entry, 'value'));
-    if (!bucket?.length) return undefined;
-    const type = read(entry, 'type');
-    const index = type === undefined ? 0 : bucket.findIndex(old => read(old, 'type') === type);
-    return bucket.splice(index < 0 ? 0 : index, 1)[0];
-  });
-}
 
 export function assertSafe(value: unknown): void {
   if (Array.isArray(value)) value.forEach(assertSafe);

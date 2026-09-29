@@ -42,6 +42,7 @@ const RESERVED_KEYS = new Set([
 ]);
 
 import { parsePatchPath, type ParsedPatchPath } from '../patch/patch-path';
+import { retainedEntries } from '../retained-entries';
 
 /**
  * Determine whether a schema definition represents the core schema for a resource type.
@@ -722,12 +723,11 @@ export class SchemaValidator {
         if (Array.isArray(oldValue)) {
           const nextValue = nextKey ? next[nextKey] : undefined;
           if (!Array.isArray(nextValue)) continue; // Removing an entry is not changing its immutable children.
+          const retained = retainedEntries(oldValue, nextValue);
           nextValue.forEach((entry, index) => {
             if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
-            const identity = this.getValueIgnoreCase(entry, 'value');
-            const oldEntry = identity === undefined ? oldValue[index] : oldValue.find(item =>
-              item && typeof item === 'object' && this.deepEqual(this.getValueIgnoreCase(item, 'value'), identity));
-            if (oldEntry && typeof oldEntry === 'object' && !Array.isArray(oldEntry)) preserve(oldEntry, entry, attr.subAttributes!);
+            const oldEntry = retained[index];
+            if (oldEntry) preserve(oldEntry, entry, attr.subAttributes!);
           });
         } else {
           const nextValue = nextKey ? next[nextKey] : undefined;
@@ -906,35 +906,23 @@ export class SchemaValidator {
 
     const immutableSubs = subAttributes.filter(sa => sa.mutability === 'immutable');
 
-    // Build a lookup of existing elements by 'value' sub-attribute (the standard SCIM identifier)
-    const existingMap = new Map<string, Record<string, unknown>>();
-    for (const item of existingVal) {
-      if (item && typeof item === 'object' && 'value' in item) {
-        existingMap.set(String((item as Record<string, unknown>).value), item as Record<string, unknown>);
-      }
-    }
+    const retained = retainedEntries(existingVal, incomingVal);
 
     for (let i = 0; i < incomingVal.length; i++) {
       const incomingItem = incomingVal[i];
-      if (!incomingItem || typeof incomingItem !== 'object') continue;
+      if (!incomingItem || typeof incomingItem !== 'object' || Array.isArray(incomingItem)) continue;
       const incomingObj = incomingItem as Record<string, unknown>;
-
-      // Try to match with existing element by 'value'
-      if ('value' in incomingObj) {
-        const matchKey = String(incomingObj.value);
-        const existingItem = existingMap.get(matchKey);
-        if (existingItem) {
-          for (const subDef of immutableSubs) {
-            this.checkImmutableAttribute(
-              `${parentPath}[${i}].${subDef.name}`,
-              existingItem,
-              incomingObj,
-              subDef,
-              errors,
-              mode,
-            );
-          }
-        }
+      const existingItem = retained[i];
+      if (!existingItem) continue;
+      for (const subDef of immutableSubs) {
+        this.checkImmutableAttribute(
+          `${parentPath}[${i}].${subDef.name}`,
+          existingItem,
+          incomingObj,
+          subDef,
+          errors,
+          mode,
+        );
       }
     }
   }

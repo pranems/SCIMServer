@@ -16,6 +16,7 @@
 | Understand schema-aware filtering, typed sorting, hidden-field projection, page limits and custom ETag consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
 | Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
 | Understand P7a schema declaration, scalar/cardinality and POST/PUT correctness with owned backend proof | [SCIM_P7A_PROFILE_VALIDATION.md](SCIM_P7A_PROFILE_VALIDATION.md) |
+| Understand one-to-one PUT retention of repeated, reordered and anonymous complex entries | [Retained-entry preservation](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries) and [focused proof](evidence/scim-retained-put-20260929/validation.json) |
 | Distinguish remaining characteristic promises from optional behavior, including the P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
 | Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
 | Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |
