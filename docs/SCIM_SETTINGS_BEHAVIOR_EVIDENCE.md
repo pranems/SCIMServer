@@ -44,6 +44,13 @@ No stored profile is repaired or downgraded automatically; see
 
 ## Reconciled matrix
 
+**Authorized follow-up, not current proof:** the parent assigned P2 rejection
+of explicit core dotted paths with verbose support OFF and active strings
+with coercion OFF in both strict modes. The matrix below still distinguishes
+the committed historical behavior from tests that have actually run. Update
+those rows only after the merged follow-up is verified; do not infer closure
+from the frozen `7113ee86` or the strict-ON P9 receipt.
+
 | Setting | Unset effective value | Actual outcome / limitation | Unit evidence | HTTP evidence | Live evidence |
 | --- | --- | --- | --- | --- | --- |
 | `PatchOpAllowRemoveAllMembers` | false | Gates bare removal of all Group members; explicit filtered/value-array removal remains available | Group service remove-all assertions | config-flags deny/allow; P9 E10/E11 explicit removals | P9 E10/E11 do not certify bare-remove toggle |

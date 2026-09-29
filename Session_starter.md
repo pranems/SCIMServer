@@ -45,14 +45,16 @@ HTTP is **327 passed / 1 blocking I03 failure / 1 PostgreSQL-only skip**.
 I02 passes and now runs by default; the final affected HTTP rerun passes 162
 cases with only I03 opt-in. The bounded combined live run has 133 checks,
 including P2's 112 assertions and P9's 18 cases / 1,162 assertions.
-Resolved I03 must also become default-running when fixed. Active-value
-flag precedence remains a parent-reviewed disposition/follow-up, not a
-frozen-P2 promised fix: strict ON/coercion OFF rejects before extraction;
-strict OFF/coercion OFF still converts recognized active strings.
+**Parent-authorized P2 follow-up, awaiting committed proof:** reject explicit
+core dotted User paths when verbose support is OFF, and reject active strings
+when coercion is OFF in both strict modes. This is not inferred from frozen
+`7113ee86`: its strict-OFF/coercion-OFF extractor still converts those strings.
+Verify merged I02/I03 outcomes first, then remove remaining TODO/environment
+gating and record new counts. I02 is already default-running locally.
 P9's corpus is strict ON only and proves no strict-OFF raw-storage contract.
 Frozen P2 intentionally retained historical literal-dotted mode and never
 claimed to fix I03. Its RED remains a parent-reviewed safety/policy acceptance
-item, not a new P2 regression or automatically accepted compatibility.
+item pending that authorized correction, not a new frozen-P2 regression.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays

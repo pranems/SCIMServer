@@ -1028,9 +1028,12 @@ reinterpretation, parser fallback or speculative remediation framework.
 **Frozen-core scope clarification:** P2 `7113ee86` deliberately retains the
 historical User non-selector literal-dotted-key mode when verbose support is
 disabled. It does not claim to fix I03. The executed RED is therefore an
-open safety/policy acceptance item, not a newly introduced P2 regression.
-The parent's rejection-or-reviewed-nested-resolution requirement below remains
-active. Historical intent alone is not the standards-backed, verified policy
+open acceptance item, not a newly introduced P2 regression.
+The parent has now specified the follow-up: reject explicit core dotted User
+paths when verbose support is OFF, and reject active strings when coercion is
+OFF in every strict mode. This supersedes the earlier undecided
+rejection-versus-nested-resolution discussion. Historical intent alone is not the
+verified policy
 disposition needed to close a C0 row. No default, behavior or assertion is
 changed by this clarification.
 **Assurance disposition: applied:** distinguish frozen-package intent from
@@ -1044,8 +1047,8 @@ of the frozen P2 core:
 | Case or boundary | Required verified outcome |
 |---|---|
 | I02 primary handoff | Appending a new primary email retains the prior email, clears its primary flag, sets the new primary, and persists both entries without unrelated changes |
-| I03 verbose-disabled dotted User path | Never persist a literal dotted key. Current P9 expects rejection. A deliberately reviewed nested-resolution contract is also acceptable only with accurate flag policy and nested-value/no-literal-key assertions; changing 400 to 200 alone is not a fix |
-| Quoted active extraction | `AllowAndCoerceBooleanStrings` must have its documented effect on legacy active PATCH extraction, not be bypassed by a special-case converter. Prove native Boolean controls, conversion-disabled behavior, explicit legacy conversion-enabled behavior and unchanged state for rejected writes |
+| I03 verbose-disabled dotted User path | Parent-authorized rejection for explicit core dotted paths with verbose support OFF. Preserve unchanged stored resource/version and do not create a literal dotted key; do not replace the expected rejection with an unreviewed 200 |
+| Quoted active extraction | Parent-authorized rejection of active strings when AllowAndCoerceBooleanStrings is OFF in all strict modes. Prove native Boolean controls, enabled explicit legacy conversion, wrapper distinctions and unchanged state for rejected writes |
 
 **Scope/ownership clarification:** frozen P2 did not promise to remove the
 legacy active converter. Strict ON with coercion OFF rejects scalar quoted
@@ -1053,9 +1056,10 @@ active in service prevalidation; strict OFF with coercion OFF still converts
 recognized strings later. P2's actual change is configured coercion ON before
 execution in both strict modes, needed by primary transitions. P9 pins strict
 ON for every endpoint, so its E04/E05 quoted-primary evidence cannot establish
-strict-OFF raw storage or universal active precedence. The parent acceptance
-requirement above remains pending a deliberate flag-policy disposition and
-assigned follow-up, rather than being reported as a failed promised core fix.
+strict-OFF raw storage or universal active precedence. The parent has explicitly
+assigned the new rejection behavior to the P2 follow-up; it awaits committed
+implementation and actual merged-source proof, rather than being reported as
+a failed promise of the frozen core.
 Any expanded test must use repository readback, not sanitized response values.
 
 The coercion contract must name the exercised wire shapes and strict-validation
@@ -1071,6 +1075,14 @@ assertions without `SCIM_P9_INTEGRATION=1`. Update receipt counts, settings
 guidance and the main live runner together, without weakening assertions or
 turning unsupported behavior into a baseline. Until resolution, retain and
 report the actually executed RED results separately.
+
+The complete P9 source sequence `109a1099` -> `8679e90f` -> `14129663` is
+already integrated as `3ddd8a1b` -> `2c5067a4` -> `2fe767e4`.
+Their 17-supported/2-pending receipts remain historical. The new integrated
+receipt must measure both I02 and I03 on the actual merged follow-up before
+removing the remaining `SCIM_P9_INTEGRATION`/TODO mechanism. Pathless dotted
+resolution, explicit core paths, registered extension paths, selectors and
+strict-mode/coercion axes are separate controls; E17 alone cannot cover them.
 
 Final integration must verify default discovery selects these cases and attach
 both-backend outcome proof to the relevant original-case and supplemental C0

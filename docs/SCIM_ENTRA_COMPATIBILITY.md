@@ -12,7 +12,10 @@ See the [correctness tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md),
 InMemory HTTP and built-local live paths and runs by default. The current
 bounded corpus is **18 cases / 1,162 live assertions**. I03 remains RED when
 explicitly enabled; quoted-active flag precedence remains an unresolved
-parent-reviewed policy/follow-up item, not a frozen P2 fix. The original
+implementation/verification item under the parent-authorized P2 follow-up,
+not a frozen P2 fix. That follow-up must reject explicit core dotted paths
+with verbose support OFF and active strings with coercion OFF in both strict
+modes. No implemented result is claimed until its committed merge is tested. The original
 two-backend P9 receipt below stays unchanged.
 Frozen P2 `7113ee86` deliberately preserved the historical non-selector
 literal-dotted-key mode when `VerbosePatchSupported=false`; it did not claim
@@ -127,9 +130,9 @@ I03 remains executable and is reported as TODO in the bounded default lane.
 `SCIM_P9_INTEGRATION=1` enables its assertions. The assembled code still
 fails it as expected from the preserved historical mode; I02 was separately
 verified and promoted to default execution.
-The current parent acceptance requirement permits rejection or deliberately
-reviewed nested resolution, not silently accepting literal storage. The frozen
-core's compatibility choice does not itself close that safety requirement.
+The latest parent decision requires rejection for explicit core dotted paths
+when verbose support is OFF. The frozen core's compatibility choice does not
+itself close that new acceptance requirement.
 Do not change defaults, semantics or the expected assertion without the
 reviewed policy decision, and do not recommend literal-key mode universally
 for Entra. A separate exploratory run enabled all integration
@@ -145,14 +148,14 @@ not fixed, by the frozen core. The branch order matters:
 | ON | ON | Converted before execution | Explicit legacy-on P9 case E03 |
 | ON | OFF | Rejected by service prevalidation before the legacy extractor | Source/owner-confirmed boundary; P9 E04/E05 themselves test quoted complex primary, not this complete active cross-product |
 | OFF | ON | P2 runs configured coercion before execution, including primary-transition inputs | P2 implementation change; not a strict-OFF claim from the P9 corpus |
-| OFF | OFF | Recognized active strings still reach the legacy converter and become Booleans | Open parent-reviewed flag-precedence/policy disposition, not a claimed P2 correction |
+| OFF | OFF | Recognized active strings still reach the legacy converter and become Booleans in frozen core | Parent-authorized P2 follow-up must reject; awaiting committed implementation/merged proof |
 
 Do not infer stored strict-OFF primary values from response sanitization.
 Any expanded strict-OFF test must assert repository readback as well as HTTP
 output and distinguish promoted active from other schema-aware Boolean paths.
-Final policy ownership/disposition remains with the parent and its designated
-P7b/follow-up owner; no new runtime assignment, default change or speculative
-rejection is made by this documentation correction.
+The parent has now assigned that active-string rejection to the P2 follow-up.
+This documentation records authorization, not implementation. No default or
+new flag is implied; separate native/quoted and wrapper controls are required.
 The additional strict-OFF branches are source-reviewed boundaries, not
 executed P9 corpus cases; output Boolean sanitization may differ from stored
 `emails[].primary` JSON.
