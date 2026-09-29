@@ -13,6 +13,10 @@ InMemory HTTP and built-local live paths and runs by default. The current
 bounded corpus is **18 cases / 1,162 live assertions**. I03 remains RED when
 explicitly enabled; quoted-active coercion controls remain a separate P2
 follow-up. The original two-backend P9 receipt below stays unchanged.
+Frozen P2 `7113ee86` deliberately preserved the historical non-selector
+literal-dotted-key mode when `VerbosePatchSupported=false`; it did not claim
+I03 was fixed. I03 is an open parent-reviewed safety/policy acceptance check,
+not a new regression caused by merging P2.
 
 ## Start here
 
@@ -112,14 +116,18 @@ Successful mutations are checked by a subsequent GET. Endpoint cleanup checks
 
 | Case | Intended contract | Why separate |
 | --- | --- | --- |
-| I03 | With verbose disabled, a dotted path must not silently become a literal key | Reproduced on this base: 200 with unchanged name and an extra dotted key |
+| I03 | With verbose disabled, a dotted path must not silently become a literal key | Open safety/policy decision: frozen P2 intentionally preserves historical literal-key mode; it does not claim this check passes |
 
 I03 remains executable and is reported as TODO in the bounded default lane.
-`SCIM_P9_INTEGRATION=1` enables its assertions. The assembled P2 core still
-fails it; I02 was separately verified and promoted to default execution.
-I03 currently demands a rejection; if P2 deliberately resolves the path
-instead, review the compatibility policy and change that assertion to the
-correct nested result, never to malformed storage. A separate exploratory run enabled all integration
+`SCIM_P9_INTEGRATION=1` enables its assertions. The assembled code still
+fails it as expected from the preserved historical mode; I02 was separately
+verified and promoted to default execution.
+The current parent acceptance requirement permits rejection or deliberately
+reviewed nested resolution, not silently accepting literal storage. The frozen
+core's compatibility choice does not itself close that safety requirement.
+Do not change defaults, semantics or the expected assertion without the
+reviewed policy decision, and do not recommend literal-key mode universally
+for Entra. A separate exploratory run enabled all integration
 assertions on the base: the pathless modern case passed and was promoted to
 E17; I02 and I03 failed for the actual intended outcomes.
 

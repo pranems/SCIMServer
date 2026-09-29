@@ -402,7 +402,7 @@ combined checkpoint has its own counts in section 11.1.
 |---|---|---|
 | D0 | Committed | `cb2e1bcb`: reviewed design, independent report and immutable baseline evidence; 22 JSON artifacts, 140 relative links and 10 rendered diagrams verified |
 | P1 | Integrated | [Implementation and evidence](SCIM_P1_IMPLEMENTATION.md): 1,476 focused unit / 65 HTTP passes; owned Prisma/PostgreSQL and InMemory each pass 24 permanent HTTP cases plus 58 live assertions. Central release metadata pending; no push/merge/deploy. |
-| P2 | Core integrated; bounded combined checks pass with I03 open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. Combined P7/P3/P4 checks pass; I02 now runs by default. I03 and effective quoted-active coercion remain separately owned follow-ups; see 11.14 |
+| P2 | Frozen core integrated; bounded checks pass, separate acceptance items open | `7113ee86` -> `2242860d`; [source receipts](SCIM_P2_IMPLEMENTATION.md) retain 1,522 units / 201 HTTP / 170 live per backend. I02 now runs by default. The core intentionally preserves historical non-selector literal-dotted mode and does not claim I03 closure; parent-reviewed I03 safety/policy and effective active-coercion follow-ups remain separate |
 | P3 | Integrated | 692 targeted units; 55 HTTP tests and 33 live assertions per backend. PostgreSQL 17.8 and InMemory. See [implementation](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md); release metadata/PR/matrix pending |
 | P3b | Active parent-assigned worker | Promised schema-uniqueness closure is in progress; no new commit supplied for assembly. P3 alone does not claim these guarantees and C0 is not unblocked |
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
@@ -410,8 +410,8 @@ combined checkpoint has its own counts in section 11.1.
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
 | P7 | P7a/P2 overlap and retained-entry fix verified in focused lanes; other follow-ups open | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md), [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md), and retained-entry receipt in 11.15. Common externalId/RFC3.1, eight baseline expectation mismatches and final case-level acceptance remain open |
 | P8 | P8a/P8b/P8c integrated; concurrent-error follow-up active | Retain [freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) and [conditional admin PATCH](ENDPOINT_WRITE_CONCURRENCY.md). [P8b cleanup](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) proves cleanup/retained audit behavior. Its original worker owns exact missing-parent error normalization for raced User/Group/custom/applicable credential routes on both backends; genuine DB faults and P3 conditional 412 remain distinct |
-| P9 | Integrated; 18 default cases verified locally, I03 open | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). P2 core resolves I02, now default-running in HTTP/live. I03 remains an executed RED and active-coercion controls remain an explicit gap; original P9 receipts are unchanged |
-| C0 | Incremental assembly verified only | Checkpoints through 11.14; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. I02 is default-verified locally; no full matrix until I03/active coercion, final P7/common attributes, P3b/compatibility and concurrent FK-error normalization close |
+| P9 | Integrated; 18 default cases verified locally, I03 safety/policy item open | [Strict-on Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). I02 is default-running. I03 remains an executed RED against historical mode, not a claimed P2-core fix or an accepted safe policy; active-coercion controls remain an explicit gap |
+| C0 | Incremental assembly verified only | Checkpoints through 11.15; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. I02 is default-verified locally; no full matrix until the deliberate I03 safety/policy disposition, active coercion, P7/common attributes/test reconciliation, P3b/compatibility and concurrent FK-error normalization close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
@@ -1018,8 +1018,21 @@ reinterpretation, parser fallback or speculative remediation framework.
 
 ### 11.12 P2 compatibility closure and permanent regression requirements
 
+**Frozen-core scope clarification:** P2 `7113ee86` deliberately retains the
+historical User non-selector literal-dotted-key mode when verbose support is
+disabled. It does not claim to fix I03. The executed RED is therefore an
+open safety/policy acceptance item, not a newly introduced P2 regression.
+The parent's rejection-or-reviewed-nested-resolution requirement below remains
+active. Historical intent alone is not the standards-backed, verified policy
+disposition needed to close a C0 row. No default, behavior or assertion is
+changed by this clarification.
+**Assurance disposition: applied:** distinguish frozen-package intent from
+release acceptance. **Design disposition: accepted:** documentation-only
+clarification; no speculative compatibility mechanism is introduced.
+
 The parent clarified the required closure of P9's remaining gaps. These are
-P2-owned protocol behaviors, not additional passing compatibility claims:
+parent-reviewed follow-up protocol decisions, not additional passing claims
+of the frozen P2 core:
 
 | Case or boundary | Required verified outcome |
 |---|---|

@@ -26,6 +26,9 @@ cases with only I03 opt-in. The bounded combined live run has 133 checks,
 including P2's 112 assertions and P9's 18 cases / 1,162 assertions.
 Resolved I03 must also become default-running when fixed. P2 still owns making quoted active PATCH extraction
 honor `AllowAndCoerceBooleanStrings`, with explicit legacy mode preserved.
+Frozen P2 intentionally retained historical literal-dotted mode and never
+claimed to fix I03. Its RED remains a parent-reviewed safety/policy acceptance
+item, not a new P2 regression or automatically accepted compatibility.
 Endpoint state is unchanged after cleanup. P4's raw-error correction remains
 the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
