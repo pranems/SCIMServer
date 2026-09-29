@@ -27,6 +27,12 @@ prove a final built artifact. Integration's focused `dist/main.js` smokes also
 do not replace C0's separate exact-artifact live gate. P6b residual filtering
 materializes candidates; green correctness tests do not prove unchanged cost.
 
+**Final C0 acceptance:** reconcile every one of the original **82 unique cases
+on each backend** using the [case-level ledger](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#118-final-c0-case-level-acceptance-ledger).
+Suite totals cannot close rows. Each backend needs an exact-source proof or
+an explicit standards-backed policy/non-applicability rationale. Unreconciled
+rows remain blocking; frozen evidence and its source guards remain unchanged.
+
 - [x] ✅ COMPLETED: Initial ordered assembly and regression-tested live-helper wiring.
 - [x] ✅ COMPLETED: P8a `39841319` integrated as `a1a62484`; freshness uses unique live section `9z-CS`.
 - [x] ✅ COMPLETED: P8c `8eb2f162` integrated as `2c0536ef`; conditional endpoint writes use `9z-CT`.
@@ -36,6 +42,7 @@ materializes candidates; green correctness tests do not prove unchanged cost.
 - [ ] Continue assembly only after the parent supplies follow-up package SHAs.
 - [ ] Close P2/P8b, final P7 PATCH integration and P3b/P9 work before the final C0 matrix.
 - [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
+- [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 
 | Date | Summary |

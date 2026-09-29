@@ -411,7 +411,7 @@ combined checkpoint has its own counts in section 11.1.
 | P7 | P7a/readOnly follow-up integrated; focused revalidation passed | [POST/PUT proof](SCIM_P7A_PROFILE_VALIDATION.md) and [characteristic matrix](SCIM_P7_CHARACTERISTIC_STATUS.md). Recursive readOnly commit `892b74ba` preserves the existing map interface and POST/PUT-only scope. Final ordered PATCH integration still waits for P2; uniqueness and compatibility closure remain separately owned |
 | P8 | Partly integrated | P8a authoritative reads/fingerprints from `39841319`: [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md). P8c conditional admin PATCH from `8eb2f162`: [CAS and single-snapshot token evidence](ENDPOINT_WRITE_CONCURRENCY.md), 172 units, 32 HTTP and 8 live checks per backend. P8b repository cleanup remains separate |
 | P9 | Active parent-assigned worker | Compatibility corpus and accurate guidance are in progress; no commit supplied for assembly and no compatibility closure claimed |
-| C0 | Incremental assembly verified only | Checkpoints 11.1-11.7; evidence boundaries in 11.6. No full matrix until P2/P8b, final P7 PATCH integration and P3b/P9 work close |
+| C0 | Incremental assembly verified only | Checkpoints 11.1-11.7; evidence boundaries in 11.6 and blocking 82-case/backend ledger in 11.8. No full matrix until P2/P8b, final P7 PATCH integration and P3b/P9 work close |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
 P1, P3/P4, P5, P6a/P6b, P7a, P8a and P8c are implemented and locally validated in their source worktrees,
@@ -706,6 +706,163 @@ by deliberate provider capability policy; whole merged-profile revalidation
 can therefore reject an unrelated profile edit on a legacy declaration.
 Neither uniqueness closure nor compatibility acceptance follows from the
 readOnly tests. **P7 remains OPEN for final P2/PATCH integration.**
+
+### 11.8 Final C0 case-level acceptance ledger
+
+**Status: seeded, not yet reconciled. No full-suite rerun is authorized by this
+ledger update.** The parent requires every original unique case on both
+backends to be reconciled against the integrated source. Baseline suites
+already passed while these defects existed, so aggregate GREEN counts are
+not acceptance evidence for an individual case.
+
+The immutable inventory is the [expanded baseline summary](evidence/scim-fresh-20260925/postgres-20260928-expanded.summary.json)
+and its [case descriptions and original results](evidence/scim-fresh-20260925/postgres-20260928-expanded.cases.csv):
+**77 initial cases + 5 alias cases = 82 unique IDs per backend, 164 backend
+dispositions**. The table below has exactly those 82 IDs. Every initial `B`
+means *case-level integrated proof has not yet been reconciled*, not that a
+new product failure has been observed.
+
+#### Dispositions and proof requirements
+
+| Code | Required meaning and evidence |
+|---|---|
+| F | Fixed and verified against the integrated source. Link the permanent test or new implementation-harness case, exact source SHA/fingerprint, backend/runtime identity, command and result artifact. An originally correct control still needs outcome verification; say explicitly when no production fix was required. |
+| P | Explicit intentional or supported-policy difference. State actual behavior, the precise RFC/errata/official compatibility reference, provider policy/capability and any affected settings. Prove the declared behavior and document compatibility impact; do not turn a bug into policy because a test is green. |
+| N | Non-applicable on this backend or supported surface, with a specific reason and evidence for the boundary. A missing runner, unavailable database, failed setup, or unsupplied package is not non-applicability. |
+| B | Still blocking: unresolved defect, missing exact-source case proof, unreviewed policy rationale, setup failure, or open package dependency. Name the missing proof or issue when known. |
+
+InMemory and PostgreSQL dispositions are independent. A row can close only
+when both cells are F/P/N with sufficient linked evidence. One backend's
+GREEN cannot close the other. The final report must summarize all 164
+dispositions and retain every B as a release blocker, not bury it in totals.
+
+**Preserve the historical experiment.** Do not change its source/database
+guards, expected failures, inputs or result artifacts to make new source pass.
+Promote the relevant inputs/assertions into permanent tests or a new,
+task-owned implementation harness recording a new source identity and
+ownership-verified database. Link old case ID to new test ID explicitly;
+similar test names and suite membership do not establish equivalence.
+
+#### Original-case reconciliation
+
+Until case-specific evidence is attached, `Pending` below means no per-case
+disposition has been accepted. Existing package receipts remain available
+evidence to inspect, not automatic row closures.
+
+| Original case ID | InMemory | PostgreSQL | Exact-source case proof and disposition rationale |
+|---|---|---|---|
+| INC-STRICT | B | B | Pending |
+| INC-LENIENT | B | B | Pending |
+| CRUD-Users | B | B | Pending |
+| SEARCH-ARRAY-Users | B | B | Pending |
+| TYPES-Users | B | B | Pending |
+| CRUD-Groups | B | B | Pending |
+| SEARCH-ARRAY-Groups | B | B | Pending |
+| TYPES-Groups | B | B | Pending |
+| CRUD-Devices | B | B | Pending |
+| SEARCH-ARRAY-Devices | B | B | Pending |
+| TYPES-Devices | B | B | Pending |
+| MV-ADD-Users | B | B | Pending |
+| MV-ADD-Groups | B | B | Pending |
+| MV-ADD-Devices | B | B | Pending |
+| VP-STRING | B | B | Pending |
+| VP-BOOLEAN | B | B | Pending |
+| VP-QUOTED-BOOLEAN | B | B | Pending |
+| VP-COMPOUND | B | B | Pending |
+| VP-NUMBER | B | B | Pending |
+| VP-MULTIMATCH | B | B | Pending |
+| READ-FILTER-TYPED | B | B | Pending |
+| REQUIRED-REMOVE-Users | B | B | Pending |
+| IMMUTABLE-SEQUENCE-Users | B | B | Pending |
+| IMMUTABLE-REMOVE-Users | B | B | Pending |
+| IMMUTABLE-PUT-Users | B | B | Pending |
+| REQUIRED-REMOVE-Groups | B | B | Pending |
+| IMMUTABLE-SEQUENCE-Groups | B | B | Pending |
+| IMMUTABLE-REMOVE-Groups | B | B | Pending |
+| IMMUTABLE-PUT-Groups | B | B | Pending |
+| REQUIRED-REMOVE-Devices | B | B | Pending |
+| IMMUTABLE-SEQUENCE-Devices | B | B | Pending |
+| IMMUTABLE-REMOVE-Devices | B | B | Pending |
+| IMMUTABLE-PUT-Devices | B | B | Pending |
+| PRIMARY-Users | B | B | Pending |
+| CASEEXACT-Users | B | B | Pending |
+| RETURNED-Users | B | B | Pending |
+| PRIMARY-Groups | B | B | Pending |
+| CASEEXACT-Groups | B | B | Pending |
+| RETURNED-Groups | B | B | Pending |
+| PRIMARY-Devices | B | B | Pending |
+| CASEEXACT-Devices | B | B | Pending |
+| RETURNED-Devices | B | B | Pending |
+| CAPABILITIES-Users | B | B | Pending |
+| LIMIT-Users | B | B | Pending |
+| CAPABILITIES-Groups | B | B | Pending |
+| LIMIT-Groups | B | B | Pending |
+| CAPABILITIES-Devices | B | B | Pending |
+| LIMIT-Devices | B | B | Pending |
+| CUSTOM-NUMERIC-SORT | B | B | Pending |
+| CUSTOM-ETAG-OFF | B | B | Pending |
+| CAS-Users-WIRE | B | B | Pending |
+| CAS-Users-BARRIER | B | B | Pending |
+| CAS-Groups-WIRE | B | B | Pending |
+| CAS-Groups-BARRIER | B | B | Pending |
+| CAS-Devices-WIRE | B | B | Pending |
+| CAS-Devices-BARRIER | B | B | Pending |
+| UNIQUE-WIRE | B | B | Pending |
+| UNIQUE-BARRIER | B | B | Pending |
+| GROUP-NATIVE-ROLLBACK | B | B | Pending |
+| GROUP-HTTP-FAULT | B | B | Pending |
+| ENDPOINT-CASCADE | B | B | Pending |
+| ENDPOINT-CACHE | B | B | Pending |
+| CUSTOM-PATCH-DISABLED | B | B | Pending |
+| TYPED-READ-CONTROL | B | B | Pending |
+| CORE-MV-ADD | B | B | Pending |
+| CORE-BOOLEAN-PATH | B | B | Pending |
+| MULTIMATCH-REMOVE | B | B | Pending |
+| NO-PATH-Users | B | B | Pending |
+| ETAG-CONTROL-Users | B | B | Pending |
+| CARDINALITY-NEGATIVE-Users | B | B | Pending |
+| NO-PATH-Groups | B | B | Pending |
+| ETAG-CONTROL-Groups | B | B | Pending |
+| CARDINALITY-NEGATIVE-Groups | B | B | Pending |
+| NO-PATH-Devices | B | B | Pending |
+| ETAG-CONTROL-Devices | B | B | Pending |
+| CARDINALITY-NEGATIVE-Devices | B | B | Pending |
+| GROUP-POST-FAULT | B | B | Pending |
+| ALIAS-BULK-SUCCESS | B | B | Pending |
+| ALIAS-BULK-ATOMICITY | B | B | Pending |
+| ALIAS-BULK-DISABLED | B | B | Pending |
+| ALIAS-ME-USER | B | B | Pending |
+| ALIAS-DISCOVERY-REFLECTION | B | B | Pending |
+
+#### Mandatory acceptance overlays
+
+The 82-case list is the minimum regression inventory, not a claim of exhaustive
+Cartesian coverage. C0 must also map these outcome/coverage boundaries to
+specific assertions and evidence, even where a package has already run a
+similarly named suite:
+
+| Required outcome or boundary | C0 evidence required | Current disposition |
+|---|---|---|
+| Exact four-operation incident, strict ON and OFF | Round-trip all four intended values, persisted readback, no literal bracket/dotted corruption, and a late-operation failure proving the whole stored resource/version is unchanged | B: reconcile exact integrated cases |
+| Supported direct, Bulk, `/Me` and custom CRUD paths | Explicit operation/resource/route inventory, real response values and stored outcomes, capability-enabled/disabled behavior, documented unsupported combinations | B: P2/P7/P9 and route reconciliation remain open |
+| All registered settings | Derive the registry inventory from the integrated source; map each key's documented policy, relevant enforcement tests and untested interactions. Do not infer coverage from registration or UI presence | B: registry-to-evidence reconciliation pending |
+| Attribute characteristics | Core/extension namespace, scalar/MV/complex-child, required/readOnly/immutable/returned/caseExact/uniqueness boundaries, defaults when omitted, provider restrictions and compatibility consequences | B: P3b/P7/P9 and characteristic reconciliation pending |
+| Controlled races and Group rollback | Deterministic same-condition races at real mutation boundaries on both backends; complete scalar/payload/member/version/timestamp rollback and no partial create or success event | B: reconcile P3/P4/P8c with final tip |
+| Endpoint cleanup and freshness | Owned dependent-record inventory, intended retained audit history, no stale item/name/list/stats behavior, and independently identified persistent readers/processes where claimed | B: P8b and integrated freshness reconciliation pending |
+| Built-runtime proof | Source SHA, build/artifact identity, actual launched command/runtime and backend, live wire outcomes and fixture cleanup. In-process test listeners and local spot checks are separate claims | B: final exact-artifact live gate pending |
+| P6b resource cost | Measure residual candidate materialization, selectivity, latency, memory and database work on stated datasets; document trade-offs without inferring unchanged cost from functional GREEN | B: final performance assessment pending |
+
+**Exit rule:** all original cases and mandatory overlays have accepted
+dispositions, no B remains, all package/compatibility blockers are closed,
+and the applicable final exact-source/artifact matrix has passed. Local tests
+do not establish remote deployment state. Do not claim exhaustive combinations
+unless the actual enumerated space was executed and recorded.
+
+**Assurance improvement: applied.** A case-ID-complete, backend-specific ledger
+prevents green-but-blind suite totals from closing the known defect inventory.
+**Design disposition: accepted.** Reuse permanent tests and owned harness seams;
+no weakened historical guard, universal testing framework or speculative
+production behavior is introduced.
 
 ## 12. Architecture and self-improvement decisions
 
