@@ -1333,6 +1333,44 @@ remain open.** Typed repository policies compose with existing CAS/lifecycle
 ports; no copied mapper, admission framework or speculative type comparison is
 added by the integration fix.
 
+### 11.17 P9 owned-bootstrap hardening integration
+
+Follow-up `8679e90f6c58cabac2003a6a95cdc3c610672743` was appended as
+`2c5067a4`; its parent `109a1099` was already integrated and was not repeated.
+P5 had already supplied the identical optional pinned-URL contract in
+`app.helper.ts`, so that shared implementation is unchanged.
+
+The new P9-only helper verifies ownership, confirms the checked URL did not
+change, and passes it explicitly through app bootstrap so a later marker
+cannot redirect the connection. The runner clears inherited DATABASE_URL
+before provisioning and probes TCP readiness. P2/P7/P9 source guards,
+case minimums, P2 baseline-transform scope and current default I02 coverage
+are retained. P9's pre-existing version guard already required 17.8+ within
+major 17; the worker corrected its earlier major-only description. The
+receipt observes actual 17.8, not a version inferred from the image tag.
+
+| Focused integration check | Result |
+|---|---|
+| P5/bootstrap isolation, default I02 discovery and live-route units | 3 suites / 8 passed |
+| URL resolver and current default compatibility corpus | 2 suites / 23 passed; I03 remains the sole default TODO and was already executed RED at the prior checkpoint |
+| Imported helper/resolver lint | 0 errors / 0 warnings |
+| Shared config branch probe | P1/P2/P7/P9 selections checked; only P9 maps the owned helper, only P2 enables its baseline transformer. This probe stubs the source guard and proves selection only, not database ownership |
+| Runtime impact | No production source, original pinned app helper or compatibility corpus change |
+| Database/live replay in this integration increment | Not run: source package supplies its fresh 17-case-per-backend owned receipt; no unchanged full-suite or final matrix rerun |
+
+The updated source-package receipt names both its new result and
+`previousReceipt`/`previousSourceSha256`, preserving provenance. Its original
+17 cases / 1,104 assertions must not be relabeled as the assembled
+18-default-case corpus. Parent I03 safety/policy acceptance requirements remain
+open even though the frozen P2 core never promised to fix the legacy mode.
+No conflict resolution downgraded that requirement to an accepted policy.
+
+Logs are in `test-results/scim-integration-p9-hardening/`.
+**Assurance improvement: applied.** Target verification must survive bootstrap,
+not only an earlier marker-absence check.
+**Design disposition: accepted.** Reuse the existing optional pin seam; apply
+the wrapper only to its owned harness instead of changing ordinary test behavior.
+
 ## 12. Architecture and self-improvement decisions
 
 | Decision | Disposition and reason |

@@ -10,6 +10,12 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 assembles P1/P2 core, P3/P4 (including follow-ups), P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 on D0.
 [Integration decisions and validation](docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#111-initial-integration-checkpoint-2026-09-28)
 record the exact source-to-integration mapping and earlier checkpoints.
+**P9 harness hardening integrated:** `8679e90f` -> `2c5067a4`. P9 now pins the
+verified URL through bootstrap; the shared runner clears inherited URLs and
+uses TCP readiness. Eight focused isolation/discovery units and 23 selected
+resolver/default-corpus cases pass, with only unresolved I03 left opt-in.
+P5's identical helper contract and P2/P7 selector/minimum guards are preserved.
+
 **P3b core assembled:** `de05e67b` -> `1d37e7b8` adds atomic uniqueness
 repository policies. Build, 524 focused units, 382 distinct InMemory HTTP
 cases (two native-DB skips) and 136 bounded built-live checks pass.
