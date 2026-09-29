@@ -9,6 +9,14 @@
 import { RepositoryError } from '../../../domain/errors/repository-error';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
+// pg/pg-pool also raise uncoded timeout errors. Match their complete messages,
+// never a bare "connect", which also appears in Prisma's query-source details.
+const PG_CONNECTION_TIMEOUT_MESSAGES = new Set([
+  'timeout exceeded when trying to connect',
+  'Connection terminated due to connection timeout',
+  'timeout expired',
+]);
+
 /**
  * Translate a Prisma error into a typed RepositoryError.
  *
@@ -39,8 +47,8 @@ export function wrapPrismaError(error: unknown, context: string, expectedVersion
   }
   // Connection-related Prisma error codes + common message patterns
   if (code === 'P1001' || code === 'P1002' || code === 'P1008' || code === 'P1017' ||
-      err.message.includes('connect') || err.message.includes('timed out') ||
-      err.message.includes('ECONNREFUSED')) {
+      (!code && (PG_CONNECTION_TIMEOUT_MESSAGES.has(err.message) || err.message.includes('timed out') ||
+      err.message.includes('ECONNREFUSED')))) {
     return new RepositoryError('CONNECTION', `${context}: database connection error`, err);
   }
   return new RepositoryError('UNKNOWN', `${context}: ${err.message}`, err);

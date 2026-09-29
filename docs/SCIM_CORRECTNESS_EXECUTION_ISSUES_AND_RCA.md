@@ -291,6 +291,16 @@ consumers; repository boundaries, defaults and live-data policy are unchanged.
 Evidence is in ignored `test-results/p8b/` logs. No shared database, deployment,
 product version or dependency manifest was changed.
 
+### P8b exact-error follow-up
+
+| ID | Type / severity | Symptom and cause | Confirmed resolution | Earliest / actual detection | Prevention |
+|---|---|---|---|---|---|
+| P8b-E01 | API contract / High | The original paused-create check accepted any 400-599. All six exact-contract cases failed on each backend: credentials returned 500; resource errors lacked the consistent endpoint-specific envelope. | A typed missing-endpoint error is emitted by the deletion barrier and by confirmed missing-parent create failures. The existing plane-aware filter serializes the common safe 404. All six cases now pass on both backends with exact status, keys, scalar detail, diagnostics and no driver text. | Exact HTTP assertion / follow-up RED | No-orphan storage checks and exact wire contracts are independent claims; neither replaces the other. |
+| P8b-E02 | Error classification / Medium | Already classified repository errors were wrapped again, and raw query text containing `connect` was classified as a database outage. | Preserve classified error identity and remove the broad connect substring heuristic. Typed-code and uncoded-driver controls now pass, preserving aggregate/conditional error classifications without importing sibling code. | Typed-error unit controls / follow-up RED | Match error codes or specific connection signals, not query-source vocabulary. |
+| P8b-E03 | Test contract / Low | The initial exact diagnostic allowlist excluded the existing `operation` field emitted for resource creates. | Accept and assert `operation: create` when present, keeping the full outer-key allowlist and no-driver-detail checks. | Envelope-factory inspection / first GREEN attempt | Preserve established plane-specific diagnostics instead of inventing a smaller envelope. |
+| P8b-E04 | Test tooling / Low | A newly added shared error assertion was accidentally nested inside another helper and unavailable to four tests. | Move it to module scope; TypeScript and the 19 applicable InMemory HTTP cases pass. | Test compile / test compile | Compile new helpers before interpreting test failures as behavioral RED. |
+| P8b-E05 | Error classification / Medium | Independent review found removing broad `connect` matching also changed genuine uncoded pg-pool timeouts from sanitized 503 to UNKNOWN/500. | Add exact native timeout messages, retain causes, and keep the negative query-text controls. Three native-message tests went RED then GREEN. A real saturated one-slot pg Pool through Prisma and the User HTTP create/update paths now proves sanitized 503 and unchanged stored state on owned PostgreSQL. | Driver-positive unit/HTTP control / independent review | Removing an overbroad classifier requires both negative false-positive tests and positive native-driver controls; mocked P100x codes alone do not cover uncoded driver errors. |
+
 ### P8b integration coordination
 
 | ID | Type / severity | Symptom and cause | Resolution | Earliest / actual detection | Prevention |
@@ -410,3 +420,33 @@ entry points are separate assertions, not interchangeable evidence.
 port and synchronous storage swaps preserve the existing repository boundaries.
 The deleted-ID barrier intentionally does not expire. A generalized UnitOfWork
 or shared-store rewrite is not needed for this package.
+
+### Exact-error follow-up reconciliation and disposition
+
+The complete parent transcript was scanned again, with an error/signal pass
+and a separate diagnosis-phrase pass. At this checkpoint it contained 36,214
+events. Selecting cleanup-worktree/P8b tool calls after the follow-up request
+at `2026-09-29T06:10:43Z` yielded 172 starts and 170 completed results.
+`test-results/p8b-errors/transcript-scan.json` records the counters.
+
+Confirmed issues map to P8b-E01 through E05. Earlier P8b error excerpts,
+intentional negative controls, quoted source and reviewer probe narration
+were not counted again as new failures. The unavailable editor diagnostics
+tool used the already-recorded native build/lint fallback; no new dependency
+or shared-tool mutation was needed. No remaining diagnosed implementation
+issue was found in that package-scoped pass.
+
+The final PostgreSQL run passed 39 HTTP tests on 17.8 after all 22 migrations;
+InMemory passed 37 with the native FK/pool controls explicitly N/A. The
+ordinary PostgreSQL E2E entry point separately passed 21 tests. Latest live
+runs passed 16 deletion plus 7 freshness checks per backend, and each exact
+owned container was removed. The saturated-pool tests exercise the installed
+driver and Prisma adapter, not an invented error message alone.
+
+**Test/gate improvement: applied.** Exact status/envelope/allowlist checks now
+accompany storage counts; native-driver positive controls complement
+false-positive negative controls. **Design/architecture disposition:
+accepted.** The subtype and create-only classifier are narrow extensions of
+existing repository and HTTP seams. Independent review's native-timeout
+finding was fixed and the follow-up review reported no significant issues.
+No P3/P4/P8c source was imported; combined integration remains parent-owned.

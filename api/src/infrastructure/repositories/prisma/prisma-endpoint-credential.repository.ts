@@ -5,27 +5,32 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../modules/prisma/prisma.service';
 import type { IEndpointCredentialRepository, CredentialAlgoCount } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import type { EndpointCredentialModel, EndpointCredentialCreateInput } from '../../../domain/models/endpoint-credential.model';
+import { wrapEndpointCreateError } from './endpoint-create-error';
 
 @Injectable()
 export class PrismaEndpointCredentialRepository implements IEndpointCredentialRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: EndpointCredentialCreateInput): Promise<EndpointCredentialModel> {
-    const row = await this.prisma.endpointCredential.create({
-      data: {
-        endpointId: input.endpointId,
-        credentialType: input.credentialType,
-        credentialHash: input.credentialHash,
-        label: input.label ?? null,
-        metadata: input.metadata ? (input.metadata as any) : undefined,
-        secretEnvelope: input.secretEnvelope ?? null,
-        expiresAt: input.expiresAt ?? null,
-        lookupKey: input.lookupKey ?? null,
-        secretHash: input.secretHash ?? null,
-        hashAlgo: input.hashAlgo ?? 'bcrypt',
-      },
-    });
-    return this.toModel(row);
+    try {
+      const row = await this.prisma.endpointCredential.create({
+        data: {
+          endpointId: input.endpointId,
+          credentialType: input.credentialType,
+          credentialHash: input.credentialHash,
+          label: input.label ?? null,
+          metadata: input.metadata ? (input.metadata as any) : undefined,
+          secretEnvelope: input.secretEnvelope ?? null,
+          expiresAt: input.expiresAt ?? null,
+          lookupKey: input.lookupKey ?? null,
+          secretHash: input.secretHash ?? null,
+          hashAlgo: input.hashAlgo ?? 'bcrypt',
+        },
+      });
+      return this.toModel(row);
+    } catch (error) {
+      throw await wrapEndpointCreateError(error, 'Credential create', input.endpointId, this.prisma);
+    }
   }
 
   async findActiveByEndpoint(endpointId: string): Promise<EndpointCredentialModel[]> {

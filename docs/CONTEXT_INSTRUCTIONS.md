@@ -105,6 +105,13 @@ These are local changes, not a new product version or deployment. The source
 package excluded P8c/P3; this assembly combines them with P4 while retaining
 separate cleanup and concurrent-error-contract acceptance claims.
 
+The P8b exact-error follow-up is now locally verified: interrupted resource
+and credential creates return a typed, sanitized endpoint 404; PostgreSQL
+confirms parent absence only after relation failure. It preserves typed
+conditional errors, 412 responses and native pg timeout classification.
+P8 remains open for parent P3/P4/P8c assembly validation, not for an assumed
+shared InMemory User-FK contract.
+
 Use [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
 for change sizing, validation lanes, commit/push/PR/merge/deploy ownership,
 session boundaries, model routing, and bounded-log/context rules. It preserves

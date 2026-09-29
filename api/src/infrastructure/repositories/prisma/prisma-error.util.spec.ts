@@ -11,6 +11,28 @@ describe('wrapPrismaError', () => {
     const error = new RepositoryError('PRECONDITION_FAILED', 'condition failed');
     expect(wrapPrismaError(error, 'aggregate')).toBe(error);
   });
+  it.each([
+    'timeout exceeded when trying to connect',
+    'Connection terminated due to connection timeout',
+    'timeout expired',
+  ])('preserves native pg timeout classification: %s', message => {
+    const cause = new Error(message);
+    const error = wrapPrismaError(cause, 'User update');
+    expect(error.code).toBe('CONNECTION');
+    expect(error.message).toBe('User update: database connection error');
+    expect(error.cause).toBe(cause);
+  });
+
+  it('preserves an already classified repository error instead of reclassifying it', () => {
+    const classified = new RepositoryError('NOT_FOUND', 'Already classified');
+    expect(wrapPrismaError(classified, 'aggregate operation')).toBe(classified);
+  });
+
+  it.each(['P2003', 'P2010', undefined])('does not classify %s as an outage from a connect statement in driver text', code => {
+    const failure = Object.assign(new Error('Driver failure in endpoint: { connect: { id } }'), { code });
+    expect(wrapPrismaError(failure, 'create').code).toBe('UNKNOWN');
+  });
+
   it('should map P2025 to NOT_FOUND', () => {
     const prismaError = Object.assign(new Error('Record not found'), { code: 'P2025' });
     const result = wrapPrismaError(prismaError, 'User update(abc)');

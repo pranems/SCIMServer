@@ -124,9 +124,10 @@ endpoint deletion barriers are the specific InMemory guarantees tested here.
 
 Already-returned snapshots and in-flight authorization work are not cancelled.
 The guarantee is that a write after deletion cannot repopulate owned storage.
-The paused HTTP probe verifies rejection and exact counts, not a universal
-status code: existing FK error translation can differ from InMemory
-`NOT_FOUND` in this concurrent-deletion case. Error normalization is separate.
+The original paused HTTP probe only verified rejection and exact counts.
+The separate [exact-error follow-up](#6-exact-concurrent-deletion-http-contract)
+now requires a safe 404 for each supported interrupted create path on both
+backends. Storage integrity alone was not a complete API error contract.
 
 ## 4. Evidence
 
@@ -149,6 +150,9 @@ so missing parents cannot hide orphan members.
 | API static gates | Build passes; full lint has 0 errors and 527 existing warnings; new tests lint clean |
 | Documentation | Content and coupled freshness gates pass for all 26 manifest docs; diagrams render in both strict themes |
 | Scope | No dependency/lockfile/product-version change, shared database, deployment or push |
+
+These are the original cleanup-package results. The follow-up's expanded
+error-contract matrix and latest counts are in section 6.
 
 Permanent evidence:
 
@@ -205,3 +209,128 @@ Integration coordination: P4 Group aggregate commits `212a6b92` and
 `66a7229f`, and P8c conditional endpoint-update commit `8eb2f162`, are merged
 by the parent integration task, not this worktree. P8b does not import their
 pending changes or change its delete scope to implement their write contracts.
+
+## 6. Exact concurrent-deletion HTTP contract
+
+The accepted cleanup commits `88b96c74` and `2db239a9` proved no orphan records
+but accepted any HTTP status from 400 to 599 for an interrupted create. That
+assertion allowed an avoidable 500. It also failed to distinguish a deleted
+endpoint from a database outage, missing member or conditional-write conflict.
+
+The follow-up first replaced that assertion with six deterministic paused
+creates: User, Group, custom Device, bearer credential, OAuth credential and
+WIF trust. All six went RED on each backend. The existing credential APIs are
+admin management routes under `/scim/admin`; they use the existing SCIM error
+envelope, not the RFC 6749 OAuth-token error body.
+
+### Decision at the persistence boundary
+
+```mermaid
+flowchart TB
+    INSERT["Endpoint-owned create fails"] --> TYPED{"Already a typed repository error?"}
+    TYPED -->|"yes"| KEEP["Preserve exact error identity"]
+    TYPED -->|"no"| REL{"Prisma P2003 or P2025?"}
+    REL -->|"no"| OTHER["Keep conflict, outage or sanitized server failure"]
+    REL -->|"yes"| READ["Read authoritative parent endpoint after failure"]
+    READ -->|"absent"| MISSING["EndpointNotFoundError"]
+    READ -->|"present"| OTHER
+    READ -->|"read fails"| OTHER
+    MEM["InMemory deleted-ID guard"] --> MISSING
+    MISSING --> HTTP["Existing plane-aware error filter: safe 404"]
+    COND["Conditional update or delete"] --> ORIGINAL["Existing conditional path, including 412"]
+```
+
+The new domain subtype is narrower than a generic `NOT_FOUND`: it means the
+owning endpoint disappeared during an attempted create. InMemory's existing
+deletion barrier emits it. PostgreSQL considers it only after a failed insert
+reports `P2003` or `P2025` **and** a fresh query proves the endpoint absent.
+An FK error by itself does not identify which relation is missing.
+
+The failed insert remains protected by the existing database constraints.
+There is no new pre-check pretending to make a write atomic. Successful
+creates issue no additional endpoint query. The rare failed-relation path
+adds one read, after the failed operation; if that read fails, absence has not
+been proved and no endpoint 404 is produced.
+
+The shared translator preserves existing typed repository errors by identity.
+The endpoint-create classifier is not called by conditional update or delete
+operations. This keeps the P3 integration boundary intact: their precondition
+failure must remain 412, not become a missing-parent classification.
+
+Unknown create failures have a safe public message and retain their original
+cause for server logging. Connection classification uses Prisma codes and
+specific native pg timeout signals. A bare `connect` inside SQL/query source
+is no longer mistaken for an outage; actual uncoded pg-pool timeouts still
+produce sanitized 503 on SCIM resource writes.
+
+### Response and negative controls
+
+The stable fields for a create that loses its endpoint are:
+
+```json
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "detail": "Endpoint no longer exists",
+  "status": "404",
+  "urn:scimserver:api:messages:2.0:Diagnostics": {
+    "errorCode": "ENDPOINT_NOT_FOUND"
+  }
+}
+```
+
+The response uses `application/scim+json`. Existing request diagnostics add
+`requestId`, `endpointId`, `logsUrl` and, on resource creates, `operation:
+create`. No `scimType` is invented for this admin-parent disappearance. Tests
+assert the full key allowlist, scalar detail, status, diagnostics and absence
+of Prisma codes, FK/constraint text, stack traces and driver internals.
+
+| Situation | Proven result |
+|---|---|
+| Six creates paused immediately before persistence, endpoint deleted meanwhile | Exact safe 404, no new rows, other endpoint unchanged |
+| Stale User, Group and Device If-Match | Existing 412 preserved, stored counts unchanged |
+| Existing typed member-reference validation error | 400 `invalidValue` preserved; not labeled `ENDPOINT_NOT_FOUND` |
+| Native PostgreSQL User-reference FK failure while endpoint exists | Still a distinct persistence failure, not a missing endpoint |
+| Actual PostgreSQL trigger failure on resource or credential insert | Safe 500, no partial new records; endpoint remains available |
+| Classified resource database outage | 503, never an endpoint 404 |
+| Unrelated credential database failure | Existing sanitized 500 convention retained; no auth redesign |
+| Actual one-slot pg Pool held until acquisition times out | User create and update return sanitized 503, no state change |
+
+The member-validation HTTP check deliberately injects an already-classified
+400 to prove pass-through. It is not evidence that this branch implements P4's
+member validation. Native User-FK and pg-pool controls are PostgreSQL-only and
+explicitly N/A for independent InMemory repositories.
+
+### Final follow-up evidence and integration handoff
+
+| Gate | Result |
+|---|---|
+| Focused unit/filter/repository matrix | 323 passed across 10 suites |
+| PostgreSQL HTTP matrix | 39 passed: 21 deletion/error cases plus 18 P8a/profile cases |
+| InMemory HTTP matrix | 37 passed, 2 explicit PostgreSQL-only N/A cases |
+| Standard PostgreSQL E2E entry point | 21 passed without task-only test variables |
+| Guarded database replay | PostgreSQL 17.8, all 22 migrations, real trigger faults and native pool timeout |
+| Local built live smoke | 16 deletion checks plus 7 P8a freshness checks per backend |
+| Build and lint | API build passed; full lint 0 errors / 527 unchanged warnings |
+| Review | Native-timeout regression found, fixed with RED/GREEN controls; follow-up review found no significant issues |
+| Documentation | 26-document content/freshness gates passed; all 3 feature diagrams rendered under both strict themes; 49 literal JSON blocks parsed in touched docs |
+| Cleanup | Each exact owned database container removed; task-owned Node runtimes stopped |
+
+The live helper now checks six late-create error envelopes after deletion.
+It does not claim to schedule an in-flight race over an unmodified public
+server. The deterministic HTTP tests provide that separate race evidence
+without adding production test hooks. Receipts and red/green artifacts are
+under ignored `test-results/p8b-errors/`.
+
+**Test/gate improvement: applied.** No-orphan checks now have exact wire
+contracts, positive native-driver controls and negative validation/outage
+controls. **Design/architecture disposition: accepted.** A small domain
+subtype plus a create-only classifier extends the existing error boundaries;
+no shared InMemory database, general FK emulator or auth strategy redesign.
+
+The previously deferred P8b HTTP contract is locally verified. Parent
+integration must still run the combined P3/P4/P8c matrix, especially P4's
+aggregate create boundary and P3's atomic same-version-write checks. No pending
+sibling source was imported. P8 remains open at the integration level until
+those independent package results are assembled and verified.

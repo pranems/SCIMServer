@@ -29,6 +29,7 @@ function Invoke-DeletionRequest {
     } else { [string]$response.Content }
     [pscustomobject]@{
         Status = [int]$response.StatusCode
+        ContentType = [string]$response.Headers['Content-Type']
         Text = $text
         Body = if ($text) { $text | ConvertFrom-Json } else { $null }
     }
@@ -104,6 +105,38 @@ try {
     foreach ($path in @($admin, "$base/Users/$($user.id)", "$base/Devices", "$admin/credentials")) {
         $missing = Invoke-DeletionRequest GET $path $null
         Add-DeletionCheck ($missing.Status -eq 404) 'Deleted endpoint and owned routes are unavailable'
+    }
+    $lateCreates = @(
+        @{ Kind = 'User'; Path = "$base/Users"; Body = @{ schemas = @($userSchema); userName = "$name-late" } }
+        @{ Kind = 'Group'; Path = "$base/Groups"; Body = @{ schemas = @($groupSchema); displayName = "$name-late" } }
+        @{ Kind = 'Device'; Path = "$base/Devices"; Body = @{ schemas = @($deviceSchema); displayName = "$name-late" } }
+        @{ Kind = 'bearer'; Path = "$admin/credentials"; Body = @{ credentialType = 'bearer' } }
+        @{ Kind = 'oauth_client'; Path = "$admin/credentials"; Body = @{ credentialType = 'oauth_client' } }
+        @{
+            Kind = 'wif'
+            Path = "$admin/credentials"
+            Body = @{
+                credentialType = 'wif'
+                wif = @{
+                    expectedIssuer = 'https://issuer.example.test'
+                    expectedSubject = 'late-subject'
+                    expectedAudience = 'late-audience'
+                    jwksUri = 'https://issuer.example.test/keys'
+                    allowedTenantId = 'late-test-tenant'
+                }
+            }
+        }
+    )
+    $allowedErrorKeys = @('schemas', 'status', 'detail', 'scimType', 'urn:scimserver:api:messages:2.0:Diagnostics')
+    foreach ($late in $lateCreates) {
+        $rejected = Invoke-DeletionRequest POST $late.Path $late.Body
+        $extraKeys = @($rejected.Body.PSObject.Properties.Name | Where-Object { $_ -notin $allowedErrorKeys })
+        $safe = $rejected.Status -eq 404 -and $rejected.Body.status -eq '404' -and
+            $rejected.ContentType -match '^application/scim\+json' -and
+            'urn:ietf:params:scim:api:messages:2.0:Error' -in @($rejected.Body.schemas) -and
+            $rejected.Body.detail -is [string] -and $extraKeys.Count -eq 0 -and
+            $rejected.Text -notmatch 'Prisma|P20\d\d|foreign.key|constraint|driverAdapter|stack'
+        Add-DeletionCheck $safe "Late $($late.Kind) create returns a safe SCIM 404"
     }
     $untouched = Invoke-DeletionRequest GET "/scim/endpoints/$($other.id)/Users/$($survivor.id)" $null
     Add-DeletionCheck ($untouched.Status -eq 200 -and $untouched.Body.userName -eq "$name-survivor") 'Other endpoint resource remains unchanged'

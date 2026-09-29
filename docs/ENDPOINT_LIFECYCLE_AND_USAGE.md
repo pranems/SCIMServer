@@ -117,6 +117,12 @@ would recreate deleted data, and clears derived endpoint/credential caches.
 It is locally validated, not yet deployed. Reusing the old name creates a new
 endpoint ID, not a recovery of the deleted resources.
 
+The locally verified exact-error follow-up also rejects User, Group, custom
+resource and bearer/OAuth/WIF credential creates that were already in flight
+when their endpoint was deleted. They return a safe SCIM `404`, not a driver
+error or generic `500`. Conditional-write `412` responses, member validation
+errors and unrelated database failures keep their existing distinct meanings.
+
 ```bash
 # Removes provisioning resources and credentials; retains audit logs
 curl -X DELETE http://localhost:8080/scim/admin/endpoints/{id} \

@@ -32,6 +32,7 @@ import type { EndpointContextStorage } from '../../endpoint/endpoint-context.sto
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { compileUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ export function handleRepositoryError(
   logCategory: LogCategory,
   context: Record<string, unknown> = {},
 ): never {
+  if (error instanceof EndpointNotFoundError) throw error;
   if (error instanceof RepositoryError) {
     if (error.code === 'PRECONDITION_FAILED') {
       logger.debug(logCategory, 'Conditional write rejected', { operation, errorCode: error.code, ...context });

@@ -18,6 +18,7 @@ import { wrapPrismaError } from './prisma-error.util';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
+import { wrapEndpointCreateError } from './endpoint-create-error';
 
 /** Maps a ScimResource row to the GenericResourceRecord domain type. */
 function toGenericRecord(resource: Record<string, unknown>): GenericResourceRecord {
@@ -59,7 +60,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
       }));
       return toGenericRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
-      throw wrapPrismaError(error, `GenericResource create(${input.scimId})`);
+      throw await wrapEndpointCreateError(error, `GenericResource create(${input.scimId})`, input.endpointId, this.prisma);
     }
   }
 

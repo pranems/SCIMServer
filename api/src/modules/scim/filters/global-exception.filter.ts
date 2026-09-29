@@ -12,6 +12,9 @@ import { LogCategory } from '../../logging/log-levels';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
 import { resolveRequestBodyForLog, type RawBodyRequest } from '../../logging/request-body-capture';
+import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
+import { ScimExceptionFilter } from './scim-exception.filter';
+import { createScimError } from '../common/scim-errors';
 
 /**
  * Global catch-all exception filter for unhandled non-HttpException errors.
@@ -40,6 +43,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
+    if (exception instanceof EndpointNotFoundError) {
+      // Reuse the existing plane-aware envelope, diagnostics and audit path.
+      new ScimExceptionFilter(this.logger, this.loggingService).catch(
+        createScimError({
+          status: 404,
+          detail: exception.message,
+          diagnostics: { errorCode: 'ENDPOINT_NOT_FOUND' },
+        }),
+        host,
+      );
+      return;
+    }
     // HttpException subclasses are handled by ScimExceptionFilter - re-throw
     // so NestJS routes them to the more specific filter.
     if (exception instanceof HttpException) {

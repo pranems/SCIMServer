@@ -542,6 +542,13 @@ unchanged. [P8b cleanup and in-flight-write behavior](SCIM_ENDPOINT_DELETION_IMP
 is locally validated but not yet deployed; PostgreSQL keeps its existing
 FK-backed deletion.
 
+If deletion wins while a supported resource or credential POST is already
+in flight, the failed create returns `404` with SCIM detail
+`Endpoint no longer exists` and diagnostics `errorCode: ENDPOINT_NOT_FOUND`.
+The [exact-error follow-up](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md#6-exact-concurrent-deletion-http-contract)
+verifies this on both backends. It does not turn member validation,
+conditional-write 412s or database outages into endpoint 404s.
+
 ```http
 DELETE /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
 Host: localhost:8080

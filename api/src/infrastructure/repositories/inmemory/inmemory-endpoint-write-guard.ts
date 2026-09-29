@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RepositoryError } from '../../../domain/errors/repository-error';
+import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
 
 @Injectable()
 export class InMemoryEndpointWriteGuard {
@@ -9,7 +9,7 @@ export class InMemoryEndpointWriteGuard {
 
   assertWritable(endpointId: string): void {
     if (this.deleted.has(endpointId)) {
-      throw new RepositoryError('NOT_FOUND', 'Endpoint no longer exists');
+      throw new EndpointNotFoundError();
     }
   }
 

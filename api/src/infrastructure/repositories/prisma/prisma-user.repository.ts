@@ -21,6 +21,7 @@ import { wrapPrismaError } from './prisma-error.util';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
+import { wrapEndpointCreateError } from './endpoint-create-error';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
@@ -64,7 +65,7 @@ export class PrismaUserRepository implements IUserRepository {
       }));
       return toUserRecord(created as unknown as Record<string, unknown>);
     } catch (error) {
-      throw wrapPrismaError(error, `User create(${input.scimId})`);
+      throw await wrapEndpointCreateError(error, `User create(${input.scimId})`, input.endpointId, this.prisma);
     }
   }
 

@@ -20,6 +20,7 @@ import type {
 import type { Prisma } from '../../../generated/prisma/client';
 import { wrapPrismaError } from './prisma-error.util';
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { wrapEndpointCreateError } from './endpoint-create-error';
 import { isValidUuid } from './uuid-guard';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
@@ -99,7 +100,7 @@ export class PrismaGroupRepository implements IGroupRepository {
           return toGroupRecord(created);
         }, members, members.length > 0);
     } catch (error) {
-      throw wrapPrismaError(error, `Group create(${input.scimId})`);
+      throw await wrapEndpointCreateError(error, `Group create(${input.scimId})`, input.endpointId, this.prisma);
     }
   }
 
