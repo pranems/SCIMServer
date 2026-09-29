@@ -407,8 +407,8 @@ combined checkpoint has its own counts in section 11.1.
 | C0 | Initial assembly verified | Section 11.1 only; final matrix/release readiness waits for remaining packages |
 
 **Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3, P5, P6a and P8a are implemented and locally validated in their source worktrees,
-and integrated here. The pre-P8a checkpoint and focused P8a integration
+P1, P3, P5, P6a, P8a and P8c are implemented and locally validated in their source worktrees,
+and integrated here. The initial checkpoint and focused P8a/P8c integration
 validation passed. The final combined matrix,
 release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
 implementation contexts. This section is updated at package boundaries. Detailed
@@ -494,8 +494,47 @@ The package's 163-unit, 18-HTTP-per-backend, two-PostgreSQL-process live and
 22-migration evidence remains in [its implementation report](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md).
 This increment does not repeat or reclassify that evidence as a new integrated
 PostgreSQL run. Logs are in `test-results/scim-integration-p8a/`.
-**P8b cleanup and conditional-admin-write guarantees remain separate.**
+At this pre-P8c checkpoint, cleanup and conditional-admin-write guarantees
+were separate. Section 11.3 adds P8c; P8b cleanup remains separate.
 Final C0, version/lock updates, publication and deployment remain pending.
+
+### 11.3 P8c incremental assembly, 2026-09-28
+
+Source `8eb2f1620e27e4e98214ddda4744c0749633e5c9`, based on P8a, was
+appended as `2c0536ef` without rewriting earlier commits. Its production
+changes applied without conflicts. PostgreSQL compares the persisted editable
+fields in the actual update predicate; InMemory checks the token and publishes
+the update without an intervening await. `getEndpointWithETag` computes the
+full editable-state token and requested response view from one authoritative
+snapshot. The moved ETag helper remains in `endpoint/common`, not controllers.
+
+The previous unconditional per-key-merge safety claim was corrected in the
+operator/API docs. Per-key merge preserves sequential edits, not concurrent
+read-modify-write requests without a condition. Missing `If-Match` and `*`
+retain their established unconditional compatibility behavior. The imported
+PC-4 pattern and instruction 3a.4 remain unchanged.
+
+The source live section `9z-CS` collided with P8a. The cross-runner regression
+caught six declarations with five distinct identifiers, and the package
+inventory caught the missing shared invocation. P8c now runs as `9z-CT`;
+all original eight assertions and dedicated cleanup remain in its helper.
+
+| Incremental integration gate | Result |
+|---|---|
+| API build | PASS |
+| P8a/P8c service, InMemory, controller, ETag and wiring units | 7 suites / 175 tests passed |
+| Conditional writes, freshness/profile and P6a HTTP interaction | 4 suites / 30 cases passed on explicit InMemory with inert database URL |
+| Focused lint | 0 errors / 21 existing warnings across 8 files; no gate changes |
+| Combined main live section | 86 checks passed: previous 78 plus 8 conditional endpoint checks |
+| Cleanup | Endpoint collection identical before/after; owned API process stopped |
+| Script syntax | 2 PowerShell files and the Node helper parsed |
+
+Original dual-backend/two-PostgreSQL-process evidence, 22 migration replays,
+and the independent review are retained in [the concurrency report](ENDPOINT_WRITE_CONCURRENCY.md);
+they are not claimed as a newly run integration database matrix. New logs are
+in `test-results/scim-integration-p8c/`. P8b cleanup remains separately owned
+and may change the endpoint deletion path later. No publication, deployment,
+release metadata update or final C0 matrix is part of this assembly.
 
 ## 12. Architecture and self-improvement decisions
 

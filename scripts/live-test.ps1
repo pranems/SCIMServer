@@ -16134,20 +16134,6 @@ Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -Foregrou
 Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 
 # ============================================
-# TEST SECTION 9z-CS: CONDITIONAL ENDPOINT WRITES
-$script:currentSection = "9z-CS: Conditional endpoint writes"
-# ============================================
-$conditionalEndpointToken = ([string]$headers.Authorization) -replace '^Bearer\s+', ''
-try {
-    $conditionalChecks = & node "$PSScriptRoot\live-endpoint-conditional.cjs" --base-url $baseUrl --token $conditionalEndpointToken
-    if ($LASTEXITCODE -ne 0) { throw 'Conditional endpoint live checks failed.' }
-    $conditionalChecks | ConvertFrom-Json |
-        ForEach-Object { Test-Result -Success $_.Success -Message "9z-CS: $($_.Message)" }
-} catch {
-    Test-Result -Success $false -Message "9z-CS: $($_.Exception.Message)"
-}
-
-# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

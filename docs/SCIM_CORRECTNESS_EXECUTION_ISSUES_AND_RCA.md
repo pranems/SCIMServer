@@ -95,6 +95,7 @@ remains a consolidation gate, not a claimed completed check.
 | C0-I03 | Environment/tooling / Low | Initial build could not find `tsc`; next build could not find generated Prisma client; editor Problems provider failed | Fresh integration worktree has no dependency tree, generated client or usable editor provider | After observed failures, reuse one owned API dependency junction without modifying its target; generate Prisma only into the integration worktree and validate through CLI with an explicit inert URL | Build intake / same | No package install, version/lock rewrite, inherited database, or shared generated-client mutation |
 | C0-I04 | Documentation / Medium | F4 source coupling rejected Custom Extensions and Schema Customization guides | P1 changed `schema-validator.ts`, but these two source-bound guides had no corresponding package update | Add operator-facing typed-selector, strict-off syntax, namespace/caseExact and diagnostic notes with explicit not-deployed status. Fifteen literal JSON blocks in edited docs parse; content audit passes. The coupled gate's explicit BaseRef mode compares committed HEAD, so final-range verification follows this commit rather than pretending uncommitted changes are visible | Package source-coupling audit / initial integration | Keep the existing F4 gate unchanged; a feature-specific implementation report does not replace each bound operator guide |
 | C0-I05 | Integration/test coverage / Medium | P8a added endpoint freshness under `9z-CR`, already owned by conditional writes | Independently chosen section identifiers collided; the original uniqueness regression inspected shared helpers but not new declarations in the main script | Two focused regressions failed with missing shared invocation and 4 distinct identifiers for 5 declarations. Move P8a into the shared orchestrator as `9z-CS` and inspect identifiers across the main script and both helper layers. All three wiring tests pass within 166 focused units | Entry-point/section contract / P8a assembly | Applied: future main-script additions cannot evade this integration-section uniqueness check. P8a's dedicated endpoint cleanup and optional two-reader arguments remain unchanged |
+| C0-I06 | Integration / Low | P8c declared `9z-CS`, already assigned to P8a | Source packages authored against separate snapshots cannot reserve global live-section IDs | Existing cross-runner uniqueness coverage caught six declarations with only five identifiers; the new package-route assertion also failed. Move P8c into the shared orchestrator as `9z-CT`. All 175 units, 30 InMemory HTTP cases and 86 live checks pass; endpoint collection remains identical | Existing integration regression / P8c assembly | Applied: extend the package invocation inventory, retain the cross-main/helper uniqueness gate, and preserve P8c's dedicated fixture cleanup and optional second reader |
 
 **Test/gate improvement: applied.** Package-local live success is now paired
 with a main-runner reachability/section regression. A helper existing on disk
@@ -126,6 +127,15 @@ No new PostgreSQL/two-process proof is claimed by this incremental run.
 **Design disposition: accepted.** A fifth real package extends the existing
 small orchestrator; no production logic, ownership guard, cleanup policy or
 P8b guarantee was added by the section-wiring correction.
+
+P8c incremental confirmation: **86 combined live checks** pass, including all
+eight new conditional endpoint checks. Existing endpoint state is unchanged,
+the owned API is stopped, and earlier checkpoint receipts remain unchanged.
+New evidence is in `test-results/scim-integration-p8c/`.
+**Design disposition: accepted.** The actual CAS/snapshot behavior remains the
+reviewed P8c rollback unit; this wiring-only follow-up adds its sixth real
+consumer to the existing small orchestrator. PC-4 and instruction 3a.4 are
+retained, and no P8b deletion/cleanup implementation is imported.
 
 ## P8a issues
 

@@ -83,5 +83,15 @@ function Invoke-ScimCorrectnessContractTests {
         } catch {
             Test-Result -Success $false -Message "9z-CS: endpoint freshness failed: $($_.Exception.Message)"
         }
+
+        $script:currentSection = '9z-CT: Conditional Endpoint Writes'
+        try {
+            $conditionalChecks = & node (Join-Path $PSScriptRoot '..\live-endpoint-conditional.cjs') --base-url $base --token $token
+            if ($LASTEXITCODE -ne 0) { throw 'Conditional endpoint live checks failed.' }
+            $conditionalChecks | ConvertFrom-Json |
+                ForEach-Object { Test-Result -Success $_.Success -Message "9z-CT: $($_.Message)" }
+        } catch {
+            Test-Result -Success $false -Message "9z-CT: $($_.Exception.Message)"
+        }
     }
 }
