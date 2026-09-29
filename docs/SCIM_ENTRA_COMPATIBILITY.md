@@ -11,8 +11,9 @@ See the [correctness tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md),
 **P2 integration checkpoint:** I02 primary handoff now passes the assembled
 InMemory HTTP and built-local live paths and runs by default. The current
 bounded corpus is **18 cases / 1,162 live assertions**. I03 remains RED when
-explicitly enabled; quoted-active coercion controls remain a separate P2
-follow-up. The original two-backend P9 receipt below stays unchanged.
+explicitly enabled; quoted-active flag precedence remains an unresolved
+parent-reviewed policy/follow-up item, not a frozen P2 fix. The original
+two-backend P9 receipt below stays unchanged.
 Frozen P2 `7113ee86` deliberately preserved the historical non-selector
 literal-dotted-key mode when `VerbosePatchSupported=false`; it did not claim
 I03 was fixed. I03 is an open parent-reviewed safety/policy acceptance check,
@@ -83,6 +84,10 @@ tenant identifier, credential or log was uploaded.
 [built-live wrapper](../scripts/live-test-p9.cjs) run the **same assertions**.
 Inputs use invented `example.com` identities and the effective `entra-id`
 preset, not captured customer payloads. Native and legacy cases are distinct.
+**Scope:** every P9 endpoint explicitly enables `StrictSchemaValidation`.
+E04/E05's coercion-switch results therefore apply to strict ON only.
+Neither the 17-case source receipt nor the later default I02 addition proves
+strict-OFF raw persistence or universal coercion-switch precedence.
 
 | Case | Wire shape and setting | Outcome checked, not just HTTP status |
 | --- | --- | --- |
@@ -132,9 +137,22 @@ assertions on the base: the pathless modern case passed and was promoted to
 E17; I02 and I03 failed for the actual intended outcomes.
 
 Another open boundary is legacy `active` PATCH extraction: source currently
-coerces quoted values independently of `AllowAndCoerceBooleanStrings`.
-E04/E05 prove the switch on complex schema-aware values, not universal
-rejection of quoted `active` when it is off. P2 owns that convergence.
+retains a special-case converter. The P2 owner confirmed that it was preserved,
+not fixed, by the frozen core. The branch order matters:
+
+| Strict validation | Coercion switch | Scalar quoted User active behavior | Evidence boundary |
+|---|---|---|---|
+| ON | ON | Converted before execution | Explicit legacy-on P9 case E03 |
+| ON | OFF | Rejected by service prevalidation before the legacy extractor | Source/owner-confirmed boundary; P9 E04/E05 themselves test quoted complex primary, not this complete active cross-product |
+| OFF | ON | P2 runs configured coercion before execution, including primary-transition inputs | P2 implementation change; not a strict-OFF claim from the P9 corpus |
+| OFF | OFF | Recognized active strings still reach the legacy converter and become Booleans | Open parent-reviewed flag-precedence/policy disposition, not a claimed P2 correction |
+
+Do not infer stored strict-OFF primary values from response sanitization.
+Any expanded strict-OFF test must assert repository readback as well as HTTP
+output and distinguish promoted active from other schema-aware Boolean paths.
+Final policy ownership/disposition remains with the parent and its designated
+P7b/follow-up owner; no new runtime assignment, default change or speculative
+rejection is made by this documentation correction.
 No zero-match-remove, filtered-add or optional-protocol default was changed.
 
 ## Attributes and characteristics: supported is not universal

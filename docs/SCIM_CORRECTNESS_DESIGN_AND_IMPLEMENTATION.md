@@ -1047,6 +1047,17 @@ of the frozen P2 core:
 | I03 verbose-disabled dotted User path | Never persist a literal dotted key. Current P9 expects rejection. A deliberately reviewed nested-resolution contract is also acceptable only with accurate flag policy and nested-value/no-literal-key assertions; changing 400 to 200 alone is not a fix |
 | Quoted active extraction | `AllowAndCoerceBooleanStrings` must have its documented effect on legacy active PATCH extraction, not be bypassed by a special-case converter. Prove native Boolean controls, conversion-disabled behavior, explicit legacy conversion-enabled behavior and unchanged state for rejected writes |
 
+**Scope/ownership clarification:** frozen P2 did not promise to remove the
+legacy active converter. Strict ON with coercion OFF rejects scalar quoted
+active in service prevalidation; strict OFF with coercion OFF still converts
+recognized strings later. P2's actual change is configured coercion ON before
+execution in both strict modes, needed by primary transitions. P9 pins strict
+ON for every endpoint, so its E04/E05 quoted-primary evidence cannot establish
+strict-OFF raw storage or universal active precedence. The parent acceptance
+requirement above remains pending a deliberate flag-policy disposition and
+assigned follow-up, rather than being reported as a failed promised core fix.
+Any expanded test must use repository readback, not sanitized response values.
+
 The coercion contract must name the exercised wire shapes and strict-validation
 settings. Retain explicit legacy support; do not use blanket strict-off advice,
 invent a new default, or silently describe an ignored flag as effective.
@@ -1172,8 +1183,9 @@ Its default-discovery assertion failed before the corpus integration flag was
 removed. The ordinary P9 HTTP/live corpus is now 18 cases; measured live
 assertions are 1,162. I03 remains opt-in only while it is unresolved, and was
 actually executed RED with expected 400 versus received 200. No assertion was
-changed to accept literal dotted storage. Quoted active extraction remains the
-original P2 owner's follow-up, not an inferred fixed behavior.
+changed to accept literal dotted storage. Quoted active extraction remains an
+unresolved parent-reviewed flag-precedence/policy item with separately assigned
+follow-up ownership, not a correction claimed by the frozen P2 core.
 
 | Incremental integration gate | Result |
 |---|---|
