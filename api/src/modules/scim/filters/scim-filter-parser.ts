@@ -151,7 +151,7 @@ function tokenize(input: string): Token[] {
     if (/[a-zA-Z_$]/.test(input[i]) || input[i] === ':') {
       let ident = '';
       // Attribute paths can contain dots, colons, and hyphens (URN paths)
-      while (i < input.length && /[a-zA-Z0-9_$_.:\-]/.test(input[i])) {
+      while (i < input.length && /[a-zA-Z0-9_$.:_-]/.test(input[i])) {
         ident += input[i];
         i++;
       }

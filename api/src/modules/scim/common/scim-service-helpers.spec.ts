@@ -1025,6 +1025,17 @@ describe('stripReadOnlyAttributes', () => {
     expect(payload).not.toHaveProperty('Groups');
   });
 
+  it('strips declared fields without dereferencing prototype-polluting keys', () => {
+    const payload = JSON.parse(
+      '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"client-id","__proto__":{"polluted":true}}',
+    ) as Record<string, unknown>;
+
+    expect(stripReadOnlyAttributes(payload, [coreSchema])).toContain('id');
+    expect(payload).not.toHaveProperty('id');
+    expect(Object.prototype.hasOwnProperty.call(payload, '__proto__')).toBe(true);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
   // ─── R-MUT-2: readOnly sub-attributes within readWrite parents ──────
 
   describe('R-MUT-2: readOnly sub-attrs within readWrite parents', () => {
@@ -1212,6 +1223,20 @@ describe('stripReadOnlyPatchOps', () => {
     expect(val).toHaveProperty('displayName');
     expect(val).not.toHaveProperty('groups');
     expect(val).not.toHaveProperty('meta');
+  });
+
+  it('strips readOnly no-path fields without dereferencing prototype-polluting keys', () => {
+    const value = JSON.parse(
+      '{"userName":"alice@example.com","groups":[{"value":"g2"}],"__proto__":{"polluted":true}}',
+    ) as Record<string, unknown>;
+
+    const { filtered, stripped } = stripReadOnlyPatchOps([{ op: 'replace', value }], [coreSchema]);
+
+    expect(stripped).toEqual(['groups']);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].value).not.toHaveProperty('groups');
+    expect(Object.prototype.hasOwnProperty.call(filtered[0].value, '__proto__')).toBe(true);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
   it('should keep id in no-path ops for G8c rejection', () => {

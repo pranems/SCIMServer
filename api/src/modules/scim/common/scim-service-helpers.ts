@@ -33,6 +33,10 @@ import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/er
 import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { compileEffectiveUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
+import {
+  isPrototypePollutingKey,
+  safePropertyKey,
+} from '../utils/scim-patch-path';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
 
@@ -650,13 +654,16 @@ export function stripReadOnlyAttributes(
     const obj = value as Record<string, unknown>;
     if (index < segments.length) {
       const key = Object.keys(obj).find(k => k.toLowerCase() === segments[index]);
-      if (key !== undefined) stripAt(obj[key], segments, index + 1, names, path ? `${path}.${key}` : key);
+      if (key !== undefined && !isPrototypePollutingKey(key)) {
+        stripAt(obj[safePropertyKey(key)], segments, index + 1, names, path ? `${path}.${key}` : key);
+      }
       return;
     }
     for (const key of Object.keys(obj)) {
       if (!path && key.toLowerCase() === 'schemas') continue;
+      if (isPrototypePollutingKey(key)) continue;
       if (names.has(key.toLowerCase())) {
-        delete obj[key];
+        delete obj[safePropertyKey(key)];
         stripped.push(path ? `${path}.${key}` : key);
       }
     }
@@ -668,7 +675,7 @@ export function stripReadOnlyAttributes(
   for (const urn of new Set([...extensions.keys(), ...extensionSubAttrs.keys()])) {
     const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
     if (!urnKey) continue;
-    const extObj = payload[urnKey];
+    const extObj = payload[safePropertyKey(urnKey)];
     if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
 
     const top = extensions.get(urn);
@@ -726,10 +733,11 @@ export function stripReadOnlyPatchOps(
       const targetAttr = parsed.attribute;
       if (parsed.schemaUrn && !targetAttr && op.op.toLowerCase() !== 'remove' &&
           op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-        const wrapper = { [parsed.schemaUrn]: structuredClone(op.value) };
+        const namespaceKey = safePropertyKey(parsed.schemaUrn);
+        const wrapper = { [namespaceKey]: structuredClone(op.value) };
         const removed = stripReadOnlyAttributes(wrapper, schemaDefinitions);
         stripped.push(...removed);
-        filtered.push(removed.length ? { ...op, value: wrapper[parsed.schemaUrn] } : op);
+        filtered.push(removed.length ? { ...op, value: wrapper[namespaceKey] } : op);
         continue;
       }
 
@@ -781,22 +789,24 @@ export function stripReadOnlyPatchOps(
       let modified = false;
 
       for (const key of Object.keys(valueObj)) {
+        if (isPrototypePollutingKey(key)) continue;
+        const safeKey = safePropertyKey(key);
         // Never strip 'id' - let G8c reject
         if (key.toLowerCase() === 'id') continue;
 
         // Expanded no-path keys must receive the same policy as explicit paths.
-        const target = stripReadOnlyPatchOps([{ ...op, path: key, value: valueObj[key] }],
+        const target = stripReadOnlyPatchOps([{ ...op, path: key, value: valueObj[safeKey] }],
           schemaDefinitions, { core, extensions, coreSubAttrs });
         if (target.stripped.length) {
-          if (target.filtered.length) valueObj[key] = target.filtered[0].value;
-          else delete valueObj[key];
+          if (target.filtered.length) valueObj[safeKey] = target.filtered[0].value;
+          else delete valueObj[safeKey];
           stripped.push(...target.stripped);
           modified = true;
           continue;
         }
 
         if (core.has(key.toLowerCase())) {
-          delete valueObj[key];
+          delete valueObj[safeKey];
           stripped.push(key);
           modified = true;
           continue;
@@ -804,36 +814,39 @@ export function stripReadOnlyPatchOps(
 
         // R-MUT-2: Strip readOnly sub-attrs from complex values in no-path ops
         const readOnlySubs = coreSubAttrs.get(key.toLowerCase());
-        if (readOnlySubs && typeof valueObj[key] === 'object' && valueObj[key] !== null && !Array.isArray(valueObj[key])) {
-          const subObj = { ...(valueObj[key] as Record<string, unknown>) };
+        if (readOnlySubs && typeof valueObj[safeKey] === 'object' &&
+            valueObj[safeKey] !== null && !Array.isArray(valueObj[safeKey])) {
+          const subObj = { ...(valueObj[safeKey] as Record<string, unknown>) };
           for (const subKey of Object.keys(subObj)) {
+            if (isPrototypePollutingKey(subKey)) continue;
             if (readOnlySubs.has(subKey.toLowerCase())) {
-              delete subObj[subKey];
+              delete subObj[safePropertyKey(subKey)];
               stripped.push(`${key}.${subKey}`);
               modified = true;
             }
           }
-          valueObj[key] = subObj;
+          valueObj[safeKey] = subObj;
         }
 
         // Check extension URN blocks in no-path value
         if (key.startsWith('urn:')) {
           for (const [urn, readOnlySet] of extensions) {
             if (key.toLowerCase() === urn.toLowerCase()) {
-              const extVal = valueObj[key];
+              const extVal = valueObj[safeKey];
               if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
                 const extObj = { ...(extVal as Record<string, unknown>) };
                 for (const extKey of Object.keys(extObj)) {
+                  if (isPrototypePollutingKey(extKey)) continue;
                   if (readOnlySet.has(extKey.toLowerCase())) {
-                    delete extObj[extKey];
+                    delete extObj[safePropertyKey(extKey)];
                     stripped.push(`${key}.${extKey}`);
                     modified = true;
                   }
                 }
                 if (Object.keys(extObj).length === 0) {
-                  delete valueObj[key];
+                  delete valueObj[safeKey];
                 } else {
-                  valueObj[key] = extObj;
+                  valueObj[safeKey] = extObj;
                 }
               }
             }

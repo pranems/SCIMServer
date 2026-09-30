@@ -255,6 +255,13 @@ independent persisted readback. The isolated Docker live suite passes
 owned API, database and network cleanup. Web Vitest passes 118 files and 1,568
 tests with all coverage floors met; production build and all 25 size budgets
 pass. The TypeScript ratchet reports 66 established errors, below its ceiling.
+PR #188 is open. The first exact-tip CI run identified five CodeQL
+dynamic-property sinks and two HIGH `fast-uri` CVEs. The sink-local correction
+reuses the canonical case-insensitive prototype-key barrier and passes 455/455
+focused units, 209/209 affected HTTP tests, changed-source lint with zero
+errors, and the API build. The manifest now selects fixed `fast-uri` 4.1.4;
+public-registry lockfile regeneration, quarantine confirmation, exact-tip CI,
+merge, and purplecliff validation are still pending.
 
 The current deployed baseline is v0.55.35 on dev and the proudbush canary. The shared digest is
 `sha256:ad8594e2e2b7263e88dc4ae813436a20797cbea30b78457340fdb35dfe7eedfc`.

@@ -78,8 +78,6 @@ describe('Test Gap Audit #2 (E2E)', () => {
 
     it('PUT should return 409 when changing displayName to existing one', async () => {
       const groupA = (await scimGet(app, `${basePath}/Groups/${groupAId}`, token).expect(200)).body;
-      const groupB = (await scimGet(app, `${basePath}/Groups/${groupBId}`, token).expect(200)).body;
-
       const res = await scimPut(app, `${basePath}/Groups/${groupBId}`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
         displayName: groupA.displayName, // duplicate

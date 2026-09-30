@@ -1200,7 +1200,7 @@ describe('scim-patch-path utilities', () => {
   // so these cases are unreachable via SCIM PATCH. This block locks the
   // defense-in-depth barrier at the util layer (CodeQL barrier).
   describe('safePropertyKey (prototype pollution guard)', () => {
-    const dangerous = ['__proto__', 'constructor', 'prototype'];
+    const dangerous = ['__proto__', 'constructor', 'prototype', 'Constructor'];
 
     it.each(dangerous)(
       'applyValuePathUpdate rejects attribute %s as unsafe key',

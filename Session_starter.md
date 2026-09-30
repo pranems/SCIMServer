@@ -24,9 +24,14 @@ PowerShell script scopes; all 22 migrations ran, endpoint inventory is empty,
 and the owned API, database and network were removed exactly. Web Vitest passes
 118 files and 1,568 tests with all coverage floors met; production build and
 all 25 size budgets pass. The TypeScript ratchet reports 66 established errors,
-below its ceiling. Remaining final static review, reviewed PR, exact-tip CI,
-merge, merged-master build, purplecliff dev deployment, and endpoint replication
-must complete in that order. Customer production is out of scope.
+below its ceiling. PR #188 is open. Its first exact-tip pass found five CodeQL
+dynamic-property sinks and two HIGH `fast-uri` CVEs. Sink-local use of the
+canonical prototype-key barrier now passes 455/455 focused units, 209/209
+affected HTTP tests, changed-source lint with zero errors, and the API build.
+The manifest selects fixed `fast-uri` 4.1.4; public-registry lockfile
+regeneration, quarantine confirmation, exact-tip CI, review, merge,
+merged-master build, purplecliff dev deployment, and endpoint replication must
+complete in that order. Customer production is out of scope.
 
 **Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
 The effective common view now reaches runtime uniqueness compilation and

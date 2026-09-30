@@ -204,8 +204,6 @@ async function endpoint(p = profile()) {
     profile: p,
   };
 }
-const resourceType = (route) =>
-  ({ Users: "User", Groups: "Group", Devices: "Device" })[route];
 function body(route, fields = {}) {
   const urn = { Users: USER, Groups: GROUP, Devices: DEVICE }[route];
   return {

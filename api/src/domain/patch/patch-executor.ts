@@ -190,7 +190,7 @@ export class PatchExecutor {
         const seed = put({}, expression.filterAttribute, expression.filterValue);
         const elementDef = def && { ...def, multiValued: false };
         const incoming = mergePatchValue(seed, parsed.subAttribute
-          ? { [parsed.subAttribute]: operation.value } : operation.value, 'add', elementDef);
+          ? put({}, parsed.subAttribute, operation.value) : operation.value, 'add', elementDef);
         const entry = this.value(undefined, { ...operation, value: incoming }, elementDef);
         if (!objectValue(entry)) throw new PatchError(400, 'A selected complex value must be an object.', 'invalidValue');
         next = handoffPrimary([...list, entry],

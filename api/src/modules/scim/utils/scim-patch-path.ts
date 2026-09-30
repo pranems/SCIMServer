@@ -26,6 +26,10 @@ const PROTOTYPE_POLLUTING_KEYS: ReadonlySet<string> = new Set([
   'prototype',
 ]);
 
+export function isPrototypePollutingKey(key: string): boolean {
+  return PROTOTYPE_POLLUTING_KEYS.has(key.toLowerCase());
+}
+
 /**
  * Throws when `key` is reserved by JavaScript's object model and writing to
  * it would pollute `Object.prototype` or interfere with built-in behavior.
@@ -36,7 +40,7 @@ const PROTOTYPE_POLLUTING_KEYS: ReadonlySet<string> = new Set([
  * their own sink sites (e.g. `rawPayload[safePropertyKey(originalPath)]`).
  */
 export function safePropertyKey(key: string): string {
-  if (typeof key !== 'string' || PROTOTYPE_POLLUTING_KEYS.has(key)) {
+  if (typeof key !== 'string' || isPrototypePollutingKey(key)) {
     throw new Error(
       `[scim-patch-path] Refusing to write to reserved property key '${String(key)}' (CWE-1321 prototype pollution guard).`,
     );
