@@ -1,6 +1,6 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.36`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
@@ -271,7 +271,7 @@ explicit granular core paths. No-path object merges (form 5) resolve dotted
 keys regardless of the flag, as do registered extension paths and selectors.
 This intentional follow-up replaces the earlier literal-key behavior.
 
-**Case and key safety:** SCIM attribute names are case-insensitive. The PATCH engines resolve each incoming segment to the casing already present in the resource, so `Status`, `status`, and mixed-case value-path segments update one canonical property rather than creating duplicates. Resolved updates and removals rebuild objects from validated entry lists instead of assigning or deleting an arbitrary property name. `__proto__`, `constructor`, and `prototype` are rejected before reconstruction. This immutable shape removes the remote-property-injection sink while preserving canonical casing.
+**Case and key safety:** SCIM attribute names are case-insensitive. The PATCH engines resolve each incoming segment to the casing already present in the resource, so `Status`, `status`, and mixed-case value-path segments update one canonical property rather than creating duplicates. Resolved updates and removals rebuild objects from validated entry lists instead of assigning or deleting an arbitrary property name. Explicit `__proto__`, `constructor`, and `prototype` paths are rejected case-insensitively before reconstruction. Lenient no-path preprocessing never dereferences reserved own-properties and leaves final compatibility handling to the shared executor, so a dangerous top-level key can be ignored while valid sibling fields commit. Sink-local barriers preserve that behavior while removing remote-property-injection paths.
 
 ---
 
