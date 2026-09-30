@@ -36,11 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previously blocked packages pass 82/82 focused assertions, and the isolated
   Docker suite passes 1,697/1,697 with 22 migrations, zero remaining endpoints,
   and exact API, database, and network cleanup.
-- Harden all five exact-tip CodeQL dynamic-property sinks in PATCH execution
-  and read-only preprocessing through the canonical case-insensitive
-  prototype-key barrier and immutable update helper. Security-focused units
-  pass 455/455, affected HTTP suites pass 209/209, changed-source lint has zero
-  errors, and the API build passes. The exact-tip CodeQL rerun remains required.
+- Remove exact-tip CodeQL dynamic-property sinks structurally from PATCH
+  execution and readOnly preprocessing. Shared execution uses immutable update
+  helpers; preprocessing rebuilds entry lists and returns its filtered payload
+  explicitly to User, Group, and generic services. This replaces a runtime-safe
+  sanitizer pass that CodeQL could not prove and fixes the duplicate regex
+  character finding. Eight unit/service suites pass 639/639, four affected HTTP
+  suites pass 317/317, changed-source lint has zero errors, and the API build
+  passes. The exact-tip CodeQL rerun remains required.
 - Advance the `fast-uri` transitive override from 4.1.3 to 4.1.4 for
   CVE-2026-84292 and CVE-2026-84394. Public-registry workflow run 36735519112
   changed only its version, URL, and SHA-512 integrity and reported a 28.2-day

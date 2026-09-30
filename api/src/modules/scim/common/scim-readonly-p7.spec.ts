@@ -47,8 +47,9 @@ describe('P7 recursive readOnly stripping', () => {
         const expected = { schemas: [core, ext, other], ...wrap(expectedLeaf), [ext]: wrap(expectedLeaf),
           [other]: wrap(leaf), locked: 'unrelated' };
         const maps = cached ? SchemaValidator.buildCharacteristicsCache(schemas).readOnlyCollected : undefined;
-        const removed = stripReadOnlyAttributes(payload, schemas, maps);
-        expect(payload).toEqual(expected);
+        const result = stripReadOnlyAttributes(payload, schemas, maps);
+        const removed = result.stripped;
+        expect(result.payload).toEqual(expected);
         const path = `OUTER${outerMany ? '[]' : ''}.INNER${innerMany ? '[]' : ''}`;
         const copies = (outerMany ? 2 : 1) * (innerMany ? 2 : 1);
         expect(removed.filter(p => p === `${path}.LOCKED`)).toHaveLength(copies);
@@ -64,8 +65,13 @@ describe('P7 recursive readOnly stripping', () => {
         subAttributes: [attr('locked', { mutability: 'readOnly' })] })] }),
     ] }];
     const payload = { 'outer.inner': { locked: 'not an actual hierarchy' } };
-    expect(stripReadOnlyAttributes(payload, schemas, SchemaValidator.buildCharacteristicsCache(schemas).readOnlyCollected)).toEqual([]);
-    expect(payload).toEqual({ 'outer.inner': { locked: 'not an actual hierarchy' } });
+    const result = stripReadOnlyAttributes(
+      payload,
+      schemas,
+      SchemaValidator.buildCharacteristicsCache(schemas).readOnlyCollected,
+    );
+    expect(result.stripped).toEqual([]);
+    expect(result.payload).toEqual({ 'outer.inner': { locked: 'not an actual hierarchy' } });
   });
 
   it('preserves malformed writable values for validation rather than coercing them while stripping', () => {
@@ -75,7 +81,8 @@ describe('P7 recursive readOnly stripping', () => {
       ] }),
     ] }];
     const payload = { schemas: [core], outer: [null, 42, { inner: 'invalid' }, { inner: { locked: 'ignore' } }] };
-    expect(stripReadOnlyAttributes(payload, schemas)).toEqual(['outer[].inner.locked']);
-    expect(payload).toEqual({ schemas: [core], outer: [null, 42, { inner: 'invalid' }, { inner: {} }] });
+    const result = stripReadOnlyAttributes(payload, schemas);
+    expect(result.stripped).toEqual(['outer[].inner.locked']);
+    expect(result.payload).toEqual({ schemas: [core], outer: [null, 42, { inner: 'invalid' }, { inner: {} }] });
   });
 });

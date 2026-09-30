@@ -76,12 +76,19 @@ describe('P7 common externalId contract', () => {
       { id: shared, isCoreSchema: false, attributes: declarations },
     ];
     const input = { schemas: [core, shared], ID: ['spoof'], MeTa: 42, [shared]: { id: [7, 9], meta: 'extension' } };
-    stripReadOnlyAttributes(input, schemas, cached ? SchemaValidator.buildCharacteristicsCache(schemas).readOnlyCollected : undefined);
-    expect(input).toEqual({ schemas: [core, shared], [shared]: { id: [7, 9], meta: 'extension' } });
-    expect(SchemaValidator.validate(input, schemas, { mode: 'create', strictMode: true }).valid).toBe(true);
+    const filtered = stripReadOnlyAttributes(
+      input,
+      schemas,
+      cached ? SchemaValidator.buildCharacteristicsCache(schemas).readOnlyCollected : undefined,
+    ).payload;
+    expect(filtered).toEqual({ schemas: [core, shared], [shared]: { id: [7, 9], meta: 'extension' } });
+    expect(SchemaValidator.validate(filtered, schemas, { mode: 'create', strictMode: true }).valid).toBe(true);
     const absent = { id: 'spoof', meta: { bad: true } };
-    stripReadOnlyAttributes(absent, [{ id: core, isCoreSchema: true, attributes: [] }]);
-    expect(absent).toEqual({});
+    const filteredAbsent = stripReadOnlyAttributes(
+      absent,
+      [{ id: core, isCoreSchema: true, attributes: [] }],
+    ).payload;
+    expect(filteredAbsent).toEqual({});
   });
 
   it.each([{ type: 'integer' }, { multiValued: true }, { caseExact: false }, { mutability: 'readOnly' },

@@ -35,7 +35,9 @@ import { compileEffectiveUniquenessPolicy, type UniquenessPolicy } from '../../.
 import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
 import {
   isPrototypePollutingKey,
-  safePropertyKey,
+  readResolvedProperty,
+  withResolvedProperty,
+  withoutResolvedProperty,
 } from '../utils/scim-patch-path';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
@@ -631,61 +633,71 @@ export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
  * Parent paths also cover the existing nested-complex compatibility mode.
  * Each declared segment is resolved against real objects, never a dotted key.
  *
- * @param payload           - The request body (mutated in place)
+ * @param payload           - The request body (not mutated)
  * @param schemaDefinitions - Core + extension schema definitions
- * @returns Array of stripped attribute names (for logging/warning)
+ * @returns The immutable filtered payload and stripped names for logging/warning
  *
  * @see RFC 7643 §2.2 - readOnly attributes SHALL be ignored by the server
  */
+export interface StripReadOnlyAttributesResult {
+  payload: Record<string, unknown>;
+  stripped: string[];
+}
+
 export function stripReadOnlyAttributes(
   payload: Record<string, unknown>,
   schemaDefinitions: readonly SchemaDefinition[],
   preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>>; extensionSubAttrs: Map<string, Map<string, Set<string>>> },
-): string[] {
+): StripReadOnlyAttributesResult {
   const { core, extensions, coreSubAttrs, extensionSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
 
-  const stripAt = (value: unknown, segments: string[], index: number, names: Set<string>, path: string): void => {
+  const stripAt = (value: unknown, segments: string[], index: number, names: Set<string>, path: string): unknown => {
     if (Array.isArray(value)) {
-      for (const item of value) stripAt(item, segments, index, names, `${path}[]`);
-      return;
+      return value.map(item => stripAt(item, segments, index, names, `${path}[]`));
     }
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== 'object') return value;
     const obj = value as Record<string, unknown>;
     if (index < segments.length) {
       const key = Object.keys(obj).find(k => k.toLowerCase() === segments[index]);
-      if (key !== undefined && !isPrototypePollutingKey(key)) {
-        stripAt(obj[safePropertyKey(key)], segments, index + 1, names, path ? `${path}.${key}` : key);
-      }
-      return;
+      if (key === undefined || isPrototypePollutingKey(key)) return obj;
+      return withResolvedProperty(
+        obj,
+        key,
+        stripAt(readResolvedProperty(obj, key), segments, index + 1, names, path ? `${path}.${key}` : key),
+      );
     }
-    for (const key of Object.keys(obj)) {
-      if (!path && key.toLowerCase() === 'schemas') continue;
-      if (isPrototypePollutingKey(key)) continue;
+    return Object.fromEntries(Object.entries(obj).filter(([key]) => {
+      if (!path && key.toLowerCase() === 'schemas') return true;
+      if (isPrototypePollutingKey(key)) return true;
       if (names.has(key.toLowerCase())) {
-        delete obj[safePropertyKey(key)];
         stripped.push(path ? `${path}.${key}` : key);
+        return false;
       }
-    }
+      return true;
+    }));
   };
 
-  stripAt(payload, [], 0, core, '');
-  for (const [parent, names] of coreSubAttrs) stripAt(payload, parent.split('.'), 0, names, '');
+  let filteredPayload = stripAt(payload, [], 0, core, '') as Record<string, unknown>;
+  for (const [parent, names] of coreSubAttrs) {
+    filteredPayload = stripAt(filteredPayload, parent.split('.'), 0, names, '') as Record<string, unknown>;
+  }
 
   for (const urn of new Set([...extensions.keys(), ...extensionSubAttrs.keys()])) {
-    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
+    const urnKey = Object.keys(filteredPayload).find(k => k.toLowerCase() === urn.toLowerCase());
     if (!urnKey) continue;
-    const extObj = payload[safePropertyKey(urnKey)];
+    let extObj = readResolvedProperty(filteredPayload, urnKey);
     if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
 
     const top = extensions.get(urn);
-    if (top) stripAt(extObj, [], 0, top, urnKey);
+    if (top) extObj = stripAt(extObj, [], 0, top, urnKey);
     for (const [parent, names] of extensionSubAttrs.get(urn) ?? []) {
-      stripAt(extObj, parent.split('.'), 0, names, urnKey);
+      extObj = stripAt(extObj, parent.split('.'), 0, names, urnKey);
     }
+    filteredPayload = withResolvedProperty(filteredPayload, urnKey, extObj);
   }
 
-  return stripped;
+  return { payload: filteredPayload, stripped };
 }
 
 /**
@@ -733,11 +745,13 @@ export function stripReadOnlyPatchOps(
       const targetAttr = parsed.attribute;
       if (parsed.schemaUrn && !targetAttr && op.op.toLowerCase() !== 'remove' &&
           op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-        const namespaceKey = safePropertyKey(parsed.schemaUrn);
-        const wrapper = { [namespaceKey]: structuredClone(op.value) };
-        const removed = stripReadOnlyAttributes(wrapper, schemaDefinitions);
+        const wrapper = withResolvedProperty({}, parsed.schemaUrn, structuredClone(op.value));
+        const result = stripReadOnlyAttributes(wrapper, schemaDefinitions);
+        const removed = result.stripped;
         stripped.push(...removed);
-        filtered.push(removed.length ? { ...op, value: wrapper[namespaceKey] } : op);
+        filtered.push(removed.length
+          ? { ...op, value: readResolvedProperty(result.payload, parsed.schemaUrn) }
+          : op);
         continue;
       }
 
@@ -785,28 +799,32 @@ export function stripReadOnlyPatchOps(
       }
     } else if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
       // No-path operation - check each key in the value object
-      const valueObj = { ...(op.value as Record<string, unknown>) };
+      let valueObj = Object.fromEntries(Object.entries(op.value as Record<string, unknown>));
       let modified = false;
 
       for (const key of Object.keys(valueObj)) {
         if (isPrototypePollutingKey(key)) continue;
-        const safeKey = safePropertyKey(key);
         // Never strip 'id' - let G8c reject
         if (key.toLowerCase() === 'id') continue;
 
         // Expanded no-path keys must receive the same policy as explicit paths.
-        const target = stripReadOnlyPatchOps([{ ...op, path: key, value: valueObj[safeKey] }],
+        const target = stripReadOnlyPatchOps([{
+          ...op,
+          path: key,
+          value: readResolvedProperty(valueObj, key),
+        }],
           schemaDefinitions, { core, extensions, coreSubAttrs });
         if (target.stripped.length) {
-          if (target.filtered.length) valueObj[safeKey] = target.filtered[0].value;
-          else delete valueObj[safeKey];
+          valueObj = target.filtered.length
+            ? withResolvedProperty(valueObj, key, target.filtered[0].value)
+            : withoutResolvedProperty(valueObj, key);
           stripped.push(...target.stripped);
           modified = true;
           continue;
         }
 
         if (core.has(key.toLowerCase())) {
-          delete valueObj[safeKey];
+          valueObj = withoutResolvedProperty(valueObj, key);
           stripped.push(key);
           modified = true;
           continue;
@@ -814,39 +832,40 @@ export function stripReadOnlyPatchOps(
 
         // R-MUT-2: Strip readOnly sub-attrs from complex values in no-path ops
         const readOnlySubs = coreSubAttrs.get(key.toLowerCase());
-        if (readOnlySubs && typeof valueObj[safeKey] === 'object' &&
-            valueObj[safeKey] !== null && !Array.isArray(valueObj[safeKey])) {
-          const subObj = { ...(valueObj[safeKey] as Record<string, unknown>) };
+        const currentValue = readResolvedProperty(valueObj, key);
+        if (readOnlySubs && typeof currentValue === 'object' &&
+            currentValue !== null && !Array.isArray(currentValue)) {
+          let subObj = Object.fromEntries(Object.entries(currentValue as Record<string, unknown>));
           for (const subKey of Object.keys(subObj)) {
             if (isPrototypePollutingKey(subKey)) continue;
             if (readOnlySubs.has(subKey.toLowerCase())) {
-              delete subObj[safePropertyKey(subKey)];
+              subObj = withoutResolvedProperty(subObj, subKey);
               stripped.push(`${key}.${subKey}`);
               modified = true;
             }
           }
-          valueObj[safeKey] = subObj;
+          valueObj = withResolvedProperty(valueObj, key, subObj);
         }
 
         // Check extension URN blocks in no-path value
         if (key.startsWith('urn:')) {
           for (const [urn, readOnlySet] of extensions) {
             if (key.toLowerCase() === urn.toLowerCase()) {
-              const extVal = valueObj[safeKey];
+              const extVal = readResolvedProperty(valueObj, key);
               if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
-                const extObj = { ...(extVal as Record<string, unknown>) };
+                let extObj = Object.fromEntries(Object.entries(extVal as Record<string, unknown>));
                 for (const extKey of Object.keys(extObj)) {
                   if (isPrototypePollutingKey(extKey)) continue;
                   if (readOnlySet.has(extKey.toLowerCase())) {
-                    delete extObj[safePropertyKey(extKey)];
+                    extObj = withoutResolvedProperty(extObj, extKey);
                     stripped.push(`${key}.${extKey}`);
                     modified = true;
                   }
                 }
                 if (Object.keys(extObj).length === 0) {
-                  delete valueObj[safeKey];
+                  valueObj = withoutResolvedProperty(valueObj, key);
                 } else {
-                  valueObj[safeKey] = extObj;
+                  valueObj = withResolvedProperty(valueObj, key, extObj);
                 }
               }
             }
@@ -1558,12 +1577,12 @@ export class ScimSchemaHelpers {
    *
    * Uses the precomputed cache when available to avoid per-request tree walks.
    *
-   * @returns Array of stripped attribute names (for logging/warning)
+   * @returns The immutable filtered payload and stripped names for logging/warning
    */
   stripReadOnlyAttributesFromPayload(
     payload: Record<string, unknown>,
     endpointId?: string,
-  ): string[] {
+  ): StripReadOnlyAttributesResult {
     const cache = this.getSchemaCache(endpointId);
     if (cache) {
       return stripReadOnlyAttributes(payload, [], cache.readOnlyCollected);

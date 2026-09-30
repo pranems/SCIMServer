@@ -950,18 +950,19 @@ describe('stripReadOnlyAttributes', () => {
       meta: { resourceType: 'User' },
     };
 
-    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+    const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(payload, [coreSchema]);
 
     expect(stripped).toContain('id');
     expect(stripped).toContain('groups');
     expect(stripped).toContain('meta');
-    expect(payload).not.toHaveProperty('id');
-    expect(payload).not.toHaveProperty('groups');
-    expect(payload).not.toHaveProperty('meta');
+    expect(payload).toHaveProperty('id', 'client-supplied-id');
+    expect(filteredPayload).not.toHaveProperty('id');
+    expect(filteredPayload).not.toHaveProperty('groups');
+    expect(filteredPayload).not.toHaveProperty('meta');
     // schemas is never stripped
-    expect(payload).toHaveProperty('schemas');
+    expect(filteredPayload).toHaveProperty('schemas');
     // readWrite attrs preserved
-    expect(payload).toHaveProperty('userName');
+    expect(filteredPayload).toHaveProperty('userName');
   });
 
   it('should not strip readWrite attributes', () => {
@@ -971,11 +972,11 @@ describe('stripReadOnlyAttributes', () => {
       displayName: 'Bob',
     };
 
-    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+    const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(payload, [coreSchema]);
 
     expect(stripped).toHaveLength(0);
-    expect(payload.userName).toBe('bob@example.com');
-    expect(payload.displayName).toBe('Bob');
+    expect(filteredPayload.userName).toBe('bob@example.com');
+    expect(filteredPayload.displayName).toBe('Bob');
   });
 
   it('should strip readOnly attributes from extension URN blocks', () => {
@@ -991,10 +992,13 @@ describe('stripReadOnlyAttributes', () => {
       },
     };
 
-    const stripped = stripReadOnlyAttributes(payload, [coreSchema, extensionSchema]);
+    const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(
+      payload,
+      [coreSchema, extensionSchema],
+    );
 
     expect(stripped).toContain('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.computedScore');
-    const ext = payload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+    const ext = filteredPayload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
     expect(ext).toHaveProperty('department');
     expect(ext).not.toHaveProperty('computedScore');
   });
@@ -1005,7 +1009,7 @@ describe('stripReadOnlyAttributes', () => {
       userName: 'carol@example.com',
     };
 
-    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+    const { stripped } = stripReadOnlyAttributes(payload, [coreSchema]);
     expect(stripped).toHaveLength(0);
   });
 
@@ -1017,12 +1021,12 @@ describe('stripReadOnlyAttributes', () => {
       userName: 'alice@example.com',
     };
 
-    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+    const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(payload, [coreSchema]);
 
     expect(stripped).toContain('ID');
     expect(stripped).toContain('Groups');
-    expect(payload).not.toHaveProperty('ID');
-    expect(payload).not.toHaveProperty('Groups');
+    expect(filteredPayload).not.toHaveProperty('ID');
+    expect(filteredPayload).not.toHaveProperty('Groups');
   });
 
   it('strips declared fields without dereferencing prototype-polluting keys', () => {
@@ -1030,9 +1034,11 @@ describe('stripReadOnlyAttributes', () => {
       '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"client-id","__proto__":{"polluted":true}}',
     ) as Record<string, unknown>;
 
-    expect(stripReadOnlyAttributes(payload, [coreSchema])).toContain('id');
-    expect(payload).not.toHaveProperty('id');
-    expect(Object.prototype.hasOwnProperty.call(payload, '__proto__')).toBe(true);
+    const result = stripReadOnlyAttributes(payload, [coreSchema]);
+
+    expect(result.stripped).toContain('id');
+    expect(result.payload).not.toHaveProperty('id');
+    expect(Object.prototype.hasOwnProperty.call(result.payload, '__proto__')).toBe(true);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
@@ -1077,11 +1083,14 @@ describe('stripReadOnlyAttributes', () => {
         manager: { value: 'mgr-1', displayName: 'Boss Man', $ref: 'https://example.com/Users/mgr-1' },
       };
 
-      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs]);
+      const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(
+        payload,
+        [schemaWithReadOnlySubs],
+      );
 
       expect(stripped).toContain('manager.displayName');
       expect(stripped).toContain('manager.$ref');
-      const mgr = payload.manager as Record<string, unknown>;
+      const mgr = filteredPayload.manager as Record<string, unknown>;
       expect(mgr).toHaveProperty('value', 'mgr-1');
       expect(mgr).not.toHaveProperty('displayName');
       expect(mgr).not.toHaveProperty('$ref');
@@ -1097,10 +1106,13 @@ describe('stripReadOnlyAttributes', () => {
         ],
       };
 
-      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs]);
+      const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(
+        payload,
+        [schemaWithReadOnlySubs],
+      );
 
       expect(stripped).toContain('emails[].display');
-      const emails = payload.emails as Array<Record<string, unknown>>;
+      const emails = filteredPayload.emails as Array<Record<string, unknown>>;
       expect(emails[0]).not.toHaveProperty('display');
       expect(emails[1]).not.toHaveProperty('display');
       // readWrite sub-attrs preserved
@@ -1115,10 +1127,13 @@ describe('stripReadOnlyAttributes', () => {
         manager: { value: 'mgr-1' },
       };
 
-      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs]);
+      const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(
+        payload,
+        [schemaWithReadOnlySubs],
+      );
 
       expect(stripped).toHaveLength(0);
-      expect((payload.manager as Record<string, unknown>).value).toBe('mgr-1');
+      expect((filteredPayload.manager as Record<string, unknown>).value).toBe('mgr-1');
     });
 
     const extensionWithReadOnlySubs = {
@@ -1150,10 +1165,13 @@ describe('stripReadOnlyAttributes', () => {
         },
       };
 
-      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs, extensionWithReadOnlySubs]);
+      const { payload: filteredPayload, stripped } = stripReadOnlyAttributes(
+        payload,
+        [schemaWithReadOnlySubs, extensionWithReadOnlySubs],
+      );
 
       expect(stripped).toContain('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.orgUnit.computedPath');
-      const ext = payload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+      const ext = filteredPayload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
       const orgUnit = ext.orgUnit as Record<string, unknown>;
       expect(orgUnit).toHaveProperty('value', 'eng-1');
       expect(orgUnit).not.toHaveProperty('computedPath');
@@ -1909,13 +1927,14 @@ describe('stripReadOnlyAttributes with preCollected', () => {
     const payload2 = { ...payload1 };
 
     // Without preCollected
-    const stripped1 = stripReadOnlyAttributes(payload1, [coreSchema]);
+    const result1 = stripReadOnlyAttributes(payload1, [coreSchema]);
 
     // With preCollected
     const { core, extensions, coreSubAttrs, extensionSubAttrs } = require('../../../domain/validation').SchemaValidator.collectReadOnlyAttributes([coreSchema]);
-    const stripped2 = stripReadOnlyAttributes(payload2, [coreSchema], { core, extensions, coreSubAttrs, extensionSubAttrs });
+    const result2 = stripReadOnlyAttributes(payload2, [coreSchema], { core, extensions, coreSubAttrs, extensionSubAttrs });
 
-    expect(stripped1.sort()).toEqual(stripped2.sort());
+    expect(result1.stripped.sort()).toEqual(result2.stripped.sort());
+    expect(result1.payload).toEqual(result2.payload);
   });
 });
 

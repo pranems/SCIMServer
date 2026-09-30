@@ -256,10 +256,12 @@ owned API, database and network cleanup. Web Vitest passes 118 files and 1,568
 tests with all coverage floors met; production build and all 25 size budgets
 pass. The TypeScript ratchet reports 66 established errors, below its ceiling.
 PR #188 is open. The first exact-tip CI run identified five CodeQL
-dynamic-property sinks and two HIGH `fast-uri` CVEs. The sink-local correction
-reuses the canonical case-insensitive prototype-key barrier and passes 455/455
-focused units, 209/209 affected HTTP tests, changed-source lint with zero
-errors, and the API build. The manifest now selects fixed `fast-uri` 4.1.4;
+dynamic-property sinks and two HIGH `fast-uri` CVEs. A sink-local sanitizer was
+runtime-safe but remained red in CodeQL, so readOnly preprocessing now rebuilds
+validated entry lists immutably and each resource service consumes the returned
+payload explicitly. The structural correction passes 639/639 focused units,
+317/317 affected HTTP tests, changed-source lint with zero errors, and the API
+build. The manifest now selects fixed `fast-uri` 4.1.4;
 public-registry workflow run 36735519112 changed only its package version, URL,
 and SHA-512 integrity and reported a 28.2-day publish age. Clean install and
 build pass with zero HIGH/CRITICAL production-audit findings. Exact-tip CI,

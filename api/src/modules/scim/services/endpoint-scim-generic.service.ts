@@ -169,7 +169,9 @@ export class EndpointScimGenericService {
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     const readOnlyCache = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
+    const readOnlyResult = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
+    body = readOnlyResult.payload;
+    const strippedAttrs = readOnlyResult.stripped;
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings ("True"/"False") → native booleans before validation
@@ -330,7 +332,13 @@ export class EndpointScimGenericService {
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected);
+    const readOnlyResult = stripReadOnlyAttributes(
+      body,
+      schemaDefs,
+      this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected,
+    );
+    body = readOnlyResult.payload;
+    const strippedAttrs = readOnlyResult.stripped;
     const existing = await this.genericRepo.findByScimId(endpointId, resourceType.name, scimId);
     if (!existing) {
       throw createScimError({

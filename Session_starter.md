@@ -25,9 +25,12 @@ and the owned API, database and network were removed exactly. Web Vitest passes
 118 files and 1,568 tests with all coverage floors met; production build and
 all 25 size budgets pass. The TypeScript ratchet reports 66 established errors,
 below its ceiling. PR #188 is open. Its first exact-tip pass found five CodeQL
-dynamic-property sinks and two HIGH `fast-uri` CVEs. Sink-local use of the
-canonical prototype-key barrier now passes 455/455 focused units, 209/209
-affected HTTP tests, changed-source lint with zero errors, and the API build.
+dynamic-property sinks and two HIGH `fast-uri` CVEs. A sink-local sanitizer was
+runtime-safe but remained red in CodeQL, so readOnly preprocessing now rebuilds
+objects immutably and User, Group, and generic services consume the returned
+payload explicitly. The structural correction passes 639/639 focused units,
+317/317 affected HTTP tests, changed-source lint with zero errors, and the API
+build.
 The manifest selects fixed `fast-uri` 4.1.4; public-registry lockfile
 workflow 36735519112 changed only its three package fields, retained public
 hosts plus SHA-512 integrity, and reported a 28.2-day publish age. Clean install

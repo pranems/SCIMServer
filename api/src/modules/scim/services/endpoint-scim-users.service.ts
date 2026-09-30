@@ -77,7 +77,12 @@ export class EndpointScimUsersService {
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateUserDto;
+    const strippedAttrs = readOnlyResult.stripped;
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation.
@@ -268,7 +273,12 @@ export class EndpointScimUsersService {
   ): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateUserDto;
+    const strippedAttrs = readOnlyResult.stripped;
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });

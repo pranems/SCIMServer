@@ -88,7 +88,12 @@ export class EndpointScimGroupsService {
     // Resolve config: use passed config or fall back to endpoint context
     const endpointConfig = config ?? this.endpointContext.getConfig();
 
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as unknown as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateGroupDto;
+    const strippedAttrs = readOnlyResult.stripped;
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
@@ -432,7 +437,12 @@ export class EndpointScimGroupsService {
     // Resolve config: use passed config or fall back to endpoint context
     const endpointConfig = config ?? this.endpointContext.getConfig();
 
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as unknown as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateGroupDto;
+    const strippedAttrs = readOnlyResult.stripped;
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
