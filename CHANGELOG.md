@@ -42,8 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pass 455/455, affected HTTP suites pass 209/209, changed-source lint has zero
   errors, and the API build passes. The exact-tip CodeQL rerun remains required.
 - Advance the `fast-uri` transitive override from 4.1.3 to 4.1.4 for
-  CVE-2026-84292 and CVE-2026-84394. The public-registry lockfile workflow,
-  seven-day quarantine check, and exact-tip Trivy rerun remain release gates.
+  CVE-2026-84292 and CVE-2026-84394. Public-registry workflow run 36735519112
+  changed only its version, URL, and SHA-512 integrity and reported a 28.2-day
+  publish age, satisfying the seven-day quarantine. Clean install and build
+  pass; the production audit has zero HIGH/CRITICAL, seven MODERATE, and one
+  LOW finding. Exact-tip Trivy remains a release gate.
 - Web validation passes 118/118 files and 1,568/1,568 Vitest tests. Coverage is
   82.68% statements, 75.37% branches, 75.22% functions, and 85.40% lines.
   The production bundle and all 25 size budgets pass; TypeScript reports 66

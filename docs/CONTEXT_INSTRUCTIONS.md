@@ -260,7 +260,9 @@ dynamic-property sinks and two HIGH `fast-uri` CVEs. The sink-local correction
 reuses the canonical case-insensitive prototype-key barrier and passes 455/455
 focused units, 209/209 affected HTTP tests, changed-source lint with zero
 errors, and the API build. The manifest now selects fixed `fast-uri` 4.1.4;
-public-registry lockfile regeneration, quarantine confirmation, exact-tip CI,
+public-registry workflow run 36735519112 changed only its package version, URL,
+and SHA-512 integrity and reported a 28.2-day publish age. Clean install and
+build pass with zero HIGH/CRITICAL production-audit findings. Exact-tip CI,
 merge, and purplecliff validation are still pending.
 
 The current deployed baseline is v0.55.35 on dev and the proudbush canary. The shared digest is

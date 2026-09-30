@@ -29,9 +29,11 @@ dynamic-property sinks and two HIGH `fast-uri` CVEs. Sink-local use of the
 canonical prototype-key barrier now passes 455/455 focused units, 209/209
 affected HTTP tests, changed-source lint with zero errors, and the API build.
 The manifest selects fixed `fast-uri` 4.1.4; public-registry lockfile
-regeneration, quarantine confirmation, exact-tip CI, review, merge,
-merged-master build, purplecliff dev deployment, and endpoint replication must
-complete in that order. Customer production is out of scope.
+workflow 36735519112 changed only its three package fields, retained public
+hosts plus SHA-512 integrity, and reported a 28.2-day publish age. Clean install
+and build pass, with zero HIGH/CRITICAL production-audit findings. Exact-tip CI,
+review, merge, merged-master build, purplecliff dev deployment, and endpoint
+replication must complete in that order. Customer production is out of scope.
 
 **Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
