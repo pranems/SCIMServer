@@ -63,7 +63,7 @@ function buildCommand() {
 
 function buildRuntimeEnv({ backend, baseUrl, databaseUrl, secret }) {
   assert.ok(["inmemory", "prisma"].includes(backend));
-  assert.equal(new URL(baseUrl).hostname, "127.0.0.1");
+  assert.equal(new URL(baseUrl).hostname, "localhost");
   return {
     ...process.env,
     PERSISTENCE_BACKEND: backend,
@@ -194,7 +194,7 @@ function freePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(0, "localhost", () => {
       const address = server.address();
       server.close((error) => {
         if (error) reject(error);
@@ -235,7 +235,7 @@ async function runBuiltRuntime({
   secrets,
 }) {
   const port = await freePort();
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const baseUrl = `http://localhost:${port}`;
   const secret = crypto.randomBytes(36).toString("base64url");
   secrets.push(secret);
   const env = buildRuntimeEnv({

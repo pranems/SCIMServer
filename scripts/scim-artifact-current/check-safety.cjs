@@ -15,7 +15,7 @@ assert.match(build.args[0], /npm-cli\.js$/);
 
 const env = buildRuntimeEnv({
   backend: "inmemory",
-  baseUrl: "http://127.0.0.1:49152",
+  baseUrl: "http://localhost:49152",
   databaseUrl:
     "postgresql://127.0.0.1:1/scim_fresh_inmemory_never_connect",
   secret: "owned-secret",
@@ -25,7 +25,7 @@ assert.equal(
   env.DATABASE_URL,
   "postgresql://127.0.0.1:1/scim_fresh_inmemory_never_connect",
 );
-assert.equal(env.PUBLIC_URL, "http://127.0.0.1:49152");
+assert.equal(env.PUBLIC_URL, "http://localhost:49152");
 assert.equal(env.SCIM_SHARED_SECRET, "owned-secret");
 assert.equal(env.OAUTH_CLIENT_SECRET, "owned-secret");
 assert.doesNotThrow(() =>
