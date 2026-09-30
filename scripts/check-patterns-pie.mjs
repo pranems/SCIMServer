@@ -35,9 +35,9 @@ if (!pie) {
   console.error(`FAIL - could not find the category-distribution pie block in ${DOC}`);
   process.exit(1);
 }
-const titleMatch = pie[1].match(/title Patterns by category \((\d+) seeded\)/);
+const titleMatch = pie[1].match(/title Patterns by category \((\d+)\)/);
 if (!titleMatch) {
-  console.error('FAIL - pie block has no "title Patterns by category (N seeded)" line');
+  console.error('FAIL - pie block has no "title Patterns by category (N)" line');
   process.exit(1);
 }
 const declaredTotal = Number(titleMatch[1]);
