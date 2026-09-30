@@ -245,10 +245,12 @@ triage additionally fixed runtime-only schema caches changing profile revisions
 and restored structured malformed-filter diagnostics. API build/lint, API unit
 6,000/6,000, InMemory API E2E 2,481 passed plus 4 skipped, and the focused
 Workbench incident regression are green. Publication still requires the
-v0.55.36 exact-tip PostgreSQL/artifact reruns, a reviewed exact-tip PR,
-merged-master build, and purplecliff dev validation. The Workbench regression
-executes the exact four-operation typed PATCH incident and verifies independent
-persisted readback.
+remaining Docker/live gates, a reviewed exact-tip PR, merged-master build, and
+purplecliff dev validation. Guarded PostgreSQL unit and E2E parity pass
+6,000/6,000 and 2,485/2,485; the exact built artifact passes 166/166 live
+outcomes per backend on PostgreSQL 17.8 after all 22 migrations. The Workbench
+regression executes the exact four-operation typed PATCH incident and verifies
+independent persisted readback.
 
 The current deployed baseline is v0.55.35 on dev and the proudbush canary. The shared digest is
 `sha256:ad8594e2e2b7263e88dc4ae813436a20797cbea30b78457340fdb35dfe7eedfc`.

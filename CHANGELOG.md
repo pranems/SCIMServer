@@ -16,10 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifecycle and error contracts, common-attribute validation, retained-entry
   matching, profile revision coordination, and all 19 default Entra cases.
 - Preserve the immutable 82-case acceptance corpus and prove 164 backend
-  dispositions with 769 assertions and zero failures. The previous clean
-  consolidation artifact passed 166/166 live outcomes on both InMemory and
-  PostgreSQL 17.8 after all 22 migrations. The v0.55.36 exact-tip artifact
-  rerun remains a release gate after the checkpoint commit.
+  dispositions with 769 assertions and zero failures. The v0.55.36 exact-tip
+  artifact passes 166/166 live outcomes on both InMemory and PostgreSQL 17.8
+  after all 22 migrations.
 - Add measured Workbench regression coverage for the exact four-operation typed
   PATCH incident. The browser flow asserts the response, performs an independent
   persisted GET, and rejects literal bracket or dotted-key corruption.
@@ -28,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build, lint at 0 errors and the existing 515-warning ratchet, API unit
   209/209 suites and 6,000/6,000 tests, and InMemory API E2E 118/118 suites
   with 2,481 passed and 4 intentional skips.
+- Guarded PostgreSQL parity also passes API unit 209/209 suites and
+  6,000/6,000 tests plus API E2E 118/118 suites and 2,485/2,485 tests.
+  The loopback-only tmpfs database replayed all 22 migrations, passed its
+  final ownership guard, and was removed by exact container ID.
 - This release does not promote customer production. Dev publication, post-deploy
   live checks, and measured Playwright validation remain gates of the release
   pipeline and will be recorded here after they pass.

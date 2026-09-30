@@ -15,10 +15,13 @@ through the browser and independently verifies persisted state. Its local
 InMemory run passed 1/1. Profile revisions now ignore lazy `_schemaCaches`, and
 malformed filters again carry structured diagnostics. API build and lint pass;
 API unit is 209/209 suites and 6,000/6,000 tests; InMemory API E2E is 118/118
-suites with 2,481 passed and 4 intentional skips. The exact-tip PostgreSQL and
-built-artifact reruns, reviewed PR, exact-tip CI, merge, merged-master build,
-purplecliff dev deployment, and endpoint replication remain pending and must
-complete in that order. Customer production is out of scope.
+suites with 2,481 passed and 4 intentional skips. Guarded PostgreSQL unit and
+E2E parity pass 6,000/6,000 and 2,485/2,485 respectively. The exact built
+artifact passes 166/166 live outcomes per backend on PostgreSQL 17.8 after all
+22 migrations, with exact owned cleanup. Docker/live gates, reviewed PR,
+exact-tip CI, merge, merged-master build, purplecliff dev deployment, and
+endpoint replication remain pending and must complete in that order. Customer
+production is out of scope.
 
 **Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
@@ -274,6 +277,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-30 | **Exact-tip backend parity is green.** The immutable 82-case corpus passes 81 plus one documented N/A on InMemory and 82/82 on PostgreSQL with 769 assertions. Guarded PostgreSQL unit is 6,000/6,000 and E2E is 2,485/2,485. The exact built artifact passes 166/166 live outcomes on each backend. PostgreSQL 17.8 replayed all 22 migrations; every owned tmpfs container and runtime was removed exactly. |
 | 2026-09-30 | **v0.55.36 release gates resumed.** RED/GREEN fixed runtime-only `_schemaCaches` causing false profile-revision conflicts and restored malformed-filter diagnostics. Stale required-extension and immutable-common-attribute E2E fixtures were corrected without weakening the current contracts. API build, lint at 0 errors/515 warnings, unit 6,000/6,000, InMemory E2E 2,481 passed plus 4 skipped, and the exact Workbench PATCH regression are green. Disposable PostgreSQL and exact-artifact reruns remain next. |
 | 2026-09-29 | **v0.55.36 release candidate assembled.** API/web manifests and lockfile root metadata are synchronized without changing dependency resolution. The exact typed PATCH incident now has a self-cleaning Workbench test that asserts all four response values, independent persisted readback, and absence of literal bracket/dotted corruption; local current-UI/InMemory execution passed 1/1. Full release gates, PR/CI, merge, merged-master dev deployment and dev endpoint validation remain pending. |
 | 2026-09-29 | Authoritative parent89810f0c integrated ase38b36aa after existingdf3 prerequisite, without replaying414. Original retained-entries filename/exports/consumer paths restored with one implementation; historical attribute-values path forwards only.428units,305IM/306PG HTTP,84retained live cases/1764assertions per backend and164main checks pass. Existing later work retained; full C0 remains open. |
