@@ -6,39 +6,33 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
-**v0.55.36 release candidate, 2026-09-30:** The completed SCIM correctness
-consolidation is now the single release rollback unit. API/web manifests and
-lockfile root metadata are `0.55.36`; dependency graphs are unchanged and
-lockfiles retain public npm hosts plus SHA-512 integrity. A self-cleaning
-Workbench regression now drives the exact four-operation typed PATCH incident
-through the browser and independently verifies persisted state. Its local
-InMemory run passed 1/1. Profile revisions now ignore lazy `_schemaCaches`, and
-malformed filters again carry structured diagnostics. API build and lint pass;
-API unit is 209/209 suites and 6,000/6,000 tests; InMemory API E2E is 118/118
-suites with 2,481 passed and 4 intentional skips. Guarded PostgreSQL unit and
-E2E parity pass 6,000/6,000 and 2,485/2,485 respectively. The exact built
-artifact passes 166/166 live outcomes per backend on PostgreSQL 17.8 after all
-22 migrations, with exact owned cleanup. The isolated Docker suite passes
-1,697/1,697 after a RED/GREEN fix made HTTP flow tracing stable across nested
-PowerShell script scopes; all 22 migrations ran, endpoint inventory is empty,
-and the owned API, database and network were removed exactly. Web Vitest passes
-118 files and 1,568 tests with all coverage floors met; production build and
-all 25 size budgets pass. The TypeScript ratchet reports 66 established errors,
-below its ceiling. PR #188 is open. Its first exact-tip pass found five CodeQL
-dynamic-property sinks and two HIGH `fast-uri` CVEs. A sink-local sanitizer was
-runtime-safe but remained red in CodeQL, so readOnly preprocessing now rebuilds
-objects immutably and User, Group, and generic services consume the returned
-payload explicitly. The structural correction passes 639/639 focused units,
-317/317 affected HTTP tests, changed-source lint with zero errors, and the API
-build.
-The manifest selects fixed `fast-uri` 4.1.4; public-registry lockfile
-workflow 36735519112 changed only its three package fields, retained public
-hosts plus SHA-512 integrity, and reported a 28.2-day publish age. Clean install
-and build pass, with zero HIGH/CRITICAL production-audit findings. Exact-tip CI,
-review, merge, merged-master build, purplecliff dev deployment, and endpoint
-replication must complete in that order. Customer production is out of scope.
+**v0.55.36 merged and deployed to purplecliff dev, 2026-09-30:** PR #188
+merged as `d6e9a497315739b62ea11d2194a919944c376c31` after exact-tip CodeQL,
+CodeQL policy, image build, Trivy, validation and documentation gates passed.
+Workflow run 36747123394 published v0.55.36 and `latest` with digest
+`sha256:49719babb9966b416312b25d99d2b30feddb219d0c266664eaf0688f7afc7f21`.
+Purplecliff revision `scimserver-dev--vd6e9a497` serves 100% of traffic. The
+full dev live SCIM gate passed; endpoint inventory remained 60 -> 60 with zero
+missing IDs; revision hygiene retained the serving revision and one rollback
+target. The initial browser pass exposed one stale test assumption: required
+extensions are declared by `/ResourceTypes/User`, not by the core entry in
+`/Schemas`. The focused RED returned 400 for the missing Enterprise extension;
+the discovery-driven correction passed 1/1 and the complete dev suite passed
+247 tests with 5 intentional skips, including the measured exact
+four-operation typed PATCH.
 
-**Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
+The exact incident endpoint was then recreated on the local v0.55.36 canary,
+read back through the admin API, and replicated to dev from that returned
+profile. Source and target profile SHA-256 values matched. Both PATCH responses
+and independent persisted GETs returned the expected nested string, typed
+multi-valued complex entries and boolean-filtered contact, with no bracket or
+dotted-key corruption. The dedicated local and dev endpoints were deleted.
+The release retains the earlier 6,000-unit, 2,485 PostgreSQL E2E, 166/166
+exact-artifact per backend, 1,697/1,697 Docker live, 1,568 web Vitest, coverage,
+25 size-budget and supply-chain evidence. Customer production and the
+parallel-prod canary were not modified.
+
+**Historical C0 local-acceptance checkpoint, 2026-09-29:**
 The effective common view now reaches runtime uniqueness compilation and
 profile admission. One schema can remain numeric/MV under an extension
 binding while core id/externalId/meta use RFC characteristics. The original

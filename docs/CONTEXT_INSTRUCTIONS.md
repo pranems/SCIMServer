@@ -2,14 +2,30 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.36
-> **Last Updated**: September 29, 2026
-> **Last verified:** 2026-09-29
+> **Last Updated**: September 30, 2026
+> **Last verified:** 2026-09-30
 
 ---
 
 ## Active Delivery Process
 
-**Current C0 local-acceptance checkpoint, not deployed:** common attribute normalization now
+**v0.55.36 dev deployment is complete.** PR #188 merged as
+`d6e9a497315739b62ea11d2194a919944c376c31` after exact-tip CodeQL, Trivy and
+review gates passed. Workflow run 36747123394 published the v0.55.36 runtime
+with digest
+`sha256:49719babb9966b416312b25d99d2b30feddb219d0c266664eaf0688f7afc7f21`.
+Purplecliff revision `scimserver-dev--vd6e9a497` serves 100% of traffic. The
+full live SCIM gate passed, all 60 endpoint IDs were preserved and revision
+hygiene retained two active revisions. A required-extension browser fixture
+was corrected to use `/ResourceTypes/User` discovery; the complete dev
+Playwright suite passes 247 tests with 5 intentional skips. The typed PATCH
+incident endpoint was recreated on the local v0.55.36 canary and replicated to
+dev from the returned profile with identical SHA-256. PATCH response and
+independent GET evidence match on both nodes, reject bracket/dotted-key
+corruption, and both dedicated fixtures were deleted. Customer production and
+the parallel-prod canary remain unchanged.
+
+**Historical C0 local-acceptance checkpoint:** common attribute normalization now
 feeds runtime uniqueness compilation per ResourceType, and admission uses the
 same compiler before profile publication. Shared declarations are unchanged;
 core-only unsupported computed promises remain admission errors. Omitted
@@ -34,8 +50,8 @@ known residual cost boundary:50,000 candidates and20.1MB transferred for a
 p50. The exact locally built `dist/main.js` artifact then passes166 live
 outcomes/backend on InMemory and PostgreSQL17.8 after all22 migrations; both
 owned PIDs stop and exact container cleanup passes. Local implementation and
-acceptance are complete. Push/PR CI, merge, release metadata and deployment
-remain approval boundaries.
+acceptance were complete at this checkpoint. Push/PR CI, merge, release
+metadata and dev deployment were completed later as recorded above.
 [Characteristic mapping](SCIM_CHARACTERISTIC_RECONCILIATION.md),
 [performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md), and
 [case evidence](evidence/scim-current-acceptance-20260929/validation.json)

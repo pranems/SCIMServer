@@ -713,18 +713,31 @@ test.describe('Settings matrix - every preset produces a distinct, working contr
         const user = resources.find((r) => r.id === CORE_USER);
         expect(user, `preset ${preset} must publish the core User schema`).toBeTruthy();
 
-        // Build a create payload from the PUBLISHED required attributes, so the
-        // test follows discovery instead of assuming a fixed attribute set -
-        // the presets genuinely differ here and a fixed payload would only be
-        // testing this file's assumptions.
+        // ResourceType discovery, not /Schemas, declares which extensions are
+        // required on a User resource.
+        const resourceType = await scim(page, id!, 'GET', '/ResourceTypes/User');
+        expect(resourceType.status, `preset ${preset} should publish its User ResourceType`).toBe(200);
+        const requiredExtensionUrns = ((resourceType.body.schemaExtensions ?? []) as Array<Record<string, unknown>>)
+          .filter((extension) => extension.required === true)
+          .map((extension) => extension.schema)
+          .filter((schema): schema is string => typeof schema === 'string');
+
+        // Build a create payload from the published core schema and required
+        // ResourceType extensions. The presets genuinely differ here, so a
+        // fixed payload would only test this file's assumptions.
         const attrs = (user!.attributes ?? []) as Array<Record<string, unknown>>;
         const has = (n: string) => attrs.some((a) => a.name === n);
         const un = `preset.${preset}.${Date.now()}@example.com`;
-        const body: Record<string, unknown> = { schemas: [CORE_USER], userName: un, active: true };
+        const body: Record<string, unknown> = {
+          schemas: [CORE_USER, ...requiredExtensionUrns],
+          userName: un,
+          active: true,
+        };
         if (has('displayName')) body.displayName = 'Preset Probe';
         if (has('externalId')) body.externalId = `ext-${Date.now()}`;
         if (has('name')) body.name = { givenName: 'Preset', familyName: 'Probe' };
         if (has('emails')) body.emails = [{ value: un, type: 'work', primary: true }];
+        for (const urn of requiredExtensionUrns) body[urn] = {};
 
         const created = await scim(page, id!, 'POST', '/Users', body);
         expect(created.status, `preset ${preset} should accept a schema-conformant User`).toBe(201);
