@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.55.36] - 2026-09-30
 
-### Release candidate - SCIM correctness consolidation
+### Released to dev - SCIM correctness consolidation
 
 - Consolidate typed and ordered PATCH execution, conditional writes, binding-qualified
   uniqueness, transactional Group mutation, query/search corrections, endpoint
@@ -43,21 +43,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sanitizer pass that CodeQL could not prove and fixes the duplicate regex
   character finding. Eight unit/service suites pass 639/639, four affected HTTP
   suites pass 317/317, changed-source lint has zero errors, and the API build
-  passes. The exact-tip CodeQL rerun remains required.
+  passes. Exact-tip CodeQL analysis and policy passed before PR #188 merged as
+  `d6e9a497315739b62ea11d2194a919944c376c31`.
 - Advance the `fast-uri` transitive override from 4.1.3 to 4.1.4 for
   CVE-2026-84292 and CVE-2026-84394. Public-registry workflow run 36735519112
   changed only its version, URL, and SHA-512 integrity and reported a 28.2-day
   publish age, satisfying the seven-day quarantine. Clean install and build
   pass; the production audit has zero HIGH/CRITICAL, seven MODERATE, and one
-  LOW finding. Exact-tip Trivy remains a release gate.
+  LOW finding. Exact-tip Trivy passed before merge and again for the published
+  v0.55.36 image.
 - Web validation passes 118/118 files and 1,568/1,568 Vitest tests. Coverage is
   82.68% statements, 75.37% branches, 75.22% functions, and 85.40% lines.
   The production bundle and all 25 size budgets pass; TypeScript reports 66
   established errors, below the 96-error ratchet, with none in this release's
   Workbench regression.
-- This release does not promote customer production. Dev publication, post-deploy
-  live checks, and measured Playwright validation remain gates of the release
-  pipeline and will be recorded here after they pass.
+- Publish the exact merged runtime through workflow run 36747123394. The
+  v0.55.36 and `latest` tags resolve to
+  `sha256:49719babb9966b416312b25d99d2b30feddb219d0c266664eaf0688f7afc7f21`.
+  Purplecliff revision `scimserver-dev--vd6e9a497` serves 100% of traffic.
+  The full dev live SCIM gate passed, endpoint inventory remained 60 -> 60
+  with zero missing IDs, and revision hygiene retained the serving revision
+  plus one rollback target.
+- Correct the post-deploy preset browser fixture to discover required
+  extensions from `/ResourceTypes/User`, where RFC discovery publishes
+  `schemaExtensions`, instead of assuming `/Schemas` carries that binding.
+  The focused RED was HTTP 400 for the required Enterprise extension; focused
+  GREEN passed 1/1 and the complete dev browser suite passed 247 tests with
+  5 intentional skips.
+- Replicate the exact typed PATCH fixture from the local v0.55.36 canary to
+  purplecliff through public admin and SCIM APIs. Source and target profile
+  SHA-256 values matched; both four-operation PATCH responses and independent
+  GETs returned the typed nested values with no bracket or dotted-key
+  corruption. Both dedicated fixtures were deleted after the receipt was
+  written.
+- This release does not promote customer production. Customer production and
+  the parallel-prod canary remain unchanged.
 
 ### Verified - current SCIM acceptance, characteristics, and query cost
 - Reuse the immutable82-case corpus through a hash-guarded current-source
