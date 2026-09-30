@@ -18,10 +18,15 @@ API unit is 209/209 suites and 6,000/6,000 tests; InMemory API E2E is 118/118
 suites with 2,481 passed and 4 intentional skips. Guarded PostgreSQL unit and
 E2E parity pass 6,000/6,000 and 2,485/2,485 respectively. The exact built
 artifact passes 166/166 live outcomes per backend on PostgreSQL 17.8 after all
-22 migrations, with exact owned cleanup. Docker/live gates, reviewed PR,
-exact-tip CI, merge, merged-master build, purplecliff dev deployment, and
-endpoint replication remain pending and must complete in that order. Customer
-production is out of scope.
+22 migrations, with exact owned cleanup. The isolated Docker suite passes
+1,697/1,697 after a RED/GREEN fix made HTTP flow tracing stable across nested
+PowerShell script scopes; all 22 migrations ran, endpoint inventory is empty,
+and the owned API, database and network were removed exactly. Web Vitest passes
+118 files and 1,568 tests with all coverage floors met; production build and
+all 25 size budgets pass. The TypeScript ratchet reports 66 established errors,
+below its ceiling. Remaining final static review, reviewed PR, exact-tip CI,
+merge, merged-master build, purplecliff dev deployment, and endpoint replication
+must complete in that order. Customer production is out of scope.
 
 **Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
@@ -277,6 +282,7 @@ without applying POST/PUT required checks to partial PATCH views.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-30 | **Docker and web release validation is green.** RED/GREEN fixed nested PowerShell helpers writing traced requests into a child `$script:` scope. The four blocked packages pass 82/82 focused assertions, and the full isolated Docker run passes 1,697/1,697 after 22 migrations with zero remaining endpoints and exact cleanup. Web Vitest passes 118 files/1,568 tests with all coverage floors met; production build and all 25 size budgets pass. |
 | 2026-09-30 | **Exact-tip backend parity is green.** The immutable 82-case corpus passes 81 plus one documented N/A on InMemory and 82/82 on PostgreSQL with 769 assertions. Guarded PostgreSQL unit is 6,000/6,000 and E2E is 2,485/2,485. The exact built artifact passes 166/166 live outcomes on each backend. PostgreSQL 17.8 replayed all 22 migrations; every owned tmpfs container and runtime was removed exactly. |
 | 2026-09-30 | **v0.55.36 release gates resumed.** RED/GREEN fixed runtime-only `_schemaCaches` causing false profile-revision conflicts and restored malformed-filter diagnostics. Stale required-extension and immutable-common-attribute E2E fixtures were corrected without weakening the current contracts. API build, lint at 0 errors/515 warnings, unit 6,000/6,000, InMemory E2E 2,481 passed plus 4 skipped, and the exact Workbench PATCH regression are green. Disposable PostgreSQL and exact-artifact reruns remain next. |
 | 2026-09-29 | **v0.55.36 release candidate assembled.** API/web manifests and lockfile root metadata are synchronized without changing dependency resolution. The exact typed PATCH incident now has a self-cleaning Workbench test that asserts all four response values, independent persisted readback, and absence of literal bracket/dotted corruption; local current-UI/InMemory execution passed 1/1. Full release gates, PR/CI, merge, merged-master dev deployment and dev endpoint validation remain pending. |

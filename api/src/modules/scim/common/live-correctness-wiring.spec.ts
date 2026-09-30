@@ -7,6 +7,41 @@ const read = (file: string): string => readFileSync(resolve(scripts, file), 'utf
 const section = 'live-test-sections/correctness-contracts.ps1';
 
 describe('integrated correctness live coverage', () => {
+  it('keeps HTTP flow steps in the root live runner when nested scripts invoke the wrapper', () => {
+    const command = `
+$ErrorActionPreference = 'Stop'
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:SCIM_LIVE_TEST_FILE, [ref]$null, [ref]$null)
+$functionAst = @($ast.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Add-FlowStep'
+}, $true))[0]
+Invoke-Expression $functionAst.Extent.Text
+$global:__ScimServerLiveTestFlowSteps = [Collections.Generic.List[object]]::new()
+$script:flowSteps = $global:__ScimServerLiveTestFlowSteps
+function Convert-FlowHeaders { param($Headers); $Headers }
+function Convert-FlowBody { param($Body); $Body }
+$child = Join-Path ([IO.Path]::GetTempPath()) "scim-live-nested-$([Guid]::NewGuid().ToString('N')).ps1"
+try {
+    @'
+Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/one' -StatusCode 200
+Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/two' -StatusCode 200
+'@ | Set-Content -LiteralPath $child
+    & $child
+    if ($script:flowSteps.Count -ne 2 -or $script:flowSteps[0].stepId -ne 1 -or $script:flowSteps[1].stepId -ne 2) {
+        throw 'Nested script requests must append to the root live flow-step collection'
+    }
+    'nested flow steps verified'
+} finally {
+    Remove-Item -LiteralPath $child -Force -ErrorAction SilentlyContinue
+    Remove-Variable -Name __ScimServerLiveTestFlowSteps -Scope Global -ErrorAction SilentlyContinue
+}
+`;
+    expect(execFileSync('pwsh', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      env: { ...process.env, SCIM_LIVE_TEST_FILE: resolve(scripts, 'live-test.ps1') },
+    }).trim()).toBe('nested flow steps verified');
+  });
+
   it('attempts both owned query fixture cleanups even when either deletion fails', () => {
     const command = `
 $ErrorActionPreference = 'Stop'

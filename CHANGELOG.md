@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   6,000/6,000 tests plus API E2E 118/118 suites and 2,485/2,485 tests.
   The loopback-only tmpfs database replayed all 22 migrations, passed its
   final ownership guard, and was removed by exact container ID.
+- Fix live HTTP tracing across separately invoked PowerShell scripts. An
+  executable scope-boundary regression changed from RED to GREEN, the four
+  previously blocked packages pass 82/82 focused assertions, and the isolated
+  Docker suite passes 1,697/1,697 with 22 migrations, zero remaining endpoints,
+  and exact API, database, and network cleanup.
+- Web validation passes 118/118 files and 1,568/1,568 Vitest tests. Coverage is
+  82.68% statements, 75.37% branches, 75.22% functions, and 85.40% lines.
+  The production bundle and all 25 size budgets pass; TypeScript reports 66
+  established errors, below the 96-error ratchet, with none in this release's
+  Workbench regression.
 - This release does not promote customer production. Dev publication, post-deploy
   live checks, and measured Playwright validation remain gates of the release
   pipeline and will be recorded here after they pass.
