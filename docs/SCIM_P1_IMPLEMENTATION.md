@@ -2,9 +2,9 @@
 
 **Last verified:** 2026-09-28
 
-**Status:** Implemented and locally validated; not pushed, merged, or deployed.
-The release-version gate belongs to the parent integration work. Product
-manifests remain `0.55.35`.
+**Status:** Implemented and locally validated; included in the `0.55.36`
+release candidate. Reviewed PR, merge, and dev deployment remain parent
+integration gates.
 
 Design base: `cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e`.
 Original failing source: `ccde1d5d6b5129dd943c6e848989c668a0d00d7a`.

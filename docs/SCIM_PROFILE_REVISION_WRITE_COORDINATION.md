@@ -1,8 +1,8 @@
 # Endpoint Profile Revision and Resource Write Coordination
 
-> **Status:** Implemented locally, not released or deployed  
-> **Last verified:** 2026-09-29  
-> **Product version:** `0.55.35`
+> **Status:** Implemented locally and included in the release candidate
+> **Last verified:** 2026-09-30
+> **Product version:** `0.55.36`
 
 ## Problem
 

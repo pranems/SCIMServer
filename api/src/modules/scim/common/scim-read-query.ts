@@ -232,11 +232,16 @@ export function createReadQuery(
     let ast: FilterNode;
     try {
       ast = parseScimFilter(params.filter);
-    } catch {
+    } catch (error) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
         detail: 'Invalid filter syntax.',
+        diagnostics: {
+          errorCode: 'FILTER_INVALID',
+          filterExpression: params.filter,
+          parseError: error instanceof Error ? error.message : 'Filter parser rejected the expression.',
+        },
       });
     }
     predicate = compile(ast);

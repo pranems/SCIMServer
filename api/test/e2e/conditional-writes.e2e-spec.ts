@@ -12,6 +12,7 @@ import type { IUserRepository } from '../../src/domain/repositories/user.reposit
 import type { IGroupRepository } from '../../src/domain/repositories/group.repository.interface';
 import type { IGenericResourceRepository } from '../../src/domain/repositories/generic-resource.repository.interface';
 import type { ExpectedVersion } from '../../src/domain/repositories/write-precondition';
+import type { ProfileRevision } from '../../src/domain/repositories/profile-revision';
 
 const USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
@@ -162,9 +163,13 @@ describe('conditional writes with real repositories', () => {
       const repo = route === 'Users' ? users : route === 'Groups' ? groups : generic;
       const originalDelete = repo.delete.bind(repo);
       const originalUpdate = repo.update.bind(repo);
-      const spy = jest.spyOn(repo, 'delete').mockImplementationOnce(async (storageId: string, expected?: ExpectedVersion) => {
+      const spy = jest.spyOn(repo, 'delete').mockImplementationOnce(async (
+        storageId: string,
+        expected?: ExpectedVersion,
+        profileRevision?: ProfileRevision,
+      ) => {
         await originalUpdate(storageId, { displayName: 'intervening-write' });
-        return originalDelete(storageId, expected);
+        return originalDelete(storageId, expected, profileRevision);
       });
       try {
         errorContract(await write(ep, route, id, 'delete', 'ignored', initial.headers.etag), 412);

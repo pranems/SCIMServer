@@ -36,4 +36,22 @@ describe('endpoint profile revisions', () => {
     expect(profileRevisionArgument(undefined)).toEqual([]);
     expect(profileRevisionArgument(revision)).toEqual([revision]);
   });
+
+  it('ignores lazily-built runtime schema caches when computing the persisted profile revision', () => {
+    const persisted = {
+      settings: { StrictSchemaValidation: true },
+      schemas: [{ id: 'urn:example:User', name: 'User', attributes: [] }],
+    };
+    const runtimeProfile = {
+      ...persisted,
+      _schemaCaches: {
+        'urn:example:User': {
+          booleansByParent: new Map([['root', new Set(['active'])]]),
+          extensionUrns: ['urn:example:extension'],
+        },
+      },
+    };
+
+    expect(endpointProfileRevision(runtimeProfile)).toBe(endpointProfileRevision(persisted));
+  });
 });

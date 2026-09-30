@@ -121,7 +121,11 @@ describe('P4 - Attribute Characteristic Fixes (E2E)', () => {
         })
         .expect(400);
 
-      expect(res.body.detail).toContain('forbidden key');
+      expect(res.body).toMatchObject({
+        scimType: 'invalidPath',
+        detail: expect.stringContaining('Invalid attribute name or sub-attribute'),
+      });
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     });
 
     it('should reject PATCH with constructor in path with 400', async () => {
@@ -137,7 +141,10 @@ describe('P4 - Attribute Characteristic Fixes (E2E)', () => {
         })
         .expect(400);
 
-      expect(res.body.detail).toContain('forbidden key');
+      expect(res.body).toMatchObject({
+        scimType: 'invalidPath',
+        detail: expect.stringContaining('Invalid attribute name or sub-attribute'),
+      });
     });
 
     it('should reject PATCH with prototype in path with 400', async () => {
@@ -153,7 +160,10 @@ describe('P4 - Attribute Characteristic Fixes (E2E)', () => {
         })
         .expect(400);
 
-      expect(res.body.detail).toContain('forbidden key');
+      expect(res.body).toMatchObject({
+        scimType: 'invalidPath',
+        detail: expect.stringContaining('Invalid attribute name or sub-attribute'),
+      });
     });
 
     it('should still allow normal PATCH operations', async () => {

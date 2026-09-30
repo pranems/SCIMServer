@@ -2,9 +2,10 @@
 
 > **Last verified:** 2026-09-29
 >
-> **Status:** P8b implemented and validated locally; not deployed.
+> **Status:** P8b implemented and validated locally; included in the `0.55.36`
+> release candidate and not yet deployed.
 >
-> **Base:** Reviewed P8a `39841319`; product remains `0.55.35`.
+> **Base:** Reviewed P8a `39841319`.
 >
 > **Related:** [Design and progress](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md),
 > [P8a freshness](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md),

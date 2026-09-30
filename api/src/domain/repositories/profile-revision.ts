@@ -8,6 +8,7 @@ function canonicalize(value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => key !== '_schemaCaches')
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([key, child]) => [key, canonicalize(child)]),
     );

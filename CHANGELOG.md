@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.55.36] - 2026-09-30
+
+### Release candidate - SCIM correctness consolidation
+
+- Consolidate typed and ordered PATCH execution, conditional writes, binding-qualified
+  uniqueness, transactional Group mutation, query/search corrections, endpoint
+  lifecycle and error contracts, common-attribute validation, retained-entry
+  matching, profile revision coordination, and all 19 default Entra cases.
+- Preserve the immutable 82-case acceptance corpus and prove 164 backend
+  dispositions with 769 assertions and zero failures. The previous clean
+  consolidation artifact passed 166/166 live outcomes on both InMemory and
+  PostgreSQL 17.8 after all 22 migrations. The v0.55.36 exact-tip artifact
+  rerun remains a release gate after the checkpoint commit.
+- Add measured Workbench regression coverage for the exact four-operation typed
+  PATCH incident. The browser flow asserts the response, performs an independent
+  persisted GET, and rejects literal bracket or dotted-key corruption.
+- Restore malformed-filter diagnostics and exclude lazy runtime schema caches
+  from profile content revisions. Focused RED/GREEN tests pass, followed by API
+  build, lint at 0 errors and the existing 515-warning ratchet, API unit
+  209/209 suites and 6,000/6,000 tests, and InMemory API E2E 118/118 suites
+  with 2,481 passed and 4 intentional skips.
+- This release does not promote customer production. Dev publication, post-deploy
+  live checks, and measured Playwright validation remain gates of the release
+  pipeline and will be recorded here after they pass.
+
 ### Verified - current SCIM acceptance, characteristics, and query cost
 - Reuse the immutable82-case corpus through a hash-guarded current-source
   adapter without changing historical inputs or evidence. Final local results

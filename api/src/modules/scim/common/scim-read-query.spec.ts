@@ -6,6 +6,7 @@ import {
 } from '../filters/apply-scim-filter';
 import { createReadQuery, type ReadQueryParams } from './scim-read-query';
 import { stripNeverReturnedFromPayload } from './scim-service-helpers';
+import { SCIM_DIAGNOSTICS_URN } from './scim-constants';
 
 const CORE = 'urn:example:query:Core';
 const EXT = 'urn:example:query:Extension';
@@ -339,6 +340,25 @@ describe('Shared read query plan', () => {
     'entries[primary gt true]',
   ])('rejects unauthorized/invalid operand %s', (filter) => {
     expect(() => page({ filter }, [])).toThrow();
+  });
+
+  it('preserves the invalid filter expression and parser error in diagnostics', () => {
+    const filter = 'userName eq "test" AND (((invalid';
+
+    try {
+      page({ filter }, []);
+      fail('Expected malformed filter to fail');
+    } catch (error) {
+      const response = (error as { getResponse(): Record<string, unknown> }).getResponse();
+      expect(response).toMatchObject({
+        scimType: 'invalidFilter',
+        [SCIM_DIAGNOSTICS_URN]: {
+          errorCode: 'FILTER_INVALID',
+          filterExpression: filter,
+          parseError: expect.any(String),
+        },
+      });
+    }
   });
 
   it('suppresses never/writeOnly children even without any hidden top-level attribute', () => {

@@ -30,7 +30,7 @@ import {
  * 4. .search response: returned:always (id, schemas, meta) verified
  * 5. PATCH case-insensitive uniqueness -> 409
  * 6. RequireIfMatch OFF explicit test (default behavior)
- * 7. VerbosePatch OFF dot-notation stored as flat key
+ * 7. VerbosePatch OFF rejects explicit dotted core paths atomically
  * 8. PatchOpAllowRemoveAllMembers ON standalone
  * 9. ETag header on single-resource GET
  * 10. 412 Precondition Failed (stale If-Match)
@@ -291,7 +291,7 @@ describe('Test Gaps Audit #5 - Comprehensive gap closure (E2E)', () => {
   });
 
   // =========================================================================
-  // 6. VerbosePatch OFF - dot-notation stored as flat key, not nested
+  // 6. VerbosePatch OFF - explicit dot-notation rejects atomically
   // =========================================================================
 
   describe('VerbosePatch OFF - dot-notation behavior', () => {
@@ -318,23 +318,22 @@ describe('Test Gaps Audit #5 - Comprehensive gap closure (E2E)', () => {
       expect(res.body.displayName).toBe('Standard Path');
     });
 
-    it('PATCH with dot-notation path should NOT resolve to nested form when VerbosePatch is OFF', async () => {
+    it('PATCH with dot-notation path rejects atomically when VerbosePatch is OFF', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser({
         name: { givenName: 'Original', familyName: 'User' },
       })).expect(201)).body;
 
-      // Dot-notation when VerbosePatch OFF: stored as flat key, original name untouched
-      await scimPatch(
+      const rejected = await scimPatch(
         app,
         `${basePath}/Users/${user.id}`,
         token,
         patchOp([{ op: 'replace', path: 'name.givenName', value: 'DotNotation' }]),
-      ).expect(200);
+      ).expect(400);
+      expect(rejected.body.scimType).toBe('invalidPath');
 
       const fetched = (await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200)).body;
-      // The original nested name.givenName should be unchanged (still 'Original')
-      // because VerbosePatch OFF stores the value under flat key "name.givenName"
       expect(fetched.name?.givenName).toBe('Original');
+      expect(fetched['name.givenName']).toBeUndefined();
     });
   });
 

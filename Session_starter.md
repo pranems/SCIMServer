@@ -1,10 +1,24 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-09-29
+**Last verified:** 2026-09-30
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
 ### Active Execution Reference
+
+**v0.55.36 release candidate, 2026-09-30:** The completed SCIM correctness
+consolidation is now the single release rollback unit. API/web manifests and
+lockfile root metadata are `0.55.36`; dependency graphs are unchanged and
+lockfiles retain public npm hosts plus SHA-512 integrity. A self-cleaning
+Workbench regression now drives the exact four-operation typed PATCH incident
+through the browser and independently verifies persisted state. Its local
+InMemory run passed 1/1. Profile revisions now ignore lazy `_schemaCaches`, and
+malformed filters again carry structured diagnostics. API build and lint pass;
+API unit is 209/209 suites and 6,000/6,000 tests; InMemory API E2E is 118/118
+suites with 2,481 passed and 4 intentional skips. The exact-tip PostgreSQL and
+built-artifact reruns, reviewed PR, exact-tip CI, merge, merged-master build,
+purplecliff dev deployment, and endpoint replication remain pending and must
+complete in that order. Customer production is out of scope.
 
 **Current C0 local-acceptance checkpoint, 2026-09-29 (not deployed):**
 The effective common view now reaches runtime uniqueness compilation and
@@ -252,14 +266,16 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: Parent test-only reconciliationdf3ca957 -> bd82e681 closes the eight legacy expectations with exact assertions, four opposing controls and142 merged unit passes, without skips.
 - [x] ✅ COMPLETED: P7b source `3cd17ac3` assembled once with later accepted seams preserved.
 - [x] ✅ COMPLETED: Bounded P7b namespace PATCH, required-binding transitions and request-only responses with both-backend/live proof.
-- [ ] Close broader characteristic overlays and profile-revision coordination before C0.
-- [ ] C0: separately prove exact built-artifact live behavior and assess P6b candidate-materialization cost.
-- [ ] C0: close all 164 backend dispositions in the canonical 82-case ledger, plus the required incident/route/settings/characteristic coverage overlays.
+- [x] ✅ COMPLETED: Broader characteristic overlays and profile-revision coordination.
+- [x] ✅ COMPLETED: Exact built-artifact live behavior and measured P6b candidate-materialization cost.
+- [x] ✅ COMPLETED: All 164 backend dispositions in the canonical 82-case ledger plus incident/route/settings/characteristic overlays.
 - [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.
 - [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-30 | **v0.55.36 release gates resumed.** RED/GREEN fixed runtime-only `_schemaCaches` causing false profile-revision conflicts and restored malformed-filter diagnostics. Stale required-extension and immutable-common-attribute E2E fixtures were corrected without weakening the current contracts. API build, lint at 0 errors/515 warnings, unit 6,000/6,000, InMemory E2E 2,481 passed plus 4 skipped, and the exact Workbench PATCH regression are green. Disposable PostgreSQL and exact-artifact reruns remain next. |
+| 2026-09-29 | **v0.55.36 release candidate assembled.** API/web manifests and lockfile root metadata are synchronized without changing dependency resolution. The exact typed PATCH incident now has a self-cleaning Workbench test that asserts all four response values, independent persisted readback, and absence of literal bracket/dotted corruption; local current-UI/InMemory execution passed 1/1. Full release gates, PR/CI, merge, merged-master dev deployment and dev endpoint validation remain pending. |
 | 2026-09-29 | Authoritative parent89810f0c integrated ase38b36aa after existingdf3 prerequisite, without replaying414. Original retained-entries filename/exports/consumer paths restored with one implementation; historical attribute-values path forwards only.428units,305IM/306PG HTTP,84retained live cases/1764assertions per backend and164main checks pass. Existing later work retained; full C0 remains open. |
 | 2026-09-29 | Residual source414e14e8 integrated asd8c9a79a with one canonical matcher and compatibility exports. Reproduced omitted/changed-type stealing on the old helper before import;491 units,509IM/511PG HTTP and164main live checks/backend pass. New9z-DD executes6cases/5474assertions while oldretention/common/query contracts remain. No full-C0 or deployment claim. |
 | 2026-09-29 | Corrected P6c pair integrated09b59b43/8f3510a8. Query/write/schema probe improves43/45->45/45 per backend; explicit-false role regression fixed after2unit/2HTTP REDs.273 scoped units+6 wiring/cleanup units,398IM/399PG HTTP and163main live checks/backend pass. Query helper now52 outcomes; CP capability/CU query mapping retained. Remaining C0 acceptance is separate. |
@@ -292,7 +308,9 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P7b/P2 integration and binding-qualified uniqueness runtime/admission; broader characteristic combinations remain a separate acceptance item. External referential integrity/raw token reconstruction are not speculative feature requirements.
 - [x] ✅ COMPLETED: P2 operation transitions and original owned-backend validation.
 - [x] ✅ COMPLETED: P2 flag-contract assembly validation and default P9 gating removal; later common-context changes receive a separate overlap rerun.
-- [ ] Integration: centralized release metadata, applicable consolidation gates and reviewed PR.
+- [x] ✅ COMPLETED: centralized v0.55.36 release metadata and the missing
+  exact-incident Workbench regression.
+- [ ] Integration: complete applicable release gates and reviewed PR.
 
 **P5 isolated implementation, 2026-09-28:** [JSON search and error contract](docs/SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md)
 is locally validated on `fix/scim-search-contract-20260928`, baseline

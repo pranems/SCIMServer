@@ -1,6 +1,6 @@
 # SCIM correctness implementation: issues and lessons
 
-> **Last verified:** 2026-09-29
+> **Last verified:** 2026-09-30
 >
 > **Status:** Implementation ledger, updated when an issue is confirmed
 >
@@ -16,6 +16,29 @@ in ignored test-results directories.
 The [independent analysis](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md) and its
 database evidence retain the earlier investigation history. They are not
 rewritten as implementation success.
+
+### v0.55.36 release-candidate gate issues
+
+| ID | Type / severity | Symptom | Root cause | Resolution and why it works | Earliest possible / actual detection | Prevention / status |
+|---|---|---|---|---|---|---|
+| RC-I01 | Correctness / High | Valid resource writes returned a false 409 `PROFILE_REVISION_CHANGED` after an endpoint profile had been read | Lazy schema compilation attaches `_schemaCaches` after the persisted profile revision is recorded, so later request-context hashing included runtime-only Maps that were never profile content | Profile revision canonicalization excludes `_schemaCaches`. A RED unit proved cache population changed the hash; GREEN keeps the content revision stable while preserving changes to persisted profile fields | Revision unit / full InMemory E2E | Permanent unit locks the runtime-only exclusion. Any future runtime cache must be reviewed at the canonical content-revision boundary |
+| RC-I02 | Error contract / Medium | Malformed filters returned `invalidFilter` without the documented diagnostics extension | `createReadQuery` caught the parser error but constructed only the base SCIM error | The catch now supplies `FILTER_INVALID`, the original filter expression, and the parser message through the existing diagnostics envelope. Focused RED/GREEN and the complete E2E suite pass | Shared query unit / full InMemory E2E | Permanent unit asserts both SCIM status/type and meaningful diagnostic values |
+| RC-I03 | Test correctness / Medium | Four legacy E2E cases returned 400 before reaching uniqueness or immutable-transition assertions | Lexmark fixtures omitted its required Enterprise extension namespace. The immutable fixture tried to redefine common `externalId` as immutable, which current RFC 7643 common-attribute admission correctly rejects | Lexmark requests now carry the required extension namespace. The immutable behavior test uses a custom `employeeNumber` characteristic instead of weakening the common-attribute contract. The two focused suites pass 67/67 | Fixture contract review / focused rerun after full E2E failure | Required-extension transition tests and common-attribute admission remain authoritative; fixtures must satisfy them before testing a later behavior |
+| RC-I04 | Harness configuration / Low | Three logging E2E suites reported seven missing-event failures | The ad hoc triage command set `LOG_LEVEL=OFF`, suppressing the events those tests intentionally observe | Rerunning the same suites under their default logging configuration passed. No product or test expectation changed | Command review / focused rerun | Do not override a capability that the selected tests assert. Full E2E confirmation ran with default logging and passed 118/118 suites |
+| RC-I05 | Execution monitoring / Medium | The API unit command appeared stalled for hours after producing no further visible output | Jest completed 209/209 suites and 6,000/6,000 tests in 104 seconds, then retained an asynchronous handle. The completed summary was not inspected when the synchronous tool moved to background | The green summary was recovered from the saved artifact and only that owned process tree was stopped. No duplicate suite was launched and no unrelated process was terminated | Bounded post-run monitor / operator escalation | A timed-out gate must be read promptly. Once a complete Jest summary exists, allow only a bounded exit grace, then stop the exact owned session and separately investigate handles rather than waiting indefinitely |
+
+**Release-candidate test/gate improvement: applied.** Content revisions now
+have a runtime-cache negative control, malformed filters require diagnostic
+values, and fixture admission is verified before downstream behavior.
+**Design/architecture disposition: accepted.** Filtering the one known
+runtime-only cache at the existing canonicalization boundary is cohesive and
+does not justify a second profile representation or a generalized cache
+registry. The query fix reuses the existing diagnostics envelope.
+
+The current environment does not expose `VSCODE_TARGET_SESSION_LOG`; final
+transcript reconciliation remains required before release completion and must
+use the available persisted session record rather than reconstructing events
+from this summary.
 
 ## Entries
 

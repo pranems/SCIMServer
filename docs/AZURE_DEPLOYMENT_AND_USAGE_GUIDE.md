@@ -1,8 +1,8 @@
 # Azure Deployment & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-08-12 - **Product version:** `0.55.36`
 
-> **Version:** 0.55.35 - **Updated:** June 3, 2026
+> **Version:** 0.55.36 - **Updated:** June 3, 2026
 > **Source of truth:** [deploy.ps1](../deploy.ps1), [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), [infra/](../infra/)
 
 ---
@@ -379,7 +379,7 @@ ephemeral tenants both use the name `ProvIAM_Subscription`; the promotion helper
 rejects that ambiguous input. When `-Subscription` is omitted for the canary, the script derives the
 active canary subscription ID from `scripts/scim-estates.json`.
 
-`-ImageTag` is the published product version such as `0.55.35`, not the local short commit tag. The
+`-ImageTag` is the published product version such as `0.55.36`, not the local short commit tag. The
 publish workflow creates GHCR tags for the version and `latest`; the short SHA is used only for
 local/ACR traceability and cannot be promoted from GHCR.
 

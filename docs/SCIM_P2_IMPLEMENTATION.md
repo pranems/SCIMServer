@@ -2,8 +2,9 @@
 
 **Last verified:** 2026-09-29
 
-**Status:** Implemented and locally validated, with independent finding closure. Not pushed,
-merged, released, or deployed. Product manifests remain `0.55.35`.
+**Status:** Implemented and locally validated, with independent finding closure.
+Included in the `0.55.36` release candidate; reviewed PR, merge, and dev
+deployment remain parent integration gates.
 
 Base: `3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51` (P1 typed paths).
 This package implements Section 4/5/8 of the

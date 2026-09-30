@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.35
+> **Version**: 0.55.36
 > **Last Updated**: September 29, 2026
 > **Last verified:** 2026-09-29
 
@@ -237,6 +237,18 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The current source release candidate is v0.55.36. It consolidates the SCIM
+correctness work. The previous clean consolidation tip completed local
+exact-artifact acceptance on InMemory and PostgreSQL 17.8. Release-candidate
+triage additionally fixed runtime-only schema caches changing profile revisions
+and restored structured malformed-filter diagnostics. API build/lint, API unit
+6,000/6,000, InMemory API E2E 2,481 passed plus 4 skipped, and the focused
+Workbench incident regression are green. Publication still requires the
+v0.55.36 exact-tip PostgreSQL/artifact reruns, a reviewed exact-tip PR,
+merged-master build, and purplecliff dev validation. The Workbench regression
+executes the exact four-operation typed PATCH incident and verifies independent
+persisted readback.
 
 The current deployed baseline is v0.55.35 on dev and the proudbush canary. The shared digest is
 `sha256:ad8594e2e2b7263e88dc4ae813436a20797cbea30b78457340fdb35dfe7eedfc`.
