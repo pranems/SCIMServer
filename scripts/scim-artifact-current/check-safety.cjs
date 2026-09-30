@@ -3,8 +3,14 @@ const assert = require("node:assert/strict");
 const {
   assertOwnedContainerMetadata,
   assertLiveReceipt,
+  buildCommand,
   buildRuntimeEnv,
 } = require("./run.cjs");
+
+const build = buildCommand();
+assert.equal(build.file, process.execPath);
+assert.deepEqual(build.args.slice(-2), ["run", "build"]);
+assert.match(build.args[0], /npm-cli\.js$/);
 
 const env = buildRuntimeEnv({
   backend: "inmemory",

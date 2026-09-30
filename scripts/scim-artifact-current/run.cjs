@@ -17,7 +17,6 @@ const {
   databaseGuard,
 } = require("../scim-acceptance-current/current-safety.cjs");
 
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const pwsh = process.platform === "win32" ? "pwsh.exe" : "pwsh";
 const REQUIRED_LIVE_OUTCOMES = [
   "9z-DE: 126 binding-qualified uniqueness",
@@ -34,6 +33,32 @@ function git(...args) {
       windowsHide: true,
     })
     .trim();
+}
+
+function buildCommand() {
+  const npmCli =
+    process.env.npm_execpath ??
+    path.join(
+      path.dirname(process.execPath),
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    );
+  assert.equal(
+    fs.existsSync(npmCli),
+    true,
+    `Installed npm CLI not found: ${npmCli}`,
+  );
+  assert.equal(
+    path.basename(npmCli),
+    "npm-cli.js",
+    "Build must use npm-cli.js through the current Node executable.",
+  );
+  return {
+    file: process.execPath,
+    args: [npmCli, "run", "build"],
+  };
 }
 
 function buildRuntimeEnv({ backend, baseUrl, databaseUrl, secret }) {
@@ -485,7 +510,8 @@ async function main() {
       redact(JSON.stringify(receipt, null, 2), secrets),
     );
   try {
-    execute(output, "api-build", npm, ["run", "build"], {
+    const build = buildCommand();
+    execute(output, "api-build", build.file, build.args, {
       cwd: API,
       secrets,
     });
@@ -591,5 +617,6 @@ module.exports = {
   REQUIRED_LIVE_OUTCOMES,
   assertOwnedContainerMetadata,
   assertLiveReceipt,
+  buildCommand,
   buildRuntimeEnv,
 };
