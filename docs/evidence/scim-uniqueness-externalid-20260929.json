@@ -1,0 +1,55 @@
+{
+  "base": "704d701f4a99363fd5840aa2e7a0113e65a71e6b",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "806b7a07a49c9a38",
+  "sourceTreeSha256": "10c621ba705cfdad9b0bb1c127299deb00712cf7618546e649b64f544ba0724c",
+  "artifact": "test-results/atomic-uniqueness/postgres-806b7a07a49c9a38/run.json",
+  "postgresVersion": "17.8",
+  "migrationsApplied": 22,
+  "newMigrations": 0,
+  "red": {
+    "unitFailed": 2,
+    "httpFailedPerBackend": 7,
+    "httpRun": "f0fee716edd50df2"
+  },
+  "unit": {
+    "suites": 10,
+    "passed": 651,
+    "failed": 0
+  },
+  "http": [
+    {
+      "backend": "prisma",
+      "passed": 167,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "backend": "inmemory",
+      "passed": 165,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "Native PostgreSQL member foreign key rollback",
+        "Independent PostgreSQL application connection pools"
+      ]
+    }
+  ],
+  "livePerBackend": {
+    "atomicUniquenessAssertions": 21,
+    "conditionalWriteAssertions": 33,
+    "groupAggregateAssertions": 69
+  },
+  "changedPolicyLint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "buildExitCode": 0,
+  "review": "No significant issues found in custom externalId preservation follow-up",
+  "cleanup": {
+    "exactContainerId": "1604ef1bed28745c134e387ca4786c984f8de921882c50c7266edeb5d89263eb",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  }
+}

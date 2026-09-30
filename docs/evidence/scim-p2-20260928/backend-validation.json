@@ -1,0 +1,231 @@
+{
+  "source": {
+    "base": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+    "head": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+    "sourceSha256": "72148497142cb37a4d86fa1fcc572bcbf81ee08460ef8ad96238f388dc29428f",
+    "fileCount": 551
+  },
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "648dc518e4142067",
+  "startedAt": "2026-09-29T06:10:05.587Z",
+  "backends": [
+    {
+      "backend": "inmemory",
+      "exit": 0,
+      "passed": 201,
+      "failed": 0,
+      "total": 201,
+      "live": {
+        "p1": {
+          "assertions": 58,
+          "strictModes": [
+            true,
+            false
+          ],
+          "families": [
+            "Users",
+            "Groups",
+            "Devices"
+          ]
+        },
+        "p2": {
+          "assertions": 112,
+          "families": [
+            "Users",
+            "Groups",
+            "Devices"
+          ],
+          "strictModes": [
+            true,
+            false
+          ]
+        },
+        "assertions": 170,
+        "pid": 48996,
+        "port": 63093,
+        "runtimeStopped": true
+      }
+    },
+    {
+      "backend": "prisma",
+      "exit": 0,
+      "passed": 201,
+      "failed": 0,
+      "total": 201,
+      "live": {
+        "p1": {
+          "assertions": 58,
+          "strictModes": [
+            true,
+            false
+          ],
+          "families": [
+            "Users",
+            "Groups",
+            "Devices"
+          ]
+        },
+        "p2": {
+          "assertions": 112,
+          "families": [
+            "Users",
+            "Groups",
+            "Devices"
+          ],
+          "strictModes": [
+            true,
+            false
+          ]
+        },
+        "assertions": 170,
+        "pid": 60224,
+        "port": 63984,
+        "runtimeStopped": true
+      }
+    }
+  ],
+  "cleanup": {
+    "exactId": "df40cad17ae022ba47c9096f9e6968669b9cd9649500bf67ad1c0104e5ee7478",
+    "removed": true
+  },
+  "build": {
+    "node": "v24.13.0",
+    "fileCount": 235,
+    "sha256": "ac2fbd2be4443549ea1429409c732a3dca6f628b9de16bac063856594b30fa88"
+  },
+  "docker": "29.6.2",
+  "container": {
+    "id": "df40cad17ae022ba47c9096f9e6968669b9cd9649500bf67ad1c0104e5ee7478",
+    "name": "scim-p1-pg-648dc518e4142067",
+    "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+    "run": "648dc518e4142067",
+    "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+    "host": "127.0.0.1",
+    "port": 50462,
+    "database": "scim_p1_648dc518e4142067",
+    "mounts": [],
+    "tmpfs": {
+      "/var/lib/postgresql/data": "rw"
+    },
+    "network": "bridge"
+  },
+  "beforeMigration": {
+    "container": {
+      "id": "df40cad17ae022ba47c9096f9e6968669b9cd9649500bf67ad1c0104e5ee7478",
+      "name": "scim-p1-pg-648dc518e4142067",
+      "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+      "run": "648dc518e4142067",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "host": "127.0.0.1",
+      "port": 50462,
+      "database": "scim_p1_648dc518e4142067",
+      "mounts": [],
+      "tmpfs": {
+        "/var/lib/postgresql/data": "rw"
+      },
+      "network": "bridge"
+    },
+    "server": {
+      "database": "scim_p1_648dc518e4142067",
+      "username": "p1_runner",
+      "cluster_name": "scim-p1-648dc518e4142067",
+      "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "server_address": "172.17.0.2/32",
+      "server_port": 5432,
+      "system_identifier": "7690835738536808483"
+    }
+  },
+  "migrationExit": 0,
+  "migrations": [
+    {
+      "migration_name": "20260223000000_postgresql_baseline",
+      "finished": true
+    },
+    {
+      "migration_name": "20260223203811_externalid_citext_case_insensitive",
+      "finished": true
+    },
+    {
+      "migration_name": "20260223225049_add_endpoint_schema",
+      "finished": true
+    },
+    {
+      "migration_name": "20260225123401_add_deleted_at_soft_delete",
+      "finished": true
+    },
+    {
+      "migration_name": "20260225181836_externalid_citext_to_text",
+      "finished": true
+    },
+    {
+      "migration_name": "20260225232117_add_endpoint_resource_type",
+      "finished": true
+    },
+    {
+      "migration_name": "20260227013947_add_endpoint_credential",
+      "finished": true
+    },
+    {
+      "migration_name": "20260313031330_add_endpoint_profile",
+      "finished": true
+    },
+    {
+      "migration_name": "20260409235323_remove_uniqueness_displayname_externalid",
+      "finished": true
+    },
+    {
+      "migration_name": "20260416025138_add_requestlog_perf_indexes",
+      "finished": true
+    },
+    {
+      "migration_name": "20260430120000_resource_member_unique_value",
+      "finished": true
+    },
+    {
+      "migration_name": "20260707000000_add_jwks_host_allowlist",
+      "finished": true
+    },
+    {
+      "migration_name": "20260707100000_add_credential_dek",
+      "finished": true
+    },
+    {
+      "migration_name": "20260707110000_add_secret_retention_and_server_settings",
+      "finished": true
+    },
+    {
+      "migration_name": "20260717120000_add_requestlog_requestid",
+      "finished": true
+    },
+    {
+      "migration_name": "20260721180000_add_requestlog_auth_summary",
+      "finished": true
+    },
+    {
+      "migration_name": "20260722120000_add_requestlog_auth_decision",
+      "finished": true
+    },
+    {
+      "migration_name": "20260724000000_drop_requestlog_endpoint_fk",
+      "finished": true
+    },
+    {
+      "migration_name": "20260827200000_add_credential_keyed_lookup",
+      "finished": true
+    },
+    {
+      "migration_name": "20260916035422_add_endpoint_credential_type_active_index",
+      "finished": true
+    },
+    {
+      "migration_name": "20260923020356_split_per_endpoint_credentials_enablement",
+      "finished": true
+    },
+    {
+      "migration_name": "20260924000000_endpoint_name_case_insensitive",
+      "finished": true
+    }
+  ],
+  "status": "passed",
+  "finishedAt": "2026-09-29T06:13:39.099Z"
+}

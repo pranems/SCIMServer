@@ -1,13 +1,233 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.35
-> **Last Updated**: September 24, 2026
-> **Last verified:** 2026-09-24
+> **Version**: 0.55.36
+> **Last Updated**: September 29, 2026
+> **Last verified:** 2026-09-29
 
 ---
 
 ## Active Delivery Process
+
+**Current C0 local-acceptance checkpoint, not deployed:** common attribute normalization now
+feeds runtime uniqueness compilation per ResourceType, and admission uses the
+same compiler before profile publication. Shared declarations are unchanged;
+core-only unsupported computed promises remain admission errors. Omitted
+optional extension lists are safely normalized. P7b is now assembled once:
+whole-namespace validation, evolving required/immutable transitions, and
+returned:request presence are integrated without replacing the accepted
+binding, query, retention or transaction seams. Focused assembly evidence is
+184 overlap units and553 HTTP cases per backend. Built runtimes each pass
+P7b153/905 plus P7a472 assertions. PostgreSQL17.8 replayed22 migrations and
+exact owned cleanup passed. Omitted `schemaExtensions` additionally has
+ResourceTypes discovery and complete custom CRUD proof. Profile revisions now
+cross the request/repository commit boundary: nine controlled User, Group and
+custom create/replace/delete races return sanitized409 with complete
+non-mutation on both backends. Affected units pass611 tests and the expanded
+guarded lane passes571 HTTP cases/backend. [Design and evidence](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
+The immutable82-case corpus now has164 current-source dispositions:81 pass
+plus one explicit cache N/A on InMemory,82 pass on PostgreSQL,769 assertions
+and0 failures. Broader characteristic overlays are mapped to permanent tests
+without a Cartesian-coverage claim. The50,000-row query benchmark records the
+known residual cost boundary:50,000 candidates and20.1MB transferred for a
+0.02%-selective custom numeric filter,401ms local fetch p50 and23ms service
+p50. The exact locally built `dist/main.js` artifact then passes166 live
+outcomes/backend on InMemory and PostgreSQL17.8 after all22 migrations; both
+owned PIDs stop and exact container cleanup passes. Local implementation and
+acceptance are complete. Push/PR CI, merge, release metadata and deployment
+remain approval boundaries.
+[Characteristic mapping](SCIM_CHARACTERISTIC_RECONCILIATION.md),
+[performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md), and
+[case evidence](evidence/scim-current-acceptance-20260929/validation.json)
+plus [artifact evidence](evidence/scim-exact-artifact-20260929/validation.json).
+
+**Corrected source pair:** `4ba9373c` was held for violating the common
+externalId contract. Corrective child `2d2da4e1` restores all-core String/SV
+and adds exact-case precedence. Their history is now retained as
+`d93d1a0d` / `43b01c4e`, but the fifth commit is never independently
+accepted or validated. Default `none` and independent extension homonyms
+remain. The [initial hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1125-held-externalid-relaxation-not-imported-2026-09-29)
+is historical; evaluate only the corrected pair's final state.
+That final state now passes176 units,367 InMemory HTTP plus two native-only
+skips,369 PostgreSQL17.8 HTTP and143 shared live checks/backend.
+[Corrected integration evidence](evidence/scim-common-uniqueness-integration-20260929/validation.json).
+
+
+The bounded [PUT retained-entry correction](SCIM_PUT_ENTRY_PRESERVATION.md)
+is a parallel source snapshot on `5581e6b7`. Its additional type-capacity,
+restoration stability and nested immutable controls extend the already
+integrated b21e44cb fix. The later authoritative parent89810f0c is integrated
+ase38b36aa: retained-entries.ts is again canonical, original consumers use
+that path, and attribute-values is a compatibility export only. There is
+never a second implementation. Source evidence is107 contract checks within1771 tests.
+Integration414e14e8 -> d8c9a79a now separately passes491 units,
+509 InMemory/511 PostgreSQL HTTP and164 shared live checks/backend,
+including6 new corpus cases/5474 assertions. [Merged residual proof](evidence/scim-retention-stability-integration-20260929/validation.json).
+The eight base expectations were subsequently
+reconciled by parentdf3ca957/bd82e681 and are not reopened.
+The parent canonical-path/fixture integration separately passes428 units,
+305 InMemory/306 PostgreSQL HTTP and164 main live checks/backend, including
+84 retained cases/1764 assertions. [Latest receipt](evidence/scim-parent-reservation-integration-20260929.json).
+The [P7b guide](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) and its
+[source receipt](evidence/scim-patch-schema-p7b-20260929/validation.json)
+remain source-specific evidence, not the final C0 matrix.
+
+The local initial assembly now includes P1/P2 core, P3/P3b/P4, P5, P6a/P6b, P7a,
+P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1110-p9-compatibility-integration-2026-09-29)
+owns current combined results; the records below are source-package evidence,
+not deployment claims. P4's raw repository-error gap was closed separately
+with value/content regressions, not assumed fixed by P5's scalar formatting.
+P7 schema-role/id/meta context, P3b representation/admission/query and the
+case-level dispositions were later closed in the current C0 acceptance.
+Scoped precise interrupted-create errors have combined proof;
+cleanup/no-orphan checks alone are not error-contract proof.
+
+P9 is locally implemented on P7a/P1: emitted strict-on Entra guidance,
+honest fixed/inert setting descriptions and a shared 17-case HTTP/live
+corpus, including the proven modern pathless shape.
+Both owned PostgreSQL 17.8 (22 migrations) and InMemory pass.
+The original P9 run had two open P2 checks. After core P2 and authorized
+follow-up `29b3b2c6` / `8d2110d1`, both pass unchanged on the assembled
+backends. All 19 cases now run by default, without TODO/environment gating.
+Each built runtime passes 1,228 P9 and 188 P2 assertions; five focused HTTP
+suites pass 356 cases/backend with zero pending/TODO. [Separate integrated
+receipt](evidence/scim-flags-default-corpus-20260929/validation.json).
+Owned P9 bootstrap now pins the
+verified URL against later marker changes; inherited URLs are cleared before
+provisioning and readiness checks target TCP.
+See [P9 scope/evidence](SCIM_ENTRA_COMPATIBILITY.md) and
+[37-setting reconciliation](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
+No version/lockfile, UI code, push or deployment changes.
+P9 corpus evidence is strict-ON only. The separate P2 flag suite verifies
+quoted User active rejection with coercion OFF in both strict modes and
+asserts raw repository state. Namespace-only strict prevalidation now has the
+bounded P7b proof above. Legacy global uniqueness
+can block unrelated profile-subblock edits because merged profiles are fully
+revalidated; do not silently downgrade the declaration or call it RFC-invalid.
+
+P7's [common binding-context follow-up](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md)
+protects generic id/meta and prevents core semantics from mutating independent
+extension uses of shared schemas. Admin rejection of core-only conflicts is
+provider policy; runtime common precedence is the RFC requirement. Generic
+meta timestamps now come from authoritative record fields. Source regression:
+1,698 tests,108 HTTP and472 live assertions per backend.
+Integration `8d5915ba` -> `e80da689` separately passes754 units,
+537 InMemory HTTP plus one native-only skip,538 PostgreSQL17.8 HTTP after
+22 migrations, and143 shared live checks/backend including472 P7 assertions.
+[Combined receipt](evidence/scim-common-context-integration-20260929/validation.json).
+Existing common-PATCH and PUT retention fixes are preserved, not reopened.
+Namespace-only strict validation is integrated through P7b. Broader
+characteristic and profile-coordination consumers are now closed by the
+current characteristic map and profile-revision proof. The parent-owned
+eight-expectation reconciliation is integrated as`df3ca957` -> `bd82e681`:142 tests in three
+suites pass with exact assertions and four opposing controls; no production
+change, skipped case or database rerun was introduced.
+
+P7's [common externalId follow-up](SCIM_P7_COMMON_EXTERNAL_ID.md) corrects
+admission/runtime behavior for all resource cores using RFC 7643 3.1, not
+column convenience. Namespaced externalId and custom displayName/active
+remain independent. Source regression: 1,687 tests. That original source
+package did not include completed-candidate PATCH integration, now supplied
+by `4a0ac7d5`. The source package also did not fix PUT
+duplicate/anonymous retention; assembly separately fixed and verified that
+behavior in `b21e44cb`, retaining the neutral matcher.
+
+P7a is implemented locally in its own P1-based worktree. The
+[P7a record](SCIM_P7A_PROFILE_VALIDATION.md) covers declaration validation,
+scalar/cardinality checks and POST/PUT contracts with 1,507 focused unit
+passes and owned backend/live evidence. It does not close P7 ordered-PATCH
+integration or remaining uniqueness/reference/deep-compatibility questions.
+No product version, lockfile, push or deployment changed.
+
+The separate recursive readOnly follow-up closes the nested-complex
+compatibility POST/PUT gap: 1,517 focused units and, per backend, 67 HTTP /
+228 live assertions. [Characteristic status](SCIM_P7_CHARACTERISTIC_STATUS.md)
+records exact unsupported server-uniqueness shapes for P3b and the intentional
+global-uniqueness capability policy. P7 remains open until final P2 integration.
+Do not treat optional external referential integrity or raw JSON token
+reconstruction as automatically required features.
+
+2026-09-29 P2 follow-up intentionally removes verbose-disabled explicit User
+literal dotted writes (400/no-write instead) and makes quoted promoted-active
+values honor `AllowAndCoerceBooleanStrings` even in lenient mode. Existing
+no-path/extension compatibility is preserved. P9 integration cases now have
+default-running P2 HTTP/live regressions; the parent still owns converting
+the sibling P9 corpus TODOs after merging.
+
+P2 shared ordered PATCH execution is implemented on isolated
+`fix/scim-patch-semantics-20260928`, based on P1 `3ecaba55`. The three
+resource adapters share target resolution, append/all-match mutations,
+readOnly policy and per-operation required/immutable/primary transitions.
+See [P2 implementation and evidence](SCIM_P2_IMPLEMENTATION.md) and
+[P2 RCA](SCIM_P2_EXECUTION_RCA.md). Its source package did not implement P3
+conditional writes, P7 validation, or P8 lifecycle changes; combined checks
+belong to this integration branch.
+No product version, locks or deployment changed.
+
+P1 correctness work is implemented locally on the isolated implementation
+branch, not on a deployment. [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md)
+records the typed-path contract, 1,476 focused unit / 65 HTTP passes and owned
+backend/live evidence. Keep P2 operation semantics separate. Version and
+CHANGELOG coordination remain the parent integration gate.
+
+P3b adds repository-commit schema uniqueness for User/Group/custom resources,
+including scalar multi-values and complex children. Database-owned namespace
+locks coordinate PostgreSQL writers; InMemory commits synchronously.
+See [contract, compatibility limits and evidence](SCIM_UNIQUENESS_IMPLEMENTATION.md).
+P7 admission and P8 profile-revision coordination remain separate packages.
+Source follow-up `704d701f`, integrated as `7001d194`, corrects generic
+promoted-column assumptions. Focused combined write/transaction checks pass:
+245 units, 304 InMemory/308 PostgreSQL HTTP and 143 shared live checks per
+backend. Its original independent probe had43/45 passing outcomes, with
+numeric scalar/MV displayName equality returning empty200/500. That
+[historical failure](evidence/scim-custom-authority-integration-20260929/validation.json)
+is now closed by the corrected P6c pair plus explicit binding-role fix.
+[New query/write/schema proof](evidence/scim-query-authority-integration-20260929/validation.json):
+45/45 additional probe outcomes per backend,398 InMemory/399 PostgreSQL
+HTTP and163 shared live checks/backend including52 query outcomes.
+Binding-qualified admission is integrated. Profile coordination and broader
+characteristic acceptance remain separate; this is not the final matrix.
+See [the exact integration hold](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1116-p3b-core-assembly-with-contract-corrections-open);
+P7 common externalId and P3b uniqueness policies have separate owners.
+The RFC follow-up limits unique types to string/integer/decimal/reference;
+references are intrinsically exact. The final adapter follow-up rejects only
+unrepresented builtin Group member leaves, not same-named extensions.
+Generic resources use public rawPayload authority, preserving custom numeric/MV
+displayName and other same-named custom fields instead of imposing builtin types.
+Common top-level externalId is a single case-exact String under RFC 7643
+section 3.1 across all resource types; namespaced extension externalId remains
+independent. Numeric/MV custom displayName and extension externalId are covered.
+Latest corrected source evidence:654 units,170 PostgreSQL HTTP and168
+InMemory plus two database-only N/A. Earlier648/158/156 counts remain
+historical; the651/167/165 checkpoint4ba9373c is SUPERSEDED by2d2da4e1,
+not independently accepted. The final corrected pair now has the separate
+merged proof above; these source counts are not its combined totals.
+C0/P6 own representation-aware filter/sort pushdown validation for those names.
+P7 common runtime is integrated; shared-policy admission remains parent/C0 work.
+
+P4 Group aggregate transactions are locally validated on top of P3 conditional
+writes: 205 focused units, 111 PostgreSQL 17.8 HTTP cases and 110 InMemory
+cases (one PostgreSQL-only FK control is skipped). Initial members commit
+with creation; failed replacements leave the complete aggregate unchanged.
+See [implementation and limits](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md).
+This is local branch work, not a deployed-version claim; release metadata and
+the integration matrix remain parent-owned.
+
+Local correctness work now includes reviewed P8a (`39841319`) and P8b endpoint
+deletion cleanup. P8b uses a required repository lifecycle port, reversible
+InMemory storage swaps and deleted-ID write barriers; PostgreSQL remains
+FK-backed. RequestLog is retained, not cascaded. See
+[the package evidence and boundaries](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md).
+These are local changes, not a new product version or deployment. The source
+package excluded P8c/P3; this assembly combines them with P4 while retaining
+separate cleanup and concurrent-error-contract acceptance claims.
+
+The P8b exact-error follow-up is now locally verified: interrupted resource
+and credential creates return a typed, sanitized endpoint 404; PostgreSQL
+confirms parent absence only after relation failure. It preserves typed
+conditional errors, 412 responses and native pg timeout classification.
+P8 remains open for parent P3/P4/P8c assembly validation, not for an assumed
+shared InMemory User-FK contract.
 
 Use [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md)
 for change sizing, validation lanes, commit/push/PR/merge/deploy ownership,
@@ -17,6 +237,35 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 `c10f9ea83822a50650c2b2867ceff9eeaa46c545`, and the same 0.55.23 artifact is
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
+
+The current source release candidate is v0.55.36. It consolidates the SCIM
+correctness work. The previous clean consolidation tip completed local
+exact-artifact acceptance on InMemory and PostgreSQL 17.8. Release-candidate
+triage additionally fixed runtime-only schema caches changing profile revisions
+and restored structured malformed-filter diagnostics. API build/lint, API unit
+6,000/6,000, InMemory API E2E 2,481 passed plus 4 skipped, and the focused
+Workbench incident regression are green. Publication still requires the
+remaining browser/static/documentation gates, a reviewed exact-tip PR,
+merged-master build, and purplecliff dev validation. Guarded PostgreSQL unit and E2E parity pass
+6,000/6,000 and 2,485/2,485; the exact built artifact passes 166/166 live
+outcomes per backend on PostgreSQL 17.8 after all 22 migrations. The Workbench
+regression executes the exact four-operation typed PATCH incident and verifies
+independent persisted readback. The isolated Docker live suite passes
+1,697/1,697 after all 22 migrations, with zero remaining endpoints and exact
+owned API, database and network cleanup. Web Vitest passes 118 files and 1,568
+tests with all coverage floors met; production build and all 25 size budgets
+pass. The TypeScript ratchet reports 66 established errors, below its ceiling.
+PR #188 is open. The first exact-tip CI run identified five CodeQL
+dynamic-property sinks and two HIGH `fast-uri` CVEs. A sink-local sanitizer was
+runtime-safe but remained red in CodeQL, so readOnly preprocessing now rebuilds
+validated entry lists immutably and each resource service consumes the returned
+payload explicitly. The structural correction passes 639/639 focused units,
+317/317 affected HTTP tests, changed-source lint with zero errors, and the API
+build. The manifest now selects fixed `fast-uri` 4.1.4;
+public-registry workflow run 36735519112 changed only its package version, URL,
+and SHA-512 integrity and reported a 28.2-day publish age. Clean install and
+build pass with zero HIGH/CRITICAL production-audit findings. Exact-tip CI,
+merge, and purplecliff validation are still pending.
 
 The current deployed baseline is v0.55.35 on dev and the proudbush canary. The shared digest is
 `sha256:ad8594e2e2b7263e88dc4ae813436a20797cbea30b78457340fdb35dfe7eedfc`.

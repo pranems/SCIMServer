@@ -1,0 +1,153 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
+
+const scripts = resolve(__dirname, '../../../../../scripts');
+const read = (file: string): string => readFileSync(resolve(scripts, file), 'utf8');
+const section = 'live-test-sections/correctness-contracts.ps1';
+
+describe('integrated correctness live coverage', () => {
+  it('keeps HTTP flow steps in the root live runner when nested scripts invoke the wrapper', () => {
+    const command = `
+$ErrorActionPreference = 'Stop'
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:SCIM_LIVE_TEST_FILE, [ref]$null, [ref]$null)
+$functionAst = @($ast.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Add-FlowStep'
+}, $true))[0]
+Invoke-Expression $functionAst.Extent.Text
+$global:__ScimServerLiveTestFlowSteps = [Collections.Generic.List[object]]::new()
+$script:flowSteps = $global:__ScimServerLiveTestFlowSteps
+function Convert-FlowHeaders { param($Headers); $Headers }
+function Convert-FlowBody { param($Body); $Body }
+$child = Join-Path ([IO.Path]::GetTempPath()) "scim-live-nested-$([Guid]::NewGuid().ToString('N')).ps1"
+try {
+    @'
+Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/one' -StatusCode 200
+Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/two' -StatusCode 200
+'@ | Set-Content -LiteralPath $child
+    & $child
+    if ($script:flowSteps.Count -ne 2 -or $script:flowSteps[0].stepId -ne 1 -or $script:flowSteps[1].stepId -ne 2) {
+        throw 'Nested script requests must append to the root live flow-step collection'
+    }
+    'nested flow steps verified'
+} finally {
+    Remove-Item -LiteralPath $child -Force -ErrorAction SilentlyContinue
+    Remove-Variable -Name __ScimServerLiveTestFlowSteps -Scope Global -ErrorAction SilentlyContinue
+}
+`;
+    expect(execFileSync('pwsh', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      env: { ...process.env, SCIM_LIVE_TEST_FILE: resolve(scripts, 'live-test.ps1') },
+    }).trim()).toBe('nested flow steps verified');
+  });
+
+  it('attempts both owned query fixture cleanups even when either deletion fails', () => {
+    const command = `
+$ErrorActionPreference = 'Stop'
+$ast = [Management.Automation.Language.Parser]::ParseFile($env:SCIM_QUERY_CLEANUP_FILE, [ref]$null, [ref]$null)
+$statement = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[0]
+$text = $statement.Finally.Extent.Text
+$cleanup = [scriptblock]::Create($text.Substring(1, $text.Length - 2))
+$roleEndpointId = 'role-owned'
+$endpointId = 'main-owned'
+function Add-QueryCheck { param($Success, $Message); if (-not $Success) { throw 'Unexpected absence result' } }
+foreach ($failedIds in @(@('role-owned'), @('main-owned'), @('role-owned', 'main-owned'))) {
+    $script:deleted = [Collections.Generic.List[string]]::new()
+    $script:failures = $failedIds
+    function Invoke-QueryRequest {
+        param($Method, $Path, $Body)
+        if ($Method -eq 'DELETE') {
+            $id = $Path.Split('/')[-1]
+            $script:deleted.Add($id)
+            if ($id -in $script:failures) { throw 'Injected owned cleanup failure' }
+            return @{ Status = 204 }
+        }
+        return @{ Status = 404 }
+    }
+    $caught = $false
+    try { & $cleanup } catch { $caught = $true }
+    if (-not $caught -or $script:deleted.Count -ne 2 -or 'role-owned' -notin $script:deleted -or 'main-owned' -notin $script:deleted) {
+        throw 'Both owned endpoints must receive a cleanup attempt'
+    }
+}
+'all cleanup attempts verified'
+`;
+    expect(execFileSync('pwsh', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      env: { ...process.env, SCIM_QUERY_CLEANUP_FILE: resolve(scripts, 'test-scim-query-semantics.ps1') },
+    }).trim()).toBe('all cleanup attempts verified');
+  });
+
+  it('invokes the shared correctness section before the main runner cleanup', () => {
+    const main = read('live-test.ps1');
+    expect(main.includes('Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers')).toBe(true);
+    expect(main.indexOf('Invoke-ScimCorrectnessContractTests'))
+      .toBeLessThan(main.indexOf('# TEST SECTION 10: DELETE OPERATIONS'));
+  });
+
+  it('routes every independent package through the shared section', () => {
+    expect(existsSync(resolve(scripts, section))).toBe(true);
+    const source = read(section);
+    for (const invocation of [
+      'Invoke-ScimSearchContractTests -BaseUrl',
+      'test-scim-capability-boundary.ps1',
+      'typed-patch.cjs',
+      'Invoke-ScimConditionalWriteContract -EndpointUrl',
+      'test-scim-endpoint-freshness.ps1',
+      'live-endpoint-conditional.cjs',
+      'test-scim-query-semantics.ps1',
+      'profile-validation.cjs',
+      'Invoke-ScimGroupAggregateContract -EndpointUrl',
+      'test-scim-endpoint-deletion.ps1',
+      'entra-compatibility.cjs',
+      'ordered-patch.cjs',
+      'retained-entry-put.cjs',
+      'Invoke-ScimAtomicUniquenessTests -BaseUrl',
+      'common-externalid-patch.cjs',
+      'binding-uniqueness.cjs',
+    ]) {
+      expect(source.includes(invocation)).toBe(true);
+    }
+    expect(source).toContain('finally');
+    expect(source).toContain('-Method Delete');
+    expect(read('live-test-sections/atomic-uniqueness.ps1')).toContain('Invoke-ScimAtomicUniquenessContract -EndpointUrl');
+  });
+
+  it('gives every integration section a unique identifier across main and shared runners', () => {
+    const main = read('live-test.ps1');
+    const search = read('live-test-sections/search-contract.ps1');
+    const atomic = read('live-test-sections/atomic-uniqueness.ps1');
+    const source = existsSync(resolve(scripts, section)) ? read(section) : main;
+    const sections = [...`${main}\n${source}\n${search}\n${atomic}`.matchAll(/\$script:currentSection\s*=\s*['"](9z-(?:C[O-Z]|D[A-Z])):/g)]
+      .map((match) => match[1]);
+    expect(new Set(sections).size).toBe(sections.length);
+    expect(sections.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it('requires the expanded recursive readOnly live contract', () => {
+    const source = read(section);
+    expect(source.includes('$receipt.assertions -eq 472')).toBe(true);
+    expect(source.includes('472 declaration, binding-context, POST/PUT, projection and cleanup assertions')).toBe(true);
+  });
+
+  it('requires all resolved compatibility and flag assertions without environment gating', () => {
+    const source = read(section);
+    expect(source.includes('SCIM_P9_INTEGRATION')).toBe(false);
+    expect(source.includes('$receipt.assertions -eq 1228')).toBe(true);
+    expect(source.includes('$receipt.assertions -eq 188')).toBe(true);
+  });
+
+  it('routes the additional retention stability corpus through a distinct owned live section', () => {
+    const source = read(section);
+    expect(source.includes('put-preservation.cjs')).toBe(true);
+    expect(source.includes('$receipt.cases -eq 6 -and $receipt.assertions -eq 5474')).toBe(true);
+    expect(source.includes('9z-DD')).toBe(true);
+  });
+
+  it('locks both binding modes and the measured uniqueness admission assertion count', () => {
+    const source = read(section);
+    expect(source).toContain('$receipt.modes -eq 2 -and $receipt.assertions -eq 126');
+    expect(source).toContain('9z-DE');
+  });
+});

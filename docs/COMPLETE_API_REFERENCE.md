@@ -1,8 +1,9 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
 
-> **Version:** 0.55.35 - **Updated:** 2026-09-18
+> **Version:** 0.55.36 - **Updated:** 2026-09-28
+> **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 >
@@ -11,6 +12,25 @@
 ---
 
 ## Table of Contents
+
+**Local P7a update, not yet merged/deployed:** no routes were added.
+Admin profile writes reject malformed declarations before saving. User,
+Group and custom-resource POST/PUT ignore readOnly input; PUT preserves
+omitted non-required immutable values and rejects explicit immutable changes.
+Required extension bindings apply in both strict modes. Supplied
+`returned:request` values appear in POST/PUT responses unless explicit
+projection excludes them. See [contracts and evidence](SCIM_P7A_PROFILE_VALIDATION.md).
+
+**Local P7b PATCH update, not deployed:** whole registered extension URNs
+(including numeric-version suffixes) and no-path namespace objects share
+strict attribute validation. Invalid later operations save nothing and
+report their zero-based index. Required bindings and required/immutable
+transitions use the evolving candidate, not a partial POST/PUT view.
+Supplied `returned:request` paths appear in PATCH responses; explicit
+projection still wins and never/writeOnly fields remain private.
+User `/Me` shares this response behavior. User/Group Bulk delegates the
+same write checks, but success envelopes return status/location/version,
+not resource bodies. See [P7b contracts and owned evidence](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md).
 
 - [Authentication](#authentication)
 - [Common Headers](#common-headers)
@@ -79,6 +99,17 @@ All requests (except public routes) are evaluated against 3 tiers in order:
 | `Content-Type` | POST/PUT/PATCH | `application/scim+json` or `application/json` | RFC 7644 S3.1 |
 | `If-Match` | Conditional | `W/"{version}"` or `*` | ETag for PUT/PATCH/DELETE. Required if `RequireIfMatch: true` |
 | `If-None-Match` | Optional | `W/"{version}"` | Conditional GET - returns 304 if match |
+
+**Conditional resource writes (P3, locally validated; release integration pending):**
+User, Group and custom-resource PUT/PATCH/DELETE enforce a numeric If-Match
+at persistence, not only at the initial read. A concurrent modification returns
+412 without changing fields, members or version. Wildcard `*` means existence,
+not a specific version; unsupported comma-separated tag lists remain rejected.
+ETag-disabled profiles ignore the header. An initially missing scoped resource
+returns 404; disappearance after a successful read returns 412 for a conditional
+write. InMemory User name create/rename now enforces the existing endpoint-scoped,
+case-insensitive PostgreSQL uniqueness policy atomically. See
+[implementation and remaining uniqueness limitations](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md).
 
 ### Response Headers
 
@@ -273,6 +304,9 @@ Returns full endpoint object (same shape as POST response).
 should quote. `id` and `name` are deliberately excluded: `name` is immutable after create and
 `id` identifies the row, so neither can participate in a lost update.
 
+With P8c, `?view=summary` publishes the same editable-state token while returning
+only the summary body. The token and response come from one resolved snapshot.
+
 ```http
 HTTP/1.1 200 OK
 ETag: W/"e9adceb0cbc7d89b3ac549485c210902"
@@ -341,10 +375,16 @@ change.
 | `*` | matches any current state; used to force an overwrite |
 | stale | `412 Precondition Failed`, `scimType: versionMismatch`, and the write is **not** applied |
 
-It matters most when you replace a whole profile section. `settings` and
-`serviceProviderConfig` merge **per key** server-side, so two callers changing different keys
-already both survive and do not need this. `schemas`, `resourceTypes` and `authentication` are
-replaced **wholesale**, so a read-modify-write of those is where an edit can be silently lost.
+`settings` and `serviceProviderConfig` merge **per key** across sequential
+requests; this alone does not protect simultaneous database read-modify-write
+operations. `schemas`, `resourceTypes` and `authentication` are replaced
+**wholesale**. Use `If-Match` when competing edits must not overwrite one another.
+
+The P8c implementation checks the condition at the write boundary. Two different
+edits using the same token cannot both commit, on either PostgreSQL or InMemory.
+This remains the admin API's existing weak content-token compatibility policy,
+not general HTTP strong-validator semantics. See
+[the contract and dual-backend evidence](ENDPOINT_WRITE_CONCURRENCY.md).
 
 For `profile.settings`, omission means no change and an explicit `null` removes only that key,
 allowing the endpoint to inherit the server/default value while preserving every sibling setting.
@@ -505,7 +545,20 @@ Deeper guides: [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) fo
 
 ### DELETE /scim/admin/endpoints/:endpointId
 
-Delete endpoint and all associated resources, logs, and credentials (cascade).
+Delete the endpoint and its Users, Groups, membership rows, all custom resource
+types, and all credentials (active, revoked, expired, and WIF). RequestLog is
+retained: its endpointId is an audit correlation value, not a cascading FK.
+The response is `204 No Content`, with no response body. Other endpoints are
+unchanged. [P8b cleanup and in-flight-write behavior](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md)
+is locally validated but not yet deployed; PostgreSQL keeps its existing
+FK-backed deletion.
+
+If deletion wins while a supported resource or credential POST is already
+in flight, the failed create returns `404` with SCIM detail
+`Endpoint no longer exists` and diagnostics `errorCode: ENDPOINT_NOT_FOUND`.
+The [exact-error follow-up](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md#6-exact-concurrent-deletion-http-contract)
+verifies this on both backends. It does not turn member validation,
+conditional-write 412s or database outages into endpoint 404s.
 
 ```http
 DELETE /scim/admin/endpoints/a1b2c3d4-... HTTP/1.1
@@ -1176,7 +1229,9 @@ Authorization: Bearer changeme-scim
 ```
 
 ```json
-{ "pruned": 1250 }
+{
+  "pruned": 1250
+}
 ```
 
 ---
@@ -1238,7 +1293,10 @@ Authorization: Bearer changeme-scim
 ```
 
 ```json
-{ "message": "Global log level set to DEBUG", "globalLevel": "DEBUG" }
+{
+  "message": "Global log level set to DEBUG",
+  "globalLevel": "DEBUG"
+}
 ```
 
 ---
@@ -1795,11 +1853,32 @@ Authorization: Bearer changeme-scim
 |-------|------|---------|-------------|
 | `filter` | string | (none) | SCIM filter expression (RFC 7644 S3.4.2.2) |
 | `startIndex` | number | 1 | 1-based pagination index |
-| `count` | number | 100 | Results per page (max 1000) |
-| `sortBy` | string | (none) | Attribute to sort by |
+| `count` | number | 100 | Results per page, capped by profile `filter.maxResults`; fallback `SCIM_MAX_COUNT` is 200. Zero returns only the full match count. |
+| `sortBy` | string | (none) | Published scalar attribute path, including qualified extensions; complex fields require a child path, e.g. `emails.value`. Unknown or writeOnly paths return 400 `invalidValue`. |
 | `sortOrder` | string | `ascending` | `ascending` or `descending` |
 | `attributes` | string | (none) | Comma-separated attributes to include |
 | `excludedAttributes` | string | (none) | Comma-separated attributes to exclude |
+
+Users, Groups and custom collections evaluate permitted filters before output
+projection. `returned:never` fields remain hidden even when explicitly
+requested, and writeOnly fields cannot be queried. Numeric/dateTime values
+sort by type; strings honor that exact namespace's `caseExact`. Multi-valued
+sort paths select the primary item, otherwise the first; missing values sort
+last ascending and first descending. `totalResults` counts all matches before
+paging. GET and the existing string-form JSON `.search` use the same read plan.
+For custom numeric or multi-valued attributes named `displayName` or `active`,
+filtering uses the schema-typed payload value rather than an incompatible
+optional query column. Common top-level `externalId` is always a single-valued
+string with caseExact comparison and ordering on every ResourceType (RFC 7643
+section 3.1). An extension-qualified `externalId` is independent and follows
+its extension's declared type, cardinality and caseExact. Presence and compound
+predicates preserve these namespace distinctions.
+See [query semantics and implementation evidence](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md).
+
+Custom PUT/PATCH/DELETE use the same ETag capability profile as discovery:
+`etag.supported: false` disables If-Match enforcement, including RequireIfMatch.
+The informational resource version may remain in metadata. Enabled ETag
+retains the existing 428/412 checks.
 
 **Response (200 OK):**
 
@@ -1948,18 +2027,31 @@ Returns same ListResponse as GET with filter.
 
 Create a group.
 
+**Aggregate persistence (P4, locally validated; release integration pending):**
+the Group and initial members are saved together. A member lookup or storage
+failure leaves no partial Group, so a corrected request can be retried.
+PUT/PATCH failures preserve scalar fields, payload, version and members;
+P3's version checks still apply. See
+[Group transaction evidence and limits](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md).
+
 ```http
-POST /scim/endpoints/a1b2c3d4-.../Groups HTTP/1.1
+POST /scim/endpoints/10000000-0000-4000-a000-000000000001/Groups HTTP/1.1
 Host: localhost:8080
 Authorization: Bearer changeme-scim
 Content-Type: application/scim+json
 
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
   "displayName": "Engineering",
   "members": [
-    { "value": "f47ac10b-..." },
-    { "value": "a83bc20e-..." }
+    {
+      "value": "20000000-0000-4000-a000-000000000001"
+    },
+    {
+      "value": "20000000-0000-4000-a000-000000000002"
+    }
   ]
 }
 ```
@@ -1968,25 +2060,31 @@ Content-Type: application/scim+json
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-  "id": "g1234567-...",
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "id": "30000000-0000-4000-a000-000000000001",
   "displayName": "Engineering",
   "members": [
-    { "value": "f47ac10b-...", "display": "jane.doe@example.com", "type": "User" },
-    { "value": "a83bc20e-...", "display": "john.smith@example.com", "type": "User" }
+    {
+      "value": "20000000-0000-4000-a000-000000000001"
+    },
+    {
+      "value": "20000000-0000-4000-a000-000000000002"
+    }
   ],
   "meta": {
     "resourceType": "Group",
     "created": "2026-04-24T10:00:00.000Z",
     "lastModified": "2026-04-24T10:00:00.000Z",
-    "location": "http://localhost:8080/scim/v2/endpoints/a1b2c3d4-.../Groups/g1234567-...",
-    "version": "W/\"1\""
+    "location": "http://localhost:8080/scim/v2/endpoints/10000000-0000-4000-a000-000000000001/Groups/30000000-0000-4000-a000-000000000001",
+    "version": "W/\"v1\""
   }
 }
 ```
 
 - `displayName` required, unique per endpoint (409 on conflict)
-- Member `value` must reference existing user IDs in the same endpoint
+- Local member values are resolved within the endpoint. Unresolved values remain external members with no internal User link; this route does not require every value to identify an existing local User.
 
 ---
 
@@ -2130,6 +2228,17 @@ Content-Type: application/scim+json
 
 Server-side search via POST body (RFC 7644 S3.4.3). Useful when filter expressions exceed URL length limits.
 
+**P5 local implementation, pending release consolidation:** Users, Groups and
+registered custom resources accept JSON arrays for `attributes` and
+`excludedAttributes`. Comma-separated JSON strings remain an explicit
+compatibility form; GET URL parameters remain comma-separated strings.
+Each field permits at most 100 array entries and 2000 characters including
+joining commas (legacy strings retain the 2000-character bound). Empty arrays
+mean no selection. Null, objects, non-string/nested array items, empty items,
+embedded commas within an array item and exceeded limits return HTTP 400.
+The existing always-returned and `attributes`-precedence rules are unchanged.
+See [implementation and validation](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md).
+
 ```http
 POST /scim/endpoints/a1b2c3d4-.../Users/.search HTTP/1.1
 Host: localhost:8080
@@ -2137,14 +2246,22 @@ Authorization: Bearer changeme-scim
 Content-Type: application/scim+json
 
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
   "filter": "emails[type eq \"work\"].value co \"@example.com\" and active eq true",
   "startIndex": 1,
   "count": 25,
   "sortBy": "meta.lastModified",
   "sortOrder": "descending",
-  "attributes": ["userName", "emails", "active"],
-  "excludedAttributes": ["phoneNumbers"]
+  "attributes": [
+    "userName",
+    "emails",
+    "active"
+  ],
+  "excludedAttributes": [
+    "phoneNumbers"
+  ]
 }
 ```
 
@@ -2393,9 +2510,26 @@ All SCIM error responses follow RFC 7644 S3.12.
 
 ### Error Format
 
+SCIM `status` is a string. `detail` is optional and, when present, is one
+human-readable string, never a Nest validation-message array. P5 joins multiple
+validation messages with `; ` without flattening existing field-level diagnostic
+lists in the diagnostics extension. OAuth token errors continue to use their
+separate OAuth JSON envelope. This local implementation is pending release
+consolidation; see [the P5 report](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md).
+
+The local P4 integration also masks mapped repository server failures:
+unexpected storage failures keep status `500`, and connection failures keep
+`503`, but their public detail contains only the operation, for example
+`Failed to create group.` Internal repository context and the original cause
+remain in server logs, not the response. Existing client-error details and the
+`DATABASE_ERROR` diagnostics classification are preserved. This is separate
+from P5's scalar-message normalization and is not yet deployed.
+
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
   "status": "409",
   "scimType": "uniqueness",
   "detail": "User with userName 'jane.doe@example.com' already exists",

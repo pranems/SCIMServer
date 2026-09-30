@@ -41,6 +41,12 @@ interface ColumnMapping {
 /** Lowercase SCIM attribute name → Prisma column + type */
 type ColumnMap = Record<string, ColumnMapping>;
 
+/** Resolved schema representation, not inferred from a promoted field's name. */
+export interface FilterAttributeShape {
+  type: string;
+  multiValued: boolean;
+}
+
 // ─── Users ───────────────────────────────────────────────────────────────────
 
 /**
@@ -74,7 +80,7 @@ export interface UserFilterResult {
  * columns and compound AND/OR expressions to the database. Only falls back
  * to in-memory for valuePath, not(), or un-mapped attribute paths.
  */
-export function buildUserFilter(filter?: string, caseExactAttrs?: Set<string>): UserFilterResult {
+export function buildUserFilter(filter?: string, caseExactAttrs?: Set<string>, attributeShapes?: ReadonlyMap<string, FilterAttributeShape>): UserFilterResult {
   if (!filter) {
     return { dbWhere: {}, fetchAll: false };
   }
@@ -86,7 +92,7 @@ export function buildUserFilter(filter?: string, caseExactAttrs?: Set<string>): 
     throw new Error(`Invalid filter: ${filter}`);
   }
 
-  return buildFilterResult(ast, USER_DB_COLUMNS, caseExactAttrs);
+  return buildFilterResult(ast, USER_DB_COLUMNS, caseExactAttrs, attributeShapes);
 }
 
 // ─── Groups ──────────────────────────────────────────────────────────────────
@@ -110,7 +116,7 @@ export interface GroupFilterResult {
   fetchAll: boolean;
 }
 
-export function buildGroupFilter(filter?: string, caseExactAttrs?: Set<string>): GroupFilterResult {
+export function buildGroupFilter(filter?: string, caseExactAttrs?: Set<string>, attributeShapes?: ReadonlyMap<string, FilterAttributeShape>): GroupFilterResult {
   if (!filter) {
     return { dbWhere: {}, fetchAll: false };
   }
@@ -122,7 +128,7 @@ export function buildGroupFilter(filter?: string, caseExactAttrs?: Set<string>):
     throw new Error(`Invalid filter: ${filter}`);
   }
 
-  return buildFilterResult(ast, GROUP_DB_COLUMNS, caseExactAttrs);
+  return buildFilterResult(ast, GROUP_DB_COLUMNS, caseExactAttrs, attributeShapes);
 }
 
 // ─── Generic Resources ───────────────────────────────────────────────────────
@@ -156,7 +162,7 @@ export interface GenericFilterResult {
  * plus AND/OR compound expressions. Pushes displayName, externalId, and id to the
  * DB; falls back to in-memory evaluation for custom/extension attributes.
  */
-export function buildGenericFilter(filter?: string, caseExactAttrs?: Set<string>): GenericFilterResult {
+export function buildGenericFilter(filter?: string, caseExactAttrs?: Set<string>, attributeShapes?: ReadonlyMap<string, FilterAttributeShape>): GenericFilterResult {
   if (!filter) {
     return { dbWhere: {}, fetchAll: false };
   }
@@ -168,7 +174,7 @@ export function buildGenericFilter(filter?: string, caseExactAttrs?: Set<string>
     throw new Error(`Invalid filter: ${filter}`);
   }
 
-  return buildFilterResult(ast, GENERIC_DB_COLUMNS, caseExactAttrs);
+  return buildFilterResult(ast, GENERIC_DB_COLUMNS, caseExactAttrs, attributeShapes);
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
@@ -181,8 +187,27 @@ function buildFilterResult(
   ast: FilterNode,
   columnMap: ColumnMap,
   caseExactAttrs?: Set<string>,
+  attributeShapes?: ReadonlyMap<string, FilterAttributeShape>,
 ): { dbWhere: Record<string, unknown>; inMemoryFilter?: (r: Record<string, unknown>) => boolean; fetchAll: boolean } {
-  const dbClause = tryPushToDb(ast, columnMap);
+  // A schema can override the column's default equality. CITEXT cannot express
+  // caseExact equality (especially ne); fall back before it drops candidates.
+  const mismatched = (node: FilterNode): boolean => {
+    if (node.type === 'logical') return mismatched(node.left) || mismatched(node.right);
+    if (node.type !== 'compare') return false;
+    const path = node.attrPath.toLowerCase();
+    const mapped = columnMap[path];
+    if (!mapped) return false;
+    // Numeric/multi-valued custom fields live in rawPayload, not these scalar
+    // query columns. Even "pr" on a null promoted column would lose matches.
+    if (attributeShapes) {
+      const shape = attributeShapes.get(path);
+      const expectedType = mapped.type === 'boolean' ? 'boolean' : 'string';
+      if (!shape || shape.multiValued || shape.type !== expectedType) return true;
+    }
+    if (!caseExactAttrs || !['citext', 'text', 'varchar'].includes(mapped.type)) return false;
+    return caseExactAttrs.has(path) !== (mapped.type === 'text');
+  };
+  const dbClause = mismatched(ast) ? null : tryPushToDb(ast, columnMap);
   if (dbClause) {
     return { dbWhere: dbClause, fetchAll: false };
   }

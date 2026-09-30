@@ -6,7 +6,7 @@
  * 1. Groups uniqueness on PUT/PATCH (displayName + externalId)
  * 2. Case-insensitive uniqueness collision (userName caseExact:false → 409)
  * 3. Missing required field on PUT → 400
- * 4. Immutable field change on PUT → 400 (StrictSchema ON)
+ * 4. Immutable custom field change on PUT → 400 (StrictSchema ON)
  * 5. returned:request behavior (absent by default, present when requested)
  * 6. Bulk + custom resource type path → 400 unsupported
  * 7. PerEndpointCredentials + RequireIfMatch combo
@@ -78,8 +78,6 @@ describe('Test Gap Audit #2 (E2E)', () => {
 
     it('PUT should return 409 when changing displayName to existing one', async () => {
       const groupA = (await scimGet(app, `${basePath}/Groups/${groupAId}`, token).expect(200)).body;
-      const groupB = (await scimGet(app, `${basePath}/Groups/${groupBId}`, token).expect(200)).body;
-
       const res = await scimPut(app, `${basePath}/Groups/${groupBId}`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
         displayName: groupA.displayName, // duplicate
@@ -213,7 +211,7 @@ describe('Test Gap Audit #2 (E2E)', () => {
 
     beforeAll(async () => {
       resetFixtureCounter();
-      // Create an endpoint with inline profile that marks externalId as immutable
+      // Create an endpoint with an inline profile that defines an immutable custom attribute.
       const wk = process.env.JEST_WORKER_ID ?? '0';
       const res = await request(app.getHttpServer())
         .post('/scim/admin/endpoints')
@@ -242,7 +240,7 @@ describe('Test Gap Audit #2 (E2E)', () => {
                 description: 'User Account',
                 attributes: [
                   { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'default', uniqueness: 'server', caseExact: false },
-                  { name: 'externalId', type: 'string', multiValued: false, required: false, mutability: 'immutable', returned: 'default', uniqueness: 'server', caseExact: true },
+                  { name: 'employeeNumber', type: 'string', multiValued: false, required: false, mutability: 'immutable', returned: 'default', uniqueness: 'server', caseExact: true },
                   { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', caseExact: false },
                   { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none' },
                   { name: 'password', type: 'string', multiValued: false, required: false, mutability: 'writeOnly', returned: 'never', uniqueness: 'none' },
@@ -262,21 +260,19 @@ describe('Test Gap Audit #2 (E2E)', () => {
         .expect(200);
     });
 
-    it('PUT should return 400 when changing immutable externalId', async () => {
-      // Create a user with externalId - use bare attrs matching the custom schema
+    it('PUT should return 400 when changing an immutable custom attribute', async () => {
       const user = await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: `immutable-change-${Date.now()}@example.com`,
-        externalId: 'IMMUTABLE-EXT-001',
+        employeeNumber: 'IMMUTABLE-001',
         displayName: 'Immutable Test User',
         active: true,
       }).expect(201);
 
-      // Try to change externalId via PUT
       const res = await scimPut(app, `${basePath}/Users/${user.body.id}`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: user.body.userName,
-        externalId: 'CHANGED-EXT-002', // different from original
+        employeeNumber: 'CHANGED-002',
         displayName: 'Updated Name',
       }).expect(400);
 
@@ -287,20 +283,19 @@ describe('Test Gap Audit #2 (E2E)', () => {
       await scimDelete(app, `${basePath}/Users/${user.body.id}`, token).expect(204);
     });
 
-    it('PUT should allow keeping immutable externalId unchanged', async () => {
+    it('PUT should allow keeping an immutable custom attribute unchanged', async () => {
       const user = await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: `immutable-keep-${Date.now()}@example.com`,
-        externalId: 'KEEP-SAME-001',
+        employeeNumber: 'KEEP-SAME-001',
         displayName: 'Keep Same Test',
         active: true,
       }).expect(201);
 
-      // PUT with same externalId → should succeed
       await scimPut(app, `${basePath}/Users/${user.body.id}`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: user.body.userName,
-        externalId: 'KEEP-SAME-001',
+        employeeNumber: 'KEEP-SAME-001',
         displayName: 'Updated OK',
       }).expect(200);
 

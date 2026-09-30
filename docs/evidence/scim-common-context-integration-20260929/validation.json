@@ -1,0 +1,121 @@
+{
+  "scope": "P7 binding-context integration with existing P2/P3b/common/retention/query controls, not final C0",
+  "verifiedAt": "2026-09-29",
+  "sourceCommit": "8d5915ba4f1a5c3f900dbc2df363f5f6a279cfcc",
+  "integrationCommit": "e80da689d4443d589e11538f9970ae99848d9d2c",
+  "sourceSha256": "73adbed247b6838ef765c58361c004824a6e476207c29bbbb63e91071d703849",
+  "fingerprintMethod": "Sorted tracked/nonignored api/src, api/test and scripts path plus bytes, including subsequent committed integration test/wiring corrections",
+  "build": "passed",
+  "unit": {
+    "suites": 14,
+    "passed": 754,
+    "failed": 0
+  },
+  "lint": {
+    "files": 13,
+    "errors": 0,
+    "warnings": 33,
+    "rulesRelaxed": false
+  },
+  "integrationCorrections": {
+    "mainLiveCount": {
+      "redTests": 1,
+      "oldExpectedAssertions": 426,
+      "verifiedAssertions": 472,
+      "section": "9z-CV"
+    },
+    "testWireTypes": {
+      "initialCompileDiagnostics": 5,
+      "initialLintErrors": 1,
+      "fix": "Declare actual SCIM metadata fields and type the Jest asymmetric matcher as unknown; protocol assertions unchanged"
+    }
+  },
+  "http": {
+    "suites": [
+      "profile-validation-p7",
+      "common-externalid-patch",
+      "retained-entry-put",
+      "ordered-patch",
+      "patch-compatibility-flags",
+      "entra-compatibility",
+      "atomic-uniqueness",
+      "query-semantics",
+      "endpoint-conditional-write"
+    ],
+    "transport": "Jest/Nest HTTP listener, separate from built-runtime validation",
+    "inmemory": {
+      "passed": 537,
+      "failed": 0,
+      "nativeOnlySkipped": 1,
+      "accounting": "Initial eight compiled suites passed429 with one native skip; after the test-only type correction, the previously uncompiled profile suite passed108. No duplicated case total."
+    },
+    "postgresql": {
+      "passed": 538,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    }
+  },
+  "builtLive": {
+    "artifact": "Local npm build output, node api/dist/main.js; not an immutable published image",
+    "inmemory": {
+      "mainSharedChecksPassed": 143,
+      "failed": 0,
+      "p7Assertions": 472,
+      "ownedRuntimeStopped": true,
+      "endpointInventoryUnchanged": true
+    },
+    "postgresql": {
+      "mainSharedChecksPassed": 143,
+      "failed": 0,
+      "p7Assertions": 472,
+      "ownedRuntimeStopped": true,
+      "endpointInventoryUnchanged": true
+    }
+  },
+  "preservedContracts": [
+    "COMMON_ID/COMMON_META/effectiveCommonAttributes are binding-local views, not global schema mutations",
+    "Extension definitions explicitly retain isCoreSchema:false and required metadata",
+    "Common externalId assigned values are checked before lossy hooks and on completed PATCH candidates, independently of strict mode",
+    "Public SchemaValidator.deepEqual and the fifth immutable-mode parameter remain",
+    "One neutral occurrence-consuming matcher remains shared by PUT and PATCH",
+    "Generic raw-payload uniqueness and immutable reconstruction from the fourth P3b correction remain",
+    "Guarded standalone P7 entry remains separate from the shared explicit-target live contract",
+    "P1/P2/P9 validation branches remain; only the P7 source minimum increases to108"
+  ],
+  "ownership": {
+    "postgresRun": "e081f3508610acc7",
+    "scope": "Fresh uniquely labeled loopback/tmpfs container, verified database/cluster/system identity and pinned bootstrap",
+    "inheritedDatabaseUrlUsed": false,
+    "preexistingMarkerAccepted": false,
+    "exactOwnedContainerRemoved": true
+  },
+  "sourceReceiptUnchanged": "../scim-p7-20260928/common-context.json",
+  "documentation": {
+    "contentAndFreshnessCouplingDocsPassed": 26,
+    "literalJsonBlocksParsed": 24,
+    "newRelativeLinksResolved": 27,
+    "newDiagramRendered": 1,
+    "themes": 2,
+    "mermaidVersion": "11.15.0",
+    "securityLevel": "strict",
+    "editorVersionParity": "Unverified: existing discovery reports0.0.0; no repinning",
+    "originalCaseLedgerUnchanged": true
+  },
+  "remainingAcceptance": [
+    "Whole registered namespace PATCH strict prevalidation",
+    "Prior eight P7 expectation mismatches need explicit reconciliation",
+    "Common-characteristic and schema-role query consumer coverage",
+    "Measured numeric scalar/MV displayName equality failures from the preceding integration checkpoint",
+    "Malformed resourceTypes schemaExtensions omission and uniqueness admission decisions",
+    "Profile-revision coordination, performance and exact packaged-artifact evidence",
+    "Original82-case/164-backend disposition ledger"
+  ],
+  "queryBlockerReceipt": "../scim-custom-authority-integration-20260929/validation.json",
+  "finalMatrix": false,
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

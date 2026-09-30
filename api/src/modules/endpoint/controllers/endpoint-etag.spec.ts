@@ -1,4 +1,4 @@
-import { endpointETag, assertEndpointIfMatch } from './endpoint-etag';
+import { endpointETag, assertEndpointIfMatch } from '../common/endpoint-etag';
 import type { EndpointResponse } from '../services/endpoint.service';
 
 /**
@@ -90,4 +90,3 @@ describe('endpoint ETag (A9)', () => {
     });
   });
 });
-

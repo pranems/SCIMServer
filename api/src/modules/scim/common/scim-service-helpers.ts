@@ -26,9 +26,19 @@ import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristics
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
+import { parsePatchPath, parsePatchTarget, patchAttributePath, type ParsedPatchPath } from '../../../domain/patch/patch-path';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
+import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { compileEffectiveUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
+import {
+  isPrototypePollutingKey,
+  readResolvedProperty,
+  withResolvedProperty,
+  withoutResolvedProperty,
+} from '../utils/scim-patch-path';
 
 // ─── Repository Error Handling ──────────────────────────────────────────────
 
@@ -55,16 +65,42 @@ export function handleRepositoryError(
   logCategory: LogCategory,
   context: Record<string, unknown> = {},
 ): never {
+  if (error instanceof EndpointNotFoundError) throw error;
   if (error instanceof RepositoryError) {
+    if (error.code === 'PRECONDITION_FAILED') {
+      logger.debug(logCategory, 'Conditional write rejected', { operation, errorCode: error.code, ...context });
+      throw createScimError({
+        status: 412,
+        scimType: 'versionMismatch',
+        detail: 'Resource no longer satisfies If-Match. Read the current resource before retrying.',
+        diagnostics: { errorCode: 'PRECONDITION_VERSION_MISMATCH' },
+      });
+    }
+    if (error.code === 'PROFILE_CHANGED') {
+      logger.debug(logCategory, 'Resource write rejected after endpoint profile change', {
+        operation,
+        errorCode: error.code,
+        ...context,
+      });
+      throw createScimError({
+        status: 409,
+        detail: 'Endpoint profile changed while the resource write was in progress. Read the current endpoint schema and retry.',
+        diagnostics: {
+          errorCode: 'PROFILE_REVISION_CHANGED',
+          triggeredBy: 'configuration',
+        },
+      });
+    }
     logger.error(logCategory, `Repository failure: ${operation}`, error.cause ?? error, {
       operation,
       errorCode: error.code,
       ...context,
     });
+    const status = repositoryErrorToHttpStatus(error.code);
     throw createScimError({
-      status: repositoryErrorToHttpStatus(error.code),
-      scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : undefined,
-      detail: `Failed to ${operation}: ${error.message}`,
+      status,
+      scimType: error.code === 'CONFLICT' ? SCIM_ERROR_TYPE.UNIQUENESS : error.code === 'INVALID_VALUE' ? 'invalidValue' : undefined,
+      detail: status >= 500 ? `Failed to ${operation}.` : `Failed to ${operation}: ${error.message}`,
       diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
   }
@@ -140,6 +176,7 @@ export function ensureSchema(schemas: string[] | undefined, requiredSchema: stri
  *
  * When the client sends an If-Match header, the resource's current version-based
  * ETag must match - otherwise 412 Precondition Failed is thrown BEFORE the write.
+ * Return the condition for the repository to enforce again atomically at mutation.
  * When RequireIfMatch is enabled, a missing If-Match header → 428 Precondition Required.
  */
 export function enforceIfMatch(
@@ -147,7 +184,7 @@ export function enforceIfMatch(
   ifMatch?: string,
   config?: EndpointConfig,
   profile?: EndpointProfile,
-): void {
+): ExpectedVersion | undefined {
   // Gap 10: ETag/If-Match is meaningful only when etag.supported is on. When an
   // endpoint explicitly sets serviceProviderConfig.etag.supported = false,
   // versioning is inert: RequireIfMatch does not apply (no 428) and a supplied
@@ -174,6 +211,7 @@ export function enforceIfMatch(
 
   const currentETag = `W/"v${currentVersion}"`;
   assertIfMatch(currentETag, ifMatch);
+  return ifMatch === '*' ? '*' : currentVersion;
 }
 
 /**
@@ -292,6 +330,7 @@ export function coercePatchOpBooleans(
 export function computeTouchedPatchKeys(
   operations: ReadonlyArray<{ op: string; path?: string; value?: unknown }>,
   extensionUrns: readonly string[],
+  coreUrn?: string,
 ): Set<string> {
   const touched = new Set<string>();
   const urnsLower = extensionUrns.map((u) => ({ urn: u, lower: u.toLowerCase() }));
@@ -300,18 +339,15 @@ export function computeTouchedPatchKeys(
     const path = typeof op.path === 'string' ? op.path.trim() : '';
     if (path.length > 0) {
       const pathLower = path.toLowerCase();
-      // URN-prefixed path -> the touched top-level key is the extension URN block.
       const matchedUrn = urnsLower.find(
-        (u) => pathLower === u.lower || pathLower.startsWith(`${u.lower}:`),
+        (u) => pathLower === u.lower,
       );
       if (matchedUrn) {
         touched.add(matchedUrn.urn);
         continue;
       }
-      // Simple / sub-attr / valuePath -> top-level attribute is the segment
-      // before the first '.' (sub-attr) or '[' (value filter).
-      const firstSegment = path.split(/[.[]/, 1)[0];
-      if (firstSegment) touched.add(firstSegment);
+      const parsed = parsePatchPath(path, extensionUrns, coreUrn);
+      touched.add(parsed.schemaUrn ?? parsed.attribute);
       continue;
     }
     // No-path operation: the value object's keys are the touched attributes/URNs.
@@ -336,8 +372,9 @@ export function scopePatchPayloadToTouched(
   resultPayload: Record<string, unknown>,
   operations: ReadonlyArray<{ op: string; path?: string; value?: unknown }>,
   extensionUrns: readonly string[],
+  coreUrn?: string,
 ): Record<string, unknown> {
-  const touched = computeTouchedPatchKeys(operations, extensionUrns);
+  const touched = computeTouchedPatchKeys(operations, extensionUrns, coreUrn);
   const reduced: Record<string, unknown> = {};
   if ('schemas' in resultPayload) {
     reduced.schemas = resultPayload.schemas;
@@ -382,8 +419,13 @@ function coerceScalarPatchValue(
   const lower = value.toLowerCase();
   if (lower !== 'true' && lower !== 'false') return undefined;
 
-  // Strip value filters: emails[type eq "work"].primary -> emails.primary
-  const cleanPath = path.replace(/\[.*?\]/g, '');
+  let cleanPath: string;
+  try {
+    const parsed = parsePatchPath(path, [], coreUrnLower);
+    cleanPath = `${parsed.schemaUrn ? `${parsed.schemaUrn}:` : ''}${patchAttributePath(parsed)}`;
+  } catch {
+    return undefined; // The engine/validator emits the indexed syntax error.
+  }
   const cleanLower = cleanPath.toLowerCase();
 
   let parentPath: string;
@@ -492,17 +534,15 @@ export function stripNeverReturnedFromPayload(
 ): string[] {
   // ─── Core top-level + sub-attr stripping ───
   const coreNever = neverByParent.get(coreUrnLower);
-  if (coreNever) {
-    for (const key of Object.keys(payload)) {
-      if (coreNever.has(key.toLowerCase())) {
-        delete payload[key];
-        continue;
-      }
-      // Sub-attrs within complex/multi-valued parents
-      const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
-      if (subNever && subNever.size > 0) {
-        stripSubAttrs(payload[key], subNever);
-      }
+  for (const key of Object.keys(payload)) {
+    if (coreNever?.has(key.toLowerCase())) {
+      delete payload[key];
+      continue;
+    }
+    // Hidden children do not require a hidden attribute at the parent level.
+    const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
+    if (subNever && subNever.size > 0) {
+      stripSubAttrs(payload[key], subNever);
     }
   }
 
@@ -525,9 +565,9 @@ export function stripNeverReturnedFromPayload(
     payload[urn] = extObj;
 
     const extNever = neverByParent.get(urnLower);
-    if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+    if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
       for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-        if (extNever.has(extKey.toLowerCase())) {
+        if (extNever?.has(extKey.toLowerCase())) {
           delete (extObj as Record<string, unknown>)[extKey];
           continue;
         }
@@ -590,126 +630,74 @@ export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
  * readWrite and is never stripped. `schemas` is a reserved structural key and is
  * also never stripped.
  *
- * Sub-attribute stripping (e.g. manager.displayName inside readWrite parent) is
- * deferred to Phase 2.
+ * Parent paths also cover the existing nested-complex compatibility mode.
+ * Each declared segment is resolved against real objects, never a dotted key.
  *
- * @param payload           - The request body (mutated in place)
+ * @param payload           - The request body (not mutated)
  * @param schemaDefinitions - Core + extension schema definitions
- * @returns Array of stripped attribute names (for logging/warning)
+ * @returns The immutable filtered payload and stripped names for logging/warning
  *
  * @see RFC 7643 §2.2 - readOnly attributes SHALL be ignored by the server
  */
+export interface StripReadOnlyAttributesResult {
+  payload: Record<string, unknown>;
+  stripped: string[];
+}
+
 export function stripReadOnlyAttributes(
   payload: Record<string, unknown>,
   schemaDefinitions: readonly SchemaDefinition[],
   preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>>; extensionSubAttrs: Map<string, Map<string, Set<string>>> },
-): string[] {
+): StripReadOnlyAttributesResult {
   const { core, extensions, coreSubAttrs, extensionSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
 
-  // Strip core readOnly attributes (case-insensitive)
-  for (const key of Object.keys(payload)) {
-    // Never strip 'schemas' - it's structural, not a user attribute
-    if (key.toLowerCase() === 'schemas') continue;
-
-    if (core.has(key.toLowerCase())) {
-      delete payload[key];
-      stripped.push(key);
+  const stripAt = (value: unknown, segments: string[], index: number, names: Set<string>, path: string): unknown => {
+    if (Array.isArray(value)) {
+      return value.map(item => stripAt(item, segments, index, names, `${path}[]`));
     }
+    if (!value || typeof value !== 'object') return value;
+    const obj = value as Record<string, unknown>;
+    if (index < segments.length) {
+      const key = Object.keys(obj).find(k => k.toLowerCase() === segments[index]);
+      if (key === undefined || isPrototypePollutingKey(key)) return obj;
+      return withResolvedProperty(
+        obj,
+        key,
+        stripAt(readResolvedProperty(obj, key), segments, index + 1, names, path ? `${path}.${key}` : key),
+      );
+    }
+    return Object.fromEntries(Object.entries(obj).filter(([key]) => {
+      if (!path && key.toLowerCase() === 'schemas') return true;
+      if (isPrototypePollutingKey(key)) return true;
+      if (names.has(key.toLowerCase())) {
+        stripped.push(path ? `${path}.${key}` : key);
+        return false;
+      }
+      return true;
+    }));
+  };
+
+  let filteredPayload = stripAt(payload, [], 0, core, '') as Record<string, unknown>;
+  for (const [parent, names] of coreSubAttrs) {
+    filteredPayload = stripAt(filteredPayload, parent.split('.'), 0, names, '') as Record<string, unknown>;
   }
 
-  // R-MUT-2: Strip readOnly sub-attributes within readWrite core parents
-  for (const [parentLower, subSet] of coreSubAttrs) {
-    const parentKey = Object.keys(payload).find(k => k.toLowerCase() === parentLower);
-    if (!parentKey) continue;
-
-    const parentVal = payload[parentKey];
-    if (parentVal === null || parentVal === undefined) continue;
-
-    // Handle single complex object
-    if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
-      const obj = parentVal as Record<string, unknown>;
-      for (const subKey of Object.keys(obj)) {
-        if (subSet.has(subKey.toLowerCase())) {
-          delete obj[subKey];
-          stripped.push(`${parentKey}.${subKey}`);
-        }
-      }
-    }
-    // Handle multi-valued (array of complex objects)
-    if (Array.isArray(parentVal)) {
-      for (const item of parentVal) {
-        if (typeof item === 'object' && item !== null) {
-          const obj = item as Record<string, unknown>;
-          for (const subKey of Object.keys(obj)) {
-            if (subSet.has(subKey.toLowerCase())) {
-              delete obj[subKey];
-              stripped.push(`${parentKey}[].${subKey}`);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Strip readOnly attributes inside extension URN blocks
-  for (const [urn, readOnlySet] of extensions) {
-    // Find the extension block in the payload (case-insensitive URN matching)
-    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
+  for (const urn of new Set([...extensions.keys(), ...extensionSubAttrs.keys()])) {
+    const urnKey = Object.keys(filteredPayload).find(k => k.toLowerCase() === urn.toLowerCase());
     if (!urnKey) continue;
-
-    const extObj = payload[urnKey];
+    let extObj = readResolvedProperty(filteredPayload, urnKey);
     if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
 
-    for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-      if (readOnlySet.has(extKey.toLowerCase())) {
-        delete (extObj as Record<string, unknown>)[extKey];
-        stripped.push(`${urnKey}.${extKey}`);
-      }
+    const top = extensions.get(urn);
+    if (top) extObj = stripAt(extObj, [], 0, top, urnKey);
+    for (const [parent, names] of extensionSubAttrs.get(urn) ?? []) {
+      extObj = stripAt(extObj, parent.split('.'), 0, names, urnKey);
     }
+    filteredPayload = withResolvedProperty(filteredPayload, urnKey, extObj);
   }
 
-  // R-MUT-2: Strip readOnly sub-attrs within readWrite extension parents
-  for (const [urn, subMap] of extensionSubAttrs) {
-    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
-    if (!urnKey) continue;
-
-    const extObj = payload[urnKey];
-    if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
-
-    for (const [parentLower, subSet] of subMap) {
-      const parentKey = Object.keys(extObj as Record<string, unknown>).find(k => k.toLowerCase() === parentLower);
-      if (!parentKey) continue;
-
-      const parentVal = (extObj as Record<string, unknown>)[parentKey];
-      if (parentVal === null || parentVal === undefined) continue;
-
-      if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
-        const obj = parentVal as Record<string, unknown>;
-        for (const subKey of Object.keys(obj)) {
-          if (subSet.has(subKey.toLowerCase())) {
-            delete obj[subKey];
-            stripped.push(`${urnKey}.${parentKey}.${subKey}`);
-          }
-        }
-      }
-      if (Array.isArray(parentVal)) {
-        for (const item of parentVal) {
-          if (typeof item === 'object' && item !== null) {
-            const obj = item as Record<string, unknown>;
-            for (const subKey of Object.keys(obj)) {
-              if (subSet.has(subKey.toLowerCase())) {
-                delete obj[subKey];
-                stripped.push(`${urnKey}.${parentKey}[].${subKey}`);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return stripped;
+  return { payload: filteredPayload, stripped };
 }
 
 /**
@@ -747,8 +735,25 @@ export function stripReadOnlyPatchOps(
 
   for (const op of operations) {
     if (op.path) {
-      // Path-based operation - resolve the target attribute
-      const targetAttr = resolvePathToAttrName(op.path, extensionSchemaMap);
+      let parsed: ParsedPatchPath;
+      try {
+        parsed = parsePatchTarget(op.path, [...extensionSchemaMap.keys()], schemaDefinitions.find(s => s.isCoreSchema)?.id);
+      } catch {
+        filtered.push(op); // Malformed paths must reach indexed error reporting.
+        continue;
+      }
+      const targetAttr = parsed.attribute;
+      if (parsed.schemaUrn && !targetAttr && op.op.toLowerCase() !== 'remove' &&
+          op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+        const wrapper = withResolvedProperty({}, parsed.schemaUrn, structuredClone(op.value));
+        const result = stripReadOnlyAttributes(wrapper, schemaDefinitions);
+        const removed = result.stripped;
+        stripped.push(...removed);
+        filtered.push(removed.length
+          ? { ...op, value: readResolvedProperty(result.payload, parsed.schemaUrn) }
+          : op);
+        continue;
+      }
 
       // NEVER strip operations targeting 'id' - let G8c hard-reject
       if (targetAttr.toLowerCase() === 'id') {
@@ -757,15 +762,15 @@ export function stripReadOnlyPatchOps(
       }
 
       // Check if the target is a readOnly core attribute
-      if (core.has(targetAttr.toLowerCase())) {
+      if (!parsed.schemaUrn && core.has(targetAttr.toLowerCase())) {
         stripped.push(targetAttr);
         continue; // Skip this operation
       }
 
       // R-MUT-2: Check if path targets a readOnly sub-attr (e.g., "manager.displayName")
-      const cleanPath = op.path.replace(/\[.*?\]/g, '');
+      const cleanPath = patchAttributePath(parsed);
       const dotIdx = cleanPath.indexOf('.');
-      if (dotIdx !== -1) {
+      if (!parsed.schemaUrn && dotIdx !== -1) {
         const parentName = cleanPath.substring(0, dotIdx).toLowerCase();
         const subName = cleanPath.substring(dotIdx + 1).split('.')[0].toLowerCase();
         const readOnlySubs = coreSubAttrs.get(parentName);
@@ -779,8 +784,8 @@ export function stripReadOnlyPatchOps(
       let isReadOnly = false;
       for (const [urn, readOnlySet] of extensions) {
         // Extension path: "urn:...:attrName" or just "attrName" in extension block
-        if (op.path.toLowerCase().startsWith(urn.toLowerCase())) {
-          const remainder = op.path.slice(urn.length + 1).replace(/\[.*?\]/g, '').split('.')[0];
+        if (parsed.schemaUrn?.toLowerCase() === urn.toLowerCase()) {
+          const remainder = parsed.attribute;
           if (remainder && readOnlySet.has(remainder.toLowerCase())) {
             stripped.push(`${urn}.${remainder}`);
             isReadOnly = true;
@@ -794,15 +799,32 @@ export function stripReadOnlyPatchOps(
       }
     } else if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
       // No-path operation - check each key in the value object
-      const valueObj = { ...(op.value as Record<string, unknown>) };
+      let valueObj = Object.fromEntries(Object.entries(op.value as Record<string, unknown>));
       let modified = false;
 
       for (const key of Object.keys(valueObj)) {
+        if (isPrototypePollutingKey(key)) continue;
         // Never strip 'id' - let G8c reject
         if (key.toLowerCase() === 'id') continue;
 
+        // Expanded no-path keys must receive the same policy as explicit paths.
+        const target = stripReadOnlyPatchOps([{
+          ...op,
+          path: key,
+          value: readResolvedProperty(valueObj, key),
+        }],
+          schemaDefinitions, { core, extensions, coreSubAttrs });
+        if (target.stripped.length) {
+          valueObj = target.filtered.length
+            ? withResolvedProperty(valueObj, key, target.filtered[0].value)
+            : withoutResolvedProperty(valueObj, key);
+          stripped.push(...target.stripped);
+          modified = true;
+          continue;
+        }
+
         if (core.has(key.toLowerCase())) {
-          delete valueObj[key];
+          valueObj = withoutResolvedProperty(valueObj, key);
           stripped.push(key);
           modified = true;
           continue;
@@ -810,36 +832,40 @@ export function stripReadOnlyPatchOps(
 
         // R-MUT-2: Strip readOnly sub-attrs from complex values in no-path ops
         const readOnlySubs = coreSubAttrs.get(key.toLowerCase());
-        if (readOnlySubs && typeof valueObj[key] === 'object' && valueObj[key] !== null && !Array.isArray(valueObj[key])) {
-          const subObj = { ...(valueObj[key] as Record<string, unknown>) };
+        const currentValue = readResolvedProperty(valueObj, key);
+        if (readOnlySubs && typeof currentValue === 'object' &&
+            currentValue !== null && !Array.isArray(currentValue)) {
+          let subObj = Object.fromEntries(Object.entries(currentValue as Record<string, unknown>));
           for (const subKey of Object.keys(subObj)) {
+            if (isPrototypePollutingKey(subKey)) continue;
             if (readOnlySubs.has(subKey.toLowerCase())) {
-              delete subObj[subKey];
+              subObj = withoutResolvedProperty(subObj, subKey);
               stripped.push(`${key}.${subKey}`);
               modified = true;
             }
           }
-          valueObj[key] = subObj;
+          valueObj = withResolvedProperty(valueObj, key, subObj);
         }
 
         // Check extension URN blocks in no-path value
         if (key.startsWith('urn:')) {
           for (const [urn, readOnlySet] of extensions) {
             if (key.toLowerCase() === urn.toLowerCase()) {
-              const extVal = valueObj[key];
+              const extVal = readResolvedProperty(valueObj, key);
               if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
-                const extObj = { ...(extVal as Record<string, unknown>) };
+                let extObj = Object.fromEntries(Object.entries(extVal as Record<string, unknown>));
                 for (const extKey of Object.keys(extObj)) {
+                  if (isPrototypePollutingKey(extKey)) continue;
                   if (readOnlySet.has(extKey.toLowerCase())) {
-                    delete extObj[extKey];
+                    extObj = withoutResolvedProperty(extObj, extKey);
                     stripped.push(`${key}.${extKey}`);
                     modified = true;
                   }
                 }
                 if (Object.keys(extObj).length === 0) {
-                  delete valueObj[key];
+                  valueObj = withoutResolvedProperty(valueObj, key);
                 } else {
-                  valueObj[key] = extObj;
+                  valueObj = withResolvedProperty(valueObj, key, extObj);
                 }
               }
             }
@@ -867,24 +893,6 @@ export function stripReadOnlyPatchOps(
  * Strips value filters and sub-attribute paths.
  * Handles extension URN-prefixed paths.
  */
-function resolvePathToAttrName(
-  path: string,
-  extensionSchemas: Map<string, SchemaDefinition>,
-): string {
-  // Strip value filters like [value eq "abc"]
-  const clean = path.replace(/\[.*?\]/g, '');
-
-  // Extension URN prefix
-  for (const [urnLower] of extensionSchemas) {
-    if (clean.toLowerCase().startsWith(urnLower + ':') || clean.toLowerCase().startsWith(urnLower + '.')) {
-      const remainder = clean.slice(urnLower.length + 1);
-      return remainder.split('.')[0] || clean;
-    }
-  }
-
-  // Core attribute - first segment
-  return clean.split('.')[0];
-}
 
 // ─── Schema-Aware Helpers (parameterized by core schema URN) ────────────────
 
@@ -927,11 +935,13 @@ export class ScimSchemaHelpers {
     // Build the set of schema URNs relevant to this resource type:
     // core + extensions declared on RTs that use this core schema.
     const relevantUrns = new Set<string>([this.coreSchemaUrn]);
+    const requiredUrns = new Set<string>();
     if (profile.resourceTypes) {
       for (const rt of profile.resourceTypes) {
         if (rt.schema === this.coreSchemaUrn) {
           for (const ext of rt.schemaExtensions) {
             relevantUrns.add(ext.schema);
+            if (ext.required) requiredUrns.add(ext.schema);
           }
         }
       }
@@ -954,6 +964,7 @@ export class ScimSchemaHelpers {
           id: ps.id,
           attributes: ps.attributes as unknown as SchemaAttributeDefinition[],
           isCoreSchema: ps.id === this.coreSchemaUrn,
+          required: requiredUrns.has(ps.id),
         });
       }
     }
@@ -962,7 +973,7 @@ export class ScimSchemaHelpers {
     const globalSchemas = this.getGlobalSchemaDefinitions();
     for (const gs of globalSchemas) {
       if (!seenIds.has(gs.id) && relevantUrns.has(gs.id)) {
-        schemas.push(gs);
+        schemas.push({ ...gs, required: requiredUrns.has(gs.id) });
       }
     }
 
@@ -980,7 +991,7 @@ export class ScimSchemaHelpers {
     const extUrns = this.schemaRegistry.getExtensionUrns();
     for (const urn of extUrns) {
       const ext = this.schemaRegistry.getSchema(urn);
-      if (ext) schemas.push(ext as SchemaDefinition);
+      if (ext) schemas.push({ ...ext, isCoreSchema: false } as SchemaDefinition);
     }
     return schemas;
   }
@@ -1090,7 +1101,7 @@ export class ScimSchemaHelpers {
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       // Type/unknown/canonical validation remains strict-gated
       if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
-      const schemas = this.buildSchemaDefinitions(dto, endpointId);
+      const schemas = this.getSchemaDefinitions(endpointId);
       if (schemas.length === 0) return;
       const cache = this.getSchemaCache(endpointId);
       const result = SchemaValidator.validateRequired(dto, schemas, mode,
@@ -1112,7 +1123,7 @@ export class ScimSchemaHelpers {
       return;
     }
 
-    const schemas = this.buildSchemaDefinitions(dto, endpointId);
+    const schemas = mode === 'patch' ? this.buildSchemaDefinitions(dto, endpointId) : this.getSchemaDefinitions(endpointId);
     if (schemas.length === 0) return;
 
     const cache = this.getSchemaCache(endpointId);
@@ -1226,10 +1237,11 @@ export class ScimSchemaHelpers {
           schemas.push({
             id: profileExt.id,
             attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+            isCoreSchema: false,
           });
         } else {
           const globalExt = this.schemaRegistry.getSchema(urn);
-          if (globalExt) schemas.push(globalExt as SchemaDefinition);
+          if (globalExt) schemas.push({ ...globalExt, isCoreSchema: false } as SchemaDefinition);
         }
       }
     }
@@ -1246,6 +1258,17 @@ export class ScimSchemaHelpers {
    */
   getSchemaDefinitions(_endpointId?: string): SchemaDefinition[] {
     return this.getProfileAwareSchemaDefinitions();
+  }
+
+  getUniquenessPolicy(endpointId?: string): UniquenessPolicy {
+    try {
+      return compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(endpointId));
+    } catch (error) {
+      if (error instanceof RepositoryError && error.code === 'INVALID_VALUE') {
+        throw createScimError({ status: 400, scimType: 'invalidValue', detail: error.message });
+      }
+      throw error;
+    }
   }
 
   // ─── Precomputed Cache Accessors (Parent→Children Maps) ───────────
@@ -1554,12 +1577,12 @@ export class ScimSchemaHelpers {
    *
    * Uses the precomputed cache when available to avoid per-request tree walks.
    *
-   * @returns Array of stripped attribute names (for logging/warning)
+   * @returns The immutable filtered payload and stripped names for logging/warning
    */
   stripReadOnlyAttributesFromPayload(
     payload: Record<string, unknown>,
     endpointId?: string,
-  ): string[] {
+  ): StripReadOnlyAttributesResult {
     const cache = this.getSchemaCache(endpointId);
     if (cache) {
       return stripReadOnlyAttributes(payload, [], cache.readOnlyCollected);
@@ -1582,7 +1605,7 @@ export class ScimSchemaHelpers {
   ): { filtered: PatchOperation[]; stripped: string[] } {
     const cache = this.getSchemaCache(endpointId);
     if (cache) {
-      return stripReadOnlyPatchOps(operations, [], cache.readOnlyCollected);
+      return stripReadOnlyPatchOps(operations, this.getSchemaDefinitions(endpointId), cache.readOnlyCollected);
     }
     const schemas = this.getSchemaDefinitions(endpointId);
     return stripReadOnlyPatchOps(operations, schemas);
@@ -1604,6 +1627,7 @@ export class ScimSchemaHelpers {
     incomingDto: Record<string, unknown>,
     endpointId: string,
     _config?: EndpointConfig,
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
     // Previously gated by StrictSchemaValidation - removed per P4 analysis
@@ -1613,15 +1637,15 @@ export class ScimSchemaHelpers {
 
     if (cache) {
       // Use precomputed maps from cache - skip per-call map building
-      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      const schemas = mode === 'replace' ? this.getSchemaDefinitions(endpointId) : this.buildSchemaDefinitions(incomingDto, endpointId);
       result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
         coreAttrMap: cache.coreAttrMap,
         extensionSchemaMap: cache.extensionSchemaMap,
-      });
+      }, mode);
     } else {
-      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      const schemas = mode === 'replace' ? this.getSchemaDefinitions(endpointId) : this.buildSchemaDefinitions(incomingDto, endpointId);
       if (schemas.length === 0) return;
-      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, undefined, mode);
     }
 
     if (!result.valid) {

@@ -1,14 +1,45 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
 
-> **Version:** 0.55.35 - **Updated:** 2026-09-24
+> **Version:** 0.55.36 - **Updated:** 2026-09-28
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
 
 | If you want to... | Read |
 |---|---|
+| Understand shared-schema uniqueness admission and runtime binding precedence without changing default externalId duplicates | [Binding-qualified integration](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29), [receipt](evidence/scim-binding-uniqueness-integration-20260929.json) |
+| Diagnose Entra without disabling strict validation; review 19 default-running compatibility cases and separate both-strict-mode flag proof | [SCIM_ENTRA_COMPATIBILITY.md](SCIM_ENTRA_COMPATIBILITY.md), [integrated receipt](evidence/scim-flags-default-corpus-20260929/validation.json) |
+| Trace custom-payload writer proof and the subsequently closed generic equality failures | [Original authority evidence](evidence/scim-custom-authority-integration-20260929/validation.json), [query/write/schema closure](evidence/scim-query-authority-integration-20260929/validation.json) |
+| Verify binding-local common id/meta/externalId semantics without reopening the integrated PATCH/PUT fixes | [Common-context integration evidence](evidence/scim-common-context-integration-20260929/validation.json) |
+| Review the corrected common-externalId uniqueness state separately from its superseded source interpretation | [Corrective-pair evidence](evidence/scim-common-uniqueness-integration-20260929/validation.json) |
+| Distinguish all 37 settings' actual behavior, inert controls, and unit/HTTP/live gaps | [SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) |
+| Review P9 execution issues and unresolved integration contracts | [SCIM_P9_EXECUTION_RCA.md](SCIM_P9_EXECUTION_RCA.md) |
+| Understand the typed PATCH-path repair and exact incident | [SCIM_P1_IMPLEMENTATION.md](SCIM_P1_IMPLEMENTATION.md) |
+| Understand schema-aware filtering, fixed common externalId semantics, independent extension homonyms, typed sorting, safe projection and profile consistency | [SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) |
+| Understand the capability-boundary fix for custom routes and Bulk PATCH | [SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md](SCIM_CAPABILITY_BOUNDARY_IMPLEMENTATION.md) |
+| Understand P7a schema declaration, scalar/cardinality and POST/PUT correctness with owned backend proof | [SCIM_P7A_PROFILE_VALIDATION.md](SCIM_P7A_PROFILE_VALIDATION.md) |
+| Trace the original one-to-one PUT/PATCH retention correction | [Original preservation](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries) and [focused proof](evidence/scim-retained-put-20260929/validation.json) |
+| Preserve reserved type capacity, restoration stability and nested immutable state | [Additional PUT preservation](SCIM_PUT_ENTRY_PRESERVATION.md) and [execution RCA](SCIM_PUT_ENTRY_PRESERVATION_RCA.md) |
+| Understand whole-namespace PATCH validation, evolving required/immutable contracts and returned:request responses | [SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) |
+| Understand how endpoint profile changes coordinate with in-flight User, Group, and custom resource writes | [SCIM_PROFILE_REVISION_WRITE_COORDINATION.md](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md) |
+| Reconcile the completed RFC characteristic combinations without claiming an exhaustive Cartesian product | [SCIM_CHARACTERISTIC_RECONCILIATION.md](SCIM_CHARACTERISTIC_RECONCILIATION.md) |
+| Review measured candidate materialization, selectivity, latency, database work, and memory cost | [SCIM_QUERY_PERFORMANCE_ASSESSMENT.md](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md) |
+| Verify the exact locally built API artifact on owned InMemory and PostgreSQL backends | [Exact-artifact receipt](evidence/scim-exact-artifact-20260929/validation.json) |
+| Distinguish historical characteristic promises from optional behavior, including the original P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
+| Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
+| Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |
+| Verify common externalId precedence across User, Group and custom cores without overrestricting extension names | [SCIM_P7_COMMON_EXTERNAL_ID.md](SCIM_P7_COMMON_EXTERNAL_ID.md) |
+| Understand common id/meta precedence and schemas shared as core and extension without definition mutation | [SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md) |
+| Follow the SCIM correctness design, implementation packages, acceptance checks and progress | [SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md) |
+| Understand atomic If-Match writes, User uniqueness parity and verified two-backend races | [SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md](SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md) |
+| Use JSON search arrays, legacy string compatibility and scalar SCIM validation errors | [SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md) |
+| Understand when another application instance sees saved endpoint settings and deletions | [SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) |
+| Understand all-or-nothing Group creation/membership, rollback and verified database constraints | [SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md) and [execution RCA](SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md) |
+| Understand endpoint deletion, cleanup, retained audit history and exact in-flight-create error contracts | [SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) |
+| Understand atomic schema uniqueness, supported scalar/MV leaves, namespaces and competing-owner tests | [SCIM_UNIQUENESS_IMPLEMENTATION.md](SCIM_UNIQUENESS_IMPLEMENTATION.md) and [execution RCA](SCIM_UNIQUENESS_EXECUTION_RCA.md) |
+| Understand the reported PATCH failure, real PostgreSQL/InMemory differences, RFC and attribute checks, and the step-by-step fix plan | [SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md) |
 | Understand the portable endpoint boundary, discovery translation, effective authentication state, APIs, DB mappings, and target UX | [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) |
 | Create and edit User, Group, and custom resources from endpoint schemas | [PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md](PROFILE_DRIVEN_RESOURCE_FORMS_AND_CUSTOM_RESOURCES.md) |
 | Understand synchronized profile forms, runtime tabs, endpoint SPC, and the AI agent example | [PROFILE_AUTHORITATIVE_RESOURCE_UI.md](PROFILE_AUTHORITATIVE_RESOURCE_UI.md) |
@@ -95,7 +126,7 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 121 route handlers, request/response examples, route summary table |
 | [ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md) | **Self-service wiki** - beginner quick start + 3 tools + copy-paste recipes (all features / no manager / no groups) + flags |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
-| [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) | **Concurrent config edits (B/C/D)** - which profile sections can actually lose data and which merge safely, the `ETag` on endpoint reads, opt-in `If-Match` with `412 versionMismatch`, the conflict dialog flow, and the per-endpoint lock that fixed the silent auth-method race |
+| [ENDPOINT_WRITE_CONCURRENCY.md](ENDPOINT_WRITE_CONCURRENCY.md) | **Concurrent config edits, including P8c** - atomic opt-in `If-Match` on both backends, usable full/summary state tokens, `412 versionMismatch`, the existing conflict dialog, and the limits of unconditional merging and process-local locks |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
 | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) | Multi-endpoint architecture, data isolation, tenant provisioning |

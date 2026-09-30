@@ -1,0 +1,106 @@
+{
+  "package": "P4 Group aggregate transactions",
+  "branch": "fix/scim-group-transactions-20260928",
+  "implementationCommit": "212a6b929683c3d853e23ec84f56310536941c3a",
+  "baseCommit": "41c5b8c52ece0d8b48042c754cbdefa68624248f",
+  "p3ImplementationCommit": "0aae30775a2888ff4bc6e67636d51ab234e717a5",
+  "finalRun": "postgres-5a349052c937bd39",
+  "startedAt": "2026-09-29T05:10:56.465Z",
+  "finishedAt": "2026-09-29T05:13:49.356Z",
+  "sourceTreeSha256": "26b97869f2f53008a7d65a1b80776f0fef5ab46211caeda166faa4b85670a5b3",
+  "sourceDiffSha256": "b89f56c2f100d3bc86aeae97f340d2e9c832553c8d9391b3aac294009de9be53",
+  "sourceHashScope": "Sorted cached and nonignored untracked files under api and scripts, each git path followed by its bytes",
+  "red": {
+    "run": "postgres-1278ff12d32dc28e",
+    "inmemory": {
+      "passed": 59,
+      "failed": 6,
+      "setupFailedSuites": 0
+    },
+    "prisma": {
+      "passed": 60,
+      "failed": 5,
+      "setupFailedSuites": 0
+    }
+  },
+  "unit": {
+    "suites": 4,
+    "baselineTests": 191,
+    "passed": 205,
+    "failed": 0,
+    "newTests": 14
+  },
+  "http": {
+    "suitesPerBackend": 5,
+    "inmemory": {
+      "passed": 110,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Native PostgreSQL User foreign-key control does not apply to independent InMemory repositories"
+    },
+    "prisma": {
+      "passed": 111,
+      "failed": 0,
+      "skipped": 0
+    },
+    "p3RegressionTestsPerBackend": 55,
+    "existingGroupRegressionTestsPerBackend": 44
+  },
+  "live": {
+    "runtime": "Owned loopback Nest HTTP listener in Node test process",
+    "groupAssertionsPerBackend": 69,
+    "conditionalAssertionsPerBackend": 33
+  },
+  "database": {
+    "serverVersion": "PostgreSQL 17.8",
+    "image": "postgres:17-alpine",
+    "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+    "migrationCount": 22,
+    "allMigrationsFinished": true,
+    "rolledBackMigrations": 0,
+    "safetyNegativeControls": 3,
+    "finalContainerId": "a816a2367cbd4bf5d8f0f1db2f89325a0143e02ead6e0776f0702dc26fadc918",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0,
+    "sharedTargetsUsed": false
+  },
+  "static": {
+    "apiBuild": "pass",
+    "lintFiles": 9,
+    "lintErrors": 0,
+    "baselineWarnings": 52,
+    "warnings": 52,
+    "newFileWarnings": 0,
+    "manifestsOrLockfilesChanged": false
+  },
+  "documentation": {
+    "contentManifestDocs": 26,
+    "freshnessManifestDocs": 26,
+    "editedJsonBlocksParsed": 41,
+    "newRelativeLinksResolved": 19,
+    "mermaidDiagrams": 7,
+    "mermaidThemes": [
+      "default",
+      "dark"
+    ],
+    "mermaidSecurityLevel": "strict",
+    "mermaidVersion": "11.15.0",
+    "rendererVersionEquivalence": "unverified: built-in discovery reports 0.0.0"
+  },
+  "review": "Independent read-only code review found no significant issues",
+  "cleanup": {
+    "ownedDatabaseContainersRemoved": 6,
+    "dependencyJunctionsRemovedWithoutTraversingTargets": 2,
+    "ownedWebDependenciesRemoved": true,
+    "ownedGeneratedPrismaAndBuildRemoved": true,
+    "serversLeftRunning": false,
+    "ignoredEvidenceRetained": "test-results/group-transactions"
+  },
+  "remaining": [
+    "Parent consolidation and release matrix",
+    "P3b Group/schema uniqueness races",
+    "P1/P2 PATCH interpretation and operation behavior",
+    "P5/consolidation existing raw repository-error detail exposure"
+  ]
+}

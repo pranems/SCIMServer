@@ -108,7 +108,7 @@ describe('InMemoryGroupRepository', () => {
       await repo.addMembers(group.id, [
         makeMemberInput(),
         makeMemberInput({ userId: 'user-2', value: 'scim-user-2', display: 'Bob' }),
-      ]);
+      ], []);
 
       const found = await repo.findWithMembers(endpointId, 'scim-grp-1');
       expect(found!.members).toHaveLength(2);
@@ -121,7 +121,7 @@ describe('InMemoryGroupRepository', () => {
 
     it('should return detached member copies', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, [makeMemberInput()]);
+      await repo.addMembers(group.id, [makeMemberInput()], []);
 
       const a = await repo.findWithMembers(endpointId, 'scim-grp-1');
       const b = await repo.findWithMembers(endpointId, 'scim-grp-1');
@@ -138,11 +138,11 @@ describe('InMemoryGroupRepository', () => {
       const g2 = await repo.create(makeGroupInput({ scimId: 'g2', displayName: 'Alpha' }));
       await repo.create(makeGroupInput({ scimId: 'g3', endpointId: otherEndpointId }));
 
-      await repo.addMembers(g1.id, [makeMemberInput()]);
+      await repo.addMembers(g1.id, [makeMemberInput()], []);
       await repo.addMembers(g2.id, [
         makeMemberInput({ userId: 'u1', value: 'v1', display: 'One' }),
         makeMemberInput({ userId: 'u2', value: 'v2', display: 'Two' }),
-      ]);
+      ], []);
     });
 
     it('should return only groups for the given endpoint with members', async () => {
@@ -244,7 +244,7 @@ describe('InMemoryGroupRepository', () => {
     it('should throw when group does not exist', async () => {
       await expect(
         repo.update('nonexistent-id', { displayName: 'X' }),
-      ).rejects.toThrow('Group with id nonexistent-id not found');
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
@@ -260,7 +260,7 @@ describe('InMemoryGroupRepository', () => {
 
     it('should cascade-delete associated members', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, [makeMemberInput(), makeMemberInput({ userId: 'u2' })]);
+      await repo.addMembers(group.id, [makeMemberInput(), makeMemberInput({ userId: 'u2', value: 'u2' })], []);
 
       await repo.delete(group.id);
 
@@ -273,7 +273,7 @@ describe('InMemoryGroupRepository', () => {
     });
 
     it('should throw RepositoryError when deleting nonexistent id', async () => {
-      await expect(repo.delete('nonexistent')).rejects.toThrow('Group with id nonexistent not found');
+      await expect(repo.delete('nonexistent')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
@@ -345,7 +345,7 @@ describe('InMemoryGroupRepository', () => {
       await repo.addMembers(group.id, [
         makeMemberInput(),
         makeMemberInput({ userId: 'u2', value: 'v2', display: 'Bob' }),
-      ]);
+      ], []);
 
       const withMembers = await repo.findWithMembers(endpointId, group.scimId);
       expect(withMembers!.members).toHaveLength(2);
@@ -354,9 +354,9 @@ describe('InMemoryGroupRepository', () => {
     it('should assign unique ids to each member', async () => {
       const group = await repo.create(makeGroupInput());
       await repo.addMembers(group.id, [
-        makeMemberInput({ userId: 'u1' }),
-        makeMemberInput({ userId: 'u2' }),
-      ]);
+        makeMemberInput({ userId: 'u1', value: 'u1' }),
+        makeMemberInput({ userId: 'u2', value: 'u2' }),
+      ], []);
 
       const withMembers = await repo.findWithMembers(endpointId, group.scimId);
       const ids = withMembers!.members.map((m) => m.id);
@@ -365,7 +365,7 @@ describe('InMemoryGroupRepository', () => {
 
     it('should set createdAt on each member', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, [makeMemberInput()]);
+      await repo.addMembers(group.id, [makeMemberInput()], []);
 
       const withMembers = await repo.findWithMembers(endpointId, group.scimId);
       expect(withMembers!.members[0].createdAt).toBeInstanceOf(Date);
@@ -375,7 +375,7 @@ describe('InMemoryGroupRepository', () => {
       const group = await repo.create(makeGroupInput());
       await repo.addMembers(group.id, [
         makeMemberInput({ userId: null, value: 'v1', type: null, display: null }),
-      ]);
+      ], []);
 
       const m = (await repo.findWithMembers(endpointId, group.scimId))!.members[0];
       expect(m.groupId).toBe(group.id);
@@ -387,7 +387,7 @@ describe('InMemoryGroupRepository', () => {
 
     it('should handle empty member array', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, []);
+      await repo.addMembers(group.id, [], []);
 
       const withMembers = await repo.findWithMembers(endpointId, group.scimId);
       expect(withMembers!.members).toHaveLength(0);
@@ -401,14 +401,14 @@ describe('InMemoryGroupRepository', () => {
       const group = await repo.create(makeGroupInput());
       await repo.addMembers(group.id, [
         makeMemberInput({ userId: 'old-u1', display: 'OldMember' }),
-      ]);
+      ], []);
 
       await repo.updateGroupWithMembers(
         group.id,
         { displayName: 'Updated' },
         [
-          makeMemberInput({ userId: 'new-u1', display: 'NewMember1' }),
-          makeMemberInput({ userId: 'new-u2', display: 'NewMember2' }),
+          makeMemberInput({ userId: 'new-u1', value: 'new-u1', display: 'NewMember1' }),
+          makeMemberInput({ userId: 'new-u2', value: 'new-u2', display: 'NewMember2' }),
         ],
       );
 
@@ -423,7 +423,7 @@ describe('InMemoryGroupRepository', () => {
 
     it('should clear all members when new members array is empty', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, [makeMemberInput()]);
+      await repo.addMembers(group.id, [makeMemberInput()], []);
 
       await repo.updateGroupWithMembers(group.id, {}, []);
 
@@ -435,8 +435,8 @@ describe('InMemoryGroupRepository', () => {
       const g1 = await repo.create(makeGroupInput({ scimId: 'g1' }));
       const g2 = await repo.create(makeGroupInput({ scimId: 'g2' }));
 
-      await repo.addMembers(g1.id, [makeMemberInput({ userId: 'u1', display: 'G1Member' })]);
-      await repo.addMembers(g2.id, [makeMemberInput({ userId: 'u2', display: 'G2Member' })]);
+      await repo.addMembers(g1.id, [makeMemberInput({ userId: 'u1', display: 'G1Member' })], []);
+      await repo.addMembers(g2.id, [makeMemberInput({ userId: 'u2', display: 'G2Member' })], []);
 
       // Update g1, replacing its members
       await repo.updateGroupWithMembers(g1.id, {}, [
@@ -455,7 +455,7 @@ describe('InMemoryGroupRepository', () => {
   describe('clear', () => {
     it('should remove all groups and members', async () => {
       const group = await repo.create(makeGroupInput());
-      await repo.addMembers(group.id, [makeMemberInput()]);
+      await repo.addMembers(group.id, [makeMemberInput()], []);
 
       repo.clear();
 

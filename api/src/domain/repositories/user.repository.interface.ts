@@ -8,6 +8,9 @@
  * Phase 3: userNameLower column removed - CITEXT/InMemory handles
  * case-insensitive comparison without a pre-computed lowercase column.
  */
+import type { ExpectedVersion } from './write-precondition';
+import type { UniquenessPolicy } from './uniqueness-policy';
+import type { ProfileRevision } from './profile-revision';
 import type {
   UserRecord,
   UserCreateInput,
@@ -17,7 +20,7 @@ import type {
 
 export interface IUserRepository {
   /** Create a new user and return the complete record. */
-  create(input: UserCreateInput): Promise<UserRecord>;
+  create(input: UserCreateInput, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<UserRecord>;
 
   /** Find a user by its SCIM-visible id within an endpoint. */
   findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null>;
@@ -37,10 +40,10 @@ export interface IUserRepository {
   ): Promise<UserRecord[]>;
 
   /** Update a user by its internal storage ID. */
-  update(id: string, data: UserUpdateInput): Promise<UserRecord>;
+  update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<UserRecord>;
 
   /** Delete a user by its internal storage ID. */
-  delete(id: string): Promise<void>;
+  delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void>;
 
   /**
    * Check for userName uniqueness within an endpoint.

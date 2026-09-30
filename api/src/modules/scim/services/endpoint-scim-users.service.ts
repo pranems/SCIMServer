@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import type { UserRecord, UserCreateInput, UserUpdateInput } from '../../../domain/models/user.model';
 import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -25,6 +26,7 @@ import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean } from '../../endpoint/endpoint
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { buildUserFilter } from '../filters/apply-scim-filter';
 import { resolveUserSortParams } from '../common/scim-sort.util';
+import { createReadQuery } from '../common/scim-read-query';
 import { UserPatchEngine } from '../../../domain/patch/user-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import { SchemaValidator } from '../../../domain/validation';
@@ -38,10 +40,10 @@ import {
   stripNeverReturnedFromPayload,
   stripInternalResponseFields,
   ScimSchemaHelpers,
-  assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { resolveNumericLimit } from '../common/capability-resolver';
+import { enforcePatchSupported } from '../common/capability-enforcement';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListUsersParams {
@@ -75,6 +77,12 @@ export class EndpointScimUsersService {
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateUserDto;
+    const strippedAttrs = readOnlyResult.stripped;
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation.
@@ -87,7 +95,6 @@ export class EndpointScimUsersService {
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'create');
 
     // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly attributes from POST payload', {
         method: 'POST', path: '/Users', stripped: strippedAttrs, endpointId,
@@ -119,13 +126,6 @@ export class EndpointScimUsersService {
       });
     }
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })));
-    }
-
     const now = new Date();
     const scimId = randomUUID();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
@@ -133,7 +133,7 @@ export class EndpointScimUsersService {
     const input: UserCreateInput = {
       endpointId,
       scimId,
-      externalId: dto.externalId ?? null,
+      externalId: typeof dto.externalId === 'string' ? dto.externalId : null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
       active: (dto.active as boolean) ?? true,
@@ -147,7 +147,11 @@ export class EndpointScimUsersService {
 
     let created: UserRecord;
     try {
-      created = await this.userRepo.create(input);
+      created = await this.userRepo.create(
+        input,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'create user', this.logger, LogCategory.SCIM_USER, { userName: dto.userName, endpointId });
     }
@@ -180,57 +184,26 @@ export class EndpointScimUsersService {
     // Gap 6: clamp to the per-endpoint filter.maxResults (RFC 7644 §3.4.2.4),
     // falling back to the global MAX_COUNT when the profile does not set it.
     const maxResults = resolveNumericLimit(this.endpointContext.getProfile?.(), (s) => s.filter?.maxResults, MAX_COUNT);
-    if (count > maxResults) {
-      count = maxResults;
-    }
-
     this.logger.info(LogCategory.SCIM_USER, 'List users', { filter, startIndex, count, endpointId });
-
-    let filterResult;
-    try {
-      filterResult = buildUserFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch (e) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: filter },
-      });
-    }
-
-    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
-    if (filter) {
-      this.schemaHelpers.validateFilterPaths(filter, endpointId);
-    }
-
-    // Fetch users from DB (repository handles endpointId scoping)
-    const sortParams = resolveUserSortParams(sortBy, sortOrder);
+    const query = createReadQuery(
+      { filter, startIndex, count, sortBy, sortOrder },
+      this.schemaHelpers.getSchemaDefinitions(endpointId), maxResults, buildUserFilter,
+    );
+    // External capability checks stay in controllers: Me also uses this lookup.
     const allDbUsers = await this.userRepo.findAll(
       endpointId,
-      filterResult.dbWhere,
-      sortParams,
+      query.dbWhere,
+      resolveUserSortParams(),
     );
-
-    // Build SCIM resources and apply in-memory filter if needed
-    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
-
-    if (filterResult.inMemoryFilter) {
-      resources = resources.filter(filterResult.inMemoryFilter);
-    }
-
-    const totalResults = resources.length;
-    const skip = Math.max(startIndex - 1, 0);
-    const take = Math.max(Math.min(count, maxResults), 0);
-    const paginatedResources = resources.slice(skip, skip + take);
-
-    this.logger.debug(LogCategory.SCIM_USER, 'List users result', { totalResults, returned: paginatedResources.length, endpointId });
-
+    const page = query.page(
+      allDbUsers,
+      user => this.toInternalUserResource(user, baseUrl, endpointId),
+      user => this.toScimUserResource(user, baseUrl, endpointId),
+    );
+    this.logger.debug(LogCategory.SCIM_USER, 'List users result', { totalResults: page.totalResults, returned: page.itemsPerPage, endpointId });
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
-      totalResults,
-      startIndex,
-      itemsPerPage: paginatedResources.length,
-      Resources: paginatedResources
+      ...page,
     };
   }
 
@@ -243,6 +216,7 @@ export class EndpointScimUsersService {
     ifMatch?: string,
   ): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'patch' });
+    enforcePatchSupported(this.endpointContext.getProfile?.());
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch user', { scimId, endpointId, opCount: patchDto.Operations?.length });
@@ -259,13 +233,19 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId, config);
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, updatedData);
+      updatedUser = await this.userRepo.update(
+        user.id,
+        updatedData,
+        expectedVersion,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'patch user', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -293,6 +273,17 @@ export class EndpointScimUsersService {
   ): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateUserDto;
+    const strippedAttrs = readOnlyResult.stripped;
+    const user = await this.userRepo.findByScimId(endpointId, scimId);
+    if (!user) {
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
+    }
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
@@ -301,10 +292,10 @@ export class EndpointScimUsersService {
     // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
     this.schemaHelpers.enforcePrimaryConstraint(dto as Record<string, unknown>, endpointId, config);
 
+    SchemaValidator.prepareReplacement(this.buildExistingPayload(user), dto, this.schemaHelpers.getSchemaDefinitions(endpointId));
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'replace');
 
     // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly attributes from PUT payload', {
         method: 'PUT', path: `/Users/${scimId}`, stripped: strippedAttrs, endpointId,
@@ -314,34 +305,17 @@ export class EndpointScimUsersService {
 
     this.logger.info(LogCategory.SCIM_USER, 'Replace user (PUT)', { scimId, userName: dto.userName, endpointId });
 
-    const user = await this.userRepo.findByScimId(endpointId, scimId);
-    
-    if (!user) {
-      this.logger.debug(LogCategory.SCIM_USER, 'Replace target not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
-    }
-
-    // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
-
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
-    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config, 'replace');
 
     await this.assertUniqueUserNameForEndpoint(dto.userName, endpointId, scimId);
-
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })), scimId);
-    }
 
     const now = new Date();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
     const meta = parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
 
     const data: UserUpdateInput = {
-      externalId: dto.externalId ?? null,
+      externalId: typeof dto.externalId === 'string' ? dto.externalId : null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
       active: (dto.active as boolean) ?? true,
@@ -354,7 +328,13 @@ export class EndpointScimUsersService {
 
     let updatedUser: UserRecord;
     try {
-      updatedUser = await this.userRepo.update(user.id, data);
+      updatedUser = await this.userRepo.update(
+        user.id,
+        data,
+        expectedVersion,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'replace user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
@@ -393,10 +373,14 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     try {
-      await this.userRepo.delete(user.id);
+      await this.userRepo.delete(
+        user.id,
+        expectedVersion,
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
@@ -488,6 +472,13 @@ export class EndpointScimUsersService {
       }
     }
 
+    // Coercion must precede execution even in lenient mode so primary handoff
+    // sees the same native Boolean that will be persisted.
+    if (getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS)) {
+      coercePatchOpBooleans(patchDto.Operations, this.schemaHelpers.getBooleansByParent(endpointId),
+        this.schemaHelpers.getCoreSchemaUrnLower(endpointId));
+    }
+
     // V2: Pre-PATCH validation - validate each operation value against its schema attribute
     if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
@@ -497,14 +488,6 @@ export class EndpointScimUsersService {
         (resultPayloadPlaceholder.schemas as string[]).push(urn);
       }
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
-
-      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-      if (coerceEnabled) {
-        const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
-        const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
-        coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
-      }
 
       for (const [opIndex, op] of patchDto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
@@ -541,7 +524,22 @@ export class EndpointScimUsersService {
           active: user.active,
           rawPayload,
         },
-        { verbosePatch, extensionUrns },
+        {
+          verbosePatch, extensionUrns, caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId),
+          allowAndCoerceBooleanStrings: getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS),
+          strictSchema: strictSchemaEnabled,
+          ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
+          onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),
+          schemaDefinitions: this.schemaHelpers.getSchemaDefinitions(endpointId),
+          normalize: (candidate, operation) => {
+            candidate.schemas = [SCIM_CORE_USER_SCHEMA, ...extensionUrns.filter(urn => urn in candidate)];
+            this.schemaHelpers.coerceBooleansByParentIfEnabled(candidate, endpointId, config);
+            this.schemaHelpers.enforcePrimaryConstraint(candidate, endpointId, config);
+            this.schemaHelpers.validatePayloadSchema(
+              scopePatchPayloadToTouched(candidate, [operation], extensionUrns), endpointId, config, 'patch',
+            );
+          },
+        },
       );
     } catch (err) {
       if (err instanceof PatchError) {
@@ -609,12 +607,6 @@ export class EndpointScimUsersService {
       user.scimId,
     );
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })), user.scimId);
-    }
 
     return {
       userName: extractedFields.userName,
@@ -630,6 +622,19 @@ export class EndpointScimUsersService {
   }
 
   private toScimUserResource(user: UserRecord, baseUrl: string, endpointId?: string): ScimUserResource {
+    const resource = this.toInternalUserResource(user, baseUrl, endpointId);
+    const visibleExtUrns = stripNeverReturnedFromPayload(
+      resource,
+      this.schemaHelpers.getNeverReturnedByParent(endpointId),
+      this.schemaHelpers.getCoreSchemaUrnLower(endpointId),
+      this.schemaHelpers.getExtensionUrns(endpointId),
+    );
+    resource.schemas = [SCIM_CORE_USER_SCHEMA, ...visibleExtUrns];
+    stripInternalResponseFields(resource);
+    return resource;
+  }
+
+  private toInternalUserResource(user: UserRecord, baseUrl: string, endpointId?: string): ScimUserResource {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
@@ -640,12 +645,8 @@ export class EndpointScimUsersService {
     const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
     sanitizeBooleanStringsByParent(rawPayload, boolMap, coreUrnLower);
 
-    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
-    const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
-    const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
-    const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA, ...visibleExtUrns];
-    stripInternalResponseFields(rawPayload);
+    const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA, ...extensionUrns];
 
     // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
     // (e.g., a client-supplied "id" in the POST body must never override scimId)

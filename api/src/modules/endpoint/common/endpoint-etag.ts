@@ -20,12 +20,11 @@ import type { EndpointResponse } from '../services/endpoint.service';
 
 /** Fields a caller can actually change - the only ones a lost update can affect. */
 function concurrencyRelevantState(endpoint: EndpointResponse): string {
-  const e = endpoint as unknown as Record<string, unknown>;
   return JSON.stringify({
-    displayName: e.displayName ?? null,
-    description: e.description ?? null,
-    active: e.active ?? null,
-    profile: e.profile ?? null,
+    displayName: endpoint.displayName ?? null,
+    description: endpoint.description ?? null,
+    active: endpoint.active ?? null,
+    profile: endpoint.profile ?? null,
   });
 }
 
@@ -53,6 +52,11 @@ export function assertEndpointIfMatch(endpoint: EndpointResponse, ifMatch?: stri
   const current = endpointETag(endpoint);
   if (ifMatch === '*' || ifMatch === current) return;
 
+  rejectEndpointIfMatch(endpoint, ifMatch);
+}
+
+export function rejectEndpointIfMatch(endpoint: EndpointResponse, ifMatch: string): never {
+  const current = endpointETag(endpoint);
   // Both sides are named so the caller can diff its stale copy against the
   // current one rather than blind-retrying and clobbering anyway.
   throw new HttpException(

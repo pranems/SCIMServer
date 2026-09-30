@@ -1,0 +1,59 @@
+{
+  "scope": "Integrated exact interrupted-create errors with P3/P3b/P4/P8c, not final C0",
+  "importedSource": "d8441f4660b11e076dab47155c9aa1e48328fe7f",
+  "baseHead": "6a52ae32e886c7920b643707361ba9f95bbe3188",
+  "testedWorkingTreeSha256": "d00bbc8dd453dc6d910316c3a93b620804090914aa2bba32ece2057957ac9402",
+  "sourceHashScope": "Sorted git ls-files -co --exclude-standard for api/src, api/test and scripts; path plus bytes",
+  "sourceFileCount": 719,
+  "builtRuntimeSha256": "759e7ac0469c2c7e009f7e608ac00ddbe85bed1d88d677420e51519470ce7a01",
+  "buildHashScope": "Sorted relative .js paths and bytes under api/dist; measured after focused run",
+  "buildFileCount": 252,
+  "integrationRegression": {
+    "barrierArgumentForwardingRed": 1,
+    "barrierArgumentForwardingGreen": 1,
+    "nativeConnectionFixtureCorrection": "Use ECONNREFUSED rather than a bare connect substring",
+    "requiredMemberPolicyFixtureCorrection": "Pass explicit empty policy for the native member-FK control"
+  },
+  "validation": {
+    "unitSuites": 9,
+    "unitPassed": 247,
+    "httpSuitesPerBackend": 5,
+    "inmemoryHttpPassed": 131,
+    "inmemoryNativeOnlySkipped": 4,
+    "postgresHttpPassed": 135,
+    "exactInterruptedCreateRoutes": 6,
+    "deletionLiveChecksPerBackend": 16,
+    "inmemoryCombinedLiveReportedChecks": 143,
+    "apiBuild": "passed",
+    "lintFiles": 16,
+    "lintErrors": 0,
+    "lintWarnings": 38
+  },
+  "postgresql": {
+    "version": "17.8",
+    "versionNumber": 170008,
+    "migrations": 22,
+    "run": "b9f6fc105e88de7b",
+    "containerId": "5724cef414e5517c4df0557944d54090e7256ccc0089aa046e272f7904efda53",
+    "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+    "exactOwnedContainerRemoved": true,
+    "builtRuntimePid": 62128,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true,
+    "faultInjection": "Real guarded transaction triggers and real held-pool timeouts; independent namespace-uniqueness writer control executed",
+    "rawReceipt": "test-results/scim-integration-p8-errors/postgres-b9f6fc105e88de7b/receipt.json"
+  },
+  "inmemory": {
+    "database": "explicit inert URL, no database connected",
+    "builtRuntimePid": 35052,
+    "builtRuntimeStopped": true,
+    "endpointCollectionUnchanged": true
+  },
+  "limits": [
+    "Controlled interrupted-write HTTP proof uses owned Nest listeners in Jest",
+    "Built-runtime live smoke verifies deleted-route envelopes and cleanup; it is not the synthetic barrier test",
+    "No blanket normalization of arbitrary FK, member, outage or transaction errors",
+    "No new integrated full matrix, deployment, data repair or release metadata",
+    "Original 82-case/backend acceptance ledger remains independently pending"
+  ]
+}

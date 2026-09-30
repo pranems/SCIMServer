@@ -6,7 +6,164 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.55.36] - 2026-09-30
+
+### Release candidate - SCIM correctness consolidation
+
+- Consolidate typed and ordered PATCH execution, conditional writes, binding-qualified
+  uniqueness, transactional Group mutation, query/search corrections, endpoint
+  lifecycle and error contracts, common-attribute validation, retained-entry
+  matching, profile revision coordination, and all 19 default Entra cases.
+- Preserve the immutable 82-case acceptance corpus and prove 164 backend
+  dispositions with 769 assertions and zero failures. The v0.55.36 exact-tip
+  artifact passes 166/166 live outcomes on both InMemory and PostgreSQL 17.8
+  after all 22 migrations.
+- Add measured Workbench regression coverage for the exact four-operation typed
+  PATCH incident. The browser flow asserts the response, performs an independent
+  persisted GET, and rejects literal bracket or dotted-key corruption.
+- Restore malformed-filter diagnostics and exclude lazy runtime schema caches
+  from profile content revisions. Focused RED/GREEN tests pass, followed by API
+  build, lint at 0 errors and the existing 515-warning ratchet, API unit
+  209/209 suites and 6,000/6,000 tests, and InMemory API E2E 118/118 suites
+  with 2,481 passed and 4 intentional skips.
+- Guarded PostgreSQL parity also passes API unit 209/209 suites and
+  6,000/6,000 tests plus API E2E 118/118 suites and 2,485/2,485 tests.
+  The loopback-only tmpfs database replayed all 22 migrations, passed its
+  final ownership guard, and was removed by exact container ID.
+- Fix live HTTP tracing across separately invoked PowerShell scripts. An
+  executable scope-boundary regression changed from RED to GREEN, the four
+  previously blocked packages pass 82/82 focused assertions, and the isolated
+  Docker suite passes 1,697/1,697 with 22 migrations, zero remaining endpoints,
+  and exact API, database, and network cleanup.
+- Remove exact-tip CodeQL dynamic-property sinks structurally from PATCH
+  execution and readOnly preprocessing. Shared execution uses immutable update
+  helpers; preprocessing rebuilds entry lists and returns its filtered payload
+  explicitly to User, Group, and generic services. This replaces a runtime-safe
+  sanitizer pass that CodeQL could not prove and fixes the duplicate regex
+  character finding. Eight unit/service suites pass 639/639, four affected HTTP
+  suites pass 317/317, changed-source lint has zero errors, and the API build
+  passes. The exact-tip CodeQL rerun remains required.
+- Advance the `fast-uri` transitive override from 4.1.3 to 4.1.4 for
+  CVE-2026-84292 and CVE-2026-84394. Public-registry workflow run 36735519112
+  changed only its version, URL, and SHA-512 integrity and reported a 28.2-day
+  publish age, satisfying the seven-day quarantine. Clean install and build
+  pass; the production audit has zero HIGH/CRITICAL, seven MODERATE, and one
+  LOW finding. Exact-tip Trivy remains a release gate.
+- Web validation passes 118/118 files and 1,568/1,568 Vitest tests. Coverage is
+  82.68% statements, 75.37% branches, 75.22% functions, and 85.40% lines.
+  The production bundle and all 25 size budgets pass; TypeScript reports 66
+  established errors, below the 96-error ratchet, with none in this release's
+  Workbench regression.
+- This release does not promote customer production. Dev publication, post-deploy
+  live checks, and measured Playwright validation remain gates of the release
+  pipeline and will be recorded here after they pass.
+
+### Verified - current SCIM acceptance, characteristics, and query cost
+- Reuse the immutable82-case corpus through a hash-guarded current-source
+  adapter without changing historical inputs or evidence. Final local results
+  are81 pass plus one documented cross-instance cache N/A on InMemory and82
+  pass on PostgreSQL:164 dispositions,769 assertions,0 failures, PostgreSQL
+  17.8, all22 migrations, and exact disposable-container cleanup. Reconcile
+  declaration/default, type/cardinality, namespace, adapter, strict-mode,
+  required, mutability, returned, caseExact, uniqueness, primary, and retained
+  entry combinations to permanent tests; no new product defect was found.
+  Measure the50,000-row residual-query boundary instead of inferring cost from
+  functional GREEN: an indexed equality transfers1 row at2.190ms local p50,
+  while a0.02%-selective custom numeric filter transfers50,000 rows/20.1MB at
+  401.049ms fetch p50 and evaluates50,000 candidates at23.203ms service p50.
+  The exact locally built `api/dist/main.js` hash passes166/166 live outcomes
+  on both InMemory and PostgreSQL17.8 after all22 migrations, including
+  binding-qualified uniqueness, P7 profile/P7b PATCH contracts,19 Entra cases
+  and PUT/PATCH retention. Endpoint inventories are unchanged, both owned
+  processes stop and the exact disposable container is removed.
+  No migration, version, lockfile, deployment, live-data, or speculative query
+  optimizer change.
+  [Acceptance and characteristic evidence](docs/SCIM_CHARACTERISTIC_RECONCILIATION.md)
+  and [performance assessment](docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md);
+  [exact-artifact receipt](docs/evidence/scim-exact-artifact-20260929/validation.json).
+
+### Fixed - endpoint profile revision write coordination, not released
+- Resource writes now carry the content revision of the endpoint profile used
+  for validation. PostgreSQL profile updates and resource commits share an
+  endpoint-scoped transaction lock; InMemory uses its existing synchronous
+  write guard. A profile change that wins the race causes a sanitized 409
+  `PROFILE_REVISION_CHANGED` response and no User, Group aggregate, or custom
+  resource mutation. Nine create/replace/delete races pass on each backend.
+  The same guarded lane closes omitted-`schemaExtensions` discovery and custom
+  CRUD coverage: 571 HTTP cases/backend, 611 affected units, P7b 153/905 and
+  P7a 472 built-runtime assertions/backend, PostgreSQL 17.8 with 22 migrations,
+  and exact cleanup. No migration, version, lockfile, deployment, or data
+  repair change.
+  [Design and evidence](docs/SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
+
+### Verified - exact interrupted-create errors in the integration assembly
+- P8b follow-up `d8441f46` integrates with P3/P3b/P4/P8c as `6a52ae32`.
+  Six interrupted resource/credential creates return sanitized 404 while
+  conditional 412, member validation, genuine outages and trigger failures
+  retain their separate contracts. The race helper now forwards all member/
+  policy arguments after a failing fidelity regression. Proof: 247 units,
+  131 InMemory HTTP plus four native-only skips, 135 PostgreSQL 17.8 HTTP after
+  22 migrations, and 16 built-local deletion checks per backend. No broad
+  lifecycle/C0 or deployment claim; no version or dependency changes.
+  [Integrated receipt](docs/evidence/scim-endpoint-errors-20260929/validation.json).
+
+### Fixed - common externalId PATCH integration, not released
+- Reject invalid original common externalId PATCH values before resource hooks
+  can erase their type, and validate the completed candidate in both strict
+  modes through one shared common-value-only seam. Preserve extension homonyms,
+  valid custom shapes, old-definition precedence, null/remove behavior and the
+  separation from complete POST/PUT required checks. RED: 13 domain / 25 HTTP
+  failures. GREEN: 973 focused units, 392 HTTP/backend, 66 new built-live
+  cases / 718 assertions plus 426 P7 assertions/backend; actual owned
+  PostgreSQL 17.8 with all 22 migrations and exact cleanup. No release-version,
+  lockfile, deployment or data repair change.
+  [Combined proof](docs/SCIM_P7_COMMON_EXTERNAL_ID.md#integrated-patch-boundary-original-value-and-completed-candidate).
+
+### Fixed - retained-entry PUT preservation, integration only
+- PUT no longer assigns one duplicate complex entry's server-owned data to
+  multiple entries. PUT preparation, immutable validation and PATCH retention
+  share one operation-neutral, occurrence-consuming matcher. New RED evidence:
+  9 unit and 48 HTTP failures. All 16 new units and 60 new HTTP cases pass;
+  focused HTTP totals are 289/backend, with 60 built-live cases / 1,260 assertions
+  per backend on owned InMemory and PostgreSQL 17.8 after 22 migrations.
+  Eight unrelated legacy P7 expectation failures reproduce on committed HEAD
+  and remain open, so no full-suite GREEN or final C0 claim is made.
+  No version, lockfile, deployment or live-data repair change.
+  [Behavior and evidence](docs/SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries).
+
+### Fixed - P2 isolated implementation, not released
+- **P9 flag-contract follow-up:** explicit core dotted User PATCH with verbose
+  support OFF now rejects atomically instead of storing literal dotted keys.
+  Legacy no-path dotted requests remain nested-resolving. Quoted User active
+  honors the coercion setting even with strict validation OFF; ON keeps
+  explicit legacy compatibility. No new flags/default/version changes.
+  Initial RED: 9 domain and 12 HTTP failures; independent namespace-target
+  regression RED: 3. Final unit count: 1,522 -> 1,543, all passing.
+  HTTP: 201 -> 234/backend; built live: 170 -> 246/backend, actual PostgreSQL
+  17.8 and InMemory. Build/lint and bounded independent closure pass;
+  exact source/build fingerprints and cleanup are retained in the P2 guide.
+- Shared ordered PATCH executor for Users, Groups and custom resources:
+  multi-valued append, all-match selection, selected-object validation,
+  current-state required/immutable enforcement, primary handoff and resolved
+  readOnly compatibility. Resource hooks and existing repository ports remain.
+  No version or lockfile change. Detailed RED/GREEN counts, owned backend/live
+  receipts and independent-review fixes:
+  [P2 implementation](docs/SCIM_P2_IMPLEMENTATION.md).
+  Validation: 1,522 targeted unit tests, 201 HTTP and 170 built-live
+  assertions on each owned backend, PostgreSQL 17.8 and InMemory; build and
+  focused lint pass, 9 diagrams rendered in both themes. No web surface,
+  migration, deployment or release-version change.
+
 ### Changed
+- **P9 owned-harness follow-up.** Pin the verified database URL across app bootstrap, clear inherited targets before provisioning and wait for TCP readiness. Late-marker RED/GREEN plus five resolver checks pass; both owned PostgreSQL 17.8/22 migrations and InMemory rerun 17 HTTP +17 built-live cases /1,104 assertions. I03 clarified as an open compatibility-policy proposal, not a P2 promised fix. No runtime behavior/default/version/dependency change.
+- **P9 local compatibility evidence (no version change).** Removed blanket strict-off Entra startup/settings advice; corrected inert request-secret and fixed credential-visibility descriptions. Reconciled all 37 settings with outcome-based evidence and explicit gaps. Added 6 unit guidance/inventory checks and 17 shared HTTP/live cases: 411 distinct focused unit tests pass; PostgreSQL 17.8 with 22 migrations and InMemory each pass 17 HTTP and 17 built-live cases / 1,104 assertions. Two executed, failing P2 integration cases remain explicit TODOs. Build and scoped lint pass (0 errors, 6 existing warnings); diagram renders in both themes. No UI, optional default, dependency, lockfile, push or deployment change. See [P9](docs/SCIM_ENTRA_COMPATIBILITY.md).
+- **SUPERSEDED P3b source checkpoint4ba9373c:** its651-unit/167-PG/165-InMemory evidence exercised an incorrect numeric/MV common-externalId interpretation. Retained only with corrective child2d2da4e1 for provenance, not independently accepted or deployed. Valid typed custom displayName and extension homonyms remain separate.
+- **P3b common externalId standards correction:** RFC 7643 section 3.1 applies to every extended type and overrides older definitions. Declared-unique top-level externalId must be a single exact-case string; default duplicates remain accepted. Numeric/MV homonym tests now use extension-namespaced externalId. Final focused evidence: 654 units, PostgreSQL 170 HTTP and InMemory 168 plus two N/A. This supersedes the interim custom externalId interpretation below; P7 owns admission/general runtime enforcement.
+- **P3b custom-payload authority:** preserve accepted custom-core numeric/MV displayName and numeric active/userName while enforcing their declared uniqueness. Generic comparison and immutable reconstruction follow public rawPayload instead of lossy convenience columns. RED three units/seven HTTP per backend; GREEN 648 units, PostgreSQL 158 HTTP and InMemory 156 plus two N/A. Independent review, build, lint and live smoke pass; no migration, release metadata or deployment change.
+- **P3b adapter follow-up:** builtin Group relation uniqueness is limited to actually stored `members.value/type/display` leaves; unrepresented children fail closed. Exact builtin URNs prevent restrictions leaking to custom cores, and extension `members.$ref` remains supported. Three RED controls now pass; final focused counts 646 units, PostgreSQL 147 HTTP and InMemory 145 plus two database N/A. No migration, version or deployment change.
+- **P3b RFC follow-up:** reject uniqueness promises on boolean/dateTime/binary/whole-complex types and compare references case-exactly by type (RFC 7643 section 2.3). These are type-applicability corrections, not extra equality modes. Five RED unit controls now pass; focused totals rise from 638 to 640 units, PostgreSQL HTTP 142 to 144 and InMemory 140 to 142 plus two database N/A. Existing live assertions, 22 migrations, build and independent review pass. No version, lockfile or deployment change.
+- **P3b local correctness package:** schema-driven User/Group/custom uniqueness now commits atomically, including scalar multi-values, complex children and Group members. Supported equality and unsupported declarations are explicit; default `none` semantics remain. Focused evidence: 638 units, PostgreSQL 17.8 142 HTTP / InMemory 140 plus two database N/A, 21 new live assertions per backend, API build and ratcheted lint green. Independent review findings were reproduced and closed. No migration, package version or deployment change. See [implementation](docs/SCIM_UNIQUENESS_IMPLEMENTATION.md).
 - **CI action pins refreshed.** Image build/publish workflows now use `docker/login-action` 4.6.0, `docker/setup-buildx-action` 4.4.1, and `docker/build-push-action` 7.4.0; CodeQL uses 4.38.1; docs freshness uses the same `actions/checkout` 7.0.1 pin as the other workflows. Every reference remains full-SHA pinned with a release comment. No workflow inputs, permissions, product code, package graph, or deployed estate changed.
 - **v0.55.35 - vulnerable transitive Hono pins remediated.** The API override map moves `@hono/node-server` from 1.19.10 to 1.19.15 and `hono` from 4.12.25 to 4.13.5, clearing all 12 medium/low findings reported by issue #144. Both targets were published more than seven days before adoption. The packages are reachable only through `prisma -> @prisma/dev`, but they ship in the runtime image because startup executes `prisma migrate deploy`, so the frozen vulnerable versions were not dismissed as dev-only. The pin checker moved from **12 findings / exit 1** to **0 findings / exit 0** with zero unchecked packages. Lockfiles are regenerated only by the public-runner `regen-lockfile` workflow and must preserve public npm hosts plus SHA-512 integrity. No application behavior or public contract changes.
   - **Canary pipeline follow-up.** Dev deployment, live tests, Playwright, endpoint integrity, and revision hygiene passed, but Stage 6.5 failed closed before canary mutation because it defaulted to the ambiguous `ProvIAM_Subscription` name. Resolving the canary subscription ID exposed a second masked defect: promotion used the short commit tag although GHCR publishes the semver tag. Both scripts now derive the subscription ID from the estate registry, Stage 6.5 promotes the published `$version`, the static contract is 22/22, and a real dry run resolves the v0.55.35 digest and complete blue/green plan without mutation.

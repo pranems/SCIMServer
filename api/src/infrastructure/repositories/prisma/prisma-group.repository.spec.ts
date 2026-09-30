@@ -90,6 +90,42 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
   // ─── create ──────────────────────────────────────────────────────────
 
   describe('create', () => {
+    it('creates the Group and initial members using the same transaction client', async () => {
+      const tx = {
+        scimResource: { create: jest.fn().mockResolvedValue(fakeGroupResource()) },
+        resourceMember: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(async (work: (client: unknown) => Promise<unknown>) => work(tx));
+      const input = { endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+        displayName: 'Engineering', rawPayload: '{}', meta: '{}' };
+      const members = [{ userId: null, value: 'external-member', type: 'User', display: 'Member' }];
+      const result = await Reflect.apply(repo.create, repo, [input, members]);
+      expect(result).toMatchObject({ id: 'grp-1', version: 1 });
+      expect(prisma.scimResource.create).not.toHaveBeenCalled();
+      expect(prisma.resourceMember.createMany).not.toHaveBeenCalled();
+      expect(tx.scimResource.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+        endpoint: { connect: { id: 'ep-1' } }, resourceType: 'Group', payload: {},
+      }) });
+      expect(tx.resourceMember.createMany).toHaveBeenCalledWith({
+        data: [expect.objectContaining({ groupResourceId: 'grp-1', memberResourceId: null, value: 'external-member' })],
+      });
+    });
+
+    it('propagates a typed membership constraint failure out of the create transaction', async () => {
+      const tx = {
+        scimResource: { create: jest.fn().mockResolvedValue(fakeGroupResource()) },
+        resourceMember: { createMany: jest.fn().mockRejectedValue(Object.assign(new Error('constraint'), { code: 'P2002' })) },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(async (work: (client: unknown) => Promise<unknown>) => work(tx));
+      await expect(Reflect.apply(repo.create, repo, [{
+        endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+        displayName: 'Engineering', rawPayload: '{}', meta: '{}',
+      }, [{ userId: null, value: 'one', type: null, display: null }]]))
+        .rejects.toMatchObject({ code: 'CONFLICT' });
+      expect(tx.scimResource.create).toHaveBeenCalledTimes(1);
+      expect(tx.resourceMember.createMany).toHaveBeenCalledTimes(1);
+    });
+
     it('should insert with resourceType "Group" into scimResource', async () => {
       const input = {
         endpointId: 'ep-1',
@@ -448,7 +484,7 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
         { userId: null, value: 'scim-2', type: 'User', display: 'Bob' },
       ];
 
-      await repo.addMembers('grp-1', members);
+      await repo.addMembers('grp-1', members, []);
 
       expect(prisma.resourceMember.createMany).toHaveBeenCalledWith({
         data: expect.arrayContaining([
@@ -467,7 +503,7 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
     });
 
     it('should skip when members array is empty', async () => {
-      await repo.addMembers('grp-1', []);
+      await repo.addMembers('grp-1', [], []);
       expect(prisma.resourceMember.createMany).not.toHaveBeenCalled();
     });
   });

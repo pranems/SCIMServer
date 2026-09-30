@@ -212,7 +212,7 @@ describe('endpoint-profile.service (orchestrator)', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should accept valid tightening: externalId.mutability=immutable', () => {
+    it('rejects externalId mutability conflicting with the RFC common-attribute contract', () => {
       const input: ShorthandProfileInput = {
         ...MINIMAL_VALID_INPUT,
         schemas: [{
@@ -222,7 +222,8 @@ describe('endpoint-profile.service (orchestrator)', () => {
         }],
       };
       const result = validateAndExpandProfile(input);
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toEqual([expect.objectContaining({ code: 'INVALID_DECLARATION', detail: expect.stringContaining('externalId') })]);
     });
   });
 

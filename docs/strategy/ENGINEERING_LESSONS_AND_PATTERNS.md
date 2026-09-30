@@ -16,6 +16,76 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Retained-array identity must survive restoration
+
+The [PUT correction](../SCIM_PUT_ENTRY_PRESERVATION_RCA.md) found three incompatible
+policies: first-value lookup, last-value map and greedy one-to-one matching.
+Share one neutral matcher, reserve type capacity before fallback, and assign
+equal-typed occurrences in stable order. Test the complete permutation and
+then repeat comparison after restoring optional immutable discriminators.
+An initially correct pairing is insufficient if restoration changes the next
+pairing. Never invent persisted IDs for anonymous or indistinguishable values.
+
+### PATCH projection needs stable schema context after a write
+
+P7b's first returned:request fix parsed client paths against the final response's
+schemas. Removing an optional namespace shrank that list, so a valid accepted
+numeric-version target became invalid during projection. The repository had
+already committed; the caller received 500. Snapshot the registered resource
+type namespace bindings and compute client presence before invoking the write.
+Do not reconstruct validation context from a filtered response. Twelve HTTP
+negative controls now require successful response, correct body and persisted
+version after namespace removal. A follow-up control also covers ignored keys:
+response generation must not revalidate input that execution intentionally
+discarded. The collector leaves indexed syntax errors to execution.
+See the [P7 RCA](../SCIM_P7_EXECUTION_RCA.md).
+
+### P9: configuration presence is not behavior or safe operator guidance
+
+A registry count proved that 37 controls existed, but did not detect startup
+advice to disable validation for every Entra client, or descriptions promising
+retired secret-retention policies. P9 now asserts the **emitted** startup
+message and current description claims. Its settings matrix separates actual
+outcome tests from configuration roundtrips, and names missing wire evidence.
+One shared corpus verifies persisted values through both HTTP-harness and
+built-server adapters. Unsupported integration cases remain explicit failing
+checks, never a green baseline of malformed storage.
+See [P9 evidence](../SCIM_ENTRA_COMPATIBILITY.md).
+
+**Integration recurrence, 2026-09-29:** P2's corrected runtime merged while
+registry text still promised literal-key storage and a coercion bypass.
+Conflict-free merging and generic advice checks did not catch the false
+specific claims. Assert a changed control's actual ON/OFF semantics in its
+published description as well as its execution. Two semantic REDs now lock
+the corrected guidance; this repeated high-severity class is promoted to
+R10.5. Separately, verified I02/I03 had to lose their optional dispatch:
+discovery/count tests now require ordinary default execution, while frozen
+source receipts remain historical. See C0-I33/I34 in the
+[integration ledger](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
+### P7a: semantic presence and ownership survive framework transformations
+
+**Common-value recurrence, 2026-09-29:** preserving a DTO's original externalId
+type was not enough for PATCH. A Group resource hook converted invalid values
+to null before the completed candidate was inspected. Validate the assigned
+common target before a lossy adapter, then validate the resulting common state
+after normalization. Do not replace that narrow invariant with a complete
+POST/PUT required-resource check on a PATCH partial view. The combined
+[RED/GREEN and real-backend proof](../evidence/scim-common-patch-20260929/validation.json)
+covers both boundaries and a control for unrelated required fields.
+
+The [P7a review](../SCIM_P7_EXECUTION_RCA.md) reproduced two defects from the
+same false premise: an optional DTO field with value `undefined` was treated
+as client input. This discarded omitted immutable values and implicitly
+requested request-only response attributes. At a JSON/DTO boundary, test
+defined value presence, not only object-key presence; retain actual `false`,
+`0`, and empty-string inputs. Permanent P7 tests exercise all four cases.
+
+Also normalize only client-writable input before restoring server-owned
+state. A profile changing an existing field to readOnly must not let an
+unrelated PUT normalize or reject that stored value. The P7 combination
+matrix checks both normalize and reject policies on every resource family.
+
 ```mermaid
 flowchart LR
     EXEC[Execution: a fix is confirmed to resolve an issue] -->|capture AT fix-confirmation time| RCA[Per-build EXECUTION_ISSUES_AND_RCA.md]
@@ -91,10 +161,10 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (30 seeded)
-    "A Test/gate integrity" : 9
+    title Patterns by category (33)
+    "A Test/gate integrity" : 11
     "B Environment/deploy" : 4
-    "C Framework/middleware" : 3
+    "C Framework/middleware" : 4
     "D Security at sinks" : 2
     "E Process/introspection" : 5
     "F Design/architecture" : 3
@@ -102,6 +172,14 @@ pie showData
 ```
 
 ### Category A - Test-harness and gate integrity (the false-green family)
+
+**Repository-barrier fidelity, 2026-09-29:** an interrupted-create test
+forwarded only the first repository argument, silently dropping P4 initial
+members and P3b uniqueness policy. A barrier can pause a real operation while
+still changing its semantics. Forward the complete typed tuple and add a
+negative control proving the original callback receives every argument.
+The [integrated exact-error proof](../evidence/scim-endpoint-errors-20260929/validation.json)
+then exercises actual Group/uniqueness transactions, not a weaker substitute.
 
 The most dangerous class: a gate that is GREEN but proves nothing. Every pattern here is a way a test can lie.
 
@@ -116,6 +194,8 @@ The most dangerous class: a gate that is GREEN but proves nothing. Every pattern
 | **PA-7** | **The process's own stdout is an unasserted signal channel - read it during live runs** | Two defects (a dead code path and an audit-log destruction vector) were emitting `prisma:error ... invalid input syntax for type uuid` on almost every request, through a full 1,368-assertion live run, with **every gate green**. Neither was found by a gate; both were found by scrolling the server log | No gate in this repo asserts on server stdout, so any failure the application **catches and logs** is invisible by construction. During a live run, capture the server output (`... *>&1 \| Tee-Object -FilePath <log>`) and **count driver/framework error lines**; treat a non-zero count as a finding even when every assertion passes. Report the count before and after a fix (here: **5 -> 0**) - it is a measured outcome, not an impression | (convention; candidate for a live-gate check) | 2026-07-30 log-uuid chain |
 | **PA-8** | **Prove a new live-test section is a real gate by running it against the unfixed build** | A section can be written, run once against the fixed code, and pass - which proves only that it does not crash. A section that would pass either way is decoration | Before trusting a new live section, run it against a deliberately reverted build and confirm (a) the intended assertions FAIL, and (b) the surrounding assertions still PASS, so it fails for the right reason and only that reason. Here 9z-CC failed exactly T3+T4 (`found 0 resolved of 2`) with T1/T2/T5 green | (convention; precedent 9z-CA, repeated for 9z-CC) | 2026-07-30 |
 | **PA-9** | **Eventually durable writes need a shared force-flush poll** | A custom-resource E2E queried RequestLog immediately after DELETE. InMemory passed because writes are synchronous; Prisma returned an empty list because rows are buffered and enqueued after the response | Assertions over just-produced durable logs must use `waitForLogRow()`, which force-flushes and polls a structural predicate to a deadline. Immediate reads and fixed sleeps are both false-green/flake generators | Shared helper [log-wait.helper.ts](../../api/test/e2e/helpers/log-wait.helper.ts) | v0.55.29 CRO-21 |
+| **PA-10** | Prove aggregate rollback and snapshot consistency | An error left a partial Group; an InMemory read mixed an old name/version with new members across an await | Compare complete stored state after native/injected late failure; test a deterministic read/write interleaving and failed-writer version preservation | Group aggregate integrity rule and permanent unit/HTTP tests | [P4 G1-G3](../SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md) |
+| **PA-11** | A locked invariant must compare the representation that commits | Case-aliased JSON keys changed interpretation after JSONB reordered them; a schema-URN substring selected the wrong namespace; retained append bypassed the new check | Force different owners to compete, reject ambiguous keys before storage, carry explicit schema identity, and enumerate every mutating repository port | Atomic invariant representation rule plus unit/HTTP/native PostgreSQL gates | [P3b U9-U11](../SCIM_UNIQUENESS_EXECUTION_RCA.md) |
 
 ### Category B - Cross-environment and deployment drift
 
@@ -137,6 +217,12 @@ Global middleware and framework defaults shape contracts in ways the design stag
 | **PC-1** | Global filters/interceptors are contract-shaping | The SCIM exception filter rewrapped the OAuth `{error}` body into `{detail}`; the content-type middleware 415'd a form-urlencoded token POST | A new endpoint under an existing prefix inherits its middleware. Assert the ACTUAL serialized body; decide content-type/error policy explicitly per cross-protocol route | (convention; A3 carve-out) | auth I-03, I-04 |
 | **PC-2** | Cross-backend parity is not optional | An InMemory endpoint-create was missing the duplicate-name guard that Prisma had; it escaped for months with no unit lock | Any file with an `isInMemoryBackend` branch MUST be walked through the parity matrix; run both backends | Stage 2.5 + 2.6; `crossBackendParityAudit` | Finding-B 2026-05 |
 | **PC-3** | **A `try/catch` spanning a multi-step fallback can make later steps unreachable** | `resolveUserDisplayName` looked up by `scimId` then fell back to `userName`. The fallback ran only when the first lookup returned **null** - but for a userName-shaped input the first query **threw**, so control left the function entirely. The fallback was dead code, and the outer `catch` returned `null`, which is exactly what "not found" looks like | A catch that spans several steps converts "step 1 failed" into "the whole thing found nothing." When step N+1 exists **because** step N can miss, step N must be able to MISS rather than THROW - guard its precondition instead of relying on the catch. Review any `try` block containing a sequential fallback chain: ask whether an early throw silently skips the rest | (convention; guarded with the shared `isUuid` predicate) | 2026-07-30 |
+
+Atomic writes need an explicit persistence-boundary check:
+
+| ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
+|---|---|---|---|---|---|
+| **PC-4** | A precondition is only effective if it still holds when the write commits | Resource and endpoint-admin requests compared versions before a later write; two requests could both pass and both save | Condition the actual database mutation on the old state, or use a transaction that protects the comparison through publication. InMemory needs the equivalent indivisible check and publish. Prove the race with controlled interleaving, and prove every response view's write token can authorize an unchanged edit | Stage 3a.4 conditional-write rule and permanent P3/P8c backend tests | SCIM correctness P3 and P8c, 2026-09-28 |
 
 ### Category D - Security at sinks
 
@@ -161,6 +247,31 @@ How the agent learns reliably across compaction boundaries.
 
 ### Category F - Design and architecture (structural drift)
 
+**P2 ordered-mutation lesson (2026-09-28): preserve operation intent, not just
+normalized values.** A schema-aware sanitizer returning a bare array loses
+whether that array means append input or the surviving state of a
+null-unassignment. A helper that runs correctly at a direct target can also
+fail when invoked through an enclosing complex object. P2's independent
+reviews found both repeatedly. Carry operation context through recursion and
+consume any internal intent representation before persistence. Permanent
+tests must cross operation (`add`/`replace`/remove/null), target form
+(direct/no-path/selected/enclosing complex), and policy (strict/ignore).
+Retained array identities must be paired one-to-one, including duplicate and
+anonymous entries; never repeatedly select the first matching old entry.
+Applied in [P2](../SCIM_P2_IMPLEMENTATION.md) with exact persisted-payload
+and atomic-failure tests, not a new speculative policy framework.
+
+**Cross-operation recurrence, 2026-09-29:** PATCH had that matcher while PUT
+still used first-match lookup and its immutable check used last-value lookup.
+Nine unit and 48 HTTP REDs confirmed state reassignment. The matcher now
+lives in an operation-neutral domain module used by all three consumers.
+Any change to retained complex-entry identity must run both PUT and PATCH
+controls for duplicate value/type combinations, anonymous occurrences and
+removed/added entries. Do not infer unique identity from a non-unique `value`.
+[Focused dual-backend proof](../evidence/scim-retained-put-20260929/validation.json)
+and actual stored/readback assertions enforce this rule without coupling the
+validator to a PATCH implementation.
+
 Structural decay that a correctness-only gate never sees; only an explicit design/architecture look finds it.
 
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
@@ -168,6 +279,27 @@ Structural decay that a correctness-only gate never sees; only an explicit desig
 | **PF-1** | Keep orchestrators thin; decouple by seam | `SharedSecretGuard` grew to 491 lines / ~7 responsibilities by inlining every resource-plane auth method (global secret + bearer + oauth_client + JWT + legacy + trace + flags); the mint plane's `client_secret` path is likewise inlined in the controller while WIF is a clean strategy - the asymmetry hid the drift | A guard/controller/service is an ORCHESTRATOR; each auth method (or per-case behavior) is a STRATEGY behind a seam (mirror the existing `IAssertionTokenProvider` + repository DI-token patterns). Adding the next method should EXTEND (a class + registration), not EDIT a god-file. Counter-check with YAGNI: a seam needs >=2 real impls or one concrete near-term one | Rule: "Design & Architecture Self-Improvement Gate" (copilot-instructions.md) | X12 2026-07-23 |
 | **PF-2** | Render the authoritative effective state, not a writable shadow | Connect displayed and wrote flat auth flags while `profile.authentication.methods[]` could override them in the runtime resolver; a switch could persist successfully yet leave enforcement unchanged | A control for a layered setting must consume the same effective resolver as enforcement. If another source wins, show provenance and disable the local write path. Tests need conflicting values so the precedence assertion discriminates | Rule R11: authoritative effective control state | v0.55.24 UX-2 2026-09-17 |
 | **PF-3** | Policy-sensitive shared state needs policy-sensitive identity | JWKS cache, single-flight, stale fallback, refresh, and unknown-kid state were keyed only by URI while 11 endpoint-specific controls changed whether that state was admissible. A lenient endpoint could seed two keys for 24 h and a stricter endpoint would reuse them despite `maxKeys:1` or a 60 s TTL | Every policy dimension that changes admissibility, lifetime, capacity, retry, or security posture must participate in shared-state identity. Test at least two tenants/endpoints with the same resource identity and conflicting policies; same-policy tests cannot expose cross-policy leakage | Rule R12: policy-sensitive shared-state identity | v0.55.32 EP-09 2026-09-24 |
+
+**P6b application of PF-3 and PD-1 (2026-09-28):** a field name is not a
+complete policy identity. Flattening two schema-qualified `code` fields
+applied one namespace's caseExact to the other. Similarly, response-shaped
+data is not a valid substitute for authorized internal query operands.
+Keep schema/parent identity through query evaluation, then enforce output
+suppression at the final assembled-resource boundary. Tests must include
+colliding namespaces and a hidden child with no hidden top-level sibling.
+The [query implementation](../SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md) supplies
+the unit, HTTP and two-backend controls; the standing query regression rule
+turns this lesson into a required assertion class.
+The P6c/P3 coordination follow-up adds representation to that identity:
+custom numeric or multi-valued attributes can reuse a promoted string-column
+name. Query push-down must carry the resolved type/cardinality rather than
+infer storage equivalence from that name. Residual evaluation cannot recover
+matches already discarded by a lossy candidate query.
+The subsequent P6d correction limits that generalization to customizable
+attributes: RFC 7643 section 3.1 fixes common externalId to string/SV/caseExact
+on every ResourceType. Only an extension-qualified homonym is independently
+customizable. A test proving current acceptance is not proof that the
+accepted input is standards-valid; read the common-attribute contract first.
 
 ### Category G - Configuration and operational defaults (a silent default is not a decision)
 
@@ -195,11 +327,14 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PA-6 (vacuous RED from a permissive test double) | 2 (both in the 2026-07-30 log-uuid chain: `findUnique`, `createMany`) | convention + negative controls in both specs; promote to a rule on a 3rd sighting |
 | PA-7 (unasserted stdout / caught-and-logged failures) | 2 (dead fallback + audit-batch loss, both invisible to a 1,368-assertion green run) | convention; candidate live-gate check (count driver-error lines during a live run) |
 | PA-8 (prove a live section against the unfixed build) | 2 (9z-CA 2026-07-30, 9z-CC 2026-07-30) | convention; promote if a decorative section ever ships |
+| PA-10 (aggregate rollback and snapshot consistency) | 1 high-severity Group partial-create escape, plus a deterministic torn-read regression | YES - aggregate integrity rule and stored-state tests |
+| PA-11 (checked versus committed representation) | Three pre-merge review gaps, including one high-severity JSONB ordering false-green | YES - atomic invariant representation rule |
 | PB-1 (env value table) | 1 | YES (convention recorded) |
 | PB-3 (diagnose the configured endpoint, not an overridden one) | 2 (same symptom misdiagnosed twice: 2026-07-29 "machine-wide block", 2026-07-30 "registry blocked") | YES - Rule N2 in the npm supply-chain policy doc; both memory and the two committed docs corrected |
 | PC-1 (contract-shaping middleware) | 2 (I-03, I-04) | convention; revisit if a 3rd escape |
 | PC-2 (cross-backend parity) | 1 (high-sev: Finding-B) | YES (Stage 2.5/2.6) |
 | PC-3 (try/catch makes a fallback unreachable) | 1 (medium-sev: dead code path disguised as a clean degrade) | convention; promote on a 2nd sighting |
+| PC-4 (check before commit is not atomic) | 2 (resource writes and endpoint-admin writes) | YES - Stage 3a.4, controlled races on both backends and summary-token contract test |
 | PD-1 (sink guard) | 1 (high-sev: security) | YES (guard + tests) |
 | PD-2 (fix the class, enumerate every column of the type) | 2 (high-sev, same vector: `requestId` v0.54.85, `endpointId` v0.54.89) | YES - Security Gate Map row + one shared guard module |
 | PE-1 / PE-2 (capture timing + transcript) | 1 (operator-surfaced) | YES - this doc + RCA rule |
@@ -207,7 +342,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PE-4 (workflow boundary = session boundary) | 1 measured high-cost session plus exact 91:1 token sample | YES - AI-Efficient Change Delivery Rule and handoff template |
 | PE-5 (coherent rollback unit) | 1 measured W3.5 release boundary | YES - AI-Efficient Change Delivery Rule; apply before every PR |
 | PF-2 (authoritative effective control state) | 1 high-severity latent security-configuration defect | YES - immediate (R11) |
-| PF-3 (policy-sensitive shared-state identity) | 1 high-severity latent cross-endpoint policy bypass | YES - immediate (R12) |
+| PF-3 (policy-sensitive shared-state identity) | 2 policy-identity collisions: cross-endpoint JWKS policy and P6b schema namespace caseExact | YES - R12 plus schema-aware query regression rule |
 | PG-1 (env-dependent value = clamped setting) | 1 (multi-site: pool, body limits, log buffer, pagination) | scheduled (W1.7); promote to a rule after the 2nd sighting |
 | PG-2 (assert the library default you depend on) | 1 (medium-sev: Prisma v7 dropped the pool acquire timeout) | scheduled (unit lock with W1.7a) |
 | PG-3 (knob name must match what it bounds) | 1 (medium-sev: `REQUEST_TIMEOUT_MS` does not bound requests) | scheduled (W1.7b) |

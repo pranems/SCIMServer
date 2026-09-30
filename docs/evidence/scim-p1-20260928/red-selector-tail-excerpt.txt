@@ -1,0 +1,17 @@
+  ● P1 typed PATCH User › rejects malformed/unsupported syntax contacts[primary eq true].value.deep before writing
+
+    expect(received).toThrow(expected)
+
+    Expected constructor: PatchError
+
+    Received function did not throw
+
+      59 |       { op: 'replace', path: `${GOOGLE}:primaryOrganization.location`, value: 'must-not-persist' },
+      60 |       { op: 'replace', path: `${CONTOSO}:${path}`, value: 'bad' },
+    > 61 |     ])).toThrow(PatchError);
+         |         ^
+      62 |     expect(input).toEqual(incidentPayload());
+      63 |   });
+      64 |
+
+      at src/domain/patch/typed-patch-path.spec.ts:61:9

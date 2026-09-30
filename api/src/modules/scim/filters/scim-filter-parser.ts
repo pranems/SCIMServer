@@ -119,13 +119,10 @@ function tokenize(input: string): Token[] {
     // Quoted string
     if (input[i] === '"') {
       i++; // skip opening quote
-      let str = '';
       while (i < input.length && input[i] !== '"') {
         if (input[i] === '\\' && i + 1 < input.length) {
-          str += input[i + 1];
           i += 2;
         } else {
-          str += input[i];
           i++;
         }
       }
@@ -133,6 +130,7 @@ function tokenize(input: string): Token[] {
         throw new Error(`Unterminated string at position ${position}`);
       }
       i++; // skip closing quote
+      const str = JSON.parse(input.slice(position, i)) as string;
       tokens.push({ type: 'STRING', value: str, position });
       continue;
     }
@@ -141,27 +139,19 @@ function tokenize(input: string): Token[] {
     if (/[-\d]/.test(input[i]) && (input[i] !== '-' || (i + 1 < input.length && /\d/.test(input[i + 1])))) {
       // Only treat as number if it's a digit or a minus followed by a digit
       // But we also need to make sure a '-' isn't part of an attribute name
-      const numStart = i;
-      if (input[i] === '-') i++;
-      while (i < input.length && /[\d.]/.test(input[i])) i++;
-      // Verify next char is whitespace, bracket, paren, or EOF (not part of an identifier)
-      if (i === numStart + (input[numStart] === '-' ? 1 : 0)) {
-        // No digits found - treat as identifier start below
-        i = numStart;
-      } else if (i < input.length && /[a-zA-Z_:]/.test(input[i])) {
-        // Part of an identifier (e.g., attribute name starting with digits - unlikely but safe)
-        i = numStart;
-      } else {
-        tokens.push({ type: 'NUMBER', value: input.slice(numStart, i), position: numStart });
-        continue;
-      }
+      const number = input.slice(i).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+      if (!number || !Number.isFinite(Number(number[0]))) throw new Error(`Invalid number at position ${i}`);
+      i += number[0].length;
+      if (i < input.length && !/[\s\])]/.test(input[i])) throw new Error(`Invalid number at position ${position}`);
+      tokens.push({ type: 'NUMBER', value: number[0], position });
+      continue;
     }
 
     // Identifier (attribute name, operator keyword, boolean, null)
-    if (/[a-zA-Z_]/.test(input[i]) || input[i] === ':') {
+    if (/[a-zA-Z_$]/.test(input[i]) || input[i] === ':') {
       let ident = '';
       // Attribute paths can contain dots, colons, and hyphens (URN paths)
-      while (i < input.length && /[a-zA-Z0-9_.:\-]/.test(input[i])) {
+      while (i < input.length && /[a-zA-Z0-9_$.:-]/.test(input[i])) {
         ident += input[i];
         i++;
       }

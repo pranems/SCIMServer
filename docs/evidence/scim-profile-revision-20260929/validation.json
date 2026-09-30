@@ -1,0 +1,81 @@
+{
+  "status": "passed",
+  "scope": "omitted schemaExtensions discovery and CRUD plus endpoint profile revision write coordination",
+  "source": {
+    "headBeforeCommit": "73cbcaea8444724306d2a85692ef1efe12dcef95",
+    "workingTreeFingerprint": "499e06389e887394d3f427ab43b7d232f48272452b718ed594476a35dd88c39c",
+    "buildFingerprint": "56c6d58c08691a18e0dfe0d41d01a954b33d45d166fc31c3101a8cb083731fc2"
+  },
+  "tdd": {
+    "red": {
+      "profileRevisionCasesFailed": 3,
+      "observedStatus": 201,
+      "expectedStatus": 409
+    },
+    "green": {
+      "profileRevisionCasesPassed": 9,
+      "resourceTypes": [
+        "User",
+        "Group",
+        "Device"
+      ],
+      "operations": [
+        "create",
+        "replace",
+        "delete"
+      ]
+    }
+  },
+  "validation": {
+    "apiBuild": "passed",
+    "apiLint": {
+      "errors": 0,
+      "warnings": 515
+    },
+    "affectedUnits": {
+      "suites": 10,
+      "passed": 611,
+      "failed": 0
+    },
+    "inmemoryHttp": {
+      "passed": 571,
+      "failed": 0,
+      "pending": 0
+    },
+    "postgresqlHttp": {
+      "version": "17.8",
+      "migrations": 22,
+      "passed": 571,
+      "failed": 0,
+      "pending": 0
+    },
+    "builtRuntimePerBackend": {
+      "p7bCases": 153,
+      "p7bAssertions": 905,
+      "p7aAssertions": 472,
+      "endpointCollectionUnchanged": true
+    },
+    "omittedSchemaExtensions": {
+      "discoveryPublishesEmptyArray": true,
+      "customCrudOperations": [
+        "POST",
+        "GET",
+        "PUT",
+        "PATCH",
+        "DELETE"
+      ],
+      "malformedExplicitContainersReturn400": true
+    }
+  },
+  "cleanup": {
+    "ownedApiProcessesStopped": true,
+    "exactContainerRemoved": true
+  },
+  "notClaimed": [
+    "final 82-case reconciliation",
+    "performance acceptance",
+    "release",
+    "deployment",
+    "live-data repair"
+  ]
+}

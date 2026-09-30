@@ -18,6 +18,9 @@ import type { EndpointProfile, ShorthandProfileInput, ServiceProviderConfig } fr
 import { expandProfile } from './auto-expand.service';
 import { validateAttributeTightenOnly } from './tighten-only-validator';
 import { RFC_SCHEMA_ATTRIBUTE_MAPS } from './rfc-baseline';
+import { validateSchemaDeclarations } from './schema-declaration-validator';
+import { isCommonAttributeName } from '../../../domain/validation/common-attributes';
+import { validateUniquenessCapabilities } from './uniqueness-admission';
 
 // ─── Validation Result ──────────────────────────────────────────────────
 
@@ -85,12 +88,14 @@ function validateSpcTruthfulness(spc: ServiceProviderConfig): ProfileValidationE
 
 function runTightenOnlyValidation(profile: EndpointProfile): ProfileValidationError[] {
   const errors: ProfileValidationError[] = [];
+  const extensionSchemas = new Set(profile.resourceTypes.flatMap(rt => rt.schemaExtensions.map(ext => ext.schema)));
 
   for (const schema of profile.schemas) {
     const attrMap = RFC_SCHEMA_ATTRIBUTE_MAPS.get(schema.id);
     if (!attrMap) continue; // Custom schema - no baseline to compare against
 
     for (const attr of schema.attributes) {
+      if (extensionSchemas.has(schema.id) && isCommonAttributeName(attr.name)) continue;
       const baseline = attrMap.get(attr.name.toLowerCase());
       if (!baseline) continue; // Custom attribute within a known schema - no baseline
 
@@ -173,6 +178,8 @@ function validateStructure(profile: EndpointProfile): ProfileValidationError[] {
  * Returns the expanded profile if valid, or errors if not.
  */
 export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileValidationResult {
+  const declarationErrors = validateSchemaDeclarations(input);
+  if (declarationErrors.length) return { valid: false, errors: declarationErrors };
   // Step 1+2: Auto-expand + auto-inject
   let profile: EndpointProfile;
   try {
@@ -185,6 +192,7 @@ export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileV
   }
 
   const allErrors: ProfileValidationError[] = [];
+  allErrors.push(...validateSchemaDeclarations(profile));
 
   // Step 3: Tighten-only validation
   allErrors.push(...runTightenOnlyValidation(profile));
@@ -194,6 +202,8 @@ export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileV
 
   // Structural validation
   allErrors.push(...validateStructure(profile));
+
+  if (allErrors.length === 0) allErrors.push(...validateUniquenessCapabilities(profile));
 
   if (allErrors.length > 0) {
     return { valid: false, errors: allErrors };

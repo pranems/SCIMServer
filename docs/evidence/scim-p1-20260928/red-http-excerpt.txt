@@ -1,0 +1,23 @@
+  ● P1 typed PATCH HTTP and persistence › StrictSchemaValidation=true › updates all four incident values on Users
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "detail": undefined,
+    -   "status": 200,
+    +   "detail": "Schema validation failed: urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser'.; urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser'.",
+    +   "status": 400,
+      }
+
+      37 |       const { url } = await create(strict, family);
+      38 |       const patched = await scimPatch(app, url, token, { schemas: [PATCH], Operations: incidentOperations() });
+    > 39 |       expect({ status: patched.status, detail: patched.body.detail }).toEqual({ status: 200, detail: undefined });
+         |                                                                       ^
+      40 |       for (const response of [patched, await scimGet(app, url, token).expect(200)]) {
+      41 |         expect(response.body[GOOGLE]).toEqual(incidentExpected()[GOOGLE]);
+      42 |         expect(response.body[CONTOSO]).toEqual(incidentExpected()[CONTOSO]);
+
+      at test/e2e/typed-patch-path.e2e-spec.ts:39:71

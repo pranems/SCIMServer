@@ -1,0 +1,196 @@
+{
+  "source": {
+    "base": "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e",
+    "head": "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e",
+    "sourceSha256": "055983baa7e6a1a72c9d4c1f2eaf134fd904bdfb91b4e0b09390632a56c0b437",
+    "fileCount": 543
+  },
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "91260acb7dcd5b78",
+  "startedAt": "2026-09-29T04:12:49.010Z",
+  "backends": [
+    {
+      "backend": "inmemory",
+      "exit": 0,
+      "passed": 24,
+      "failed": 0,
+      "total": 24,
+      "live": {
+        "assertions": 58,
+        "strictModes": [
+          true,
+          false
+        ],
+        "families": [
+          "Users",
+          "Groups",
+          "Devices"
+        ],
+        "pid": 48228,
+        "port": 60658,
+        "runtimeStopped": true
+      }
+    },
+    {
+      "backend": "prisma",
+      "exit": 0,
+      "passed": 24,
+      "failed": 0,
+      "total": 24,
+      "live": {
+        "assertions": 58,
+        "strictModes": [
+          true,
+          false
+        ],
+        "families": [
+          "Users",
+          "Groups",
+          "Devices"
+        ],
+        "pid": 16976,
+        "port": 60841,
+        "runtimeStopped": true
+      }
+    }
+  ],
+  "cleanup": {
+    "exactId": "822871c05e67b5f0bb974ac18cd5b195a1d019a396bb296605297a6f6b73f95d",
+    "removed": true
+  },
+  "docker": "29.6.2",
+  "container": {
+    "id": "822871c05e67b5f0bb974ac18cd5b195a1d019a396bb296605297a6f6b73f95d",
+    "name": "scim-p1-pg-91260acb7dcd5b78",
+    "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+    "run": "91260acb7dcd5b78",
+    "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+    "host": "127.0.0.1",
+    "port": 60259,
+    "database": "scim_p1_91260acb7dcd5b78",
+    "mounts": [],
+    "tmpfs": {
+      "/var/lib/postgresql/data": "rw"
+    },
+    "network": "bridge"
+  },
+  "beforeMigration": {
+    "container": {
+      "id": "822871c05e67b5f0bb974ac18cd5b195a1d019a396bb296605297a6f6b73f95d",
+      "name": "scim-p1-pg-91260acb7dcd5b78",
+      "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+      "run": "91260acb7dcd5b78",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "host": "127.0.0.1",
+      "port": 60259,
+      "database": "scim_p1_91260acb7dcd5b78",
+      "mounts": [],
+      "tmpfs": {
+        "/var/lib/postgresql/data": "rw"
+      },
+      "network": "bridge"
+    },
+    "server": {
+      "database": "scim_p1_91260acb7dcd5b78",
+      "username": "p1_runner",
+      "cluster_name": "scim-p1-91260acb7dcd5b78",
+      "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "server_address": "172.17.0.3/32",
+      "server_port": 5432,
+      "system_identifier": "7690805509219868707"
+    }
+  },
+  "migrationExit": 0,
+  "migrations": [
+    {
+      "migration_name": "20260223000000_postgresql_baseline",
+      "finished": true
+    },
+    {
+      "migration_name": "20260223203811_externalid_citext_case_insensitive",
+      "finished": true
+    },
+    {
+      "migration_name": "20260223225049_add_endpoint_schema",
+      "finished": true
+    },
+    {
+      "migration_name": "20260225123401_add_deleted_at_soft_delete",
+      "finished": true
+    },
+    {
+      "migration_name": "20260225181836_externalid_citext_to_text",
+      "finished": true
+    },
+    {
+      "migration_name": "20260225232117_add_endpoint_resource_type",
+      "finished": true
+    },
+    {
+      "migration_name": "20260227013947_add_endpoint_credential",
+      "finished": true
+    },
+    {
+      "migration_name": "20260313031330_add_endpoint_profile",
+      "finished": true
+    },
+    {
+      "migration_name": "20260409235323_remove_uniqueness_displayname_externalid",
+      "finished": true
+    },
+    {
+      "migration_name": "20260416025138_add_requestlog_perf_indexes",
+      "finished": true
+    },
+    {
+      "migration_name": "20260430120000_resource_member_unique_value",
+      "finished": true
+    },
+    {
+      "migration_name": "20260707000000_add_jwks_host_allowlist",
+      "finished": true
+    },
+    {
+      "migration_name": "20260707100000_add_credential_dek",
+      "finished": true
+    },
+    {
+      "migration_name": "20260707110000_add_secret_retention_and_server_settings",
+      "finished": true
+    },
+    {
+      "migration_name": "20260717120000_add_requestlog_requestid",
+      "finished": true
+    },
+    {
+      "migration_name": "20260721180000_add_requestlog_auth_summary",
+      "finished": true
+    },
+    {
+      "migration_name": "20260722120000_add_requestlog_auth_decision",
+      "finished": true
+    },
+    {
+      "migration_name": "20260724000000_drop_requestlog_endpoint_fk",
+      "finished": true
+    },
+    {
+      "migration_name": "20260827200000_add_credential_keyed_lookup",
+      "finished": true
+    },
+    {
+      "migration_name": "20260916035422_add_endpoint_credential_type_active_index",
+      "finished": true
+    },
+    {
+      "migration_name": "20260923020356_split_per_endpoint_credentials_enablement",
+      "finished": true
+    },
+    {
+      "migration_name": "20260924000000_endpoint_name_case_insensitive",
+      "finished": true
+    }
+  ],
+  "status": "passed",
+  "finishedAt": "2026-09-29T04:15:47.299Z"
+}

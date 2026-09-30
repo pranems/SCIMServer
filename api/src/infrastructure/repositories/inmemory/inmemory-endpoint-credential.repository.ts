@@ -11,10 +11,18 @@ import { randomUUID } from 'crypto';
 import type { IEndpointCredentialRepository, CredentialAlgoCount } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import type { EndpointCredentialModel, EndpointCredentialCreateInput } from '../../../domain/models/endpoint-credential.model';
 import { HASH_ALGO_BCRYPT } from '../../../security/credential-token';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 
 @Injectable()
 export class InMemoryEndpointCredentialRepository implements IEndpointCredentialRepository {
-  private readonly store = new Map<string, EndpointCredentialModel>();
+  private store = new Map<string, EndpointCredentialModel>();
+
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    return prepareMapRemoval(this.store, row => row.endpointId === endpointId, rows => { this.store = rows; });
+  }
 
   async create(input: EndpointCredentialCreateInput): Promise<EndpointCredentialModel> {
     const model: EndpointCredentialModel = {
@@ -34,6 +42,7 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
       // both backends rather than `undefined` here and 'bcrypt' there.
       hashAlgo: input.hashAlgo ?? 'bcrypt',
     };
+    this.writes.assertWritable(input.endpointId);
     this.store.set(model.id, model);
     return model;
   }
@@ -154,6 +163,7 @@ export class InMemoryEndpointCredentialRepository implements IEndpointCredential
       secretHash: replacement.secretHash ?? null,
       hashAlgo: replacement.hashAlgo ?? 'bcrypt',
     };
+    this.writes.assertWritable(replacement.endpointId);
     source.active = false;
     this.store.set(created.id, created);
     return created;

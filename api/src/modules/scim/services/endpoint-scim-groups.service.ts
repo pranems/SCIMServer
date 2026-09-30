@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
+import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import type {
   GroupWithMembers,
@@ -30,6 +31,7 @@ import type { PatchGroupDto } from '../dto/patch-group.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import { buildGroupFilter } from '../filters/apply-scim-filter';
 import { resolveGroupSortParams } from '../common/scim-sort.util';
+import { createReadQuery } from '../common/scim-read-query';
 import { GroupPatchEngine } from '../../../domain/patch/group-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import { SchemaValidator } from '../../../domain/validation';
@@ -43,10 +45,10 @@ import {
   stripNeverReturnedFromPayload,
   stripInternalResponseFields,
   ScimSchemaHelpers,
-  assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { resolveNumericLimit } from '../common/capability-resolver';
+import { enforcePatchSupported } from '../common/capability-enforcement';
 import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListGroupsParams {
@@ -86,6 +88,12 @@ export class EndpointScimGroupsService {
     // Resolve config: use passed config or fall back to endpoint context
     const endpointConfig = config ?? this.endpointContext.getConfig();
 
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as unknown as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateGroupDto;
+    const strippedAttrs = readOnlyResult.stripped;
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
@@ -97,7 +105,6 @@ export class EndpointScimGroupsService {
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'create');
 
     // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from POST payload', {
         attributes: strippedAttrs,
@@ -116,7 +123,8 @@ export class EndpointScimGroupsService {
       : null;
 
     // Check for duplicate displayName - always throw 409 on conflict
-    const displayNameConflict = await this.groupRepo.findByDisplayName(endpointId, dto.displayName);
+    const displayNameConflict = this.usesFoldedNameUniqueness(endpointId)
+      ? await this.groupRepo.findByDisplayName(endpointId, dto.displayName) : null;
     if (displayNameConflict) {
       this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: displayName '${dto.displayName}'`, {
         endpointId, conflictScimId: displayNameConflict.scimId,
@@ -141,13 +149,6 @@ export class EndpointScimGroupsService {
     // BF-1: Server MUST generate id (RFC 7643 §2.2 - id is readOnly, server-assigned)
     const scimId = randomUUID();
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrs.length > 0) {
-      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })));
-    }
-
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
     const input: GroupCreateInput = {
@@ -165,19 +166,15 @@ export class EndpointScimGroupsService {
 
     let group;
     try {
-      group = await this.groupRepo.create(input);
+      const memberInputs = await this.resolveMemberInputs(dto.members ?? [], endpointId);
+      group = await this.groupRepo.create(
+        input,
+        memberInputs,
+        this.schemaHelpers.getUniquenessPolicy(endpointId),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'create group', this.logger, LogCategory.SCIM_GROUP, { displayName: dto.displayName, endpointId });
-    }
-
-    const members = dto.members ?? [];
-    if (members.length > 0) {
-      const memberInputs = await this.resolveMemberInputs(members, endpointId);
-      try {
-        await this.groupRepo.addMembers(String(group.id), memberInputs);
-      } catch (error) {
-        handleRepositoryError(error, 'add members to group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
-      }
     }
 
     const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
@@ -209,62 +206,31 @@ export class EndpointScimGroupsService {
     // Gap 6: clamp to the per-endpoint filter.maxResults (RFC 7644 §3.4.2.4),
     // falling back to the global MAX_COUNT when the profile does not set it.
     const maxResults = resolveNumericLimit(this.endpointContext.getProfile?.(), (s) => s.filter?.maxResults, MAX_COUNT);
-    if (count > maxResults) {
-      count = maxResults;
-    }
-
     this.logger.info(LogCategory.SCIM_GROUP, 'List groups', { filter, startIndex, count, endpointId });
-
-    let filterResult;
-    try {
-      filterResult = buildGroupFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch (e) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: filter },
-      });
-    }
-
-    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
-    if (filter) {
-      this.schemaHelpers.validateFilterPaths(filter, endpointId);
-    }
-
-    // Fetch groups from DB (repository handles endpointId scoping + member include)
-    const sortParams = resolveGroupSortParams(sortBy, sortOrder);
+    const query = createReadQuery(
+      { filter, startIndex, count, sortBy, sortOrder },
+      this.schemaHelpers.getSchemaDefinitions(endpointId), maxResults, buildGroupFilter,
+    );
     const allGroups = await this.groupRepo.findAllWithMembers(
       endpointId,
-      filterResult.dbWhere,
-      sortParams,
+      query.dbWhere,
+      resolveGroupSortParams(),
     );
-
-    // Build SCIM resources and apply in-memory filter if needed
-    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
-
-    if (filterResult.inMemoryFilter) {
-      resources = resources.filter(filterResult.inMemoryFilter);
-    }
-
-    const totalResults = resources.length;
-    const skip = Math.max(startIndex - 1, 0);
-    const take = Math.max(Math.min(count, maxResults), 0);
-    const paginatedResources = resources.slice(skip, skip + take);
-
-    this.logger.debug(LogCategory.SCIM_GROUP, 'List groups result', { totalResults, returned: paginatedResources.length, endpointId });
-
+    const page = query.page(
+      allGroups,
+      group => this.toInternalGroupResource(group, baseUrl, endpointId),
+      group => this.toScimGroupResource(group, baseUrl, endpointId),
+    );
+    this.logger.debug(LogCategory.SCIM_GROUP, 'List groups result', { totalResults: page.totalResults, returned: page.itemsPerPage, endpointId });
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
-      totalResults,
-      startIndex,
-      itemsPerPage: paginatedResources.length,
-      Resources: paginatedResources
+      ...page,
     };
   }
 
   async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
     this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'patch' });
+    enforcePatchSupported(this.endpointContext.getProfile?.());
     ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
@@ -280,7 +246,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -311,6 +277,11 @@ export class EndpointScimGroupsService {
       }
     }
 
+    if (getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS)) {
+      coercePatchOpBooleans(dto.Operations, this.schemaHelpers.getBooleansByParent(endpointId),
+        this.schemaHelpers.getCoreSchemaUrnLower(endpointId));
+    }
+
     // V2: Pre-PATCH validation - validate each operation value against schema definitions
     if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
@@ -320,14 +291,6 @@ export class EndpointScimGroupsService {
         (resultPayloadPlaceholder.schemas as string[]).push(urn);
       }
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
-
-      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-      if (coerceEnabled) {
-        const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
-        const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
-        coercePatchOpBooleans(dto.Operations, boolMap, coreUrnLower);
-      }
 
       for (const [opIndex, op] of dto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
@@ -363,7 +326,22 @@ export class EndpointScimGroupsService {
           members: this.memberRecordsToDtos(group.members),
           rawPayload: parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
         },
-        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns, caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId) },
+        {
+          allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns,
+          caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId),
+          strictSchema: strictSchemaEnabled,
+          ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
+          onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),
+          schemaDefinitions: this.schemaHelpers.getSchemaDefinitions(endpointId),
+          normalize: (candidate, operation) => {
+            candidate.schemas = [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns.filter(urn => urn in candidate)];
+            this.schemaHelpers.coerceBooleansByParentIfEnabled(candidate, endpointId, endpointConfig);
+            this.schemaHelpers.enforcePrimaryConstraint(candidate, endpointId, endpointConfig);
+            this.schemaHelpers.validatePayloadSchema(
+              scopePatchPayloadToTouched(candidate, [operation], extensionUrns), endpointId, endpointConfig, 'patch',
+            );
+          },
+        },
       );
     } catch (err) {
       if (err instanceof PatchError) {
@@ -412,13 +390,6 @@ export class EndpointScimGroupsService {
     // externalId is NOT checked - saved as received per RFC 7643.
     await this.assertUniqueDisplayName(displayName, endpointId, scimId);
 
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrsPatch = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrsPatch.length > 0) {
-      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrsPatch, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
-    }
-
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
@@ -433,7 +404,8 @@ export class EndpointScimGroupsService {
           ...parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
           lastModified: new Date().toISOString()
         })
-      }, memberInputs);
+      }, memberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, 'patch group (transaction)', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
@@ -465,6 +437,17 @@ export class EndpointScimGroupsService {
     // Resolve config: use passed config or fall back to endpoint context
     const endpointConfig = config ?? this.endpointContext.getConfig();
 
+    const readOnlyResult = this.schemaHelpers.stripReadOnlyAttributesFromPayload(
+      dto as unknown as Record<string, unknown>,
+      endpointId,
+    );
+    dto = readOnlyResult.payload as unknown as CreateGroupDto;
+    const strippedAttrs = readOnlyResult.stripped;
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
+    if (!group) {
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
+    }
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
@@ -473,10 +456,10 @@ export class EndpointScimGroupsService {
     // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
     this.schemaHelpers.enforcePrimaryConstraint(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
+    SchemaValidator.prepareReplacement(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, this.schemaHelpers.getSchemaDefinitions(endpointId));
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
     // Strip readOnly attributes from PUT payload (RFC 7643 §2.2)
-    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
     if (strippedAttrs.length > 0) {
       this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from PUT payload', {
         attributes: strippedAttrs,
@@ -488,17 +471,8 @@ export class EndpointScimGroupsService {
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
-    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
-    if (!group) {
-      this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found for PUT', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
-    }
-
-    // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
-
     // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
-    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
     // G8f: Uniqueness enforcement on PUT - only displayName must remain unique
     // externalId is NOT checked - saved as received per RFC 7643.
@@ -506,13 +480,6 @@ export class EndpointScimGroupsService {
     const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
-
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrsPut = this.schemaHelpers.getUniqueAttributes(endpointId);
-    if (uniqueAttrsPut.length > 0) {
-      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
-    }
 
     const now = new Date();
     const meta = parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
@@ -531,7 +498,8 @@ export class EndpointScimGroupsService {
           ...meta,
           lastModified: now.toISOString()
         })
-      }, replaceMemberInputs);
+      }, replaceMemberInputs, expectedVersion, this.schemaHelpers.getUniquenessPolicy(endpointId),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, 'replace group (transaction)', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
@@ -560,7 +528,7 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Settings v7: Gate hard delete behind GroupHardDeleteEnabled (default: true)
     const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED);
@@ -574,7 +542,11 @@ export class EndpointScimGroupsService {
     }
 
     try {
-      await this.groupRepo.delete(group.id);
+      await this.groupRepo.delete(
+        group.id,
+        expectedVersion,
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
@@ -590,12 +562,19 @@ export class EndpointScimGroupsService {
    * Assert displayName uniqueness within the endpoint (case-insensitive).
    * Per SCIM spec, duplicate groups should be rejected with 409 Conflict.
    */
+  private usesFoldedNameUniqueness(endpointId: string): boolean {
+    return this.schemaHelpers.getUniquenessPolicy(endpointId).some((attr) =>
+      attr.schemaUrn === null && attr.path.length === 1 &&
+      attr.path[0].name.toLowerCase() === 'displayname' && !attr.caseExact);
+  }
+
   private async assertUniqueDisplayName(
     displayName: string,
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
     // Phase 3: Pass original name - CITEXT (PostgreSQL) / toLowerCase (InMemory) handles case-insensitivity
+    if (!this.usesFoldedNameUniqueness(endpointId)) return;
     const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
@@ -674,6 +653,19 @@ export class EndpointScimGroupsService {
   }
 
   private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
+    const resource = this.toInternalGroupResource(group, baseUrl, endpointId);
+    const visibleExtUrns = stripNeverReturnedFromPayload(
+      resource,
+      this.schemaHelpers.getNeverReturnedByParent(endpointId),
+      this.schemaHelpers.getCoreSchemaUrnLower(endpointId),
+      this.schemaHelpers.getExtensionUrns(endpointId),
+    );
+    resource.schemas = [SCIM_CORE_GROUP_SCHEMA, ...visibleExtUrns];
+    stripInternalResponseFields(resource);
+    return resource;
+  }
+
+  private toInternalGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.', diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
@@ -695,12 +687,8 @@ export class EndpointScimGroupsService {
     // Remove schemas from rawPayload - we build it dynamically below (G19 / FP-1)
     delete rawPayload.schemas;
 
-    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
-    const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
-    const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
-    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA, ...visibleExtUrns];
-    stripInternalResponseFields(rawPayload);
+    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA, ...extensionUrns];
 
     return {
       schemas,

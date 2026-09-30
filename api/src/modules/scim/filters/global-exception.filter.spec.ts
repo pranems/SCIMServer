@@ -5,6 +5,8 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY } from '../../logging/request-logging.interceptor';
 import * as scimLoggerModule from '../../logging/scim-logger.service';
+import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
@@ -73,9 +75,33 @@ describe('GlobalExceptionFilter', () => {
     expect(filter).toBeDefined();
   });
 
+  it('translates only a typed missing endpoint into a safe 404 and records the right audit status', () => {
+    filter.catch(new EndpointNotFoundError(new Error('Private driver detail')), createHost('/scim/admin/endpoints/ep-123/credentials'));
+    expect(mockResponse.status).toHaveBeenCalledWith(404);
+    const body: unknown = mockResponse.json.mock.calls[0][0];
+    expect(body).toMatchObject({
+      schemas: [SCIM_ERROR_SCHEMA], status: '404', detail: 'Endpoint no longer exists',
+      [SCIM_DIAGNOSTICS_URN]: { errorCode: 'ENDPOINT_NOT_FOUND' },
+    });
+    expect(JSON.stringify(body)).not.toContain('Private driver detail');
+    expect(mockLoggingService.recordRequest).toHaveBeenCalledWith(expect.objectContaining({ status: 404 }));
+    expect(mockScimLogger.error).not.toHaveBeenCalled();
+  });
+
+  it('does not rewrite an unrelated repository failure as endpoint not found', () => {
+    filter.catch(new RepositoryError('UNKNOWN', 'Private FK detail'), createHost());
+    expect(mockResponse.status).toHaveBeenCalledWith(500);
+    expect(JSON.stringify(mockResponse.json.mock.calls)).not.toContain('Private FK detail');
+  });
+
   // ─── HttpException passthrough ────────────────────────────────────
 
   describe('HttpException passthrough', () => {
+    it('preserves conditional-write 412 without invoking the missing-endpoint translation', () => {
+      const stale = new HttpException('Precondition failed', 412);
+      expect(() => filter.catch(stale, createHost())).toThrow(stale);
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
     it('should re-throw HttpException to let ScimExceptionFilter handle it', () => {
       const httpException = new HttpException('Bad Request', HttpStatus.BAD_REQUEST);
       const host = createHost();

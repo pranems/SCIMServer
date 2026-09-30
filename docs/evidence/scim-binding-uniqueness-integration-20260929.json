@@ -1,0 +1,341 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-29",
+  "scope": "C0 binding-qualified uniqueness runtime/admission; local integration, not release or deployment",
+  "base": "208de3655b823e75bf13930afd774f85e1fb47cb",
+  "sourceSha256": "6ecb2fe10f1306096b2a944ff8c3f3af46576934da258a3b6e7c755ac544e5fe",
+  "buildMainSha256": "43ea832dccad252d08f3d10ca4f0a48823164ad6200cc8775e47520dbe2fab72",
+  "documentation": {
+    "contentAudit": "passed, 26 documents",
+    "freshnessAudit": "passed, 26 documents; committed-range recheck recorded in final handoff",
+    "changedMarkdownFiles": 9,
+    "literalJsonBlocksParsed": 6,
+    "mermaidBlocksUnchanged": 16,
+    "renderDecision": "No Mermaid block changed; no redundant render run.",
+    "diffWhitespaceCheck": "passed"
+  },
+  "sourceFingerprintMethod": "Sorted tracked/untracked nonignored api/src, api/test and scripts paths, concatenated with checked-out file bytes; same source for both PostgreSQL runs.",
+  "manifest": [
+    {
+      "path": "api/src/domain/repositories/binding-uniqueness.spec.ts",
+      "sha256": "b69aba2329d98f815a4575b45bd30835a86892281651748582c40b471264fa97"
+    },
+    {
+      "path": "api/src/domain/repositories/uniqueness-policy.ts",
+      "sha256": "b025088512af088f45451aeb63cf6baaa2cfa28e8d67fe9471b390f883595598"
+    },
+    {
+      "path": "api/src/domain/validation/common-attributes.ts",
+      "sha256": "e45129232a43c7d6fee1cd04f659dd04f1d7df48809ab47f91e0a4e2836293ee"
+    },
+    {
+      "path": "api/src/modules/scim/common/live-correctness-wiring.spec.ts",
+      "sha256": "dd89421f62dfea86972e1257329258c4ad02c932dd7b4a214019b4808cd8bdf3"
+    },
+    {
+      "path": "api/src/modules/scim/common/scim-service-helpers.ts",
+      "sha256": "dd2e4eeb2d1c8ce93925bdb4cd5405c48363e6cdbc8b4fa3b92566ef88f86095"
+    },
+    {
+      "path": "api/src/modules/scim/endpoint-profile/auto-expand.service.ts",
+      "sha256": "fd13d2ac2cd8ed6378a14597d48ba809e967d29b12c42093b32d1fa78254995f"
+    },
+    {
+      "path": "api/src/modules/scim/endpoint-profile/endpoint-profile.service.ts",
+      "sha256": "89605682cd49c709d1b5551b060a1943d402e86b14a6dd14817f6a2c89f1623c"
+    },
+    {
+      "path": "api/src/modules/scim/endpoint-profile/profile-uniqueness-admission.spec.ts",
+      "sha256": "728177a2db2f6695f4b9f6e00f79d20b53f4c38e06aec5d046ee2600935a893a"
+    },
+    {
+      "path": "api/src/modules/scim/endpoint-profile/uniqueness-admission.ts",
+      "sha256": "fe53258b7bf8a11f0b5247158d4642518aaf42c77b819291d85577ad42dd875b"
+    },
+    {
+      "path": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+      "sha256": "3d774f650bad8784fae21f2b61ef98963ff4b3f8e3b5c37568e6eb9034fbf3ac"
+    },
+    {
+      "path": "api/test/e2e/binding-uniqueness.e2e-spec.ts",
+      "sha256": "a2e8b037529fe748253aa3a426cbc42c37b64cb247747035a9ca7503a2cd23dc"
+    },
+    {
+      "path": "api/test/helpers/binding-uniqueness.fixture.ts",
+      "sha256": "1aad7a1d52512eede6eacc0027cc1181af103a852adf8c2bda4532422f0ac9e5"
+    },
+    {
+      "path": "api/test/helpers/binding-uniqueness.json",
+      "sha256": "02a24c2fd10dfc17bd5ac135a37e41bcaf977aec2de864c83fe511d123ac969f"
+    },
+    {
+      "path": "scripts/live-test-sections/binding-uniqueness.cjs",
+      "sha256": "e99e8fd1c7d58d36774de6548e1d98fd2cd1584fc61ace6730ca7264263922ae"
+    },
+    {
+      "path": "scripts/live-test-sections/correctness-contracts.ps1",
+      "sha256": "78f13cc8ab74e8d60bdf44e0cfec726d2ceb81e59d3ddc2999620226925f8e5a"
+    }
+  ],
+  "red": {
+    "unit": {
+      "passed": 8,
+      "failed": 7,
+      "pending": 0,
+      "todo": 0,
+      "suites": 2
+    },
+    "http": {
+      "passed": 0,
+      "failed": 6,
+      "pending": 0,
+      "todo": 0,
+      "suites": 1
+    },
+    "liveRoute": {
+      "passed": 6,
+      "failed": 1,
+      "pending": 0,
+      "todo": 0,
+      "suites": 1
+    },
+    "liveCount": {
+      "passed": 0,
+      "failed": 1,
+      "pending": 7,
+      "todo": 0,
+      "suites": 1
+    }
+  },
+  "green": {
+    "build": {
+      "exit": 0,
+      "command": "npm run build (api)"
+    },
+    "unitPrimary": {
+      "passed": 383,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "suites": 9
+    },
+    "finalWiring": {
+      "passed": 8,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "suites": 1
+    },
+    "inmemoryPrimary": {
+      "passed": 317,
+      "failed": 0,
+      "pending": 2,
+      "todo": 0,
+      "suites": 7
+    },
+    "inmemoryLateControls": {
+      "passed": 9,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "suites": 1
+    },
+    "inmemoryDistinctHttp": 318,
+    "postgresHttp": {
+      "passed": 320,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "suites": 7
+    },
+    "migrations": 22,
+    "postgresVersion": "17.8",
+    "inmemoryMainLive": {
+      "passed": 165,
+      "failed": 0,
+      "newAssertions": 126,
+      "modes": 2,
+      "inventoryUnchanged": true
+    },
+    "postgresMainLive": {
+      "passed": 165,
+      "failed": 0,
+      "newAssertions": 126,
+      "wrapperExit": 1,
+      "limitation": "Copied wrapper expected164 after165 passed; final inventory check was not reached. Original failure retained."
+    },
+    "postgresFocusedReplay": {
+      "passed": 1,
+      "failed": 0,
+      "newAssertions": 126,
+      "wrapperExit": 0,
+      "inventoryUnchanged": true
+    },
+    "lint": {
+      "rows": [
+        {
+          "file": "src/domain/repositories/binding-uniqueness.spec.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": null
+        },
+        {
+          "file": "src/modules/scim/endpoint-profile/profile-uniqueness-admission.spec.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": null
+        },
+        {
+          "file": "src/modules/scim/endpoint-profile/uniqueness-admission.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": null
+        },
+        {
+          "file": "test/e2e/binding-uniqueness.e2e-spec.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": null
+        },
+        {
+          "file": "test/helpers/binding-uniqueness.fixture.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": null
+        },
+        {
+          "file": "src/domain/repositories/uniqueness-policy.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 0
+          }
+        },
+        {
+          "file": "src/domain/validation/common-attributes.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 0
+          }
+        },
+        {
+          "file": "src/modules/scim/common/live-correctness-wiring.spec.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 0
+          }
+        },
+        {
+          "file": "src/modules/scim/common/scim-service-helpers.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 13
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 13
+          }
+        },
+        {
+          "file": "src/modules/scim/endpoint-profile/auto-expand.service.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 5
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 5
+          }
+        },
+        {
+          "file": "src/modules/scim/endpoint-profile/endpoint-profile.service.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 1
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 1
+          }
+        },
+        {
+          "file": "src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "current": {
+            "errors": 0,
+            "warnings": 11
+          },
+          "baseline": {
+            "errors": 0,
+            "warnings": 11
+          }
+        }
+      ],
+      "current": {
+        "errors": 0,
+        "warnings": 30
+      },
+      "baseline": {
+        "errors": 0,
+        "warnings": 30
+      }
+    }
+  },
+  "cleanup": {
+    "postgresContainers": [
+      "exact-owned-container-removed",
+      "exact-owned-container-removed"
+    ],
+    "postgresProcessesStopped": [
+      true,
+      true
+    ],
+    "inmemoryProcessStopped": true,
+    "inheritedDatabaseUsed": false,
+    "tooling": "Only owned API junction borrowed after MODULE_NOT_FOUND; removal verified in final handoff."
+  },
+  "decisions": {
+    "capabilityCompiler": "compileUniquenessPolicy is unchanged and remains the only type/path capability table.",
+    "viewAdapter": "compileEffectiveUniquenessPolicy applies effectiveCommonAttributes by actual binding before storage compilation.",
+    "admission": "Core-only raw promises must compile; shared declarations receive common precedence per core binding, without schema mutation.",
+    "externalId": "Common String/SV/exact; default-none permits duplicates; explicit server policy is endpoint/resource-type/path scoped, not client-domain/global.",
+    "meta": "Effective common metadata uniqueness defaults to none; explicit unsupported core-only promises are rejected at admission.",
+    "schemaExtensions": "Omission defaults to[] on a copied ResourceType; explicit null/non-array remains declaration error.",
+    "review": "Direct changed-source design/contract review; no independent-review claim."
+  },
+  "rca": [
+    "C0-I52",
+    "C0-I53",
+    "C0-I54",
+    "C0-I55",
+    "C0-I56"
+  ],
+  "remaining": [
+    "Worker2f90 strict namespace-only PATCH, evolving required extensions, returned:request projection",
+    "Broader characteristic overlays and profile-revision coordination",
+    "Candidate-materialization performance",
+    "Original82-case/164-backend ledger and final exact packaged-artifact matrix",
+    "Release metadata, reviewed PR/exact-tip CI and separately authorized deployment"
+  ],
+  "evidenceRoot": "test-results/scim-integration-binding-uniqueness"
+}

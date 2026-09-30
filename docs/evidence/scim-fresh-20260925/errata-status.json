@@ -1,0 +1,412 @@
+{
+  "retrievedAt": "2026-09-26T03:12:35.297Z",
+  "source": "Official RFC Editor records view; statuses are time-stamped not assumed from repo comments.",
+  "errata": [
+    {
+      "rfc": "7643",
+      "id": 5368,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid5368"
+    },
+    {
+      "rfc": "7643",
+      "id": 5606,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid5606"
+    },
+    {
+      "rfc": "7643",
+      "id": 5607,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid5607"
+    },
+    {
+      "rfc": "7643",
+      "id": 6004,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6004"
+    },
+    {
+      "rfc": "7643",
+      "id": 7522,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid7522"
+    },
+    {
+      "rfc": "7643",
+      "id": 8361,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8361"
+    },
+    {
+      "rfc": "7643",
+      "id": 8415,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8415"
+    },
+    {
+      "rfc": "7643",
+      "id": 8417,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8417"
+    },
+    {
+      "rfc": "7643",
+      "id": 8450,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8450"
+    },
+    {
+      "rfc": "7643",
+      "id": 8471,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8471"
+    },
+    {
+      "rfc": "7643",
+      "id": 8472,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8472"
+    },
+    {
+      "rfc": "7643",
+      "id": 8475,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8475"
+    },
+    {
+      "rfc": "7643",
+      "id": 5990,
+      "status": "Verified",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid5990"
+    },
+    {
+      "rfc": "7643",
+      "id": 5991,
+      "status": "Verified",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid5991"
+    },
+    {
+      "rfc": "7643",
+      "id": 6727,
+      "status": "Verified",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid6727"
+    },
+    {
+      "rfc": "7643",
+      "id": 8435,
+      "status": "Verified",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid8435"
+    },
+    {
+      "rfc": "7643",
+      "id": 5999,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid5999"
+    },
+    {
+      "rfc": "7643",
+      "id": 6000,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6000"
+    },
+    {
+      "rfc": "7643",
+      "id": 6007,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6007"
+    },
+    {
+      "rfc": "7643",
+      "id": 6011,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6011"
+    },
+    {
+      "rfc": "7643",
+      "id": 8011,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8011"
+    },
+    {
+      "rfc": "7643",
+      "id": 8924,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8924"
+    },
+    {
+      "rfc": "7643",
+      "id": 9018,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid9018"
+    },
+    {
+      "rfc": "7643",
+      "id": 6001,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6001"
+    },
+    {
+      "rfc": "7643",
+      "id": 6403,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6403"
+    },
+    {
+      "rfc": "7643",
+      "id": 8279,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8279"
+    },
+    {
+      "rfc": "7643",
+      "id": 8280,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8280"
+    },
+    {
+      "rfc": "7643",
+      "id": 8281,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8281"
+    },
+    {
+      "rfc": "7643",
+      "id": 8358,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8358"
+    },
+    {
+      "rfc": "7643",
+      "id": 8359,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8359"
+    },
+    {
+      "rfc": "7643",
+      "id": 8363,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8363"
+    },
+    {
+      "rfc": "7643",
+      "id": 8366,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8366"
+    },
+    {
+      "rfc": "7643",
+      "id": 8418,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8418"
+    },
+    {
+      "rfc": "7643",
+      "id": 8419,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8419"
+    },
+    {
+      "rfc": "7643",
+      "id": 6005,
+      "status": "Held for Document Update",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid6005"
+    },
+    {
+      "rfc": "7643",
+      "id": 4979,
+      "status": "Rejected",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid4979"
+    },
+    {
+      "rfc": "7643",
+      "id": 7921,
+      "status": "Rejected",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid7921"
+    },
+    {
+      "rfc": "7643",
+      "id": 8360,
+      "status": "Rejected",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8360"
+    },
+    {
+      "rfc": "7643",
+      "id": 8362,
+      "status": "Rejected",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8362"
+    },
+    {
+      "rfc": "7643",
+      "id": 6438,
+      "status": "Rejected",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid6438"
+    },
+    {
+      "rfc": "7644",
+      "id": 7916,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid7916"
+    },
+    {
+      "rfc": "7644",
+      "id": 8096,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8096"
+    },
+    {
+      "rfc": "7644",
+      "id": 8365,
+      "status": "Verified",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8365"
+    },
+    {
+      "rfc": "7644",
+      "id": 6893,
+      "status": "Verified",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid6893"
+    },
+    {
+      "rfc": "7644",
+      "id": 7898,
+      "status": "Verified",
+      "type": "Editorial",
+      "url": "https://www.rfc-editor.org/errata/eid7898"
+    },
+    {
+      "rfc": "7644",
+      "id": 4978,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid4978"
+    },
+    {
+      "rfc": "7644",
+      "id": 5050,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid5050"
+    },
+    {
+      "rfc": "7644",
+      "id": 5295,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid5295"
+    },
+    {
+      "rfc": "7644",
+      "id": 6010,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid6010"
+    },
+    {
+      "rfc": "7644",
+      "id": 7319,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid7319"
+    },
+    {
+      "rfc": "7644",
+      "id": 7322,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid7322"
+    },
+    {
+      "rfc": "7644",
+      "id": 8057,
+      "status": "Reported",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8057"
+    },
+    {
+      "rfc": "7644",
+      "id": 4670,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid4670"
+    },
+    {
+      "rfc": "7644",
+      "id": 4690,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid4690"
+    },
+    {
+      "rfc": "7644",
+      "id": 7122,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid7122"
+    },
+    {
+      "rfc": "7644",
+      "id": 8084,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8084"
+    },
+    {
+      "rfc": "7644",
+      "id": 8097,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8097"
+    },
+    {
+      "rfc": "7644",
+      "id": 8367,
+      "status": "Held for Document Update",
+      "type": "Technical",
+      "url": "https://www.rfc-editor.org/errata/eid8367"
+    }
+  ]
+}

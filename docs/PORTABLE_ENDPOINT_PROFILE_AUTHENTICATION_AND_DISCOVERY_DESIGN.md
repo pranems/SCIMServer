@@ -1437,7 +1437,7 @@ Each phase is a separate coherent rollback unit.
 | Expansion and secret stripping | [auto-expand.service.ts](../api/src/modules/scim/endpoint-profile/auto-expand.service.ts) |
 | Validation and SPC truthfulness | [endpoint-profile.service.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.service.ts) |
 | Endpoint CRUD and merge | [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts) |
-| Endpoint ETag | [endpoint-etag.ts](../api/src/modules/endpoint/controllers/endpoint-etag.ts) |
+| Endpoint ETag | [endpoint-etag.ts](../api/src/modules/endpoint/common/endpoint-etag.ts) |
 | Endpoint config registry | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) |
 | Endpoint discovery | [scim-discovery.service.ts](../api/src/modules/scim/discovery/scim-discovery.service.ts) |
 | Method CRUD | [admin-authentication-method.controller.ts](../api/src/modules/scim/controllers/admin-authentication-method.controller.ts) |

@@ -2,12 +2,13 @@ import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import {
-  scimPost,
-  scimPatch,
-  scimGet,
+  scimPost as rawPost,
+  scimPatch as rawPatch,
+  scimGet as rawGet,
   createEndpointWithConfig,
   scimBasePath,
 } from './helpers/request.helper';
+import type { TypedHttpTest } from './helpers/typed-http';
 import {
   validUser,
   patchOp,
@@ -16,6 +17,14 @@ import {
 
 const ENT_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 const MANAGER_PATH = `${ENT_URN}:manager`;
+
+interface WireBody extends Record<string, unknown> {
+  id: string;
+  [ENT_URN]: { manager: Record<string, unknown> };
+}
+const scimPost = (...args: Parameters<typeof rawPost>) => rawPost(...args) as unknown as TypedHttpTest<WireBody>;
+const scimGet = (...args: Parameters<typeof rawGet>) => rawGet(...args) as unknown as TypedHttpTest<WireBody>;
+const scimPatch = (...args: Parameters<typeof rawPatch>) => rawPatch(...args) as unknown as TypedHttpTest<WireBody>;
 
 /**
  * Manager PATCH String Coercion (RFC 7644 §3.5.2.3 + Postel's Law)
@@ -51,6 +60,21 @@ describe('Manager PATCH String Coercion (E2E)', () => {
   });
 
   // ───────────── Add Manager with raw string (Entra ID style) ─────────────
+
+  it('P2 remove ignores a stray manager string instead of assigning it', async () => {
+    const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+    const url = `${basePath}/Users/${created.id}`;
+    await scimPatch(app, url, token, patchOp([{ op: 'add', path: MANAGER_PATH, value: 'old-manager' }])).expect(200);
+    const result = await scimPatch(app, url, token, patchOp([{ op: 'remove', path: MANAGER_PATH, value: 'new-manager' }])).expect(200);
+    expect(result.body[ENT_URN]?.manager).toBeUndefined();
+    expect((await scimGet(app, url, token).expect(200)).body[ENT_URN]?.manager).toBeUndefined();
+  });
+  it('P2 expands no-path manager shorthand through the same value adapter', async () => {
+    const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+    const url = `${basePath}/Users/${created.id}`;
+    await scimPatch(app, url, token, patchOp([{ op: 'add', value: { [MANAGER_PATH]: 'manager' } }])).expect(200);
+    expect((await scimGet(app, url, token).expect(200)).body[ENT_URN].manager).toEqual({ value: 'manager' });
+  });
 
   describe('PATCH add manager with raw string value', () => {
     it('should accept raw string for manager add (Entra ID compat)', async () => {

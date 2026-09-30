@@ -1,0 +1,124 @@
+{
+  "package": "P7a",
+  "branch": "fix/scim-profile-validation-20260928",
+  "base": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+  "status": "locally-validated-not-pushed-or-deployed",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "baseline": {
+    "unitRed": {
+      "failed": 45,
+      "passed": 15,
+      "artifact": "test-results/p7/unit-red.json",
+      "examples": [
+        "Malformed binary accepted: not base64!",
+        "Malformed declaration accepted: multiValued as a string",
+        "readOnly create input rejected instead of ignored"
+      ]
+    },
+    "additionalRedArtifacts": [
+      "test-results/p7/http-red.json",
+      "test-results/p7/dto-red.log",
+      "test-results/p7/returned-red.log",
+      "test-results/p7/projection-red.log",
+      "test-results/p7/formats-red.log",
+      "test-results/p7/immutable-red.log",
+      "test-results/p7/review-unit-red.log",
+      "test-results/p7/review-http-red.log"
+    ]
+  },
+  "focusedUnit": {
+    "suites": 21,
+    "passed": 1507,
+    "failed": 0,
+    "artifact": "test-results/p7/regression.json"
+  },
+  "backendRun": {
+    "startedAt": "2026-09-29T05:09:26.903Z",
+    "artifact": "test-results/p7/backends-c644b99c66cf53d2/run.json",
+    "sourceSha256": "51d76df88398f5fd2269386dc4385492dfb2c895e2c3e2fc3b500c5470dfa8c1",
+    "sourceFileCount": 550,
+    "server": {
+      "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "serverVersionNum": 170008,
+      "database": "scim_p1_c644b99c66cf53d2",
+      "clusterName": "scim-p1-c644b99c66cf53d2",
+      "systemIdentifier": "7690820081660952611",
+      "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+      "migrationsAppliedAndVerified": 22
+    },
+    "backends": [
+      {
+        "backend": "inmemory",
+        "httpPassed": 55,
+        "httpFailed": 0,
+        "liveAssertions": 156,
+        "runtimePid": 43328,
+        "runtimeStopped": true,
+        "endpointsDeleted": true
+      },
+      {
+        "backend": "prisma",
+        "httpPassed": 55,
+        "httpFailed": 0,
+        "liveAssertions": 156,
+        "runtimePid": 33000,
+        "runtimeStopped": true,
+        "endpointsDeleted": true
+      }
+    ],
+    "cleanup": {
+      "exactContainerId": "364677d44a31c732a7e2970a91fbbb240b54dd916343dbef2561126da5d42b30",
+      "removed": true
+    }
+  },
+  "postRunTypeOnlyLintCleanup": {
+    "finalSourceSha256": "e196d1411c54847e01d67d1928c02e175d9f7ded94616262fbd9ed1eec152bcd",
+    "description": "Removed three unnecessary TypeScript assertions; emitted runtime JavaScript byte-identical before and after the successful final build.",
+    "artifact": "test-results/p7/type-only-emission.json",
+    "emittedFiles": [
+      {
+        "file": "api/dist/modules/scim/endpoint-profile/schema-declaration-validator.js",
+        "beforeAndAfterSha256": "e784b45ebdfdd646ac80ad63cfb6525cd722f523812cf0b2dff5bf4727afde12"
+      },
+      {
+        "file": "api/dist/modules/scim/services/endpoint-scim-groups.service.js",
+        "beforeAndAfterSha256": "02dc548e835cb8e52c2ff675a29238f9747034bfb9a959420c401ed2d0f5c016"
+      }
+    ]
+  },
+  "staticGates": {
+    "apiBuild": "passed",
+    "productionLintErrors": 0,
+    "productionLintWarningsBefore": 62,
+    "productionLintWarningsAfter": 62,
+    "docFreshness": "passed: 26 documents",
+    "docContent": "passed: 26 documents",
+    "literalJsonFences": "60 parsed without error before final documentation-only additions",
+    "mermaid": "23 blocks rendered in light and dark, strict security",
+    "rendererWarning": "Built-in renderer discovery reported 0.0.0; pinned 11.15.0 Chromium render passed. No dependencies repinned."
+  },
+  "review": {
+    "independentFindings": 3,
+    "fixed": 3,
+    "permanentReviewRegressionTests": {
+      "unit": 2,
+      "httpPerBackend": 6
+    },
+    "openFindings": 0
+  },
+  "remaining": [
+    "P2 ordered PATCH integration and P7b characteristic-promise review",
+    "Custom server-uniqueness atomicity and unsupported multivalued/sub-attribute scope",
+    "Optional referenceTypes semantics and non-RFC deep-complex readOnly compatibility",
+    "Raw integer JSON lexical representation is not preserved after parsing",
+    "Parent full-transcript RCA reconciliation, consolidation and release metadata"
+  ],
+  "safety": {
+    "sourceGuardNegativeControls": 3,
+    "sourceGuardPositiveControls": 1,
+    "liveEstateAccess": false,
+    "sharedDatabaseAccess": false,
+    "versionsOrLockfilesChanged": false,
+    "pushOrDeployment": false
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "verifiedAt": "2026-09-29",
+  "sourceHead": "7332fdbcc70762a8f5ace4c5a63c67b00582eb87",
+  "status": "complete",
+  "claim": "Enumerated characteristic overlays are covered without claiming an exhaustive Cartesian product.",
+  "backends": {
+    "current82Cases": {
+      "inmemory": {
+        "passed": 81,
+        "acceptedNotApplicable": 1,
+        "failed": 0,
+        "checksPassed": 383
+      },
+      "postgresql": {
+        "passed": 82,
+        "acceptedNotApplicable": 0,
+        "failed": 0,
+        "checksPassed": 386,
+        "version": "17.8",
+        "migrations": 22
+      },
+      "evidence": "docs/evidence/scim-current-acceptance-20260929/validation.json"
+    },
+    "p7bGuarded": {
+      "inmemoryCasesPassed": 571,
+      "postgresqlCasesPassed": 571,
+      "failed": 0,
+      "pending": 0,
+      "localReceipt": "test-results/p7b/10117adbbd9c6b03/receipt.json"
+    }
+  },
+  "boundaries": [
+    {
+      "name": "declaration-and-defaults",
+      "combinations": [
+        "omitted RFC defaults",
+        "valid and invalid Boolean declarations",
+        "valid and invalid type, mutability, returned, and uniqueness keywords"
+      ],
+      "tests": [
+        "api/src/modules/scim/endpoint-profile/profile-declaration-p7.spec.ts",
+        "api/test/e2e/profile-validation-p7.e2e-spec.ts"
+      ]
+    },
+    {
+      "name": "type-cardinality-and-depth",
+      "combinations": [
+        "eight native SCIM types",
+        "single and multi-valued",
+        "complex children",
+        "wrong scalar and list representations"
+      ],
+      "tests": [
+        "TYPES-Users",
+        "TYPES-Groups",
+        "TYPES-Devices",
+        "CARDINALITY-NEGATIVE-Users",
+        "CARDINALITY-NEGATIVE-Groups",
+        "CARDINALITY-NEGATIVE-Devices"
+      ]
+    },
+    {
+      "name": "binding-and-adapter",
+      "combinations": [
+        "core and extension namespace",
+        "User, Group, and custom resource",
+        "strict true and false"
+      ],
+      "tests": [
+        "api/test/e2e/profile-validation-p7.e2e-spec.ts",
+        "api/test/e2e/patch-schema-contract.e2e-spec.ts",
+        "api/test/e2e/typed-patch-path.e2e-spec.ts"
+      ]
+    },
+    {
+      "name": "required",
+      "combinations": [
+        "required core value",
+        "required extension binding",
+        "required complex child",
+        "optional extension removal",
+        "ordered PATCH transition"
+      ],
+      "tests": [
+        "api/test/e2e/profile-validation-p7.e2e-spec.ts",
+        "api/test/e2e/patch-schema-contract.e2e-spec.ts",
+        "REQUIRED-REMOVE-Users",
+        "REQUIRED-REMOVE-Groups",
+        "REQUIRED-REMOVE-Devices"
+      ]
+    },
+    {
+      "name": "mutability",
+      "combinations": [
+        "readOnly top-level and recursive nested",
+        "immutable assign, preserve, replace, remove, and null-parent",
+        "writeOnly response privacy",
+        "retained duplicate array entries"
+      ],
+      "tests": [
+        "api/test/e2e/profile-validation-p7.e2e-spec.ts",
+        "api/test/e2e/patch-schema-contract.e2e-spec.ts",
+        "api/test/e2e/retained-entry-put.e2e-spec.ts",
+        "IMMUTABLE-SEQUENCE-Users",
+        "IMMUTABLE-SEQUENCE-Groups",
+        "IMMUTABLE-SEQUENCE-Devices"
+      ]
+    },
+    {
+      "name": "returned",
+      "combinations": [
+        "always",
+        "default",
+        "request",
+        "never",
+        "implicit presence",
+        "explicit attributes and excludedAttributes",
+        "core and extension homonyms"
+      ],
+      "tests": [
+        "api/test/e2e/returned-characteristic.e2e-spec.ts",
+        "api/test/e2e/p2-attribute-characteristics.e2e-spec.ts",
+        "api/test/e2e/profile-validation-p7.e2e-spec.ts",
+        "api/test/e2e/patch-schema-contract.e2e-spec.ts",
+        "RETURNED-Users",
+        "RETURNED-Groups",
+        "RETURNED-Devices"
+      ]
+    },
+    {
+      "name": "case-and-query",
+      "combinations": [
+        "caseExact true and false",
+        "read filter",
+        "PATCH selector",
+        "qualified namespace",
+        "pushdown and residual evaluation"
+      ],
+      "tests": [
+        "CASEEXACT-Users",
+        "CASEEXACT-Groups",
+        "CASEEXACT-Devices",
+        "api/src/modules/scim/common/scim-read-query.spec.ts"
+      ]
+    },
+    {
+      "name": "uniqueness",
+      "combinations": [
+        "none and server",
+        "scalar, multi-valued, and child",
+        "core and extension binding",
+        "concurrent create and replace",
+        "unsupported type and global declarations"
+      ],
+      "tests": [
+        "api/test/e2e/binding-uniqueness.e2e-spec.ts",
+        "api/test/e2e/schema-driven-uniqueness.e2e-spec.ts",
+        "UNIQUE-WIRE",
+        "UNIQUE-BARRIER"
+      ]
+    },
+    {
+      "name": "multi-valued-primary-and-retention",
+      "combinations": [
+        "primary handoff",
+        "reject and normalize policy",
+        "duplicate values and types",
+        "omitted and null type",
+        "reorder, insertion, deletion, and repeated PUT"
+      ],
+      "tests": [
+        "PRIMARY-Users",
+        "PRIMARY-Groups",
+        "PRIMARY-Devices",
+        "api/test/e2e/retained-entry-put.e2e-spec.ts"
+      ]
+    }
+  ],
+  "productionChangesRequired": false,
+  "remainingCharacteristicBlockers": []
+}

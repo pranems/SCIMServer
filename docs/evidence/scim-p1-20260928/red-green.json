@@ -1,0 +1,112 @@
+{
+  "package": "P1",
+  "dateLocal": "2026-09-28",
+  "designBase": "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e",
+  "originalSource": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "worktree": "SCIMServer-scim-implementation",
+  "branch": "fix/scim-correctness-p1-20260928",
+  "red": [
+    {
+      "commandFromApi": "npm test -- --runInBand --runTestsByPath src/domain/patch/typed-patch-path.spec.ts",
+      "failed": 53,
+      "passed": 4,
+      "actualAssertion": "expect(received).toEqual(expected): contacts[0].value was old; extra contacts[primary eq true] object contained value new",
+      "log": "test-results/p1/red-domain.log",
+      "retainedExcerpt": "red-domain-excerpt.txt"
+    },
+    {
+      "commandFromApi": "npm run test:e2e -- --runInBand --runTestsByPath test/e2e/typed-patch-path.e2e-spec.ts",
+      "failed": 12,
+      "passed": 0,
+      "actualAssertion": "Expected status 200; received status 400 and duplicate unknown contacts[primary eq true] diagnostics in strict mode",
+      "log": "test-results/p1/red-http.log",
+      "retainedExcerpt": "red-http-excerpt.txt"
+    },
+    {
+      "commandFromApi": "npm test -- --runInBand --runTestsByPath src/domain/patch/typed-patch-path.spec.ts --testNamePattern=value.deep",
+      "failed": 3,
+      "skipped": 57,
+      "actualAssertion": "Expected constructor: PatchError. Received function did not throw.",
+      "log": "test-results/p1/red-selector-tail.log",
+      "retainedExcerpt": "red-selector-tail-excerpt.txt"
+    }
+  ],
+  "green": {
+    "apiBuild": {
+      "commandFromApi": "npm run build",
+      "exitCode": 0,
+      "log": "test-results/p1/build.log"
+    },
+    "unit": {
+      "commandFromApi": "npm test -- --runInBand --runTestsByPath <unitFiles below>",
+      "suites": 18,
+      "passed": 1476,
+      "failed": 0,
+      "log": "test-results/p1/green-unit.log"
+    },
+    "http": {
+      "commandFromApi": "npm run test:e2e -- --runInBand --runTestsByPath <httpFiles below>",
+      "suites": 5,
+      "passed": 65,
+      "failed": 0,
+      "log": "test-results/p1/green-e2e.log"
+    },
+    "lint": {
+      "commandFromApi": "node node_modules/eslint/bin/eslint.js src/domain/patch src/domain/validation/schema-validator.ts src/modules/scim/utils/scim-patch-path.ts src/modules/scim/filters/scim-filter-parser.ts src/modules/scim/common/scim-service-helpers.ts src/modules/scim/services/endpoint-scim-users.service.ts src/modules/scim/services/endpoint-scim-groups.service.ts src/modules/scim/services/endpoint-scim-generic.service.ts",
+      "baselineErrors": 0,
+      "baselineWarnings": 55,
+      "finalErrors": 0,
+      "finalWarnings": 55,
+      "baselineLog": "test-results/p1/lint-baseline.log",
+      "finalLog": "test-results/p1/lint-final.log"
+    },
+    "backends": {
+      "commandFromRoot": "node scripts/p1-validation/check-safety.cjs && node scripts/p1-validation/run.cjs",
+      "receipt": "backend-validation.json",
+      "httpPassedPerBackend": 24,
+      "liveAssertionsPerBackend": 58,
+      "migrations": 22,
+      "postgresVersion": "17.8"
+    }
+  },
+  "unitFiles": [
+    "src/domain/patch/patch-path.spec.ts",
+    "src/domain/patch/typed-patch-path.spec.ts",
+    "src/domain/patch/user-patch-engine.spec.ts",
+    "src/domain/patch/group-patch-engine.spec.ts",
+    "src/domain/patch/generic-patch-engine.spec.ts",
+    "src/domain/patch/extension-and-flags.spec.ts",
+    "src/domain/patch/patch-engine-v19-v20.spec.ts",
+    "src/modules/scim/utils/scim-patch-path.spec.ts",
+    "src/modules/scim/filters/scim-filter-parser.spec.ts",
+    "src/domain/validation/schema-validator.spec.ts",
+    "src/domain/validation/schema-validator-cache.spec.ts",
+    "src/domain/validation/schema-validator-comprehensive.spec.ts",
+    "src/modules/scim/common/scim-service-helpers.spec.ts",
+    "src/modules/scim/services/sanitize-boolean-strings.spec.ts",
+    "src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+    "src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+    "src/modules/scim/services/endpoint-scim-generic.service.spec.ts",
+    "src/modules/scim/controllers/endpoint-scim-users.controller.spec.ts"
+  ],
+  "httpFiles": [
+    "test/e2e/typed-patch-path.e2e-spec.ts",
+    "test/e2e/advanced-patch.e2e-spec.ts",
+    "test/e2e/patch-untouched-attribute-validation.e2e-spec.ts",
+    "test/e2e/patch-null-handling.e2e-spec.ts",
+    "test/e2e/manager-patch-string-coercion.e2e-spec.ts"
+  ],
+  "environment": {
+    "PERSISTENCE_BACKENDForFocusedRuns": "inmemory",
+    "DATABASE_URLForFocusedRuns": "postgresql://127.0.0.1:1/scim_p1_never_connect",
+    "inheritedDatabaseUsed": false,
+    "normalGlobalTeardownUsedOnPostgres": false,
+    "dependencyLockfilesChanged": false
+  },
+  "pending": [
+    "Central integration version and CHANGELOG metadata",
+    "Complete applicable consolidation evidence and independent review",
+    "Exact-tip CI, reviewed PR, merge and any deployment",
+    "Exact editor Mermaid version parity: renderer discovery reported 0.0.0"
+  ]
+}

@@ -11,7 +11,7 @@ describe('InMemoryUserRepository', () => {
     endpointId,
     scimId: 'scim-user-1',
     externalId: 'ext-1',
-    userName: 'Alice',
+    userName: overrides?.scimId ?? 'Alice',
     displayName: null,
     active: true,
     rawPayload: '{}',
@@ -224,7 +224,7 @@ describe('InMemoryUserRepository', () => {
     it('should throw when the user does not exist', async () => {
       await expect(
         repo.update('nonexistent-id', { active: false }),
-      ).rejects.toThrow('User with id nonexistent-id not found');
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
     it('should return a detached copy', async () => {
@@ -249,7 +249,7 @@ describe('InMemoryUserRepository', () => {
     });
 
     it('should throw RepositoryError when deleting nonexistent id', async () => {
-      await expect(repo.delete('nonexistent-id')).rejects.toThrow('User with id nonexistent-id not found');
+      await expect(repo.delete('nonexistent-id')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 

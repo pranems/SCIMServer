@@ -1,0 +1,54 @@
+{
+  "base": "cefb540be4f979f7019e99131f8b3f5e6759002a",
+  "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+  "run": "2321df0d53ff0f52",
+  "sourceTreeSha256": "3122512638883911d578fca22c9ad8fbad1728b3a11103b1f2b95772531292d6",
+  "artifact": "test-results/atomic-uniqueness/postgres-2321df0d53ff0f52/run.json",
+  "postgresVersion": "17.8",
+  "migrationsApplied": 22,
+  "newMigrations": 0,
+  "redUnit": {
+    "passed": 38,
+    "failed": 3
+  },
+  "unit": {
+    "suites": 10,
+    "passed": 646,
+    "failed": 0
+  },
+  "http": [
+    {
+      "backend": "prisma",
+      "passed": 147,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "backend": "inmemory",
+      "passed": 145,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "Native PostgreSQL member foreign key rollback",
+        "Independent PostgreSQL application connection pools"
+      ]
+    }
+  ],
+  "livePerBackend": {
+    "atomicUniquenessAssertions": 21,
+    "conditionalWriteAssertions": 33,
+    "groupAggregateAssertions": 69
+  },
+  "changedPolicyLint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "buildExitCode": 0,
+  "review": "No significant issues found in exact builtin Group member policy follow-up",
+  "cleanup": {
+    "exactContainerId": "5c97369a758dbb73aec6596e866178b8f64eebb4c1c80b34d8c25a13e1db235d",
+    "removed": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0
+  }
+}

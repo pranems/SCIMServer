@@ -1,0 +1,83 @@
+{
+  "status": "analysis-validated-with-explicit-baseline-limitations",
+  "sourceBase": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "existingUnit": {
+    "suites": 12,
+    "passed": 974
+  },
+  "existingHttp": {
+    "suites": 9,
+    "passed": 179,
+    "backend": "inmemory"
+  },
+  "normativeHttp": {
+    "expectedFailures": 3,
+    "actualStatuses": [
+      400,
+      400,
+      500
+    ]
+  },
+  "productionCodeCharacterization": {
+    "observations": 50,
+    "validShapeRepresentatives": 16
+  },
+  "postgresRuntime": "not exercised",
+  "liveWrites": "none",
+  "documentContent": {
+    "command": "npm run docs:content",
+    "exitCode": 0,
+    "manifestDocuments": 26,
+    "scopeNote": "Existing manifest; new report is separately checked for links, JSON and diagrams."
+  },
+  "documentFreshnessAndLinks": {
+    "command": "pwsh -NoProfile -File scripts\\audit-doc-freshness.ps1 -SkipCoupling -ManifestPath test-results\\fresh-analysis\\doc-manifest.json",
+    "exitCode": 1,
+    "report": "pass",
+    "index": "pass",
+    "sessionContext": "three pre-existing unresolved historical links",
+    "baselineVerifiedMissingLinks": [
+      ".vscode/settings.json",
+      "web/e2e/preferences.spec.ts",
+      "web/e2e/telemetry.spec.ts"
+    ]
+  },
+  "json": {
+    "evidenceFilesParsed": 12,
+    "literalJsonFencesInEditedDocs": 0,
+    "parseFailures": 0
+  },
+  "mermaid": {
+    "parseExitCode": 0,
+    "parseBlocks": 3,
+    "renderExitCode": 0,
+    "renderBlocks": 3,
+    "themes": [
+      "default",
+      "dark"
+    ],
+    "securityLevel": "strict",
+    "libraryVersion": "11.15.0",
+    "editorParityWarning": "Built-in renderer detector reports 0.0.0; exact editor version parity unverified."
+  },
+  "followUp": {
+    "receipt": "repro-validation.json",
+    "earlierAdminError": "earlier-admin-error.json",
+    "reproductionInstructions": "repro/README.md",
+    "observationCountChanged": false,
+    "normativeHttpCountChanged": false,
+    "unchangedMermaidEvidenceReused": true
+  },
+  "hygiene": {
+    "newReportEmDash": false,
+    "privateScalarHashesInIncidentArtifact": false,
+    "productCodeChanges": false,
+    "manifestOrVersionChanges": false,
+    "commitCreated": false,
+    "toolingJunctionsRemoved": 3,
+    "sharedDependencySentinelsUnchanged": true,
+    "generatedPrismaClientRemoved": true,
+    "disposableHttpSpecRemovedFromProductTree": true,
+    "finalHead": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a"
+  }
+}

@@ -9,9 +9,10 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'userName must not be empty or whitespace-only.' })
   userName!: string;
 
+  // Preserve the JSON type for common-attribute validation; implicit String()
+  // conversion would accept numeric/Boolean identifiers before that check.
   @IsOptional()
-  @IsString()
-  externalId?: string;
+  externalId?: unknown;
 
   /**
    * Active status. Accepts boolean or string ("True"/"False") - coerced

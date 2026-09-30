@@ -179,12 +179,13 @@ async function bootstrap(): Promise<void> {
   Logger.log(`🔎 Log stream (SSE): http://localhost:${port}/scim/admin/log-config/stream?level=INFO`);
   Logger.log(`🔎 Log download (JSON): http://localhost:${port}/scim/admin/log-config/download?format=json`);
 
-  // Settings v8: StrictSchemaValidation now defaults to true (RFC 7643 compliance).
-  // Log the new default so operators are aware.
   Logger.log(
     '✅ StrictSchemaValidation is ON by default for all endpoints. ' +
-    'SCIM payloads are type-checked against schema definitions (RFC 7643 §2). ' +
-    'Disable per-endpoint for Entra ID compatibility: { "StrictSchemaValidation": "False" }',
+    'Keep strict validation enabled for Microsoft Entra ID. ' +
+    'Diagnose the rejected attribute, effective schema and actual request first. ' +
+    'For documented legacy quoted booleans check AllowAndCoerceBooleanStrings; ' +
+    'for supported dotted User PATCH paths check VerbosePatchSupported. ' +
+    'Neither setting repairs an invalid path or schema. See docs/SCIM_ENTRA_COMPATIBILITY.md.',
     'SchemaValidation',
   );
 }

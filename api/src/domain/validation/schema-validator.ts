@@ -7,11 +7,11 @@
  * Validations performed:
  *  1. Required attributes (on create/replace only, not patch)
  *  2. Attribute type checking (string, boolean, integer, decimal, complex, dateTime, reference, binary)
- *  3. Mutability constraints (readOnly attributes rejected on create/replace AND on PATCH operations)
+ *  3. Mutability constraints (POST/PUT readOnly input ignored; PATCH validated separately)
  *  4. Unknown attribute detection (strict mode only)
  *  5. Multi-valued / single-valued enforcement
  *  6. Sub-attribute validation for complex types
- *  7. Canonical value enforcement (V10)
+ *  7. Canonical values remain recommendations, not an implicit closed enum
  *  8. Required sub-attribute enforcement (V9)
  *  9. Strict ISO 8601 dateTime format validation (V31)
  * 10. schemas array validation (V25)
@@ -28,6 +28,9 @@ import type {
   ValidationOptions,
   ValidationResult,
 } from './validation-types';
+import { isScimBinary, isScimDateTime, isScimReference } from './scim-scalar-formats';
+import { COMMON_EXTERNAL_ID, effectiveCommonAttribute, effectiveCommonAttributes, validateCommonAttributeValues } from './common-attributes';
+import { retainedEntries } from '../retained-entries';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -39,6 +42,8 @@ const RESERVED_KEYS = new Set([
   'externalId',
   'meta',
 ]);
+
+import { parsePatchTarget, type ParsedPatchPath } from '../patch/patch-path';
 
 /**
  * Determine whether a schema definition represents the core schema for a resource type.
@@ -52,14 +57,6 @@ function isCoreSchema(schema: SchemaDefinition): boolean {
   if (schema.isCoreSchema !== undefined) return schema.isCoreSchema;
   return schema.id.startsWith('urn:ietf:params:scim:schemas:core:');
 }
-
-/**
- * xsd:dateTime regex (RFC 7643 §2.3.5).
- * Validates ISO 8601 / xsd:dateTime format:
- *   YYYY-MM-DDTHH:MM:SSZ  or  YYYY-MM-DDTHH:MM:SS.sss±HH:MM
- * Not anchored to allow timezone offset variants.
- */
-const XSD_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 export class SchemaValidator {
   /**
@@ -93,7 +90,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -144,7 +141,13 @@ export class SchemaValidator {
     }
 
     for (const [key, value] of Object.entries(payload)) {
+      // class-transformer materializes optional DTO fields with undefined values.
+      if (value === undefined) continue;
       // Skip reserved SCIM keys
+      if (key.toLowerCase() === 'externalid') {
+        if (options.mode === 'patch') this.validateAttribute(key, value, COMMON_EXTERNAL_ID, options, errors);
+        continue;
+      }
       if (RESERVED_KEYS.has(key)) continue;
 
       // Extension URN blocks are validated separately
@@ -153,15 +156,6 @@ export class SchemaValidator {
         if (!extSchema) {
           // Unknown extension URN in strict mode → already handled by enforceStrictSchemaValidation
           continue;
-        }
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-          this.validateAttributes(
-            value as Record<string, unknown>,
-            extSchema.attributes,
-            key,
-            options,
-            errors,
-          );
         }
         continue;
       }
@@ -188,6 +182,8 @@ export class SchemaValidator {
       const extPayload = payload[urn] as Record<string, unknown> | undefined;
       if (extPayload && typeof extPayload === 'object' && !Array.isArray(extPayload)) {
         this.validateAttributes(extPayload, schema.attributes, urn, options, errors);
+      } else if (extPayload !== undefined && extPayload !== null) {
+        errors.push({ path: urn, message: `Extension '${urn}' must be a complex object.`, scimType: 'invalidValue' });
       }
     }
 
@@ -265,7 +261,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -383,12 +379,7 @@ export class SchemaValidator {
 
     // ── Mutability check ──
     if (attrDef.mutability === 'readOnly' && (options.mode === 'create' || options.mode === 'replace')) {
-      errors.push({
-        path,
-        message: `Attribute '${attrDef.name}' is readOnly and cannot be set by the client.`,
-        scimType: 'mutability',
-      });
-      return; // Don't further validate readOnly attributes set by client
+      return; // POST/PUT ignore client readOnly values, including malformed ones.
     }
 
     // ── Multi-valued check ──
@@ -433,7 +424,7 @@ export class SchemaValidator {
   ): void {
     if (value === null || value === undefined) return;
 
-    switch (attrDef.type) {
+    switch (attrDef.type ?? 'string') {
       case 'string':
       case 'reference':
       case 'binary':
@@ -443,6 +434,11 @@ export class SchemaValidator {
             message: `Attribute '${attrDef.name}' must be a string, got ${typeof value}.`,
             scimType: 'invalidValue',
           });
+        } else if (
+          (attrDef.type === 'binary' && !isScimBinary(value)) ||
+          (attrDef.type === 'reference' && !isScimReference(value))
+        ) {
+          errors.push({ path, message: `Attribute '${attrDef.name}' is not a valid ${attrDef.type} value.`, scimType: 'invalidValue' });
         }
         break;
 
@@ -467,7 +463,7 @@ export class SchemaValidator {
         break;
 
       case 'decimal':
-        if (typeof value !== 'number') {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
           errors.push({
             path,
             message: `Attribute '${attrDef.name}' must be a number, got ${typeof value}.`,
@@ -483,7 +479,7 @@ export class SchemaValidator {
             message: `Attribute '${attrDef.name}' must be a dateTime string, got ${typeof value}.`,
             scimType: 'invalidValue',
           });
-        } else if (!XSD_DATETIME_RE.test(value)) {
+        } else if (!isScimDateTime(value)) {
           // V31: Strict xsd:dateTime format (RFC 7643 §2.3.5)
           errors.push({
             path,
@@ -536,27 +532,8 @@ export class SchemaValidator {
         break;
 
       default:
-        // Unknown type - skip validation (forward-compatible)
+        errors.push({ path, message: `Attribute '${attrDef.name}' has an unsupported schema type.`, scimType: 'invalidValue' });
         break;
-    }
-
-    // ── V10: Canonical values enforcement ────────────────────────────
-    // If the attribute defines canonicalValues and the value is a string,
-    // verify the value is one of the allowed canonical values (case-insensitive).
-    if (
-      attrDef.canonicalValues &&
-      attrDef.canonicalValues.length > 0 &&
-      typeof value === 'string'
-    ) {
-      const lower = value.toLowerCase();
-      const allowed = attrDef.canonicalValues.map(cv => cv.toLowerCase());
-      if (!allowed.includes(lower)) {
-        errors.push({
-          path,
-          message: `Attribute '${attrDef.name}' value '${value}' is not one of the canonical values: [${attrDef.canonicalValues.join(', ')}].`,
-          scimType: 'invalidValue',
-        });
-      }
     }
   }
 
@@ -573,19 +550,6 @@ export class SchemaValidator {
     const subMap = new Map<string, SchemaAttributeDefinition>();
     for (const sa of subAttrDefs) {
       subMap.set(sa.name.toLowerCase(), sa);
-    }
-
-    // V9: Required sub-attribute enforcement (create/replace only)
-    if (options.mode !== 'patch') {
-      for (const sa of subAttrDefs) {
-        if (sa.required && !this.findKeyIgnoreCase(obj, sa.name)) {
-          errors.push({
-            path: `${parentPath}.${sa.name}`,
-            message: `Required sub-attribute '${sa.name}' is missing in '${parentPath}'.`,
-            scimType: 'invalidValue',
-          });
-        }
-      }
     }
 
     for (const [key, value] of Object.entries(obj)) {
@@ -632,24 +596,7 @@ export class SchemaValidator {
       //
       // Only when the value really is an array: null/undefined keep falling
       // through so RFC 7643 §2.5 unassigned-value handling is untouched.
-      if (subDef.multiValued === true && Array.isArray(value)) {
-        const elementDef: SchemaAttributeDefinition = { ...subDef, multiValued: false };
-        value.forEach((element, index) => {
-          this.validateSingleValue(
-            `${parentPath}.${key}[${index}]`,
-            element,
-            elementDef,
-            options,
-            errors,
-          );
-        });
-        continue;
-      }
-
-      // Reached only for a sub-attribute the schema declares SINGULAR, so an
-      // array here is a genuine cardinality violation and validateSingleValue
-      // is right to reject it.
-      this.validateSingleValue(`${parentPath}.${key}`, value, subDef, options, errors);
+      this.validateAttribute(`${parentPath}.${key}`, value, subDef, options, errors);
     }
   }
 
@@ -700,7 +647,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -723,28 +670,94 @@ export class SchemaValidator {
     extensionSchemas: Map<string, SchemaDefinition>,
     errors: ValidationError[],
   ): void {
-    for (const attr of coreAttributes.values()) {
-      if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(payload, attr.name))) {
-        errors.push({
-          path: attr.name,
-          message: `Required attribute '${attr.name}' is missing.`,
-          scimType: 'invalidValue',
-        });
+    // Common externalId remains typed even when strict schema checks are off or
+    // an old/custom core omitted its declaration. Namespaced fields are independent.
+    errors.push(...validateCommonAttributeValues(payload));
+    const collect = (obj: Record<string, unknown>, attrs: Iterable<SchemaAttributeDefinition>, prefix: string): void => {
+      for (const attr of attrs) {
+        if (attr.mutability === 'readOnly') continue;
+        const value = this.getValueIgnoreCase(obj, attr.name);
+        const path = prefix ? `${prefix}.${attr.name}` : attr.name;
+        if (attr.required && (value == null || value === '' || (Array.isArray(value) && value.length === 0))) {
+          errors.push({ path, message: `Required attribute '${attr.name}' is missing or unassigned.`, scimType: 'invalidValue' });
+        }
+        if (attr.type === 'complex' && attr.subAttributes) {
+          const elements = Array.isArray(value) ? value : [value];
+          elements.forEach((element, index) => {
+            if (element && typeof element === 'object' && !Array.isArray(element)) {
+              collect(element as Record<string, unknown>, attr.subAttributes!, Array.isArray(value) ? `${path}[${index}]` : path);
+            }
+          });
+        }
       }
-    }
+    };
+    collect(payload, coreAttributes.values(), '');
 
     // Check required extension attributes
     for (const [urn, schema] of extensionSchemas) {
       const extPayload = payload[urn] as Record<string, unknown> | undefined;
-      if (extPayload && typeof extPayload === 'object') {
-        for (const attr of schema.attributes) {
-          if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(extPayload, attr.name))) {
-            errors.push({
-              path: `${urn}.${attr.name}`,
-              message: `Required attribute '${attr.name}' is missing in extension '${urn}'.`,
-              scimType: 'invalidValue',
-            });
-          }
+      if (schema.required && (!extPayload || typeof extPayload !== 'object' || Array.isArray(extPayload) ||
+        !Array.isArray(payload.schemas) || !payload.schemas.includes(urn))) {
+        errors.push({ path: urn, message: `Required extension '${urn}' must be present in schemas and the resource body.`, scimType: 'invalidValue' });
+        continue;
+      }
+      if (extPayload && typeof extPayload === 'object' && !Array.isArray(extPayload)) collect(extPayload, schema.attributes, urn);
+    }
+  }
+
+  /**
+   * Build a PUT candidate without discarding server-owned or omitted immutable
+   * data. Required writable attributes must still be supplied by the client.
+   * Explicit immutable changes remain visible to checkImmutable.
+   */
+  static prepareReplacement(
+    existing: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+    schemas: readonly SchemaDefinition[],
+  ): void {
+    const preserve = (old: Record<string, unknown>, next: Record<string, unknown>,
+      attrs: readonly SchemaAttributeDefinition[]): void => {
+      for (const attr of attrs) {
+        const oldKey = Object.keys(old).find(key => key.toLowerCase() === attr.name.toLowerCase());
+        const nextKey = Object.keys(next).find(key => key.toLowerCase() === attr.name.toLowerCase());
+        const oldValue = oldKey ? old[oldKey] : undefined;
+        const supplied = nextKey !== undefined && next[nextKey] !== undefined;
+        if (attr.mutability === 'readOnly' || (attr.mutability === 'immutable' && !supplied && !attr.required)) {
+          if (nextKey) delete next[nextKey];
+          if (oldKey && oldValue !== undefined) next[oldKey] = structuredClone(oldValue);
+          continue;
+        }
+        if (attr.type !== 'complex' || !attr.subAttributes || !oldValue || typeof oldValue !== 'object') continue;
+        if (Array.isArray(oldValue)) {
+          const nextValue = nextKey ? next[nextKey] : undefined;
+          if (!Array.isArray(nextValue)) continue; // Removing an entry is not changing its immutable children.
+          const retained = retainedEntries(oldValue, nextValue);
+          nextValue.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+            const oldEntry = retained[index];
+            if (oldEntry) preserve(oldEntry, entry, attr.subAttributes!);
+          });
+        } else {
+          const nextValue = nextKey ? next[nextKey] : undefined;
+          if (nextValue !== undefined && (!nextValue || typeof nextValue !== 'object' || Array.isArray(nextValue))) continue;
+          const target = (nextValue ?? {}) as Record<string, unknown>;
+          preserve(oldValue as Record<string, unknown>, target, attr.subAttributes);
+          if (Object.keys(target).length) next[nextKey ?? attr.name] = target;
+        }
+      }
+    };
+    for (const schema of schemas) {
+      if (isCoreSchema(schema)) preserve(existing, incoming, schema.attributes.map(attr => effectiveCommonAttribute(attr, true)));
+      else {
+        const old = existing[schema.id];
+        const next = incoming[schema.id];
+        if (!old || typeof old !== 'object' || Array.isArray(old)) continue;
+        if (next !== undefined && (!next || typeof next !== 'object' || Array.isArray(next))) continue;
+        const target = (next ?? {}) as Record<string, unknown>;
+        preserve(old as Record<string, unknown>, target, schema.attributes);
+        if (Object.keys(target).length) {
+          incoming[schema.id] = target;
+          if (Array.isArray(incoming.schemas) && !incoming.schemas.includes(schema.id)) incoming.schemas.push(schema.id);
         }
       }
     }
@@ -765,6 +778,7 @@ export class SchemaValidator {
     incoming: Record<string, unknown>,
     schemas: readonly SchemaDefinition[],
     preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
+    mode: 'patch' | 'replace' = 'patch',
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
@@ -781,7 +795,7 @@ export class SchemaValidator {
       for (const schema of schemas) {
         if (isCoreSchema(schema)) {
           for (const attr of schema.attributes) {
-            coreAttributes.set(attr.name.toLowerCase(), attr);
+            coreAttributes.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
           }
         } else {
           extensionSchemas.set(schema.id, schema);
@@ -797,6 +811,7 @@ export class SchemaValidator {
         incoming,
         attrDef,
         errors,
+        mode,
       );
     }
 
@@ -813,6 +828,7 @@ export class SchemaValidator {
           incomingExt ?? {},
           attrDef,
           errors,
+          mode,
         );
       }
     }
@@ -829,12 +845,13 @@ export class SchemaValidator {
     incoming: Record<string, unknown>,
     attrDef: SchemaAttributeDefinition,
     errors: ValidationError[],
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     if (attrDef.mutability !== 'immutable') {
       // For complex attributes with sub-attributes, check sub-attribute immutability
       if (attrDef.type === 'complex' && attrDef.subAttributes) {
         const hasImmutableSubs = attrDef.subAttributes.some(sa => sa.mutability === 'immutable');
-        if (!hasImmutableSubs) return;
+        if (!hasImmutableSubs && mode !== 'replace') return;
 
         const existingVal = this.getValueIgnoreCase(existing, attrDef.name);
         const incomingVal = this.getValueIgnoreCase(incoming, attrDef.name);
@@ -842,17 +859,18 @@ export class SchemaValidator {
         if (attrDef.multiValued) {
           // Multi-valued complex: compare each matched element's immutable sub-attrs
           this.checkImmutableMultiValuedComplex(
-            path, existingVal, incomingVal, attrDef.subAttributes, errors,
+            path, existingVal, incomingVal, attrDef.subAttributes, errors, mode,
           );
-        } else if (existingVal && incomingVal &&
-                   typeof existingVal === 'object' && typeof incomingVal === 'object') {
+        } else if (existingVal && typeof existingVal === 'object' &&
+                   ((incomingVal && typeof incomingVal === 'object') || mode === 'replace')) {
           for (const subDef of attrDef.subAttributes) {
             this.checkImmutableAttribute(
               `${path}.${subDef.name}`,
               existingVal as Record<string, unknown>,
-              incomingVal as Record<string, unknown>,
+              (incomingVal ?? {}) as Record<string, unknown>,
               subDef,
               errors,
+              mode,
             );
           }
         }
@@ -868,7 +886,7 @@ export class SchemaValidator {
     if (existingVal === null || existingVal === undefined) return;
 
     // Not present in incoming → allow (attribute not being modified)
-    if (incomingVal === undefined) return;
+    if (incomingVal === undefined && mode !== 'replace') return;
 
     // Compare values
     if (!this.deepEqual(existingVal, incomingVal)) {
@@ -890,38 +908,26 @@ export class SchemaValidator {
     incomingVal: unknown,
     subAttributes: readonly SchemaAttributeDefinition[],
     errors: ValidationError[],
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     if (!Array.isArray(existingVal) || !Array.isArray(incomingVal)) return;
 
-    const immutableSubs = subAttributes.filter(sa => sa.mutability === 'immutable');
-
-    // Build a lookup of existing elements by 'value' sub-attribute (the standard SCIM identifier)
-    const existingMap = new Map<string, Record<string, unknown>>();
-    for (const item of existingVal) {
-      if (item && typeof item === 'object' && 'value' in item) {
-        existingMap.set(String((item as Record<string, unknown>).value), item as Record<string, unknown>);
-      }
-    }
-
+    const retained = retainedEntries(existingVal, incomingVal);
     for (let i = 0; i < incomingVal.length; i++) {
       const incomingItem = incomingVal[i];
-      if (!incomingItem || typeof incomingItem !== 'object') continue;
+      if (!incomingItem || typeof incomingItem !== 'object' || Array.isArray(incomingItem)) continue;
       const incomingObj = incomingItem as Record<string, unknown>;
-
-      // Try to match with existing element by 'value'
-      if ('value' in incomingObj) {
-        const matchKey = String(incomingObj.value);
-        const existingItem = existingMap.get(matchKey);
-        if (existingItem) {
-          for (const subDef of immutableSubs) {
-            this.checkImmutableAttribute(
-              `${parentPath}[${i}].${subDef.name}`,
-              existingItem,
-              incomingObj,
-              subDef,
-              errors,
-            );
-          }
+      const existingItem = retained[i];
+      if (existingItem) {
+        for (const subDef of subAttributes) {
+          this.checkImmutableAttribute(
+            `${parentPath}[${i}].${subDef.name}`,
+            existingItem,
+            incomingObj,
+            subDef,
+            errors,
+            mode,
+          );
         }
       }
     }
@@ -953,7 +959,7 @@ export class SchemaValidator {
   /**
    * Deep equality comparison for SCIM attribute values.
    */
-  private static deepEqual(a: unknown, b: unknown): boolean {
+  static deepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     if (a === null || b === null) return false;
     if (typeof a !== typeof b) return false;
@@ -1006,7 +1012,7 @@ export class SchemaValidator {
     };
 
     for (const schema of schemas) {
-      collect(schema.attributes);
+      collect(schema.attributes.map(attr => effectiveCommonAttribute(attr, isCoreSchema(schema))));
     }
 
     return names;
@@ -1191,6 +1197,11 @@ export class SchemaValidator {
       }
     }
 
+    const externalIdDefinition = coreAttributes.get('externalid');
+    coreAttributes = new Map(coreAttributes);
+    coreAttributes.set('externalid', externalIdDefinition
+      ? effectiveCommonAttribute(externalIdDefinition, true) : COMMON_EXTERNAL_ID);
+
     const opLower = op.toLowerCase();
 
     // No path - value is an object whose keys are top-level attributes
@@ -1198,59 +1209,41 @@ export class SchemaValidator {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const obj = value as Record<string, unknown>;
         for (const [key, val] of Object.entries(obj)) {
-          if (RESERVED_KEYS.has(key)) continue;
-          // Extension blocks
-          if (key.startsWith('urn:')) {
-            const extSchema = extensionSchemas.get(key);
-            if (extSchema && val && typeof val === 'object' && !Array.isArray(val)) {
-              // G8c: Check readOnly on extension attributes
-              for (const [extKey] of Object.entries(val as Record<string, unknown>)) {
-                const extAttrDef = extSchema.attributes.find(
-                  a => a.name.toLowerCase() === extKey.toLowerCase(),
-                );
-                if (extAttrDef?.mutability === 'readOnly') {
-                  errors.push({
-                    path: `${key}:${extKey}`,
-                    message: `Attribute '${extKey}' is readOnly and cannot be modified via PATCH.`,
-                    scimType: 'mutability',
-                  });
-                }
-              }
-              this.validateAttributes(
-                val as Record<string, unknown>,
-                extSchema.attributes,
-                key,
-                { strictMode: false, mode: 'patch' },
-                errors,
-              );
-            }
-            continue;
-          }
-          const attrDef = coreAttributes.get(key.toLowerCase());
-          if (attrDef) {
-            // G8c: readOnly mutability check for no-path operations
-            if (attrDef.mutability === 'readOnly') {
-              errors.push({
-                path: key,
-                message: `Attribute '${attrDef.name}' is readOnly and cannot be modified via PATCH.`,
-                scimType: 'mutability',
-              });
-              continue;
-            }
-            this.validateAttribute(key, val, attrDef, { strictMode: false, mode: 'patch' }, errors);
-          }
+          if (['schemas', 'id', 'meta'].includes(key.toLowerCase())) continue;
+          errors.push(...this.validatePatchOperationValue(op, key, val, schemas, preBuiltMaps).errors);
         }
       }
       return { valid: errors.length === 0, errors };
     }
 
     // Resolve the path to its attribute definition
-    const attrDef = this.resolvePatchPath(path, coreAttributes, extensionSchemas);
+    let parsed: ParsedPatchPath;
+    try {
+      parsed = parsePatchTarget(path, [...extensionSchemas.keys()], schemas.find(isCoreSchema)?.id);
+    } catch (error) {
+      return { valid: false, errors: [{ path, message: (error as Error).message, scimType: 'invalidPath' }] };
+    }
+    if (parsed.schemaUrn && !parsed.attribute) {
+      // Whole namespace targets use the same parsed semantics as execution.
+      // Null/remove unassign; required/immutable checks need the evolving resource.
+      if (opLower === 'remove' || value == null) return { valid: true, errors: [] };
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        return { valid: false, errors: [{ path, message: 'Extension namespace requires an object.', scimType: 'invalidValue' }] };
+      }
+      for (const [key, incoming] of Object.entries(value)) {
+        errors.push(...this.validatePatchOperationValue(op, `${parsed.schemaUrn}:${key}`, incoming, schemas, preBuiltMaps).errors);
+      }
+      return { valid: errors.length === 0, errors };
+    }
+    const attrDef = this.resolvePatchPath(parsed, coreAttributes, extensionSchemas);
+    if (parsed.schemaUrn && !attrDef && extensionSchemas.has(parsed.schemaUrn)) {
+      return { valid: false, errors: [{ path, message: `Unknown extension attribute '${parsed.attribute}'.`, scimType: 'invalidPath' }] };
+    }
 
     // G8c: Also check if the ROOT attribute in the path chain is readOnly.
     // e.g. "groups[value eq \"x\"].display" - `groups` is readOnly, so the
     // entire sub-path is unreachable for client writes.
-    const rootAttrDef = this.resolveRootAttribute(path, coreAttributes, extensionSchemas);
+    const rootAttrDef = this.resolveRootAttribute(parsed, coreAttributes, extensionSchemas);
 
     if (rootAttrDef?.mutability === 'readOnly') {
       errors.push({
@@ -1277,11 +1270,17 @@ export class SchemaValidator {
         return { valid: true, errors: [] };
       }
 
+      const targetDef = parsed.kind === 'selection' && !parsed.subAttribute ? { ...attrDef, multiValued: false } : attrDef;
+      const selectedGroupSingleton = parsed.kind === 'selection' && !parsed.schemaUrn &&
+        parsed.attribute.toLowerCase() === 'members' && !parsed.subAttribute &&
+        schemas.some(s => s.id.toLowerCase() === 'urn:ietf:params:scim:schemas:core:2.0:group') &&
+        Array.isArray(value) && value.length === 1;
+      const targetValue = selectedGroupSingleton ? value[0] : value;
       this.validateAttribute(
         path,
-        value,
-        attrDef,
-        { strictMode: false, mode: 'patch' },
+        opLower === 'add' ? this.patchAddShape(targetValue, targetDef) : targetValue,
+        targetDef,
+        { strictMode: !!parsed.schemaUrn, mode: 'patch' },
         errors,
       );
     } else if (opLower === 'remove') {
@@ -1290,6 +1289,19 @@ export class SchemaValidator {
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  private static patchAddShape(value: unknown, def: SchemaAttributeDefinition): unknown {
+    if (value == null) return value;
+    if (def.multiValued) {
+      return (Array.isArray(value) ? value : [value]).map(item =>
+        this.patchAddShape(item, { ...def, multiValued: false }));
+    }
+    if (def.type !== 'complex' || typeof value !== 'object' || Array.isArray(value)) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => {
+      const sub = def.subAttributes?.find(a => a.name.toLowerCase() === key.toLowerCase());
+      return [key, sub ? this.patchAddShape(child, sub) : child];
+    }));
   }
 
   /**
@@ -1303,29 +1315,24 @@ export class SchemaValidator {
    *  - "attrName[filter].subAttr" → sub-attribute via value filter
    */
   private static resolvePatchPath(
-    path: string,
+    path: ParsedPatchPath,
     coreAttributes: Map<string, SchemaAttributeDefinition>,
     extensionSchemas: Map<string, SchemaDefinition>,
   ): SchemaAttributeDefinition | undefined {
-    // Strip value filter (e.g., emails[type eq "work"].value → emails.value)
-    const cleanPath = path.replace(/\[.*?\]/g, '');
-
-    // Check for extension URN prefix
     for (const [urn, schema] of extensionSchemas) {
-      if (cleanPath.startsWith(urn + ':') || cleanPath.startsWith(urn + '.')) {
-        const remainder = cleanPath.slice(urn.length + 1);
+      if (path.schemaUrn?.toLowerCase() === urn.toLowerCase()) {
         const extAttrMap = new Map<string, SchemaAttributeDefinition>();
         for (const a of schema.attributes) {
           extAttrMap.set(a.name.toLowerCase(), a);
         }
-        if (!remainder) return undefined;
-        const segments = remainder.split('.');
+        const segments = [path.attribute, ...(path.subAttribute?.split('.') ?? [])];
         return this.walkAttributePath(segments, extAttrMap);
       }
     }
 
     // Core attribute path
-    const segments = cleanPath.split('.');
+    if (path.schemaUrn) return undefined;
+    const segments = [path.attribute, ...(path.subAttribute?.split('.') ?? [])];
     return this.walkAttributePath(segments, coreAttributes);
   }
 
@@ -1478,7 +1485,8 @@ export class SchemaValidator {
     };
 
     for (const schema of schemas) {
-      collect(schema.attributes);
+      if (isCoreSchema(schema)) result.add('externalid');
+      collect(schema.attributes.map(attr => effectiveCommonAttribute(attr, isCoreSchema(schema))));
     }
 
     return result;
@@ -1557,42 +1565,34 @@ export class SchemaValidator {
     const coreSubAttrs = new Map<string, Set<string>>();
     const extensionSubAttrs = new Map<string, Map<string, Set<string>>>();
 
-    for (const schema of schemas) {
-      if (isCoreSchema(schema)) {
-        for (const attr of schema.attributes) {
-          if (attr.mutability === 'readOnly') {
-            core.add(attr.name.toLowerCase());
-          } else if (attr.subAttributes) {
-            // R-MUT-2: Collect readOnly sub-attrs within non-readOnly parents
-            for (const sub of attr.subAttributes) {
-              if (sub.mutability === 'readOnly') {
-                const parentKey = attr.name.toLowerCase();
-                if (!coreSubAttrs.has(parentKey)) {
-                  coreSubAttrs.set(parentKey, new Set());
-                }
-                coreSubAttrs.get(parentKey)!.add(sub.name.toLowerCase());
-              }
-            }
+    const collect = (
+      attributes: readonly SchemaAttributeDefinition[],
+      top: Set<string>,
+      nested: Map<string, Set<string>>,
+      parent = '',
+    ): void => {
+      for (const attr of attributes) {
+        const name = attr.name.toLowerCase();
+        if (attr.mutability === 'readOnly') {
+          if (!parent) top.add(name);
+          else {
+            if (!nested.has(parent)) nested.set(parent, new Set());
+            nested.get(parent)!.add(name);
           }
         }
+        if (attr.mutability !== 'readOnly' && attr.subAttributes) {
+          collect(attr.subAttributes, top, nested, parent ? `${parent}.${name}` : name);
+        }
+      }
+    };
+
+    for (const schema of schemas) {
+      if (isCoreSchema(schema)) {
+        collect(effectiveCommonAttributes(schema.attributes, true), core, coreSubAttrs);
       } else {
         const extSet = new Set<string>();
         const extSubMap = new Map<string, Set<string>>();
-        for (const attr of schema.attributes) {
-          if (attr.mutability === 'readOnly') {
-            extSet.add(attr.name.toLowerCase());
-          } else if (attr.subAttributes) {
-            for (const sub of attr.subAttributes) {
-              if (sub.mutability === 'readOnly') {
-                const parentKey = attr.name.toLowerCase();
-                if (!extSubMap.has(parentKey)) {
-                  extSubMap.set(parentKey, new Set());
-                }
-                extSubMap.get(parentKey)!.add(sub.name.toLowerCase());
-              }
-            }
-          }
-        }
+        collect(schema.attributes, extSet, extSubMap);
         if (extSet.size > 0) {
           extensions.set(schema.id, extSet);
         }
@@ -1669,9 +1669,12 @@ export class SchemaValidator {
 
       // Build attribute definition lookups
       if (isCore) {
-        for (const attr of schema.attributes) {
-          coreAttrMap.set(attr.name.toLowerCase(), attr);
+        for (const attr of effectiveCommonAttributes(schema.attributes, true)) {
+          coreAttrMap.set(attr.name.toLowerCase(), effectiveCommonAttribute(attr, true));
         }
+        if (!coreAttrMap.has('externalid')) coreAttrMap.set('externalid', COMMON_EXTERNAL_ID);
+        addTo(caseExactByParent, topParent, 'externalid');
+        caseExactPaths.add('externalid');
       } else {
         extensionSchemaMap.set(schema.id, schema);
       }
@@ -1681,7 +1684,8 @@ export class SchemaValidator {
         parentKey: string,
         isTopLevel: boolean,
       ): void => {
-        for (const attr of attrs) {
+        for (const declared of attrs) {
+          const attr = effectiveCommonAttribute(declared, isCore && isTopLevel);
           const nameLower = attr.name.toLowerCase();
           const returned = attr.returned?.toLowerCase();
           const mutability = attr.mutability?.toLowerCase();
@@ -1713,6 +1717,10 @@ export class SchemaValidator {
           // ─── CaseExact ───
           if (attr.caseExact === true) {
             addTo(caseExactByParent, parentKey, nameLower);
+            if (!isCore) {
+              const relative = parentKey === topParent ? nameLower : `${parentKey.slice(topParent.length + 1)}.${nameLower}`;
+              caseExactPaths.add(`${topParent}:${relative}`);
+            }
             // Also build dotted path for filter consumer convenience
             // Strip the leading URN prefix for the flat caseExactPaths set
             if (allSchemaUrns.has(parentKey)) {
@@ -1755,7 +1763,7 @@ export class SchemaValidator {
         }
       };
 
-      walkAttrs(schema.attributes, topParent, true);
+      walkAttrs(effectiveCommonAttributes(schema.attributes, isCore), topParent, true);
     }
 
     // ─── Build readOnlyCollected from readOnlyByParent ───────────────
@@ -1838,27 +1846,19 @@ export class SchemaValidator {
   // ─── G8c: PATCH path utilities ────────────────────────────────────
 
   private static resolveRootAttribute(
-    path: string,
+    path: ParsedPatchPath,
     coreAttributes: Map<string, SchemaAttributeDefinition>,
     extensionSchemas: Map<string, SchemaDefinition>,
   ): SchemaAttributeDefinition | undefined {
-    // Strip value filters
-    const cleanPath = path.replace(/\[.*?\]/g, '');
-
-    // Extension URN prefix → root is the first extension attribute
     for (const [urn, schema] of extensionSchemas) {
-      if (cleanPath.startsWith(urn + ':') || cleanPath.startsWith(urn + '.')) {
-        const remainder = cleanPath.slice(urn.length + 1);
-        if (!remainder) return undefined;
-        const rootName = remainder.split('.')[0];
+      if (path.schemaUrn?.toLowerCase() === urn.toLowerCase()) {
         return schema.attributes.find(
-          a => a.name.toLowerCase() === rootName.toLowerCase(),
+          a => a.name.toLowerCase() === path.attribute.toLowerCase(),
         );
       }
     }
 
     // Core attribute - first segment
-    const rootName = cleanPath.split('.')[0];
-    return coreAttributes.get(rootName.toLowerCase());
+    return path.schemaUrn ? undefined : coreAttributes.get(path.attribute.toLowerCase());
   }
 }

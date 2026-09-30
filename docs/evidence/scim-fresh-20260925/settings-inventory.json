@@ -1,0 +1,3037 @@
+{
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "count": 37,
+  "referenceMethod": "Exact setting symbol/key lexical references; not runtime coverage claims",
+  "referenceClassification": "Test: *.spec.ts, *.spec.tsx, *.test.ts, *.test.tsx, or any file under a test/ or e2e/ path segment. Separators are normalized; all remaining references are production references. This is lexical classification, not execution proof.",
+  "settings": [
+    {
+      "key": "PatchOpAllowRemoveAllMembers",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "GroupPatchEngine",
+      "flows": "Group PATCH/Bulk; legacy member removal compatibility",
+      "precedenceAndCoupling": "No SPC field; endpoint settings only",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/domain/patch/group-patch-engine.ts",
+          "line": 468
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 82
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id.json",
+          "line": 1069
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+          "line": 292
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 119
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 38
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 205
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+          "line": 732
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 154
+        },
+        {
+          "file": "api/test/e2e/patch-null-handling.e2e-spec.ts",
+          "line": 325
+        },
+        {
+          "file": "api/test/e2e/soft-delete-flags.e2e-spec.ts",
+          "line": 394
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 345
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 270
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 169
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "VerbosePatchSupported",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "UserPatchEngine",
+      "flows": "User core dot-path PATCH; extensions resolved independently; generic always dot-aware",
+      "precedenceAndCoupling": "Independent of patch.supported",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 84
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id.json",
+          "line": 1070
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+          "line": 468
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 136
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 128
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 41
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 424
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 206
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 1027
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 228
+        },
+        {
+          "file": "api/test/e2e/multi-endpoint-isolation.e2e-spec.ts",
+          "line": 63
+        },
+        {
+          "file": "api/test/e2e/patch-null-handling.e2e-spec.ts",
+          "line": 82
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 332
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 356
+        },
+        {
+          "file": "api/test/e2e/soft-delete-flags.e2e-spec.ts",
+          "line": 306
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 444
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 304
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 876
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 168
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "logLevel",
+      "type": "logLevel",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": "inherit/unset",
+      "owner": "EndpointService and ScimLogger",
+      "flows": "All endpoint request logging",
+      "precedenceAndCoupling": "Endpoint > category/global thresholds; no mutation semantics",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 224
+        },
+        {
+          "file": "api/src/modules/logging/log-levels.ts",
+          "line": 84
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 86
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 225
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 42
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 635
+        },
+        {
+          "file": "api/src/modules/logging/log-config.controller.spec.ts",
+          "line": 19
+        },
+        {
+          "file": "api/src/modules/logging/log-levels.spec.ts",
+          "line": 130
+        },
+        {
+          "file": "api/src/modules/logging/scim-logger.service.spec.ts",
+          "line": 18
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-log.controller.spec.ts",
+          "line": 17
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 569
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit.e2e-spec.ts",
+          "line": 423
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 277
+        },
+        {
+          "file": "web/src/pages/OverviewTab.test.tsx",
+          "line": 256
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 453
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 71
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "StrictSchemaValidation",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "ScimSchemaHelpers and Generic service",
+      "flows": "U/G/custom POST PUT PATCH schema/type/readOnly gates",
+      "precedenceAndCoupling": "Profile schemas drive validation; required create/replace and immutability remain independent",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/main.ts",
+          "line": 185
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-errors.ts",
+          "line": 12
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.ts",
+          "line": 1006
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 88
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id-minimal.json",
+          "line": 398
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id.json",
+          "line": 1071
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/rfc-standard.json",
+          "line": 1121
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "line": 519
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+          "line": 298
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+          "line": 475
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 132
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 56
+        },
+        {
+          "file": "web/src/workbench/workbench-templates.ts",
+          "line": 114
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/domain/validation/rfc-compliant-subattributes.spec.ts",
+          "line": 120
+        },
+        {
+          "file": "api/src/modules/dashboard/dashboard.controller.spec.ts",
+          "line": 302
+        },
+        {
+          "file": "api/src/modules/endpoint/controllers/endpoint-etag.spec.ts",
+          "line": 17
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 43
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-context.storage.spec.ts",
+          "line": 213
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 91
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-errors.spec.ts",
+          "line": 74
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.spec.ts",
+          "line": 203
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 209
+        },
+        {
+          "file": "api/src/modules/scim/filters/scim-exception.filter.spec.ts",
+          "line": 336
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.spec.ts",
+          "line": 1409
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+          "line": 91
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 104
+        },
+        {
+          "file": "api/src/shared/types/shared-types.spec.ts",
+          "line": 63
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 308
+        },
+        {
+          "file": "api/test/e2e/diagnostics-enrichment.e2e-spec.ts",
+          "line": 43
+        },
+        {
+          "file": "api/test/e2e/endpoint-authentication-model.e2e-spec.ts",
+          "line": 147
+        },
+        {
+          "file": "api/test/e2e/group-parity-gaps.e2e-spec.ts",
+          "line": 315
+        },
+        {
+          "file": "api/test/e2e/helpers/request.helper.ts",
+          "line": 234
+        },
+        {
+          "file": "api/test/e2e/manager-patch-string-coercion.e2e-spec.ts",
+          "line": 48
+        },
+        {
+          "file": "api/test/e2e/multi-endpoint-isolation.e2e-spec.ts",
+          "line": 48
+        },
+        {
+          "file": "api/test/e2e/p4-attribute-fixes.e2e-spec.ts",
+          "line": 66
+        },
+        {
+          "file": "api/test/e2e/patch-null-handling.e2e-spec.ts",
+          "line": 81
+        },
+        {
+          "file": "api/test/e2e/patch-untouched-attribute-validation.e2e-spec.ts",
+          "line": 84
+        },
+        {
+          "file": "api/test/e2e/primary-enforcement.e2e-spec.ts",
+          "line": 253
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 317
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 167
+        },
+        {
+          "file": "api/test/e2e/readonly-stripping.e2e-spec.ts",
+          "line": 177
+        },
+        {
+          "file": "api/test/e2e/rfc-compliant-subattributes.e2e-spec.ts",
+          "line": 160
+        },
+        {
+          "file": "api/test/e2e/schema-cache-integration.e2e-spec.ts",
+          "line": 80
+        },
+        {
+          "file": "api/test/e2e/schema-validation.e2e-spec.ts",
+          "line": 58
+        },
+        {
+          "file": "api/test/e2e/soft-delete-flags.e2e-spec.ts",
+          "line": 328
+        },
+        {
+          "file": "api/test/e2e/stale-settings-keys.e2e-spec.ts",
+          "line": 93
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-2.e2e-spec.ts",
+          "line": 237
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 323
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 108
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 164
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit.e2e-spec.ts",
+          "line": 69
+        },
+        {
+          "file": "web/src/api/mutations.test.ts",
+          "line": 359
+        },
+        {
+          "file": "web/src/pages/CreateEndpointWizard.test.tsx",
+          "line": 89
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 273
+        },
+        {
+          "file": "web/src/pages/OverviewTab.test.tsx",
+          "line": 64
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 127
+        },
+        {
+          "file": "web/src/test/msw/fixtures.ts",
+          "line": 179
+        },
+        {
+          "file": "web/src/workbench/workbench-templates.test.ts",
+          "line": 44
+        },
+        {
+          "file": "web/e2e/resource-types-inventory.spec.ts",
+          "line": 123
+        },
+        {
+          "file": "web/e2e/rfc-compliant-subattributes-flag.spec.ts",
+          "line": 318
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 517
+        },
+        {
+          "file": "web/e2e/workbench-templates.spec.ts",
+          "line": 131
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "RequireIfMatch",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "enforceIfMatch",
+      "flows": "U/G/custom PUT PATCH DELETE and /Me/Bulk",
+      "precedenceAndCoupling": "U/G suppressed by etag.supported=false; generic omits profile argument",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.ts",
+          "line": 160
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 90
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 134
+        },
+        {
+          "file": "web/src/api/scim-error.ts",
+          "line": 271
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 74
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 44
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-context.storage.spec.ts",
+          "line": 239
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 1241
+        },
+        {
+          "file": "api/src/modules/scim/common/capability-resolver.spec.ts",
+          "line": 85
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.spec.ts",
+          "line": 129
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.spec.ts",
+          "line": 1207
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+          "line": 1793
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 2586
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 382
+        },
+        {
+          "file": "api/test/e2e/etag-conditional.e2e-spec.ts",
+          "line": 327
+        },
+        {
+          "file": "api/test/e2e/group-parity-gaps.e2e-spec.ts",
+          "line": 109
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 328
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 208
+        },
+        {
+          "file": "api/test/e2e/rca-diagnostics.e2e-spec.ts",
+          "line": 159
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-2.e2e-spec.ts",
+          "line": 468
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 316
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 249
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 477
+        },
+        {
+          "file": "web/src/api/mutations.test.ts",
+          "line": 575
+        },
+        {
+          "file": "web/src/api/scim-error.test.ts",
+          "line": 172
+        },
+        {
+          "file": "web/src/components/detail/ResourceDetailDrawer.test.tsx",
+          "line": 440
+        },
+        {
+          "file": "web/src/pages/CreateEndpointWizard.test.tsx",
+          "line": 91
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 155
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 493
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "AllowAndCoerceBooleanStrings",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "boolean coercion helpers",
+      "flows": "U/G/custom POST PUT/PATCH and output",
+      "precedenceAndCoupling": "Schema boolean paths; not a general path grammar fix",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.ts",
+          "line": 1330
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 92
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id-minimal.json",
+          "line": 397
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id.json",
+          "line": 1067
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "line": 541
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+          "line": 325
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+          "line": 502
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 133
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 65
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 45
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 1285
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/auto-expand.service.spec.ts",
+          "line": 303
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 199
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+          "line": 1876
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 2689
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 309
+        },
+        {
+          "file": "api/test/e2e/endpoint-profile.e2e-spec.ts",
+          "line": 59
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 348
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 80
+        },
+        {
+          "file": "api/test/e2e/schema-cache-integration.e2e-spec.ts",
+          "line": 79
+        },
+        {
+          "file": "api/test/e2e/soft-delete-flags.e2e-spec.ts",
+          "line": 607
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 967
+        },
+        {
+          "file": "web/src/api/mutations.test.ts",
+          "line": 361
+        },
+        {
+          "file": "web/src/pages/CreateEndpointWizard.test.tsx",
+          "line": 90
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 167
+        },
+        {
+          "file": "web/src/test/msw/fixtures.ts",
+          "line": 180
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 538
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "SecretTokenBearerAuthEnabled",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "Auth enablement resolver + authenticators/token services",
+      "flows": "Credential create/token issuance/resource auth across U/G/custom and admin separation",
+      "precedenceAndCoupling": "Matching authentication.methods facet overrides dedicated flag; otherwise flag then default; SPC auth computed",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 724
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 324
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.ts",
+          "line": 215
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 179
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.tsx",
+          "line": 1879
+        },
+        {
+          "file": "web/src/pages/endpoint-auth-flags.ts",
+          "line": 52
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/auth/authenticators/endpoint-credential.authenticator.spec.ts",
+          "line": 27
+        },
+        {
+          "file": "api/src/modules/auth/shared-secret.guard.spec.ts",
+          "line": 402
+        },
+        {
+          "file": "api/src/modules/dashboard/dashboard.controller.spec.ts",
+          "line": 400
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 33
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 190
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.spec.ts",
+          "line": 36
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-wif-diagnostics.controller.spec.ts",
+          "line": 29
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.spec.ts",
+          "line": 97
+        },
+        {
+          "file": "api/test/e2e/api-response-contracts-2.e2e-spec.ts",
+          "line": 347
+        },
+        {
+          "file": "api/test/e2e/computed-authentication-schemes.e2e-spec.ts",
+          "line": 60
+        },
+        {
+          "file": "api/test/e2e/connection-info.e2e-spec.ts",
+          "line": 70
+        },
+        {
+          "file": "api/test/e2e/credential-caps.e2e-spec.ts",
+          "line": 48
+        },
+        {
+          "file": "api/test/e2e/credential-keyed-lookup.e2e-spec.ts",
+          "line": 57
+        },
+        {
+          "file": "api/test/e2e/credential-lifecycle.e2e-spec.ts",
+          "line": 42
+        },
+        {
+          "file": "api/test/e2e/credential-migration-status.e2e-spec.ts",
+          "line": 71
+        },
+        {
+          "file": "api/test/e2e/dashboard-overview.e2e-spec.ts",
+          "line": 170
+        },
+        {
+          "file": "api/test/e2e/per-endpoint-credentials.e2e-spec.ts",
+          "line": 44
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 350
+        },
+        {
+          "file": "api/test/e2e/scim-event-sse-bridge.e2e-spec.ts",
+          "line": 163
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-2.e2e-spec.ts",
+          "line": 475
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 1014
+        },
+        {
+          "file": "web/src/api/mutations.test.ts",
+          "line": 360
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.test.tsx",
+          "line": 143
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 157
+        },
+        {
+          "file": "web/src/test/msw/fixtures.ts",
+          "line": 181
+        },
+        {
+          "file": "web/e2e/connect-tab-migration.spec.ts",
+          "line": 59
+        },
+        {
+          "file": "web/e2e/connect-tab.spec.ts",
+          "line": 230
+        },
+        {
+          "file": "web/e2e/credential-lifecycle.spec.ts",
+          "line": 46
+        },
+        {
+          "file": "web/e2e/credential-reveal.spec.ts",
+          "line": 72
+        },
+        {
+          "file": "web/e2e/credential-token-format.spec.ts",
+          "line": 57
+        },
+        {
+          "file": "web/e2e/endpoint-detail-tabs.spec.ts",
+          "line": 229
+        },
+        {
+          "file": "web/e2e/endpoint-fixture.ts",
+          "line": 55
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 27
+        },
+        {
+          "file": "web/e2e/wif-credentials.spec.ts",
+          "line": 78
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "OAuthClientCredentialsAuthEnabled",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "Auth enablement resolver + authenticators/token services",
+      "flows": "Credential create/token issuance/resource auth across U/G/custom and admin separation",
+      "precedenceAndCoupling": "Matching authentication.methods facet overrides dedicated flag; otherwise flag then default; SPC auth computed",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 725
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 330
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.ts",
+          "line": 248
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 180
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.tsx",
+          "line": 1880
+        },
+        {
+          "file": "web/src/pages/endpoint-auth-flags.ts",
+          "line": 25
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/auth/shared-secret.guard.spec.ts",
+          "line": 402
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 33
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 191
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.spec.ts",
+          "line": 37
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.spec.ts",
+          "line": 79
+        },
+        {
+          "file": "api/test/e2e/computed-authentication-schemes.e2e-spec.ts",
+          "line": 61
+        },
+        {
+          "file": "api/test/e2e/connection-info.e2e-spec.ts",
+          "line": 35
+        },
+        {
+          "file": "api/test/e2e/credential-caps.e2e-spec.ts",
+          "line": 75
+        },
+        {
+          "file": "api/test/e2e/credential-keyed-lookup.e2e-spec.ts",
+          "line": 200
+        },
+        {
+          "file": "api/test/e2e/credential-reveal.e2e-spec.ts",
+          "line": 64
+        },
+        {
+          "file": "api/test/e2e/credential-rotate.e2e-spec.ts",
+          "line": 44
+        },
+        {
+          "file": "api/test/e2e/credential-secret-visibility.e2e-spec.ts",
+          "line": 31
+        },
+        {
+          "file": "api/test/e2e/dashboard-overview.e2e-spec.ts",
+          "line": 117
+        },
+        {
+          "file": "api/test/e2e/endpoint-oauth-client.e2e-spec.ts",
+          "line": 40
+        },
+        {
+          "file": "api/test/e2e/per-endpoint-credentials.e2e-spec.ts",
+          "line": 414
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 351
+        },
+        {
+          "file": "api/test/e2e/wif-assertion.e2e-spec.ts",
+          "line": 850
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.test.tsx",
+          "line": 221
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 158
+        },
+        {
+          "file": "web/src/test/msw/fixtures.ts",
+          "line": 182
+        },
+        {
+          "file": "web/e2e/connect-tab-migration.spec.ts",
+          "line": 56
+        },
+        {
+          "file": "web/e2e/connect-tab.spec.ts",
+          "line": 136
+        },
+        {
+          "file": "web/e2e/credential-reveal.spec.ts",
+          "line": 210
+        },
+        {
+          "file": "web/e2e/endpoint-detail-tabs.spec.ts",
+          "line": 230
+        },
+        {
+          "file": "web/e2e/endpoint-fixture.ts",
+          "line": 56
+        },
+        {
+          "file": "web/e2e/wif-credentials.spec.ts",
+          "line": 446
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "SharedSecretBearerAuthEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "Auth enablement resolver + authenticators/token services",
+      "flows": "Credential create/token issuance/resource auth across U/G/custom and admin separation",
+      "precedenceAndCoupling": "Matching authentication.methods facet overrides dedicated flag; otherwise flag then default; SPC auth computed",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/auth/authenticators/global-shared-secret.authenticator.ts",
+          "line": 40
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 726
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.ts",
+          "line": 186
+        },
+        {
+          "file": "api/src/oauth/auth-reason-catalog.ts",
+          "line": 256
+        },
+        {
+          "file": "web/src/api/scim-error.ts",
+          "line": 226
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.tsx",
+          "line": 1878
+        },
+        {
+          "file": "web/src/pages/endpoint-auth-flags.ts",
+          "line": 43
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/auth/authenticators/global-shared-secret.authenticator.spec.ts",
+          "line": 50
+        },
+        {
+          "file": "api/src/modules/auth/shared-secret.guard.spec.ts",
+          "line": 181
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1286
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.spec.ts",
+          "line": 79
+        },
+        {
+          "file": "api/test/e2e/connection-info.e2e-spec.ts",
+          "line": 147
+        },
+        {
+          "file": "api/test/e2e/per-endpoint-credentials.e2e-spec.ts",
+          "line": 438
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.test.tsx",
+          "line": 1847
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 159
+        },
+        {
+          "file": "web/e2e/connect-tab-migration.spec.ts",
+          "line": 58
+        },
+        {
+          "file": "web/e2e/endpoint-detail-tabs.spec.ts",
+          "line": 231
+        },
+        {
+          "file": "web/e2e/endpoint-fixture.ts",
+          "line": 58
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 627
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "IncludeWarningAboutIgnoredReadOnlyAttribute",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "U/G/generic controllers",
+      "flows": "Mutation response decoration",
+      "precedenceAndCoupling": "No SPC field; /Me and Bulk need parity review",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-generic.controller.ts",
+          "line": 69
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-groups.controller.ts",
+          "line": 61
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-users.controller.ts",
+          "line": 61
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 94
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 147
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 137
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 46
+        },
+        {
+          "file": "api/test/e2e/group-parity-gaps.e2e-spec.ts",
+          "line": 251
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 245
+        },
+        {
+          "file": "api/test/e2e/readonly-stripping.e2e-spec.ts",
+          "line": 215
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 666
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 875
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit.e2e-spec.ts",
+          "line": 131
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 170
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "IgnoreReadOnlyAttributesInPatch",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "U/G/generic services",
+      "flows": "PATCH readOnly stripping",
+      "precedenceAndCoupling": "Only distinguishes strict-on behavior",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 96
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "line": 520
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+          "line": 299
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+          "line": 476
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 146
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 146
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 47
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-errors.spec.ts",
+          "line": 326
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 246
+        },
+        {
+          "file": "api/test/e2e/readonly-stripping.e2e-spec.ts",
+          "line": 309
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-2.e2e-spec.ts",
+          "line": 548
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 442
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 667
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 874
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit.e2e-spec.ts",
+          "line": 68
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 171
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "UserSoftDeleteEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "U/generic services",
+      "flows": "PATCH active=false result gate",
+      "precedenceAndCoupling": "No SPC field; also blocks unrelated patches of inactive records",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 1037
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 70
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+          "line": 557
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 168
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 83
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/dashboard/dashboard.controller.spec.ts",
+          "line": 303
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 486
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 435
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 1390
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 424
+        },
+        {
+          "file": "api/test/e2e/endpoint-profile.e2e-spec.ts",
+          "line": 140
+        },
+        {
+          "file": "api/test/e2e/group-parity-gaps.e2e-spec.ts",
+          "line": 175
+        },
+        {
+          "file": "api/test/e2e/multi-endpoint-isolation.e2e-spec.ts",
+          "line": 48
+        },
+        {
+          "file": "api/test/e2e/profile-combinations.e2e-spec.ts",
+          "line": 316
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 70
+        },
+        {
+          "file": "api/test/e2e/soft-delete-flags.e2e-spec.ts",
+          "line": 977
+        },
+        {
+          "file": "api/test/e2e/stale-settings-keys.e2e-spec.ts",
+          "line": 63
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 127
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 783
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit.e2e-spec.ts",
+          "line": 655
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 47
+        },
+        {
+          "file": "web/src/pages/OverviewTab.test.tsx",
+          "line": 254
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 161
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 29
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "UserHardDeleteEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "U/generic services",
+      "flows": "User/custom DELETE; /Me/Bulk User delegation",
+      "precedenceAndCoupling": "No SPC field; custom inheritance is product coupling",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 72
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "line": 750
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+          "line": 384
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 169
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 92
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 487
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.spec.ts",
+          "line": 446
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 1302
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 446
+        },
+        {
+          "file": "api/test/e2e/profile-flag-combos.e2e-spec.ts",
+          "line": 133
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 128
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 266
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 162
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 568
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "GroupHardDeleteEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "Group service",
+      "flows": "Group DELETE; Bulk Group delegation",
+      "precedenceAndCoupling": "No SPC field",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 74
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+          "line": 566
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 170
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 101
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 488
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+          "line": 1093
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 467
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 241
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 609
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 268
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 163
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 597
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "MultiMemberPatchOpForGroupEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "GroupPatchEngine",
+      "flows": "Group PATCH member arrays",
+      "precedenceAndCoupling": "No SPC field",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 1038
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 76
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id.json",
+          "line": 1068
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+          "line": 288
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 158
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 110
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 489
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 23
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 204
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-groups.service.spec.ts",
+          "line": 423
+        },
+        {
+          "file": "api/test/e2e/auth-admin-events.e2e-spec.ts",
+          "line": 98
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 79
+        },
+        {
+          "file": "api/test/e2e/soft-delete-flags.e2e-spec.ts",
+          "line": 350
+        },
+        {
+          "file": "api/test/e2e/stale-settings-keys.e2e-spec.ts",
+          "line": 88
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 269
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 164
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "SchemaDiscoveryEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "EndpointScimDiscoveryController",
+      "flows": "Endpoint Schemas/ResourceTypes/SPC GET",
+      "precedenceAndCoupling": "Does not switch resource capabilities; root discovery separate",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-discovery.controller.ts",
+          "line": 76
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 78
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 155
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 490
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 488
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-4.e2e-spec.ts",
+          "line": 409
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 629
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 273
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 165
+        },
+        {
+          "file": "web/src/test/msw/fixtures.ts",
+          "line": 183
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 474
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "logFileEnabled",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "EndpointService and ScimLogger",
+      "flows": "Endpoint file transport",
+      "precedenceAndCoupling": "No mutation/discovery semantics",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 1116
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 118
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 200
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 1669
+        },
+        {
+          "file": "api/test/e2e/endpoint-profile.e2e-spec.ts",
+          "line": 216
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 1090
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 277
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "PrimaryEnforcement",
+      "type": "primaryEnforcement",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": "passthrough",
+      "owner": "ScimSchemaHelpers and Generic service",
+      "flows": "U/G/custom payload primary handling",
+      "precedenceAndCoupling": "Unset runtime passthrough; reject/normalize/passthrough; not sequential primary handoff",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.ts",
+          "line": 1394
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 105
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id-minimal.json",
+          "line": 399
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/entra-id.json",
+          "line": 1072
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/presets/rfc-standard.json",
+          "line": 1122
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "line": 1032
+        },
+        {
+          "file": "api/src/scripts/seed-shape-coverage.ts",
+          "line": 135
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 212
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.spec.ts",
+          "line": 716
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/built-in-presets.spec.ts",
+          "line": 575
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.spec.ts",
+          "line": 1674
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+          "line": 3152
+        },
+        {
+          "file": "api/test/e2e/primary-enforcement.e2e-spec.ts",
+          "line": 40
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-5.e2e-spec.ts",
+          "line": 507
+        },
+        {
+          "file": "api/test/e2e/test-gaps-audit-6.e2e-spec.ts",
+          "line": 963
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 48
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 387
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 70
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "WifCredentialsEnabled",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "Auth enablement resolver + authenticators/token services",
+      "flows": "Credential create/token issuance/resource auth across U/G/custom and admin separation",
+      "precedenceAndCoupling": "Matching authentication.methods facet overrides dedicated flag; otherwise flag then default; SPC auth computed",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 727
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 312
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-wif-diagnostics.controller.ts",
+          "line": 247
+        },
+        {
+          "file": "api/src/modules/scim/discovery/authentication-schemes.ts",
+          "line": 81
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 120
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.ts",
+          "line": 309
+        },
+        {
+          "file": "api/src/oauth/auth-reason-catalog.ts",
+          "line": 68
+        },
+        {
+          "file": "web/src/api/scim-error.ts",
+          "line": 128
+        },
+        {
+          "file": "web/src/components/primitives/AuthDiagnosticsPanel.tsx",
+          "line": 80
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.tsx",
+          "line": 1210
+        },
+        {
+          "file": "web/src/pages/endpoint-auth-flags.ts",
+          "line": 34
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1082
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.inmemory.spec.ts",
+          "line": 151
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 276
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.spec.ts",
+          "line": 286
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-wif-diagnostics.controller.spec.ts",
+          "line": 96
+        },
+        {
+          "file": "api/src/modules/scim/controllers/wif-assertion-token.provider.spec.ts",
+          "line": 65
+        },
+        {
+          "file": "api/src/modules/scim/discovery/authentication-schemes.spec.ts",
+          "line": 113
+        },
+        {
+          "file": "api/src/modules/scim/discovery/scim-discovery.service.spec.ts",
+          "line": 708
+        },
+        {
+          "file": "api/src/modules/scim/services/connection-info.service.spec.ts",
+          "line": 79
+        },
+        {
+          "file": "api/src/oauth/auth-admin-event.spec.ts",
+          "line": 75
+        },
+        {
+          "file": "api/test/e2e/auth-admin-events.e2e-spec.ts",
+          "line": 79
+        },
+        {
+          "file": "api/test/e2e/computed-authentication-schemes.e2e-spec.ts",
+          "line": 62
+        },
+        {
+          "file": "api/test/e2e/connection-info.e2e-spec.ts",
+          "line": 36
+        },
+        {
+          "file": "api/test/e2e/credential-rotate.e2e-spec.ts",
+          "line": 150
+        },
+        {
+          "file": "api/test/e2e/n6-slice-audience.e2e-spec.ts",
+          "line": 101
+        },
+        {
+          "file": "api/test/e2e/wif-assertion.e2e-spec.ts",
+          "line": 95
+        },
+        {
+          "file": "api/test/e2e/wif-tenant-gleaning.e2e-spec.ts",
+          "line": 38
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.test.tsx",
+          "line": 613
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 160
+        },
+        {
+          "file": "web/src/test/msw/fixtures.ts",
+          "line": 155
+        },
+        {
+          "file": "web/e2e/back-navigation.spec.ts",
+          "line": 80
+        },
+        {
+          "file": "web/e2e/connect-tab-migration.spec.ts",
+          "line": 57
+        },
+        {
+          "file": "web/e2e/connect-tab.spec.ts",
+          "line": 310
+        },
+        {
+          "file": "web/e2e/credential-lifecycle.spec.ts",
+          "line": 95
+        },
+        {
+          "file": "web/e2e/effective-egress-policy.spec.ts",
+          "line": 24
+        },
+        {
+          "file": "web/e2e/endpoint-fixture.ts",
+          "line": 57
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 28
+        },
+        {
+          "file": "web/e2e/wif-credentials.spec.ts",
+          "line": 77
+        },
+        {
+          "file": "web/e2e/wif-trust-management.spec.ts",
+          "line": 101
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "CredentialSecretVisibility",
+      "type": "credentialVisibility",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": "always",
+      "owner": "credential services / effective visibility helper",
+      "flows": "Credential admin create/read/export",
+      "precedenceAndCoupling": "Effective helper always returns always; new once invalid; not SCIM mutation",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.ts",
+          "line": 728
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 839
+        },
+        {
+          "file": "api/src/modules/scim/controllers/admin-security-settings.controller.ts",
+          "line": 23
+        },
+        {
+          "file": "api/src/security/credential-security.service.ts",
+          "line": 24
+        },
+        {
+          "file": "web/src/api/queries.ts",
+          "line": 1900
+        },
+        {
+          "file": "web/src/pages/CredentialsTab.tsx",
+          "line": 1903
+        },
+        {
+          "file": "web/src/pages/SettingsPage.tsx",
+          "line": 537
+        },
+        {
+          "file": "web/src/pages/SettingsTab.tsx",
+          "line": 199
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/dashboard/dashboard.controller.spec.ts",
+          "line": 399
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config-ui-coverage.spec.ts",
+          "line": 61
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1455
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 149
+        },
+        {
+          "file": "api/src/security/credential-security.service.spec.ts",
+          "line": 45
+        },
+        {
+          "file": "api/test/e2e/connection-info.e2e-spec.ts",
+          "line": 172
+        },
+        {
+          "file": "api/test/e2e/credential-reveal.e2e-spec.ts",
+          "line": 65
+        },
+        {
+          "file": "api/test/e2e/credential-rotate.e2e-spec.ts",
+          "line": 45
+        },
+        {
+          "file": "api/test/e2e/credential-secret-visibility.e2e-spec.ts",
+          "line": 16
+        },
+        {
+          "file": "api/test/e2e/dashboard-overview.e2e-spec.ts",
+          "line": 118
+        },
+        {
+          "file": "web/src/pages/SettingsPage.test.tsx",
+          "line": 138
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 139
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "EnforceResourceTypes",
+      "type": "boolean",
+      "registeredDefault": true,
+      "effectiveDefault": true,
+      "owner": "U/G controllers",
+      "flows": "Only relaxes unsupported built-in list/.search to warning + empty result",
+      "precedenceAndCoupling": "Profile RT registry remains authoritative for item reads/writes",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/common/resource-type-enforcement.ts",
+          "line": 66
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-groups.controller.ts",
+          "line": 100
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-users.controller.ts",
+          "line": 100
+        },
+        {
+          "file": "api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts",
+          "line": 126
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 164
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1083
+        },
+        {
+          "file": "api/src/modules/scim/common/resource-type-enforcement.spec.ts",
+          "line": 10
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-groups.controller.spec.ts",
+          "line": 909
+        },
+        {
+          "file": "api/src/modules/scim/controllers/endpoint-scim-users.controller.spec.ts",
+          "line": 829
+        },
+        {
+          "file": "api/test/e2e/profile-enforcement-gaps.e2e-spec.ts",
+          "line": 102
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 275
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 166
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksFetchTimeoutMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 5000,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 100,
+        "max": 60000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 148
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 4
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 236
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/controllers/endpoint.controller.spec.ts",
+          "line": 188
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1511
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 1091
+        },
+        {
+          "file": "api/src/modules/scim/controllers/wif-assertion-token.provider.spec.ts",
+          "line": 280
+        },
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 22
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 727
+        },
+        {
+          "file": "api/test/e2e/endpoint-egress-policy.e2e-spec.ts",
+          "line": 24
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 213
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 476
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 95
+        },
+        {
+          "file": "web/e2e/effective-egress-policy.spec.ts",
+          "line": 25
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 424
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksFetchRetries",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 2,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 0,
+        "max": 10
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 149
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 5
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 240
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/controllers/endpoint.controller.spec.ts",
+          "line": 41
+        },
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1513
+        },
+        {
+          "file": "api/src/modules/endpoint/services/endpoint.service.spec.ts",
+          "line": 1092
+        },
+        {
+          "file": "api/src/modules/scim/controllers/wif-assertion-token.provider.spec.ts",
+          "line": 281
+        },
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 23
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 435
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 728
+        },
+        {
+          "file": "api/test/e2e/endpoint-egress-policy.e2e-spec.ts",
+          "line": 41
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 213
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 477
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 96
+        },
+        {
+          "file": "web/e2e/effective-egress-policy.spec.ts",
+          "line": 26
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 425
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksFetchRetryBackoffMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 200,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 0,
+        "max": 10000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 150
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 6
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 244
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1515
+        },
+        {
+          "file": "api/src/modules/scim/controllers/wif-assertion-token.provider.spec.ts",
+          "line": 282
+        },
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 24
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 194
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 729
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 478
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 97
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 426
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksCacheMaxAgeMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 86400000,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 0,
+        "max": 86400000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 151
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 7
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 248
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1516
+        },
+        {
+          "file": "api/src/modules/scim/controllers/wif-assertion-token.provider.spec.ts",
+          "line": 283
+        },
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 25
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 291
+        },
+        {
+          "file": "api/src/oauth/jwks-prewarm.service.spec.ts",
+          "line": 92
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 730
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 213
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 479
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 98
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 427
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksTotalDeadlineMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 10000,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 100,
+        "max": 120000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 152
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 8
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 264
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 207
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 434
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 99
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 428
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksMaxResponseBytes",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 1048576,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 1024,
+        "max": 10485760
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 153
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 9
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 268
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 208
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 476
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 100
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 429
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksMaxKeys",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 100,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 1,
+        "max": 1000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 154
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 10
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 272
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 209
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 508
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 280
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 101
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 117
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 430
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "MaxActiveBearerCredentials",
+      "type": "number",
+      "registeredDefault": 5,
+      "effectiveDefault": 5,
+      "owner": "Credential lifecycle repositories/controllers",
+      "flows": "Credential create/reactivation capacity; no payload semantics",
+      "precedenceAndCoupling": "Endpoint cap then registered default; not SPC",
+      "bounds": {
+        "min": 1,
+        "max": 25
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 246
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 252
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.spec.ts",
+          "line": 397
+        },
+        {
+          "file": "api/test/e2e/credential-caps.e2e-spec.ts",
+          "line": 49
+        },
+        {
+          "file": "api/test/e2e/credential-keyed-lookup.e2e-spec.ts",
+          "line": 153
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 49
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 106
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 410
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "MaxActiveOAuthClientCredentials",
+      "type": "number",
+      "registeredDefault": 5,
+      "effectiveDefault": 5,
+      "owner": "Credential lifecycle repositories/controllers",
+      "flows": "Credential create/reactivation capacity; no payload semantics",
+      "precedenceAndCoupling": "Endpoint cap then registered default; not SPC",
+      "bounds": {
+        "min": 1,
+        "max": 25
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 247
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 256
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.spec.ts",
+          "line": 425
+        },
+        {
+          "file": "api/test/e2e/credential-caps.e2e-spec.ts",
+          "line": 77
+        },
+        {
+          "file": "api/test/e2e/endpoint-oauth-client.e2e-spec.ts",
+          "line": 41
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 410
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "MaxActiveWifTrusts",
+      "type": "number",
+      "registeredDefault": 10,
+      "effectiveDefault": 10,
+      "owner": "Credential lifecycle repositories/controllers",
+      "flows": "Credential create/reactivation capacity; no payload semantics",
+      "precedenceAndCoupling": "Endpoint cap then registered default; not SPC",
+      "bounds": {
+        "min": 1,
+        "max": 25
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/modules/scim/controllers/admin-credential.controller.ts",
+          "line": 248
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 260
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config-ui-coverage.spec.ts",
+          "line": 131
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 280
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 115
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 410
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksMaxCacheEntries",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 50,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 1,
+        "max": 1000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 155
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 11
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 276
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 210
+        },
+        {
+          "file": "api/src/oauth/external-jwks-validator.service.spec.ts",
+          "line": 534
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 102
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 431
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksRefreshIntervalMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 3600000,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 60000,
+        "max": 86400000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 156
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 12
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 280
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 26
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 795
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 103
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 432
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksUnknownKidMinIntervalMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 300000,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 0,
+        "max": 3600000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 157
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 13
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 284
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 27
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 796
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 104
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 433
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "JwksStaleIfErrorMs",
+      "type": "number",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": 172800000,
+      "owner": "egress-policy / JWKS services",
+      "flows": "WIF/JWKS auth fetch/cache; all resource types only through auth",
+      "precedenceAndCoupling": "Endpoint numeric override > server env > hard default; clamp bounds; admin egress view not SCIM SPC",
+      "bounds": {
+        "min": 0,
+        "max": 604800000
+      },
+      "productionReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.ts",
+          "line": 158
+        },
+        {
+          "file": "web/src/pages/egress-policy-ui.ts",
+          "line": 14
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 288
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/oauth/egress-policy.spec.ts",
+          "line": 28
+        },
+        {
+          "file": "api/test/e2e/config-flags.e2e-spec.ts",
+          "line": 797
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 105
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 434
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "PersistRequestSecrets",
+      "type": "boolean",
+      "registeredDefault": "inherit/unset",
+      "effectiveDefault": "inherit/unset",
+      "owner": "LoggingService/redaction",
+      "flows": "Durable request logs; latest implementation always redacts sensitive values",
+      "precedenceAndCoupling": "Registry description stale; no mutation semantics",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 191
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.tsx",
+          "line": 248
+        },
+        {
+          "file": "web/src/pages/SettingsTab.tsx",
+          "line": 195
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/modules/endpoint/endpoint-config.interface.spec.ts",
+          "line": 1580
+        },
+        {
+          "file": "api/src/modules/logging/logging-body-capture.spec.ts",
+          "line": 17
+        },
+        {
+          "file": "api/src/modules/logging/logging-redaction.spec.ts",
+          "line": 27
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 277
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 443
+        },
+        {
+          "file": "web/e2e/credential-secret-visibility.spec.ts",
+          "line": 61
+        },
+        {
+          "file": "web/e2e/endpoint-related-settings.spec.ts",
+          "line": 73
+        },
+        {
+          "file": "web/e2e/settings-matrix.spec.ts",
+          "line": 50
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    },
+    {
+      "key": "RfcCompliantSubAttributes",
+      "type": "boolean",
+      "registeredDefault": false,
+      "effectiveDefault": false,
+      "owner": "SchemaValidator nesting traversal",
+      "flows": "U/G/custom payload shape validation",
+      "precedenceAndCoupling": "False default permits nested complex; independent from strict; not admin metaschema validation",
+      "bounds": null,
+      "productionReferences": [
+        {
+          "file": "api/src/domain/validation/schema-validator.ts",
+          "line": 214
+        },
+        {
+          "file": "api/src/modules/scim/common/scim-service-helpers.ts",
+          "line": 1070
+        },
+        {
+          "file": "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+          "line": 912
+        },
+        {
+          "file": "web/src/pages/endpoint-settings-definitions.ts",
+          "line": 173
+        }
+      ],
+      "testReferences": [
+        {
+          "file": "api/src/domain/validation/rfc-compliant-subattributes.spec.ts",
+          "line": 119
+        },
+        {
+          "file": "api/test/e2e/rfc-compliant-subattributes.e2e-spec.ts",
+          "line": 140
+        },
+        {
+          "file": "web/src/pages/EndpointRelatedSettings.test.tsx",
+          "line": 273
+        },
+        {
+          "file": "web/src/pages/SettingsTab.test.tsx",
+          "line": 278
+        },
+        {
+          "file": "web/e2e/rfc-compliant-subattributes-flag.spec.ts",
+          "line": 35
+        }
+      ],
+      "evidenceLevel": "source trace plus focused registry tests; individual runtime permutations not all exercised"
+    }
+  ]
+}

@@ -139,6 +139,8 @@ export interface SchemaDefinition {
    * Set explicitly for custom resource types whose URNs don't use the standard prefix.
    */
   isCoreSchema?: boolean;
+  /** ResourceType schemaExtensions.required, not an attribute characteristic. */
+  required?: boolean;
 }
 
 /**

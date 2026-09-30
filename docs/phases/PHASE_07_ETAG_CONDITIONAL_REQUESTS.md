@@ -6,6 +6,13 @@
 
 ## Overview
 
+**2026-09-28 P3 update:** The historical pre-write check described below is now
+backed by an atomic repository condition for User, Group and custom-resource
+PUT/PATCH/DELETE. Group scalar and member writes share the same conditional
+transaction. Wildcard remains an existence condition. See
+[conditional-write implementation and dual-backend evidence](../SCIM_CONDITIONAL_WRITES_IMPLEMENTATION.md).
+Local validation is complete; release integration remains pending.
+
 Phase 7 replaces the timestamp-based ETag system with a version-based, monotonic ETag scheme and adds pre-write If-Match enforcement at the service layer. A new `RequireIfMatch` config flag enables per-endpoint opt-in to strict concurrency control (428 on missing header).
 
 ## Architecture Changes

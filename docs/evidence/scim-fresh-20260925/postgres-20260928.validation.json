@@ -1,0 +1,56 @@
+{
+  "status": "validated",
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "casesPerBackend": 77,
+  "totalCaseExecutions": 154,
+  "setupFailures": 0,
+  "migrationReplayPerOwnedDatabase": 22,
+  "ownedDatabases": 2,
+  "containersRemoved": 2,
+  "persistentVolumesCreated": 0,
+  "customNetworksCreated": 0,
+  "safetyNegativeControls": 3,
+  "priorEvidenceModified": false,
+  "productionSourceModified": false,
+  "liveEstateCalls": 0,
+  "commitsCreated": 0,
+  "assertionChecks": {
+    "inmemory": {
+      "passed": 227,
+      "failed": 100
+    },
+    "prisma": {
+      "passed": 235,
+      "failed": 95
+    },
+    "total": 657
+  },
+  "documents": {
+    "freshnessAndLinks": "passed",
+    "scopedDocuments": 2,
+    "newMermaidBlocks": 0
+  },
+  "harness": {
+    "syntaxCheckedCjsFiles": 7,
+    "existingPrettierCheck": "passed",
+    "recordedSha256Hashes": "match final published harness",
+    "executionBoundary": "Original 62 cases followed by 15 new non-overlapping controls; original case bodies unchanged."
+  },
+  "artifacts": {
+    "jsonFiles": 4,
+    "csvCases": 77,
+    "backendIdsMatch": true,
+    "duplicateCaseIds": 0,
+    "postgreSqlIncidentJsonbReadConfirmed": true,
+    "credentialBearingData": false,
+    "credentialScanNote": "Broad initial source scan matched the dynamic password template. Persisted data scan excludes source templates; no credential values are saved."
+  },
+  "cleanup": {
+    "bothExactContainerIdsAbsent": true,
+    "taskApiDependencyJunctionRemoved": true,
+    "sharedDependencySentinelUnchanged": true,
+    "taskGeneratedPrismaClientRemoved": true,
+    "testDatabaseMarkerAbsent": true,
+    "finalSourceHead": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a"
+  }
+}

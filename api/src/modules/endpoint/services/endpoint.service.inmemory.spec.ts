@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { EndpointService } from './endpoint.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { RepositoryModule } from '../../../infrastructure/repositories/repository.module';
 
 // Inmemory-backend parity tests for EndpointService.createEndpoint().
 //
@@ -46,6 +47,7 @@ describe('EndpointService - inmemory backend createEndpoint() parity', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
+      imports: [RepositoryModule.register()],
       providers: [
         EndpointService,
         {

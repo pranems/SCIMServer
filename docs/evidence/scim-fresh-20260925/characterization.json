@@ -1,0 +1,1083 @@
+{
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "backend": "production pure functions and real InMemory repository/service",
+  "results": [
+    {
+      "id": "P01",
+      "purpose": "Native boolean extension valuePath parse",
+      "observed": {
+        "schemaUrn": "urn:example:extension:2.0:Probe",
+        "attributePath": "contacts[primary eq true]",
+        "subAttribute": "value"
+      }
+    },
+    {
+      "id": "P02",
+      "purpose": "Native boolean extension path persists a literal key",
+      "observed": {
+        "payload": {
+          "urn:example:extension:2.0:Probe": {
+            "contacts": [
+              {
+                "primary": true,
+                "value": "old"
+              }
+            ],
+            "contacts[primary eq true]": {
+              "value": "new"
+            }
+          }
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P03",
+      "purpose": "Native boolean core valuePath silently no-ops",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "primary": true,
+              "value": "old"
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P04",
+      "purpose": "Filter matches multiple entries",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "type": "work",
+              "value": "new"
+            },
+            {
+              "type": "work",
+              "value": "b"
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P05",
+      "purpose": "ne filter semantics",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "type": "work",
+              "value": "new"
+            },
+            {
+              "type": "home",
+              "value": "b"
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P06",
+      "purpose": "Add to existing multi-valued core attribute",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "value": "b"
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P07",
+      "purpose": "Valid multi-valued primitive extension PATCH",
+      "observed": {
+        "payload": {
+          "urn:example:extension:2.0:Probe": {
+            "tags": [
+              "b"
+            ]
+          }
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P08",
+      "purpose": "Primitive arrays valid on schema POST",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P09",
+      "purpose": "Filtered complex selected entry object prevalidation",
+      "observed": {
+        "valid": false,
+        "errors": [
+          {
+            "path": "items[type eq \"work\"]",
+            "message": "Attribute 'items' is multi-valued and must be an array.",
+            "scimType": "invalidSyntax"
+          }
+        ]
+      }
+    },
+    {
+      "id": "P10",
+      "purpose": "Unknown remove path prevalidation",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P11",
+      "purpose": "Required removal postvalidation",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P12",
+      "purpose": "Primary update does not unset previous primary",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "type": "work",
+              "primary": true
+            },
+            {
+              "type": "home",
+              "primary": true
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P13",
+      "purpose": "Verbose false materializes dot in core key",
+      "observed": {
+        "payload": {
+          "name": {
+            "givenName": "old"
+          },
+          "name.givenName": "new"
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P14",
+      "purpose": "Core complex replace merges sibling",
+      "observed": {
+        "payload": {
+          "name": {
+            "givenName": "new",
+            "familyName": "kept"
+          }
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P15",
+      "purpose": "No-path add overwrites existing multi-valued array",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "value": "b"
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    },
+    {
+      "id": "P16",
+      "purpose": "Generic core valuePath treated as literal object path",
+      "observed": {
+        "items": [
+          {
+            "type": "work",
+            "value": "a"
+          }
+        ],
+        "items[type eq \"work\"]": {
+          "value": "b"
+        }
+      }
+    },
+    {
+      "id": "P17",
+      "purpose": "Generic add core array concatenates",
+      "observed": {
+        "items": [
+          {
+            "value": "a"
+          },
+          {
+            "value": "b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "P18",
+      "purpose": "Group add displayName routes to members handling",
+      "error": {
+        "name": "PatchError",
+        "message": "Add operation path 'displayName' is not supported.",
+        "status": 400,
+        "scimType": "invalidPath"
+      }
+    },
+    {
+      "id": "P19",
+      "purpose": "DateTime invalid calendar values",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P20",
+      "purpose": "Binary format only string checked",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P21",
+      "purpose": "referenceTypes only string checked",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P22",
+      "purpose": "CaseExact canonicalValues compares case-insensitively",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P23",
+      "purpose": "Extension validation duplicate errors",
+      "observed": {
+        "valid": false,
+        "errors": [
+          {
+            "path": "urn:example:extension:2.0:Probe.contacts[primary eq true]",
+            "message": "Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:example:extension:2.0:Probe'.",
+            "scimType": "invalidSyntax"
+          },
+          {
+            "path": "urn:example:extension:2.0:Probe.contacts[primary eq true]",
+            "message": "Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:example:extension:2.0:Probe'.",
+            "scimType": "invalidSyntax"
+          }
+        ]
+      }
+    },
+    {
+      "id": "P24",
+      "purpose": "Scalar extension namespace is ignored",
+      "observed": {
+        "valid": true,
+        "errors": []
+      }
+    },
+    {
+      "id": "P25",
+      "purpose": "Uppercase declared schema URN in direct strict validator",
+      "observed": {
+        "valid": false,
+        "errors": [
+          {
+            "path": "schemas",
+            "message": "Schema URN 'URN:IETF:PARAMS:SCIM:SCHEMAS:CORE:2.0:USER' is not recognized for this resource type.",
+            "scimType": "invalidValue"
+          }
+        ]
+      }
+    },
+    {
+      "id": "P26",
+      "purpose": "Malformed attr schema type accepted in admin expansion",
+      "observed": {
+        "valid": true,
+        "errors": [],
+        "profile": {
+          "schemas": [
+            {
+              "id": "urn:example:custom:Device",
+              "name": "Device",
+              "description": "Device",
+              "attributes": [
+                {
+                  "name": "x",
+                  "type": "typo"
+                }
+              ]
+            }
+          ],
+          "resourceTypes": [
+            {
+              "id": "Device",
+              "name": "Device",
+              "endpoint": "/Devices",
+              "schema": "urn:example:custom:Device",
+              "schemaExtensions": []
+            }
+          ],
+          "serviceProviderConfig": {
+            "patch": {
+              "supported": true
+            },
+            "bulk": {
+              "supported": false
+            },
+            "filter": {
+              "supported": true,
+              "maxResults": 200
+            },
+            "changePassword": {
+              "supported": false
+            },
+            "sort": {
+              "supported": false
+            },
+            "etag": {
+              "supported": false
+            }
+          },
+          "settings": {}
+        }
+      }
+    },
+    {
+      "id": "P27",
+      "purpose": "Strict full service incident with InMemory write unchanged",
+      "observed": {
+        "error": {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:Error"
+          ],
+          "detail": "Schema validation failed: urn:example:extension:2.0:Probe.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:example:extension:2.0:Probe'.; urn:example:extension:2.0:Probe.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:example:extension:2.0:Probe'.",
+          "scimType": "invalidSyntax",
+          "status": "400",
+          "urn:scimserver:api:messages:2.0:Diagnostics": {
+            "triggeredBy": "StrictSchemaValidation",
+            "errorCode": "VALIDATION_SCHEMA",
+            "attributePaths": [
+              "urn:example:extension:2.0:Probe.contacts[primary eq true]",
+              "urn:example:extension:2.0:Probe.contacts[primary eq true]"
+            ],
+            "attributePath": "urn:example:extension:2.0:Probe.contacts[primary eq true]",
+            "activeConfig": {
+              "StrictSchemaValidation": true
+            }
+          }
+        },
+        "persisted": {
+          "schemas": [
+            "urn:ietf:params:scim:schemas:core:2.0:User",
+            "urn:example:extension:2.0:Probe"
+          ],
+          "requiredCustom": "required",
+          "urn:example:extension:2.0:Probe": {
+            "mandatory": "required",
+            "contacts": [
+              {
+                "primary": true,
+                "value": "old"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "P28",
+      "purpose": "Lenient service then GET contains malformed extension key",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User",
+          "urn:example:extension:2.0:Probe"
+        ],
+        "requiredCustom": "required",
+        "urn:example:extension:2.0:Probe": {
+          "mandatory": "required",
+          "contacts": [
+            {
+              "primary": true,
+              "value": "old"
+            }
+          ],
+          "contacts[primary eq true]": {
+            "value": "new"
+          }
+        },
+        "id": "74d2170c-6a66-4fa0-9443-2e2bc3e8e91a",
+        "userName": "probe-26",
+        "active": true,
+        "meta": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.060Z",
+          "lastModified": "2026-09-26T03:02:36.063Z",
+          "location": "https://example.test/scim/v2/Users/74d2170c-6a66-4fa0-9443-2e2bc3e8e91a",
+          "version": "W/\"v2\""
+        }
+      }
+    },
+    {
+      "id": "P29",
+      "purpose": "Full service required custom attribute removal",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User",
+          "urn:example:extension:2.0:Probe"
+        ],
+        "urn:example:extension:2.0:Probe": {
+          "mandatory": "required",
+          "contacts": [
+            {
+              "primary": true,
+              "value": "old"
+            }
+          ]
+        },
+        "id": "ad6108a5-7b0d-41f9-a37e-e6893c605a66",
+        "userName": "probe-28",
+        "active": true,
+        "meta": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.064Z",
+          "lastModified": "2026-09-26T03:02:36.065Z",
+          "location": "https://example.test/scim/v2/Users/ad6108a5-7b0d-41f9-a37e-e6893c605a66",
+          "version": "W/\"v2\""
+        }
+      }
+    },
+    {
+      "id": "P30",
+      "purpose": "Two concurrent same-version If-Match service writes",
+      "observed": {
+        "outcomes": [
+          {
+            "status": "fulfilled",
+            "version": "W/\"v2\""
+          },
+          {
+            "status": "fulfilled",
+            "version": "W/\"v3\""
+          }
+        ],
+        "storedVersion": 3
+      }
+    },
+    {
+      "id": "P31",
+      "purpose": "Concurrent duplicate username creates with InMemory",
+      "observed": [
+        {
+          "status": "fulfilled",
+          "id": "d19fa419-64fd-46d4-af6d-aa78555edd71"
+        },
+        {
+          "status": "fulfilled",
+          "id": "6127fb03-1a58-46f9-9f2e-a9e9452b523a"
+        }
+      ]
+    },
+    {
+      "id": "P32",
+      "purpose": "Soft-delete-disabled rejects unrelated patch of inactive user",
+      "error": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": "User soft-delete (active=false) is not enabled for this endpoint.",
+        "scimType": "invalidValue",
+        "status": "400",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "triggeredBy": "UserSoftDeleteEnabled",
+          "errorCode": "SOFT_DELETE_DISABLED"
+        }
+      }
+    },
+    {
+      "id": "P33",
+      "purpose": "Immutable delete on full service",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User",
+          "urn:example:extension:2.0:Probe"
+        ],
+        "requiredCustom": "r",
+        "urn:example:extension:2.0:Probe": {
+          "mandatory": "m"
+        },
+        "id": "3ee84032-fc05-4278-99e1-5292ca0e7aa2",
+        "userName": "immutable-delete",
+        "active": true,
+        "meta": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.067Z",
+          "lastModified": "2026-09-26T03:02:36.068Z",
+          "location": "https://example.test/scim/v2/Users/3ee84032-fc05-4278-99e1-5292ca0e7aa2",
+          "version": "W/\"v2\""
+        }
+      }
+    },
+    {
+      "id": "P34",
+      "purpose": "Sequential immutable assignment twice in one request",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User",
+          "urn:example:extension:2.0:Probe"
+        ],
+        "requiredCustom": "r",
+        "serial": "second",
+        "urn:example:extension:2.0:Probe": {
+          "mandatory": "m"
+        },
+        "id": "3dd4d267-cc48-4f7c-a06c-731c5953452d",
+        "userName": "immutable-sequence",
+        "active": true,
+        "meta": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.068Z",
+          "lastModified": "2026-09-26T03:02:36.068Z",
+          "location": "https://example.test/scim/v2/Users/3dd4d267-cc48-4f7c-a06c-731c5953452d",
+          "version": "W/\"v2\""
+        }
+      }
+    },
+    {
+      "id": "P35",
+      "purpose": "Primary handoff full service reject mode",
+      "error": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": "The 'primary' attribute value 'true' MUST appear no more than once in 'items' (found 2). [RFC 7643 section 2.4]",
+        "scimType": "invalidValue",
+        "status": "400",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "triggeredBy": "PrimaryEnforcement",
+          "errorCode": "PRIMARY_CONSTRAINT_VIOLATION",
+          "attributePath": "items",
+          "primaryCount": 2
+        }
+      }
+    },
+    {
+      "id": "P36",
+      "purpose": "Filtering on hidden extension attribute uses projected data",
+      "observed": {
+        "totalResults": 0
+      }
+    },
+    {
+      "id": "P37",
+      "purpose": "Generic ignores endpoint filter maxResults",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+        ],
+        "totalResults": 2,
+        "startIndex": 1,
+        "itemsPerPage": 2,
+        "Resources": [
+          {
+            "schemas": [
+              "urn:example:custom:Device"
+            ],
+            "id": "c403fe19-688a-4747-814a-34c1d93aae0f",
+            "displayName": "device-2",
+            "cost": 2,
+            "meta": {
+              "resourceType": "Device",
+              "created": "2026-09-26T03:02:36.607Z",
+              "lastModified": "2026-09-26T03:02:36.607Z",
+              "location": "https://example.test/scim/v2/Devices/c403fe19-688a-4747-814a-34c1d93aae0f",
+              "version": "W/\"v1\""
+            }
+          },
+          {
+            "schemas": [
+              "urn:example:custom:Device"
+            ],
+            "id": "632e8ace-6f49-41d1-9e6f-ca67c0764692",
+            "displayName": "device-10",
+            "cost": 10,
+            "meta": {
+              "resourceType": "Device",
+              "created": "2026-09-26T03:02:36.608Z",
+              "lastModified": "2026-09-26T03:02:36.608Z",
+              "location": "https://example.test/scim/v2/Devices/632e8ace-6f49-41d1-9e6f-ca67c0764692",
+              "version": "W/\"v1\""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "P38",
+      "purpose": "Generic numeric sorting is string sorting",
+      "observed": [
+        10,
+        2
+      ]
+    },
+    {
+      "id": "P39",
+      "purpose": "Generic still requires If-Match with ETag capability false",
+      "error": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": "If-Match header is required for this operation. Current ETag: W/\"v1\"",
+        "status": "428",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "triggeredBy": "RequireIfMatch",
+          "errorCode": "PRECONDITION_IF_MATCH",
+          "currentETag": "W/\"v1\""
+        }
+      }
+    },
+    {
+      "id": "P40",
+      "purpose": "Generic core array add is correct primitive positive control",
+      "observed": {
+        "tags": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "P41",
+      "purpose": "POST readOnly attribute validation occurs before ignore",
+      "error": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:Error"
+        ],
+        "detail": "Schema validation failed: computed: Attribute 'computed' is readOnly and cannot be set by the client.",
+        "scimType": "mutability",
+        "status": "400",
+        "urn:scimserver:api:messages:2.0:Diagnostics": {
+          "triggeredBy": "StrictSchemaValidation",
+          "errorCode": "VALIDATION_SCHEMA",
+          "attributePaths": [
+            "computed"
+          ],
+          "attributePath": "computed",
+          "activeConfig": {
+            "StrictSchemaValidation": true
+          }
+        }
+      }
+    },
+    {
+      "id": "P42",
+      "purpose": "Service PUT omitted immutable drops existing value",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User",
+          "urn:example:extension:2.0:Probe"
+        ],
+        "requiredCustom": "r",
+        "urn:example:extension:2.0:Probe": {
+          "mandatory": "m"
+        },
+        "id": "7c9b0370-e594-4ae7-8f54-2066f558c8b7",
+        "userName": "immutable-put",
+        "active": true,
+        "meta": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.612Z",
+          "lastModified": "2026-09-26T03:02:36.612Z",
+          "location": "https://example.test/scim/v2/Users/7c9b0370-e594-4ae7-8f54-2066f558c8b7",
+          "version": "W/\"v2\""
+        }
+      }
+    },
+    {
+      "id": "P43",
+      "purpose": "No-op duplicate add metadata behavior",
+      "observed": {
+        "before": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.613Z",
+          "lastModified": "2026-09-26T03:02:36.613Z",
+          "location": "https://example.test/scim/v2/Users/8ce9ab1f-63b4-4296-8c8c-bbceedaa964f",
+          "version": "W/\"v1\""
+        },
+        "after": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.613Z",
+          "lastModified": "2026-09-26T03:02:36.613Z",
+          "location": "https://example.test/scim/v2/Users/8ce9ab1f-63b4-4296-8c8c-bbceedaa964f",
+          "version": "W/\"v2\""
+        }
+      }
+    },
+    {
+      "id": "P44",
+      "purpose": "Exact four incident paths with current live schema, synthetic local data",
+      "observed": {
+        "strictError": {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:Error"
+          ],
+          "detail": "Schema validation failed: urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser'.; urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]: Unknown attribute 'contacts[primary eq true]' is not defined in extension schema 'urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser'.",
+          "scimType": "invalidSyntax",
+          "status": "400",
+          "urn:scimserver:api:messages:2.0:Diagnostics": {
+            "triggeredBy": "StrictSchemaValidation",
+            "errorCode": "VALIDATION_SCHEMA",
+            "attributePaths": [
+              "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]",
+              "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]"
+            ],
+            "attributePath": "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser.contacts[primary eq true]",
+            "activeConfig": {
+              "StrictSchemaValidation": true
+            }
+          }
+        },
+        "strictStored": {
+          "schemas": [
+            "urn:ietf:params:scim:schemas:core:2.0:User",
+            "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser",
+            "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser"
+          ],
+          "name": {
+            "formatted": "Synthetic Probe",
+            "givenName": "Synthetic",
+            "familyName": "Probe"
+          },
+          "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser": {
+            "primaryOrganization": {
+              "location": "old"
+            },
+            "additionalOrganizations": [
+              {
+                "type": "school",
+                "symbol": "old"
+              },
+              {
+                "type": "work",
+                "symbol": "old"
+              }
+            ]
+          },
+          "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser": {
+            "contacts": [
+              {
+                "primary": true,
+                "value": "old"
+              }
+            ]
+          }
+        },
+        "after": {
+          "schemas": [
+            "urn:ietf:params:scim:schemas:core:2.0:User",
+            "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser",
+            "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser"
+          ],
+          "name": {
+            "formatted": "Synthetic Probe",
+            "givenName": "Synthetic",
+            "familyName": "Probe"
+          },
+          "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser": {
+            "primaryOrganization": {
+              "location": "synthetic-new"
+            },
+            "additionalOrganizations": [
+              {
+                "type": "school",
+                "symbol": "synthetic-new"
+              },
+              {
+                "type": "work",
+                "symbol": "synthetic-new"
+              }
+            ]
+          },
+          "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser": {
+            "contacts": [
+              {
+                "primary": true,
+                "value": "old"
+              }
+            ],
+            "contacts[primary eq true]": {
+              "value": "synthetic-new"
+            }
+          },
+          "id": "cc154ec8-606e-4ee4-afa8-805462942758",
+          "userName": "synthetic-four-path",
+          "active": true,
+          "meta": {
+            "resourceType": "User",
+            "created": "2026-09-26T03:02:36.618Z",
+            "lastModified": "2026-09-26T03:02:36.620Z",
+            "location": "https://example.test/scim/v2/Users/cc154ec8-606e-4ee4-afa8-805462942758",
+            "version": "W/\"v2\""
+          }
+        }
+      }
+    },
+    {
+      "id": "P45",
+      "purpose": "Generic controller accepts filter although advertised false",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+        ],
+        "totalResults": 1,
+        "startIndex": 1,
+        "itemsPerPage": 1,
+        "Resources": [
+          {
+            "schemas": [
+              "urn:example:custom:Device"
+            ],
+            "id": "c403fe19-688a-4747-814a-34c1d93aae0f",
+            "displayName": "device-2",
+            "cost": 2,
+            "meta": {
+              "resourceType": "Device",
+              "created": "2026-09-26T03:02:36.607Z",
+              "lastModified": "2026-09-26T03:02:36.607Z",
+              "location": "https://example.test/scim/v2/Devices/c403fe19-688a-4747-814a-34c1d93aae0f",
+              "version": "W/\"v1\""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "P46",
+      "purpose": "Generic .search array-valued attributes contract",
+      "error": {
+        "name": "TypeError",
+        "message": "raw.split is not a function"
+      }
+    },
+    {
+      "id": "P47",
+      "purpose": "Shape validator all eight top-level types single and multiple",
+      "observed": [
+        {
+          "type": "string",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "string",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "boolean",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "boolean",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "integer",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "integer",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "decimal",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "decimal",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "dateTime",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "dateTime",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "binary",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "binary",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "reference",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "reference",
+          "multiValued": true,
+          "valid": true
+        },
+        {
+          "type": "complex",
+          "multiValued": false,
+          "valid": true
+        },
+        {
+          "type": "complex",
+          "multiValued": true,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "P48",
+      "purpose": "Required ResourceType schema extension absent on POST",
+      "observed": {
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User"
+        ],
+        "requiredCustom": "r",
+        "id": "6a608139-3c12-4e4f-943c-52c5132dae8e",
+        "userName": "missing-required-extension",
+        "active": true,
+        "meta": {
+          "resourceType": "User",
+          "created": "2026-09-26T03:02:36.623Z",
+          "lastModified": "2026-09-26T03:02:36.623Z",
+          "location": "https://example.test/scim/v2/Users/6a608139-3c12-4e4f-943c-52c5132dae8e",
+          "version": "W/\"v1\""
+        }
+      }
+    },
+    {
+      "id": "P49",
+      "purpose": "Uniqueness collector skips promoted-name extension and multi-valued leaves",
+      "observed": [
+        {
+          "schemaUrn": "urn:example:extension:2.0:Probe",
+          "attrName": "customUnique",
+          "caseExact": false
+        }
+      ]
+    },
+    {
+      "id": "P50",
+      "purpose": "Unsupported boolean compound filter accepted as no-op core patch",
+      "observed": {
+        "payload": {
+          "items": [
+            {
+              "type": "work",
+              "primary": true,
+              "value": "old"
+            }
+          ]
+        },
+        "extractedFields": {
+          "userName": "synthetic-user",
+          "displayName": null,
+          "externalId": null,
+          "active": true
+        }
+      }
+    }
+  ]
+}

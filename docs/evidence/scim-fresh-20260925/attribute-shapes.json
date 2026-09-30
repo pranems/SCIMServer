@@ -1,0 +1,394 @@
+{
+  "rows": [
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "string",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "string",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "string",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "string",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "string",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "string",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "boolean",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "boolean",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "boolean",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "boolean",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "boolean",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "boolean",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "integer",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "integer",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "integer",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "integer",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "integer",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "integer",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "decimal",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "decimal",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "decimal",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "decimal",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "decimal",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "decimal",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "dateTime",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "dateTime",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "dateTime",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "dateTime",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "dateTime",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "dateTime",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "binary",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "binary",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "binary",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "binary",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "binary",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "binary",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "reference",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "reference",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "reference",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "SchemaValidator subAttribute walker; existing tests, not every product flow"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "reference",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "reference",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "reference",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "RFC 7643 schema referenceTypes with verified 5607; existing rfc-compliant-subattributes suite"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "complex",
+      "multiValued": false,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "complex",
+      "multiValued": false,
+      "rfcPermitted": false,
+      "evidence": "RFC 7643 2.3.8 / verified 8415; flag false intentionally permits"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "complex",
+      "multiValued": false,
+      "rfcPermitted": false,
+      "evidence": "RFC 7643 2.3.8 / verified 8415; flag false intentionally permits"
+    },
+    {
+      "placement": "top-level core or extension",
+      "parentCardinality": "not applicable",
+      "type": "complex",
+      "multiValued": true,
+      "rfcPermitted": true,
+      "evidence": "P47 validator valid representative; not all flows"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "single complex",
+      "type": "complex",
+      "multiValued": true,
+      "rfcPermitted": false,
+      "evidence": "RFC 7643 2.3.8 / verified 8415; flag false intentionally permits"
+    },
+    {
+      "placement": "subAttribute of core or extension complex",
+      "parentCardinality": "multi complex",
+      "type": "complex",
+      "multiValued": true,
+      "rfcPermitted": false,
+      "evidence": "RFC 7643 2.3.8 / verified 8415; flag false intentionally permits"
+    }
+  ],
+  "dimensionsNotMultiplied": [
+    "User / Group / custom",
+    "POST / PUT / PATCH / GET / list / .search / Bulk / Me",
+    "characteristics and policy combinations enumerated in report"
+  ],
+  "exhaustiveRuntimeClaim": false
+}

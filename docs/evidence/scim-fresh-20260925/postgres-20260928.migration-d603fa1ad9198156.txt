@@ -1,0 +1,90 @@
+Datasource "db": PostgreSQL database "scim_fresh_d603fa1ad9198156", schema "public" at "127.0.0.1:60936"
+
+22 migrations found in prisma/migrations
+
+Applying migration `20260223000000_postgresql_baseline`
+Applying migration `20260223203811_externalid_citext_case_insensitive`
+Applying migration `20260223225049_add_endpoint_schema`
+Applying migration `20260225123401_add_deleted_at_soft_delete`
+Applying migration `20260225181836_externalid_citext_to_text`
+Applying migration `20260225232117_add_endpoint_resource_type`
+Applying migration `20260227013947_add_endpoint_credential`
+Applying migration `20260313031330_add_endpoint_profile`
+Applying migration `20260409235323_remove_uniqueness_displayname_externalid`
+Applying migration `20260416025138_add_requestlog_perf_indexes`
+Applying migration `20260430120000_resource_member_unique_value`
+Applying migration `20260707000000_add_jwks_host_allowlist`
+Applying migration `20260707100000_add_credential_dek`
+Applying migration `20260707110000_add_secret_retention_and_server_settings`
+Applying migration `20260717120000_add_requestlog_requestid`
+Applying migration `20260721180000_add_requestlog_auth_summary`
+Applying migration `20260722120000_add_requestlog_auth_decision`
+Applying migration `20260724000000_drop_requestlog_endpoint_fk`
+Applying migration `20260827200000_add_credential_keyed_lookup`
+Applying migration `20260916035422_add_endpoint_credential_type_active_index`
+Applying migration `20260923020356_split_per_endpoint_credentials_enablement`
+Applying migration `20260924000000_endpoint_name_case_insensitive`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260223000000_postgresql_baseline/
+    └─ migration.sql
+  └─ 20260223203811_externalid_citext_case_insensitive/
+    └─ migration.sql
+  └─ 20260223225049_add_endpoint_schema/
+    └─ migration.sql
+  └─ 20260225123401_add_deleted_at_soft_delete/
+    └─ migration.sql
+  └─ 20260225181836_externalid_citext_to_text/
+    └─ migration.sql
+  └─ 20260225232117_add_endpoint_resource_type/
+    └─ migration.sql
+  └─ 20260227013947_add_endpoint_credential/
+    └─ migration.sql
+  └─ 20260313031330_add_endpoint_profile/
+    └─ migration.sql
+  └─ 20260409235323_remove_uniqueness_displayname_externalid/
+    └─ migration.sql
+  └─ 20260416025138_add_requestlog_perf_indexes/
+    └─ migration.sql
+  └─ 20260430120000_resource_member_unique_value/
+    └─ migration.sql
+  └─ 20260707000000_add_jwks_host_allowlist/
+    └─ migration.sql
+  └─ 20260707100000_add_credential_dek/
+    └─ migration.sql
+  └─ 20260707110000_add_secret_retention_and_server_settings/
+    └─ migration.sql
+  └─ 20260717120000_add_requestlog_requestid/
+    └─ migration.sql
+  └─ 20260721180000_add_requestlog_auth_summary/
+    └─ migration.sql
+  └─ 20260722120000_add_requestlog_auth_decision/
+    └─ migration.sql
+  └─ 20260724000000_drop_requestlog_endpoint_fk/
+    └─ migration.sql
+  └─ 20260827200000_add_credential_keyed_lookup/
+    └─ migration.sql
+  └─ 20260916035422_add_endpoint_credential_type_active_index/
+    └─ migration.sql
+  └─ 20260923020356_split_per_endpoint_credentials_enablement/
+    └─ migration.sql
+  └─ 20260924000000_endpoint_name_case_insensitive/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+┌─────────────────────────────────────────────────────────┐
+│  Update available 7.8.0 -> 8.0.0-rc.17                  │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘

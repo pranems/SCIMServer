@@ -1,0 +1,31 @@
+{
+  "scope": "Parent-owned legacy P7 expectation reconciliation, test-only",
+  "sourceCommit": "df3ca95773eae65938e07d136c1f199b28746863",
+  "integrationCommit": "bd82e68157c358f2b871ae225d51e08a7b308ecd",
+  "sourceBase": "b21e44cb1dd3ee2d92b00d04846b90e68fe1a7dd",
+  "parentRed": {
+    "failed": 8,
+    "passed": 68
+  },
+  "currentAssemblyGreen": {
+    "suites": 3,
+    "passed": 142,
+    "failed": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 2
+  },
+  "changedTestUnchangedFromParent": true,
+  "opposingControlsAdded": 4,
+  "productionTypeScriptChanged": false,
+  "httpOrLiveCodeChanged": false,
+  "postgresqlOrLiveRerun": false,
+  "sourceSha256IncludingChangedTest": "22b4e4a395ad10c52ed5f380af0b392704bfca0e4445fa29c9f28f26187bf721",
+  "documentationContentAndFreshnessPassed": 26,
+  "original82CaseLedgerUnchanged": true,
+  "blockerDisposition": "Eight legacy expectations closed without deleted/skipped or weaker outcomes; no full-unit/final-C0 claim",
+  "publication": false,
+  "deployment": false
+}

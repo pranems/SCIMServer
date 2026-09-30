@@ -90,11 +90,9 @@ describe('Sorting (RFC 7644 §3.4.2.3) E2E', () => {
       expect(names).toEqual(['Anna', 'Mike', 'Zara']);
     });
 
-    it('should fall back to default sort for unknown sortBy attribute', async () => {
-      const res = await scimGet(app, `${basePath}/Users?sortBy=unknownField`, token).expect(200);
-      expect(res.body.totalResults).toBe(3);
-      // Should still return results (falls back to createdAt asc)
-      expect(res.body.Resources.length).toBe(3);
+    it('should reject an unknown sortBy rather than silently sorting creation time', async () => {
+      const res = await scimGet(app, `${basePath}/Users?sortBy=unknownField`, token).expect(400);
+      expect(res.body).toMatchObject({ status: '400', scimType: 'invalidValue' });
     });
 
     it('should sort with case-insensitive attribute names', async () => {

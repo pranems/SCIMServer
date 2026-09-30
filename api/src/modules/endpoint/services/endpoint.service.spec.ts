@@ -3,6 +3,8 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EndpointService } from './endpoint.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import { PrismaEndpointLifecycleRepository } from '../../../infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository';
 
 // Force Prisma backend for unit tests - these tests mock PrismaService,
 // not the in-memory cache. The inmemory path uses a different code flow.
@@ -16,7 +18,7 @@ describe('EndpointService', () => {
   let scimLogger: ScimLogger;
 
   const mockEndpoint = {
-    id: 'test-endpoint-id',
+    id: '76e3c596-22aa-4527-bd6d-234367d798e6',
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'A test endpoint',
@@ -27,30 +29,39 @@ describe('EndpointService', () => {
   };
 
   beforeEach(async () => {
+    const prismaTransactionClient = {
+      endpoint: {
+        findUnique: jest.fn().mockResolvedValue(mockEndpoint),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      scimResource: {
+        count: jest.fn(),
+      },
+      resourceMember: {
+        count: jest.fn(),
+      },
+      requestLog: {
+        count: jest.fn(),
+      },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    const prismaMock = {
+      ...prismaTransactionClient,
+      $transaction: jest.fn((
+        callback: (client: typeof prismaTransactionClient) => Promise<unknown>,
+      ) => callback(prismaTransactionClient)),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointService,
+        { provide: ENDPOINT_LIFECYCLE_REPOSITORY, useClass: PrismaEndpointLifecycleRepository },
         {
           provide: PrismaService,
-          useValue: {
-            endpoint: {
-              findUnique: jest.fn(),
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-              delete: jest.fn(),
-            },
-            scimResource: {
-              count: jest.fn(),
-            },
-            resourceMember: {
-              count: jest.fn(),
-            },
-            requestLog: {
-              count: jest.fn(),
-            },
-          },
+          useValue: prismaMock,
         },
         {
           provide: ScimLogger,
@@ -119,7 +130,7 @@ describe('EndpointService', () => {
     it('should reject invalid settings value on update', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
       await expect(
-        service.updateEndpoint('test-endpoint-id', {
+        service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
           profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'invalid' } as any },
         }),
       ).rejects.toThrow(BadRequestException);
@@ -129,7 +140,7 @@ describe('EndpointService', () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
       (prisma.endpoint.update as jest.Mock).mockResolvedValue(mockEndpoint);
 
-      const result = await service.updateEndpoint('test-endpoint-id', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
         displayName: 'New Name',
       });
 
@@ -158,7 +169,7 @@ describe('EndpointService', () => {
         Promise.resolve({ ...before, profile: args.data.profile }),
       );
 
-      await expect(service.updateEndpoint('test-endpoint-id', {
+      await expect(service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
         profile: { settings: { CredentialSecretVisibility: 'once' } },
       })).rejects.toThrow(BadRequestException);
 
@@ -182,7 +193,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...before, profile: structuredClone(args.data.profile) });
       });
 
-      await service.updateEndpoint('test-endpoint-id', {
+      await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
         profile: { settings: { StrictSchemaValidation: false } },
       });
 
@@ -222,7 +233,7 @@ describe('EndpointService', () => {
         );
 
         await expect(
-          service.updateEndpoint('test-endpoint-id', {
+          service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
             profile: { authentication: { defaultMethodId: 'm-keep' } as any },
           }),
         ).rejects.toThrow(BadRequestException);
@@ -236,7 +247,7 @@ describe('EndpointService', () => {
         );
 
         await expect(
-          service.updateEndpoint('test-endpoint-id', {
+          service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
             profile: { authentication: { methods: 'not-an-array' } as any },
           }),
         ).rejects.toThrow(BadRequestException);
@@ -249,7 +260,7 @@ describe('EndpointService', () => {
           Promise.resolve({ ...before, profile: args.data.profile }),
         );
 
-        const result = await service.updateEndpoint('test-endpoint-id', {
+        const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
           profile: { authentication: { schemaVersion: 1, methods: [] } },
         });
 
@@ -263,7 +274,7 @@ describe('EndpointService', () => {
           Promise.resolve({ ...before, profile: args.data.profile }),
         );
 
-        const result = await service.updateEndpoint('test-endpoint-id', {
+        const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
           profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'True' } },
         });
 
@@ -280,13 +291,13 @@ describe('EndpointService', () => {
         profile: { settings: { WifCredentialsEnabled: 'True' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} },
       });
 
-      await service.updateEndpoint('test-endpoint-id', {
+      await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
         profile: { settings: { WifCredentialsEnabled: 'True' } as never },
       });
 
       const call = (scimLogger.info as jest.Mock).mock.calls.find((c) => c[1] === 'Auth config change');
       expect(call).toBeDefined();
-      expect(call![2]).toMatchObject({ action: 'auth_flags_changed', outcome: 'success', endpointId: 'test-endpoint-id' });
+      expect(call![2]).toMatchObject({ action: 'auth_flags_changed', outcome: 'success', endpointId: '76e3c596-22aa-4527-bd6d-234367d798e6' });
       const changed = (call![2] as { changedFlags: Array<{ flag: string; from: unknown; to: unknown }> }).changedFlags;
       expect(changed).toEqual(expect.arrayContaining([{ flag: 'WifCredentialsEnabled', from: 'False', to: 'True' }]));
     });
@@ -299,7 +310,7 @@ describe('EndpointService', () => {
         profile: { settings: { WifCredentialsEnabled: 'True', MultiMemberPatchOpForGroupEnabled: 'True' }, schemas: [p4MinSchema], resourceTypes: [p4MinRT], serviceProviderConfig: {} },
       });
 
-      await service.updateEndpoint('test-endpoint-id', {
+      await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
         profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'True' } as never },
       });
 
@@ -371,14 +382,15 @@ describe('EndpointService', () => {
     it('should return endpoint by ID', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
 
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
-      expect(result.id).toBe('test-endpoint-id');
+      expect(result.id).toBe('76e3c596-22aa-4527-bd6d-234367d798e6');
       expect(result.name).toBe('test-endpoint');
     });
 
     it('should resolve cached endpoint names case-insensitively', async () => {
       (service as any).cacheSet(mockEndpoint);
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(mockEndpoint);
 
       const result = await service.getEndpoint('TEST-ENDPOINT');
 
@@ -397,7 +409,7 @@ describe('EndpointService', () => {
     it('should parse profile settings correctly', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
 
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       expect(result.profile?.settings).toEqual({ MultiMemberPatchOpForGroupEnabled: 'True' });
     });
@@ -408,7 +420,7 @@ describe('EndpointService', () => {
         profile: null,
       });
 
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       expect(result.profile).toBeNull();
     });
@@ -429,7 +441,7 @@ describe('EndpointService', () => {
         },
       });
 
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       // Stale keys should be renamed to current names
       expect(result.profile?.settings).toHaveProperty('UserSoftDeleteEnabled', 'True');
@@ -456,7 +468,7 @@ describe('EndpointService', () => {
         },
       });
 
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       expect(result.profile?.settings).toEqual(expect.objectContaining({
         SecretTokenBearerAuthEnabled: 'True',
@@ -480,7 +492,7 @@ describe('EndpointService', () => {
         },
       });
 
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       expect(result.profile?.settings).toEqual(expect.objectContaining({
         SecretTokenBearerAuthEnabled: 'True',
@@ -500,6 +512,7 @@ describe('EndpointService', () => {
 
     it('should resolve cached endpoint names case-insensitively', async () => {
       (service as any).cacheSet(mockEndpoint);
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(mockEndpoint);
 
       const result = await service.getEndpointByName('TEST-ENDPOINT');
 
@@ -567,9 +580,9 @@ describe('EndpointService', () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
       (prisma.endpoint.delete as jest.Mock).mockResolvedValue(mockEndpoint);
 
-      await expect(service.deleteEndpoint('test-endpoint-id')).resolves.toBeUndefined();
+      await expect(service.deleteEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6')).resolves.toBeUndefined();
       expect(prisma.endpoint.delete).toHaveBeenCalledWith({
-        where: { id: 'test-endpoint-id' },
+        where: { id: '76e3c596-22aa-4527-bd6d-234367d798e6' },
       });
     });
 
@@ -597,7 +610,7 @@ describe('EndpointService', () => {
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(25);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(100);
 
-      const result = await service.getEndpointStats('test-endpoint-id');
+      const result = await service.getEndpointStats('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       expect(result).toEqual({
         users: { total: 10, active: 8, inactive: 2 },
@@ -613,7 +626,7 @@ describe('EndpointService', () => {
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(0);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(0);
 
-      const result = await service.getEndpointStats('test-endpoint-id');
+      const result = await service.getEndpointStats('76e3c596-22aa-4527-bd6d-234367d798e6');
 
       expect(result).toEqual({
         users: { total: 0, active: 0, inactive: 0 },
@@ -650,7 +663,7 @@ describe('EndpointService', () => {
           profile: { settings: { logLevel: 'DEBUG' }, schemas: [minSchema], resourceTypes: [minRT] },
         });
 
-        expect(scimLogger.setEndpointLevel).toHaveBeenCalledWith('test-endpoint-id', expect.any(Number));
+        expect(scimLogger.setEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6', expect.any(Number));
       });
 
       it('should call clearEndpointLevel when profile settings has no logLevel', async () => {
@@ -665,7 +678,7 @@ describe('EndpointService', () => {
           profile: { settings: { strictMode: true }, schemas: [minSchema], resourceTypes: [minRT] },
         });
 
-        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('test-endpoint-id');
+        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
       });
 
       it('should not sync logLevel when profile is not provided', async () => {
@@ -678,7 +691,7 @@ describe('EndpointService', () => {
         await service.createEndpoint({ name: 'test-endpoint' });
 
         // Should clear since null profile means no logLevel
-        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('test-endpoint-id');
+        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
       });
 
       // 'VERBOSE' is not a recognized LogLevel, but parseLogLevel() silently
@@ -706,7 +719,7 @@ describe('EndpointService', () => {
           profile: { settings: { logLevel: 0 }, schemas: [minSchema], resourceTypes: [minRT] },
         });
 
-        expect(scimLogger.setEndpointLevel).toHaveBeenCalledWith('test-endpoint-id', 0);
+        expect(scimLogger.setEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6', 0);
       });
     });
 
@@ -730,11 +743,11 @@ describe('EndpointService', () => {
           profile: { ...validProfileEndpoint.profile, settings: { ...validProfileEndpoint.profile.settings, logLevel: 'TRACE' } },
         });
 
-        await service.updateEndpoint('test-endpoint-id', {
+        await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
           profile: { settings: { logLevel: 'TRACE' } },
         });
 
-        expect(scimLogger.setEndpointLevel).toHaveBeenCalledWith('test-endpoint-id', expect.any(Number));
+        expect(scimLogger.setEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6', expect.any(Number));
       });
 
       it('should call clearEndpointLevel when updating profile settings without logLevel', async () => {
@@ -744,18 +757,18 @@ describe('EndpointService', () => {
           profile: { ...validProfileEndpoint.profile, settings: { strictMode: true } },
         });
 
-        await service.updateEndpoint('test-endpoint-id', {
+        await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
           profile: { settings: { strictMode: true } },
         });
 
-        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('test-endpoint-id');
+        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
       });
 
       it('should not sync logLevel when profile is not in the update dto', async () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
         (prisma.endpoint.update as jest.Mock).mockResolvedValue(mockEndpoint);
 
-        await service.updateEndpoint('test-endpoint-id', {
+        await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', {
           displayName: 'New Name',
         });
 
@@ -769,9 +782,9 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
         (prisma.endpoint.delete as jest.Mock).mockResolvedValue(mockEndpoint);
 
-        await service.deleteEndpoint('test-endpoint-id');
+        await service.deleteEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
-        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('test-endpoint-id');
+        expect(scimLogger.clearEndpointLevel).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
       });
     });
 
@@ -866,7 +879,7 @@ describe('EndpointService', () => {
 
   describe('Endpoint cache', () => {
     const cachedEndpoint = {
-      id: 'cached-ep-1',
+      id: '76e3c596-22aa-4527-bd6d-234367d798e7',
       name: 'cached-test',
       displayName: 'Cached Test',
       description: null,
@@ -886,11 +899,11 @@ describe('EndpointService', () => {
 
       await service.onModuleInit();
 
-      // Now getEndpoint should return from cache without hitting prisma.findUnique
-      (prisma.endpoint.findUnique as jest.Mock).mockClear();
-      const result = await service.getEndpoint('cached-ep-1');
-      expect(result.id).toBe('cached-ep-1');
-      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+      // The cached representation is reusable only after an authoritative read.
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e7');
+      expect(result.id).toBe('76e3c596-22aa-4527-bd6d-234367d798e7');
+      expect(prisma.endpoint.findUnique).toHaveBeenCalledTimes(1);
     });
 
     it('onModuleInit should populate cacheByName', async () => {
@@ -899,23 +912,24 @@ describe('EndpointService', () => {
       await service.onModuleInit();
 
       (prisma.endpoint.findUnique as jest.Mock).mockClear();
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(cachedEndpoint);
       const result = await service.getEndpointByName('cached-test');
       expect(result.name).toBe('cached-test');
       expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
     });
 
     it('createEndpoint should cache the new endpoint', async () => {
-      const newEndpoint = { ...cachedEndpoint, id: 'new-ep-1', name: 'new-test' };
+      const newEndpoint = { ...cachedEndpoint, id: '76e3c596-22aa-4527-bd6d-234367d798e8', name: 'new-test' };
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.endpoint.create as jest.Mock).mockResolvedValue(newEndpoint);
 
       await service.createEndpoint({ name: 'new-test', profilePreset: 'rfc-standard' });
 
-      // Subsequent get should use cache
-      (prisma.endpoint.findUnique as jest.Mock).mockClear();
-      const result = await service.getEndpoint('new-ep-1');
-      expect(result.id).toBe('new-ep-1');
-      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+      // Creation warms the cache, but the next read still verifies persistence.
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(newEndpoint);
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e8');
+      expect(result.id).toBe('76e3c596-22aa-4527-bd6d-234367d798e8');
+      expect(prisma.endpoint.findUnique).toHaveBeenCalledTimes(1);
     });
 
     it('deleteEndpoint should remove from cache', async () => {
@@ -926,11 +940,11 @@ describe('EndpointService', () => {
       // Delete
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
       (prisma.endpoint.delete as jest.Mock).mockResolvedValue(cachedEndpoint);
-      await service.deleteEndpoint('cached-ep-1');
+      await service.deleteEndpoint('76e3c596-22aa-4527-bd6d-234367d798e7');
 
       // Now getEndpoint should fail (item removed from cache + DB)
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
-      await expect(service.getEndpoint('cached-ep-1')).rejects.toThrow(NotFoundException);
+      await expect(service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e7')).rejects.toThrow(NotFoundException);
     });
 
     it('updateEndpoint should update cache entry', async () => {
@@ -943,17 +957,18 @@ describe('EndpointService', () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
       (prisma.endpoint.update as jest.Mock).mockResolvedValue(updated);
 
-      const result = await service.updateEndpoint('cached-ep-1', { displayName: 'Updated Name' });
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e7', { displayName: 'Updated Name' });
       expect(result.displayName).toBe('Updated Name');
 
-      // Cache should be updated
+      // The repository now contains the updated record.
       (prisma.endpoint.findUnique as jest.Mock).mockClear();
-      const cached = await service.getEndpoint('cached-ep-1');
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(updated);
+      const cached = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e7');
       expect(cached.displayName).toBe('Updated Name');
-      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+      expect(prisma.endpoint.findUnique).toHaveBeenCalledTimes(1);
     });
 
-    it('listEndpoints should serve from cache when warmed', async () => {
+    it('listEndpoints should revalidate the database when warmed', async () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
       await service.onModuleInit();
 
@@ -961,61 +976,55 @@ describe('EndpointService', () => {
       const list = await service.listEndpoints();
       expect(list.totalResults).toBeGreaterThanOrEqual(1);
       expect(list.endpoints.length).toBeGreaterThanOrEqual(1);
-      // findMany should NOT be called again - served from cache
-      expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
+      expect(prisma.endpoint.findMany).toHaveBeenCalledTimes(1);
     });
 
     it('getEndpoint cache miss should fall back to DB', async () => {
       // Don't warm cache - force a cache miss
-      const dbEndpoint = { ...cachedEndpoint, id: 'db-only-ep' };
+      const dbEndpoint = { ...cachedEndpoint, id: '76e3c596-22aa-4527-bd6d-234367d798e9' };
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(dbEndpoint);
 
-      const result = await service.getEndpoint('db-only-ep');
-      expect(result.id).toBe('db-only-ep');
-      expect(prisma.endpoint.findUnique).toHaveBeenCalledWith({ where: { id: 'db-only-ep' } });
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e9');
+      expect(result.id).toBe('76e3c596-22aa-4527-bd6d-234367d798e9');
+      expect(prisma.endpoint.findUnique).toHaveBeenCalledWith({ where: { id: '76e3c596-22aa-4527-bd6d-234367d798e9' } });
     });
 
-    it('getEndpoint should log DB errors at DEBUG (not silently swallow)', async () => {
-      // Simulate a DB connection error on both ID and name lookups
+    it('getEndpoint should propagate DB errors rather than disguise them as 404', async () => {
       const dbError = new Error('Connection refused');
       (prisma.endpoint.findUnique as jest.Mock).mockRejectedValue(dbError);
 
-      await expect(service.getEndpoint('some-id')).rejects.toThrow(NotFoundException);
-
-      // Verify the catch block logged at DEBUG (not silently swallowed)
-      expect(scimLogger.debug).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('lookup failed'),
-        expect.objectContaining({ error: 'Connection refused' }),
-      );
+      await expect(service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e7')).rejects.toBe(dbError);
+      expect(prisma.endpoint.findFirst).not.toHaveBeenCalled();
     });
 
-    it('listEndpoints with active=true filter should work from cache', async () => {
+    it('listEndpoints with active=true should use the database filter', async () => {
       const activeEp = { ...cachedEndpoint, id: 'active-ep', name: 'active-test', active: true };
       const inactiveEp = { ...cachedEndpoint, id: 'inactive-ep', name: 'inactive-test', active: false };
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([activeEp, inactiveEp]);
 
       await service.onModuleInit();
       (prisma.endpoint.findMany as jest.Mock).mockClear();
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([activeEp]);
 
       const activeList = await service.listEndpoints(true);
       expect(activeList.totalResults).toBe(1);
       expect(activeList.endpoints[0].id).toBe('active-ep');
-      expect(prisma.endpoint.findMany).not.toHaveBeenCalled(); // served from cache
+      expect(prisma.endpoint.findMany).toHaveBeenCalledWith({ where: { active: true }, orderBy: { createdAt: 'desc' } });
     });
 
-    it('listEndpoints with active=false filter should work from cache', async () => {
+    it('listEndpoints with active=false should use the database filter', async () => {
       const activeEp = { ...cachedEndpoint, id: 'active-ep2', name: 'active-test2', active: true };
       const inactiveEp = { ...cachedEndpoint, id: 'inactive-ep2', name: 'inactive-test2', active: false };
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([activeEp, inactiveEp]);
 
       await service.onModuleInit();
       (prisma.endpoint.findMany as jest.Mock).mockClear();
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([inactiveEp]);
 
       const inactiveList = await service.listEndpoints(false);
       expect(inactiveList.totalResults).toBe(1);
       expect(inactiveList.endpoints[0].id).toBe('inactive-ep2');
-      expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
+      expect(prisma.endpoint.findMany).toHaveBeenCalledWith({ where: { active: false }, orderBy: { createdAt: 'desc' } });
     });
   });
 
@@ -1023,7 +1032,7 @@ describe('EndpointService', () => {
 
   describe('updateEndpoint - partial profile PATCH', () => {
     const profileEndpoint = {
-      id: 'patch-ep-1',
+      id: '76e3c596-22aa-4527-bd6d-234367d798ea',
       name: 'patch-test',
       displayName: 'Patch Test',
       description: null,
@@ -1055,7 +1064,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { StrictSchemaValidation: 'True' } },
       });
 
@@ -1074,7 +1083,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { UserSoftDeleteEnabled: 'False' } },
       });
 
@@ -1098,7 +1107,7 @@ describe('EndpointService', () => {
         Promise.resolve({ ...withEgressOverride, profile: _args.data.profile }),
       );
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { JwksFetchTimeoutMs: null } as any },
       });
 
@@ -1113,7 +1122,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: {
           serviceProviderConfig: {
             patch: { supported: true }, bulk: { supported: false },
@@ -1141,7 +1150,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: {
           serviceProviderConfig: { sort: { supported: false } },
         },
@@ -1167,7 +1176,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: {
           schemas: [
             { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
@@ -1195,7 +1204,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: {
           schemas: [
             { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
@@ -1218,7 +1227,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: {
           resourceTypes: [
             { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
@@ -1236,7 +1245,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', {
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: {
           settings: { RequireIfMatch: 'True' },
           serviceProviderConfig: {
@@ -1261,12 +1270,12 @@ describe('EndpointService', () => {
       const listener = jest.fn();
       service.setProfileChangeListener(listener);
 
-      await service.updateEndpoint('patch-ep-1', {
+      await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { VerbosePatchSupported: 'True' } },
       });
 
       expect(listener).toHaveBeenCalledTimes(1);
-      expect(listener).toHaveBeenCalledWith('patch-ep-1', expect.objectContaining({
+      expect(listener).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798ea', expect.objectContaining({
         settings: expect.objectContaining({ VerbosePatchSupported: 'True' }),
       }));
     });
@@ -1281,15 +1290,19 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      await service.updateEndpoint('patch-ep-1', {
+      const saved = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { AllowAndCoerceBooleanStrings: 'True' } },
       });
 
       // Verify cache was updated
       (prisma.endpoint.findUnique as jest.Mock).mockClear();
-      const cached = await service.getEndpoint('patch-ep-1');
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+        ...profileEndpoint,
+        profile: saved.profile,
+      });
+      const cached = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea');
       expect(cached.profile?.settings?.AllowAndCoerceBooleanStrings).toBe('True');
-      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+      expect(prisma.endpoint.findUnique).toHaveBeenCalledTimes(1);
     });
 
     it('should preserve profile.settings when only displayName is updated', async () => {
@@ -1298,7 +1311,7 @@ describe('EndpointService', () => {
         ...profileEndpoint, displayName: 'New Name',
       });
 
-      const result = await service.updateEndpoint('patch-ep-1', { displayName: 'New Name' });
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', { displayName: 'New Name' });
       expect(result.displayName).toBe('New Name');
       expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
@@ -1314,7 +1327,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result1 = await service.updateEndpoint('patch-ep-1', {
+      const result1 = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { StrictSchemaValidation: 'True' } },
       });
 
@@ -1330,7 +1343,7 @@ describe('EndpointService', () => {
         return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
       });
 
-      const result2 = await service.updateEndpoint('patch-ep-1', {
+      const result2 = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798ea', {
         profile: { settings: { RequireIfMatch: 'True' } },
       });
 
@@ -1487,7 +1500,7 @@ describe('EndpointService', () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
       await service.onModuleInit();
 
-      const result = await service.getEndpoint('test-endpoint-id', 'full');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', 'full');
       expect(result.profile).toBeDefined();
       expect(result.profileSummary).toBeUndefined();
     });
@@ -1496,7 +1509,7 @@ describe('EndpointService', () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
       await service.onModuleInit();
 
-      const result = await service.getEndpoint('test-endpoint-id', 'summary');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', 'summary');
       expect(result.profileSummary).toBeDefined();
       expect(result.profile).toBeUndefined();
     });
@@ -1521,6 +1534,7 @@ describe('EndpointService', () => {
 
     it('getEndpointByName supports view param', async () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(mockEndpoint);
       await service.onModuleInit();
 
       const summaryResult = await service.getEndpointByName('test-endpoint', 'summary');
@@ -1542,22 +1556,22 @@ describe('EndpointService', () => {
     });
 
     it('should include _links with self, stats, credentials, scim', async () => {
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
       expect(result._links).toBeDefined();
-      expect(result._links.self).toBe('/admin/endpoints/test-endpoint-id');
-      expect(result._links.stats).toBe('/admin/endpoints/test-endpoint-id/stats');
-      expect(result._links.credentials).toBe('/admin/endpoints/test-endpoint-id/credentials');
-      expect(result._links.scim).toBe('/scim/endpoints/test-endpoint-id');
+      expect(result._links.self).toBe('/admin/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6');
+      expect(result._links.stats).toBe('/admin/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6/stats');
+      expect(result._links.credentials).toBe('/admin/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6/credentials');
+      expect(result._links.scim).toBe('/scim/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6');
     });
 
     it('should return scimBasePath instead of scimEndpoint', async () => {
-      const result = await service.getEndpoint('test-endpoint-id');
-      expect(result.scimBasePath).toBe('/scim/endpoints/test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
+      expect(result.scimBasePath).toBe('/scim/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6');
       expect((result as any).scimEndpoint).toBeUndefined();
     });
 
     it('should return ISO 8601 string timestamps', async () => {
-      const result = await service.getEndpoint('test-endpoint-id');
+      const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
       expect(typeof result.createdAt).toBe('string');
       expect(typeof result.updatedAt).toBe('string');
       // Verify ISO 8601 format (basic check)
@@ -1580,7 +1594,7 @@ describe('EndpointService', () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
       (prisma.endpoint.update as jest.Mock).mockResolvedValue({ ...mockEndpoint, displayName: 'Updated' });
 
-      const result = await service.updateEndpoint('test-endpoint-id', { displayName: 'Updated' });
+      const result = await service.updateEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6', { displayName: 'Updated' });
       expect(result._links).toBeDefined();
       expect(typeof result.createdAt).toBe('string');
     });
@@ -1684,7 +1698,7 @@ describe('EndpointService', () => {
 
       // logFileEnabled not set → defaults to true → enable is called, disable is NOT called for this endpoint
       expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalled();
-      expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('test-endpoint-id');
+      expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
     });
 
     it('should enable file logging when logFileEnabled is explicitly true', async () => {
@@ -1699,7 +1713,7 @@ describe('EndpointService', () => {
         profile: { settings: { logFileEnabled: true }, schemas: [minSchema], resourceTypes: [minRT] },
       });
 
-      expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id', expect.any(String));
+      expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6', expect.any(String));
     });
 
     it('should disable file logging when logFileEnabled is explicitly false', async () => {
@@ -1714,7 +1728,7 @@ describe('EndpointService', () => {
         profile: { settings: { logFileEnabled: false }, schemas: [minSchema], resourceTypes: [minRT] },
       });
 
-      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id');
+      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
     });
 
     it('should disable file logging when logFileEnabled is "False" (string)', async () => {
@@ -1729,7 +1743,7 @@ describe('EndpointService', () => {
         profile: { settings: { logFileEnabled: 'False' }, schemas: [minSchema], resourceTypes: [minRT] },
       });
 
-      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id');
+      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
     });
 
     it('should disable file logging when logFileEnabled is "0"', async () => {
@@ -1744,7 +1758,7 @@ describe('EndpointService', () => {
         profile: { settings: { logFileEnabled: '0' }, schemas: [minSchema], resourceTypes: [minRT] },
       });
 
-      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id');
+      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
     });
 
     it('should enable file logging when profile is null (default behavior)', async () => {
@@ -1759,7 +1773,7 @@ describe('EndpointService', () => {
       // Default preset is applied, so enableEndpointFileLogging is called
       // (logFileEnabled defaults to true, no explicit false to disable)
       expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalled();
-      expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('test-endpoint-id');
+      expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('76e3c596-22aa-4527-bd6d-234367d798e6');
     });
   });
 
@@ -1783,14 +1797,14 @@ describe('EndpointService', () => {
     describe('full view response shape', () => {
       it('should contain ONLY allowed keys in full view response', async () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-        const result = await service.getEndpoint('test-endpoint-id');
+        const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
         const keys = Object.keys(result).sort();
         expect(keys).toEqual(FULL_VIEW_ALLOWED_KEYS);
       });
 
       it('should NOT contain _schemaCaches in full view response', async () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-        const result = await service.getEndpoint('test-endpoint-id');
+        const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
         expect(result).not.toHaveProperty('_schemaCaches');
         expect(result.profile).not.toHaveProperty('_schemaCaches');
       });
@@ -1824,7 +1838,7 @@ describe('EndpointService', () => {
           profile: profileWithCache,
         });
 
-        const result = await service.getEndpoint('test-endpoint-id');
+        const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
 
         // _schemaCaches must NOT appear in the response
         expect(result.profile).not.toHaveProperty('_schemaCaches');
@@ -1835,7 +1849,7 @@ describe('EndpointService', () => {
 
       it('should have profile keys matching allowlist (no internal fields)', async () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-        const result = await service.getEndpoint('test-endpoint-id');
+        const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
         const profileKeys = Object.keys(result.profile!).sort();
         expect(profileKeys).toEqual(PROFILE_ALLOWED_KEYS);
       });
@@ -1862,12 +1876,12 @@ describe('EndpointService', () => {
     describe('_links correctness', () => {
       it('should have _links with correct paths for the endpoint ID', async () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-        const result = await service.getEndpoint('test-endpoint-id');
+        const result = await service.getEndpoint('76e3c596-22aa-4527-bd6d-234367d798e6');
         expect(result._links).toEqual({
-          self: '/admin/endpoints/test-endpoint-id',
-          stats: '/admin/endpoints/test-endpoint-id/stats',
-          credentials: '/admin/endpoints/test-endpoint-id/credentials',
-          scim: '/scim/endpoints/test-endpoint-id',
+          self: '/admin/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6',
+          stats: '/admin/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6/stats',
+          credentials: '/admin/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6/credentials',
+          scim: '/scim/endpoints/76e3c596-22aa-4527-bd6d-234367d798e6',
         });
       });
     });

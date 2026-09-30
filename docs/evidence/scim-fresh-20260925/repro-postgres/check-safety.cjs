@@ -1,0 +1,38 @@
+const assert = require("node:assert/strict");
+const cp = require("node:child_process");
+const { ROOT } = require("./safety.cjs");
+const script = `
+  require('./docs/evidence/scim-fresh-20260925/repro-postgres/safety.cjs')
+    .testGuard().then(()=>process.exit(0),()=>process.exit(2));
+`;
+const output = require("node:path").join(
+  ROOT,
+  "test-results",
+  "fresh-analysis",
+  "safety-check",
+);
+for (const [label, env] of [
+  ["missing explicit backend", { PERSISTENCE_BACKEND: "" }],
+  ["Prisma missing task container identity", { PERSISTENCE_BACKEND: "prisma" }],
+  [
+    "InMemory with arbitrary DB URL",
+    {
+      PERSISTENCE_BACKEND: "inmemory",
+      DATABASE_URL: "postgresql://127.0.0.1:5432/not_task_owned",
+    },
+  ],
+]) {
+  const result = cp.spawnSync(process.execPath, ["-e", script], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      PG_ANALYSIS_CONTAINER_ID: "",
+      PG_ANALYSIS_RUN: "",
+      PG_ANALYSIS_OUTPUT: output,
+      ...env,
+    },
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 2, label);
+  console.log(`REJECTED safely before database access: ${label}`);
+}

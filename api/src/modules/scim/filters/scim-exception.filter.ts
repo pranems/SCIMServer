@@ -122,7 +122,7 @@ export class ScimExceptionFilter implements ExceptionFilter {
       // If the exception already carries a SCIM-formatted body (thrown via createScimError),
       // use it directly, otherwise wrap it in the standard SCIM error envelope.
       if (Array.isArray(raw.schemas) && (raw.schemas as string[]).includes(SCIM_ERROR_SCHEMA)) {
-        body = raw;
+        body = { ...raw };
       } else {
         body = {
           schemas: [SCIM_ERROR_SCHEMA],
@@ -136,6 +136,15 @@ export class ScimExceptionFilter implements ExceptionFilter {
         detail: typeof exceptionResponse === 'string' ? exceptionResponse : exception.message,
         status: String(status),
       };
+    }
+
+    // Nest ValidationPipe uses message arrays; SCIM detail is a scalar.
+    // Leave structured diagnostics and OAuth's separate envelope untouched.
+    if ('detail' in body && typeof body.detail !== 'string') {
+      const messages = Array.isArray(body.detail)
+        ? body.detail.filter((message): message is string => typeof message === 'string')
+        : [];
+      body.detail = messages.length > 0 ? messages.join('; ') : exception.message;
     }
 
     // Ensure "status" is always a string per RFC 7644 §3.12

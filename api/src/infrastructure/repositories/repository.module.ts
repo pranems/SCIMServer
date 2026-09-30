@@ -18,6 +18,7 @@ import {
   JWKS_HOST_ALLOWLIST_REPOSITORY,
   CREDENTIAL_DEK_REPOSITORY,
   SERVER_SETTING_REPOSITORY,
+  ENDPOINT_LIFECYCLE_REPOSITORY,
 } from '../../domain/repositories/repository.tokens';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
 import { PrismaGroupRepository } from './prisma/prisma-group.repository';
@@ -34,6 +35,9 @@ import { InMemoryJwksHostAllowlistRepository } from './inmemory/inmemory-jwks-ho
 import { InMemoryCredentialDekRepository } from './inmemory/inmemory-credential-dek.repository';
 import { InMemoryServerSettingRepository } from './inmemory/inmemory-server-setting.repository';
 import { PrismaModule } from '../../modules/prisma/prisma.module';
+import { InMemoryEndpointWriteGuard } from './inmemory/inmemory-endpoint-write-guard';
+import { InMemoryEndpointLifecycleRepository } from './inmemory/inmemory-endpoint-lifecycle.repository';
+import { PrismaEndpointLifecycleRepository } from './prisma/prisma-endpoint-lifecycle.repository';
 
 @Module({})
 export class RepositoryModule {
@@ -61,6 +65,8 @@ export class RepositoryModule {
         module: RepositoryModule,
         global: true,
         providers: [
+          InMemoryEndpointWriteGuard,
+          { provide: ENDPOINT_LIFECYCLE_REPOSITORY, useClass: InMemoryEndpointLifecycleRepository },
           { provide: USER_REPOSITORY, useClass: InMemoryUserRepository },
           { provide: GROUP_REPOSITORY, useClass: InMemoryGroupRepository },
           { provide: GENERIC_RESOURCE_REPOSITORY, useClass: InMemoryGenericResourceRepository },
@@ -69,7 +75,7 @@ export class RepositoryModule {
           { provide: CREDENTIAL_DEK_REPOSITORY, useClass: InMemoryCredentialDekRepository },
           { provide: SERVER_SETTING_REPOSITORY, useClass: InMemoryServerSettingRepository },
         ],
-        exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY, CREDENTIAL_DEK_REPOSITORY, SERVER_SETTING_REPOSITORY],
+        exports: [ENDPOINT_LIFECYCLE_REPOSITORY, USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY, CREDENTIAL_DEK_REPOSITORY, SERVER_SETTING_REPOSITORY],
       };
       return this.cachedModule;
     }
@@ -80,6 +86,7 @@ export class RepositoryModule {
       global: true,
       imports: [PrismaModule],
       providers: [
+        { provide: ENDPOINT_LIFECYCLE_REPOSITORY, useClass: PrismaEndpointLifecycleRepository },
         { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
         { provide: GROUP_REPOSITORY, useClass: PrismaGroupRepository },
         { provide: GENERIC_RESOURCE_REPOSITORY, useClass: PrismaGenericResourceRepository },
@@ -88,7 +95,7 @@ export class RepositoryModule {
         { provide: CREDENTIAL_DEK_REPOSITORY, useClass: PrismaCredentialDekRepository },
         { provide: SERVER_SETTING_REPOSITORY, useClass: PrismaServerSettingRepository },
       ],
-      exports: [USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY, CREDENTIAL_DEK_REPOSITORY, SERVER_SETTING_REPOSITORY],
+      exports: [ENDPOINT_LIFECYCLE_REPOSITORY, USER_REPOSITORY, GROUP_REPOSITORY, GENERIC_RESOURCE_REPOSITORY, ENDPOINT_CREDENTIAL_REPOSITORY, JWKS_HOST_ALLOWLIST_REPOSITORY, CREDENTIAL_DEK_REPOSITORY, SERVER_SETTING_REPOSITORY],
     };
     return this.cachedModule;
   }

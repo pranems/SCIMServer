@@ -28,8 +28,9 @@ $testsPassed = 0
 $testsFailed = 0
 $VerboseMode = $Verbose.IsPresent
 $script:testResults = @()
-$script:flowSteps = @()
-$script:flowStepCounter = 0
+# Nested .ps1 helpers must append to the same process-owned trace collection.
+$global:__ScimServerLiveTestFlowSteps = [System.Collections.Generic.List[object]]::new()
+$script:flowSteps = $global:__ScimServerLiveTestFlowSteps
 $script:lastLinkedFlowStepId = 0
 $script:currentSection = "Setup"
 $script:preexistingEndpointIds = @()
@@ -102,9 +103,9 @@ function Add-FlowStep {
     )
 
     $finishedAt = Get-Date
-    $script:flowStepCounter++
-    $script:flowSteps += [PSCustomObject]@{
-        stepId      = $script:flowStepCounter
+    $stepId = $global:__ScimServerLiveTestFlowSteps.Count + 1
+    $flowStep = [PSCustomObject]@{
+        stepId      = $stepId
         section     = $script:currentSection
         actionStep  = "$Method $Uri"
         startedAt   = $StartedAt.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
@@ -133,6 +134,7 @@ function Add-FlowStep {
             $null
         }
     }
+    [void]$global:__ScimServerLiveTestFlowSteps.Add($flowStep)
 }
 
 # Override built-in cmdlets to inject verbose logging transparently.
@@ -16130,6 +16132,10 @@ try {
 Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -ForegroundColor Green
 
 # ============================================
+. "$PSScriptRoot\live-test-sections\correctness-contracts.ps1"
+Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
@@ -16344,6 +16350,7 @@ Write-Host "`n========================================`n" -ForegroundColor Magen
 # replaces $LASTEXITCODE with the exit code of the LAST command in the
 # pipeline, which will be 0. Gate on the unpiped invocation, or capture the
 # output to a file and inspect it separately.
+Remove-Variable -Name __ScimServerLiveTestFlowSteps -Scope Global -ErrorAction SilentlyContinue
 if ($testsFailed -gt 0) {
     Write-Host "EXIT 1 - $testsFailed assertion(s) failed." -ForegroundColor Red
     exit 1

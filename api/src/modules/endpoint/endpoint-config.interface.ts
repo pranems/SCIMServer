@@ -17,9 +17,10 @@ export const ENDPOINT_CONFIG_FLAGS = {
 
   /**
    * When true, enables verbose PATCH support with dot-notation path resolution.
-   * Paths like "name.givenName" are resolved into nested objects instead of flat keys.
-   * When false (default), dot-notation paths are stored as literal top-level keys.
-   * In practice: enable for RFC-compliant clients; disable for Entra ID which sends flat keys.
+   * Explicit User paths like "name.givenName" resolve to nested objects.
+   * When false (default), explicit core dotted User paths are rejected without a write.
+   * Legacy no-path objects, registered extension paths and selectors remain supported.
+   * Enable for documented Entra explicit dotted User paths; this is not a client-brand switch.
    */
   VERBOSE_PATCH_SUPPORTED: 'VerbosePatchSupported',
 
@@ -41,7 +42,8 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * - PATCH operations on readOnly attributes rejected with 400 (G8c)
    * When false, the server is lenient: accepts undeclared URNs, skips type validation,
    * silently strips readOnly PATCH ops instead of rejecting.
-   * In practice: set false for Entra ID compatibility (sends readOnly attrs, boolean strings).
+   * Keep enabled for Entra. Diagnose the effective schema and specific request first;
+   * use the targeted Boolean/readOnly compatibility controls only when needed.
    * @see RFC 7643 §2.2, RFC 7644 §3.3/§3.5.1/§3.5.2
    */
   STRICT_SCHEMA_VALIDATION: 'StrictSchemaValidation',
@@ -60,8 +62,9 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * are automatically coerced to native booleans before schema validation and storage.
    * This enables interoperability with clients like Microsoft Entra ID that send boolean
    * values as strings (e.g., roles[].primary = "True" instead of true).
-   * Scope: All paths - POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
-   * Supersedes StrictSchemaValidation for boolean type checks when enabled.
+   * Scope: supported schema-aware input conversion, before strict type checks.
+   * Output normalization is separate. Quoted User active PATCH values are rejected
+   * when OFF in both strict modes; ON preserves explicit legacy-string compatibility.
    * When false, string boolean values are passed through as-is and will be rejected
    * by StrictSchemaValidation if that flag is also enabled.
    * In practice: keep true unless all clients send proper JSON booleans.
@@ -411,9 +414,10 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     type: 'boolean',
     default: false,
     description:
-      'When true, enables dot-notation path resolution in PATCH (e.g., "name.givenName" → nested object). ' +
-      'When false (default), dot-notation paths are stored as literal top-level keys. ' +
-      'Enable for RFC-compliant clients; disable for Entra ID which sends flat keys.',
+      'When true, enables explicit dotted User core paths (e.g., "name.givenName" resolves to a nested object). ' +
+      'When false (default), rejects explicit core dotted User paths with 400 invalidPath and no write. ' +
+      'Legacy no-path objects, registered extension paths and selectors remain supported. ' +
+      'This User-only control is not a client-brand switch; enable it for documented Entra explicit dotted User paths.',
   },
   LOG_LEVEL: {
     key: ENDPOINT_CONFIG_FLAGS.LOG_LEVEL,
@@ -433,7 +437,8 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'rejects undeclared/unregistered extension URNs in POST/PUT, validates attribute types, ' +
       'enforces immutable attributes on PUT, rejects readOnly PATCH ops with 400. ' +
       'When false, lenient mode: accepts undeclared URNs, skips type validation, ' +
-      'silently strips readOnly PATCH ops. Set false for Entra ID compatibility.',
+      'silently strips readOnly PATCH ops. Keep enabled for Entra; diagnose the effective ' +
+      'schema and request before using targeted Boolean or readOnly compatibility controls.',
   },
   REQUIRE_IF_MATCH: {
     key: ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH,
@@ -451,10 +456,10 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     description:
       'When true (default), boolean-typed attributes received as strings ("True"/"False") ' +
       'are coerced to native booleans before schema validation and storage. ' +
-      'Scope: POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output. ' +
-      'Supersedes StrictSchemaValidation for boolean type checks. ' +
-      'When false, string booleans are passed through as-is and rejected by strict schema if enabled. ' +
-      'Keep true for Entra ID interoperability.',
+      'Applies to supported schema-aware input paths before strict validation. Native JSON booleans ' +
+      'need no coercion. When OFF, quoted User active PATCH values are rejected in both strict modes; ' +
+      'ON retains explicit legacy-string compatibility. Output normalization remains separate. ' +
+      'See docs/SCIM_ENTRA_COMPATIBILITY.md for tested boundaries.',
   },
   SECRET_TOKEN_BEARER_AUTH_ENABLED: {
     key: ENDPOINT_CONFIG_FLAGS.SECRET_TOKEN_BEARER_AUTH_ENABLED,
@@ -584,10 +589,9 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     type: 'credentialVisibility',
     default: undefined, // string default via getEffectiveCredentialSecretVisibility (server ceiling -> 'always')
     description:
-      'Controls whether a per-endpoint credential secret is retained (encrypted at rest) and ' +
-      're-viewable by an admin, or shown once at creation. "always" (default): retain + reveal. ' +
-      '"once": shown once at create, then hidden (retained ciphertext is purged). The server-scope ' +
-      'setting is the ceiling - most-restrictive-wins, so server "once" forces "once" everywhere.',
+      'Currently supports "always" only: retain encrypted credentials for authorized admin reveal. ' +
+      '"once" is rejected on new writes; effective resolution remains "always" for legacy values. ' +
+      'This setting does not enable secret retention in request logs.',
   },
   ENFORCE_RESOURCE_TYPES: {
     key: ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES,
@@ -761,15 +765,12 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
   PERSIST_REQUEST_SECRETS: {
     key: ENDPOINT_CONFIG_FLAGS.PERSIST_REQUEST_SECRETS,
     type: 'boolean',
-    // Unset -> inherit the server-level PERSIST_REQUEST_SECRETS env (default true).
-    // NOT baked into DEFAULT_ENDPOINT_CONFIG so "unset" stays distinguishable.
+    // Retained for configuration compatibility; effective resolution is always false.
     default: undefined,
     description:
-      'When true (default, inherited from server env PERSIST_REQUEST_SECRETS when unset), the ' +
-      'RequestLog stores + displays the COMPLETE request/response (headers + body, secrets ' +
-      'included) for fast RCA. When false, secret-bearing values are redacted before persist ' +
-      '(and API/UI display). Endpoint value overrides the server default; console/file logs ' +
-      'always redact regardless.',
+      'Retained for configuration compatibility only. Request secrets are always redacted, ' +
+      'regardless of this value or the former server environment setting. Console/file logs ' +
+      'also redact. This control cannot enable unredacted storage or display.',
   },
   RFC_COMPLIANT_SUB_ATTRIBUTES: {
     key: ENDPOINT_CONFIG_FLAGS.RFC_COMPLIANT_SUB_ATTRIBUTES,
@@ -985,11 +986,7 @@ export function resolveEndpointEgressOverrides(
 }
 
 /**
- * Resolve the EFFECTIVE `PersistRequestSecrets` for an endpoint (RequestLog RCA
- * privacy). Precedence: the endpoint's explicit value OVERRIDES the server-level
- * default; when the endpoint leaves it unset it inherits `serverDefault`. When
- * the result is `true` the RequestLog keeps the full request/response (secrets
- * included); when `false` the persisted + displayed row is redacted.
+ * Legacy inputs are accepted for compatibility but can never disable redaction.
  */
 export function getEffectivePersistRequestSecrets(
   _config: EndpointConfig | undefined,

@@ -94,6 +94,14 @@ describe('EndpointScimGroupsController', () => {
   });
 
   describe('Group Operations', () => {
+    it('projects JSON search exclusions without mutating the service response', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      const resource = { id: 'group-1', displayName: 'Search', members: [{ value: 'user-1' }] };
+      mockGroupsService.listGroupsForEndpoint.mockResolvedValue({ Resources: [resource], totalResults: 1 });
+      const result = await controller.searchGroups('endpoint-1', { excludedAttributes: ['members'] }, mockRequest);
+      expect(result.Resources).toEqual([{ id: 'group-1', displayName: 'Search' }]);
+      expect(resource.members).toEqual([{ value: 'user-1' }]);
+    });
     describe('POST /endpoints/:endpointId/Groups', () => {
       it('should create a group in specific endpoint', async () => {
         const createDto: CreateGroupDto = {
@@ -316,6 +324,17 @@ describe('EndpointScimGroupsController', () => {
     });
 
     describe('PATCH /endpoints/:endpointId/Groups/:id', () => {
+      it('P2 forwards ordered member transitions without flattening the operation list', async () => {
+        const dto: PatchGroupDto = { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [
+          { op: 'add', path: 'members', value: [{ value: 'new-user' }] },
+          { op: 'replace', path: 'members[value eq "new-user"].display', value: 'Selected' },
+        ] };
+        const result = { schemas: [], id: 'group', displayName: 'Group', members: [{ value: 'new-user', display: 'Selected' }], meta: {} };
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockGroupsService.patchGroupForEndpoint.mockResolvedValue(result);
+        expect(await controller.updateGroup('endpoint-1', 'group', dto, mockRequest)).toEqual(result);
+        expect(mockGroupsService.patchGroupForEndpoint.mock.calls[0][1]).toEqual(dto);
+      });
       it('should patch a group in specific endpoint', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],

@@ -1,0 +1,74 @@
+{
+  "schemas": [
+    {
+      "id": "urn:ietf:params:scim:schemas:core:2.0:UniqueShared",
+      "name": "Shared",
+      "attributes": [
+        {
+          "name": "id",
+          "type": "integer",
+          "multiValued": true,
+          "required": false,
+          "uniqueness": "server"
+        },
+        {
+          "name": "externalId",
+          "type": "integer",
+          "multiValued": true,
+          "required": false,
+          "uniqueness": "server",
+          "caseExact": false
+        },
+        {
+          "name": "meta",
+          "type": "string",
+          "multiValued": false,
+          "required": false,
+          "uniqueness": "server"
+        },
+        {
+          "name": "displayName",
+          "type": "integer",
+          "multiValued": true,
+          "required": false,
+          "uniqueness": "server"
+        }
+      ]
+    },
+    {
+      "id": "urn:example:uniqueness:Other",
+      "name": "Other",
+      "attributes": [
+        {
+          "name": "label",
+          "type": "string",
+          "multiValued": false,
+          "required": false
+        }
+      ]
+    }
+  ],
+  "resourceTypes": [
+    {
+      "id": "Shared",
+      "name": "Shared",
+      "description": "Shared",
+      "endpoint": "/Shareds",
+      "schema": "urn:ietf:params:scim:schemas:core:2.0:UniqueShared",
+      "schemaExtensions": []
+    },
+    {
+      "id": "Other",
+      "name": "Other",
+      "description": "Other",
+      "endpoint": "/Others",
+      "schema": "urn:example:uniqueness:Other",
+      "schemaExtensions": [
+        {
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:UniqueShared",
+          "required": false
+        }
+      ]
+    }
+  ]
+}

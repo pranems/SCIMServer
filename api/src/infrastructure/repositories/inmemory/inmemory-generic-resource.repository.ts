@@ -17,13 +17,25 @@ import type {
   GenericResourceUpdateInput,
 } from '../../../domain/models/generic-resource.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
-import { RepositoryError } from '../../../domain/errors/repository-error';
+import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 @Injectable()
 export class InMemoryGenericResourceRepository implements IGenericResourceRepository {
-  private readonly resources: Map<string, GenericResourceRecord> = new Map();
+  private resources: Map<string, GenericResourceRecord> = new Map();
 
-  async create(input: GenericResourceCreateInput): Promise<GenericResourceRecord> {
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    return prepareMapRemoval(this.resources, row => row.endpointId === endpointId, rows => { this.resources = rows; });
+  }
+
+  async create(input: GenericResourceCreateInput, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GenericResourceRecord> {
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload(input, undefined, 'payload'), [...this.resources.values()]
+      .filter((r) => r.endpointId === input.endpointId && r.resourceType === input.resourceType).map((r) => uniquenessPayload(r, undefined, 'payload')));
     const now = new Date();
     const record: GenericResourceRecord = {
       id: randomUUID(),
@@ -39,6 +51,7 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       createdAt: now,
       updatedAt: now,
     };
+    this.writes.assertWritable(input.endpointId, profileRevision);
     this.resources.set(record.id, record);
     return { ...record };
   }
@@ -80,11 +93,11 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       .map((r) => ({ ...r }));
   }
 
-  async update(id: string, data: GenericResourceUpdateInput): Promise<GenericResourceRecord> {
+  async update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GenericResourceRecord> {
     const existing = this.resources.get(id);
-    if (!existing) {
-      throw new RepositoryError('NOT_FOUND', `GenericResource with id "${id}" not found.`);
-    }
+    assertWritePrecondition(existing, expectedVersion);
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }, undefined, 'payload'), [...this.resources.values()]
+      .filter((r) => r.id !== id && r.endpointId === existing.endpointId && r.resourceType === existing.resourceType).map((r) => uniquenessPayload(r, undefined, 'payload')));
 
     const updated: GenericResourceRecord = {
       ...existing,
@@ -93,14 +106,15 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       version: existing.version + 1,
       updatedAt: new Date(),
     };
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.resources.set(id, updated);
     return { ...updated };
   }
 
-  async delete(id: string): Promise<void> {
-    if (!this.resources.has(id)) {
-      throw new RepositoryError('NOT_FOUND', `GenericResource with id "${id}" not found.`);
-    }
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
+    const existing = this.resources.get(id);
+    assertWritePrecondition(existing, expectedVersion);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.resources.delete(id);
   }
 

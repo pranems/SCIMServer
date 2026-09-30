@@ -7,6 +7,7 @@ import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage'
 import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
+import { PATCH, incidentOperations, incidentExpected } from '../../../../test/e2e/helpers/typed-patch-fixtures';
 
 describe('EndpointScimUsersController', () => {
   let controller: EndpointScimUsersController;
@@ -94,6 +95,20 @@ describe('EndpointScimUsersController', () => {
   });
 
   describe('User Operations', () => {
+    it('projects JSON search arrays after forwarding only list parameters', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.listUsersForEndpoint.mockResolvedValue({
+        Resources: [{ id: 'user-1', userName: 'search', displayName: 'Search', active: true }],
+        totalResults: 1,
+      });
+      const result = await controller.searchUsers('endpoint-1', {
+        attributes: ['displayName'], count: 5,
+      }, mockRequest);
+      expect(result.Resources).toEqual([{ id: 'user-1', userName: 'search', displayName: 'Search' }]);
+      expect(mockUsersService.listUsersForEndpoint.mock.calls[0][0]).toEqual({
+        filter: undefined, startIndex: undefined, count: 5, sortBy: undefined, sortOrder: undefined,
+      });
+    });
     describe('POST /endpoints/:endpointId/Users', () => {
       it('should create a user in specific endpoint', async () => {
         const createDto: CreateUserDto = {
@@ -321,6 +336,26 @@ describe('EndpointScimUsersController', () => {
     });
 
     describe('PATCH /endpoints/:endpointId/Users/:id', () => {
+      it('P2 forwards append then selection in the supplied order', async () => {
+        const dto: PatchUserDto = { schemas: [PATCH], Operations: [
+          { op: 'add', path: 'emails', value: { type: 'work', value: 'new@example.test' } },
+          { op: 'replace', path: 'emails[type eq "work"].primary', value: true },
+        ] };
+        const result = { schemas: [], id: 'user', userName: 'synthetic', emails: [{ type: 'work', value: 'new@example.test', primary: true }], meta: {} };
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.patchUserForEndpoint.mockResolvedValue(result);
+        expect(await controller.updateUser('endpoint-1', 'user', dto, mockRequest)).toEqual(result);
+        expect(mockUsersService.patchUserForEndpoint.mock.calls[0][1]).toEqual(dto);
+      });
+      it('P1 forwards the four typed selectors intact and returns the service values', async () => {
+        const dto = { schemas: [PATCH], Operations: incidentOperations() };
+        const expected = { schemas: [], id: 'synthetic', ...incidentExpected(), meta: {} };
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.patchUserForEndpoint.mockResolvedValue(expected);
+        const result = await controller.updateUser('endpoint-1', 'synthetic', dto, mockRequest);
+        expect(mockUsersService.patchUserForEndpoint.mock.calls[0][1]).toEqual(dto);
+        expect(result).toEqual(expected);
+      });
       it('should patch a user in specific endpoint', async () => {
         const patchDto: PatchUserDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -475,6 +510,18 @@ describe('EndpointScimUsersController', () => {
   // ───────────── G8e: returned characteristic filtering ─────────────
 
   describe('G8e - returned:request attribute filtering', () => {
+    it('P7 returns a request-only attribute explicitly supplied on POST and PUT', async () => {
+      const dto = { schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: 'p7', secretQuestion: 'Pet?' };
+      const resource = { ...dto, id: 'p7', meta: { resourceType: 'User' } };
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.createUserForEndpoint.mockResolvedValue(resource);
+      mockUsersService.replaceUserForEndpoint.mockResolvedValue(resource);
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([
+        ['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])],
+      ]));
+      expect((await controller.createUser('endpoint-1', dto, mockRequest)).secretQuestion).toBe('Pet?');
+      expect((await controller.replaceUser('endpoint-1', 'p7', dto, mockRequest)).secretQuestion).toBe('Pet?');
+    });
     it('POST createUser should strip returned:request attributes from response', async () => {
       const createDto: CreateUserDto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],

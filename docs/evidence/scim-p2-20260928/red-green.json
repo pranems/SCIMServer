@@ -1,0 +1,204 @@
+{
+  "package": "P2",
+  "base": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+  "source": {
+    "base": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+    "head": "3ecaba55df5424b5427b8fdc41c1bdad0b8d0f51",
+    "sourceSha256": "72148497142cb37a4d86fa1fcc572bcbf81ee08460ef8ad96238f388dc29428f",
+    "fileCount": 551
+  },
+  "build": {
+    "node": "v24.13.0",
+    "fileCount": 235,
+    "sha256": "ac2fbd2be4443549ea1429409c732a3dca6f628b9de16bac063856594b30fa88"
+  },
+  "redControls": [
+    {
+      "name": "unit-red",
+      "passed": 3,
+      "failed": 46,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "http-red",
+      "passed": 6,
+      "failed": 39,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "invariant-red",
+      "passed": 0,
+      "failed": 6,
+      "skipped": 69,
+      "suites": 2
+    },
+    {
+      "name": "review-red",
+      "passed": 101,
+      "failed": 15,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "review2-red",
+      "passed": 116,
+      "failed": 9,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "review3-red",
+      "passed": 126,
+      "failed": 7,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "review4-red",
+      "passed": 134,
+      "failed": 2,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "review5-red",
+      "passed": 136,
+      "failed": 2,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "manager-red",
+      "passed": 138,
+      "failed": 1,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "nested-retention-red",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 139,
+      "suites": 1
+    },
+    {
+      "name": "review6-red",
+      "passed": 140,
+      "failed": 4,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "name": "promoted-red",
+      "passed": 2,
+      "failed": 1,
+      "skipped": 198,
+      "suites": 6
+    }
+  ],
+  "unitGreen": {
+    "suites": 21,
+    "passed": 1522,
+    "failed": 0
+  },
+  "lint": {
+    "baseline": {
+      "files": 13,
+      "errors": 0,
+      "warnings": 106
+    },
+    "current": {
+      "files": 18,
+      "errors": 0,
+      "warnings": 105
+    }
+  },
+  "backendReceipt": "backend-validation.json",
+  "independentReview": {
+    "findingRounds": 6,
+    "findingsAddressed": 15,
+    "closureReview": "passed: preservation-intent reproduction and prior null/add controls",
+    "scope": "bounded closure, not C0 integration/release certification"
+  },
+  "constraints": {
+    "productVersionChanged": false,
+    "locksChanged": false,
+    "pushed": false,
+    "deployed": false,
+    "sharedDatabaseAccess": false
+  },
+  "files": [
+    "CHANGELOG.md",
+    "Session_starter.md",
+    "api/src/domain/patch/generic-patch-engine.ts",
+    "api/src/domain/patch/group-patch-engine.spec.ts",
+    "api/src/domain/patch/group-patch-engine.ts",
+    "api/src/domain/patch/ordered-patch.spec.ts",
+    "api/src/domain/patch/patch-executor.ts",
+    "api/src/domain/patch/patch-readonly.ts",
+    "api/src/domain/patch/patch-selection.ts",
+    "api/src/domain/patch/patch-types.ts",
+    "api/src/domain/patch/patch-values.ts",
+    "api/src/domain/patch/user-patch-engine.ts",
+    "api/src/domain/validation/schema-validator.ts",
+    "api/src/modules/scim/controllers/endpoint-scim-generic.controller.spec.ts",
+    "api/src/modules/scim/controllers/endpoint-scim-groups.controller.spec.ts",
+    "api/src/modules/scim/controllers/endpoint-scim-users.controller.spec.ts",
+    "api/src/modules/scim/services/endpoint-scim-generic.service.ts",
+    "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+    "api/src/modules/scim/services/endpoint-scim-users.service.spec.ts",
+    "api/src/modules/scim/services/endpoint-scim-users.service.ts",
+    "api/test/e2e/manager-patch-string-coercion.e2e-spec.ts",
+    "api/test/e2e/ordered-patch.e2e-spec.ts",
+    "docs/CONTEXT_INSTRUCTIONS.md",
+    "docs/INDEX.md",
+    "docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md",
+    "docs/SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md",
+    "docs/SCIM_P2_EXECUTION_RCA.md",
+    "docs/SCIM_P2_IMPLEMENTATION.md",
+    "docs/evidence/scim-p2-20260928/backend-validation.json",
+    "docs/evidence/scim-p2-20260928/red-green.json",
+    "docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md",
+    "scripts/live-test-p2.cjs",
+    "scripts/p1-validation/baseline-transform.cjs",
+    "scripts/p1-validation/jest.config.cjs",
+    "scripts/p1-validation/run.cjs",
+    "scripts/p1-validation/safety.cjs"
+  ],
+  "documentation": {
+    "literalJsonBlocksParsed": 18,
+    "relativeLinksResolved": 71,
+    "mermaidDiagrams": 9,
+    "themes": [
+      "default",
+      "dark"
+    ],
+    "securityLevel": "strict",
+    "mermaidVersion": "11.15.0",
+    "localRendererMetadataWarning": "Built-in reports 0.0.0; preview version parity not claimed"
+  },
+  "failureExamples": [
+    {
+      "control": "unit-red",
+      "test": "P2 ordered User appends multi-valued add {\"op\":\"add\",\"path\":\"urn:example:scim:schemas:extension:2.0:Ordered:tags\",\"value\":[\"b\"]}",
+      "assertion": "Error: expect(received).toMatchObject(expected)\n\n- Expected  - 1\n+ Received  + 0\n\n  Object {\n    \"tags\": Array [\n-     \"a\",\n      \"b\",\n    ],\n  }"
+    },
+    {
+      "control": "http-red",
+      "test": "P2 ordered PATCH HTTP and repository contract Users appends scalar, array, no-path and complex adds; strict=true",
+      "assertion": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 2\n+ Received  + 2\n\n  Object {\n-   \"detail\": undefined,\n-   \"status\": 200,\n+   \"detail\": \"PATCH operation value validation failed: Attribute 'tags' is multi-valued and must be an array.\",\n+   \"status\": 400,\n  }"
+    },
+    {
+      "control": "review6-red",
+      "test": "P2 ordered User does not append projected readOnly values when adding a writable sibling",
+      "assertion": "Error: expect(received).toEqual(expected) // deep equality\n\n- Expected  - 0\n+ Received  + 3\n\n  Array [\n    \"server\",\n+   \"server\",\n+   \"server\",\n+   \"server\",\n  ]"
+    },
+    {
+      "control": "promoted-red",
+      "test": "P2 ordered PATCH HTTP and repository contract Devices removes externalId from both payload and promoted repository column",
+      "assertion": "Error: expect(received).toBeNull()\n\nReceived: \"external\""
+    }
+  ]
+}

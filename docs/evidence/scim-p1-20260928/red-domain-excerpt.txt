@@ -1,0 +1,35 @@
+  ● P1 typed PATCH User › applies the exact four-operation synthetic incident without a literal bracket key
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 4
+
+    @@ -1,13 +1,16 @@
+      Object {
+        "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser": Object {
+          "contacts": Array [
+            Object {
+              "primary": true,
+    +         "value": "old",
+    +       },
+    +     ],
+    +     "contacts[primary eq true]": Object {
+            "value": "new",
+          },
+    -     ],
+        },
+        "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser": Object {
+          "additionalOrganizations": Array [
+            Object {
+              "symbol": "new",
+
+      26 |   it('applies the exact four-operation synthetic incident without a literal bracket key', () => {
+      27 |     const payload = incidentPayload();
+    > 28 |     expect(apply(payload, incidentOperations())).toEqual(incidentExpected());
+         |                                                  ^
+      29 |     expect(payload).toEqual(incidentPayload());
+      30 |   });
+      31 |
+
+      at Object.<anonymous> (src/domain/patch/typed-patch-path.spec.ts:28:50)

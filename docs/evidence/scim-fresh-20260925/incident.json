@@ -1,0 +1,509 @@
+{
+  "observedAt": "2026-09-26T02:50:59.9122654Z",
+  "sourceBase": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "endpointId": "64b5f7bb-f4f7-4ec6-872b-352ecd498890",
+  "userId": "6cbe932c-3bfc-417e-9734-e02b35c49657",
+  "earlierAdminErrorFollowUp": {
+    "evidence": "earlier-admin-error.json",
+    "logId": "7282fa8e-66cc-4805-baf1-734fe208516f",
+    "retrievalStatus": 200,
+    "requestAndResponseTruncated": false,
+    "classification": "Product tighten-only profile validation rejects Group.displayName uniqueness none against server baseline; separate from later valuePath failure."
+  },
+  "scope": {
+    "initial": "2026-09-24T22:10:00Z through 23:10:00Z",
+    "initialRows": 65,
+    "surrounding": "2026-09-24T21:00:00Z through 23:10:00Z",
+    "surroundingErrors": {
+      "items": [
+        {
+          "id": "e0d83dad-362d-49d2-846d-64200ee7967c",
+          "url": "/scim/v2/endpoints/64b5f7bb-f4f7-4ec6-872b-352ecd498890/Users/6cbe932c-3bfc-417e-9734-e02b35c49657",
+          "createdAt": "2026-09-24T22:21:30.556Z",
+          "method": "PATCH",
+          "status": 400
+        },
+        {
+          "id": "7282fa8e-66cc-4805-baf1-734fe208516f",
+          "url": "/scim/admin/endpoints/64b5f7bb-f4f7-4ec6-872b-352ecd498890",
+          "createdAt": "2026-09-24T21:03:41.929Z",
+          "method": "PATCH",
+          "status": 400
+        }
+      ],
+      "total": 2
+    }
+  },
+  "privacy": "Only incident-target structural fields persisted here. Private scalar values replaced by arbitrary stable symbols, not hashes. No Authorization or credential values.",
+  "create": {
+    "status": 201,
+    "createdAt": "2026-09-24T22:19:45.547Z",
+    "shape": {
+      "google": {
+        "primaryOrganization": {
+          "location": "[private-value-1]"
+        },
+        "additionalOrganizations": [
+          {
+            "type": "school",
+            "symbol": "[private-value-1]"
+          },
+          {
+            "type": "work",
+            "symbol": "[private-value-1]"
+          }
+        ]
+      },
+      "contoso": {
+        "contacts": [
+          {
+            "value": "[private-value-1]",
+            "primary": true
+          }
+        ]
+      }
+    }
+  },
+  "timeline": [
+    {
+      "id": "ead85761-fdea-42ca-96f7-38ef75b7cb18",
+      "createdAt": "2026-09-24T22:15:42.63Z",
+      "method": "PATCH",
+      "status": 200,
+      "kind": "endpoint-admin",
+      "profileBodyTruncated": true,
+      "shape": {}
+    },
+    {
+      "id": "7f848ec2-c242-4643-a9c3-1e56ed7b6379",
+      "createdAt": "2026-09-24T22:17:43.055Z",
+      "method": "PATCH",
+      "status": 200,
+      "kind": "endpoint-admin",
+      "settingsPatch": {
+        "VerbosePatchSupported": true
+      },
+      "profileBodyTruncated": false,
+      "shape": {}
+    },
+    {
+      "id": "e0d83dad-362d-49d2-846d-64200ee7967c",
+      "createdAt": "2026-09-24T22:21:30.556Z",
+      "method": "PATCH",
+      "status": 400,
+      "kind": "User",
+      "profileBodyTruncated": false,
+      "shape": {},
+      "operationPaths": [
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser:primaryOrganization.location"
+        },
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser:additionalOrganizations[type eq \"school\"].symbol"
+        },
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser:additionalOrganizations[type eq \"work\"].symbol"
+        },
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser:contacts[primary eq true].value"
+        }
+      ]
+    },
+    {
+      "id": "1d68ae8f-13df-463b-b206-5b46b20a4b3f",
+      "createdAt": "2026-09-24T22:21:30.556Z",
+      "method": "GET",
+      "status": 200,
+      "kind": "User",
+      "profileBodyTruncated": false,
+      "shape": {
+        "google": {
+          "primaryOrganization": {
+            "location": "[private-value-1]"
+          },
+          "additionalOrganizations": [
+            {
+              "type": "school",
+              "symbol": "[private-value-1]"
+            },
+            {
+              "type": "work",
+              "symbol": "[private-value-1]"
+            }
+          ]
+        },
+        "contoso": {
+          "contacts": [
+            {
+              "value": "[private-value-1]",
+              "primary": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ef40dbe6-ec0c-4bd9-83d8-33edf68af5c3",
+      "createdAt": "2026-09-24T22:28:20.301Z",
+      "method": "PATCH",
+      "status": 200,
+      "kind": "endpoint-admin",
+      "settingsPatch": {
+        "StrictSchemaValidation": false
+      },
+      "profileBodyTruncated": false,
+      "shape": {}
+    },
+    {
+      "id": "3a851554-41ac-4478-bf75-3bdbe5e1889a",
+      "createdAt": "2026-09-24T22:28:32.819Z",
+      "method": "GET",
+      "status": 200,
+      "kind": "User",
+      "profileBodyTruncated": false,
+      "shape": {
+        "google": {
+          "primaryOrganization": {
+            "location": "[private-value-1]"
+          },
+          "additionalOrganizations": [
+            {
+              "type": "school",
+              "symbol": "[private-value-1]"
+            },
+            {
+              "type": "work",
+              "symbol": "[private-value-1]"
+            }
+          ]
+        },
+        "contoso": {
+          "contacts": [
+            {
+              "value": "[private-value-1]",
+              "primary": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ddc478b1-280a-4adf-aa4a-4ef7276de0d0",
+      "createdAt": "2026-09-24T22:28:32.819Z",
+      "method": "PATCH",
+      "status": 200,
+      "kind": "User",
+      "profileBodyTruncated": false,
+      "shape": {
+        "google": {
+          "primaryOrganization": {
+            "location": "[private-value-2]"
+          },
+          "additionalOrganizations": [
+            {
+              "type": "school",
+              "symbol": "[private-value-2]"
+            },
+            {
+              "type": "work",
+              "symbol": "[private-value-2]"
+            }
+          ]
+        },
+        "contoso": {
+          "contacts": [
+            {
+              "value": "[private-value-1]",
+              "primary": true
+            }
+          ],
+          "contacts[primary eq true]": {
+            "value": "[private-value-2]"
+          }
+        }
+      },
+      "operationPaths": [
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser:primaryOrganization.location"
+        },
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser:additionalOrganizations[type eq \"school\"].symbol"
+        },
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser:additionalOrganizations[type eq \"work\"].symbol"
+        },
+        {
+          "op": "replace",
+          "path": "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser:contacts[primary eq true].value"
+        }
+      ]
+    },
+    {
+      "id": "8b647a18-9708-42a4-b927-fd7bff4da79a",
+      "createdAt": "2026-09-24T22:31:33.374Z",
+      "method": "PATCH",
+      "status": 200,
+      "kind": "endpoint-admin",
+      "settingsPatch": {
+        "StrictSchemaValidation": true
+      },
+      "profileBodyTruncated": false,
+      "shape": {}
+    }
+  ],
+  "current": {
+    "updatedAt": "2026-09-24T22:31:32.426Z",
+    "settings": {
+      "PrimaryEnforcement": "reject",
+      "VerbosePatchSupported": true,
+      "StrictSchemaValidation": true
+    },
+    "shape": {
+      "google": {
+        "primaryOrganization": {
+          "location": "[private-value-2]"
+        },
+        "additionalOrganizations": [
+          {
+            "type": "school",
+            "symbol": "[private-value-2]"
+          },
+          {
+            "type": "work",
+            "symbol": "[private-value-2]"
+          }
+        ]
+      },
+      "contoso": {
+        "contacts": [
+          {
+            "value": "[private-value-1]",
+            "primary": true
+          }
+        ],
+        "contacts[primary eq true]": {
+          "value": "[private-value-2]"
+        }
+      }
+    }
+  },
+  "schemaExcerpt": [
+    {
+      "id": "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityUser",
+      "attributes": [
+        {
+          "name": "primaryOrganization",
+          "type": "complex",
+          "required": false,
+          "returned": "default",
+          "mutability": "readWrite",
+          "uniqueness": "none",
+          "multiValued": false,
+          "subAttributes": [
+            {
+              "name": "type",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false,
+              "canonicalValues": [
+                "school",
+                "work"
+              ]
+            },
+            {
+              "name": "domain",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "fullTimeEquivalent",
+              "type": "integer",
+              "required": false,
+              "returned": "default",
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "location",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "symbol",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            }
+          ]
+        },
+        {
+          "name": "additionalOrganizations",
+          "type": "complex",
+          "required": false,
+          "returned": "default",
+          "mutability": "readWrite",
+          "uniqueness": "none",
+          "multiValued": true,
+          "subAttributes": [
+            {
+              "name": "type",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false,
+              "canonicalValues": [
+                "school",
+                "work"
+              ]
+            },
+            {
+              "name": "costCenter",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "department",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "domain",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "fullTimeEquivalent",
+              "type": "integer",
+              "required": false,
+              "returned": "default",
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "location",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "symbol",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "uniqueness": "none",
+              "multiValued": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "urn:ietf:params:scim:schemas:extension:contoso:2.0:ScalarMVUser",
+      "attributes": [
+        {
+          "name": "contacts",
+          "type": "complex",
+          "required": false,
+          "returned": "default",
+          "mutability": "readWrite",
+          "multiValued": true,
+          "subAttributes": [
+            {
+              "name": "primary",
+              "type": "boolean",
+              "required": false,
+              "returned": "default",
+              "mutability": "readWrite",
+              "multiValued": false
+            },
+            {
+              "name": "value",
+              "type": "string",
+              "required": false,
+              "returned": "default",
+              "caseExact": false,
+              "mutability": "readWrite",
+              "multiValued": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Historical complete profile bodies were truncated; current schema excerpt is not an at-time snapshot.",
+    "GET and PATCH may share buffered log createdAt; their ordering is not inferred from tied timestamps.",
+    "No live mutation, replay or repair was performed."
+  ]
+}

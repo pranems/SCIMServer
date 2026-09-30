@@ -13,7 +13,8 @@ import { OAUTH_METADATA_PATH } from '@app/oauth/oauth.constants';
 import { applyCorrelationMiddleware } from '@app/bootstrap/correlation-middleware';
 import { applyBodyParsers } from '@app/bootstrap/body-parsers';
 
-export function resolveTestDatabaseUrl(marker: string | undefined, fallback: string): string {
+export function resolveTestDatabaseUrl(marker: string | undefined, fallback: string, pinned?: string): string {
+  if (pinned !== undefined) return pinned;
   const candidate = marker?.trim();
   if (candidate?.startsWith('postgresql://') || candidate?.startsWith('postgres://')) {
     return candidate;
@@ -36,17 +37,19 @@ export function resolveTestDatabaseUrl(marker: string | undefined, fallback: str
  */
 export async function createTestApp(
   customize?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+  options?: { databaseUrl: string },
 ): Promise<INestApplication> {
   // Read the database URL from the marker file written by global-setup
   const markerPath = path.resolve(__dirname, '..', '.test-db-path');
   const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
 
   if (backend !== 'inmemory') {
-    const marker = fs.existsSync(markerPath)
+    // Owned validation runners pin a verified URL and never read a competing marker.
+    const marker = options?.databaseUrl === undefined && fs.existsSync(markerPath)
       ? fs.readFileSync(markerPath, 'utf-8')
       : undefined;
     const fallback = process.env.DATABASE_URL ?? 'postgresql://scim:scim@localhost:5432/scimdb';
-    const dbUrl = resolveTestDatabaseUrl(marker, fallback);
+    const dbUrl = resolveTestDatabaseUrl(marker, fallback, options?.databaseUrl);
     process.env.DATABASE_URL = dbUrl;
   }
 

@@ -1,8 +1,8 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
 
-> **Updated:** 2026-09-18
+> **Updated:** 2026-09-29
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 >
 > **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines the portability boundary, discovery translation, authentication provenance, API/DB ownership, and target UX. This document remains authoritative for current profile expansion and PATCH merge semantics.
@@ -14,6 +14,7 @@
 - [Overview](#overview)
 - [Profile Structure](#profile-structure)
 - [Profile Creation Flow](#profile-creation-flow)
+- [Profile Revision and Write Coordination](#profile-revision-and-write-coordination)
 - [Built-In Presets](#built-in-presets)
 - [Auto-Expand Engine](#auto-expand-engine)
 - [Tighten-Only Validation](#tighten-only-validation)
@@ -25,6 +26,43 @@
 ---
 
 ## Overview
+
+**C0 local uniqueness bridge, not deployed:** structural validation is followed
+by per-ResourceType uniqueness capability compilation. Core-only raw promises
+are checked before common normalization; schemas shared with an extension keep
+their raw declaration, and the effective core view uses RFC common
+characteristics. Both admission and runtime delegate to the same storage
+compiler, so the type/represented-path capability list cannot drift between
+them. The view adapter does not alter the stored profile. Omitted optional
+extension lists are normalized on copied ResourceTypes before validation
+consumers iterate them. [Design, RED/GREEN and parity receipt](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
+
+**P7a implementation note (local, not deployed):** the existing profile
+pipeline validates raw declarations before expansion, then expanded
+declarations before tighten-only/structural checks. This prevents malformed
+containers or unknown types from becoming accepted profiles. ResourceType
+extension requiredness is carried into schema validation caches. Global
+uniqueness is rejected as unsupported rather than ranked as a locally
+enforceable promise. See [P7a](SCIM_P7A_PROFILE_VALIDATION.md) for exact boundaries.
+
+`global` is valid in RFC 7643; its rejection is this server's supported-capability
+policy. Because `mergeProfilePartial` validates the entire merged profile,
+even a settings-only profile edit rejects an old stored global declaration.
+Reads and top-level endpoint edits without a `profile` block are not automatic
+profile migrations. See [the exact behavior matrix](SCIM_P7_CHARACTERISTIC_STATUS.md#3-global-uniqueness-is-a-supported-capability-policy).
+
+Core externalId admission and internal runtime characteristics now apply RFC
+7643 3.1 precedence on every resource type, not just the builtin User/Group
+baselines. Its shorthand expands common characteristics, and obsolete core
+definitions cannot turn client-owned identifiers readOnly. Namespaced
+extension attributes remain independent. [Implementation and evidence](SCIM_P7_COMMON_EXTERNAL_ID.md).
+
+The [binding-context follow-up](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md) extends
+common precedence to id/meta. Core-only conflicting declarations are rejected
+as an admin policy; schemas used as extensions are preserved and receive
+common overrides only in a core runtime binding. Neither expansion nor
+tighten-only checks globally rewrite their common-looking extension fields.
+Explicit internal extension roles replace URN-prefix guesses.
 
 Every endpoint has a **profile** that fully defines its SCIM behavior. A profile is the single source of truth for:
 
@@ -164,6 +202,25 @@ sequenceDiagram
     ES-->>EC: EndpointResponse
     EC-->>Op: 201 Created
 ```
+
+---
+
+## Profile Revision and Write Coordination
+
+Resource writes are validated against a request-scoped endpoint profile
+snapshot. The service derives a canonical SHA-256 revision from that snapshot
+and forwards it to the repository mutation boundary. PostgreSQL mutations and
+profile updates acquire the same transaction-scoped advisory lock; InMemory
+repositories compare against the synchronously published current revision.
+If the profile changed after validation, the mutation is rejected with HTTP
+409 and diagnostic code `PROFILE_REVISION_CHANGED`. No resource row, member
+change, version increment, or success event is published.
+
+The revision is not an operator-managed profile field and does not alter the
+stored profile or discovery response. It is an internal coordination token.
+See [SCIM_PROFILE_REVISION_WRITE_COORDINATION.md](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md)
+for the lock ordering, canonicalization rules, error contract, and dual-backend
+evidence.
 
 ---
 
@@ -480,11 +537,36 @@ the endpoint still had its previous single resource type.
 
 ### When the change takes effect
 
-Immediately, on the next SCIM request. There is no restart and no TTL. After a successful
-PATCH the service replaces the cached endpoint object synchronously, which discards the
-lazily-built `_schemaCaches`, then fires `profileChangeListener` and broadcasts
-`ENDPOINT_UPDATED` on SSE. Discovery (`/Schemas`, `/ResourceTypes`), schema validation and
-characteristic enforcement all read the new profile on the very next call.
+The P8c implementation makes an endpoint PATCH with `If-Match` conditional at
+the write boundary, not only at the earlier controller check. PostgreSQL
+compares the persisted editable fields as part of the update; InMemory checks
+and publishes without an intervening await. The summary and full GET views
+publish a token for the same editable state. See
+[endpoint write concurrency](ENDPOINT_WRITE_CONCURRENCY.md) for the race
+regression, compatibility limits and dual-backend evidence.
+
+On the process handling the PATCH, the service replaces the cached endpoint,
+discards its lazily-built `_schemaCaches`, fires `profileChangeListener` and
+broadcasts `ENDPOINT_UPDATED` on SSE.
+
+The [P8b deletion package](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) removes
+owned resources and credentials before evicting the endpoint profile and its
+schema characteristics caches. It retains RequestLog audit history. A reader
+that discovers a remotely deleted endpoint also invalidates its local WIF
+trust cache through the existing deletion event.
+
+The P8a implementation also handles a different PostgreSQL-backed process:
+every new endpoint lookup reads the authoritative row. A changed snapshot
+refreshes that process's schema overlay and logging settings; an unchanged
+snapshot retains its derived indexes. A lookup started after the save commits
+sees the new row. Reads already in progress are not cancelled. This removes the
+previous indefinite cross-process cache staleness without adding a TTL or broker.
+Database failure is surfaced rather than hidden by the cached profile.
+
+See [P8a evidence and limits](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) for
+two-application HTTP tests, two-process PostgreSQL live checks and the measured
+extra query cost. P8a is not yet deployed. InMemory is still instance-local;
+the historical verification below does not prove replication between processes.
 
 ### Live verification of this section
 

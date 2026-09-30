@@ -1,8 +1,8 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
 
-> **Version:** 0.55.35 - **Updated:** 2026-09-18
+> **Version:** 0.55.36 - **Updated:** 2026-09-18
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
 > **Source of truth:** [endpoint.controller.ts](../api/src/modules/endpoint/controllers/endpoint.controller.ts) - [built-in-presets.ts](../api/src/modules/scim/endpoint-profile/built-in-presets.ts)
 
@@ -13,6 +13,31 @@ This is the "start here" page. For deeper reference see:
 [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) (every route).
 
 An endpoint profile is portable configuration, not a complete running endpoint export. It includes schemas, ResourceTypes, capability inputs, endpoint settings, and non-secret authentication method declarations. Credentials, secrets, resources, logs, and server policy are configured separately. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
+
+**P7a local source update, not deployed:** when creating/updating an inline
+profile, use Boolean characteristic values, valid SCIM type/mutability/returned
+keywords and arrays of attribute definitions. Omitted RFC defaults remain
+valid. Unsupported `global` uniqueness is rejected before saving. See
+[the declaration checklist and HTTP proof](SCIM_P7A_PROFILE_VALIDATION.md).
+
+Top-level externalId cannot be redefined as numeric/multi-valued on a custom
+resource: it is a common String/single-valued/caseExact/readWrite attribute.
+An externalId inside an extension has its own independent definition.
+See [the standards correction](SCIM_P7_COMMON_EXTERNAL_ID.md).
+
+Top-level id/meta remain server-owned if omitted from a custom-core schema.
+For a schema shared as core and extension, the [binding-aware policy](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md)
+preserves the declaration and applies common semantics only to core usage.
+Admin rejection of conflicting **core-only** declarations is an explicit
+provider choice; RFC precedence itself does not prescribe an admin API.
+
+**C0 local admission update, not deployed:** `uniqueness:server` must be
+supported for the declared type and stored path. Boolean/dateTime/binary and
+whole-complex promises are rejected before endpoint creation or profile
+publication; supported scalar leaves remain available. Shared schemas retain
+their extension declarations while common core fields use RFC semantics.
+Omitting optional `schemaExtensions` means an empty list; sending null or a
+non-array is an error. [Integration evidence and exact boundaries](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
 
 ---
 
@@ -375,7 +400,7 @@ Quick checks per recipe:
 # Deactivate (keeps data, blocks SCIM ops with 403)
 Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id" -Method Patch -Headers $H -ContentType 'application/json' -Body '{"active":false}'
 
-# Or delete permanently (cascades users, groups, logs, credentials)
+# Or delete permanently (removes resources and credentials; retains audit logs)
 Invoke-RestMethod -Uri "$base/scim/admin/endpoints/$id" -Method Delete -Headers $H
 ```
 

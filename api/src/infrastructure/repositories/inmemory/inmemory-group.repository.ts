@@ -23,14 +23,34 @@ import type {
   MemberRecord,
 } from '../../../domain/models/group.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
+import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { RepositoryError } from '../../../domain/errors/repository-error';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
+import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
-  private readonly groups: Map<string, GroupRecord> = new Map();
-  private readonly members: Map<string, MemberRecord> = new Map();
+  private groups: Map<string, GroupRecord> = new Map();
+  private members: Map<string, MemberRecord> = new Map();
 
-  async create(input: GroupCreateInput): Promise<GroupRecord> {
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    const groupIds = new Set([...this.groups.values()].filter(row => row.endpointId === endpointId).map(row => row.id));
+    const groups = prepareMapRemoval(this.groups, row => groupIds.has(row.id), rows => { this.groups = rows; });
+    const members = prepareMapRemoval(this.members, row => groupIds.has(row.groupId), rows => { this.members = rows; });
+    return {
+      commit: () => { groups.commit(); members.commit(); },
+      rollback: () => { members.rollback(); groups.rollback(); },
+    };
+  }
+
+  async create(input: GroupCreateInput, members: MemberCreateInput[] = [], uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
+    if (this.findGroup(input.endpointId, input.scimId)) {
+      throw new RepositoryError('CONFLICT', 'Group SCIM id already exists in this endpoint.');
+    }
     const now = new Date();
     const record: GroupRecord = {
       id: randomUUID(),
@@ -45,22 +65,23 @@ export class InMemoryGroupRepository implements IGroupRepository {
       createdAt: now,
       updatedAt: now,
     };
+    const initialMembers = this.stageMembers(record.id, members, now);
+    this.assertUnique(uniqueness, record, initialMembers);
+    this.writes.assertWritable(input.endpointId, profileRevision);
     this.groups.set(record.id, record);
+    for (const member of initialMembers) this.members.set(member.id, member);
     return { ...record };
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null> {
-    const normalizedScimId = scimId.toLowerCase();
-    for (const group of this.groups.values()) {
-      if (group.endpointId === endpointId && group.scimId.toLowerCase() === normalizedScimId) {
-        return { ...group };
-      }
-    }
-    return null;
+    const group = this.findGroup(endpointId, scimId);
+    return group ? { ...group } : null;
   }
 
   async findWithMembers(endpointId: string, scimId: string): Promise<GroupWithMembers | null> {
-    const group = await this.findByScimId(endpointId, scimId);
+    // Read both maps in the same turn: an await here can mix old scalar state
+    // with new membership even when writers publish atomically.
+    const group = this.findGroup(endpointId, scimId);
     if (!group) return null;
     return {
       ...group,
@@ -101,11 +122,9 @@ export class InMemoryGroupRepository implements IGroupRepository {
     }));
   }
 
-  async update(id: string, data: GroupUpdateInput): Promise<GroupRecord> {
+  async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
     const existing = this.groups.get(id);
-    if (!existing) {
-      throw new RepositoryError('NOT_FOUND', `Group with id ${id} not found`);
-    }
+    assertWritePrecondition(existing, expectedVersion);
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: GroupRecord = {
       ...existing,
@@ -113,14 +132,16 @@ export class InMemoryGroupRepository implements IGroupRepository {
       version: (existing.version ?? 1) + 1,
       updatedAt: new Date(),
     };
+    this.assertUnique(uniqueness, updated, this.getMembersForGroup(id), id);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.groups.set(id, updated);
     return { ...updated };
   }
 
-  async delete(id: string): Promise<void> {
-    if (!this.groups.has(id)) {
-      throw new RepositoryError('NOT_FOUND', `Group with id ${id} not found`);
-    }
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
+    const existing = this.groups.get(id);
+    assertWritePrecondition(existing, expectedVersion);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.groups.delete(id);
     // Cascade: remove associated members
     for (const [memberId, member] of this.members) {
@@ -162,41 +183,83 @@ export class InMemoryGroupRepository implements IGroupRepository {
     return null;
   }
 
-  async addMembers(groupId: string, members: MemberCreateInput[]): Promise<void> {
-    for (const m of members) {
-      const record: MemberRecord = {
-        id: randomUUID(),
-        groupId,
-        userId: m.userId,
-        value: m.value,
-        type: m.type,
-        display: m.display,
-        createdAt: new Date(),
-      };
-      this.members.set(record.id, record);
-    }
+  async addMembers(groupId: string, members: MemberCreateInput[], uniqueness: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<void> {
+    if (members.length === 0) return;
+    const group = this.groups.get(groupId);
+    assertWritePrecondition(group);
+    const existing = this.getMembersForGroup(groupId);
+    const staged = this.stageMembers(groupId, members, new Date(), new Set(existing.map((m) => m.value)));
+    this.assertUnique(uniqueness, group, [...existing, ...staged], groupId);
+    this.writes.assertWritable(group.endpointId, profileRevision);
+    for (const member of staged) this.members.set(member.id, member);
   }
 
   async updateGroupWithMembers(
     groupId: string,
     data: GroupUpdateInput,
     members: MemberCreateInput[],
+    expectedVersion?: ExpectedVersion,
+    uniqueness: UniquenessPolicy = [],
+    profileRevision?: ProfileRevision,
   ): Promise<void> {
-    await this.update(groupId, data);
+    const existing = this.groups.get(groupId);
+    assertWritePrecondition(existing, expectedVersion);
+    // Stage the entire aggregate before committing either map. No await can
+    // interleave a second conditional writer between the check and mutation.
+    const now = new Date();
+    const updated: GroupRecord = {
+      ...existing, ...data, version: existing.version + 1, updatedAt: now,
+    };
+    const replacement = this.stageMembers(groupId, members, now);
+    this.assertUnique(uniqueness, updated, replacement, groupId);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
 
+    this.groups.set(groupId, updated);
     for (const [memberId, member] of this.members) {
       if (member.groupId === groupId) {
         this.members.delete(memberId);
       }
     }
 
-    await this.addMembers(groupId, members);
+    for (const member of replacement) this.members.set(member.id, member);
   }
 
   /** Clear all data - useful in test teardowns. */
   clear(): void {
     this.groups.clear();
     this.members.clear();
+  }
+
+  private findGroup(endpointId: string, scimId: string): GroupRecord | null {
+    const normalizedScimId = scimId.toLowerCase();
+    for (const group of this.groups.values()) {
+      if (group.endpointId === endpointId && group.scimId.toLowerCase() === normalizedScimId) return group;
+    }
+
+    return null;
+  }
+
+  private assertUnique(policy: UniquenessPolicy, record: GroupRecord, members: MemberRecord[], excludeId?: string): void {
+    if (policy.length === 0) return;
+    assertUnique(policy, uniquenessPayload(record, members), [...this.groups.values()]
+      .filter((r) => r.id !== excludeId && r.endpointId === record.endpointId)
+      .map((r) => uniquenessPayload(r, this.getMembersForGroup(r.id))));
+  }
+
+  private stageMembers(
+    groupId: string, members: MemberCreateInput[], now: Date, values = new Set<string>(),
+  ): MemberRecord[] {
+    return members.map((m) => {
+      const record: MemberRecord = {
+        id: randomUUID(), groupId, userId: m.userId, value: m.value,
+        type: m.type, display: m.display, createdAt: now,
+      };
+      if (values.has(record.value)) {
+        throw new RepositoryError('CONFLICT', 'Group member value already exists.');
+      }
+      values.add(record.value);
+      return record;
+    });
   }
 
   private getMembersForGroup(groupId: string): MemberRecord[] {

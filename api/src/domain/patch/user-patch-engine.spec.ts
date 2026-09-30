@@ -325,14 +325,12 @@ describe('UserPatchEngine', () => {
       expect(name.middleName).toBe('Q');
     });
 
-    it('should ignore dot-notation when verbosePatch is disabled', () => {
-      const result = apply(
+    it('should reject explicit dot-notation when verbosePatch is disabled', () => {
+      expect(() => apply(
         [{ op: 'replace', path: 'name.givenName', value: 'Nope' }],
         undefined,
         defaultConfig,
-      );
-      // Stored as literal key (not navigated into nested)
-      expect(result.payload['name.givenName']).toBe('Nope');
+      )).toThrow(PatchError);
     });
 
     it('should remove nested attribute via dot-notation', () => {

@@ -50,6 +50,9 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { resolveResourceType } from '../common/resource-type-resolver';
 import { buildBaseUrl } from '../common/base-url.util';
+import { patchSuppliedPaths } from '../../../domain/patch/patch-presence';
+import { SearchRequestDto } from '../dto/search-request.dto';
+import { searchAttributeSelectionToQuery } from '../dto/search-attribute-selection';
 
 @Controller('endpoints/:endpointId')
 export class EndpointScimGenericController {
@@ -133,11 +136,12 @@ export class EndpointScimGenericController {
       resourceTypePath,
       req,
     );
+    const writePayload = structuredClone(body);
     const result = await this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
     const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 
@@ -217,7 +221,7 @@ export class EndpointScimGenericController {
   async searchResources(
     @Param('endpointId') endpointId: string,
     @Param('resourceType') resourceTypePath: string,
-    @Body() body: { filter?: string; startIndex?: number; count?: number; sortBy?: string; sortOrder?: 'ascending' | 'descending'; attributes?: string; excludedAttributes?: string },
+    @Body() body: SearchRequestDto,
     @Req() req: Request,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
@@ -247,8 +251,8 @@ export class EndpointScimGenericController {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources as Record<string, unknown>[],
-          body.attributes,
-          body.excludedAttributes,
+          searchAttributeSelectionToQuery(body.attributes),
+          searchAttributeSelectionToQuery(body.excludedAttributes),
           alwaysByParent,
           requestByParent,
         ),
@@ -314,6 +318,7 @@ export class EndpointScimGenericController {
       req,
     );
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const writePayload = structuredClone(body);
     const result = await this.genericService.replaceResource(
       id,
       body,
@@ -326,7 +331,7 @@ export class EndpointScimGenericController {
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
     const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 
@@ -350,6 +355,8 @@ export class EndpointScimGenericController {
       req,
     );
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const extensionUrns = resourceType.schemaExtensions.map(ext => ext.schema);
+    const suppliedPaths = patchSuppliedPaths(body?.Operations, extensionUrns, resourceType.schema);
     const result = await this.genericService.patchResource(
       id,
       body,
@@ -362,7 +369,8 @@ export class EndpointScimGenericController {
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
     const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, undefined,
+      suppliedPaths);
     return this.attachWarnings(projected, config);
   }
 

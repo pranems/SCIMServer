@@ -512,7 +512,7 @@ describe('AUDIT-2: returned:request sub-attr stripping', () => {
       },
       meta: { resourceType: 'User' },
     };
-    const requestSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.details', new Set(['internalcode'])]]);
+    const requestSubs = new Map([['urn:ext:custom.details', new Set(['internalcode'])]]);
     const result = applyAttributeProjection(resource, undefined, undefined, undefined, requestSubs);
     const ext = result['urn:ext:custom'] as Record<string, unknown>;
     const details = ext.details as Record<string, unknown>;
@@ -725,4 +725,3 @@ describe('stripReturnedNever (G8e)', () => {
     expect(name.secretHash).toBe('abc'); // not stripped without neverByParent
   });
 });
-

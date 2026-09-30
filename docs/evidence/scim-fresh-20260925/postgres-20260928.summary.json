@@ -1,0 +1,601 @@
+{
+  "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "collectedAt": "2026-09-29T01:11:38.087Z",
+  "evidenceType": "Real HTTP plus real persisted repositories, PostgreSQL compared to InMemory",
+  "runs": [
+    {
+      "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+      "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+      "run": "d603fa1ad9198156",
+      "startedAt": "2026-09-29T01:02:27.390Z",
+      "output": "test-results\\fresh-analysis\\postgres-20260928-d603fa1ad9198156",
+      "status": "complete",
+      "backendResults": [
+        {
+          "backend": "inmemory",
+          "exitCode": 1,
+          "cases": 62,
+          "passed": 16,
+          "behaviorFailed": 45,
+          "setupFailed": 0,
+          "notApplicable": 1,
+          "checksPassed": 192,
+          "checksFailed": 89,
+          "file": "test-results\\fresh-analysis\\postgres-20260928-d603fa1ad9198156\\inmemory.json"
+        },
+        {
+          "backend": "prisma",
+          "exitCode": 1,
+          "cases": 62,
+          "passed": 17,
+          "behaviorFailed": 45,
+          "setupFailed": 0,
+          "notApplicable": 0,
+          "checksPassed": 200,
+          "checksFailed": 84,
+          "file": "test-results\\fresh-analysis\\postgres-20260928-d603fa1ad9198156\\prisma.json"
+        }
+      ],
+      "cleanup": {
+        "exactContainerId": "7769575c24024eebf1da5e117908e42a067876989651bfb89a9fbc12fa3dfe1f",
+        "removed": true,
+        "persistentVolumesCreated": 0,
+        "customNetworksCreated": 0
+      },
+      "dockerServerVersion": "29.6.2",
+      "image": "postgres:17-alpine",
+      "container": {
+        "id": "7769575c24024eebf1da5e117908e42a067876989651bfb89a9fbc12fa3dfe1f",
+        "name": "scim-fresh-pg-d603fa1ad9198156",
+        "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+        "run": "d603fa1ad9198156",
+        "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+        "host": "127.0.0.1",
+        "port": 60936,
+        "database": "scim_fresh_d603fa1ad9198156",
+        "mounts": [],
+        "tmpfs": {
+          "/var/lib/postgresql/data": "rw"
+        },
+        "network": "bridge"
+      },
+      "beforeMigration": {
+        "container": {
+          "id": "7769575c24024eebf1da5e117908e42a067876989651bfb89a9fbc12fa3dfe1f",
+          "name": "scim-fresh-pg-d603fa1ad9198156",
+          "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+          "run": "d603fa1ad9198156",
+          "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+          "host": "127.0.0.1",
+          "port": 60936,
+          "database": "scim_fresh_d603fa1ad9198156",
+          "mounts": [],
+          "tmpfs": {
+            "/var/lib/postgresql/data": "rw"
+          },
+          "network": "bridge"
+        },
+        "server": {
+          "database": "scim_fresh_d603fa1ad9198156",
+          "username": "fresh_runner",
+          "cluster_name": "scim-fresh-d603fa1ad9198156",
+          "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+          "server_address": "172.17.0.2/32",
+          "server_port": 5432,
+          "system_identifier": "7690756416877445156"
+        }
+      },
+      "migrationExit": 0,
+      "migrations": [
+        {
+          "migration_name": "20260223000000_postgresql_baseline",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260223203811_externalid_citext_case_insensitive",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260223225049_add_endpoint_schema",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260225123401_add_deleted_at_soft_delete",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260225181836_externalid_citext_to_text",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260225232117_add_endpoint_resource_type",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260227013947_add_endpoint_credential",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260313031330_add_endpoint_profile",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260409235323_remove_uniqueness_displayname_externalid",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260416025138_add_requestlog_perf_indexes",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260430120000_resource_member_unique_value",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260707000000_add_jwks_host_allowlist",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260707100000_add_credential_dek",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260707110000_add_secret_retention_and_server_settings",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260717120000_add_requestlog_requestid",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260721180000_add_requestlog_auth_summary",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260722120000_add_requestlog_auth_decision",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260724000000_drop_requestlog_endpoint_fk",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260827200000_add_credential_keyed_lookup",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260916035422_add_endpoint_credential_type_active_index",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260923020356_split_per_endpoint_credentials_enablement",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260924000000_endpoint_name_case_insensitive",
+          "finished": true,
+          "rolled_back": false
+        }
+      ],
+      "extensions": [
+        {
+          "extname": "citext",
+          "extversion": "1.6"
+        },
+        {
+          "extname": "pg_trgm",
+          "extversion": "1.6"
+        },
+        {
+          "extname": "pgcrypto",
+          "extversion": "1.3"
+        },
+        {
+          "extname": "plpgsql",
+          "extversion": "1.0"
+        },
+        {
+          "extname": "uuid-ossp",
+          "extversion": "1.1"
+        }
+      ],
+      "finishedAt": "2026-09-29T01:05:25.780Z"
+    },
+    {
+      "base": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+      "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+      "run": "d14af7fea23f1faf",
+      "startedAt": "2026-09-29T01:07:31.443Z",
+      "output": "test-results\\fresh-analysis\\postgres-20260928-d14af7fea23f1faf",
+      "status": "complete",
+      "backendResults": [
+        {
+          "backend": "inmemory",
+          "exitCode": 1,
+          "cases": 15,
+          "passed": 7,
+          "behaviorFailed": 8,
+          "setupFailed": 0,
+          "notApplicable": 0,
+          "checksPassed": 35,
+          "checksFailed": 11,
+          "file": "test-results\\fresh-analysis\\postgres-20260928-d14af7fea23f1faf\\inmemory.json"
+        },
+        {
+          "backend": "prisma",
+          "exitCode": 1,
+          "cases": 15,
+          "passed": 7,
+          "behaviorFailed": 8,
+          "setupFailed": 0,
+          "notApplicable": 0,
+          "checksPassed": 35,
+          "checksFailed": 11,
+          "file": "test-results\\fresh-analysis\\postgres-20260928-d14af7fea23f1faf\\prisma.json"
+        }
+      ],
+      "cleanup": {
+        "exactContainerId": "70899bd90228aedd96494ccf11a3abc60a6d25d29013f3cd3063b714cef642d2",
+        "removed": true,
+        "persistentVolumesCreated": 0,
+        "customNetworksCreated": 0
+      },
+      "selectedCases": [
+        "CUSTOM-PATCH-DISABLED",
+        "TYPED-READ-CONTROL",
+        "CORE-MV-ADD",
+        "CORE-BOOLEAN-PATH",
+        "MULTIMATCH-REMOVE",
+        "NO-PATH-Users",
+        "ETAG-CONTROL-Users",
+        "CARDINALITY-NEGATIVE-Users",
+        "NO-PATH-Groups",
+        "ETAG-CONTROL-Groups",
+        "CARDINALITY-NEGATIVE-Groups",
+        "NO-PATH-Devices",
+        "ETAG-CONTROL-Devices",
+        "CARDINALITY-NEGATIVE-Devices",
+        "GROUP-POST-FAULT"
+      ],
+      "dockerServerVersion": "29.6.2",
+      "image": "postgres:17-alpine",
+      "container": {
+        "id": "70899bd90228aedd96494ccf11a3abc60a6d25d29013f3cd3063b714cef642d2",
+        "name": "scim-fresh-pg-d14af7fea23f1faf",
+        "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+        "run": "d14af7fea23f1faf",
+        "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+        "host": "127.0.0.1",
+        "port": 63615,
+        "database": "scim_fresh_d14af7fea23f1faf",
+        "mounts": [],
+        "tmpfs": {
+          "/var/lib/postgresql/data": "rw"
+        },
+        "network": "bridge"
+      },
+      "beforeMigration": {
+        "container": {
+          "id": "70899bd90228aedd96494ccf11a3abc60a6d25d29013f3cd3063b714cef642d2",
+          "name": "scim-fresh-pg-d14af7fea23f1faf",
+          "owner": "bf8209ca-96fe-46aa-8cab-1641c725a077",
+          "run": "d14af7fea23f1faf",
+          "imageId": "sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af",
+          "host": "127.0.0.1",
+          "port": 63615,
+          "database": "scim_fresh_d14af7fea23f1faf",
+          "mounts": [],
+          "tmpfs": {
+            "/var/lib/postgresql/data": "rw"
+          },
+          "network": "bridge"
+        },
+        "server": {
+          "database": "scim_fresh_d14af7fea23f1faf",
+          "username": "fresh_runner",
+          "cluster_name": "scim-fresh-d14af7fea23f1faf",
+          "version": "PostgreSQL 17.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+          "server_address": "172.17.0.2/32",
+          "server_port": 5432,
+          "system_identifier": "7690757713219112995"
+        }
+      },
+      "migrationExit": 0,
+      "migrations": [
+        {
+          "migration_name": "20260223000000_postgresql_baseline",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260223203811_externalid_citext_case_insensitive",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260223225049_add_endpoint_schema",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260225123401_add_deleted_at_soft_delete",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260225181836_externalid_citext_to_text",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260225232117_add_endpoint_resource_type",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260227013947_add_endpoint_credential",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260313031330_add_endpoint_profile",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260409235323_remove_uniqueness_displayname_externalid",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260416025138_add_requestlog_perf_indexes",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260430120000_resource_member_unique_value",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260707000000_add_jwks_host_allowlist",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260707100000_add_credential_dek",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260707110000_add_secret_retention_and_server_settings",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260717120000_add_requestlog_requestid",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260721180000_add_requestlog_auth_summary",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260722120000_add_requestlog_auth_decision",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260724000000_drop_requestlog_endpoint_fk",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260827200000_add_credential_keyed_lookup",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260916035422_add_endpoint_credential_type_active_index",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260923020356_split_per_endpoint_credentials_enablement",
+          "finished": true,
+          "rolled_back": false
+        },
+        {
+          "migration_name": "20260924000000_endpoint_name_case_insensitive",
+          "finished": true,
+          "rolled_back": false
+        }
+      ],
+      "extensions": [
+        {
+          "extname": "citext",
+          "extversion": "1.6"
+        },
+        {
+          "extname": "pg_trgm",
+          "extversion": "1.6"
+        },
+        {
+          "extname": "pgcrypto",
+          "extversion": "1.3"
+        },
+        {
+          "extname": "plpgsql",
+          "extversion": "1.0"
+        },
+        {
+          "extname": "uuid-ossp",
+          "extversion": "1.1"
+        }
+      ],
+      "finishedAt": "2026-09-29T01:09:18.031Z"
+    }
+  ],
+  "backendSummary": {
+    "inmemory": {
+      "cases": 77,
+      "passed": 23,
+      "behaviorFailed": 53,
+      "notApplicable": 1,
+      "setupFailed": 0,
+      "checksPassed": 227,
+      "checksFailed": 100
+    },
+    "prisma": {
+      "cases": 77,
+      "passed": 24,
+      "behaviorFailed": 53,
+      "notApplicable": 0,
+      "setupFailed": 0,
+      "checksPassed": 235,
+      "checksFailed": 95
+    }
+  },
+  "backendDifferences": [
+    {
+      "id": "CAS-Users-WIRE",
+      "mode": "plain concurrent HTTP",
+      "inmemory": "passed",
+      "postgresql": "behavior-failed",
+      "inmemoryFailedChecks": [],
+      "postgresqlFailedChecks": [
+        "exactly one write accepted",
+        "only one version increment"
+      ]
+    },
+    {
+      "id": "CAS-Groups-WIRE",
+      "mode": "plain concurrent HTTP",
+      "inmemory": "passed",
+      "postgresql": "behavior-failed",
+      "inmemoryFailedChecks": [],
+      "postgresqlFailedChecks": [
+        "exactly one write accepted",
+        "only one version increment"
+      ]
+    },
+    {
+      "id": "CAS-Devices-WIRE",
+      "mode": "plain concurrent HTTP",
+      "inmemory": "passed",
+      "postgresql": "behavior-failed",
+      "inmemoryFailedChecks": [],
+      "postgresqlFailedChecks": [
+        "exactly one write accepted",
+        "only one version increment"
+      ]
+    },
+    {
+      "id": "UNIQUE-BARRIER",
+      "mode": "HTTP + deterministic real-repository pre-create barrier",
+      "inmemory": "behavior-failed",
+      "postgresql": "passed",
+      "inmemoryFailedChecks": [
+        "one success one uniqueness conflict",
+        "one durable user"
+      ],
+      "postgresqlFailedChecks": []
+    },
+    {
+      "id": "GROUP-NATIVE-ROLLBACK",
+      "mode": "direct real repository; native duplicate-member constraint",
+      "inmemory": "behavior-failed",
+      "postgresql": "passed",
+      "inmemoryFailedChecks": [
+        "duplicate member rejected by repository",
+        "group scalar rolled back",
+        "membership rolled back",
+        "version rolled back"
+      ],
+      "postgresqlFailedChecks": []
+    },
+    {
+      "id": "GROUP-HTTP-FAULT",
+      "mode": "HTTP; explicitly injected persistence failure, real storage",
+      "inmemory": "behavior-failed",
+      "postgresql": "passed",
+      "inmemoryFailedChecks": [
+        "scalar unchanged",
+        "members unchanged",
+        "version unchanged"
+      ],
+      "postgresqlFailedChecks": []
+    },
+    {
+      "id": "ENDPOINT-CASCADE",
+      "mode": "HTTP + direct persisted orphan check",
+      "inmemory": "behavior-failed",
+      "postgresql": "passed",
+      "inmemoryFailedChecks": [
+        "User repository no orphan",
+        "Group repository no orphan",
+        "custom repository no orphan"
+      ],
+      "postgresqlFailedChecks": []
+    },
+    {
+      "id": "ENDPOINT-CACHE",
+      "mode": "two real service caches over same PostgreSQL; not two processes",
+      "inmemory": "not-applicable",
+      "postgresql": "behavior-failed",
+      "inmemoryFailedChecks": [],
+      "postgresqlFailedChecks": [
+        "other warmed service sees new setting"
+      ]
+    }
+  ],
+  "coverageBoundary": {
+    "fullConformanceClaim": false,
+    "plainWireRaces": "One observed race per resource/backend, not a probability estimate.",
+    "barrierRaces": "Both real repository calls are paused before actual persistence; storage is not mocked.",
+    "groupNativeFailure": "Real PostgreSQL duplicate-member constraint; InMemory has no corresponding constraint.",
+    "groupHttpFault": "Task-only PostgreSQL trigger raises inside actual persistence; InMemory throws at addMembers seam.",
+    "cache": "Two real EndpointService instances share PostgreSQL. Not a two-process or distributed-cache experiment.",
+    "notTested": [
+      "Customer/live estates",
+      "credential cascade and auth-method matrix",
+      "Bulk and /Me in this new dual-backend corpus",
+      "all filter grammar and all schema-characteristic permutations",
+      "multi-process cache invalidation",
+      "load/performance percentiles",
+      "production deployment, repair, or migration against an existing database"
+    ]
+  },
+  "harnessHashes": {
+    "build-evidence.cjs": "0aad6018c078b1f18d59c106aee633e55dc10ee526f5b19eb829c4edc1d8b0c3",
+    "check-safety.cjs": "dfe91fbf53180ee1016d7f67854e786fa92d4bb8f98013273aa0e6f76a34e3af",
+    "dual-backend.spec.cjs": "9ce04d6dbbaf8715000823ad50bbb85bdaf618674df16da748c54c40a01a2cc2",
+    "global-setup.cjs": "9961fe7c2f606dc2ebc1be2866c0a595cee6829bde50beab9eadc67d99114be0",
+    "jest.config.cjs": "270307f5519769017b9ea7e733b7dc205c1194c1c355759a50612a180fdfb460",
+    "run.cjs": "53379cedd7d87f4d4d1e9448649dbcf159f60b4e386d057ef32f04e59ae09e39",
+    "safety.cjs": "7c0bdc02d703be72e70088f7019072a1702c3b19d6b9a96757d6b649013d3efe"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "package": "P5",
+  "branch": "fix/scim-search-contract-20260928",
+  "sourceBase": "cb2e1bcb4ad31366ef972ac5a163e8aae0e0707e",
+  "sourceState": "Current-source implementation tested before local commit; sourceBase is not a claim of testing pristine baseline.",
+  "red": {
+    "dtoAndErrorUnits": {
+      "passed": 54,
+      "failed": 15
+    },
+    "http": {
+      "run": "598c934a6a5d816f",
+      "passed": 42,
+      "failed": 19,
+      "assertions": [
+        "Users and Groups RFC arrays: expected HTTP 200, received 400",
+        "Custom-resource RFC arrays: expected HTTP 200, received 500",
+        "Genuine invalid DTO: expected scalar string detail, received object/array"
+      ]
+    },
+    "bootstrapIsolation": {
+      "passed": 1,
+      "failed": 1,
+      "assertion": "Expected verified task-owned URL, received subsequently discovered unowned marker URL"
+    }
+  },
+  "green": {
+    "unitSuites": 10,
+    "unitTests": 354,
+    "httpSuitesPerBackend": 3,
+    "httpTestsPerBackend": 61,
+    "postgresRun": "c9cc727551f7d7fe",
+    "inmemoryFinalImportCheck": "47143f3f6508a260",
+    "postgresVersion": "17.8",
+    "replayedMigrations": 22,
+    "postgresCleanup": "Verified task-owned exact container ID removed",
+    "localLiveAssertions": 61,
+    "localApiCleanup": "Task-owned child process stopped",
+    "safetyNegativeControls": 4,
+    "safetyPositiveControls": 1,
+    "apiBuild": "passed",
+    "changedSourceLintErrors": 0,
+    "changedSourceLintWarningsBefore": 44,
+    "changedSourceLintWarningsAfter": 44,
+    "newFilesLint": "zero errors and warnings",
+    "renderedMermaidBlocks": 4,
+    "renderedThemes": [
+      "default",
+      "dark"
+    ],
+    "mermaidSecurityLevel": "strict",
+    "docFreshness": "26 docs passed",
+    "docContent": "passed"
+  },
+  "independentReview": {
+    "productBoundary": "No high-confidence product correctness finding",
+    "harnessFindings": [
+      {
+        "finding": "A later marker can override a previously verified URL",
+        "resolution": "Per-bootstrap ownership verification plus pinned database target that skips marker reads"
+      },
+      {
+        "finding": "Unix-socket readiness can precede PostgreSQL TCP readiness",
+        "resolution": "Explicit TCP pg_isready host followed by published-loopback identity verification"
+      }
+    ]
+  },
+  "unchanged": [
+    "Historical scim-fresh-20260925 evidence",
+    "Dependency manifests and lockfiles",
+    "Product versions",
+    "Web source",
+    "PATCH engines and parser",
+    "Query and capability internals",
+    "Sibling worktrees and shared databases",
+    "Cloud resources and deployments"
+  ],
+  "pendingConsolidation": [
+    "Product version and release metadata",
+    "Full applicable matrix and exact-tip CI",
+    "Full-parent-transcript reconciliation",
+    "Three pre-existing missing Session history links",
+    "Renderer detector sentinel 0.0.0 versus successfully rendered pinned Mermaid 11.15.0",
+    "Frozen tooling install audit notices: web 12 high and 3 moderate, root 2 moderate"
+  ]
+}

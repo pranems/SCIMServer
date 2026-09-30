@@ -22,12 +22,26 @@ import type {
 } from '../../../domain/models/user.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
 import { RepositoryError } from '../../../domain/errors/repository-error';
+import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
+import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
+import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
+import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 
 @Injectable()
 export class InMemoryUserRepository implements IUserRepository {
-  private readonly users: Map<string, UserRecord> = new Map();
+  private users: Map<string, UserRecord> = new Map();
 
-  async create(input: UserCreateInput): Promise<UserRecord> {
+  constructor(private readonly writes: InMemoryEndpointWriteGuard = new InMemoryEndpointWriteGuard()) {}
+
+  prepareEndpointDeletion(endpointId: string): EndpointDeletionStep {
+    return prepareMapRemoval(this.users, row => row.endpointId === endpointId, rows => { this.users = rows; });
+  }
+
+  async create(input: UserCreateInput, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<UserRecord> {
+    this.assertUniqueUserName(input.endpointId, input.userName);
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload(input), [...this.users.values()]
+      .filter((r) => r.endpointId === input.endpointId).map((r) => uniquenessPayload(r)));
     const now = new Date();
     const record: UserRecord = {
       id: randomUUID(),
@@ -43,6 +57,7 @@ export class InMemoryUserRepository implements IUserRepository {
       createdAt: now,
       updatedAt: now,
     };
+    this.writes.assertWritable(input.endpointId, profileRevision);
     this.users.set(record.id, record);
     return { ...record };
   }
@@ -87,11 +102,12 @@ export class InMemoryUserRepository implements IUserRepository {
     return results.map((u) => ({ ...u }));
   }
 
-  async update(id: string, data: UserUpdateInput): Promise<UserRecord> {
+  async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<UserRecord> {
     const existing = this.users.get(id);
-    if (!existing) {
-      throw new RepositoryError('NOT_FOUND', `User with id ${id} not found`);
-    }
+    assertWritePrecondition(existing, expectedVersion);
+    this.assertUniqueUserName(existing.endpointId, data.userName ?? existing.userName, id);
+    if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }), [...this.users.values()]
+      .filter((r) => r.id !== id && r.endpointId === existing.endpointId).map((r) => uniquenessPayload(r)));
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: UserRecord = {
       ...existing,
@@ -99,15 +115,26 @@ export class InMemoryUserRepository implements IUserRepository {
       version: (existing.version ?? 1) + 1,
       updatedAt: new Date(),
     };
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.users.set(id, updated);
     return { ...updated };
   }
 
-  async delete(id: string): Promise<void> {
-    if (!this.users.has(id)) {
-      throw new RepositoryError('NOT_FOUND', `User with id ${id} not found`);
-    }
+  async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
+    const existing = this.users.get(id);
+    assertWritePrecondition(existing, expectedVersion);
+    this.writes.assertWritable(existing.endpointId, profileRevision);
     this.users.delete(id);
+  }
+
+  private assertUniqueUserName(endpointId: string, userName: string, excludeId?: string): void {
+    const normalized = userName.toLowerCase();
+    for (const user of this.users.values()) {
+      if (user.id !== excludeId && user.endpointId === endpointId &&
+          user.userName.toLowerCase() === normalized) {
+        throw new RepositoryError('CONFLICT', 'User userName already exists in this endpoint.');
+      }
+    }
   }
 
   async findConflict(

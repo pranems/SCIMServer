@@ -1,0 +1,159 @@
+{
+  "method": "Unmodified historical utility source transpiled by installed TypeScript; relative constants import resolves pinned master. Enterprise URN common to all versions is explicitly selected. Every SHA verified ancestor of pinned source.",
+  "rows": [
+    {
+      "sha": "9d7be46ba86f53aa9cc6cee4ba64882b801c877a",
+      "ref": "9d7be46ba86f53aa9cc6cee4ba64882b801c877a",
+      "sourceFile": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "booleanCore": null,
+      "stringCore": {
+        "attribute": "contacts",
+        "filterAttribute": "type",
+        "filterOperator": "eq",
+        "filterValue": "work",
+        "subAttribute": "value"
+      },
+      "booleanExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[primary eq true].value"
+      },
+      "stringExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[type eq \"work\"].value"
+      }
+    },
+    {
+      "sha": "11020d759e36811faeb84d029b280022fb10ecec",
+      "ref": "99571dd83efe7accd92ab7dda966d27c6a691853^",
+      "sourceFile": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "booleanCore": null,
+      "stringCore": {
+        "attribute": "contacts",
+        "filterAttribute": "type",
+        "filterOperator": "eq",
+        "filterValue": "work",
+        "subAttribute": "value"
+      },
+      "booleanExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[primary eq true].value"
+      },
+      "stringExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[type eq \"work\"].value"
+      }
+    },
+    {
+      "sha": "99571dd83efe7accd92ab7dda966d27c6a691853",
+      "ref": "99571dd83efe7accd92ab7dda966d27c6a691853",
+      "sourceFile": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "booleanCore": null,
+      "stringCore": {
+        "attribute": "contacts",
+        "filterAttribute": "type",
+        "filterOperator": "eq",
+        "filterValue": "work",
+        "subAttribute": "value"
+      },
+      "booleanExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[primary eq true]",
+        "subAttribute": "value"
+      },
+      "stringExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "valuePath": {
+          "attribute": "contacts",
+          "filterAttribute": "type",
+          "filterOperator": "eq",
+          "filterValue": "work",
+          "subAttribute": "value"
+        }
+      }
+    },
+    {
+      "sha": "c10f9ea83822a50650c2b2867ceff9eeaa46c545",
+      "ref": "c10f9ea83822a50650c2b2867ceff9eeaa46c545",
+      "sourceFile": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "booleanCore": null,
+      "stringCore": {
+        "attribute": "contacts",
+        "filterAttribute": "type",
+        "filterOperator": "eq",
+        "filterValue": "work",
+        "subAttribute": "value"
+      },
+      "booleanExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[primary eq true]",
+        "subAttribute": "value"
+      },
+      "stringExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "valuePath": {
+          "attribute": "contacts",
+          "filterAttribute": "type",
+          "filterOperator": "eq",
+          "filterValue": "work",
+          "subAttribute": "value"
+        }
+      }
+    },
+    {
+      "sha": "bca4f6b46f584dfd3c233ec2956d610f9b7f47d3",
+      "ref": "bca4f6b46f584dfd3c233ec2956d610f9b7f47d3",
+      "sourceFile": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "booleanCore": null,
+      "stringCore": {
+        "attribute": "contacts",
+        "filterAttribute": "type",
+        "filterOperator": "eq",
+        "filterValue": "work",
+        "subAttribute": "value"
+      },
+      "booleanExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[primary eq true]",
+        "subAttribute": "value"
+      },
+      "stringExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "valuePath": {
+          "attribute": "contacts",
+          "filterAttribute": "type",
+          "filterOperator": "eq",
+          "filterValue": "work",
+          "subAttribute": "value"
+        }
+      }
+    },
+    {
+      "sha": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+      "ref": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+      "sourceFile": "api/src/modules/scim/utils/scim-patch-path.ts",
+      "booleanCore": null,
+      "stringCore": {
+        "attribute": "contacts",
+        "filterAttribute": "type",
+        "filterOperator": "eq",
+        "filterValue": "work",
+        "subAttribute": "value"
+      },
+      "booleanExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "attributePath": "contacts[primary eq true]",
+        "subAttribute": "value"
+      },
+      "stringExtension": {
+        "schemaUrn": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "valuePath": {
+          "attribute": "contacts",
+          "filterAttribute": "type",
+          "filterOperator": "eq",
+          "filterValue": "work",
+          "subAttribute": "value"
+        }
+      }
+    }
+  ]
+}

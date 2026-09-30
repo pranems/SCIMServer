@@ -1,0 +1,88 @@
+{
+  "date": "2026-09-28",
+  "sourceCommit": "ccde1d5d6b5129dd943c6e848989c668a0d00d7a",
+  "scope": "Plain-language report, standards coverage, and verification of recorded PostgreSQL/InMemory results",
+  "databaseEvidence": {
+    "summary": "postgres-20260928-expanded.summary.json",
+    "uniqueCasesPerBackend": 82,
+    "caseExecutions": 164,
+    "assertions": 771,
+    "setupFailures": 0,
+    "postgresqlVersion": "17.8",
+    "ownedDatabases": 3,
+    "migrationsAppliedPerDatabase": 22,
+    "exactContainerIdsIndependentlyConfirmedAbsent": 3,
+    "interpretation": "Expected-behavior failures remain open product defects; safe evidence collection is not a passing conformance suite."
+  },
+  "documentChecks": {
+    "manifestContent": "passed",
+    "manifestFreshness": "26 of 26 passed",
+    "focusedDocuments": 5,
+    "relativeFileLinksResolved": 110,
+    "internalSectionLinks": "all resolved",
+    "literalJsonExamplesParsed": 2,
+    "mermaidDiagramsParsed": 7,
+    "mermaidDiagramsRendered": 7,
+    "renderThemes": [
+      "default",
+      "dark"
+    ],
+    "securityLevel": "strict",
+    "mermaidVersion": "11.15.0",
+    "editorRendererParity": "Not established; existing detector still reports built-in version 0.0.0. Do not install that placeholder.",
+    "htmlArtifact": "test-results/docs-html/docs__SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.html",
+    "htmlInlineSvgCount": 7,
+    "htmlDiagramErrors": 0,
+    "gitDiffCheck": "passed",
+    "newDocumentEmDashes": 0,
+    "databaseHarnessSyntaxFilesPassed": 9,
+    "databaseSafetyNegativeControlsPassed": 3
+  },
+  "preferencePersistence": {
+    "copilotUserInstructions": "Existing user-level copilot-instructions.md updated",
+    "vscodeLocalAgentInstructions": "Existing user-profile plain-language.instructions.md updated, applyTo **",
+    "scope": "Supported Copilot CLI, Copilot Agent Host and VS Code Local agent sessions for this user, regardless of selected model",
+    "limitation": "Does not force unrelated tools, other operating-system accounts, disabled custom instructions, or already-running sessions to load the preference."
+  },
+  "standards": {
+    "base": [
+      "RFC 7642 background",
+      "RFC 7643 schema, types and characteristics",
+      "RFC 7644 protocol"
+    ],
+    "additionalApplicability": [
+      "RFC 9865 optional cursor pagination",
+      "RFC 9967 optional security events and asynchronous behavior",
+      "RFC 9110 conditional HTTP requests",
+      "RFC 8259 JSON",
+      "RFC 3986 URI syntax",
+      "RFC 4648 binary encoding",
+      "RFC 6750 authentication boundary only"
+    ],
+    "selectedErrataRecheckedAt": "2026-09-29T00:54:35.504Z",
+    "verifiedErrata": [
+      5607,
+      7916,
+      8096,
+      8365,
+      8415
+    ],
+    "heldForDocumentUpdate": [
+      8097
+    ],
+    "claimBoundary": "Relevant rules and characteristics are inventoried; neither full RFC conformance nor all input/setting combinations are claimed."
+  },
+  "toolingNotes": [
+    "HTML export first failed because the fresh worktree lacked browser tooling. Existing root/web dependency directories were reused through temporary verified junctions; both links were removed and the dependency sentinel was unchanged.",
+    "An independent cleanup-count check initially assumed the alias receipt used the same top-level array as the original receipt. The actual run object was read and all three exact container IDs and migration lists then verified successfully."
+  ],
+  "safety": {
+    "productSourceChanged": false,
+    "dependencyManifestsChanged": false,
+    "liveWrites": 0,
+    "deployments": 0,
+    "newCommits": 0,
+    "temporaryDocumentationToolingLinksRemoved": true,
+    "priorPreservedDocsCommitUnchanged": "e93d931085314daf558a3165fb0f02510e87a161"
+  }
+}

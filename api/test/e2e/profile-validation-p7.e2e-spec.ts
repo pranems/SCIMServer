@@ -1,0 +1,411 @@
+import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { createTestApp } from './helpers/app.helper';
+import { getAuthToken } from './helpers/auth.helper';
+import { randomUUID } from 'crypto';
+import type { Server } from 'node:http';
+import { recursiveReadOnlyAttribute, recursiveReadOnlyInput, recursiveReadOnlyExpected } from './helpers/profile-p7-readonly.fixture';
+import { effectiveCharacteristic, type SchemaAttribute } from './helpers/schema-characteristics.helper';
+import { commonContextProfile, SHARED_COMMON_SCHEMA, OTHER_COMMON_SCHEMA } from './helpers/profile-p7-common-context.fixture';
+
+const DIAG = 'urn:scimserver:api:messages:2.0:Diagnostics';
+const EXT = 'urn:example:params:scim:schemas:extension:p7:2.0:Test';
+interface WireBody extends Record<string, unknown> {
+  id: string;
+  Resources: { id: string; attributes: SchemaAttribute[] }[];
+  profile: {
+    schemas: { id: string; attributes: Record<string, unknown>[] }[];
+    settings: Record<string, unknown>;
+  };
+  meta: { resourceType: string; created: string; lastModified: string; location: string; version: string };
+  [EXT]: Record<string, unknown>;
+  [DIAG]: { attributePaths: string[] };
+}
+type WireResponse = Omit<request.Response, 'body'> & { body: WireBody };
+type WireTest = Omit<request.Test, 'then' | 'send' | 'query' | 'expect'> & PromiseLike<WireResponse> & {
+  send(body: object): WireTest;
+  query(query: Record<string, unknown>): WireTest;
+  expect(status: number | ((response: WireResponse) => void)): WireTest;
+};
+const shapes = [
+  ['text', 'string', 'bespoke'], ['flag', 'boolean', false], ['whole', 'integer', 27],
+  ['fraction', 'decimal', 1.25], ['encoded', 'binary', '+/8='],
+  ['link', 'reference', '../Users/123'], ['stamp', 'dateTime', '2024-02-29T12:00:00Z'],
+] as const;
+
+describe('P7 declaration and POST/PUT contracts', () => {
+  let app: INestApplication;
+  let token: string;
+  const endpoints: string[] = [];
+  const admin = (method: 'post' | 'patch' | 'get' | 'delete', path = '') =>
+    request(app.getHttpServer() as Server)[method](`/scim/admin/endpoints${path}`).set('Authorization', `Bearer ${token}`) as unknown as WireTest;
+  const scim = (method: 'post' | 'put' | 'get', path: string) =>
+    request(app.getHttpServer() as Server)[method](path).set('Authorization', `Bearer ${token}`).set('Content-Type', 'application/scim+json') as unknown as WireTest;
+  const error = (body: Record<string, unknown>, type: string) => {
+    expect(body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:Error');
+    expect(body.status).toBe('400');
+    expect(body.scimType).toBe(type);
+    expect(typeof body.detail).toBe('string');
+    for (const key of Object.keys(body)) expect(['schemas', 'status', 'scimType', 'detail', DIAG]).toContain(key);
+  };
+  beforeAll(async () => { app = await createTestApp(); token = await getAuthToken(app); });
+  afterAll(async () => {
+    for (const id of endpoints) await admin('delete', `/${id}`);
+    await app.close();
+  });
+
+  it.each([true, false])('honors common contract by resource binding without mutating a shared extension schema, strict=%s', async strict => {
+    const profile = commonContextProfile(strict);
+    const ep = await admin('post').send({ name: `p7-common-context-${randomUUID()}`, profile }).expect(201);
+    endpoints.push(ep.body.id);
+    expect(ep.body.profile.schemas[0].attributes).toEqual(profile.schemas[0].attributes);
+    const base = `/scim/endpoints/${ep.body.id}`;
+    const coreBody = { schemas: [SHARED_COMMON_SCHEMA], externalId: 'Client-AbC',
+      id: ['spoof'], meta: 'not-server-meta', displayName: [7, 9], active: 'custom' };
+    const created = await scim('post', `${base}/Shareds`).send(coreBody).expect(201);
+    expect(typeof created.body.id).toBe('string');
+    expect(created.body.id).not.toBe('spoof');
+    expect(created.body.meta).toMatchObject({ resourceType: 'Shared', location: expect.stringContaining(`/Shareds/${created.body.id}`) as unknown });
+    expect(created.body.externalId).toBe('Client-AbC');
+    expect(created.body.displayName).toEqual([7, 9]);
+    expect(created.body.active).toBe('custom');
+    for (const key of Object.keys(created.body)) expect(['schemas', 'id', 'meta', 'externalId', 'displayName', 'active']).toContain(key);
+    for (const key of Object.keys(created.body.meta)) expect(['resourceType', 'created', 'lastModified', 'location', 'version']).toContain(key);
+    const replaced = await scim('put', `${base}/Shareds/${created.body.id}`)
+      .send({ ...coreBody, id: { bad: true }, meta: [1, 2], externalId: 'Client-New' }).expect(200);
+    expect(replaced.body.id).toBe(created.body.id);
+    expect(replaced.body.meta.created).toBe(created.body.meta.created);
+    expect(replaced.body.externalId).toBe('Client-New');
+    const rejected = await scim('put', `${base}/Shareds/${created.body.id}`).send({ ...coreBody, externalId: [7] }).expect(400);
+    error(rejected.body, 'invalidValue');
+    expect((await scim('get', `${base}/Shareds/${created.body.id}`).expect(200)).body).toEqual(replaced.body);
+    const independent = { externalId: [11, 13], id: [17, 19], meta: 'independent', displayName: [23], active: 'ext' };
+    const extBody = { schemas: [OTHER_COMMON_SCHEMA, SHARED_COMMON_SCHEMA], label: 'other', [SHARED_COMMON_SCHEMA]: independent };
+    const extCreated = await scim('post', `${base}/Others`).send(extBody).expect(201);
+    expect(extCreated.body[SHARED_COMMON_SCHEMA]).toEqual(independent);
+    for (const key of Object.keys(extCreated.body)) expect(['schemas', 'id', 'meta', 'label', SHARED_COMMON_SCHEMA]).toContain(key);
+    const extPut = await scim('put', `${base}/Others/${extCreated.body.id}`).send(extBody).expect(200);
+    expect(extPut.body[SHARED_COMMON_SCHEMA]).toEqual(independent);
+    expect((await admin('get', `/${ep.body.id}`).expect(200)).body.profile.schemas[0].attributes).toEqual(profile.schemas[0].attributes);
+  });
+
+  it.each([true, false])('ignores id/meta without custom-core declarations, strict=%s', async strict => {
+    const core = 'urn:example:core:2.0:UnlistedCommon';
+    const ep = await admin('post').send({ name: `p7-unlisted-common-${randomUUID()}`, profile: {
+      schemas: [{ id: core, name: 'Unlisted', attributes: [{ name: 'label', type: 'string' }] }],
+      resourceTypes: [{ id: 'Unlisted', name: 'Unlisted', endpoint: '/Unlisteds', schema: core, schemaExtensions: [] }],
+      settings: { StrictSchemaValidation: strict },
+    } }).expect(201);
+    endpoints.push(ep.body.id);
+    const route = `/scim/endpoints/${ep.body.id}/Unlisteds`;
+    const created = await scim('post', route).send({ schemas: [core], label: 'ok', ID: [42], META: 'spoof' }).expect(201);
+    expect(created.body.ID).toBeUndefined();
+    expect(created.body.META).toBeUndefined();
+    expect(created.body.meta.resourceType).toBe('Unlisted');
+    expect(typeof created.body.id).toBe('string');
+    const replaced = await scim('put', `${route}/${created.body.id}`)
+      .send({ schemas: [core], label: 'new', ID: { fake: true }, META: 42 }).expect(200);
+    expect(replaced.body.ID).toBeUndefined();
+    expect(replaced.body.META).toBeUndefined();
+    expect(replaced.body.id).toBe(created.body.id);
+    expect(replaced.body.meta.created).toBe(created.body.meta.created);
+  });
+
+  it('keeps custom-core displayName and active schema-driven while enforcing common externalId', async () => {
+    const core = 'urn:example:core:2.0:P7Flexible';
+    const createdEndpoint = await admin('post').send({ name: `p7-flexible-${randomUUID()}`, profile: {
+      schemas: [{ id: core, name: 'Flexible', attributes: [
+        { name: 'displayName', type: 'integer', multiValued: true },
+        { name: 'active', type: 'string' }, { name: 'externalId' },
+      ] }],
+      resourceTypes: [{ id: 'Flexible', name: 'Flexible', endpoint: '/Flexibles', schema: core, schemaExtensions: [] }],
+      settings: { StrictSchemaValidation: true, AllowAndCoerceBooleanStrings: true },
+    } }).expect(201);
+    endpoints.push(createdEndpoint.body.id);
+    const route = `/scim/endpoints/${createdEndpoint.body.id}/Flexibles`;
+    const input = { schemas: [core], displayName: [17, 23], active: 'custom-state', externalId: 'Client-AbC' };
+    const created = await scim('post', route).send(input).expect(201);
+    expect(created.body).toMatchObject(input);
+    const replaced = await scim('put', `${route}/${created.body.id}`).send(input).expect(200);
+    expect(replaced.body).toMatchObject(input);
+    const invalid = await scim('put', `${route}/${created.body.id}`).send({ ...input, externalId: [17] }).expect(400);
+    error(invalid.body, 'invalidValue');
+    expect((await scim('get', `${route}/${created.body.id}`).expect(200)).body).toEqual(replaced.body);
+  });
+
+  it.each([{ type: 'typo' }, { multiValued: 'false' }, { mutability: 'Readonly' }, { uniqueness: 'global' }])(
+    'admin rejects invalid declaration %j on create and update without changing saved profile', async override => {
+      const created = await admin('post').send({ name: `p7-${randomUUID()}`, profilePreset: 'rfc-standard' }).expect(201);
+      endpoints.push(created.body.id);
+      const before = (await admin('get', `/${created.body.id}`).expect(200)).body;
+      const profile = structuredClone(before.profile);
+      profile.schemas[0].attributes.push({ name: 'sample', ...override });
+      const rejectedCreate = await admin('post').send({ name: `p7-invalid-${randomUUID()}`, profile });
+      expect(rejectedCreate.status).toBe(400);
+      const rejectedUpdate = await admin('patch', `/${created.body.id}`).send({ profile });
+      expect(rejectedUpdate.status).toBe(400);
+      const after = (await admin('get', `/${created.body.id}`).expect(200)).body;
+      expect(after.profile).toEqual(before.profile);
+      expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+  for (const resource of ['User', 'Group', 'Widget']) {
+    const core = resource === 'Widget'
+      ? 'urn:example:params:scim:schemas:core:2.0:Widget'
+      : `urn:ietf:params:scim:schemas:core:2.0:${resource}`;
+    const primary = resource === 'User' ? 'userName' : 'displayName';
+    const attrs = [
+      recursiveReadOnlyAttribute(),
+      ...shapes.flatMap(([name, type]) => [
+        { name, type, multiValued: false }, { name: `${name}List`, type, multiValued: true },
+      ]),
+      { name: 'suggested', type: 'string', canonicalValues: ['work'], caseExact: true },
+      { name: 'serverOwned', type: 'integer', mutability: 'readOnly' },
+      { name: 'fixed', type: 'string', mutability: 'immutable' },
+      { name: 'hidden', type: 'string', returned: 'never' },
+      { name: 'secret', type: 'string', mutability: 'writeOnly', returned: 'never' },
+      { name: 'asked', type: 'string', returned: 'request' },
+      { name: 'parent', type: 'complex', subAttributes: [{ name: 'fixed', type: 'string', mutability: 'immutable' }] },
+      { name: 'lockedContacts', type: 'complex', multiValued: true, subAttributes: [
+        { name: 'value', type: 'string' }, { name: 'primary', type: 'boolean' },
+      ] },
+      { name: 'children', type: 'complex', multiValued: true, subAttributes: [
+        { name: 'value', type: 'string', required: true }, { name: 'labels', type: 'string', multiValued: true },
+        { name: 'serverOwned', type: 'integer', mutability: 'readOnly', required: true },
+      ] },
+    ];
+    for (const strict of [true, false]) {
+      describe(`${resource} strict=${strict}`, () => {
+        let base: string;
+        let endpointId: string;
+        beforeAll(async () => {
+          const response = await admin('post').send({ name: `p7-${resource}-${randomUUID()}`, profile: {
+            schemas: [
+              { id: core, name: resource, attributes: [{ name: primary, type: 'string', required: true }, { name: 'externalId' }, ...attrs] },
+              { id: EXT, name: 'P7Extension', attributes: [{ name: 'requiredValue', type: 'string', required: true },
+                { name: 'externalId', type: 'integer', multiValued: true }, ...attrs] },
+            ],
+            resourceTypes: [{ id: resource, name: resource, description: 'P7', endpoint: `/${resource}s`, schema: core,
+              schemaExtensions: [{ schema: EXT, required: true }] }],
+            settings: { StrictSchemaValidation: strict, AllowAndCoerceBooleanStrings: false, RfcCompliantSubAttributes: false },
+            serviceProviderConfig: { etag: { supported: true } },
+          } }).expect(201);
+          endpoints.push(response.body.id);
+          endpointId = response.body.id;
+          base = `/scim/endpoints/${response.body.id}/${resource}s`;
+        });
+        const body = () => ({
+          schemas: [core, EXT], [primary]: `p7-${randomUUID()}`, [EXT]: { requiredValue: 'present' },
+        });
+
+        it.each([42, false, ['client'], { value: 'client' }])('rejects non-string top-level externalId %j atomically regardless of strict mode', async externalId => {
+          const input = { ...body(), externalId: 'Client-AbC' };
+          const created = await scim('post', base).send(input).expect(201);
+          const before = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
+          const post = await scim('post', base).send({ ...body(), externalId }).expect(400);
+          error(post.body, 'invalidValue');
+          const put = await scim('put', `${base}/${created.body.id}`).send({ ...input, externalId }).expect(400);
+          error(put.body, 'invalidValue');
+          expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(before);
+        });
+
+        it('preserves externalId case, permits client-scoped duplicates and allows replacement', async () => {
+          const input = { ...body(), externalId: 'Client-AbC', [EXT]: { requiredValue: 'present', externalId: [7, 9] } };
+          const first = await scim('post', base).send(input).expect(201);
+          const second = await scim('post', base).send({ ...body(), externalId: 'Client-AbC' }).expect(201);
+          expect(first.body.externalId).toBe('Client-AbC');
+          expect(first.body[EXT].externalId).toEqual([7, 9]);
+          expect(second.body.externalId).toBe('Client-AbC');
+          const changed = await scim('put', `${base}/${first.body.id}`).send({ ...input, externalId: 'Client-aBc' }).expect(200);
+          expect(changed.body.externalId).toBe('Client-aBc');
+          expect(changed.body[EXT].externalId).toEqual([7, 9]);
+          const schemas = await scim('get', `/scim/endpoints/${endpointId}/Schemas`).expect(200);
+          const published = schemas.body.Resources.find(schema => schema.id === core)?.attributes
+            .find(attribute => attribute.name?.toLowerCase() === 'externalid');
+          expect(published).toBeDefined();
+          expect(effectiveCharacteristic(published, 'type')).toBe('string');
+          expect(effectiveCharacteristic(published, 'multiValued')).toBe(false);
+          expect(effectiveCharacteristic(published, 'caseExact')).toBe(true);
+          expect(effectiveCharacteristic(published, 'mutability')).toBe('readWrite');
+        });
+
+        it('rejects conflicting common externalId profile updates before saving', async () => {
+          const before = (await admin('get', `/${endpointId}`).expect(200)).body;
+          for (const override of [{ type: 'integer' }, { multiValued: true }, { caseExact: false }, { mutability: 'readOnly' }]) {
+            const profile = structuredClone(before.profile);
+            const declaration = profile.schemas.find(schema => schema.id === core)?.attributes
+              .find(attribute => typeof attribute.name === 'string' && attribute.name.toLowerCase() === 'externalid');
+            if (!declaration) throw new Error('Expected common externalId in the published core schema.');
+            Object.assign(declaration, override);
+            await admin('patch', `/${endpointId}`).send({ profile }).expect(400);
+            const after = (await admin('get', `/${endpointId}`).expect(200)).body;
+            expect(after.profile).toEqual(before.profile);
+            expect(after.updatedAt).toBe(before.updatedAt);
+          }
+        });
+
+        it('requires extension binding even when omitted from schemas and resource body', async () => {
+          const input = { schemas: [core], [primary]: `p7-${randomUUID()}` };
+          const rejected = await scim('post', base).send(input).expect(400);
+          error(rejected.body, 'invalidValue');
+          expect(rejected.body[DIAG].attributePaths).toContain(EXT);
+          const listed = await scim('get', base).query({ filter: `${primary} eq "${String(input[primary])}"` }).expect(200);
+          expect(listed.body.totalResults).toBe(0);
+        });
+
+        it('ignores malformed readOnly data before type/required checks, on POST and PUT', async () => {
+          const input = { ...body(), serverOwned: { bad: true },
+            children: [{ value: 'child', labels: ['one'], serverOwned: 'not an integer' }],
+            [EXT]: { requiredValue: 'present', serverOwned: [] },
+          };
+          const created = await scim('post', base).send(input).expect(res => {
+            expect({ status: res.status, error: res.status >= 400 ? res.body : undefined }).toEqual({ status: 201 });
+          });
+          expect(created.body.serverOwned).toBeUndefined();
+          expect(created.body.children).toEqual([{ value: 'child', labels: ['one'] }]);
+          expect(created.body[EXT]).toEqual({ requiredValue: 'present' });
+          const replaced = await scim('put', `${base}/${created.body.id}`).send(input).expect(200);
+          expect(replaced.body.children).toEqual(created.body.children);
+        });
+
+          it('recursively ignores readOnly input on POST and PUT in nested-complex compatibility mode', async () => {
+            const input = { ...body(), nested: recursiveReadOnlyInput(),
+              [EXT]: { requiredValue: 'present', nested: recursiveReadOnlyInput([]) } };
+            const created = await scim('post', base).send(input).expect(201);
+            expect(created.body.nested).toEqual(recursiveReadOnlyExpected());
+            expect(created.body[EXT].nested).toEqual(recursiveReadOnlyExpected());
+            const replaced = await scim('put', `${base}/${created.body.id}`).send(input).expect(200);
+            expect(replaced.body.nested).toEqual(recursiveReadOnlyExpected());
+            expect(replaced.body[EXT].nested).toEqual(recursiveReadOnlyExpected());
+            const read = await scim('get', `${base}/${created.body.id}`).expect(200);
+            expect(read.body.nested).toEqual(recursiveReadOnlyExpected());
+            expect(read.body[EXT].nested).toEqual(recursiveReadOnlyExpected());
+            if (strict) {
+              const bad = structuredClone(input);
+              delete (bad.nested.records[0].details[0] as { open?: string }).open;
+              const rejected = await scim('put', `${base}/${created.body.id}`).send(bad).expect(400);
+              error(rejected.body, 'invalidValue');
+              expect(rejected.body[DIAG].attributePaths).toContain('nested.records[0].details[0].open');
+              expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(read.body);
+            }
+          });
+
+          it('retains deep server-owned values on PUT after a profile changes them to readOnly', async () => {
+            const originalProfile = (await admin('get', `/${endpointId}`).expect(200)).body.profile;
+            const seedProfile = structuredClone(originalProfile);
+            for (const schema of seedProfile.schemas) {
+              schema.attributes = schema.attributes.map(a =>
+                a.name === 'nested' ? recursiveReadOnlyAttribute('readWrite') : a);
+            }
+            let id: string;
+            try {
+              await admin('patch', `/${endpointId}`).send({ profile: seedProfile }).expect(200);
+              const seed = { ...body(), nested: recursiveReadOnlyInput(7),
+                [EXT]: { requiredValue: 'present', nested: recursiveReadOnlyInput(9) } };
+              id = (await scim('post', base).send(seed).expect(201)).body.id;
+            } finally {
+              await admin('patch', `/${endpointId}`).send({ profile: originalProfile }).expect(200);
+            }
+            const replaced = await scim('put', `${base}/${id}`).send({ ...body(), nested: recursiveReadOnlyInput(false),
+              [EXT]: { requiredValue: 'present', nested: recursiveReadOnlyInput({ wrong: true }) } }).expect(200);
+            expect(replaced.body.nested).toEqual(recursiveReadOnlyInput(7));
+            expect(replaced.body[EXT].nested).toEqual(recursiveReadOnlyInput(9));
+          });
+        it('preserves immutable state on omitted PUT input or rejects the replacement without mutation', async () => {
+          const input = { ...body(), fixed: 'first', [EXT]: { requiredValue: 'present', fixed: 'ext-first' } };
+          const created = await scim('post', base).send(input).expect(201);
+          const before = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
+          const replacement = await scim('put', `${base}/${created.body.id}`).send(body());
+          // This implementation chooses preservation for omitted immutable values.
+          expect(replacement.status).toBe(200);
+          expect(replacement.body.fixed).toBe('first');
+          expect(replacement.body[EXT].fixed).toBe('ext-first');
+          const changed = await scim('put', `${base}/${created.body.id}`).send({ ...input, fixed: 'second' }).expect(400);
+          error(changed.body, 'mutability');
+          const after = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
+          expect(after.fixed).toBe(before.fixed);
+          expect(after[EXT].fixed).toBe(before[EXT].fixed);
+          expect(after.meta.version).toBe(replacement.body.meta.version);
+        });
+
+        it('rejects explicit null clearing a parent with assigned immutable children', async () => {
+          const input = { ...body(), parent: { fixed: 'nested' } };
+          const created = await scim('post', base).send(input).expect(201);
+          const before = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
+          const rejected = await scim('put', `${base}/${created.body.id}`).send({ ...input, parent: null }).expect(400);
+          error(rejected.body, 'mutability');
+          expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(before);
+        });
+
+        it('does not normalize retained readOnly data on unrelated PUT', async () => {
+          await admin('patch', `/${endpointId}`).send({ profile: { settings: { PrimaryEnforcement: 'passthrough' } } }).expect(200);
+          const contacts = [{ value: 'a', primary: true }, { value: 'b', primary: true }];
+          const created = await scim('post', base).send({ ...body(), lockedContacts: contacts }).expect(201);
+          const beforeProfile = (await admin('get', `/${endpointId}`).expect(200)).body.profile;
+          const updatedProfile = structuredClone(beforeProfile);
+          const lockedContacts = updatedProfile.schemas.find(schema => schema.id === core)?.attributes
+            .find(attr => attr.name === 'lockedContacts');
+          if (!lockedContacts) throw new Error('Expected lockedContacts in the published core schema.');
+          lockedContacts.mutability = 'readOnly';
+          updatedProfile.settings.PrimaryEnforcement = 'normalize';
+          try {
+            await admin('patch', `/${endpointId}`).send({ profile: updatedProfile }).expect(200);
+            const replaced = await scim('put', `${base}/${created.body.id}`).send(body()).expect(200);
+            expect(replaced.body.lockedContacts).toEqual(contacts);
+            updatedProfile.settings.PrimaryEnforcement = 'reject';
+            await admin('patch', `/${endpointId}`).send({ profile: updatedProfile }).expect(200);
+            const again = await scim('put', `${base}/${created.body.id}`).send(body()).expect(200);
+            expect(again.body.lockedContacts).toEqual(contacts);
+          } finally {
+            await admin('patch', `/${endpointId}`).send({ profile: beforeProfile }).expect(200);
+          }
+        });
+
+        it('stores valid scalar/list/complex shapes and projects returned characteristics', async () => {
+          const values = Object.fromEntries<unknown>(shapes.flatMap(([name, , value]): [string, unknown][] =>
+            [[name, value], [`${name}List`, [value]]]));
+          const input = { ...body(), ...values, suggested: 'bespoke', hidden: 'never', secret: 'write-only', asked: 'on-request',
+            children: [{ value: 'child', labels: ['a', 'b'] }],
+            [EXT]: { requiredValue: 'present', ...values, suggested: 'bespoke', hidden: 'ext-never', secret: 'ext-secret' },
+          };
+          const created = await scim('post', base).send(input).expect(201);
+          expect(created.body).toMatchObject(values);
+          expect(created.body[EXT]).toMatchObject(values);
+          expect(created.body.hidden).toBeUndefined();
+          expect(created.body.secret).toBeUndefined();
+          expect(created.body[EXT].hidden).toBeUndefined();
+          expect(created.body[EXT].secret).toBeUndefined();
+          expect(created.body.asked).toBe('on-request');
+          const read = await scim('get', `${base}/${created.body.id}`).expect(200);
+          expect(read.body.asked).toBeUndefined();
+          const selected = await scim('get', `${base}/${created.body.id}`).query({ attributes: 'asked,hidden,secret' }).expect(200);
+          expect(selected.body.asked).toBe('on-request');
+          expect(selected.body.hidden).toBeUndefined();
+          expect(selected.body.secret).toBeUndefined();
+          for (const key of Object.keys(read.body)) expect(['schemas', 'id', 'meta', primary, 'active', 'externalId', 'members',
+            'suggested', 'children', EXT, ...Object.keys(values)]).toContain(key);
+        });
+
+        if (strict) {
+          it.each([
+            ['stamp', '2023-02-29T00:00:00Z'], ['encoded', 'invalid!'], ['link', 'https://exa mple.test'],
+            ['wholeList', [1.25]], ['children', [{ value: 'ok', labels: 'bad' }]],
+          ])('rejects bad %s on POST/PUT with stored snapshot and version unchanged', async (key, invalid) => {
+            const input = body();
+            const created = await scim('post', base).send(input).expect(201);
+            const before = (await scim('get', `${base}/${created.body.id}`).expect(200)).body;
+            for (const extension of [false, true]) {
+              const bad = extension ? { ...input, [EXT]: { requiredValue: 'present', [key]: invalid } }
+                : { ...input, [key]: invalid };
+              const rejected = await scim('put', `${base}/${created.body.id}`).send(bad).expect(400);
+              error(rejected.body, key === 'children' ? 'invalidSyntax' : 'invalidValue');
+              expect((await scim('get', `${base}/${created.body.id}`).expect(200)).body).toEqual(before);
+              const post = await scim('post', base).send({ ...bad, [primary]: `bad-${randomUUID()}` }).expect(400);
+              error(post.body, key === 'children' ? 'invalidSyntax' : 'invalidValue');
+            }
+          });
+        }
+      });
+    }
+  }
+});

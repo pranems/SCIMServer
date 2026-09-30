@@ -404,7 +404,7 @@ flowchart TD
 2. **AsyncLocalStorage**: Per-request endpoint context stored in Node.js ALS (zero-overhead thread-local)
 3. **Database WHERE clause**: Every repository query includes `endpointId` filter
 4. **Composite unique indexes**: userName uniqueness is per-endpoint, not global
-5. **Cascade delete**: Deleting an endpoint cascades to all its resources, logs, and credentials
+5. **Cascade delete**: Deleting an endpoint removes its resources, membership rows and credentials. RequestLog is retained without an endpoint FK. [P8b](SCIM_ENDPOINT_DELETION_IMPLEMENTATION.md) adds atomic InMemory cleanup and late-write protection; PostgreSQL remains FK-backed.
 6. **In-memory cache**: EndpointService maintains a Map by ID and by name for fast lookups
 
 ---

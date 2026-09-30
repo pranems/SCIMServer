@@ -18,4 +18,12 @@ describe('E2E test database URL resolution', () => {
     expect(resolveTestDatabaseUrl('', fallback)).toBe(fallback);
     expect(resolveTestDatabaseUrl('not-a-database-url', fallback)).toBe(fallback);
   });
+
+  it('pins an owned URL even if a competing database marker appears later', () => {
+    const resolvePinned: (marker: string | undefined, fallback: string, pinned?: string) => string =
+      resolveTestDatabaseUrl;
+    const pinned = 'postgresql://127.0.0.1:1/owned';
+    expect(resolvePinned('postgresql://127.0.0.1:5432/not_owned', fallback, pinned)).toBe(pinned);
+    expect(resolvePinned(undefined, fallback, pinned)).toBe(pinned);
+  });
 });

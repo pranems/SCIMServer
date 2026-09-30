@@ -1,0 +1,77 @@
+{
+  "scope": "Authoritative parent matcher/path reconciliation and expanded retained-entry cases, not final C0",
+  "sourceCommit": "89810f0cb7c8083849adbc95842435c189cbaa1c",
+  "prerequisiteSource": "df3ca95773eae65938e07d136c1f199b28746863",
+  "integrationCommit": "e38b36aaf9ee50687b3ad576150de57ee8e83b4f",
+  "sourceSha256": "f9671cd7041a70024c08b3b47cf35fdf0feff9eebd2c062116fc0431ce168f73",
+  "fingerprintMethod": "Sorted tracked/nonignored api/src, api/test and scripts path plus bytes",
+  "canonicalImplementation": "api/src/domain/retained-entries.ts",
+  "compatibilityOnly": "api/src/domain/attribute-values.ts",
+  "originalPatchAndPutConsumerImportsRestored": true,
+  "parentMatcherUnchanged": true,
+  "parallelSourceReplayed": false,
+  "priorCommittedWorkPreserved": "Existing nested traversal, common/query/policy fixes, tests and history were not silently reverted",
+  "causality": {
+    "originalGreedyBug": "An omitted/changed type consumed a stored entry needed by a later explicit type",
+    "reservationGuards": "Stable equal-type distribution and null/absent-type treatment guard hazards introduced by reservation; not two extra independently reproduced b21 defects"
+  },
+  "build": "passed",
+  "unit": {
+    "suites": 8,
+    "passed": 428,
+    "failed": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1,
+    "rulesRelaxed": false
+  },
+  "http": {
+    "suites": 6,
+    "inmemory": {
+      "passed": 305,
+      "failed": 0,
+      "nativeOnlySkipped": 1
+    },
+    "postgresql": {
+      "passed": 306,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "actualVersion": "17.8",
+      "migrationsReplayedAndVerified": 22
+    }
+  },
+  "builtLive": {
+    "artifact": "Separate local node api/dist/main.js processes, not immutable published images",
+    "mainChecksPerBackend": 164,
+    "failed": 0,
+    "section": "9z-DA",
+    "parentRetainedCasesPerBackend": 84,
+    "parentRetainedAssertionsPerBackend": 1764,
+    "priorAdditionalCorpusPreserved": "9z-DD remains6 cases/5474 assertions",
+    "ownedRuntimesStopped": true,
+    "endpointInventoriesUnchanged": true
+  },
+  "ownership": {
+    "postgresRun": "20afca65cdf6033e",
+    "freshLoopbackTmpfsIdentityVerified": true,
+    "pinnedBootstrap": true,
+    "inheritedDatabaseUrlUsed": false,
+    "exactOwnedContainerRemoved": true
+  },
+  "sourceReceiptUnchanged": "scim-retained-put-20260929/type-reservation.json",
+  "documentation": {
+    "contentAndWorkingTreeFreshnessPassed": 26,
+    "committedRangeCoupling": "Run after final documentation commit; final handoff records result",
+    "literalJsonBlocksParsed": 30,
+    "newRelativeLinksResolved": 4,
+    "diagramEdits": 0,
+    "originalCaseLedgerUnchanged": true
+  },
+  "priorParallelHistory": "414e14e8 was already integrated before the later ownership note; this increment does not replay it or create a second matcher",
+  "finalMatrix": false,
+  "publication": false,
+  "deployment": false,
+  "versionOrLockfileChanges": false
+}

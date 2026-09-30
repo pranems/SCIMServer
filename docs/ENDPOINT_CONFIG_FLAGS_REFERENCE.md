@@ -1,10 +1,10 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-18 - **Product version:** `0.55.35`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
 
-> **Version:** 0.55.35 - **Updated:** September 18, 2026
+> **Version:** 0.55.36 - **Updated:** September 29, 2026
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)
-> 38 flags: 21 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 string-valued (`logLevel`, the tri-state `PrimaryEnforcement`, and the two-value `CredentialSecretVisibility`). Counted from `ENDPOINT_CONFIG_FLAGS_DEFINITIONS`, which is the single source of truth.
+> 37 registered settings: 20 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 other typed values. `PersistRequestSecrets` is inert and `CredentialSecretVisibility` supports only `always`. See the [behavioral evidence and explicit coverage gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) and [Entra compatibility guide](SCIM_ENTRA_COMPATIBILITY.md). Registry membership is not evidence of enforcement.
 > 6 value types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
 >
 > **Authentication ownership:** Flat authentication flags are compatibility inputs. An explicit `profile.authentication.methods[]` entry has higher precedence. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for desired/effective provenance and migration rules.
@@ -138,12 +138,12 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 17 | [`SecretTokenBearerAuthEnabled`](#per-method-auth-enablement-flags) | boolean | `false` | Authentication |
 | 18 | [`OAuthClientCredentialsAuthEnabled`](#per-method-auth-enablement-flags) | boolean | `false` | Authentication |
 | 19 | [`SharedSecretBearerAuthEnabled`](#per-method-auth-enablement-flags) | boolean | `true` | Authentication |
-| 20 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | enum (`always`/`once`) | `always` | Authentication |
+| 20 | [`CredentialSecretVisibility`](#credentialsecretvisibility) | fixed `always`; `once` rejected | `always` | Authentication |
 | 21 | [`EnforceResourceTypes`](#enforceresourcetypes) | boolean | `true` | Resource Types |
 | 22 | [`JwksFetchTimeoutMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 5000) | Runtime egress |
 | 23 | [`JwksFetchRetries`](#runtime-egress-wif-jwks-fetch) | number | (server: 2) | Runtime egress |
 | 24 | [`JwksFetchRetryBackoffMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 200) | Runtime egress |
-| 25 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 600000) | Runtime egress |
+| 25 | [`JwksCacheMaxAgeMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 86400000) | Runtime egress |
 | 26 | [`JwksTotalDeadlineMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 10000) | Runtime egress |
 | 27 | [`JwksMaxResponseBytes`](#runtime-egress-wif-jwks-fetch) | number | (server: 1048576) | Runtime egress |
 | 28 | [`JwksMaxKeys`](#runtime-egress-wif-jwks-fetch) | number | (server: 100) | Runtime egress |
@@ -151,20 +151,19 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 30 | [`JwksRefreshIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 3600000) | Runtime egress |
 | 31 | [`JwksUnknownKidMinIntervalMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 300000) | Runtime egress |
 | 32 | [`JwksStaleIfErrorMs`](#runtime-egress-wif-jwks-fetch) | number | (server: 172800000) | Runtime egress |
-| 33 | [`PersistRequestSecrets`](#persistrequestsecrets) | boolean | (server: `true`) | Logging & privacy |
+| 33 | [`PersistRequestSecrets`](#persistrequestsecrets) | inert boolean | effective `false` | Logging & privacy |
 | 34 | [`RfcCompliantSubAttributes`](#rfccompliantsubattributes) | boolean | `false` | Validation |
+| 35 | `MaxActiveBearerCredentials` | number | `5` | Active bearer credential cap |
+| 36 | `MaxActiveOAuthClientCredentials` | number | `5` | Active OAuth credential cap |
+| 37 | `MaxActiveWifTrusts` | number | `10` | Active WIF trust cap |
 
 ### CredentialSecretVisibility
 
-Controls whether a per-endpoint credential secret is
-retained (encrypted at rest, re-viewable by an admin) or shown exactly once at
-creation. Enum `always` (default) or `once`. The **server-scope** setting is the
-ceiling: most-restrictive-wins, so a server value of `once` forces `once` on
-every endpoint regardless of the endpoint value. When the effective value is
-`always`, a freshly-created secret is encrypted in its storage envelope and
-stored on the credential; when it is `once`, no ciphertext is retained (and a
-flip to `once` purges any retained ciphertext). The retained envelope is NEVER
-exposed on any response; reveal is a separate admin-only, audit-logged endpoint
+Supports **`always` only**. New `once` values are rejected, and effective
+resolution remains `always` for legacy values. Freshly created secrets are
+retained encrypted for authenticated admin reveal; this does not permit
+secrets in RequestLog. The retained envelope is NEVER
+exposed on any response; reveal is a separate admin-only, audit-logged endpoint.
 Pre-feature credentials are bcrypt-only and cannot be retro-revealed.
 
 ### WifCredentialsEnabled
@@ -477,23 +476,15 @@ Coverage: unit (`admin-credential.controller.spec.ts`), E2E
 
 ### PersistRequestSecrets
 
-Governs **request-log privacy** for this endpoint. When `true` (the **default**,
-inherited from the server-level `PERSIST_REQUEST_SECRETS` env when unset here),
-the RequestLog stores AND displays (in the admin API + UI) the **complete**
-request/response for this endpoint - headers and body, secrets included - for
-fast, complete RCA. When `false`, secret-bearing header and body values
+Retained for configuration compatibility; **it cannot disable redaction**.
+Regardless of the endpoint value or former server environment setting,
+secret-bearing header and body values
 (`Authorization`, `Cookie`, `client_secret`, `client_assertion`, `password`,
 `access_token`, ...) are redacted to `[REDACTED]` **before the row is persisted**
 (and therefore before it is shown anywhere).
 
-Precedence: the endpoint value **overrides** the server default
-(`endpoint ?? server-env ?? true`). The server default is the env var
-`PERSIST_REQUEST_SECRETS` (default `true`; set to `false` to redact by default
-across all endpoints).
-
-Independent of this flag, the shipped **console/file structured logs always
-redact** secrets (defense in depth for log aggregation) - the RequestLog is the
-deliberate full-fidelity RCA surface this flag governs.
+The effective value is always false. **Console/file structured logs also
+redact** secrets. Non-secret diagnostics remain available for investigation.
 
 ```json
 {
@@ -548,7 +539,9 @@ flowchart TD
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
   "status": "400",
   "scimType": "invalidValue",
   "detail": "Extension URN 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User' found in body but not in schemas[] array"
@@ -566,19 +559,20 @@ turning it off disables considerably more than the URN check:
 | Unknown extension attribute | 400 | accepted |
 | Unknown sub-attribute | 400 | accepted |
 | Attribute **type** (string / boolean / integer / decimal / dateTime / binary / reference / complex) | 400 | **not checked at all** |
-| Canonical values | 400 | not checked |
+| Canonical values | Suggestions, not an implicit closed enum | Suggestions |
 | Cardinality (`multiValued`) at both attribute and sub-attribute level | enforced | not checked |
-| Immutable attribute changed on `PUT` | 400 | accepted |
+| Immutable attribute changed on `PUT` | 400 | **400 (P7a always enforced)** |
 | `readOnly` attribute in a `PATCH` op | 400 | silently stripped |
 | Required attributes on create / replace | 400 | **400 (always enforced)** |
 
 The row that surprises people is the type row: **lenient mode is not a more
 forgiving validator, it is essentially no validator**, so a genuinely wrong type
-is stored without complaint. Required-attribute checks are the one thing that
-runs unconditionally, because RFC 7643 §2.4 states them as a "MUST".
+is stored without complaint. Required attributes, required extension bindings and immutable PUT checks
+run independently of strict mode after P7a.
 
-Set it to `false` for Entra ID interop, where the provisioning service sends
-undeclared attributes and trimmed sub-attribute sets. See
+Keep it enabled for Entra ID. Check the actual request and effective schema;
+use targeted Boolean/readOnly compatibility only when needed. See
+[the native/legacy corpus and limitations](SCIM_ENTRA_COMPATIBILITY.md) and
 [RfcCompliantSubAttributes](#rfccompliantsubattributes) for how this flag
 differs from the other schema-shaped flag, including the outcome matrix.
 
@@ -588,12 +582,23 @@ differs from the other schema-shaped flag, including the outcome matrix.
 
 **Type:** boolean | **Default:** `true` | **Category:** Compatibility
 
-Coerces string representations of booleans (`"True"`, `"False"`, `"true"`, `"false"`) to native boolean values. Required for Entra ID compatibility, which sends `"True"` instead of `true`.
+Coerces supported string representations of booleans (`"True"`, `"False"`, `"true"`, `"false"`) to native Boolean values. Modern native Boolean payloads need no coercion. Microsoft's legacy examples include quoted values; do not assume every Entra job emits them.
 
 **Before coercion:** `{ "active": "True" }`
 **After coercion:** `{ "active": true }`
 
-Applies to all boolean fields in POST, PUT, and PATCH request bodies, including nested extension attributes.
+Applies to supported schema-aware input paths, including nested extensions.
+Output normalization is separate. The historical P7a/P1 extractor was not
+fully gated; the integrated P2 follow-up now closes that User active input
+gap. See [the verified flag matrix and limits](SCIM_ENTRA_COMPATIBILITY.md).
+
+P2 follow-up: OFF rejects quoted User `active` in PATCH even when strict
+schema validation is OFF; the promoted-field adapter cannot silently
+override the setting. ON (the unchanged default) retains recognized legacy
+quoted values. Native booleans are always accepted subject to other policy,
+and string-typed extension attributes named `active` remain strings. Legacy
+`{ "active": "False" }` operation-value wrappers remain available in lenient
+mode only when coercion is enabled.
 
 ---
 
@@ -606,7 +611,7 @@ Controls how the `primary: true` sub-attribute is handled on multi-valued attrib
 | Value | Behavior |
 |-------|----------|
 | `passthrough` | No enforcement. Multiple `primary: true` values allowed |
-| `normalize` | Auto-normalize: if multiple `primary: true`, keep only the last one. Applied on POST, PUT, and PATCH post-merge |
+| `normalize` | Auto-normalize: if multiple `primary: true`, keep the first one. Final-state normalization is not the ordered PATCH handoff; see P9 I02 |
 | `reject` | Strict: return 400 if request contains multiple `primary: true` values for the same multi-valued attribute |
 
 **Preset defaults:** entra-id/entra-id-minimal = `normalize`, rfc-standard = `reject`
@@ -614,8 +619,16 @@ Controls how the `primary: true` sub-attribute is handled on multi-valued attrib
 ```json
 {
   "emails": [
-    { "value": "work@example.com", "type": "work", "primary": true },
-    { "value": "home@example.com", "type": "home", "primary": true }
+    {
+      "value": "work@example.com",
+      "type": "work",
+      "primary": true
+    },
+    {
+      "value": "home@example.com",
+      "type": "home",
+      "primary": true
+    }
   ]
 }
 ```
@@ -632,26 +645,32 @@ Controls how the `primary: true` sub-attribute is handled on multi-valued attrib
 
 **Type:** boolean | **Default:** `false` | **Category:** Concurrency
 
-When enabled, mandates the `If-Match` header on all PUT, PATCH, and DELETE operations. Prevents concurrent modification without optimistic locking.
+When enabled and the effective ETag capability is active, requires `If-Match`
+on PUT, PATCH and DELETE. The header policy alone does not make persistence
+atomic; compare-and-save correctness belongs to the persistence package.
 
 **When enabled and If-Match missing:**
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-  "status": "412",
-  "detail": "If-Match header is required for this endpoint"
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "status": "428",
+  "detail": "If-Match header is required for this operation. Current ETag: W/\"v2\""
 }
 ```
 
-**When If-Match doesn't match:**
+**When If-Match doesn't match:** status-only envelope illustration; optional
+detail/diagnostics are omitted. `versionMismatch` is not an RFC 7644 Table 9
+`scimType` keyword and must not be documented as one.
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-  "status": "412",
-  "scimType": "versionMismatch",
-  "detail": "ETag mismatch: expected W/\"2\", got W/\"1\""
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
+  "status": "412"
 }
 ```
 
@@ -661,7 +680,9 @@ When enabled, mandates the `If-Match` header on all PUT, PATCH, and DELETE opera
 
 **Type:** boolean | **Default:** `true` | **Category:** Delete Behavior
 
-When enabled, a PATCH operation that sets `active: false` will mark the user as soft-deleted (sets `deletedAt` timestamp) rather than permanently removing it. The user remains in the database but is treated as inactive.
+When enabled, a PATCH setting `active:false` deactivates the User rather
+than deleting it. The row remains and still occupies its unique values.
+P9 E02 verifies deactivation and reactivation through GET readback.
 
 Soft-deleted users can be re-activated via PATCH `active: true`.
 
@@ -694,9 +715,15 @@ When enabled, allows adding or removing multiple members in a single PATCH opera
   "op": "add",
   "path": "members",
   "value": [
-    { "value": "user-id-1" },
-    { "value": "user-id-2" },
-    { "value": "user-id-3" }
+    {
+      "value": "user-id-1"
+    },
+    {
+      "value": "user-id-2"
+    },
+    {
+      "value": "user-id-3"
+    }
   ]
 }
 ```
@@ -712,7 +739,10 @@ When disabled, only single-member operations are allowed per PATCH op.
 When enabled, allows removing all members from a group via:
 
 ```json
-{ "op": "remove", "path": "members" }
+{
+  "op": "remove",
+  "path": "members"
+}
 ```
 
 When disabled (default), this operation returns 400 to prevent accidental mass removal.
@@ -726,10 +756,20 @@ When disabled (default), this operation returns 400 to prevent accidental mass r
 When enabled, supports dot-notation PATCH paths:
 
 ```json
-{ "op": "replace", "path": "name.givenName", "value": "Jane" }
+{
+  "op": "replace",
+  "path": "name.givenName",
+  "value": "Jane"
+}
 ```
 
-Without this flag, only standard paths are supported (`"name"` with complex value, or valuePath syntax `"name[formatted eq \"old\"]"`).
+For Users, OFF rejects explicit core dotted paths with 400 `invalidPath` and
+no write; they are never persisted as literal keys. Complex values targeting
+`name`, no-path objects (including legacy dotted keys), registered extension
+paths and typed selectors remain supported. Group/custom adapters do not use
+this User-specific gate. The default remains OFF.
+Enable it for documented Entra explicit dotted User paths; this is not a
+client-brand switch. These are local implementation results, not a deployment.
 
 ---
 

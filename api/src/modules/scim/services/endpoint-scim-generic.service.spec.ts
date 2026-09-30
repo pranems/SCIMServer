@@ -16,6 +16,7 @@ import { SCIM_EVENTS } from '../../stats/scim-events';
 describe('EndpointScimGenericService', () => {
   let service: EndpointScimGenericService;
   let eventEmitter: EventEmitter2;
+  let registry: ScimSchemaRegistry;
 
   const endpointId = 'ep-gen-1';
   const baseUrl = 'http://localhost:6000/scim';
@@ -115,7 +116,18 @@ describe('EndpointScimGenericService', () => {
 
     service = module.get<EndpointScimGenericService>(EndpointScimGenericService);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+    registry = module.get(ScimSchemaRegistry);
   });
+
+  function registerQuerySchema() {
+    const original = registry.getSchema.bind(registry);
+    jest.spyOn(registry, 'getSchema').mockImplementation(urn => urn === deviceResourceType.schema ? {
+      id: urn, name: 'Device', description: 'Registered query fixture',
+      attributes: ['displayName', 'serialNumber'].map(name => ({
+        name, type: 'string', multiValued: false, required: false,
+      })),
+    } : original(urn));
+  }
 
   afterEach(() => {
     jest.resetAllMocks();
@@ -190,6 +202,19 @@ describe('EndpointScimGenericService', () => {
   // ─── getResource ──────────────────────────────────────────────────────
 
   describe('getResource', () => {
+    it('uses authoritative stored timestamps instead of stale pre-write meta JSON', async () => {
+      mockGenericRepo.findByScimId.mockResolvedValue({
+        ...mockGenericRecord,
+        createdAt: new Date('2025-01-01T00:00:00.123Z'),
+        updatedAt: new Date('2025-01-02T00:00:00.456Z'),
+      });
+      const result = await service.getResource('scim-dev-001', baseUrl, endpointId, deviceResourceType);
+      expect(result.meta).toMatchObject({
+        created: '2025-01-01T00:00:00.123Z',
+        lastModified: '2025-01-02T00:00:00.456Z',
+      });
+    });
+
     it('should return a SCIM resource by scimId', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
 
@@ -440,7 +465,7 @@ describe('EndpointScimGenericService', () => {
         deviceResourceType,
       );
 
-      expect(mockGenericRepo.delete).toHaveBeenCalledWith(mockGenericRecord.id);
+      expect(mockGenericRepo.delete).toHaveBeenCalledWith(mockGenericRecord.id, undefined);
     });
 
     it('should error when UserHardDeleteEnabled is false (settings v7)', async () => {
@@ -559,6 +584,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Sorting in LIST ──────────────────────────────────────────────────
 
   describe('listResources - sorting', () => {
+    beforeEach(registerQuerySchema);
     it('should sort by displayName ascending by default', async () => {
       const records = [
         { ...mockGenericRecord, id: 'r3', scimId: 's3', displayName: 'Charlie', rawPayload: JSON.stringify({ displayName: 'Charlie' }) },
@@ -819,6 +845,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Filter parsing in LIST ───────────────────────────────────────────
 
   describe('listResources - filter parsing', () => {
+    beforeEach(registerQuerySchema);
     it('should pass displayName eq filter to repository with Prisma case-insensitive match', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
@@ -906,7 +933,7 @@ describe('EndpointScimGenericService', () => {
       );
     });
 
-    it('should push externalId ne (not equal, case-sensitive) to DB', async () => {
+    it('should retain missing externalId candidates for SCIM ne evaluation', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       await service.listResources(
@@ -919,7 +946,7 @@ describe('EndpointScimGenericService', () => {
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        { externalId: { not: 'ext-999' } },
+        {},
       );
     });
 
@@ -1005,11 +1032,11 @@ describe('EndpointScimGenericService', () => {
         deviceResourceType,
       );
 
-      // fetchAll = true → repository called with no dbFilter
+      // An empty typed filter fetches all candidates before residual evaluation.
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        undefined,
+        {},
       );
       // In-memory filter applied on SCIM representation
       expect(result.totalResults).toBe(1);

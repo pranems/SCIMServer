@@ -281,6 +281,14 @@ Origin: 2026-06-12. A Playwright / ad-hoc capture run dropped 38 numbered PNGs (
 
 ## Schema-Characteristic Test Rule (CRITICAL - RFC 7643 §2.2 + §7)
 
+**Retained-array ownership (2026-09-29):** PUT and PATCH must share neutral
+one-to-one entry matching. Test duplicate values/types, omitted and null
+discriminators, anonymous occurrences, and added/removed/nested entries.
+Recheck matching after restoring optional immutable/readOnly discriminators;
+a correct initial pairing alone is insufficient. Never infer identity from a
+first/last-value lookup or persist invented IDs. See
+[PUT preservation RCA](../docs/SCIM_PUT_ENTRY_PRESERVATION_RCA.md).
+
 When writing tests against `/Schemas` attribute definitions (unit, E2E, or live), the test MUST:
 
 1. **Check for the presence** of the attribute characteristic in the published schema.
@@ -431,6 +439,8 @@ The concrete failures and their standing corrections:
 3. **Declaring "complete" from gate-green instead of outcome-correct.** The agent said "everything is complete" because the pipeline was green. Green gates are necessary, not sufficient - they are only as strong as their assertions, and a newly-authored surface's assertions are exactly the ones most likely to be too weak. **Rule: before declaring any user-facing work complete, the agent MUST (a) enumerate the user-visible outcomes the change promises, (b) point to the specific assertion (test line or measured observation) that proves EACH outcome, and (c) treat any outcome with only a presence-level assertion as UNVERIFIED. "The suite is green" is never a sufficient completion statement on its own.**
 
 4. **Pre-existing latent defects are still the agent's miss when it touches/ships the surface.** The Operations table bug pre-dated this session, but the agent added a spec for that page and shipped it, so the weak spec is the agent's. **Rule: when adding coverage for an existing surface, first VERIFY the surface is actually correct (measure it), then write assertions that would fail if it were not. Do not codify a broken state as the baseline (this is the same lesson as the 2026-07-07 polluted-visual-baseline: R3).**
+
+5. **Published control descriptions are behavioral contracts.** When a setting's semantics change, assert the new ON/OFF claim in emitted registry/help text alongside the runtime outcome, not merely absence of generic bad advice. Conflict-free merges can retain obsolete literal-key or coercion-bypass promises after execution is fixed. Once an opt-in integration assertion passes the approved unchanged outcome, make it default-running and add a discovery regression; preserve the prior pending receipt as historical rather than rewriting it. Origin: P9 guidance and C0-I33/I34, 2026-09-29.
 
 This rule is the general form of R1 (measure bounds, not CSS), R3 (a FAIL/baseline can hide a real bug), and the API key-allowlist rules (Stage 3a.2/3a.3). It is enforced by: the `addMissingTests` prompt (now checks "does each new spec assert an OUTCOME, not just presence?"), `codeReviewSelfAudit` (flags presence-only specs), and the new `scripts/audit-table-layout.ps1` static gate (below). When any operator-surfaced bug reveals a gate that was green-but-blind, the fixing commit MUST strengthen that assertion class, not just fix the instance.
 
@@ -608,6 +618,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 3a.1. **`addMissingTests` prompt** - Inventory current test coverage vs the change. Close every gap at the unit + E2E + live layer BEFORE moving on. The May 2026 Group.displayName uniqueness flip would have been caught a release earlier had this gate run.
 3a.2. **`apiContractVerification` prompt** - Confirm every response shape matches the documented contract. Use key-allowlist assertions (`expect(ALLOWED_KEYS).toContain(key)`), never `toHaveProperty`. Internal runtime fields prefixed with `_` MUST be invisible at every public response.
 3a.3. **`error-handling-verification` prompt** - Audit every error path: HTTP status, SCIM `scimType` keyword (RFC 7644 Table 9), structured diagnostics envelope (`attributePaths[]`, `activeConfig`, `filterExpression`), and the smart-error-explainer client surface.
+3a.4. **Conditional-write boundary rule** - A controller/guard/service precheck alone does not make a write conditional. The database mutation must compare the expected state in the same operation, or a transaction must protect comparison through commit. InMemory must provide an equivalent indivisible check and publication. For two different edits using the same old token, use a barrier to force the competing requests past their earlier reads and prove one winner, one precondition failure, and only the winner's stored payload/version on actual PostgreSQL and InMemory. Test unchanged/idempotent content separately where content tokens intentionally permit it. Every response view that publishes a write token must prove that token can authorize an unchanged edit without exposing fields the view is meant to omit. Origin: P3 resource races and P8c endpoint-admin races, 2026-09-28; see PC-4 in the engineering-pattern ledger.
 
 #### Stage 3b - Cross-Cutting Audits (verify the IMPL against external standards)
 3b.1. **`logging-verification` prompt** - Verify the new code path produces correctly-categorized + correctly-leveled log entries, with PII redacted, requestId propagated, and slow-request thresholds honored.
@@ -833,6 +844,16 @@ These deployments are retired and not live. Any tooling, doc, or script referenc
 - Follow existing patterns: `Test-Result -Success <bool> -Message <string>`, `Invoke-RestMethod`, `$scimBase`, `$headers`
 
 ### Gate-Strategy Self-Improvement Loop
+
+**Aggregate integrity rule (P4, 2026-09-28).** For a resource stored across
+multiple rows or maps, test late native/injected write failures against the
+complete stored state: scalar fields, payload, version, timestamps and child
+row ids. An error status alone does not prove rollback. Also test a concurrent
+reader: atomic writers are insufficient if an await between component reads
+can mix versions. Keep InMemory checks, staging and publication synchronous.
+See [Group aggregate evidence](../docs/SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md)
+and pattern PA-10 in the engineering lessons.
+
 After every commit that exposes a new bug class (parity gap, prompt-injection vector, RFC ambiguity, test-rot pattern, etc.), update THIS section to add the corresponding gate. The formal engine for this loop is `gateStrategySelfAudit` (Stage X.1) for general drift and `securityBestPracticesIntake` (Stage X.2) for security-landscape changes. Manual updates here are still valid for fast-turn cases; both prompts aggregate them on their periodic runs.
 
 Examples of standing rules that originated from real failures:
@@ -883,3 +904,80 @@ Examples of standing rules that originated from real failures:
 - **DPoP (RFC 9449) for endpoint credentials** - sender-constrained tokens; tightens our bearer-token model. Low priority at current scale.
 
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**
+
+## Original-value and completed-candidate validation (2026-09-29)
+
+For typed common attributes, preserve and validate original client value
+types before DTO/resource adapters can coerce or clear them, and validate the
+completed common state before persistence. A successful normalized value is
+not proof that the original assignment was valid. PATCH checks must remain
+value-scoped; never reuse complete POST/PUT required-extension checks on
+touched partial PATCH views. Include late-operation rollback and unrelated
+required-field controls.
+
+## Retained-entry cross-operation regression rule (2026-09-29)
+
+Changes to preservation/matching of multi-valued complex entries MUST cover
+both PUT and PATCH: duplicate values with differing types reordered, equal
+value/type occurrences consumed once, anonymous entries, additions/removals,
+and readOnly/immutable server-state readback. A `value` is not implicitly
+unique. Share the operation-neutral matcher rather than maintaining first-
+and last-match variants or importing PATCH execution into SchemaValidator.
+
+## Schema-aware query regression rule (2026-09-28, P6b)
+
+When changing list/filter/sort/projection code, test all affected resource
+families with two namespaces sharing a field name but conflicting caseExact
+rules. Authorize operands before evaluating internal values, count and page
+before response projection, and never enable writeOnly filtering as a
+side effect. Include a hidden child without a hidden top-level sibling,
+typed sort outcomes, missing values and count zero. Preserve internal `/Me`
+lookup when external filtering is disabled. Assert actual rows/order/totals
+and forbidden output keys, not only HTTP success.
+When schema-defined fields reuse promoted column names, test numeric and
+multi-valued representations as well as scalar strings. A database prefilter
+must be equivalent to the resolved type/cardinality; a later correct residual
+evaluator cannot recover candidates that a lossy prefilter already removed.
+Check fixed RFC common-attribute contracts before generalizing schema
+customization: top-level externalId is string, single-valued and caseExact
+for every ResourceType (RFC 7643 section 3.1). Numeric/multi-valued externalId
+tests must use an extension-qualified homonym, never the common attribute.
+
+## Atomic Invariant Representation Rule (P3b, 2026-09-28)
+
+Race barriers and repository spies MUST forward the complete typed argument
+tuple, including expected versions, initial members and uniqueness policy.
+Prove forwarding with a negative control; pausing a call while dropping its
+policy is not evidence about the original operation.
+
+For a persistence uniqueness/invariant change, tests MUST force two DIFFERENT
+owners to compete, not only two writes to the same version. Assert one losing
+conflict, one stored owner and unchanged loser state on both backends.
+The representation checked under a lock must match what storage commits:
+reject ambiguous case-insensitive keys on constrained paths before JSONB can
+reorder them, and carry explicit schema identity instead of inferring it from
+a URN substring. Enumerate every mutating repository port, including retained
+append/helper ports; each must participate in the same policy and atomicity
+protocol. See [P3b RCA](../docs/SCIM_UNIQUENESS_EXECUTION_RCA.md).
+
+Before defining equality, verify the type-specific applicability of the
+characteristic: RFC 7643 section 2.3 gives boolean/dateTime/binary/complex no
+uniqueness and makes reference case exact. A permissive schema admission path
+is not evidence that an inconsistent declaration deserves a new comparison
+mode. Reject unsupported/inconsistent promises explicitly and test legitimate
+non-unique values remain accepted.
+
+Determine each resource family's authoritative representation from its actual
+response and mutation reconstruction. A promoted convenience column does not
+prove that a same-named custom attribute is restricted to the column's type:
+generic SCIM resources emit rawPayload. Compare and persist the representation
+clients observe, retaining server-owned id semantics, and test numeric/MV
+custom attributes whose names collide with builtin convenience fields.
+
+Before applying that custom-payload rule, classify RFC common attributes.
+RFC 7643 section 3.1 applies to ALL extended resource types and its listed
+characteristics override older schema entries. Top-level externalId remains a
+single case-exact String with client-defined value; permissive current admission
+does not make numeric/MV common externalId valid. A namespaced extension
+externalId is independent. Keep default non-uniqueness and provisioning-domain
+scope distinct from any explicitly declared product uniqueness policy.

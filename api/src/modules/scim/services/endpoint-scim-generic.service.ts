@@ -16,9 +16,11 @@
  *   - returned:never stripping on output
  */
 import { Inject, Injectable } from '@nestjs/common';
+import { compileEffectiveUniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
+import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import type {
   GenericResourceRecord,
   GenericResourceCreateInput,
@@ -36,7 +38,6 @@ import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
 // assertIfMatch replaced by enforceIfMatch for RequireIfMatch 428 parity
 import {
-  DEFAULT_COUNT,
   MAX_COUNT,
   SCIM_LIST_RESPONSE_SCHEMA,
   SCIM_PATCH_SCHEMA,
@@ -52,7 +53,6 @@ import {
   stripInternalResponseFields,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
-  assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { SchemaValidator } from '../../../domain/validation';
@@ -61,11 +61,14 @@ import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
+import { readResolvedProperty } from '../utils/scim-patch-path';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
-import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import { buildGenericFilter } from '../filters/apply-scim-filter';
+import { createReadQuery } from '../common/scim-read-query';
+import { resolveNumericLimit } from '../common/capability-resolver';
 import { SCIM_EVENTS } from '../../stats/scim-events';
+import { enforceFilterSupported, enforcePatchSupported, enforceSortSupported } from '../common/capability-enforcement';
 
 interface ListGenericParams {
   filter?: string;
@@ -135,10 +138,12 @@ export class EndpointScimGenericService {
         schemas.push({
           id: profileExt.id,
           attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+          isCoreSchema: false,
+          required: ext.required,
         });
       } else {
         const extDef = this.schemaRegistry.getSchema(ext.schema);
-        if (extDef) schemas.push(extDef as SchemaDefinition);
+        if (extDef) schemas.push({ ...extDef, isCoreSchema: false, required: ext.required } as SchemaDefinition);
       }
     }
 
@@ -162,6 +167,11 @@ export class EndpointScimGenericService {
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
+    const readOnlyCache = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    const readOnlyResult = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
+    body = readOnlyResult.payload;
+    const strippedAttrs = readOnlyResult.stripped;
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings ("True"/"False") → native booleans before validation
@@ -174,9 +184,6 @@ export class EndpointScimGenericService {
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'create');
 
     // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
-    const readOnlyCache = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
     if (strippedAttrs.length > 0) {
       this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly attributes from POST payload', {
         method: 'POST', path: resourceType.endpoint, stripped: strippedAttrs, endpointId,
@@ -191,13 +198,6 @@ export class EndpointScimGenericService {
     // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     const scimId = randomUUID();
-
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
-    if (uniqueAttrs.length > 0) {
-      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-      assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })));
-    }
 
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
@@ -230,7 +230,11 @@ export class EndpointScimGenericService {
 
     let record;
     try {
-      record = await this.genericRepo.create(input);
+      record = await this.genericRepo.create(
+        input,
+        compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)),
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, `create ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -288,72 +292,24 @@ export class EndpointScimGenericService {
     _config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'list' });
+    const profile = this.endpointContext.getProfile?.();
+    enforceFilterSupported(profile, params.filter);
+    enforceSortSupported(profile, params.sortBy);
     this.scimLogger.info(LogCategory.SCIM_RESOURCE, `List ${resourceType.name}`, { endpointId, filter: params.filter });
-    const startIndex = Math.max(params.startIndex ?? 1, 1);
-    const count = Math.min(Math.max(params.count ?? DEFAULT_COUNT, 0), MAX_COUNT);
-
-    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
-    if (params.filter) {
-      this.validateFilterAttributePaths(params.filter, resourceType, endpointId);
-    }
-
-    // RFC 7644 §3.4.2.2: Full AST-based filter with DB push-down + in-memory fallback
-    const caseExactAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactPaths;
-    let filterResult: ReturnType<typeof buildGenericFilter>;
-    try {
-      filterResult = buildGenericFilter(params.filter, caseExactAttrs);
-    } catch (e) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: params.filter },
-      });
-    }
-
-    let records = await this.genericRepo.findAll(
+    const maxResults = resolveNumericLimit(profile, s => s.filter?.maxResults, MAX_COUNT);
+    const query = createReadQuery(params, this.getSchemaDefinitions(resourceType, endpointId), maxResults, buildGenericFilter);
+    const records = await this.genericRepo.findAll(
       endpointId,
       resourceType.name,
-      filterResult.fetchAll ? undefined : filterResult.dbWhere,
+      query.dbWhere,
     );
-
-    // Convert to SCIM representation for in-memory filtering + response
-    let resources = records.map((r) => this.toScimResponse(r, resourceType));
-
-    // Apply in-memory filter when the filter couldn't be fully pushed to DB
-    if (filterResult.inMemoryFilter) {
-      resources = resources.filter(filterResult.inMemoryFilter);
-    }
-
-    // In-memory sort for generic resources (RFC 7644 §3.4.2.3)
-    if (params.sortBy) {
-      const sortField = params.sortBy.toLowerCase();
-      const direction = params.sortOrder === 'descending' ? -1 : 1;
-      // Map SCIM attribute names to record fields
-      const fieldMap: Record<string, string> = {
-        id: 'id',
-        externalid: 'externalId',
-        displayname: 'displayName',
-        'meta.created': 'meta.created',
-        'meta.lastmodified': 'meta.lastModified',
-      };
-      const mappedField = fieldMap[sortField] ?? sortField;
-      resources.sort((a, b) => {
-        const va = String(this.resolveNestedValue(a, mappedField) ?? '');
-        const vb = String(this.resolveNestedValue(b, mappedField) ?? '');
-        return va.localeCompare(vb) * direction;
-      });
-    }
-
-    const totalResults = resources.length;
-    const pageResources = resources.slice(startIndex - 1, startIndex - 1 + count);
-
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
-      totalResults,
-      startIndex,
-      itemsPerPage: pageResources.length,
-      Resources: pageResources,
+      ...query.page(
+        records,
+        record => this.toInternalResource(record, resourceType),
+        record => this.toScimResponse(record, resourceType),
+      ),
     };
   }
 
@@ -375,6 +331,23 @@ export class EndpointScimGenericService {
     // GEN-11: Validate schemas array includes the core schema
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    const readOnlyResult = stripReadOnlyAttributes(
+      body,
+      schemaDefs,
+      this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected,
+    );
+    body = readOnlyResult.payload;
+    const strippedAttrs = readOnlyResult.stripped;
+    const existing = await this.genericRepo.findByScimId(endpointId, resourceType.name, scimId);
+    if (!existing) {
+      throw createScimError({
+        status: 404, scimType: 'noTarget', detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
+      });
+    }
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
+
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
@@ -385,36 +358,13 @@ export class EndpointScimGenericService {
     this.enforcePrimaryConstraint(body, resourceType, endpointId, config);
 
     // GEN-01: Attribute-level payload validation
+    SchemaValidator.prepareReplacement(this.buildExistingPayload(existing, resourceType), body, schemaDefs);
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'replace');
 
-    const existing = await this.genericRepo.findByScimId(
-      endpointId,
-      resourceType.name,
-      scimId,
-    );
-
-    if (!existing) {
-      this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Replace target ${resourceType.name} not found`, { scimId, endpointId });
-      throw createScimError({
-        status: 404,
-        scimType: 'noTarget',
-        detail: `${resourceType.name} "${scimId}" not found.`,
-        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
-      });
-    }
-
-    // GEN-12: Config-aware soft-delete guard
-    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
-
-    enforceIfMatch(existing.version, ifMatch, config);
-
     // GEN-02: Immutable attribute enforcement - compare existing with incoming
-    this.checkImmutableAttributes(existing, body, resourceType, endpointId, config);
+    this.checkImmutableAttributes(existing, body, resourceType, endpointId, config, 'replace');
 
     // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
-    const readOnlyCachePut = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCachePut);
     if (strippedAttrs.length > 0) {
       this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly attributes from PUT payload', {
         method: 'PUT', path: `${resourceType.endpoint}/${scimId}`, stripped: strippedAttrs, endpointId,
@@ -427,13 +377,6 @@ export class EndpointScimGenericService {
     const active = body.active !== false;
 
     // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
-
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const uniqueAttrsPut = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
-    if (uniqueAttrsPut.length > 0) {
-      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-      assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })), scimId);
-    }
 
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
@@ -462,7 +405,8 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(payload),
         meta: JSON.stringify(metaObj),
-      });
+      }, expectedVersion, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -488,6 +432,7 @@ export class EndpointScimGenericService {
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'patch' });
+    enforcePatchSupported(this.endpointContext.getProfile?.());
     this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Patch ${resourceType.name}`, { scimId, endpointId });
     // Validate PATCH schema
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
@@ -511,7 +456,7 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    enforceIfMatch(existing.version, ifMatch, config);
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // AUDIT-4: ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
     // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → reject 400
@@ -533,17 +478,14 @@ export class EndpointScimGenericService {
       }
     }
 
-    // GEN-03/04: Pre-PATCH boolean coercion + validation for strict mode
+    if (getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS)) {
+      coercePatchOpBooleans(patchDto.Operations, this.getBooleansByParentForRT(resourceType, endpointId),
+        this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase());
+    }
+
+    // GEN-03/04: Pre-PATCH validation for strict mode
     if (strictSchemaEnabled) {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-
-      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-      if (coerceEnabled) {
-        const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
-        const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
-        coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
-      }
 
       // GEN-01: Pre-PATCH validation - validate each operation value against schema
       for (const [opIndex, op] of patchDto.Operations.entries()) {
@@ -583,7 +525,26 @@ export class EndpointScimGenericService {
     }
 
     const extensionUrns = resourceType.schemaExtensions.map(e => e.schema);
-    const patchEngine = new GenericPatchEngine(payload, extensionUrns);
+    const patchEngine = new GenericPatchEngine(
+      payload, extensionUrns,
+      this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactPaths,
+      resourceType.schema,
+      {
+        strictSchema: strictSchemaEnabled,
+        ignoreReadOnly: !strictSchemaEnabled || ignorePatchReadOnly,
+        onReadOnlyIgnored: path => this.endpointContext.addWarnings([`Attribute '${path}' is readOnly and was ignored in PATCH`]),
+        schemaDefinitions: this.getSchemaDefinitions(resourceType, endpointId),
+        normalize: (candidate, operation) => {
+          candidate.schemas = [resourceType.schema, ...extensionUrns.filter(urn => urn in candidate)];
+          this.coerceBooleanStringsIfEnabled(candidate, resourceType, endpointId, config);
+          this.enforcePrimaryConstraint(candidate, resourceType, endpointId, config);
+          this.validatePayloadSchema(
+            scopePatchPayloadToTouched(candidate, [operation], extensionUrns, resourceType.schema),
+            resourceType, endpointId, config, 'patch',
+          );
+        },
+      },
+    );
 
     try {
       for (let i = 0; i < patchDto.Operations.length; i++) {
@@ -619,16 +580,12 @@ export class EndpointScimGenericService {
 
     const patchedPayload = patchEngine.getResult();
 
-    // Extract updated top-level fields from patched payload.
-    // GAP-1 fix: Detect field removal - when key is absent after patch, the field
-    // was removed. Use 'in' check to distinguish "removed" (absent) from "unchanged"
-    // (still present). Fallback to existing only when the field was NOT part of the patch.
-    const externalId = 'externalId' in patchedPayload
-      ? (typeof patchedPayload.externalId === 'string' ? patchedPayload.externalId : null)
-      : existing.externalId;
-    const displayName = 'displayName' in patchedPayload
-      ? (typeof patchedPayload.displayName === 'string' ? patchedPayload.displayName : null)
-      : existing.displayName;
+    // The completed payload is authoritative, including unassignment. Retaining
+    // an old nullable query column after removal disagrees with the saved resource.
+    const externalValue = readResolvedProperty(patchedPayload, 'externalId');
+    const displayValue = readResolvedProperty(patchedPayload, 'displayName');
+    const externalId = typeof externalValue === 'string' ? externalValue : null;
+    const displayName = typeof displayValue === 'string' ? displayValue : null;
     const active = patchedPayload.active !== undefined
       ? patchedPayload.active !== false
       : existing.active;
@@ -657,6 +614,7 @@ export class EndpointScimGenericService {
         resultPayload,
         patchDto.Operations,
         extensionUrns,
+        resourceType.schema,
       );
       this.validatePayloadSchema(patchValidationPayload, resourceType, endpointId, config, 'patch');
 
@@ -665,15 +623,6 @@ export class EndpointScimGenericService {
     }
 
     // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
-
-    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    {
-      const uniqueAttrsPatch = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
-      if (uniqueAttrsPatch.length > 0) {
-        const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-        assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })), scimId);
-      }
-    }
 
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
@@ -699,7 +648,8 @@ export class EndpointScimGenericService {
         active,
         rawPayload: JSON.stringify(patchedPayload),
         meta: JSON.stringify(metaObj),
-      });
+      }, expectedVersion, compileEffectiveUniquenessPolicy(this.getSchemaDefinitions(resourceType, endpointId)),
+      ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -744,7 +694,7 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard (double-delete → 404)
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    enforceIfMatch(existing.version, ifMatch, config);
+    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
 
     // Settings v7: Gate hard delete behind USER_HARD_DELETE_ENABLED (default: true)
     const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED);
@@ -758,7 +708,11 @@ export class EndpointScimGenericService {
     }
 
     try {
-      await this.genericRepo.delete(existing.id);
+      await this.genericRepo.delete(
+        existing.id,
+        expectedVersion,
+        ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
+      );
     } catch (error) {
       handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
@@ -779,6 +733,22 @@ export class EndpointScimGenericService {
    * - G8e: returned:never filtering (RFC 7643 §2.4)
    */
   private toScimResponse(
+    record: GenericResourceRecord,
+    resourceType: ScimResourceType,
+  ): Record<string, unknown> {
+    const resource = this.toInternalResource(record, resourceType);
+    const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
+    const visibleExtUrns = stripNeverReturnedFromPayload(
+      resource, cache?.neverReturnedByParent ?? new Map(),
+      cache?.coreSchemaUrn ?? resourceType.schema.toLowerCase(),
+      resourceType.schemaExtensions.map(e => e.schema),
+    );
+    resource.schemas = [resourceType.schema, ...visibleExtUrns];
+    stripInternalResponseFields(resource);
+    return resource;
+  }
+
+  private toInternalResource(
     record: GenericResourceRecord,
     resourceType: ScimResourceType,
   ): Record<string, unknown> {
@@ -804,6 +774,8 @@ export class EndpointScimGenericService {
 
     // Ensure version is current
     meta.version = `W/"v${record.version}"`;
+    meta.created = record.createdAt.toISOString();
+    meta.lastModified = record.updatedAt.toISOString();
 
     // GEN-04: Parent-context-aware boolean sanitization on output
     const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
@@ -811,13 +783,8 @@ export class EndpointScimGenericService {
     const boolMap = this.getBooleansByParentForRT(resourceType, record.endpointId);
     sanitizeBooleanStringsByParent(payload, boolMap, coreUrnLower);
 
-    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
-    const neverByParent = cache?.neverReturnedByParent ?? new Map();
     const extSchemaUrns = resourceType.schemaExtensions.map(e => e.schema);
-    const visibleExtUrns = stripNeverReturnedFromPayload(payload, neverByParent, coreUrnLower, extSchemaUrns);
-    const schemas: string[] = [resourceType.schema, ...visibleExtUrns];
-
-    stripInternalResponseFields(payload);
+    const schemas: string[] = [resourceType.schema, ...extSchemaUrns];
     delete payload.id;
     delete payload.meta;
     delete payload.schemas;
@@ -892,7 +859,7 @@ export class EndpointScimGenericService {
     endpointId: string,
     isStrict: boolean,
   ): void {
-    const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+    const schemas = this.getSchemaDefinitions(resourceType, endpointId);
     if (schemas.length === 0) return;
 
     const nesting = SchemaValidator.validateSubAttributeNesting(
@@ -949,7 +916,7 @@ export class EndpointScimGenericService {
     if (!isStrict) {
       // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
       if (mode === 'patch') return;
-      const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+      const schemas = this.getSchemaDefinitions(resourceType, endpointId);
       if (schemas.length === 0) return;
       const result = SchemaValidator.validateRequired(dto, schemas, mode,
         this.getAttrMapsForRT(resourceType, endpointId));
@@ -970,7 +937,7 @@ export class EndpointScimGenericService {
       return;
     }
 
-    const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+    const schemas = mode === 'patch' ? this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId) : this.getSchemaDefinitions(resourceType, endpointId);
     if (schemas.length === 0) return;
 
     const result = SchemaValidator.validate(dto, schemas, {
@@ -1164,12 +1131,13 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     endpointId: string,
     _config?: EndpointConfig,
+    mode: 'patch' | 'replace' = 'patch',
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
     // Previously gated by StrictSchemaValidation - removed per P4 analysis
 
     const existingPayload = this.buildExistingPayload(existing, resourceType);
-    const schemas = this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);
+    const schemas = mode === 'replace' ? this.getSchemaDefinitions(resourceType, endpointId) : this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);
     if (schemas.length === 0) return;
 
     // Use precomputed maps from cache when available
@@ -1178,8 +1146,8 @@ export class EndpointScimGenericService {
       ? SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
           coreAttrMap: cache.coreAttrMap,
           extensionSchemaMap: cache.extensionSchemaMap,
-        })
-      : SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+        }, mode)
+      : SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, undefined, mode);
 
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
@@ -1207,9 +1175,6 @@ export class EndpointScimGenericService {
     return {
       schemas: [resourceType.schema],
       ...rawPayload,
-      externalId: record.externalId ?? undefined,
-      displayName: record.displayName ?? undefined,
-      active: record.active,
     };
   }
 
@@ -1259,11 +1224,12 @@ export class EndpointScimGenericService {
           schemas.push({
             id: profileExt.id,
             attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+            isCoreSchema: false,
           });
         } else {
           const extSchema = this.schemaRegistry.getSchema(urn);
           if (extSchema) {
-            schemas.push(extSchema as SchemaDefinition);
+            schemas.push({ ...extSchema, isCoreSchema: false } as SchemaDefinition);
           }
         }
       }
@@ -1294,62 +1260,4 @@ export class EndpointScimGenericService {
     return this.getSchemaCacheForRT(resourceType, endpointId)?.requestReturnedByParent ?? new Map();
   }
 
-  /**
-   * Validate that attribute paths in a filter expression are known to the
-   * schema definitions for this resource type (RFC 7644 §3.4.2.2).
-   */
-  private validateFilterAttributePaths(
-    filter: string,
-    resourceType: ScimResourceType,
-    endpointId: string,
-  ): void {
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    if (schemaDefs.length === 0) return;
-
-    let ast;
-    try {
-      ast = parseScimFilter(filter);
-    } catch (err) {
-      // Syntax errors are handled by buildGenericFilter in the caller
-      if (process.env.NODE_ENV !== 'test') {
-        console.debug?.('[generic-service] Filter parse failed in validateFilterAttributePaths:', (err as Error).message);
-      }
-      return;
-    }
-    const paths = extractFilterPaths(ast);
-    if (paths.length === 0) return;
-
-    const result = SchemaValidator.validateFilterAttributePaths(paths, schemaDefs,
-      this.getAttrMapsForRT(resourceType, endpointId),
-    );
-    if (!result.valid) {
-      const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Filter validation failed: ${details}`,
-        diagnostics: {
-          errorCode: 'VALIDATION_FILTER',
-          triggeredBy: 'StrictSchemaValidation',
-          attributePaths: result.errors.map((e) => e.path),
-          activeConfig: { StrictSchemaValidation: true },
-          filterExpression: filter,
-        },
-      });
-    }
-  }
-
-  /**
-   * Resolve a potentially nested dotted path on an object.
-   * E.g. resolveNestedValue(obj, 'meta.created') → obj.meta.created
-   */
-  private resolveNestedValue(obj: Record<string, unknown>, path: string): unknown {
-    const parts = path.split('.');
-    let current: unknown = obj;
-    for (const part of parts) {
-      if (current == null || typeof current !== 'object') return undefined;
-      current = (current as Record<string, unknown>)[part];
-    }
-    return current;
-  }
 }

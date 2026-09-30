@@ -34,8 +34,10 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
+import { searchAttributeSelectionToQuery } from '../dto/search-attribute-selection';
 import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
+import { patchSuppliedPaths } from '../../../domain/patch/patch-presence';
 
 /**
  * Endpoint-specific SCIM Users Controller
@@ -143,11 +145,12 @@ export class EndpointScimUsersController {
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const writePayload = structuredClone(dto);
     const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
     const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 
@@ -258,8 +261,8 @@ export class EndpointScimUsersController {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
-          dto.attributes,
-          dto.excludedAttributes,
+          searchAttributeSelectionToQuery(dto.attributes),
+          searchAttributeSelectionToQuery(dto.excludedAttributes),
           alwaysByParent,
           requestByParent
         )
@@ -315,11 +318,12 @@ export class EndpointScimUsersController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const writePayload = structuredClone(dto);
     const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
     const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, writePayload);
     return this.attachWarnings(projected, config);
   }
 
@@ -339,11 +343,13 @@ export class EndpointScimUsersController {
     const { baseUrl, config, profile } = await this.validateAndSetContext(endpointId, req);
     enforcePatchSupported(profile);
     const ifMatch = req.headers['if-match'] as string | undefined;
+    const extensionUrns = profile?.resourceTypes?.find(rt => rt.name === 'User')?.schemaExtensions.map(ext => ext.schema) ?? [];
+    const suppliedPaths = patchSuppliedPaths(dto.Operations, extensionUrns);
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
     const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent, undefined, suppliedPaths);
     return this.attachWarnings(projected, config);
   }
 

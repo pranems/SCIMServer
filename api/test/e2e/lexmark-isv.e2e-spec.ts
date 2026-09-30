@@ -687,26 +687,29 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
       const t = ts();
       const userName = `dup-${t}@lexmark.com`;
       await scimPost(app, `${scimBasePath(epId)}/Users`, token, {
-        schemas: [CORE_SCHEMA],
+        schemas: [CORE_SCHEMA, ENTERPRISE_URN],
         userName,
         displayName: 'Dup User 1',
         active: true,
+        [ENTERPRISE_URN]: {},
       }).expect(201);
 
       const dup = await scimPost(app, `${scimBasePath(epId)}/Users`, token, {
-        schemas: [CORE_SCHEMA],
+        schemas: [CORE_SCHEMA, ENTERPRISE_URN],
         userName,
         displayName: 'Dup User 2',
         active: true,
+        [ENTERPRISE_URN]: {},
       });
       expect(dup.status).toBe(409);
     });
 
     it('should return 400 for POST without userName', async () => {
       const res = await scimPost(app, `${scimBasePath(epId)}/Users`, token, {
-        schemas: [CORE_SCHEMA],
+        schemas: [CORE_SCHEMA, ENTERPRISE_URN],
         displayName: 'No Username',
         active: true,
+        [ENTERPRISE_URN]: {},
       });
       expect(res.status).toBe(400);
     });
@@ -715,11 +718,12 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
       await scimDelete(app, `${scimBasePath(epId)}/Users/nonexistent-uuid`, token).expect(404);
     });
 
-    it('should create user with only required fields (userName)', async () => {
+    it('should create user with only required core fields and the required extension namespace', async () => {
       const t = ts();
       const res = await scimPost(app, `${scimBasePath(epId)}/Users`, token, {
-        schemas: [CORE_SCHEMA],
+        schemas: [CORE_SCHEMA, ENTERPRISE_URN],
         userName: `minimal-${t}@lexmark.com`,
+        [ENTERPRISE_URN]: {},
       }).expect(201);
 
       expect(res.body.id).toBeDefined();

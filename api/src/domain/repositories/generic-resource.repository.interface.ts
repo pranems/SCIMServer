@@ -5,6 +5,9 @@
  * with an arbitrary resourceType discriminator. All queries are scoped by
  * both endpointId AND resourceType to ensure proper data isolation.
  */
+import type { ExpectedVersion } from './write-precondition';
+import type { UniquenessPolicy } from './uniqueness-policy';
+import type { ProfileRevision } from './profile-revision';
 import type {
   GenericResourceRecord,
   GenericResourceCreateInput,
@@ -13,7 +16,7 @@ import type {
 
 export interface IGenericResourceRepository {
   /** Create a new generic resource and return the complete record. */
-  create(input: GenericResourceCreateInput): Promise<GenericResourceRecord>;
+  create(input: GenericResourceCreateInput, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<GenericResourceRecord>;
 
   /** Find a generic resource by its SCIM-visible id within an endpoint + resourceType. */
   findByScimId(
@@ -36,10 +39,10 @@ export interface IGenericResourceRepository {
   ): Promise<GenericResourceRecord[]>;
 
   /** Update a generic resource by its internal storage ID. */
-  update(id: string, data: GenericResourceUpdateInput): Promise<GenericResourceRecord>;
+  update(id: string, data: GenericResourceUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<GenericResourceRecord>;
 
   /** Delete a generic resource by its internal storage ID. */
-  delete(id: string): Promise<void>;
+  delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void>;
 
   /** Find a resource by externalId within an endpoint + resourceType. */
   findByExternalId(
