@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   assertOwnedContainerMetadata,
   assertLiveReceipt,
+  assertEmptyEndpointInventory,
   buildCommand,
   buildRuntimeEnv,
 } = require("./run.cjs");
@@ -27,6 +28,21 @@ assert.equal(
 assert.equal(env.PUBLIC_URL, "http://127.0.0.1:49152");
 assert.equal(env.SCIM_SHARED_SECRET, "owned-secret");
 assert.equal(env.OAUTH_CLIENT_SECRET, "owned-secret");
+assert.doesNotThrow(() =>
+  assertEmptyEndpointInventory({ endpoints: [], totalResults: 0 }),
+);
+assert.throws(
+  () =>
+    assertEmptyEndpointInventory({
+      endpoints: [{ id: "unexpected" }],
+      totalResults: 1,
+    }),
+  /empty endpoint inventory/,
+);
+assert.throws(
+  () => assertEmptyEndpointInventory([]),
+  /canonical endpoint inventory/,
+);
 
 const containerId = "a".repeat(64);
 const containerRun = "b".repeat(16);

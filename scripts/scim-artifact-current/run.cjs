@@ -104,6 +104,24 @@ function assertLiveReceipt(receipt) {
   }
 }
 
+function assertEmptyEndpointInventory(inventory) {
+  assert.equal(
+    Array.isArray(inventory?.endpoints),
+    true,
+    "Expected the canonical endpoint inventory envelope.",
+  );
+  assert.equal(
+    inventory.endpoints.length,
+    0,
+    "Exact artifact requires an empty endpoint inventory.",
+  );
+  assert.equal(
+    inventory.totalResults,
+    0,
+    "Exact artifact requires an empty endpoint inventory.",
+  );
+}
+
 function assertOwnedContainerMetadata(container, { id, run }) {
   assert.equal(container.Id, id, "Container identity changed.");
   assert.equal(
@@ -265,7 +283,7 @@ async function runBuiltRuntime({
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     assert.ok(before, `Owned ${backend} runtime did not become ready.`);
-    assert.deepEqual(before, [], "Exact-artifact database must start empty.");
+    assertEmptyEndpointInventory(before);
 
     const liveFile = path.join(output, `${backend}-live.json`);
     const live = execute(
@@ -615,6 +633,7 @@ if (require.main === module) {
 
 module.exports = {
   REQUIRED_LIVE_OUTCOMES,
+  assertEmptyEndpointInventory,
   assertOwnedContainerMetadata,
   assertLiveReceipt,
   buildCommand,
