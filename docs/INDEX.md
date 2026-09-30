@@ -26,6 +26,7 @@
 | Understand how endpoint profile changes coordinate with in-flight User, Group, and custom resource writes | [SCIM_PROFILE_REVISION_WRITE_COORDINATION.md](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md) |
 | Reconcile the completed RFC characteristic combinations without claiming an exhaustive Cartesian product | [SCIM_CHARACTERISTIC_RECONCILIATION.md](SCIM_CHARACTERISTIC_RECONCILIATION.md) |
 | Review measured candidate materialization, selectivity, latency, database work, and memory cost | [SCIM_QUERY_PERFORMANCE_ASSESSMENT.md](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md) |
+| Verify the exact locally built API artifact on owned InMemory and PostgreSQL backends | [Exact-artifact receipt](evidence/scim-exact-artifact-20260929/validation.json) |
 | Distinguish historical characteristic promises from optional behavior, including the original P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
 | Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
 | Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |

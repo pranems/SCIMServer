@@ -272,6 +272,23 @@ remains a consolidation gate, not a claimed completed check.
   Earliest/actual detection: final exact-tip wrapper invocation. Prevention:
   every guarded runner rewrite must be exercised by the preflight safety test,
   including checkout line-ending variance.
+- **C0-I64 - Windows npm wrapper launch / Low.** The first exact-artifact
+  invocation failed before the build or Docker because Node24 on Windows
+  returned `EINVAL` for direct `spawnSync npm.cmd`. The runner now resolves
+  the installed `npm-cli.js` and invokes it through the current Node
+  executable. A preflight contract locks the executable and argument shape.
+  Earliest/actual detection: first exact-artifact build invocation.
+  Prevention: task-owned Node orchestrators invoke JavaScript CLIs through
+  Node rather than relying on Windows command wrappers.
+- **C0-I65 - endpoint inventory envelope / Low.** The next invocation built
+  successfully, started the owned InMemory artifact and then stopped before
+  live contracts because the harness expected a bare empty array. The actual
+  canonical admin response is `{ endpoints: [], totalResults: 0 }`. A
+  dedicated assertion now requires that envelope before execution and compares
+  the complete envelope after cleanup. Positive and nonempty/wrong-shape
+  negative controls pass. Earliest/actual detection: built-artifact readiness
+  check. Prevention: harness assertions reuse the public wire contract rather
+  than an internal collection shape.
 
 **Test/gate improvement: applied.** Per-binding promise tests and admission
 publication checks close the original blind spots. **Design/architecture

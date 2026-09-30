@@ -38,11 +38,16 @@ benchmark measures the known residual boundary: a0.02%-selective numeric
 predicate transfers/materializes50,000 candidates (20.1MB,401ms local fetch
 p50) before returning5 rows, versus1 candidate/2.19ms for indexed equality.
 This is a documented scaling trade-off, not an inferred unchanged-cost claim.
-Only final exact-tip gates and clean handoff remain. No version, lockfile,
-release or deployment was changed. See
+The local exact-artifact gate builds257 JavaScript files and runs the same
+`dist/main.js` hash on both backends:166/166 live outcomes each, PostgreSQL
+17.8 with all22 migrations, unchanged endpoint inventories, exact PIDs stopped
+and exact container cleanup. Local implementation and acceptance are complete;
+push/PR CI, merge, version/release metadata and deployment remain separate
+approval boundaries. See
 [characteristic reconciliation](docs/SCIM_CHARACTERISTIC_RECONCILIATION.md),
 [performance assessment](docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md), and the
-[164-disposition evidence](docs/evidence/scim-current-acceptance-20260929/validation.json).
+[164-disposition evidence](docs/evidence/scim-current-acceptance-20260929/validation.json)
+plus [exact-artifact evidence](docs/evidence/scim-exact-artifact-20260929/validation.json).
 
 **Historical bounded PUT source receipt, 2026-09-29:** Based only on committed combined
 snapshot `5581e6b7`, [PUT entry preservation](docs/SCIM_PUT_ENTRY_PRESERVATION.md)
@@ -192,12 +197,12 @@ the separate `9991ff50` rollback unit.
 No package is deployed by this assembly. Product/version/lock metadata stays
 unchanged. P8b cleanup and its precise interrupted-create follow-up now have
 focused combined-backend proof; genuine DB faults and conditional 412 remain
-distinct. Final P7 PATCH integration depends
-on remaining follow-ups; the P2/P7 selected-value/cardinality and POST/PUT
-overlap checks pass. P7b closes namespace-only prevalidation and response
-presence; the binding-qualified compiler/admission bridge closes the runtime
-policy seam. Broader characteristics, profile coordination and the
-case-level/performance/artifact matrix remain open before C0.
+distinct. The P2/P7 selected-value/cardinality and POST/PUT overlap checks pass. P7b
+closes namespace-only prevalidation and response presence; the
+binding-qualified compiler/admission bridge closes the runtime policy seam.
+Broader characteristics, profile coordination, case-level reconciliation,
+performance and the built-artifact matrix are now closed by the current C0
+checkpoint.
 
 **Evidence boundary, parent checkpoint 2026-09-29:** P4's portable live receipt
 uses an owned loopback Nest listener inside the Node test process; it does not

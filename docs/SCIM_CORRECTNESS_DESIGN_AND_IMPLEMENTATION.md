@@ -1,6 +1,6 @@
 # SCIM correctness: design, implementation, and progress
 
-> **Status:** Local implementation and acceptance complete; final exact-tip gates pending
+> **Status:** Local implementation, source acceptance, performance, and exact-artifact gates complete
 >
 > **Last verified:** 2026-09-29
 >
@@ -11,6 +11,7 @@
 > [current 164-disposition ledger](evidence/scim-current-acceptance-20260929/validation.json),
 > [characteristic reconciliation](SCIM_CHARACTERISTIC_RECONCILIATION.md),
 > [query performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md),
+> [exact-artifact receipt](evidence/scim-exact-artifact-20260929/validation.json),
 > and [reproduction instructions](evidence/scim-fresh-20260925/repro-postgres/README.md).
 
 ## 1. What we are delivering
@@ -438,20 +439,19 @@ combined checkpoint has its own counts in section 11.1.
 | P4 | Integrated; focused combined validation passed | `212a6b92` and `66a7229f`: source evidence 205 units, 111 PostgreSQL HTTP / 110 InMemory HTTP plus one explicit PostgreSQL FK skip. [Implementation and evidence](SCIM_GROUP_TRANSACTIONS_IMPLEMENTATION.md). Section 11.5 records the raw-error correction and live wiring |
 | P5 | Integrated | Shared JSON search boundary and scalar SCIM errors; 354 unit tests, 61 HTTP tests per backend, 61 live assertions. [Implementation and evidence](SCIM_SEARCH_CONTRACT_IMPLEMENTATION.md). Release metadata and final consolidation remain pending |
 | P6 | Integrated; focused combined validation passed | P6a capability boundary preserved. P6b `cc3ccdbc` adds [query semantics](SCIM_QUERY_SEMANTICS_IMPLEMENTATION.md): source evidence 616 units, 156 HTTP and 32 live checks per backend, PostgreSQL 17.8 and 22 migrations |
-| P7 | P7b assembled; broader acceptance open | Context, expectations and binding-qualified runtime/admission are preserved. P7b source `3cd17ac3` adds whole namespaces, evolving binding/attribute transitions and supplied response presence. Combined184 overlap units,553 HTTP/backend, built P7b153/905 plus P7a472/backend pass; section11.32. |
+| P7 | Integrated and accepted locally | Context, expectations and binding-qualified runtime/admission are preserved. P7b source `3cd17ac3` adds whole namespaces, evolving binding/attribute transitions and supplied response presence. Combined184 overlap units,553 HTTP/backend and exact-artifact P7b153/905 plus P7a472/backend pass; sections11.32-11.35. |
 | P8 | Exact interrupted-create contract integrated and focused parity verified | `d8441f46` -> `6a52ae32`; 247 units, 131 InMemory/135 PostgreSQL HTTP and 16 built-live checks per backend. P3/P3b/P4/P8c arguments/transactions preserved, exact 404 distinct from 412/member/outage/trigger errors. [Integrated receipt](evidence/scim-endpoint-errors-20260929/validation.json); final case-level lifecycle/C0 reconciliation remains |
 | P9 | All 19 cases default-running; frozen receipt preserved | [Entra guidance/corpus](SCIM_ENTRA_COMPATIBILITY.md), [37 settings evidence/gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md). Unchanged I02/I03 pass on both backends, then TODO/env dispatch removed. Separate built runtimes each pass 19/1228; source 17-supported/2-pending receipt remains historical |
-| C0 | Corrected source assembly verified in focused lanes; final acceptance open | Checkpoints through11.32; query, binding-qualified admission and bounded P7b failures are closed. Original82-case/backend ledger, broader characteristic/coordination/performance/artifact acceptance remain open |
+| C0 | Local acceptance complete | Original82 cases/backend reconciled, broader characteristic/profile coordination closed,50,000-row query cost measured and exact `dist/main.js` hash passed166 live outcomes/backend on InMemory/PostgreSQL17.8 after22 migrations; sections11.34-11.35. Publication remains separate. |
 | P6c/P6d | Corrected source pair and cross-package query regression verified | `f77786c4` -> `09b59b43`, `2aa96f0b` -> `8f3510a8`; explicit-false role fix follows2unit/2HTTP REDs.398IM/399PG HTTP,52query live and45/45typed authority outcomes/backend. Initial numeric-common interpretation superseded, not accepted; section11.27 |
 
-**Current overall progress:** design/evidence validated for the baseline commit;
-P1, P3/P4, P5, P6a/P6b, P7a, P8a/P8b/P8c and P9 are implemented and locally validated in their source worktrees,
-and integrated here. The bounded package and focused overlap checks passed;
-P9's unchanged I02/I03 now pass by default after authorized P2 integration.
-The final combined matrix,
-release metadata, PR, and deployment remain pending. Other statuses are owned by their independent
-implementation contexts. This section is updated at package boundaries. Detailed
-issues are recorded in the [execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+**Current overall progress:** design/evidence, package assembly,164 backend
+dispositions, characteristic/profile reconciliation, performance measurement
+and the exact locally built artifact matrix are complete. P9's unchanged
+I02/I03 pass by default after authorized P2 integration. Release metadata,
+push/PR exact-tip CI, merge and deployment remain pending approval boundaries,
+not local correctness blockers. Detailed issues are recorded in the
+[execution RCA ledger](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
 
 ### 11.1 Initial integration checkpoint, 2026-09-28
 
@@ -2334,7 +2334,7 @@ change. See
 | Controlled races and Group rollback | Current wire/barrier cases, aggregate fault cases, and profile-revision race suite passed |
 | Endpoint cleanup, freshness, concurrent deletion contract | Current case ledger plus P8 focused guarded tests passed |
 | P6b resource cost | Measured and documented without an unchanged-cost claim |
-| Built-runtime exact-tip proof | Remains the final separate local gate; no deployment claim |
+| Built-runtime exact-tip proof | Passed: one257-file `dist` hash,166 live outcomes/backend, PostgreSQL17.8/all22 migrations, endpoint inventories unchanged and exact cleanup |
 
 **Assurance improvement: applied.** Historical inputs stay immutable while a
 hash-guarded adapter names each current-architecture change and preserves raw
@@ -2342,6 +2342,35 @@ calibration evidence. Performance records scaling inputs and work, not only
 elapsed time. **Design/architecture disposition: accepted.** The adapter and
 benchmark are task-owned assurance tools; product seams remain unchanged and a
 new query optimizer is deferred until it has its own semantic contract.
+
+### 11.35 Exact locally built artifact closure, 2026-09-29
+
+The remaining local artifact gate built the committed API once and hashed257
+JavaScript files under `api/dist` as
+`90315ba793c9121eb6a47f0be45259b572d068aaafbde09b3afe715288e119b4`.
+That same `dist/main.js` artifact ran in separate loopback processes on
+InMemory and a task-owned PostgreSQL17.8 container after all22 migrations.
+
+Each backend passed166 tracked live outcomes with no failure. Mandatory outcome
+checks include126 binding-qualified uniqueness/admission/query assertions,
+472 P7 profile assertions,19 default Entra cases/1228 assertions,6 retention
+stability cases/5474 assertions, and153 P7b PATCH/schema cases/905 assertions.
+The endpoint inventory was empty before and unchanged after each run. Both
+owned process IDs stopped; the exact labeled PostgreSQL container was removed,
+with no persistent volume or custom network.
+
+Permanent evidence:
+[validation.json](evidence/scim-exact-artifact-20260929/validation.json).
+This is a local build artifact, not a published immutable image. No push, PR
+CI, merge, release metadata, deployment, shared database or live estate is
+claimed.
+
+**Assurance improvement: applied.** The task-owned runner rejects a dirty
+source, noncanonical endpoint envelope, failed/incomplete live receipt,
+missing recent contract marker and wrong-owner container before making a
+success claim. **Design/architecture disposition: accepted.** It composes the
+existing shared live contract and P7b corpus around the production artifact;
+it adds no product runtime seam or second acceptance implementation.
 
 ## 12. Architecture and self-improvement decisions
 

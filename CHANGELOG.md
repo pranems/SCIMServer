@@ -19,10 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   functional GREEN: an indexed equality transfers1 row at2.190ms local p50,
   while a0.02%-selective custom numeric filter transfers50,000 rows/20.1MB at
   401.049ms fetch p50 and evaluates50,000 candidates at23.203ms service p50.
+  The exact locally built `api/dist/main.js` hash passes166/166 live outcomes
+  on both InMemory and PostgreSQL17.8 after all22 migrations, including
+  binding-qualified uniqueness, P7 profile/P7b PATCH contracts,19 Entra cases
+  and PUT/PATCH retention. Endpoint inventories are unchanged, both owned
+  processes stop and the exact disposable container is removed.
   No migration, version, lockfile, deployment, live-data, or speculative query
   optimizer change.
   [Acceptance and characteristic evidence](docs/SCIM_CHARACTERISTIC_RECONCILIATION.md)
-  and [performance assessment](docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md).
+  and [performance assessment](docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md);
+  [exact-artifact receipt](docs/evidence/scim-exact-artifact-20260929/validation.json).
 
 ### Fixed - endpoint profile revision write coordination, not released
 - Resource writes now carry the content revision of the endpoint profile used

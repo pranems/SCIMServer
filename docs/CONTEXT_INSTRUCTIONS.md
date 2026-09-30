@@ -31,10 +31,15 @@ and0 failures. Broader characteristic overlays are mapped to permanent tests
 without a Cartesian-coverage claim. The50,000-row query benchmark records the
 known residual cost boundary:50,000 candidates and20.1MB transferred for a
 0.02%-selective custom numeric filter,401ms local fetch p50 and23ms service
-p50. Only the final exact-tip matrix and clean handoff remain.
+p50. The exact locally built `dist/main.js` artifact then passes166 live
+outcomes/backend on InMemory and PostgreSQL17.8 after all22 migrations; both
+owned PIDs stop and exact container cleanup passes. Local implementation and
+acceptance are complete. Push/PR CI, merge, release metadata and deployment
+remain approval boundaries.
 [Characteristic mapping](SCIM_CHARACTERISTIC_RECONCILIATION.md),
 [performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md), and
-[case evidence](evidence/scim-current-acceptance-20260929/validation.json).
+[case evidence](evidence/scim-current-acceptance-20260929/validation.json)
+plus [artifact evidence](evidence/scim-exact-artifact-20260929/validation.json).
 
 **Corrected source pair:** `4ba9373c` was held for violating the common
 externalId contract. Corrective child `2d2da4e1` restores all-core String/SV
@@ -72,9 +77,10 @@ P8a/P8b/P8c and P9. [The integration tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEM
 owns current combined results; the records below are source-package evidence,
 not deployment claims. P4's raw repository-error gap was closed separately
 with value/content regressions, not assumed fixed by P5's scalar formatting.
-Remaining P7 schema-role/id/meta context, P3b representation/admission/query and case-level
-dispositions still block C0. Scoped precise interrupted-create errors now have
-combined proof; cleanup/no-orphan checks alone are not error-contract proof.
+P7 schema-role/id/meta context, P3b representation/admission/query and the
+case-level dispositions were later closed in the current C0 acceptance.
+Scoped precise interrupted-create errors have combined proof;
+cleanup/no-orphan checks alone are not error-contract proof.
 
 P9 is locally implemented on P7a/P1: emitted strict-on Entra guidance,
 honest fixed/inert setting descriptions and a shared 17-case HTTP/live
@@ -110,9 +116,10 @@ Integration `8d5915ba` -> `e80da689` separately passes754 units,
 22 migrations, and143 shared live checks/backend including472 P7 assertions.
 [Combined receipt](evidence/scim-common-context-integration-20260929/validation.json).
 Existing common-PATCH and PUT retention fixes are preserved, not reopened.
-Namespace-only strict validation is now integrated through P7b. Broader
-characteristic and profile-coordination consumers remain open. The parent-owned eight-expectation
-reconciliation is integrated as`df3ca957` -> `bd82e681`:142 tests in three
+Namespace-only strict validation is integrated through P7b. Broader
+characteristic and profile-coordination consumers are now closed by the
+current characteristic map and profile-revision proof. The parent-owned
+eight-expectation reconciliation is integrated as`df3ca957` -> `bd82e681`:142 tests in three
 suites pass with exact assertions and four opposing controls; no production
 change, skipped case or database rerun was introduced.
 

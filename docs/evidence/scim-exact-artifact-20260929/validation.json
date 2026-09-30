@@ -1,0 +1,56 @@
+{
+  "status": "passed",
+  "scope": "Exact locally built API artifact on owned InMemory and PostgreSQL backends",
+  "source": {
+    "head": "687e6e2ee2a1c01a331ab3dccb7e4f9778f9d162",
+    "branch": "integrate/scim-correctness-20260928",
+    "apiTree": "76e4a9aa469659edd832e4c0c55afee291e7126f",
+    "node": "v24.13.0"
+  },
+  "build": {
+    "command": "npm run build through installed npm-cli.js and the current Node executable",
+    "artifact": "api/dist/main.js",
+    "javascriptFiles": 257,
+    "sha256": "90315ba793c9121eb6a47f0be45259b572d068aaafbde09b3afe715288e119b4"
+  },
+  "backends": {
+    "inmemory": {
+      "command": "node api/dist/main.js",
+      "liveOutcomesPassed": 166,
+      "liveOutcomesFailed": 0,
+      "endpointCollectionUnchanged": true,
+      "ownedProcessStopped": true
+    },
+    "postgresql": {
+      "command": "node api/dist/main.js",
+      "version": "17.8",
+      "migrationsReplayedAndVerified": 22,
+      "liveOutcomesPassed": 166,
+      "liveOutcomesFailed": 0,
+      "endpointCollectionUnchanged": true,
+      "ownedProcessStopped": true
+    }
+  },
+  "requiredOutcomesPerBackend": [
+    "126 binding-qualified uniqueness/admission/query/cleanup assertions",
+    "472 declaration/binding-context/POST/PUT/projection assertions",
+    "19 default-running Entra cases and 1228 assertions",
+    "6 PUT/PATCH retention stability cases and 5474 assertions",
+    "153 P7b PATCH/schema cases and 905 assertions"
+  ],
+  "cleanup": {
+    "exactOwnedContainerRemoved": true,
+    "persistentVolumesCreated": 0,
+    "customNetworksCreated": 0,
+    "sharedDatabaseOrEstateUsed": false
+  },
+  "rawReceipt": "test-results/scim-artifact-current/687e6e2ee2a1-42cd82ba1b07ea76/receipt.json",
+  "notClaimed": [
+    "published immutable container image",
+    "push or pull request CI",
+    "merge",
+    "deployment",
+    "shared live estate validation",
+    "release metadata or version change"
+  ]
+}
