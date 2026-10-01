@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Release assurance follow-up
+
+- Correct the backend-matrix gate so a missing `DATABASE_URL` exits 2 before
+  tests unless the caller explicitly selects `-SkipPrisma`. A functional
+  subprocess RED/GREEN contract proves both the fail-closed default and the
+  explicit reduced-matrix path.
+- Preserve future dev Playwright outcomes with the readable line reporter and
+  a timestamped JSON report beside the deployment receipt. The JSON report
+  retains every skipped test and annotation; aggregate counts and
+  `.last-run.json` do not.
+- Reconcile the unchanged shipped API tree on a guarded exact-tip PostgreSQL
+  database: 209/209 unit suites with 6,004/6,004 tests and 118/118 E2E suites
+  with 2,485/2,485 tests pass after all 22 migrations, followed by ownership
+  verification and exact container cleanup.
+- Record explicit source-bound dispositions for the nine reviewer-judgment
+  gates. A focused current browser classification names four skips and has an
+  effective 49 pass / 4 skip / 0 fail result after an exact serial rerun of
+  five transient blank-page outcomes. The visual diffs were inspected and no
+  baseline was regenerated.
+- These are assurance-harness and documentation corrections. They do not
+  change the v0.55.36 runtime or deployed purplecliff artifact.
+
 ## [0.55.36] - 2026-09-30
 
 ### Released to dev - SCIM correctness consolidation

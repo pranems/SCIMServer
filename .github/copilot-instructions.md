@@ -597,7 +597,7 @@ After implementation AND before considering work complete, ALL of the following 
 2.3. **Web vitest** - `cd web; npm test` -> all suites pass. Capture counts.
 2.4. **Web vitest coverage gate** - `cd web; npm run test:coverage` -> meets Phase H4 ratchet thresholds (lines:78 / branches:70 / functions:65 / statements:75 floor; raise as repo improves, never lower).
 2.5. **`crossBackendParityAudit` prompt** - For ANY change that touches a file with an `isInMemoryBackend` branch, walk through the parity matrix (Q1-Q4) and confirm both backends behave identically. This is the Finding-B preventer (May 2026 - InMemory endpoint-create was missing the duplicate-name guard Prisma had).
-2.6. **API + Web tests across persistence backends** - `pwsh scripts/test-all-modes.ps1` (Phase H5 orchestrator) covers 6 modes including api-unit-prisma + api-unit-inmemory + api-e2e-prisma + api-e2e-inmemory. Companion runner to 2.5; the prompt does the thinking, the orchestrator does the execution.
+2.6. **API + Web tests across persistence backends** - `pwsh scripts/test-all-modes.ps1` (Phase H5 orchestrator) covers 6 modes including api-unit-prisma + api-unit-inmemory + api-e2e-prisma + api-e2e-inmemory. Companion runner to 2.5; the prompt does the thinking, the orchestrator does the execution. Missing `DATABASE_URL` MUST exit 2 before any mode runs unless the caller explicitly supplies `-SkipPrisma`. A run using `-SkipPrisma` is a reduced matrix and MUST be reported that way; it is never six-mode evidence.
 
 2.7. **API unit + E2E run at PUSH time, not only on request** (added 2026-08-27, operator-approved). `scripts/pre-push-checks.ps1` **Fast** mode - the mode the `.githooks/pre-push` hook uses by default - now includes `api: unit tests (jest)` and `api: e2e tests (inmemory, maxWorkers=2)`.
 
@@ -641,7 +641,7 @@ Stage 3 is split into three sub-stages by the SCOPE of what each prompt audits. 
 ### Stage 5 - UI-Specific Gates (when the change touches `web/`)
 5.1. **`uiTestAndValidation` prompt** - Full React/vitest test suite + a11y + visual regression sanity check.
 5.2. **`playwrightSpecHygieneAudit` prompt** - Audit `web/e2e/*.spec.ts` files against the currently-shipped UI surface. Delete stale specs (specs testing components deleted in Phase I v0.48.0: `raw-logs`, `manual-provision`, `database-browser`, `app-shell`, `activity-feed`, `live-data-verification`, `new-ui`). Run this BEFORE 5.3 so the next run produces a trustworthy signal.
-5.3. **Playwright E2E vs dev** - `cd web; $env:E2E_BASE_URL='<dev FQDN>'; npx playwright test --reporter=line` -> all currently-live specs pass. Visual-regression baseline drift is acceptable only when accompanied by a CHANGELOG entry justifying the UI evolution AND fresh baselines committed in the same change.
+5.3. **Playwright E2E vs dev** - `cd web; $env:E2E_BASE_URL='<dev FQDN>'; $env:PLAYWRIGHT_JSON_OUTPUT_FILE='<report path>'; npx playwright test --reporter=line,json` -> all currently-live specs pass. Retain the JSON report beside the deployment report so every skipped test and annotation remains auditable; aggregate counts and `.last-run.json` are insufficient. Visual-regression baseline drift is acceptable only when accompanied by a CHANGELOG entry justifying the UI evolution AND fresh baselines committed in the same change.
 5.4. **Browser binary sync** - If `npx playwright install` is required (binary version drift), run it as a one-shot setup step before 5.3. Not a per-commit gate, but a per-branch / per-clean-clone gate.
 
 ### Stage 6 - Commit Hygiene + Release Documentation

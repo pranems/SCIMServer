@@ -25,6 +25,20 @@ independent GET evidence match on both nodes, reject bracket/dotted-key
 corruption, and both dedicated fixtures were deleted. Customer production and
 the parallel-prod canary remain unchanged.
 
+Final assurance now includes a guarded exact-tip PostgreSQL rerun at
+`b304f663`: 209/209 unit suites and 6,004/6,004 tests, 118/118 E2E suites and
+2,485/2,485 tests, all 22 migrations, and exact cleanup. The
+[release-assurance receipt](evidence/scim-release-assurance-20260930/validation.json)
+records all nine review dispositions, browser supersession, four current skip
+identities, and limitations. Five blank-page outcomes in the focused skip
+classification passed an exact serial rerun after their visual diffs were
+inspected; no baseline was regenerated. Current dev reports 71 long-lived
+active endpoints rather than the historical deployment snapshot's 60, while
+the focused run retained zero created or updated endpoints. Do not rewrite the
+historical receipt or delete those entries without separate provenance.
+Operator visual sign-off is still required before any production-readiness
+statement.
+
 **Historical C0 local-acceptance checkpoint:** common attribute normalization now
 feeds runtime uniqueness compilation per ResourceType, and admission uses the
 same compiler before profile publication. Shared declarations are unchanged;

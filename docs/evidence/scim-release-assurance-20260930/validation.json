@@ -1,0 +1,239 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-30T20:43:04-06:00",
+  "status": "passed_with_documented_limitations",
+  "scope": "Final assurance reconciliation for the SCIM correctness v0.55.36 dev release",
+  "source": {
+    "releaseMergeSha": "d6e9a497315739b62ea11d2194a919944c376c31",
+    "browserFollowUpMergeSha": "b304f663b4c0414b40402034660cd31ff8a4d6a6",
+    "assuranceBaseSha": "b304f663b4c0414b40402034660cd31ff8a4d6a6",
+    "apiTreeSha": "bb2c5d1e301a6f55e3aad6aa8609721a5c736063",
+    "releaseApiTreeSha": "bb2c5d1e301a6f55e3aad6aa8609721a5c736063",
+    "runtimeFilesChangedAfterReleaseMerge": 0
+  },
+  "deployment": {
+    "version": "0.55.36",
+    "estatePurpose": "dev",
+    "revision": "scimserver-dev--vd6e9a497",
+    "trafficPercent": 100,
+    "imageDigest": "sha256:49719babb9966b416312b25d99d2b30feddb219d0c266664eaf0688f7afc7f21",
+    "customerProductionChanged": false,
+    "parallelProductionChanged": false
+  },
+  "exactTipPostgresql": {
+    "status": "passed",
+    "sourceSha": "b304f663b4c0414b40402034660cd31ff8a4d6a6",
+    "unit": {
+      "suitesPassed": 209,
+      "suitesFailed": 0,
+      "testsPassed": 6004,
+      "testsFailed": 0,
+      "durationSeconds": 142.796
+    },
+    "e2e": {
+      "suitesPassed": 118,
+      "suitesFailed": 0,
+      "testsPassed": 2485,
+      "testsFailed": 0,
+      "testsSkipped": 0,
+      "durationSeconds": 1480.163
+    },
+    "database": {
+      "image": "postgres:17-alpine",
+      "migrationsReplayed": 22,
+      "loopbackOnly": true,
+      "tmpfsData": true,
+      "inheritedDatabaseUrlUsed": false
+    },
+    "cleanup": {
+      "ownedContainerId": "a28d61cbbd6d4418e8e02b35322d51714954245eaff2fc540fd68b55be92a7f9",
+      "ownershipGuardPassed": true,
+      "exactOwnedContainerRemoved": true,
+      "restoredScimContainersUnchanged": true
+    },
+    "rawReceipt": "test-results/release-prisma-matrix/b304f663b4c0-8f486a3320e84de9/receipt.json"
+  },
+  "browser": {
+    "historicalDeploymentReceipt": {
+      "path": "test-results/dev-deploy-2026-09-30-101631.md",
+      "stage53Status": "failed",
+      "cause": "The required-extension fixture read binding metadata from the core Schema resource instead of ResourceTypes/User.",
+      "preservedAsHistorical": true
+    },
+    "supersession": {
+      "pullRequest": 190,
+      "mergeSha": "b304f663b4c0414b40402034660cd31ff8a4d6a6",
+      "focusedCorrectionPassed": 1,
+      "completeDevPassed": 247,
+      "completeDevSkipped": 5,
+      "completeDevFailed": 0,
+      "historicalSkipIdentitiesRecoverable": false,
+      "reason": "The historical run retained aggregate console counts and Playwright .last-run.json, which contains only status and failedTests."
+    },
+    "currentSkipClassification": {
+      "scope": "All ten specs containing executable test.skip calls",
+      "initialRun": {
+        "passed": 44,
+        "skipped": 4,
+        "failed": 5
+      },
+      "failureClassification": {
+        "routerBlankPageFailures": 2,
+        "visualBlankPageFailures": 3,
+        "visualDiffsInspected": true,
+        "actualImageDescription": "All three failed visual captures were the same 1440x900 solid #0F1115 blank page, not an intended UI change.",
+        "baselinesRegenerated": false
+      },
+      "exactFailureRerun": {
+        "workers": 1,
+        "passed": 5,
+        "skipped": 0,
+        "failed": 0
+      },
+      "effectiveOutcome": {
+        "passed": 49,
+        "skipped": 4,
+        "failed": 0
+      },
+      "skips": [
+        {
+          "file": "web/e2e/operations-page.spec.ts",
+          "test": "the All-users table renders all 4 columns bounded (userName does not swallow the row)",
+          "reason": "Tenant has zero users; the All-users table is not rendered.",
+          "classification": "environment_data_precondition"
+        },
+        {
+          "file": "web/e2e/router-behavior.spec.ts",
+          "test": "hovering Endpoints sidebar link triggers /scim/admin/endpoints fetch before click",
+          "reason": "Hover-prefetch network observability is suppressed by the onboarding query and is locked by the router loader unit contract.",
+          "classification": "intentional_design_exclusion"
+        },
+        {
+          "file": "web/e2e/sse-cross-tab.spec.ts",
+          "test": "Tab A creates user, Tab B refetches WITHOUT manual reload",
+          "reason": "The test requires a local Vite server with MSW; server-side SSE behavior is covered by API E2E and live checks.",
+          "classification": "environment_specific"
+        },
+        {
+          "file": "web/e2e/visual-regression.spec.ts",
+          "test": "Endpoint detail - Overview tab",
+          "reason": "The disposable snapshot endpoint could not be created during the parallel focused run.",
+          "classification": "transient_fixture"
+        }
+      ],
+      "rawJson": [
+        "test-results/playwright-skip-capable-dev-20260930.json",
+        "test-results/playwright-skip-capable-failure-rerun-dev-20260930.json"
+      ]
+    },
+    "futureEvidence": {
+      "dualReporter": [
+        "line",
+        "json"
+      ],
+      "durableJsonPattern": "test-results/playwright-dev-<timestamp>.json",
+      "sourceContractPassed": true,
+      "prePushWired": true
+    }
+  },
+  "acceptanceEvidence": {
+    "currentCorpus": {
+      "casesPerBackend": 82,
+      "backendDispositions": 164,
+      "passedDispositions": 163,
+      "acceptedNotApplicable": 1,
+      "assertionsPassed": 769,
+      "assertionsFailed": 0,
+      "receipt": "docs/evidence/scim-current-acceptance-20260929/validation.json"
+    },
+    "exactBuiltArtifact": {
+      "liveOutcomesPerBackend": 166,
+      "failedOutcomesPerBackend": 0,
+      "receipt": "docs/evidence/scim-exact-artifact-20260929/validation.json"
+    },
+    "characteristics": {
+      "status": "complete_enumerated_mapping",
+      "exhaustiveCartesianClaim": false,
+      "document": "docs/SCIM_CHARACTERISTIC_RECONCILIATION.md"
+    },
+    "performance": {
+      "datasetRows": 50000,
+      "indexedEqualityFetchP50Ms": 2.19,
+      "residualFetchP50Ms": 401.049,
+      "residualServiceP50Ms": 23.203,
+      "residualRowsTransferred": 50000,
+      "document": "docs/SCIM_QUERY_PERFORMANCE_ASSESSMENT.md"
+    }
+  },
+  "auditDispositions": [
+    {
+      "gate": "addMissingTests",
+      "status": "passed",
+      "basis": "The immutable 82-case corpus, 164 backend dispositions, 769 assertions, 166 exact-artifact outcomes per backend, 6,004 exact-tip unit tests, 2,485 exact-tip PostgreSQL E2E tests, and current browser outcome checks cover the release delta. Characteristic coverage is enumerated without an exhaustive Cartesian claim."
+    },
+    {
+      "gate": "apiContractVerification",
+      "status": "passed",
+      "basis": "Permanent API response-contract suites, exact outer-key allowlists, no-underscore checks, the exact interrupted-create envelope receipt, and 166 built-live outcomes per backend passed. No API tree changed after the release merge."
+    },
+    {
+      "gate": "error-handling-verification",
+      "status": "passed",
+      "basis": "Repository, filter, conditional-write, diagnostics, exact interrupted-create, bulk and global-error suites passed in the exact-tip 2,485-test PostgreSQL E2E run. Exact error receipts assert status, SCIM type, diagnostics keys, non-mutation and driver-detail suppression."
+    },
+    {
+      "gate": "logging-verification",
+      "status": "passed",
+      "basis": "Logging configuration, endpoint-scoped logs, diagnostics enrichment, request-body privacy and auth decision suites passed in exact-tip unit/E2E and live evidence. No new runtime logging path exists in this assurance follow-up."
+    },
+    {
+      "gate": "auditAgainstRFC",
+      "status": "passed",
+      "basis": "RFC declaration/default, type, cardinality, required, mutability, returned, caseExact, uniqueness, primary and retained-entry behavior is mapped to permanent two-backend evidence in SCIM_CHARACTERISTIC_RECONCILIATION.md."
+    },
+    {
+      "gate": "securityAudit",
+      "status": "passed",
+      "basis": "PRs 188 and 190 have successful CodeQL and validate checks. The release image passed Trivy; production dependency audit had zero HIGH or CRITICAL findings. Auth, credential, response-leak, security-header and input-validation tests remained green."
+    },
+    {
+      "gate": "performanceBenchmark",
+      "status": "passed_with_accepted_limitation",
+      "basis": "The 50,000-row benchmark measures indexed and residual paths, selectivity, transferred rows and bytes, database and service latency, and RSS. Residual JSONB filtering is correct but materializes all candidates; schema-aware pushdown remains a separate optimization contract."
+    },
+    {
+      "gate": "codeReviewSelfAudit",
+      "status": "passed",
+      "basis": "Package-scoped independent reviews closed their findings before integration. The assurance follow-up changes scripts, contracts and documentation only, with no production TypeScript or API tree delta. Harness changes are narrow and covered by executable contracts."
+    },
+    {
+      "gate": "auditAndUpdateDocs",
+      "status": "passed",
+      "basis": "The design, RCA, changelog, session context, assistant context, documentation index, engineering patterns and this final evidence receipt were reconciled. Mechanical content, freshness, JSON and Mermaid gates are required before merge."
+    }
+  ],
+  "estateInventoryObservation": {
+    "historicalDeploymentSnapshot": 60,
+    "currentAuthoritativeList": 71,
+    "currentActive": 71,
+    "currentInactive": 0,
+    "createdSinceFocusedBrowserRun": 0,
+    "updatedSinceFocusedBrowserRun": 0,
+    "additionalEntries": 11,
+    "additionalEntriesAreLongLived": true,
+    "classification": "not_created_or_modified_by_current_assurance_run",
+    "limitation": "The 11 active entries have August or September creation timestamps and unchanged pre-run update timestamps, but were absent from the historical 60-ID snapshot. Their intervening provenance cannot be reconstructed from the deployment receipt, so the historical 60-to-60 result remains preserved rather than rewritten."
+  },
+  "limitations": [
+    "The exact identities of all five skips in the historical 247-pass dev run cannot be recovered from the retained aggregate artifact.",
+    "The current focused run names four current skips; it does not retroactively identify the historical fifth skip.",
+    "The current 71-endpoint dev enumeration differs from the historical 60-ID deployment snapshot, but the focused assurance run created or updated zero endpoints.",
+    "Operator visual verification has not been recorded, so this receipt is not a production-readiness declaration."
+  ],
+  "selfImprovement": {
+    "testAndGateDisposition": "applied",
+    "testAndGateReason": "The backend matrix now fails closed when PostgreSQL is omitted, and dev Playwright runs retain item-level JSON evidence. The retained JSON made the blank-page failure and four current skip identities reviewable without rerunning the complete suite.",
+    "designAndArchitectureDisposition": "accepted",
+    "designAndArchitectureReason": "The changes remain in existing harness and documentation seams. A new runtime abstraction or query optimizer would be speculative and outside this assurance-only rollback unit."
+  }
+}

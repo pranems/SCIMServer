@@ -32,6 +32,23 @@ exact-artifact per backend, 1,697/1,697 Docker live, 1,568 web Vitest, coverage,
 25 size-budget and supply-chain evidence. Customer production and the
 parallel-prod canary were not modified.
 
+**Final assurance reconciliation, 2026-09-30:** the unchanged shipped API tree
+at browser follow-up `b304f663` passes a new guarded exact-tip PostgreSQL
+matrix: 209/209 unit suites and 6,004/6,004 tests, 118/118 E2E suites and
+2,485/2,485 tests, all 22 migrations, ownership guard, and exact container
+cleanup. All nine reviewer-judgment gates now have explicit source-bound
+dispositions in the
+[release-assurance receipt](docs/evidence/scim-release-assurance-20260930/validation.json).
+The historical 247-pass / 5-skip browser aggregate cannot yield its five skip
+identities; a focused current classification names four skips and, after an
+exact serial rerun of five blank-page outcomes, has an effective 49 pass /
+4 skip / 0 fail result. Visual diffs were inspected and no baseline was
+regenerated. The focused run retained no created or updated endpoint. Current
+dev returns 71 long-lived active endpoints versus the historical 60-ID
+snapshot; that provenance limitation is recorded without deleting or repairing
+live data. Operator visual sign-off remains required before a production-ready
+claim.
+
 **Historical C0 local-acceptance checkpoint, 2026-09-29:**
 The effective common view now reaches runtime uniqueness compilation and
 profile admission. One schema can remain numeric/MV under an extension
@@ -274,18 +291,21 @@ without applying POST/PUT required checks to partial PATCH views.
 - [x] ✅ COMPLETED: P8b exact six-route interrupted-create errors integrated with current transactions; `9z-CX` now supplies 16 checks.
 - [x] ✅ COMPLETED: P3b fourth source `704d701f` -> `7001d194`; generic write authority verified with current P3/P4/P7/P8 seams on both backends.
 - [x] ✅ COMPLETED: Measured numeric/MV displayName equality failures and explicit extension-role query regression, with real query/write/schema parity proof.
-- [ ] Close remaining characteristic coverage and profile-revision coordination before C0.
+- [x] ✅ COMPLETED: Remaining characteristic coverage and profile-revision coordination before C0.
 - [x] ✅ COMPLETED: Parent test-only reconciliationdf3ca957 -> bd82e681 closes the eight legacy expectations with exact assertions, four opposing controls and142 merged unit passes, without skips.
 - [x] ✅ COMPLETED: P7b source `3cd17ac3` assembled once with later accepted seams preserved.
 - [x] ✅ COMPLETED: Bounded P7b namespace PATCH, required-binding transitions and request-only responses with both-backend/live proof.
 - [x] ✅ COMPLETED: Broader characteristic overlays and profile-revision coordination.
 - [x] ✅ COMPLETED: Exact built-artifact live behavior and measured P6b candidate-materialization cost.
 - [x] ✅ COMPLETED: All 164 backend dispositions in the canonical 82-case ledger plus incident/route/settings/characteristic overlays.
-- [ ] Final handoff: supply a scoped, restorable-backup and dry-run repair proposal for separate operator approval; never claim P1 repaired existing live data.
-- [ ] Release metadata on the approved runner, review/PR and deployment remain separate checkpoints.
+- [x] ✅ COMPLETED: Release metadata, reviewed PR #188, exact-tip CI, merge, immutable image publication and purplecliff dev deployment.
+- [x] ✅ COMPLETED: Local-to-dev typed PATCH incident replication, persisted readback and exact fixture cleanup without live-data repair.
+- [x] ✅ COMPLETED: Automated final assurance with exact-tip PostgreSQL evidence, current browser skip identities and nine named review dispositions.
+- [ ] Merge the assurance-only scripts/docs follow-up and obtain explicit operator visual sign-off before any production-readiness claim. Customer production remains a separate approval boundary.
 
 | Date | Summary |
 | --- | --- |
+| 2026-09-30 | **Final automated release assurance is reconciled.** The unchanged shipped API tree passes 209/209 PostgreSQL unit suites with 6,004 tests and 118/118 PostgreSQL E2E suites with 2,485 tests after all 22 migrations and exact cleanup. Browser supersession, four current skip identities, all nine review dispositions, Docker recovery evidence and the 71-versus-60 dev inventory limitation are recorded in the final receipt. The harness now fails closed when PostgreSQL is omitted and future dev Playwright runs retain item-level JSON. |
 | 2026-09-30 | **Docker and web release validation is green.** RED/GREEN fixed nested PowerShell helpers writing traced requests into a child `$script:` scope. The four blocked packages pass 82/82 focused assertions, and the full isolated Docker run passes 1,697/1,697 after 22 migrations with zero remaining endpoints and exact cleanup. Web Vitest passes 118 files/1,568 tests with all coverage floors met; production build and all 25 size budgets pass. |
 | 2026-09-30 | **Exact-tip backend parity is green.** The immutable 82-case corpus passes 81 plus one documented N/A on InMemory and 82/82 on PostgreSQL with 769 assertions. Guarded PostgreSQL unit is 6,000/6,000 and E2E is 2,485/2,485. The exact built artifact passes 166/166 live outcomes on each backend. PostgreSQL 17.8 replayed all 22 migrations; every owned tmpfs container and runtime was removed exactly. |
 | 2026-09-30 | **v0.55.36 release gates resumed.** RED/GREEN fixed runtime-only `_schemaCaches` causing false profile-revision conflicts and restored malformed-filter diagnostics. Stale required-extension and immutable-common-attribute E2E fixtures were corrected without weakening the current contracts. API build, lint at 0 errors/515 warnings, unit 6,000/6,000, InMemory E2E 2,481 passed plus 4 skipped, and the exact Workbench PATCH regression are green. Disposable PostgreSQL and exact-artifact reruns remain next. |
