@@ -2,11 +2,11 @@
 # orchestrator script. Validates the script parses, exposes the
 # documented switches, and emits the expected mode-name labels.
 #
-# This is a script-syntax + parameter-block contract test, NOT a
-# functional test: actually running the matrix takes ~5 minutes and
-# requires a live Postgres connection for the prisma modes. The
-# functional test path is "run scripts/test-all-modes.ps1 yourself
-# in CI / pre-push hook".
+# This combines source-shape checks with two functional subprocess
+# checks in an isolated sandbox. It does not run the product suites:
+# the fake npm shim verifies that missing PostgreSQL configuration
+# fails before a mode starts and that -SkipPrisma is the only explicit
+# reduced-matrix path.
 #
 # Why this exists: the orchestrator is only called from CI and from
 # the developer's terminal, so silent breakage (a typo'd switch, a
@@ -83,6 +83,46 @@ Invoke-Assert -Description 'env-var stash + restore via finally block' `
 Invoke-Assert -Description 'exits 1 when any mode fails' -Condition ($content -match 'exit\s+1')
 Invoke-Assert -Description 'exits 0 when all modes pass' -Condition ($content -match 'exit\s+0')
 Invoke-Assert -Description 'exits 2 on prerequisite failure' -Condition ($content -match 'exit\s+2')
+
+# 7. Missing PostgreSQL configuration must fail before any test mode runs.
+#    Only an explicit -SkipPrisma is allowed to reduce the backend matrix.
+$sandbox = Join-Path $env:TEMP ('test-all-modes-contract-' + [guid]::NewGuid().ToString('N'))
+$savedPath = $env:PATH
+$savedDatabaseUrl = $env:DATABASE_URL
+try {
+    $sandboxScripts = Join-Path $sandbox 'scripts'
+    $sandboxApiModules = Join-Path $sandbox 'api\node_modules'
+    $npmShimDirectory = Join-Path $sandbox 'bin'
+    New-Item -ItemType Directory -Path $sandboxScripts, $sandboxApiModules, $npmShimDirectory | Out-Null
+    Copy-Item -LiteralPath $orchestrator -Destination (Join-Path $sandboxScripts 'test-all-modes.ps1')
+    @(
+        '@echo off'
+        'exit /b 0'
+    ) | Set-Content -LiteralPath (Join-Path $npmShimDirectory 'npm.cmd') -Encoding ascii
+
+    $env:PATH = "$npmShimDirectory;$savedPath"
+    $env:DATABASE_URL = $null
+    $sandboxOrchestrator = Join-Path $sandboxScripts 'test-all-modes.ps1'
+
+    $missingDatabaseOutput = (& pwsh -NoProfile -File $sandboxOrchestrator -SkipE2E -SkipWeb 2>&1 | Out-String)
+    $missingDatabaseExit = $LASTEXITCODE
+    Invoke-Assert -Description 'missing DATABASE_URL exits 2 unless Prisma is explicitly skipped' `
+        -Condition ($missingDatabaseExit -eq 2)
+    Invoke-Assert -Description 'missing DATABASE_URL fails before any test mode starts' `
+        -Condition ($missingDatabaseOutput -notmatch 'api-unit-inmemory')
+
+    $explicitSkipOutput = (& pwsh -NoProfile -File $sandboxOrchestrator -SkipPrisma -SkipE2E -SkipWeb 2>&1 | Out-String)
+    $explicitSkipExit = $LASTEXITCODE
+    Invoke-Assert -Description 'explicit -SkipPrisma remains a successful one-backend opt-out' `
+        -Condition (($explicitSkipExit -eq 0) -and ($explicitSkipOutput -match 'All 1 modes passed'))
+}
+finally {
+    $env:PATH = $savedPath
+    $env:DATABASE_URL = $savedDatabaseUrl
+    if (Test-Path -LiteralPath $sandbox) {
+        Remove-Item -LiteralPath $sandbox -Recurse -Force
+    }
+}
 
 # Summary.
 Write-Host ""

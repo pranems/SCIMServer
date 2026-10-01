@@ -1,10 +1,15 @@
 # SCIM correctness: design, implementation, and progress
 
-> **Status:** Local implementation, source acceptance, performance, and exact-artifact gates complete
+> **Status:** v0.55.36 merged and deployed to purplecliff dev; final automated
+> and reviewer-evidence reconciliation complete; operator visual sign-off pending
 >
-> **Last verified:** 2026-09-29
+> **Last verified:** 2026-09-30
 >
 > **Starting source:** `ccde1d5d6b5129dd943c6e848989c668a0d00d7a`, version `0.55.35`
+>
+> **Released runtime:** merge `d6e9a497315739b62ea11d2194a919944c376c31`,
+> version `0.55.36`, image digest
+> `sha256:49719babb9966b416312b25d99d2b30feddb219d0c266664eaf0688f7afc7f21`
 >
 > **Evidence:** [Independent report](SCIM_FRESH_MASTER_ANALYSIS_2026-09-25.md),
 > [82-case database comparison](evidence/scim-fresh-20260925/postgres-20260928-expanded.summary.json),
@@ -12,9 +17,29 @@
 > [characteristic reconciliation](SCIM_CHARACTERISTIC_RECONCILIATION.md),
 > [query performance assessment](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md),
 > [exact-artifact receipt](evidence/scim-exact-artifact-20260929/validation.json),
+> [final release-assurance receipt](evidence/scim-release-assurance-20260930/validation.json),
 > and [reproduction instructions](evidence/scim-fresh-20260925/repro-postgres/README.md).
 
 ## 1. What we are delivering
+
+**Current release state, 2026-09-30:** the assembled SCIM correction shipped
+through PR #188 and is serving 100% of purplecliff dev traffic. PR #190
+corrected the required-extension browser fixture; the complete dev browser
+suite passed 247 tests with 5 intentional skips. The exact four-operation PATCH
+incident was recreated locally, replicated from the returned endpoint profile
+to dev, verified through PATCH plus an independent persisted GET on both nodes,
+and cleaned up. Customer production and the parallel-prod canary were not
+modified. Final reconciliation closed both evidence-shape gaps. The exact
+`b304f663` API tree passes 209 PostgreSQL unit suites / 6,004 tests and 118
+PostgreSQL E2E suites / 2,485 tests after all 22 migrations, with exact owned
+cleanup. A focused run of all ten skip-capable browser specs records four
+current skip identities. Five blank-page failures from that focused run passed
+an exact serial rerun; all three visual diffs were inspected and no baseline was
+regenerated. The historical fifth skip identity remains unrecoverable because
+the earlier run retained only aggregate output. The
+[final receipt](evidence/scim-release-assurance-20260930/validation.json)
+records all nine review dispositions and limitations. This evidence does not
+authorize production promotion.
 
 **Bounded combined-source correction, 2026-09-29:** [PUT entry preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
 repairs first-match reuse and last-match immutable comparison on committed
@@ -2371,6 +2396,50 @@ missing recent contract marker and wrong-owner container before making a
 success claim. **Design/architecture disposition: accepted.** It composes the
 existing shared live contract and P7b corpus around the production artifact;
 it adds no product runtime seam or second acceptance implementation.
+
+### 11.36 Final release-assurance reconciliation, 2026-09-30
+
+The shipped API tree is identical at `d6e9a497` and browser follow-up
+`b304f663`. A new exact-tip guarded PostgreSQL run used a loopback-only random
+port, tmpfs storage, the pinned cached PostgreSQL 17 image, and no inherited
+database URL. It passed 209/209 unit suites with 6,004/6,004 tests and 118/118
+E2E suites with 2,485/2,485 tests. All 22 migrations completed, the final
+ownership guard passed, and the exact owned container was removed. The restored
+local SCIM API and database containers remained healthy and were not used by
+the matrix.
+
+The historical deployment receipt remains unchanged: its first Stage 5.3 run
+failed on the required-extension fixture and listed nine reviewer-judgment
+gates as pending. PR #190 and the complete 247-pass / 5-skip dev rerun
+supersede that browser failure. Because `.last-run.json` did not preserve
+passed or skipped items, all ten specs with executable `test.skip` calls were
+run as a focused current classification with JSON reporting. The effective
+result is 49 pass, 4 named skips and 0 failure after rerunning five transient
+blank-page outcomes serially. The three visual diffs were inspected: each
+actual was the same solid blank frame, not an intended visual change. No
+baseline was regenerated.
+
+The current dev endpoint list returns 71 active long-lived entries rather than
+the historical deployment snapshot's 60. The focused browser run created or
+updated zero retained endpoints; the 11 additional entries have August or
+September timestamps. Their intervening provenance is not reconstructable from
+the historical deployment receipt, so the old 60-to-60 result is preserved as
+historical rather than rewritten or treated as proof of the current count.
+
+The final receipt gives explicit evidence-based dispositions for
+`addMissingTests`, `apiContractVerification`,
+`error-handling-verification`, `logging-verification`, `auditAgainstRFC`,
+`securityAudit`, `performanceBenchmark`, `codeReviewSelfAudit`, and
+`auditAndUpdateDocs`:
+[validation.json](evidence/scim-release-assurance-20260930/validation.json).
+Operator visual verification is still required before any production-readiness
+statement. Customer production and the parallel-prod canary remain unchanged.
+
+**Assurance improvement: applied.** The backend matrix now fails closed when
+PostgreSQL is omitted, and future dev browser runs retain item-level JSON
+results. **Design/architecture disposition: accepted.** These changes remain
+inside existing harness and documentation seams; there is no new runtime
+abstraction or speculative optimizer.
 
 ## 12. Architecture and self-improvement decisions
 

@@ -161,8 +161,8 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (33)
-    "A Test/gate integrity" : 11
+    title Patterns by category (35)
+    "A Test/gate integrity" : 13
     "B Environment/deploy" : 4
     "C Framework/middleware" : 4
     "D Security at sinks" : 2
@@ -196,6 +196,8 @@ The most dangerous class: a gate that is GREEN but proves nothing. Every pattern
 | **PA-9** | **Eventually durable writes need a shared force-flush poll** | A custom-resource E2E queried RequestLog immediately after DELETE. InMemory passed because writes are synchronous; Prisma returned an empty list because rows are buffered and enqueued after the response | Assertions over just-produced durable logs must use `waitForLogRow()`, which force-flushes and polls a structural predicate to a deadline. Immediate reads and fixed sleeps are both false-green/flake generators | Shared helper [log-wait.helper.ts](../../api/test/e2e/helpers/log-wait.helper.ts) | v0.55.29 CRO-21 |
 | **PA-10** | Prove aggregate rollback and snapshot consistency | An error left a partial Group; an InMemory read mixed an old name/version with new members across an await | Compare complete stored state after native/injected late failure; test a deterministic read/write interleaving and failed-writer version preservation | Group aggregate integrity rule and permanent unit/HTTP tests | [P4 G1-G3](../SCIM_GROUP_TRANSACTIONS_EXECUTION_RCA.md) |
 | **PA-11** | A locked invariant must compare the representation that commits | Case-aliased JSON keys changed interpretation after JSONB reordered them; a schema-URN substring selected the wrong namespace; retained append bypassed the new check | Force different owners to compete, reject ambiguous keys before storage, carry explicit schema identity, and enumerate every mutating repository port | Atomic invariant representation rule plus unit/HTTP/native PostgreSQL gates | [P3b U9-U11](../SCIM_UNIQUENESS_EXECUTION_RCA.md) |
+| **PA-12** | A reduced matrix must require an explicit opt-out | `test-all-modes.ps1` converted a missing `DATABASE_URL` into `SkipPrisma=true`, ran four of six modes, and exited zero while the deployment receipt called it a six-mode pass | Infrastructure absence is a prerequisite failure, not permission to weaken an authoritative gate. Exit non-zero before tests unless the caller explicitly requests the reduced scope, and record that opt-out as such | Stage 2.6 rule plus a functional subprocess contract for both missing-database failure and explicit `-SkipPrisma` success | SCIM correctness RC-I16 |
+| **PA-13** | Aggregate counts need item-level diagnostic evidence | The final dev browser rerun retained `247 passed / 5 skipped`, but `.last-run.json` stored no skipped tests or annotations, making the aggregate impossible to audit later | A pass count proves completion, not why exclusions were intentional. Keep a human reporter plus a structured reporter containing every test outcome and annotation | Dev deployment writes timestamped Playwright JSON beside its Markdown report; a pre-push contract locks the reporter and environment cleanup | SCIM correctness RC-I17 |
 
 ### Category B - Cross-environment and deployment drift
 
@@ -329,6 +331,8 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PA-8 (prove a live section against the unfixed build) | 2 (9z-CA 2026-07-30, 9z-CC 2026-07-30) | convention; promote if a decorative section ever ships |
 | PA-10 (aggregate rollback and snapshot consistency) | 1 high-severity Group partial-create escape, plus a deterministic torn-read regression | YES - aggregate integrity rule and stored-state tests |
 | PA-11 (checked versus committed representation) | Three pre-merge review gaps, including one high-severity JSONB ordering false-green | YES - atomic invariant representation rule |
+| PA-12 (reduced matrix requires explicit opt-out) | 1 high-severity false-green deployment receipt | YES - Stage 2.6 and functional orchestrator contract |
+| PA-13 (aggregate counts need item-level evidence) | 2 deployment reports with unrecoverable skip identities | YES - Stage 5.3 retained JSON reporter and pre-push contract |
 | PB-1 (env value table) | 1 | YES (convention recorded) |
 | PB-3 (diagnose the configured endpoint, not an overridden one) | 2 (same symptom misdiagnosed twice: 2026-07-29 "machine-wide block", 2026-07-30 "registry blocked") | YES - Rule N2 in the npm supply-chain policy doc; both memory and the two committed docs corrected |
 | PC-1 (contract-shaping middleware) | 2 (I-03, I-04) | convention; revisit if a 3rd escape |

@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.36`
 
-> **Version:** 0.55.36 - **Updated:** 2026-09-28
+> **Version:** 0.55.36 - **Updated:** 2026-09-30
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -27,6 +27,7 @@
 | Reconcile the completed RFC characteristic combinations without claiming an exhaustive Cartesian product | [SCIM_CHARACTERISTIC_RECONCILIATION.md](SCIM_CHARACTERISTIC_RECONCILIATION.md) |
 | Review measured candidate materialization, selectivity, latency, database work, and memory cost | [SCIM_QUERY_PERFORMANCE_ASSESSMENT.md](SCIM_QUERY_PERFORMANCE_ASSESSMENT.md) |
 | Verify the exact locally built API artifact on owned InMemory and PostgreSQL backends | [Exact-artifact receipt](evidence/scim-exact-artifact-20260929/validation.json) |
+| Review final v0.55.36 exact-tip PostgreSQL, browser supersession, nine audit dispositions, and known limitations | [Release assurance receipt](evidence/scim-release-assurance-20260930/validation.json) |
 | Distinguish historical characteristic promises from optional behavior, including the original P3b uniqueness handoff | [SCIM_P7_CHARACTERISTIC_STATUS.md](SCIM_P7_CHARACTERISTIC_STATUS.md) |
 | Understand shared ordered PATCH semantics, compatibility, tests and backend evidence | [SCIM_P2_IMPLEMENTATION.md](SCIM_P2_IMPLEMENTATION.md) |
 | Inspect P2 execution issues, independent review fixes and prevention | [SCIM_P2_EXECUTION_RCA.md](SCIM_P2_EXECUTION_RCA.md) |

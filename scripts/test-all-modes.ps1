@@ -165,8 +165,8 @@ if (-not (Test-Path $webNodeModules) -and -not $SkipWeb) {
 }
 
 if (-not $SkipPrisma -and [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
-    Write-Warning "DATABASE_URL not set and -SkipPrisma not specified. Skipping prisma mode."
-    $SkipPrisma = $true
+    Write-Error "DATABASE_URL is required unless -SkipPrisma is explicitly specified."
+    exit 2
 }
 
 # ─── Mode 1: API unit tests, in-memory backend ───────────────────────

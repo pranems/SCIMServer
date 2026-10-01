@@ -669,7 +669,21 @@ if (-not $SkipDeploy -and -not $SkipPlaywright) {
         # after itself, so enable them here - otherwise the primary
         # endpoint-creation flow has no browser coverage at all.
         $env:E2E_ALLOW_MUTATIONS = '1'
-        npx playwright test --reporter=line
+        $previousPlaywrightJsonOutput = [Environment]::GetEnvironmentVariable(
+            'PLAYWRIGHT_JSON_OUTPUT_FILE',
+            'Process'
+        )
+        try {
+            $env:PLAYWRIGHT_JSON_OUTPUT_FILE = Join-Path $ReportDir "playwright-dev-$timestamp.json"
+            npx playwright test --reporter=line,json
+        }
+        finally {
+            [Environment]::SetEnvironmentVariable(
+                'PLAYWRIGHT_JSON_OUTPUT_FILE',
+                $previousPlaywrightJsonOutput,
+                'Process'
+            )
+        }
     } 'web' | Out-Null
 } elseif ($SkipPlaywright) {
     Add-Result -Stage '5.3' -Gate 'Playwright vs dev' -Status 'SKIPPED' -Detail '-SkipPlaywright'
