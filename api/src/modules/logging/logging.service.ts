@@ -876,10 +876,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
    *   - excludes `/scim/admin/*` (admin API)
    *   - excludes `/` and `/health` (root + health probes)
    *
-   * Performance: indexed range scan on `createdAt`, returns `select { createdAt: true }`
-   * only. For a busy 100 req/min server this is ~144k rows in 24h - still
-   * sub-100ms with the default index. If this becomes a hot path we can
-   * push the bucketing to SQL via $queryRaw + date_trunc.
+   * Performance: PostgreSQL performs the indexed range scan and hourly
+   * aggregation. At most `hours` compact rows cross the process boundary.
    *
    * @param opts.hours number of hours in the series (default 24, clamped 1..168)
    * @returns number[] of length `hours`, oldest first
@@ -918,20 +916,26 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       return series;
     }
 
-    // Postgres: indexed range scan, project createdAt only.
+    // Postgres: aggregate before crossing the process boundary. Materializing
+    // every matching timestamp exhausted the five-connection pool when several
+    // dashboard loads overlapped on a log table with 180k+ rows.
     try {
-      const rows = await this.prisma.requestLog.findMany({
-        where: {
-          createdAt: { gte: cutoff },
-          AND: [
-            { url: { not: { contains: '/scim/admin/' } } },
-            { url: { not: { equals: '/' } } },
-            { url: { not: { equals: '/health' } } },
-          ],
-        },
-        select: { createdAt: true },
-      });
-      for (const r of rows) tally(r.createdAt);
+      const rows = await this.prisma.$queryRaw<Array<{ bucket: Date; count: number }>>`
+        SELECT
+          date_trunc('hour', "createdAt") AS bucket,
+          COUNT(*)::int AS count
+        FROM "RequestLog"
+        WHERE "createdAt" >= ${cutoff}
+          AND "url" NOT LIKE '%/scim/admin/%'
+          AND "url" <> '/'
+          AND "url" <> '/health'
+        GROUP BY date_trunc('hour', "createdAt")
+        ORDER BY bucket
+      `;
+      for (const row of rows) {
+        const idx = Math.floor((new Date(row.bucket).getTime() - oldestBucketStart) / bucketMs);
+        if (idx >= 0 && idx < hours) series[idx] += Number(row.count);
+      }
     } catch (err) {
       this.logger.error(
         LogCategory.DATABASE,

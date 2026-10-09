@@ -98,6 +98,7 @@ describe('ActivityController', () => {
         {
           provide: PrismaService,
           useValue: {
+            $queryRaw: jest.fn(),
             requestLog: {
               findMany: jest.fn(),
               count: jest.fn(),
@@ -491,16 +492,16 @@ describe('ActivityController', () => {
     });
   });
 
-  // ── getActivitySummary - uses count() for all fields ───────────────────────
+  // ── getActivitySummary - one bounded aggregate query ──────────────────────
 
   describe('getActivitySummary - SQL-level counting', () => {
-    it('should use count() for all summary fields (no findMany)', async () => {
-      // All 4 fields should use count() - no findMany at all
-      (prismaService.requestLog.count as jest.Mock)
-        .mockResolvedValueOnce(100)   // last24Hours
-        .mockResolvedValueOnce(500)   // lastWeek
-        .mockResolvedValueOnce(200)   // userOperations
-        .mockResolvedValueOnce(50);   // groupOperations
+    it('should use one aggregate query for all summary fields', async () => {
+      (prismaService.$queryRaw as jest.Mock).mockResolvedValue([{
+        last24Hours: 100,
+        lastWeek: 500,
+        userOperations: 200,
+        groupOperations: 50,
+      }]);
 
       const result = await controller.getActivitySummary();
 
@@ -509,41 +510,29 @@ describe('ActivityController', () => {
       expect(result.summary.operations.users).toBe(200);
       expect(result.summary.operations.groups).toBe(50);
 
-      // Verify findMany was NOT called (count-only approach)
       expect(prismaService.requestLog.findMany).not.toHaveBeenCalled();
-
-      // Verify count was called exactly 4 times
-      expect(prismaService.requestLog.count).toHaveBeenCalledTimes(4);
+      expect(prismaService.requestLog.count).not.toHaveBeenCalled();
+      expect(prismaService.$queryRaw).toHaveBeenCalledTimes(1);
     });
 
-    it('should exclude admin traffic in all count queries', async () => {
-      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+    it('should bound the scan and exclude admin and keepalive traffic', async () => {
+      (prismaService.$queryRaw as jest.Mock).mockResolvedValue([]);
 
       await controller.getActivitySummary();
 
-      const calls = (prismaService.requestLog.count as jest.Mock).mock.calls;
-      // Every call should contain admin exclusion
-      for (const call of calls) {
-        const where = JSON.stringify(call[0]?.where ?? {});
-        expect(where).toContain('/admin/');
-      }
-    });
-
-    it('should exclude keepalive in user and time-based counts', async () => {
-      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
-
-      await controller.getActivitySummary();
-
-      const calls = (prismaService.requestLog.count as jest.Mock).mock.calls;
-      // First 3 calls (24h, 7d, users) should have keepalive exclusion (NOT clause with method=GET)
-      for (let i = 0; i < 3; i++) {
-        const where = JSON.stringify(calls[i][0]?.where ?? {});
-        expect(where).toContain('GET');
-      }
+      const query = ((prismaService.$queryRaw as jest.Mock).mock.calls[0][0] as TemplateStringsArray).join(' ');
+      expect(query).toContain('/admin/');
+      expect(query).toContain('GET');
+      expect(query).toContain('/Users');
+      const cutoffs = (prismaService.$queryRaw as jest.Mock).mock.calls[0]
+        .filter((arg) => arg instanceof Date) as Date[];
+      expect(cutoffs).toHaveLength(3);
+      expect(Math.min(...cutoffs.map((date) => date.getTime())))
+        .toBeLessThanOrEqual(Date.now() - 29 * 24 * 60 * 60 * 1000);
     });
 
     it('should not return system operations key', async () => {
-      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+      (prismaService.$queryRaw as jest.Mock).mockResolvedValue([]);
 
       const result = await controller.getActivitySummary();
 

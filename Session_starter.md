@@ -106,6 +106,15 @@ Each passed when isolated; explicit 30-second outcome waits now cover only
 navigation/render/cache settlement while the SSE refresh SLA remains five
 seconds.
 
+The next complete run exposed a shared backend constraint rather than ten
+independent UI failures: from 15:45:20Z through 15:50:17Z, Azure dev logged 31
+`timeout exceeded when trying to connect` failures while acquiring the
+five-connection PostgreSQL pool (22 Dashboard, 4 Endpoints, 3 Activity summary,
+2 Logs). One Activity summary call held four concurrent count scans and lasted
+14.462 seconds; each Dashboard request also transferred every qualifying
+24-hour request-log timestamp to Node. Both hot paths now aggregate in
+PostgreSQL with one connection and bounded result rows.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:
