@@ -256,6 +256,33 @@ function Test-PrereqOrExit {
     }
 }
 
+function Assert-OwnedPostgresContainer {
+    param(
+        [Parameter(Mandatory)] [string]$ContainerId,
+        [Parameter(Mandatory)] [string]$RunId
+    )
+
+    $owner = (docker inspect --format '{{ index .Config.Labels "scimserver.owner" }}' $ContainerId 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $owner -ne 'dev-deployment-pipeline') {
+        throw "PostgreSQL container '$ContainerId' is not owned by dev-deployment-pipeline."
+    }
+
+    $actualRunId = (docker inspect --format '{{ index .Config.Labels "scimserver.run" }}' $ContainerId 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $actualRunId -ne $RunId) {
+        throw "PostgreSQL container '$ContainerId' does not belong to run '$RunId'."
+    }
+}
+
+function Get-RemoteImageDigest {
+    param([Parameter(Mandatory)] [string]$Reference)
+
+    $inspection = docker buildx imagetools inspect $Reference 2>$null
+    if ($LASTEXITCODE -ne 0) { return $null }
+    $match = [regex]::Match(($inspection -join "`n"), '(?m)^Digest:\s+(sha256:[0-9a-f]{64})$')
+    if (-not $match.Success) { return $null }
+    return $match.Groups[1].Value
+}
+
 # =============================================================================
 # Stage 0 - Pre-flight + state capture
 # =============================================================================
@@ -384,22 +411,106 @@ Invoke-Gate '1.13' 'Docs content matches source' {
 # =============================================================================
 Write-Stage 2 'Local test gates'
 
-# Ensure Postgres for E2E (Stage 2.2)
+$savedDatabaseUrl = [Environment]::GetEnvironmentVariable('DATABASE_URL', 'Process')
+$postgresRunId = [guid]::NewGuid().ToString('N')
+$postgresContainerName = "scim-dev-pipeline-pg-$($postgresRunId.Substring(0, 12))"
+$postgresContainerId = $null
+$postgresReady = $DryRun
+
 if (-not $DryRun) {
-    $pgExists = (docker ps --filter "publish=5432" --format "{{.Names}}" 2>$null)
-    if (-not $pgExists) {
-        Write-Host "  Starting local Postgres for E2E (scim/scim@:5432/scimdb)..." -ForegroundColor Yellow
-        docker rm -f scim-dev-pipeline-pg 2>$null | Out-Null
-        docker run -d --name scim-dev-pipeline-pg -p 5432:5432 -e POSTGRES_USER=scim -e POSTGRES_PASSWORD=scim -e POSTGRES_DB=scimdb $PgImage 2>&1 | Out-Null
-        Start-Sleep -Seconds 5
+    try {
+        $postgresContainerId = (
+            docker run -d `
+                --name $postgresContainerName `
+                --label 'scimserver.owner=dev-deployment-pipeline' `
+                --label "scimserver.run=$postgresRunId" `
+                --publish 127.0.0.1::5432 `
+                --mount type=tmpfs,destination=/var/lib/postgresql/data `
+                --env POSTGRES_USER=scim `
+                --env POSTGRES_PASSWORD=scim `
+                --env POSTGRES_DB=scimdb `
+                $PgImage
+        ).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($postgresContainerId)) {
+            throw 'Could not start the task-owned PostgreSQL container.'
+        }
+
+        Assert-OwnedPostgresContainer -ContainerId $postgresContainerId -RunId $postgresRunId
+        $publishedPort = (docker port $postgresContainerId 5432/tcp 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $publishedPort -notmatch '^127\.0\.0\.1:(\d+)$') {
+            throw "Could not resolve the loopback PostgreSQL port for '$postgresContainerId'."
+        }
+
+        $postgresPort = [int]$Matches[1]
+        $env:DATABASE_URL = '{0}://{1}:{2}@{3}:{4}/{5}?schema=public' -f `
+            'postgresql', 'scim', 'scim', '127.0.0.1', $postgresPort, 'scimdb'
+
+        $postgresReady = $false
+        for ($attempt = 1; $attempt -le 30; $attempt++) {
+            docker exec $postgresContainerId pg_isready -U scim -d scimdb > $null 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                $postgresReady = $true
+                break
+            }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $postgresReady) {
+            throw "Task-owned PostgreSQL container '$postgresContainerId' did not become ready."
+        }
+
+        Add-Result -Stage '2.0' -Gate 'Task-owned PostgreSQL prerequisite' -Status 'PASS' `
+            -Detail "container=$($postgresContainerId.Substring(0, 12)) port=$postgresPort tmpfs=true"
+    }
+    catch {
+        Add-Result -Stage '2.0' -Gate 'Task-owned PostgreSQL prerequisite' -Status 'FAIL' `
+            -Detail $_.Exception.Message
     }
 }
 
-Invoke-Gate '2.1' 'API unit jest (3,816 baseline)' { Remove-Item Env:\PERSISTENCE_BACKEND -ErrorAction SilentlyContinue; npm test } 'api' | Out-Null
-Invoke-Gate '2.2' 'API E2E jest (1,217 baseline, prisma)' { npm run test:e2e } 'api' | Out-Null
-Invoke-Gate '2.3' 'Web vitest (1,006 baseline)' { npm test } 'web' | Out-Null
-Invoke-Gate '2.4' 'Web vitest coverage (lines:78 / branches:70 / functions:65 / statements:75 ratchet)' { npm run test:coverage } 'web' | Out-Null
-Invoke-Gate '2.6' 'test-all-modes.ps1 (6-mode matrix)' { pwsh -NoProfile -File scripts/test-all-modes.ps1 } | Out-Null
+try {
+    if ($postgresReady) {
+        Invoke-Gate '2.1' 'API unit jest (3,816 baseline)' { Remove-Item Env:\PERSISTENCE_BACKEND -ErrorAction SilentlyContinue; npm test } 'api' | Out-Null
+        Invoke-Gate '2.2' 'API E2E jest (1,217 baseline, prisma)' { npm run test:e2e } 'api' | Out-Null
+        Invoke-Gate '2.3' 'Web vitest (1,006 baseline)' { npm test } 'web' | Out-Null
+        Invoke-Gate '2.4' 'Web vitest coverage (lines:78 / branches:70 / functions:65 / statements:75 ratchet)' { npm run test:coverage } 'web' | Out-Null
+        Invoke-Gate '2.6' 'test-all-modes.ps1 (6-mode matrix)' { pwsh -NoProfile -File scripts/test-all-modes.ps1 } | Out-Null
+    }
+    else {
+        foreach ($gate in @(
+            @{ Stage = '2.1'; Name = 'API unit jest (3,816 baseline)' },
+            @{ Stage = '2.2'; Name = 'API E2E jest (1,217 baseline, prisma)' },
+            @{ Stage = '2.3'; Name = 'Web vitest (1,006 baseline)' },
+            @{ Stage = '2.4'; Name = 'Web vitest coverage (lines:78 / branches:70 / functions:65 / statements:75 ratchet)' },
+            @{ Stage = '2.6'; Name = 'test-all-modes.ps1 (6-mode matrix)' }
+        )) {
+            Add-Result -Stage $gate.Stage -Gate $gate.Name -Status 'SKIPPED' `
+                -Detail 'task-owned PostgreSQL prerequisite failed'
+        }
+    }
+}
+finally {
+    [Environment]::SetEnvironmentVariable('DATABASE_URL', $savedDatabaseUrl, 'Process')
+    if (-not [string]::IsNullOrWhiteSpace($postgresContainerId)) {
+        try {
+            Assert-OwnedPostgresContainer -ContainerId $postgresContainerId -RunId $postgresRunId
+            docker rm -f $postgresContainerId > $null 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not remove task-owned PostgreSQL container '$postgresContainerId'."
+            }
+
+            docker inspect $postgresContainerId > $null 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                throw "The exact owned PostgreSQL container was not removed: '$postgresContainerId'."
+            }
+            Add-Result -Stage '2.7' -Gate 'Task-owned PostgreSQL exact cleanup' -Status 'PASS' `
+                -Detail "removed=$($postgresContainerId.Substring(0, 12))"
+        }
+        catch {
+            Add-Result -Stage '2.7' -Gate 'Task-owned PostgreSQL exact cleanup' -Status 'FAIL' `
+                -Detail $_.Exception.Message
+        }
+    }
+}
 
 # =============================================================================
 # Stage 3 - Audits. The mechanically-checkable ones RUN here; only the ones
@@ -476,31 +587,25 @@ if (-not $SkipDeploy) {
     $localImagePresent = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($composeImageId)
     $localImageId = if ($localImagePresent) {
         (docker image inspect $composeImageId --format '{{.Id}}' 2>$null).Trim()
-    } else { $null }
+    } else { $null     }
     $localImagePresent = $localImagePresent -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($localImageId)
     if ($localImagePresent) {
         Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') } | Out-Null
-        Invoke-Gate '4.2b' "Mirror local image -> $RegistryAcr/scimserver:$ImageTag" {
-            $targets = @(
-                "$RegistryAcr/scimserver:$ImageTag",
-                "$RegistryAcr/scimserver:latest"
-            )
-            foreach ($target in $targets) {
-                docker tag $localImageId $target
-                if ($LASTEXITCODE -ne 0) { throw "docker tag failed for image $localImageId -> $target" }
-                $taggedImageId = (docker image inspect $target --format '{{.Id}}' 2>$null).Trim()
-                if ($LASTEXITCODE -ne 0 -or $taggedImageId -ne $localImageId) {
-                    throw "Local mirror tag identity mismatch for $target (expected $localImageId, got $taggedImageId)"
-                }
+        $localMirrorTag = "local-$ImageTag"
+        Invoke-Gate '4.2b' "Mirror local image -> $RegistryAcr/scimserver:$localMirrorTag" {
+            $target = "$RegistryAcr/scimserver:$localMirrorTag"
+            docker tag $localImageId $target
+            if ($LASTEXITCODE -ne 0) { throw "docker tag failed for image $localImageId -> $target" }
+            $taggedImageId = (docker image inspect $target --format '{{.Id}}' 2>$null).Trim()
+            if ($LASTEXITCODE -ne 0 -or $taggedImageId -ne $localImageId) {
+                throw "Local mirror tag identity mismatch for $target (expected $localImageId, got $taggedImageId)"
             }
-            foreach ($target in $targets) {
-                docker push $target
-                if ($LASTEXITCODE -ne 0) { throw "docker push failed for $target" }
-            }
+            docker push $target
+            if ($LASTEXITCODE -ne 0) { throw "docker push failed for $target" }
         } | Out-Null
     } else {
         Add-Result -Stage '4.2a' -Gate "ACR login ($RegistryAcr)"                          -Status 'SKIPPED' -Detail 'no local image (Docker build did not run or failed); deploy uses the GHCR import path'
-        Add-Result -Stage '4.2b' -Gate "Mirror local image -> $RegistryAcr/scimserver:tag"  -Status 'SKIPPED' -Detail 'no local image; not on the deploy critical path since 2026-07-29'
+        Add-Result -Stage '4.2b' -Gate "Mirror local image -> $RegistryAcr/scimserver:local-tag"  -Status 'SKIPPED' -Detail 'no local image; not on the deploy critical path since 2026-07-29'
     }
 
     # 4.3 - GHCR push via CI workflow (uses GITHUB_TOKEN; no local PAT needed)
@@ -516,7 +621,7 @@ if (-not $SkipDeploy) {
     # disagreed. Asserting HEAD is contained in master removes the disagreement
     # instead of trading one direction of it for the other.
     $publishRef = 'master'
-    Invoke-Gate '4.3a' 'HEAD is merged into origin/master (shipping ref check)' {
+    $shippingRefReady = Invoke-Gate '4.3a' 'HEAD is merged into origin/master (shipping ref check)' {
         git fetch origin master --quiet
         $head = (git rev-parse HEAD).Trim()
         git merge-base --is-ancestor $head origin/master
@@ -524,36 +629,97 @@ if (-not $SkipDeploy) {
             throw "HEAD ($($head.Substring(0,8))) is NOT contained in origin/master. Merge before publishing - a shipping image must be built from master."
         }
         Write-Host "    HEAD $($head.Substring(0,8)) is contained in origin/master" -ForegroundColor DarkGray
-    } | Out-Null
+    }
 
-    Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $publishRef)" {
-        $expectedHeadSha = (git rev-parse $publishRef).Trim()
-        $dispatchedAfter = [DateTimeOffset]::UtcNow.AddSeconds(-5)
-        gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Failed to dispatch publish-ghcr.yml.'
+    $firstParent = (git rev-parse 'HEAD^1').Trim()
+    $previousPackage = (git show "${firstParent}:api/package.json" | ConvertFrom-Json)
+    $previousVersion = [string]$previousPackage.version
+    $runtimeInputPaths = @(
+        'Dockerfile',
+        'api/package.json',
+        'api/package-lock.json',
+        'api/src',
+        'api/prisma',
+        'api/docker-entrypoint.sh',
+        'web/package.json',
+        'web/package-lock.json',
+        'web/src',
+        'web/public',
+        'web/vite.config.ts',
+        'web/index.html'
+    )
+    $runtimeInputsChanged = @(git diff --name-only "${firstParent}..HEAD" -- $runtimeInputPaths).Count -gt 0
+    $runtimeSourceCommit = (git log --first-parent -1 --format=%H -- $runtimeInputPaths).Trim()
+    $releaseSourceValid = Invoke-Gate '4.3b' 'Runtime image inputs require a version bump' {
+        if ($runtimeInputsChanged -and $version -eq $previousVersion) {
+            throw "Runtime image inputs changed without a version bump (still $version)."
         }
+        Write-Host "    version $previousVersion -> $version; runtimeInputsChanged=$runtimeInputsChanged" -ForegroundColor DarkGray
+    }
 
-        $selectedRun = $null
-        for ($attempt = 1; $attempt -le 15 -and $null -eq $selectedRun; $attempt++) {
-            $runJson = gh run list --workflow=publish-ghcr.yml --branch $publishRef --event workflow_dispatch --limit 20 --json databaseId,headSha,createdAt,status,conclusion
-            if ($LASTEXITCODE -eq 0) {
-                $runs = @(ConvertFrom-GithubCliJson -InputObject $runJson)
-                $selectedRun = Select-GithubWorkflowRun -Runs $runs -ExpectedHeadSha $expectedHeadSha -DispatchedAfter $dispatchedAfter
+    $existingVersionDigest = Get-RemoteImageDigest -Reference "${RegistryGhcr}:$version"
+
+    $releaseArtifactReady = $shippingRefReady -and $releaseSourceValid
+    if (-not $releaseArtifactReady) {
+        Add-Result -Stage '4.3' -Gate "GHCR publish v$version + latest" -Status 'SKIPPED' `
+            -Detail 'shipping ref or version/runtime-source contract failed'
+    } elseif ($existingVersionDigest) {
+        Add-Result -Stage '4.3' -Gate "GHCR publish v$version + latest" -Status 'PASS' `
+            -Detail "semantic version tag already exists; reusing immutable artifact $existingVersionDigest"
+    } else {
+        $releaseArtifactReady = Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $publishRef)" {
+            $expectedHeadSha = (git rev-parse $publishRef).Trim()
+            $dispatchedAfter = [DateTimeOffset]::UtcNow.AddSeconds(-5)
+            gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Failed to dispatch publish-ghcr.yml.'
+            }
+
+            $selectedRun = $null
+            for ($attempt = 1; $attempt -le 15 -and $null -eq $selectedRun; $attempt++) {
+                $runJson = gh run list --workflow=publish-ghcr.yml --branch $publishRef --event workflow_dispatch --limit 20 --json databaseId,headSha,createdAt,status,conclusion
+                if ($LASTEXITCODE -eq 0) {
+                    $runs = @(ConvertFrom-GithubCliJson -InputObject $runJson)
+                    $selectedRun = Select-GithubWorkflowRun -Runs $runs -ExpectedHeadSha $expectedHeadSha -DispatchedAfter $dispatchedAfter
+                }
+                if ($null -eq $selectedRun) {
+                    Start-Sleep -Seconds 2
+                }
             }
             if ($null -eq $selectedRun) {
-                Start-Sleep -Seconds 2
+                throw "Could not find the dispatched publish run for master SHA $expectedHeadSha."
             }
+            Write-Host "    Watching workflow run $($selectedRun.databaseId) for $($expectedHeadSha.Substring(0,8))" -ForegroundColor DarkGray
+            gh run watch $selectedRun.databaseId --exit-status
         }
-        if ($null -eq $selectedRun) {
-            throw "Could not find the dispatched publish run for master SHA $expectedHeadSha."
+    }
+
+    $sourceShaDigest = Get-RemoteImageDigest -Reference "${RegistryGhcr}:sha-$runtimeSourceCommit"
+    $existingVersionDigest = Get-RemoteImageDigest -Reference "${RegistryGhcr}:$version"
+    $script:verifiedGhcrDigest = $null
+    if ($releaseArtifactReady) {
+        $releaseArtifactReady = Invoke-Gate '4.3c' 'Semantic tag matches runtime source SHA digest' {
+            if (-not $sourceShaDigest) {
+                throw "Missing source SHA tag ${RegistryGhcr}:sha-$runtimeSourceCommit."
+            }
+            if (-not $existingVersionDigest) {
+                throw "Missing semantic tag ${RegistryGhcr}:$version."
+            }
+            if ($existingVersionDigest -ne $sourceShaDigest) {
+                throw "Semantic tag digest $existingVersionDigest does not match runtime source SHA digest $sourceShaDigest."
+            }
+            $script:verifiedGhcrDigest = $sourceShaDigest
+            Write-Host "    runtime source $($runtimeSourceCommit.Substring(0,8)) -> $sourceShaDigest" -ForegroundColor DarkGray
         }
-        Write-Host "    Watching workflow run $($selectedRun.databaseId) for $($expectedHeadSha.Substring(0,8))" -ForegroundColor DarkGray
-        gh run watch $selectedRun.databaseId --exit-status
-    } | Out-Null
+    } else {
+        Add-Result -Stage '4.3c' -Gate 'Semantic tag matches runtime source SHA digest' -Status 'SKIPPED' `
+            -Detail 'release artifact is not ready'
+    }
+    $verifiedGhcrDigest = $script:verifiedGhcrDigest
 
     # 4.4 - Verify anonymous GHCR pull
-    Invoke-Gate '4.4' "Anonymous pull $RegistryGhcr:latest" {
+    if ($releaseArtifactReady) {
+      $releaseArtifactReady = Invoke-Gate '4.4' "Anonymous pull $RegistryGhcr:latest" {
         docker logout ghcr.io 2>&1 | Out-Null
         docker rmi "${RegistryGhcr}:$version" -f 2>&1 | Out-Null
         docker rmi "${RegistryGhcr}:latest" -f 2>&1 | Out-Null
@@ -561,13 +727,24 @@ if (-not $SkipDeploy) {
         if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:$version" }
         docker pull "${RegistryGhcr}:latest"
         if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:latest" }
-        $versionImageId = (docker image inspect "${RegistryGhcr}:$version" --format '{{.Id}}').Trim()
-        $latestImageId = (docker image inspect "${RegistryGhcr}:latest" --format '{{.Id}}').Trim()
-        if (-not $versionImageId -or $latestImageId -ne $versionImageId) {
-            throw "Version/latest image mismatch: $version=$versionImageId latest=$latestImageId"
+        docker pull "${RegistryGhcr}:sha-$runtimeSourceCommit"
+        if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:sha-$runtimeSourceCommit" }
+        $versionDigest = ((docker image inspect "${RegistryGhcr}:$version" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
+        $latestDigest = ((docker image inspect "${RegistryGhcr}:latest" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
+        $sourceDigest = ((docker image inspect "${RegistryGhcr}:sha-$runtimeSourceCommit" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
+        if (
+            $versionDigest -ne $verifiedGhcrDigest -or
+            $latestDigest -ne $verifiedGhcrDigest -or
+            $sourceDigest -ne $verifiedGhcrDigest
+        ) {
+            throw "GHCR digest mismatch: verified=$verifiedGhcrDigest version=$versionDigest latest=$latestDigest source=$sourceDigest"
         }
-        Write-Host "    version/latest image content matches ($versionImageId)" -ForegroundColor DarkGray
-    } | Out-Null
+        Write-Host "    version/latest/source tags match $verifiedGhcrDigest" -ForegroundColor DarkGray
+      }
+    } else {
+        Add-Result -Stage '4.4' -Gate "Anonymous pull $RegistryGhcr:latest" -Status 'SKIPPED' `
+            -Detail 'release artifact is not ready'
+    }
 
     # 4.5 - Import the CI-BUILT image from GHCR into ACR.
     #
@@ -579,23 +756,46 @@ if (-not $SkipDeploy) {
     # published is both more robust AND more correct: dev runs exactly the bits
     # GHCR serves, so local Docker is no longer on the deployment critical path.
     $acrName = $RegistryAcr.Split('.')[0]
-    Invoke-Gate '4.5' "Import ${RegistryGhcr}:$version -> $RegistryAcr/scimserver:$version" {
-        az acr import --name $acrName --source "${RegistryGhcr}:${version}" --image "scimserver:${version}" --force
-    } | Out-Null
-
-    # 4.5b - NEVER point the Container App at a tag that does not exist. This is
-    # the check whose absence turned a failed build into a broken dev revision.
-    $acrTags = @(az acr repository show-tags --name $acrName --repository scimserver -o tsv 2>$null)
-    $tagPresent = $acrTags -contains $version
-    if ($tagPresent) {
-        Add-Result -Stage '4.5b' -Gate 'Deployable image tag exists in ACR' -Status 'PASS' -Detail "scimserver:$version"
+    if ($releaseArtifactReady) {
+        $releaseArtifactReady = Invoke-Gate '4.5' "Import ${RegistryGhcr}:$version -> ACR version + latest" {
+            az acr import --name $acrName --source "${RegistryGhcr}@${verifiedGhcrDigest}" --image "scimserver:${version}" --force
+            if ($LASTEXITCODE -ne 0) { throw "Could not import ACR version tag from ${RegistryGhcr}@${verifiedGhcrDigest}." }
+            az acr import --name $acrName --source "${RegistryGhcr}@${verifiedGhcrDigest}" --image 'scimserver:latest' --force
+            if ($LASTEXITCODE -ne 0) { throw "Could not import ACR latest tag from ${RegistryGhcr}@${verifiedGhcrDigest}." }
+        }
     } else {
-        Add-Result -Stage '4.5b' -Gate 'Deployable image tag exists in ACR' -Status 'FAIL' -Detail "scimserver:$version NOT in ACR - refusing to deploy"
+        Add-Result -Stage '4.5' -Gate "Import ${RegistryGhcr}:$version -> ACR version + latest" -Status 'SKIPPED' `
+            -Detail 'release artifact is not ready'
     }
 
-    if (-not $tagPresent) {
+    # 4.5b - Both ACR shipping tags must exist, and both must identify the exact
+    # GHCR artifact. A mutable tag that points at a local rebuild is not the same
+    # artifact even when package versions and compiled output happen to match.
+    $acrTags = @(az acr repository show-tags --name $acrName --repository scimserver -o tsv 2>$null)
+    $tagPresent = $releaseArtifactReady -and ($acrTags -contains $version) -and ($acrTags -contains 'latest')
+    if ($tagPresent) {
+        Add-Result -Stage '4.5b' -Gate 'Deployable image tags exist in ACR' -Status 'PASS' -Detail "scimserver:$version, scimserver:latest"
+    } else {
+        Add-Result -Stage '4.5b' -Gate 'Deployable image tags exist in ACR' -Status 'FAIL' -Detail "version or latest missing in ACR - refusing to deploy"
+    }
+
+    $script:digestParity = $false
+    if ($tagPresent) {
+        Invoke-Gate '4.5c' 'GHCR and ACR version/latest digest parity' {
+            $ghcrDigest = $verifiedGhcrDigest
+            $acrVersionDigest = (az acr manifest show-metadata --registry $acrName --name "scimserver:$version" --query digest -o tsv 2>$null).Trim()
+            $acrLatestDigest = (az acr manifest show-metadata --registry $acrName --name 'scimserver:latest' --query digest -o tsv 2>$null).Trim()
+            if ($ghcrDigest -ne $acrVersionDigest -or $ghcrDigest -ne $acrLatestDigest) {
+                throw "Registry digest mismatch: GHCR=$ghcrDigest ACR-version=$acrVersionDigest ACR-latest=$acrLatestDigest"
+            }
+            $script:digestParity = $true
+            Write-Host "    all shipping tags resolve to $ghcrDigest" -ForegroundColor DarkGray
+        } | Out-Null
+    }
+
+    if (-not $tagPresent -or -not $script:digestParity) {
         # Abort the deploy chain rather than breaking a working dev instance.
-        Add-Result -Stage '4.6'  -Gate "Deploy to $DevAppName"           -Status 'SKIPPED' -Detail 'image tag missing in ACR (4.5b FAIL)'
+        Add-Result -Stage '4.6'  -Gate "Deploy to $DevAppName"           -Status 'SKIPPED' -Detail 'ACR tag presence or digest parity failed'
         Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image'  -Status 'SKIPPED' -Detail 'deploy skipped'
         Add-Result -Stage '4.7'  -Gate 'Live SCIM tests vs dev'          -Status 'SKIPPED' -Detail 'deploy skipped - running these would validate the OLD image'
     }
@@ -611,33 +811,67 @@ if (-not $SkipDeploy) {
         # registry credentials (`properties.configuration.registries` is empty)
         # and pulls GHCR anonymously; pointing it at ACR fails the pull with
         # UNAUTHORIZED. ACR stays a mirror, not the deploy path.
-        $deployImage = "$RegistryGhcr`:$version"
+        $deployImage = "$RegistryGhcr@$verifiedGhcrDigest"
         Invoke-Gate '4.6' "Deploy $deployImage to $DevAppName" {
             az containerapp update --name $DevAppName --resource-group $DevResourceGroup --image $deployImage --revision-suffix $revisionSuffix --output none
         } | Out-Null
 
-        # 4.6b - Confirm dev is actually SERVING the new build.
+        # 4.6b - Confirm the exact intended revision is ready and serving.
         #
-        # This asserts the reported VERSION, not (as before) a regex against the
-        # runtime hostname. The hostname check was indirect and could pass or
-        # fail for reasons unrelated to which code is live.
-        Write-Host "  Waiting for dev to report version $version..." -ForegroundColor Yellow
-        $maxWait = 18
+        # Version alone is not an identity. A same-version redeploy can answer
+        # from the old revision while ingress is switching. If OAuth uses an
+        # ephemeral key, a token minted on old then presented to new fails its
+        # signature even though both report the same semantic version.
+        $expectedRevision = "$DevAppName--$revisionSuffix"
+        Write-Host "  Waiting for exact dev revision $expectedRevision at 100%..." -ForegroundColor Yellow
+        $maxWait = 36
         $devReady = $false
         $reported = '(no response)'
+        $consecutiveReadyChecks = 0
         for ($i = 1; $i -le $maxWait; $i++) {
-            Start-Sleep -Seconds 10
+            Start-Sleep -Seconds 5
             try {
+                $appStateJson = az containerapp show -n $DevAppName -g $DevResourceGroup `
+                    --query 'properties.{latestRevisionName:latestRevisionName,latestReadyRevisionName:latestReadyRevisionName}' -o json 2>$null
+                $revisionStateJson = az containerapp revision list -n $DevAppName -g $DevResourceGroup `
+                    --query "[?name=='$expectedRevision'] | [0].{healthState:properties.healthState,replicas:properties.replicas,trafficWeight:properties.trafficWeight}" -o json 2>$null
+                $appState = $appStateJson | ConvertFrom-Json
+                $revisionState = $revisionStateJson | ConvertFrom-Json
+                $controlPlaneReady = (
+                    $appState.latestRevisionName -eq $expectedRevision -and
+                    $appState.latestReadyRevisionName -eq $expectedRevision -and
+                    $revisionState.healthState -eq 'Healthy' -and
+                    [int]$revisionState.replicas -ge 1 -and
+                    [int]$revisionState.trafficWeight -eq 100
+                )
+                if (-not $controlPlaneReady) {
+                    $consecutiveReadyChecks = 0
+                    continue
+                }
+
                 $tok = (Invoke-RestMethod -Uri "https://$DevFqdn/scim/oauth/token" -Method Post -Body '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"changeme-oauth"}' -ContentType 'application/json' -TimeoutSec 15).access_token
                 $v = Invoke-RestMethod -Uri "https://$DevFqdn/scim/admin/version" -Headers @{Authorization = "Bearer $tok"} -TimeoutSec 15
                 $reported = $v.version
-                if ($reported -eq $version) { $devReady = $true; break }
-            } catch { }
+                if ($reported -eq $version) {
+                    $consecutiveReadyChecks++
+                    if ($consecutiveReadyChecks -ge 2) {
+                        $devReady = $true
+                        break
+                    }
+                }
+                else {
+                    $consecutiveReadyChecks = 0
+                }
+            } catch {
+                $consecutiveReadyChecks = 0
+            }
         }
         if ($devReady) {
-            Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'PASS' -Detail "dev reports $version"
+            Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'PASS' `
+                -Detail "$expectedRevision healthy at 100%; two authenticated probes report $version"
         } else {
-            Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'FAIL' -Detail "expected $version, dev reports $reported after $($maxWait * 10)s"
+            Add-Result -Stage '4.6b' -Gate 'Dev revision serving new image' -Status 'FAIL' `
+                -Detail "expected $expectedRevision at 100% with version $version; last report=$reported after $($maxWait * 5)s"
         }
 
         # 4.7 - Live SCIM tests vs dev.

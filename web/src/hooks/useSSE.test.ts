@@ -1,37 +1,43 @@
 /**
  * useSSE hook tests.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Mock EventSource
-class MockEventSource {
-  static instances: MockEventSource[] = [];
-  url: string;
-  onopen: ((ev: Event) => void) | null = null;
-  onmessage: ((ev: MessageEvent) => void) | null = null;
-  onerror: ((ev: Event) => void) | null = null;
-  readyState = 0;
-  close = vi.fn();
+const sseMock = vi.hoisted(() => {
+  const instances: Array<{
+    options: {
+      url: string;
+      token?: string;
+      onOpen: () => void;
+      onMessage: (data: string) => void;
+      onError: (error: Error) => void;
+    };
+    close: ReturnType<typeof vi.fn>;
+    simulateMessage: (data: string) => void;
+    fail: () => void;
+  }> = [];
+  const open = vi.fn((options: typeof instances[number]['options']) => {
+    const connection = {
+      options,
+      close: vi.fn(),
+      completed: Promise.resolve(),
+      simulateMessage: (data: string) => options.onMessage(data),
+      fail: () => options.onError(new Error('test stream failure')),
+    };
+    instances.push(connection);
+    setTimeout(() => options.onOpen(), 0);
+    return connection;
+  });
+  return { instances, open };
+});
 
-  constructor(url: string) {
-    this.url = url;
-    MockEventSource.instances.push(this);
-    // Simulate connection
-    setTimeout(() => {
-      this.readyState = 1;
-      this.onopen?.(new Event('open'));
-    }, 0);
-  }
-
-  /** Simulate receiving a message */
-  simulateMessage(data: string) {
-    this.onmessage?.(new MessageEvent('message', { data }));
-  }
-}
+vi.mock('./authenticated-sse', () => ({
+  openAuthenticatedSse: sseMock.open,
+}));
 
 // Mock token
 vi.mock('../auth/token', () => ({
@@ -49,34 +55,31 @@ function createWrapper() {
 
 describe('useSSE', () => {
   beforeEach(() => {
-    MockEventSource.instances = [];
-    (globalThis as any).EventSource = MockEventSource;
+    sseMock.instances.length = 0;
+    sseMock.open.mockClear();
   });
 
-  afterEach(() => {
-    delete (globalThis as any).EventSource;
-  });
-
-  it('creates EventSource connection when enabled', () => {
+  it('creates an authenticated SSE connection when enabled', () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE({ enabled: true }), { wrapper });
 
-    expect(MockEventSource.instances).toHaveLength(1);
-    expect(MockEventSource.instances[0].url).toContain('/scim/admin/log-config/stream');
+    expect(sseMock.instances).toHaveLength(1);
+    expect(sseMock.instances[0].options.url).toContain('/scim/admin/log-config/stream');
   });
 
-  it('does not create EventSource when disabled', () => {
+  it('does not create an SSE connection when disabled', () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE({ enabled: false }), { wrapper });
 
-    expect(MockEventSource.instances).toHaveLength(0);
+    expect(sseMock.instances).toHaveLength(0);
   });
 
-  it('includes token in URL', () => {
+  it('passes the token separately and never puts it in the URL', () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE(), { wrapper });
 
-    expect(MockEventSource.instances[0].url).toContain('token=test-token');
+    expect(sseMock.instances[0].options.token).toBe('test-token');
+    expect(sseMock.instances[0].options.url).not.toContain('test-token');
   });
 
   it('invalidates dashboard cache on SCIM user event', async () => {
@@ -89,18 +92,18 @@ describe('useSSE', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Simulate receiving a user created event
-    MockEventSource.instances[0].simulateMessage(
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({ type: 'scim.user.created', endpointId: 'ep-1' }),
     );
 
     expect(invalidateSpy).toHaveBeenCalled();
   });
 
-  it('closes EventSource on unmount', () => {
+  it('closes the SSE connection on unmount', () => {
     const { wrapper } = createWrapper();
     const { unmount } = renderHook(() => useSSE(), { wrapper });
 
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     unmount();
 
     expect(es.close).toHaveBeenCalled();
@@ -114,7 +117,7 @@ describe('useSSE', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Simulate a keepalive/non-SCIM message
-    MockEventSource.instances[0].simulateMessage(JSON.stringify({ type: 'keepalive' }));
+    sseMock.instances[0].simulateMessage(JSON.stringify({ type: 'keepalive' }));
 
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
@@ -127,21 +130,17 @@ describe('useSSE', () => {
 // keeps that state in sync across the lifecycle (connecting -> open
 // -> reconnecting on error -> closed on unmount). Without this lock
 // the Realtime traffic-light would lie about reality whenever the
-// EventSource state machine changes.
+// realtime stream state machine changes.
 import { useUIStore } from '../store/ui-store';
 
 describe('useSSE - K2 ui-store connection state', () => {
   beforeEach(() => {
-    MockEventSource.instances = [];
-    (globalThis as any).EventSource = MockEventSource;
+    sseMock.instances.length = 0;
+    sseMock.open.mockClear();
     useUIStore.setState({ sseConnectionState: 'closed' });
   });
 
-  afterEach(() => {
-    delete (globalThis as any).EventSource;
-  });
-
-  it('writes "connecting" the moment the EventSource is constructed', () => {
+  it('writes "connecting" the moment the stream connection is constructed', () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE({ enabled: true }), { wrapper });
     // Constructor ran synchronously; onopen is a microtask away.
@@ -149,19 +148,18 @@ describe('useSSE - K2 ui-store connection state', () => {
     expect(useUIStore.getState().sseConnectionState).toBe('connecting');
   });
 
-  it('writes "open" once the EventSource onopen fires', async () => {
+  it('writes "open" once the stream onOpen callback fires', async () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE({ enabled: true }), { wrapper });
     await new Promise((r) => setTimeout(r, 10));
     expect(useUIStore.getState().sseConnectionState).toBe('open');
   });
 
-  it('writes "reconnecting" when onerror fires (before the next connect attempt)', async () => {
+  it('writes "reconnecting" when the stream fails (before the next connect attempt)', async () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE({ enabled: true }), { wrapper });
     await new Promise((r) => setTimeout(r, 10));
-    // Trigger an error - the hook closes the ES, schedules reconnect.
-    MockEventSource.instances[0].onerror?.(new Event('error'));
+    sseMock.instances[0].fail();
     expect(useUIStore.getState().sseConnectionState).toBe('reconnecting');
   });
 
@@ -309,17 +307,9 @@ describe('computeInvalidations Phase F3 completeness audit', () => {
 });
 
 describe('useSSE channel dispatch (Phase B3)', () => {
-  // Mirror the lifecycle from the outer describe block - those hooks
-  // don't apply to sibling describes, so we re-install the EventSource
-  // shim here. Without this MockEventSource.instances stays empty
-  // because the global EventSource was deleted by the prior afterEach.
   beforeEach(() => {
-    MockEventSource.instances = [];
-    (globalThis as any).EventSource = MockEventSource;
-  });
-
-  afterEach(() => {
-    delete (globalThis as any).EventSource;
+    sseMock.instances.length = 0;
+    sseMock.open.mockClear();
   });
 
   it('invalidates the per-endpoint Overview cache on credential.created', async () => {
@@ -327,14 +317,11 @@ describe('useSSE channel dispatch (Phase B3)', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     renderHook(() => useSSE(), { wrapper });
-    // Wait for the EventSource constructor's setTimeout(...) onopen
-    // shim to fire. The hook's useEffect runs synchronously inside
-    // renderHook, but MockEventSource defers onopen to a microtask so
-    // we need a tick before the event listener is wired up.
+    // Wait for the mock connection's deferred onOpen callback.
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(MockEventSource.instances.length).toBeGreaterThan(0);
-    MockEventSource.instances[0].simulateMessage(
+    expect(sseMock.instances.length).toBeGreaterThan(0);
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({ type: 'scim.credential.created', endpointId: 'ep-7' }),
     );
     // Allow microtasks queued by invalidateQueries to flush.
@@ -352,8 +339,8 @@ describe('useSSE channel dispatch (Phase B3)', () => {
     renderHook(() => useSSE(), { wrapper });
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(MockEventSource.instances.length).toBeGreaterThan(0);
-    MockEventSource.instances[0].simulateMessage(
+    expect(sseMock.instances.length).toBeGreaterThan(0);
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({ type: 'scim.user.deleted', endpointId: 'ep-9' }),
     );
     await new Promise((r) => setTimeout(r, 0));
@@ -378,21 +365,17 @@ import {
 
 describe('useSSE - N1 notifications-store bridge', () => {
   beforeEach(() => {
-    MockEventSource.instances = [];
-    (globalThis as any).EventSource = MockEventSource;
+    sseMock.instances.length = 0;
+    sseMock.open.mockClear();
     // Reset notifications store between tests.
     clearNotifications();
-  });
-
-  afterEach(() => {
-    delete (globalThis as any).EventSource;
   });
 
   it('appends a notification on every supported SCIM event', async () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE(), { wrapper });
     await new Promise((r) => setTimeout(r, 10));
-    MockEventSource.instances[0].simulateMessage(
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({
         type: 'scim.user.created',
         endpointId: 'ep-1',
@@ -411,10 +394,10 @@ describe('useSSE - N1 notifications-store bridge', () => {
     renderHook(() => useSSE(), { wrapper });
     await new Promise((r) => setTimeout(r, 10));
     // Same type + endpointId + second-bucket -> same id -> dedupe.
-    MockEventSource.instances[0].simulateMessage(
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({ type: 'scim.user.created', endpointId: 'ep-1', timestamp: '2026-05-15T10:00:00.100Z' }),
     );
-    MockEventSource.instances[0].simulateMessage(
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({ type: 'scim.user.created', endpointId: 'ep-1', timestamp: '2026-05-15T10:00:00.800Z' }),
     );
     expect(useNotificationsStore.getState().entries).toHaveLength(1);
@@ -427,7 +410,7 @@ describe('useSSE - N1 notifications-store bridge', () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE(), { wrapper });
     await new Promise((r) => setTimeout(r, 10));
-    MockEventSource.instances[0].simulateMessage(
+    sseMock.instances[0].simulateMessage(
       JSON.stringify({ type: 'scim.endpoint.updated', endpointId: 'ep-1', timestamp: '2026-05-15T10:00:00.500Z' }),
     );
     expect(useNotificationsStore.getState().entries[0].severity).toBe('warning');
@@ -437,8 +420,7 @@ describe('useSSE - N1 notifications-store bridge', () => {
     const { wrapper } = createWrapper();
     renderHook(() => useSSE(), { wrapper });
     await new Promise((r) => setTimeout(r, 10));
-    MockEventSource.instances[0].simulateMessage(JSON.stringify({ type: 'keepalive' }));
+    sseMock.instances[0].simulateMessage(JSON.stringify({ type: 'keepalive' }));
     expect(useNotificationsStore.getState().entries).toHaveLength(0);
   });
 });
-

@@ -266,6 +266,19 @@ test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
         authOutcome: 'accept',
         authMethod: 'oauth_client',
       },
+      {
+        id: 'log-x5-deleted',
+        method: 'DELETE',
+        url: `/scim/v2/endpoints/ep-deleted/Users/user-1`,
+        status: 204,
+        durationMs: 9,
+        createdAt: '2026-07-23T12:02:00.000Z',
+        requestId: 'req-x5-deleted',
+        endpointId: 'ep-deleted',
+        endpointName: 'Deleted Endpoint Snapshot',
+        authOutcome: 'accept',
+        authMethod: 'shared_secret',
+      },
     ],
   };
   const endpointsList = {
@@ -305,6 +318,13 @@ test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
     await expect(page.getByTestId('log-row-endpoint-open-log-x5-crud')).toBeVisible();
   });
 
+  test('X6b: a deleted endpoint log uses its persisted name snapshot instead of the raw UUID', async ({ page }) => {
+    await page.goto('/logs');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('log-row-endpoint-log-x5-deleted')).toContainText('Deleted Endpoint Snapshot');
+    await expect(page.getByTestId('log-row-endpoint-log-x5-deleted')).not.toContainText('ep-deleted');
+  });
+
   test('X7: a log column is resizable by dragging its header handle', async ({ page }) => {
     await page.goto('/logs');
     await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
@@ -337,4 +357,3 @@ test.describe('Logs auth-method chip + endpoint name (X5/X6)', () => {
     await expect(chip).toHaveAttribute('aria-pressed', /true|false/);
   });
 });
-

@@ -4,9 +4,11 @@ import type { Request, Response } from 'express';
 import type { EndpointConfig } from './endpoint-config.interface';
 import type { EndpointProfile } from '../scim/endpoint-profile/endpoint-profile.types';
 import { endpointProfileRevision, type ProfileRevision } from '../../domain/repositories/profile-revision';
+import { enrichCorrelationContext } from '../logging/scim-logger.service';
 
 export interface EndpointContext {
   endpointId: string;
+  endpointName?: string;
   baseUrl: string;
   /** Full endpoint profile - the single runtime source of truth */
   profile?: EndpointProfile;
@@ -78,6 +80,9 @@ export class EndpointContextStorage {
         ...this.withProfileRevision(context),
         config: context.config ?? context.profile?.settings as EndpointConfig,
       });
+    }
+    if (context.endpointName) {
+      enrichCorrelationContext({ endpointName: context.endpointName });
     }
   }
 

@@ -29,6 +29,8 @@ export interface CorrelationContext {
   path?: string;
   /** SCIM endpoint ID (if applicable) */
   endpointId?: string;
+  /** Endpoint display-name snapshot captured while the endpoint still exists. */
+  endpointName?: string;
   /** Start timestamp for duration tracking */
   startTime?: number;
 
@@ -120,6 +122,11 @@ const correlationStorage = new AsyncLocalStorage<CorrelationContext>();
  */
 export function getCorrelationContext(): CorrelationContext | undefined {
   return correlationStorage.getStore();
+}
+
+export function enrichCorrelationContext(partial: Partial<CorrelationContext>): void {
+  const current = correlationStorage.getStore();
+  if (current) Object.assign(current, partial);
 }
 
 /**
@@ -260,10 +267,7 @@ export class ScimLogger {
 
   /** Update fields on the current correlation context. */
   enrichContext(partial: Partial<CorrelationContext>): void {
-    const current = correlationStorage.getStore();
-    if (current) {
-      Object.assign(current, partial);
-    }
+    enrichCorrelationContext(partial);
   }
 
   // ─── Configuration ────────────────────────────────────────────────

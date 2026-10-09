@@ -1,10 +1,17 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-09-30
+**Last verified:** 2026-10-09
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
 ### Active Execution Reference
+
+**Consolidation checkpoint, 2026-10-09:** the dependency and comprehensive UI
+branches are combined through ordinary merge commits on
+`integrate/ui-dependencies-20261009`, preserving every constituent commit.
+Exact-tip consolidation validation, reviewed PR, release publication, dev
+deployment, canonical pixel classification and operator visual sign-off remain
+pending. No image or deployment is authorized.
 
 **Dependency remediation preparation, 2026-10-09:** the isolated
 `chore/regen-lockfile-quarantine-20261009` branch selects company-feed-visible,
@@ -21,6 +28,90 @@ remain blocked by one API critical / three API high / 20 API moderate and
 11 web high package findings. New-graph web coverage passes 1,568 tests.
 No image or deployment is authorized. The separate dirty comprehensive UI
 validation worktree is preserved.
+
+**Current unmerged validation branch, 2026-10-08:** work continues in the
+`SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
+based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:
+no commit, push, merge, or branch deployment has occurred. Local Chromium
+completed 238 passes / 15 skips / zero failures. Local InMemory and isolated
+Docker/PostgreSQL live checks each passed 1,700 assertions with zero leaked
+endpoints. Final serial Prisma E2E passed 118 suites / 2,486 tests.
+Final current-source Docker Chromium completed 248 passes / 14 documented
+skips / zero failures across 262 cases. All six seeded profiles and three
+mutation journeys are included. Final local InMemory browser regressions
+pass 2/2. Full current web units and coverage pass 119 suites / 1,577 tests:
+lines 85.49%, branches 75.39%, functions 75.31%, statements 82.72%.
+Isolated Docker evidence is not a new Compose-specific run.
+
+The first resumed Docker run completed 238 pass / 14 skip / one fail.
+The extension-edit failure exposed a cache-settlement race: a successful write
+could close its drawer before list refresh completed. Three deterministic unit
+REDs locked premature completion in User, Group and custom update hooks.
+Returning their existing refresh promises fixes the race. Two further REDs
+prevent PATCH envelopes from contaminating cached resource schemas.
+Final focused evidence is 105 units; the full 262-case confirmation includes
+HR extension roundtrip/restore, strict Group edit/ETag restore and Device CRUD.
+The owned Docker API/database/network were removed by exact IDs after label
+verification. Six endpoints / 18 Users / 10 Groups / zero Devices and restored
+HR data were verified before cleanup; unrelated Compose containers remain
+running. The receipt is `test-results/comprehensive-validation-receipt-20261008.json`.
+
+Production dependency audit on 2026-10-08 is **BLOCKED**: API has one critical,
+nine moderate and one low package finding; web has one critical package
+finding. Critical packages are `proxy-addr` and `seroval`, respectively.
+Artifacts are retained in `test-results/npm-audit-*-production-20261008.json`.
+The focused changed-code security review found no vulnerabilities; that does
+not override the dependency gate. Do not publish or deploy this branch until
+the release boundary and dependency blockers are resolved.
+
+**Persistence checkpoint, 2026-10-09:** the feature branch now has four
+constituent commits instead of one large uncommitted overlay:
+`824cc0f4` durable request-log endpoint identity, `93df52aa` authenticated
+streams and measured log tables, `f1276fe7` cache settlement/profile addressing,
+and `9c9904e9` validation-runner hardening. Combined dependency + feature
+Compose validation passes 250 browser cases with only 12 canonical pixel
+comparisons skipped and passes 1,700 live assertions. Both formerly skipped
+behavioral browser scenarios now run with inspected negative controls.
+All API persistence lanes pass; the complete web coverage lane passes 1,577
+tests. The visual PNGs remain intentionally unstaged until canonical dev pixel
+execution. Push the feature branch after its normal hook, then consolidate by
+ordinary merges so these commits remain in history.
+
+**Dependency continuation, 2026-10-09:** a separate, clean master-based branch
+`chore/regen-lockfile-quarantine-20261009` is pushed at `6075ad3d`.
+The first CI lock artifact was rejected because three floated packages were
+under seven days old. The second artifact's 51 changed entries were reviewed
+through company-feed timestamps (minimum age 7.159 days), public resolved
+hosts and SHA-512 integrity. Exact-tip CI run 37892363753 reproduces the
+accepted lock bytes. Owned installations preserve the shared caches.
+Production audits are clean for that separate installed graph. Its 20 normal
+Fast pre-push gates pass, including 6,007 API units and 2,426 InMemory E2E
+passes / four PostgreSQL-only skips. The two logging suites normally excluded
+by the hook were explicitly run: 55/55 passed. Web coverage passes 1,568 tests;
+bundle budgets and live pin review pass. Full development audits remain
+blocked: API one critical / three high / 20 moderate; web 11 high. Residual
+leaves are Handlebars, Braces, sprintf-js, basic-ftp and extract-zip.
+See the separate worktree's `test-results/dependency-validation-receipt-20261009.json`.
+No merge, publication or deployment occurred. This dirty UI validation
+worktree's manifests are unchanged; integrating the dependency commits and
+revalidating the combined source remains necessary. Existing browser evidence
+still has 14 Docker skips, including 12 unexecuted canonical dev pixel checks.
+
+**Operator preferences:** start substantive chat updates with completed,
+in-progress and remaining tasks. The monthly AI budget is 50,000 credits
+shared with SyncFabric connector work. Reuse unchanged green evidence,
+retain bounded logs, and avoid redundant agents or full-suite reruns.
+The host controls model/context allocation; do not claim a numeric context
+capacity or remaining credit balance without host telemetry.
+
+### Continuation update log
+
+| Date | Summary |
+|---|---|
+| 2026-10-09 | Combined the dependency and comprehensive UI branches through ordinary merge commits on a current-master consolidation branch, preserving all constituent history. Exact-tip validation and release/deployment gates remain pending. |
+| 2026-10-09 | Persisted the comprehensive feature work as four logical commits; combined dependency/UI Compose browsers pass 250 / 12 pixel skips / zero failures and live checks pass 1,700. Restored real SSE and observable hover-prefetch browser cases with negative controls. |
+| 2026-10-09 | Followed the existing seven-day company-feed/CI lockfile procedure in an isolated branch; rejected an under-age artifact, accepted 51 aged changes, passed new-graph units/E2E/web coverage and bundle gates, and explicitly ran 55 hook-excluded logging tests. Production audits are clean there; residual development advisories, integration with this UI branch and release validation remain blocked/pending. |
+| 2026-10-08 | Completed real-browser local/Docker and six-profile proof, fixed resource-save cache settlement and PATCH-envelope contamination with RED/GREEN tests, passed 1,577 web units and coverage, and verified exact owned-estate cleanup. Critical dependency advisories, reviewed release, fresh Compose/Azure proof, formal performance evidence and operator sign-off remain outstanding. No commit or deployment. |
 
 **v0.55.36 merged and deployed to purplecliff dev, 2026-09-30:** PR #188
 merged as `d6e9a497315739b62ea11d2194a919944c376c31` after exact-tip CodeQL,

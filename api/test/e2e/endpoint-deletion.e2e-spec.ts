@@ -302,9 +302,6 @@ describe('Endpoint deletion storage and HTTP contract', () => {
       await prisma.$executeRawUnsafe(`CREATE TRIGGER "${trigger}" BEFORE INSERT ON "${table}"
         FOR EACH ROW EXECUTE FUNCTION "${trigger}"()`);
       installed = true;
-    } else if (isPrisma) {
-      const delegate = kind === 'User' ? prisma.scimResource : prisma.endpointCredential;
-      jest.spyOn(delegate, 'create').mockRejectedValueOnce(Object.assign(new Error('private driver connect statement failure'), { code: 'P2010' }));
     } else {
       const repository = kind === 'User' ? users : credentials;
       jest.spyOn(repository, 'create').mockRejectedValueOnce(new Error('private driver connect statement failure'));

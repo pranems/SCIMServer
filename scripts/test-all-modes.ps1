@@ -199,7 +199,7 @@ if (-not $SkipE2E -and -not $SkipPrisma) {
     Invoke-TestMode `
         -Mode 'api-e2e-prisma' `
         -WorkDir (Join-Path $repoRoot 'api') `
-        -Command 'npm run test:e2e' `
+        -Command 'npm run test:e2e -- --runInBand' `
         -EnvVars @{ PERSISTENCE_BACKEND = 'prisma'; DATABASE_URL = $DatabaseUrl }
 }
 

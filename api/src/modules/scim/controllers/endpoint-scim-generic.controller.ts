@@ -102,7 +102,7 @@ export class EndpointScimGenericController {
     const profile = endpoint.profile;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
 
     // Derive custom resource type availability from profile.resourceTypes (D9)
     const rt = resolveResourceType(profile, { endpointPath: `/${resourceTypePath}` }).resourceType;

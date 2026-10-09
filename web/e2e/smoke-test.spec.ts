@@ -4,8 +4,7 @@
  * This test does NOT mock anything. It hits the real server, enters a real
  * token, and validates that every page renders with real data.
  *
- * Every step saves a screenshot to docs/screenshots/ (committed to repo
- * so the UI guide can reference them).
+ * Every step saves a scratch screenshot under test-results/ui-screenshots/.
  *
  * Run:
  *   E2E_BASE_URL=https://scimserver-dev.xyz E2E_TOKEN=changeme-scim npx playwright test e2e/smoke-test.spec.ts
@@ -18,8 +17,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** Screenshots go into docs/screenshots/ so they're committed and visible in the UI guide */
-const SCREENSHOT_DIR = path.resolve(__dirname, '..', '..', 'docs', 'screenshots');
+const SCREENSHOT_DIR = path.resolve(__dirname, '..', '..', 'test-results', 'ui-screenshots');
 
 // Ensure directory exists
 if (!fs.existsSync(SCREENSHOT_DIR)) {
@@ -29,6 +27,10 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
 async function screenshot(page: any, name: string): Promise<void> {
   const filePath = path.join(SCREENSHOT_DIR, `${name}.png`);
   await page.screenshot({ path: filePath, fullPage: true });
+}
+
+async function waitForShell(page: import('@playwright/test').Page): Promise<void> {
+  await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 20_000 });
 }
 
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
@@ -217,10 +219,10 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
-    await page.waitForTimeout(4000);
+    await waitForShell(page);
 
-    await page.getByTestId('app-sidebar').getByText('Logs').click();
-    await page.waitForTimeout(4000);
+    await page.getByTestId('nav-logs').click();
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 20_000 });
     await screenshot(page, '16-logs-full');
 
     // Check for log entries
@@ -239,7 +241,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
-    await page.waitForTimeout(4000);
+    await waitForShell(page);
 
     await screenshot(page, '18-theme-light');
 
@@ -258,7 +260,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
-    await page.waitForTimeout(4000);
+    await waitForShell(page);
     await page.addStyleTag({ content: '.TanStackRouterDevtools { display: none !important; }' });
 
     await screenshot(page, '21-sidebar-expanded');
@@ -276,7 +278,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
-    await page.waitForTimeout(4000);
+    await waitForShell(page);
 
     // Click change token
     await page.getByTestId('change-token').click();
@@ -299,31 +301,13 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
-    await page.waitForTimeout(4000);
+    await waitForShell(page);
 
     await screenshot(page, '26-mobile-dashboard');
 
     await page.getByTestId('nav-settings').click();
     await page.waitForTimeout(3000);
     await screenshot(page, '27-mobile-settings');
-  });
-
-  test('11. Legacy UI still accessible via ?ui=legacy', async ({ page }) => {
-    await page.goto('/?ui=legacy');
-    await page.waitForTimeout(3000);
-    await screenshot(page, '28-legacy-initial');
-
-    // Try entering token if modal shows
-    const tokenInput = page.locator('input[type="password"]');
-    if (await tokenInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tokenInput.fill(TOKEN);
-      const saveBtn = page.locator('button:has-text("Save Token")');
-      if (await saveBtn.isVisible().catch(() => false)) {
-        await saveBtn.click();
-        await page.waitForTimeout(3000);
-      }
-    }
-    await screenshot(page, '29-legacy-authenticated');
   });
 
   test('12. Click endpoint card navigates to detail page + all tabs load', async ({ page }) => {
@@ -391,11 +375,11 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
-    await page.waitForTimeout(4000);
+    await waitForShell(page);
 
     // Navigate to Settings
-    await page.getByTestId('app-sidebar').getByText('Settings').click();
-    await page.waitForTimeout(2000);
+    await page.getByTestId('nav-settings').click();
+    await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 20_000 });
 
     // Verify we're on settings
     const settingsVisible = await page.getByTestId('settings-page').isVisible().catch(() => false);

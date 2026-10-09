@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const template = require('../../api/test/helpers/binding-uniqueness.json');
+const { liveFetch } = require('../live-test-http.cjs');
 
 async function main() {
   const base = process.env.SCIM_LIVE_BASE_URL;
@@ -17,7 +18,7 @@ async function main() {
   const check = condition => { assert.ok(condition); assertions++; };
   const keys = (body, allowed) => { equal(Object.keys(body).filter(key => !allowed.includes(key)), []); };
   async function send(method, path, payload) {
-    const response = await fetch(`${origin}${path}`, {
+    const response = await liveFetch(`${origin}${path}`, {
       method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/scim+json' },
       body: payload === undefined ? undefined : JSON.stringify(payload), signal: AbortSignal.timeout(15000),
     });

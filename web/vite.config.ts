@@ -20,6 +20,18 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'",
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'X-Permitted-Cross-Domain-Policies': 'none',
+      'X-DNS-Prefetch-Control': 'off',
+      'X-Download-Options': 'noopen',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), accelerometer=(), gyroscope=()',
+    },
     proxy: {
       '/scim': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',

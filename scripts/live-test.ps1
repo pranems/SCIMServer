@@ -16132,6 +16132,69 @@ try {
 Write-Host "`n--- 9z-CN: Custom Resource ETag Round-Trip Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-DO: DURABLE ENDPOINT NAME IN REQUEST LOGS
+# ============================================
+$script:currentSection = "9z-DO: Durable Endpoint Log Name"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-DO: DURABLE ENDPOINT LOG NAME" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+$doEndpointId = $null
+try {
+    $doDisplayName = "Durable Log Endpoint $(Get-Random)"
+    $doCreated = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
+        name = "live-test-log-name-$(Get-Random)"
+        displayName = $doDisplayName
+        profilePreset = "rfc-standard"
+    } | ConvertTo-Json)
+    $doEndpointId = $doCreated.id
+    Test-Result -Success ([string]::IsNullOrWhiteSpace($doEndpointId) -eq $false) `
+        -Message "9z-DO.T1: created dedicated endpoint for durable log-name proof"
+
+    $doRequestId = [guid]::NewGuid().ToString()
+    $doRequestHeaders = $headers.Clone()
+    $doRequestHeaders['X-Request-Id'] = $doRequestId
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$doEndpointId/Users?count=1" `
+        -Method GET -Headers $doRequestHeaders
+
+    $doLogRow = $null
+    for ($attempt = 1; $attempt -le 20 -and -not $doLogRow; $attempt++) {
+        try {
+            $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers
+        } catch {
+            # The polling assertion below remains authoritative.
+        }
+        $doLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$doRequestId&includeAdmin=true&pageSize=25" `
+            -Method GET -Headers $headers
+        $doLogRow = @($doLogs.items | Where-Object { $_.requestId -eq $doRequestId }) | Select-Object -First 1
+        if (-not $doLogRow) { Start-Sleep -Milliseconds 200 }
+    }
+    Test-Result -Success ($doLogRow.endpointName -eq $doDisplayName) `
+        -Message "9z-DO.T2: request log stores the endpoint display-name snapshot"
+
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$doEndpointId" -Method DELETE -Headers $headers
+    $doEndpointId = $null
+
+    $doAfterDelete = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?requestId=$doRequestId&includeAdmin=true&pageSize=25" `
+        -Method GET -Headers $headers
+    $doAfterDeleteRow = @($doAfterDelete.items | Where-Object { $_.requestId -eq $doRequestId }) | Select-Object -First 1
+    Test-Result -Success ($doAfterDeleteRow.endpointName -eq $doDisplayName) `
+        -Message "9z-DO.T3: endpoint name remains readable after endpoint deletion"
+} catch {
+    Test-Result -Success $false -Message "9z-DO: durable endpoint log-name section threw: $($_.Exception.Message)"
+} finally {
+    if ($doEndpointId) {
+        try {
+            $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$doEndpointId" -Method DELETE -Headers $headers
+        } catch {
+            Test-Result -Success $false -Message "9z-DO.cleanup: failed to delete dedicated endpoint"
+        }
+    }
+}
+
+Write-Host "`n--- 9z-DO: Durable Endpoint Log Name Complete ---" -ForegroundColor Green
+
+# ============================================
 . "$PSScriptRoot\live-test-sections\correctness-contracts.ps1"
 Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 

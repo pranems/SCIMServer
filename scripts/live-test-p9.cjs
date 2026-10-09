@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { testGuard } = require("./p1-validation/safety.cjs");
 const { cases, runCase } = require("../api/test/e2e/corpus/entra-compatibility.cjs");
+const { liveFetch } = require("./live-test-http.cjs");
 
 async function runLiveP9(baseUrl, secret) {
   await testGuard();
@@ -18,7 +19,7 @@ async function runP9Contract(baseUrl, secret) {
   const outcomes = [];
   for (const test of cases) {
     outcomes.push(await runCase(test, async (method, route, body) => {
-      const response = await fetch(`${baseUrl}${route}`, {
+      const response = await liveFetch(`${baseUrl}${route}`, {
         method,
         headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/scim+json" },
         ...(body ? { body: JSON.stringify(body) } : {}),

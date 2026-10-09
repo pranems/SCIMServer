@@ -9,11 +9,11 @@
  *   - A2: browser back / forward navigates between previously visited routes
  *   - A3: pagination + filter inputs are URL-driven; refresh preserves them
  *   - A3: typing in the SearchBox updates the URL query string in real time
- *   - A4: hovering a sidebar Link triggers a network request (loader prefetch)
- *         before the user actually clicks
+ *   - A4: hovering the cold Logs route fetches data before navigation and
+ *         reuses the prefetched response on click.
  *
  * Run against dev:
- *   E2E_BASE_URL=https://scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io \
+ *   E2E_BASE_URL=<dev URL resolved from the estate registry> \
  *   E2E_TOKEN=changeme-scim \
  *   npx playwright test e2e/router-behavior.spec.ts
  *
@@ -167,63 +167,40 @@ test.describe('Phase A3 router contract - URL search params', () => {
 // ─── A4 - Hover-triggered loader prefetch ────────────────────────────
 
 test.describe('Phase A4 router contract - hover-prefetch', () => {
-  test('hovering Endpoints sidebar link triggers /scim/admin/endpoints fetch before click', async ({ page }) => {
-    // Phase N2 (2026-05-16) mounted <OnboardingWizard /> at chrome-level in
-    // AppShell, which calls useEndpoints() on every route mount to decide
-    // whether to show the first-run wizard. That means the endpoints query
-    // is always already in cache before the user could possibly hover the
-    // sidebar link - so the hover-triggered prefetch is correctly suppressed
-    // by Phase A4's defaultPreloadStaleTime: 30_000.
-    //
-    // The hover-prefetch contract itself is still correct, and is locked at the
-    // unit layer by web/src/router-loaders.test.ts, which asserts every route
-    // declares a `loader` function, `defaultPreload === 'intent'`, and
-    // `defaultPreloadStaleTime === 30_000`. It just cannot be observed at the
-    // network layer post-N2.
-    //
-    // REVIEWED 2026-08-05 during the skip-elimination sweep. The previously
-    // suggested rewrite - "assert no loading skeleton between click and page
-    // render" - was evaluated and REJECTED as vacuous: OnboardingWizard warms
-    // the endpoints query on EVERY route mount, so that assertion would pass
-    // whether or not hover-prefetch worked at all. It would be a test that
-    // cannot fail for the reason it claims to test, which is worse than no
-    // test (see copilot-instructions.md R10 "presence is not correctness").
-    //
-    // This is therefore a DELIBERATE, permanent skip with real coverage
-    // elsewhere, not a deferred TODO. To make it observable again the wizard's
-    // mount-time useEndpoints() would have to become lazy - a product change,
-    // not a test change.
-    test.skip(true, 'Hover-prefetch network observability suppressed by N2 OnboardingWizard mount-time useEndpoints(); contract locked by web/src/router-loaders.test.ts (loader per route + defaultPreload:intent + defaultPreloadStaleTime:30_000). A "no skeleton" rewrite would be vacuous - see comment.');
-
-    // Capture every admin-endpoints request the page sends.
+  test('hovering the cold Logs route fetches its data before click and reuses it on navigation', async ({ page }) => {
+    // Onboarding warms Endpoints. Logs stays cold, so this observes prefetch
+    // without changing product behavior or substituting a vacuous skeleton check.
     const requests: string[] = [];
     page.on('request', (req) => {
-      const url = req.url();
-      if (url.includes('/scim/admin/endpoints') && !url.includes('/credentials')) {
-        requests.push(url);
+      if (new URL(req.url()).pathname === '/scim/admin/logs') {
+        requests.push(req.url());
       }
     });
 
-    // Navigate to /settings first - that route does NOT pre-fetch /endpoints,
-    // so the TanStack Query cache for endpoints is empty when we hover.
-    // (Going to /dashboard would warm the cache via the dashboard loader,
-    // and Phase A4's defaultPreloadStaleTime:30_000 would suppress the
-    // hover-triggered re-fetch correctly - that's the bug the prior version
-    // of this test had.)
     await page.goto('/settings');
-    await page.getByTestId('app-shell').waitFor({ state: 'visible' });
-    await page.waitForTimeout(1500);
-    requests.length = 0;
+    await expect(page.getByTestId('settings-page')).toBeVisible();
+    expect(requests).toHaveLength(0);
+    const prefetched = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/scim/admin/logs' &&
+      response.status() === 200, { timeout: 5_000 });
 
-    // Hover (not click) the Endpoints link. defaultPreload: 'intent' on
-    // the router (web/src/router.ts) plus the loader on the /endpoints
-    // route (web/src/routes/endpoints.tsx) should cause the endpoint
-    // list fetch to fire on mouseover.
-    const link = page.getByTestId('app-sidebar').locator('a[href="/endpoints"]');
+    const link = page.getByTestId('app-sidebar').locator('a[href="/logs"]');
     await link.hover();
 
-    // Give the prefetch a beat to land. Don't waste 30s on this.
-    await expect.poll(() => requests.length, { timeout: 5_000 }).toBeGreaterThan(0);
-    expect(requests.some((u) => /\/scim\/admin\/endpoints(\?|$)/.test(u))).toBe(true);
+    const body = await (await prefetched).json() as {
+      items: Array<Record<string, unknown>>;
+      page: number;
+      pageSize: number;
+      total: number;
+    };
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.page).toBe(1);
+    expect(body.pageSize).toBe(50);
+    expect(body.total).toBeGreaterThanOrEqual(body.items.length);
+    await expect(page).toHaveURL(/\/settings$/);
+    expect(requests).toHaveLength(1);
+    await link.click();
+    await expect(page.getByTestId('global-logs-page')).toBeVisible();
+    expect(requests).toHaveLength(1);
   });
 });

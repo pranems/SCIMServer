@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.36`
+> **Status:** Implemented locally - **Last verified:** 2026-10-01 - **Product version:** `0.55.36`
 
 ## Purpose
 
@@ -76,6 +76,12 @@ Operations and Logs are complementary, not duplicate:
 - **Logs** is recorded history. It lists request method, URL, endpoint, status, authentication outcome, duration, timestamp, and request/response details subject to retention and filters.
 
 Each page links to the other. Operations says "what exists now"; Logs says "what happened."
+
+Logs preserves endpoint identity as history: a row prefers the live display
+name, then the request-time endpoint-name snapshot, then a bounded deleted-ID
+fallback for legacy rows. A quick-open action appears only while the endpoint
+still exists. This prevents a deleted endpoint from turning historical rows
+into raw UUIDs or dead navigation.
 
 The Logs **Errors only** filter uses a boolean in typed router state and `true`/`false` text in the URL. Both forms are accepted by the same schema. This prevents the former `invalid_value` route error when the toolbar supplied native `true`.
 
