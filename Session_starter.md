@@ -13,8 +13,10 @@ Its exact-tip Fast gate is green: API build/lint, web type/build, static gates,
 6,006 API units and 2,426 InMemory E2E passes with four PostgreSQL-only skips.
 The follow-up dependency pass removes `ts-jest`, `ts-node-dev` and the Size
 Limit time/browser chain at their owners rather than overriding unfixed leaves;
-focused transformer/ESM proof passes 45 tests. CI lock regeneration, clean
-audits and full applicable validation remain required. Reviewed PR, release
+focused transformer/ESM proof passes 45 tests. The first full unit run exposed
+missing Jest mock-hoisting and stale-transform-cache semantics; explicit hoist
+and cache-key controls plus both affected suites pass 48 tests. CI lock
+regeneration, clean audits and full applicable validation remain required. Reviewed PR, release
 publication, dev deployment, canonical pixel classification and operator
 visual sign-off remain pending. No image or deployment is authorized.
 

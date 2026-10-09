@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them: Jest now uses a local TypeScript transpiler backed by the already
   installed compiler, Node 24 supplies watch/debug restarts, and Size Limit
   retains only its file plugin. Focused transformer and ESM `jose` proof
-  passes 45 tests; clean lock regeneration and complete audits remain required.
+  passes 45 tests. A follow-up mock-hoisting/cache contract plus the two suites
+  that exposed the gap pass 48 tests; clean lock regeneration and complete
+  audits remain required.
 - Select aged, company-feed-visible fixes for the API and web dependency
   findings, including `proxy-addr@2.0.8` and `seroval@1.6.3`.
 - Preserve installed major lines for transitive overrides; pair Vitest and
