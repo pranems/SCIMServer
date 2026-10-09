@@ -116,12 +116,12 @@ export class DashboardController {
   async getDashboard(): Promise<DashboardResponse> {
     const persistenceBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase();
 
-    // Parallel: endpoints + recent activity + 24h series. Stats are in-memory (sync).
-    const [endpointList, recentLogs, requestsLast24hSeries] = await Promise.all([
-      this.endpointService.listEndpoints(),
-      this.loggingService.listLogs({ pageSize: 20, page: 1 }),
-      this.loggingService.getRequestSeries({ hours: 24 }),
-    ]);
+    // Keep database work sequential. listLogs performs two queries and the
+    // series is an aggregate scan; fanning three dashboard branches out let
+    // one request consume most of the five-connection production pool.
+    const endpointList = await this.endpointService.listEndpoints();
+    const recentLogs = await this.loggingService.listLogs({ pageSize: 20, page: 1 });
+    const requestsLast24hSeries = await this.loggingService.getRequestSeries({ hours: 24 });
 
     // Global stats from in-memory projection (0 DB queries)
     const globalStats = this.statsService.getGlobalStats();

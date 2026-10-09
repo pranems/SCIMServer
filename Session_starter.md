@@ -4,8 +4,8 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Release candidate:** v0.55.38 contains the merged request-log aggregation and
-browser-readiness fixes from PR #197. The first exact-master deployment pipeline
+**Release candidate:** v0.55.39 contains the request-log aggregation,
+browser-readiness, and database pool fan-out corrections. The first exact-master deployment pipeline
 passed all local static, unit, Prisma E2E, web coverage, six-mode, dependency,
 and isolated Docker live gates, then correctly blocked publication because the
 runtime change still reported v0.55.37. The leaked browser fixture from the
@@ -128,6 +128,13 @@ Post-review local Docker revalidation was blocked before compilation by two
 consecutive corporate-feed HTTP 504 responses on different unchanged packages.
 Both GUID-owned partial estates were removed. The feed and seven-day quarantine
 were not bypassed; GitHub CI is the required build proof for the UTC follow-up.
+
+**v0.55.38 load finding:** the exact deployed browser run still recorded 80
+pool-acquire timeouts from 20:10:14Z through 20:15:48Z. Dashboard aggregation
+reduced row transfer but retained nested query fan-out: the controller started
+three database branches concurrently and `listLogs` started count + row fetch
+concurrently, so one page could demand four of five connections. RED/GREEN
+contracts now require sequential Dashboard and log-list database work.
 
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.39] - 2026-10-09
+
+### Database pool fan-out hotfix
+
+- Serialize the three database-backed Dashboard reads and the two request-log
+  list queries. The v0.55.38 three-worker browser run measured 80 pool-acquire
+  timeouts because one Dashboard request could demand four of the five
+  production connections; two overlapping pages demanded eight.
+
 ## [0.55.38] - 2026-10-09
 
 ### Post-merge validation hardening

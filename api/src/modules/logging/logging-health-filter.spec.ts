@@ -6,12 +6,16 @@ import { ScimLogger } from './scim-logger.service';
 describe('LoggingService.recordRequest - health-probe filter', () => {
   let service: LoggingService;
   let prisma: {
+    $queryRawUnsafe: jest.Mock;
     requestLog: {
       deleteMany: jest.Mock;
       count: jest.Mock;
       findMany: jest.Mock;
       create: jest.Mock;
       createMany: jest.Mock;
+    };
+    scimResource: {
+      findFirst: jest.Mock;
     };
   };
   let logger: {
@@ -27,12 +31,16 @@ describe('LoggingService.recordRequest - health-probe filter', () => {
     process.env.LOG_AUTO_PRUNE = 'false';
 
     prisma = {
+      $queryRawUnsafe: jest.fn().mockResolvedValue([]),
       requestLog: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      scimResource: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     };
 
@@ -57,6 +65,82 @@ describe('LoggingService.recordRequest - health-probe filter', () => {
 
   afterEach(async () => {
     await service.onModuleDestroy();
+  });
+
+  it('does not acquire count and row-query connections concurrently', async () => {
+    let releaseCount!: (value: number) => void;
+    prisma.requestLog.count.mockReturnValueOnce(new Promise<number>((resolve) => {
+      releaseCount = resolve;
+    }));
+
+    const request = service.listLogs({ page: 1, pageSize: 20 });
+    await Promise.resolve();
+
+    expect(prisma.requestLog.count).toHaveBeenCalledTimes(1);
+    expect(prisma.requestLog.findMany).not.toHaveBeenCalled();
+
+    releaseCount(0);
+    await request;
+
+    expect(prisma.requestLog.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fan user display-name lookups out across the pool', async () => {
+    prisma.requestLog.count.mockResolvedValueOnce(2);
+    prisma.requestLog.findMany.mockResolvedValueOnce([
+      {
+        id: 'log-1',
+        method: 'POST',
+        url: '/scim/endpoints/ep-1/Users',
+        status: 201,
+        durationMs: 5,
+        createdAt: new Date(),
+        errorMessage: null,
+        requestId: null,
+        endpointId: null,
+        endpointName: null,
+        authOutcome: null,
+        authMethod: null,
+        authReason: null,
+        authCredentialId: null,
+      },
+      {
+        id: 'log-2',
+        method: 'POST',
+        url: '/scim/endpoints/ep-1/Users',
+        status: 201,
+        durationMs: 5,
+        createdAt: new Date(),
+        errorMessage: null,
+        requestId: null,
+        endpointId: null,
+        endpointName: null,
+        authOutcome: null,
+        authMethod: null,
+        authReason: null,
+        authCredentialId: null,
+      },
+    ]);
+    prisma.$queryRawUnsafe.mockResolvedValueOnce([
+      { id: 'log-1', identifier: 'user-one' },
+      { id: 'log-2', identifier: 'user-two' },
+    ]);
+
+    const resolvers: Array<(value: null) => void> = [];
+    prisma.scimResource.findFirst.mockImplementation(
+      () => new Promise<null>((resolve) => { resolvers.push(resolve); }),
+    );
+
+    const request = service.listLogs({ page: 1, pageSize: 20 });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(prisma.scimResource.findFirst).toHaveBeenCalledTimes(1);
+    resolvers[0](null);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(prisma.scimResource.findFirst).toHaveBeenCalledTimes(2);
+    resolvers[1](null);
+
+    await request;
   });
 
   // Helper that fires a recordRequest call and forces the buffer to flush so
