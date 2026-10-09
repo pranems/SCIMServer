@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.39] - 2026-10-09
+
 ### Database pool fan-out hotfix
 
 - Serialize the three database-backed Dashboard reads and the two request-log

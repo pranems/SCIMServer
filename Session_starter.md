@@ -4,8 +4,8 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Release candidate:** v0.55.38 contains the merged request-log aggregation and
-browser-readiness fixes from PR #197. The first exact-master deployment pipeline
+**Release candidate:** v0.55.39 contains the request-log aggregation,
+browser-readiness, and database pool fan-out corrections. The first exact-master deployment pipeline
 passed all local static, unit, Prisma E2E, web coverage, six-mode, dependency,
 and isolated Docker live gates, then correctly blocked publication because the
 runtime change still reported v0.55.37. The leaked browser fixture from the
