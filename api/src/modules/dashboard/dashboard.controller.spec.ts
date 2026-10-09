@@ -151,6 +151,28 @@ describe('DashboardController', () => {
   });
 
   describe('GET /admin/dashboard', () => {
+    it('shares one in-flight dashboard read across concurrent browser loads', async () => {
+      let releaseEndpoints!: (value: Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>) => void;
+      const endpointsPending = new Promise<Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>>(
+        (resolve) => { releaseEndpoints = resolve; },
+      );
+      mockEndpointWithGet.listEndpoints.mockReturnValueOnce(endpointsPending);
+
+      const first = controller.getDashboard();
+      const second = controller.getDashboard();
+      await Promise.resolve();
+
+      expect(mockEndpointWithGet.listEndpoints).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.listLogs).not.toHaveBeenCalled();
+
+      releaseEndpoints({ totalResults: 0, endpoints: [] });
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+
+      expect(secondResult).toBe(firstResult);
+      expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.getRequestSeries).toHaveBeenCalledTimes(1);
+    });
+
     it('does not fan endpoint, log, and series queries out across the database pool', async () => {
       let releaseEndpoints!: (value: Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>) => void;
       const endpointsPending = new Promise<Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>>(
@@ -343,6 +365,26 @@ describe('DashboardController', () => {
         genericResourceCount: 0,
       });
       mockCredentialRepo.findByEndpoint.mockResolvedValue([]);
+    });
+
+    it('finishes the credential query before listing recent endpoint logs', async () => {
+      let releaseCredentials!: (value: []) => void;
+      const credentialsPending = new Promise<[]>(
+        (resolve) => { releaseCredentials = resolve; },
+      );
+      mockCredentialRepo.findByEndpoint.mockReturnValueOnce(credentialsPending);
+
+      const request = controller.getEndpointOverview(endpointId, reqStub());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockCredentialRepo.findByEndpoint).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.listLogs).not.toHaveBeenCalled();
+
+      releaseCredentials([]);
+      await request;
+
+      expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(1);
     });
 
     it('returns the canonical overview shape (key allowlist)', async () => {

@@ -153,6 +153,50 @@ describe('ActivityParserService', () => {
   // ── parseActivity ──────────────────────────────────────────────────────────
 
   describe('parseActivity', () => {
+    it('resolves group member names in order instead of launching a member-sized query burst', async () => {
+      const firstId = '11111111-1111-4111-8111-111111111111';
+      const secondId = '22222222-2222-4222-8222-222222222222';
+      const resolvers: Array<(value: {
+        userName: string;
+        payload: { displayName: string };
+      }) => void> = [];
+      prisma.scimResource.findFirst.mockImplementation(
+        () => new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+      );
+
+      const request = service.parseActivity({
+        id: 'log-members',
+        method: 'PATCH',
+        url: '/scim/endpoints/ep1/Groups/group-name',
+        status: 200,
+        requestBody: JSON.stringify({
+          Operations: [{
+            op: 'add',
+            path: 'members',
+            value: [{ value: firstId }, { value: secondId }],
+          }],
+        }),
+        createdAt: '2026-04-16T12:00:00Z',
+        identifier: 'group-name',
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(prisma.scimResource.findFirst).toHaveBeenCalledTimes(1);
+
+      resolvers[0]({ userName: 'first', payload: { displayName: 'First User' } });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(prisma.scimResource.findFirst).toHaveBeenCalledTimes(2);
+
+      resolvers[1]({ userName: 'second', payload: { displayName: 'Second User' } });
+      const result = await request;
+
+      expect(result.message).toContain('First User, Second User');
+    });
+
     it('should parse a POST /Users log into a user creation activity', async () => {
       const activity = await service.parseActivity({
         id: 'log-1',
