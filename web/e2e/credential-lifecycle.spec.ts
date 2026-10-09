@@ -85,7 +85,9 @@ test.describe('Connect credential lifecycle', () => {
     const purgeDialog = page.getByTestId('credentials-purge-dialog');
     await expect(purgeDialog).toContainText('cannot be undone');
     await purgeDialog.getByRole('button', { name: 'Permanently delete' }).click();
-    await expect(page.getByTestId(`credential-row-${replacementId}`)).toHaveCount(0);
+    await expect(page.getByTestId(`credential-row-${replacementId}`)).toHaveCount(0, {
+      timeout: 30_000,
+    });
   });
 
   test('an inactive WIF trust has the same confirmed permanent cleanup path', async ({ page }) => {

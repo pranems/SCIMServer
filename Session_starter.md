@@ -98,6 +98,14 @@ three-repeat Dashboard/Settings stress cases pass. All nine reviewer-judgement
 gates were performed and recorded on PR #195 rather than treated as unperformed
 pipeline placeholders.
 
+**Merged-master browser consolidation, 2026-10-09:** the suite now contains
+263 cases. Two complete three-worker Azure runs exposed three unrelated
+fixed/default readiness-window failures: credential purge settlement, Logs
+shell readiness, and the Tab A empty-state action in the cross-tab SSE flow.
+Each passed when isolated; explicit 30-second outcome waits now cover only
+navigation/render/cache settlement while the SSE refresh SLA remains five
+seconds.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:

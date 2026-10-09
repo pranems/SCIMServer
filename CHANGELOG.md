@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Post-merge validation hardening
 
+- Replace three fixed/default browser readiness windows that flaked only under
+  the complete three-worker Azure run: route-shell loading, the second-tab SSE
+  create affordance, and post-purge cache settlement now each receive an
+  explicit 30-second outcome wait without weakening the five-second SSE
+  mutation-refetch assertion.
 - Refresh the three inspected Dashboard light, Dashboard dark, and Settings
   pixel baselines for the intended global workflow-context navigation shipped
   by `31176497`: header back/forward controls and the clearer

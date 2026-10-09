@@ -33,6 +33,7 @@ test('Tab A creates a User; authenticated SSE refreshes Tab B without reloading'
     const tabB = await authenticatedPage(contextB, `/endpoints/${endpointId}/users`);
     await expect(tabB.getByTestId('users-empty-action')).toBeVisible();
     await tabA.goto(`/endpoints/${endpointId}/users`);
+    await expect(tabA.getByTestId('users-empty-action')).toBeVisible({ timeout: 30_000 });
     await tabA.getByTestId('users-empty-action').click();
     const userName = `cross-tab-${Date.now()}@example.test`;
     await tabA.getByTestId('create-resource-form-userName-input').fill(userName);

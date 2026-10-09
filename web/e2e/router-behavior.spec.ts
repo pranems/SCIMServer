@@ -149,7 +149,7 @@ test.describe('Phase A3 router contract - URL search params', () => {
 
   test('logs page refresh preserves urlContains filter', async ({ page }) => {
     await page.goto('/logs?urlContains=Users');
-    await page.getByTestId('app-shell').waitFor({ state: 'visible' });
+    await page.getByTestId('app-shell').waitFor({ state: 'visible', timeout: 30_000 });
     await expect(page).toHaveURL(/[?&]urlContains=Users(\b|&)/);
 
     // Assert the accessible field contract rather than placeholder copy or
@@ -158,7 +158,7 @@ test.describe('Phase A3 router contract - URL search params', () => {
     await expect(urlFilter).toHaveValue('Users');
 
     await page.reload();
-    await page.getByTestId('app-shell').waitFor({ state: 'visible' });
+    await page.getByTestId('app-shell').waitFor({ state: 'visible', timeout: 30_000 });
     await expect(page).toHaveURL(/[?&]urlContains=Users(\b|&)/);
     await expect(page.getByRole('searchbox', { name: 'URL contains' })).toHaveValue('Users');
   });
