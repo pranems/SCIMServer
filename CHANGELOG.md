@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pin review now covers API and web, including version-qualified overrides;
   focused watcher tests increased from 16 to 19 with three confirmed
   RED/GREEN controls. Full new-graph evidence remains pending lock generation.
+- Rejected the first CI artifact because three floated Browserslist data
+  packages were under seven days old; constrain them to measured aged
+  compatible versions before regenerating again.
 
 ### Release assurance follow-up
 

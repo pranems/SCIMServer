@@ -467,6 +467,17 @@ or deployment is part of this preparation. A manifest edit is not proof that
 the installed graph is fixed; that requires the generated lockfiles and a new
 audit and applicable validation.
 
+**First artifact rejected, not installed:** [run 37889553539](https://github.com/pranems/SCIMServer/actions/runs/37889553539)
+produced public-host/SHA-512 lockfiles, but its age report showed three
+quarantined transitive selections: `caniuse-lite@1.0.30001815` (1.8 days),
+`electron-to-chromium@1.5.452` (0.1 days), and `node-releases@2.0.58`
+(0.8 days). These were floated by the patched Browserslist dependency,
+not deliberately selected fixes. Rejecting the artifact is the policy's
+intended behavior; a successful regeneration job is not acceptance.
+Feed-visible pins 1.0.30001814, 1.5.444 and 2.0.57 satisfy the parent's
+declared ranges and are 8.86, 7.15 and 15.88 days old respectively.
+Regenerate again with these pins and review the entire changed graph.
+
 | Issue | Type / severity | Symptom and root cause | Resolution and why it works | Detection / prevention |
 |---|---|---|---|---|
 | SP-3 | Gate correctness / High | Qualified override names matched no package advisories and returned zero findings. The watcher compared selectors to plain package names. | Normalize only the trailing version selector, retaining scoped names. Both lookup and evaluation use the same normalization. | Two focused RED/GREEN controls caught this before lock generation. Earliest applicable gate: pin-watcher unit tests. |
@@ -474,6 +485,7 @@ audit and applicable validation.
 | SP-5 | Tooling / Low | The fresh worktree could not find Jest because it had no installed dependencies. | Temporarily use an explicitly owned junction to the existing cache for watcher tests only. Do not install into the shared target; install the regenerated graph in an owned directory later. | Caught at the first focused test. Existing dependency ownership discipline applies. |
 | SP-6 | Evidence parsing / Low | PowerShell lock parsing rejected the empty root key, and date coercion shifted an early eligibility probe by six hours. | Parse lock maps with a hashtable or Node, and calculate ages from raw ISO timestamps in Node. The retained classification uses that path. | Metadata review caught this before selecting pins. Compare raw publication timestamps, not reparsed display dates. |
 | SP-7 | Tooling / Low | Prisma generation in the fresh worktree lacked `DATABASE_URL`, causing downstream missing-client compile errors. | Supply a non-routable placeholder for generation only and generate into the worktree-local `src/generated/prisma` output. Generation requires configuration but does not connect to that database. | Caught by setup/build before pushing. Inspect generator output and require generation success before interpreting downstream compile errors. |
+| SP-8 | Quarantine timing / Medium | CI floated three Browserslist data dependencies younger than seven days, despite every intended advisory fix being aged. | Reject the artifact before installation and pin feed-visible, aged versions within the parent's declared ranges, then regenerate. | The existing CI age report and local changed-entry review caught this at artifact acceptance, the earliest stage with the complete new graph. Check every changed entry, not only manually selected fixes. |
 
 **Design/architecture disposition: applied.** The small existing watcher remains
 one cohesive service; both workspaces and qualified names reuse it without a
