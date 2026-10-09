@@ -111,7 +111,7 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
     it('aggregates in PostgreSQL instead of materializing request-log rows', async () => {
       await service.getRequestSeries({ hours: 24 });
       const query = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join(' ');
-      expect(query).toContain('date_trunc');
+      expect(query).toContain(`date_trunc('hour', "createdAt", 'UTC')`);
       expect(query).toContain('COUNT(*)::int');
       expect(query).toContain('GROUP BY');
     });

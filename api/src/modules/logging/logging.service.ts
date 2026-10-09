@@ -922,14 +922,14 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     try {
       const rows = await this.prisma.$queryRaw<Array<{ bucket: Date; count: number }>>`
         SELECT
-          date_trunc('hour', "createdAt") AS bucket,
+          date_trunc('hour', "createdAt", 'UTC') AS bucket,
           COUNT(*)::int AS count
         FROM "RequestLog"
         WHERE "createdAt" >= ${cutoff}
           AND "url" NOT LIKE '%/scim/admin/%'
           AND "url" <> '/'
           AND "url" <> '/health'
-        GROUP BY date_trunc('hour', "createdAt")
+        GROUP BY date_trunc('hour', "createdAt", 'UTC')
         ORDER BY bucket
       `;
       for (const row of rows) {

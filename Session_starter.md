@@ -117,6 +117,10 @@ PostgreSQL with one connection and bounded result rows.
 The corrected image then passed the isolated Prisma Docker lane with
 1,700/1,700 live assertions; its GUID-owned containers, network, and volume
 were removed after the run.
+Post-review local Docker revalidation was blocked before compilation by two
+consecutive corporate-feed HTTP 504 responses on different unchanged packages.
+Both GUID-owned partial estates were removed. The feed and seven-day quarantine
+were not bypassed; GitHub CI is the required build proof for the UTC follow-up.
 
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
