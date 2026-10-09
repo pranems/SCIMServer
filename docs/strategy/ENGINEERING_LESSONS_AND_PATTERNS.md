@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Advisory lookup must use package identity, not an override selector
+
+The 2026-10-09 dependency review reproduced a false-green: an npm override
+such as `package@^3.0.0` matched no advisory whose package name was `package`.
+Preserve selectors in manifests to protect installed major lines, but
+normalize package identity for lookup and evaluation, retaining scoped names.
+Watch every workspace that introduces overrides, not just the original API
+workspace. Three RED/GREEN controls now assert these outcomes, including the
+actual CLI request names and both manifest paths. This gate is applied in
+the existing watcher rather than introducing a new framework.
+See [the policy and issue ledger](NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-10-09-remediation-in-progress).
+
 ### Retained-array identity must survive restoration
 
 The [PUT correction](../SCIM_PUT_ENTRY_PRESERVATION_RCA.md) found three incompatible

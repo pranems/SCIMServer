@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Seven-day-compliant dependency remediation
+
+- Select aged, company-feed-visible fixes for the API and web dependency
+  findings, including `proxy-addr@2.0.8` and `seroval@1.6.3`.
+- Preserve installed major lines for transitive overrides; pair Vitest and
+  its coverage provider at the patched 4.1.11 minimum.
+- Regenerate lockfiles only through the existing CI workflow, then verify
+  public resolved hosts, SHA-512 integrity and changed-package publish ages.
+  No quarantine control is lowered and no release image is published.
+- Findings without an available fixed version and the major-only `basic-ftp`
+  upgrade remain explicit follow-up items, not silent audit suppressions.
+- Pin review now covers API and web, including version-qualified overrides;
+  focused watcher tests increased from 16 to 19 with three confirmed
+  RED/GREEN controls. Full new-graph evidence remains pending lock generation.
+
 ### Release assurance follow-up
 
 - Correct the backend-matrix gate so a missing `DATABASE_URL` exits 2 before

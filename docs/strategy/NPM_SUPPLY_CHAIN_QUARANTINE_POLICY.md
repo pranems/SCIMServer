@@ -437,3 +437,46 @@ packages would therefore be incorrect.
 ### Day-to-day effect
 
 Nothing changes for ordinary work. `npm ci` is unaffected, and neither check blocks a push - both open an Issue, because both need the network and a flaky blocking gate is worse than a reliable nagging one. What changes is that a suppression now has to say **which kind** it is, a timing hold cannot quietly become a quarter, and a rotting pin gets noticed by a scheduled job instead of by a failed required status check after an image build.
+
+### 2026-10-09 remediation in progress
+
+The company-feed lookup confirms that the production-critical fixes
+`proxy-addr@2.0.8` and `seroval@1.6.3` are already about 24 and 47 days old.
+They are eligible now, not blocked by the laptop. The isolated
+`chore/regen-lockfile-quarantine-20261009` branch selects aged fixes and uses
+the existing regeneration workflow. Vitest and its coverage provider are
+pinned together at 4.1.11. Every changed lock entry must still pass the
+seven-day review before the generated artifact is accepted.
+
+Version-qualified overrides preserve the existing major lines of
+`brace-expansion` and `nanoid`. The pin watcher now strips selectors before
+advisory lookup and evaluation, and reads both API and web manifests.
+The scheduled workflow watches both manifests too. Three new controls went
+RED against the old watcher and GREEN after the fix: qualified names,
+qualified scoped names, and CLI traversal of both workspaces. Focused
+coverage increased from 16 to 19 passing tests.
+
+| Remaining finding | Measured disposition |
+|---|---|
+| `handlebars@4.7.9` | [GHSA-xw65-4hp5-5hc7](https://github.com/advisories/GHSA-xw65-4hp5-5hc7) names 4.7.10, but the configured feed returns E404 for that version. Package publication time is unverified. Do not derive `Fix-available-from` from the advisory date or fabricate a quarantine exception. |
+| `braces`, `sprintf-js`, `extract-zip` | No fixed version was verified in the feed/advisory evidence. Keep these visible as residual findings. |
+| `basic-ftp` | The measured fixed candidate is a major upgrade to 6.2.1, not a compatible leaf override. Review the owning dependency rather than silently forcing a new major. |
+
+No audit suppression, registry bypass, seven-day relaxation, image publication
+or deployment is part of this preparation. A manifest edit is not proof that
+the installed graph is fixed; that requires the generated lockfiles and a new
+audit and applicable validation.
+
+| Issue | Type / severity | Symptom and root cause | Resolution and why it works | Detection / prevention |
+|---|---|---|---|---|
+| SP-3 | Gate correctness / High | Qualified override names matched no package advisories and returned zero findings. The watcher compared selectors to plain package names. | Normalize only the trailing version selector, retaining scoped names. Both lookup and evaluation use the same normalization. | Two focused RED/GREEN controls caught this before lock generation. Earliest applicable gate: pin-watcher unit tests. |
+| SP-4 | Gate coverage / High | New web overrides had no scheduled watcher; CLI and workflow covered API only. | Read both manifests and trigger on either manifest. A mocked CLI test asserts both paths and actual queried names. | Focused RED/GREEN caught this before publishing the new pins. Earliest applicable gate: CLI wiring test. |
+| SP-5 | Tooling / Low | The fresh worktree could not find Jest because it had no installed dependencies. | Temporarily use an explicitly owned junction to the existing cache for watcher tests only. Do not install into the shared target; install the regenerated graph in an owned directory later. | Caught at the first focused test. Existing dependency ownership discipline applies. |
+| SP-6 | Evidence parsing / Low | PowerShell lock parsing rejected the empty root key, and date coercion shifted an early eligibility probe by six hours. | Parse lock maps with a hashtable or Node, and calculate ages from raw ISO timestamps in Node. The retained classification uses that path. | Metadata review caught this before selecting pins. Compare raw publication timestamps, not reparsed display dates. |
+| SP-7 | Tooling / Low | Prisma generation in the fresh worktree lacked `DATABASE_URL`, causing downstream missing-client compile errors. | Supply a non-routable placeholder for generation only and generate into the worktree-local `src/generated/prisma` output. Generation requires configuration but does not connect to that database. | Caught by setup/build before pushing. Inspect generator output and require generation success before interpreting downstream compile errors. |
+
+**Design/architecture disposition: applied.** The small existing watcher remains
+one cohesive service; both workspaces and qualified names reuse it without a
+new abstraction. **Test/gate self-improvement: applied.** The new negative
+controls prevent qualified selectors and web overrides from looking checked
+when they are not.

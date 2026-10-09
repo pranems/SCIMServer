@@ -6,6 +6,17 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 
 ### Active Execution Reference
 
+**Dependency remediation preparation, 2026-10-09:** the isolated
+`chore/regen-lockfile-quarantine-20261009` branch selects company-feed-visible,
+seven-day-eligible fixes. Production-critical `proxy-addr@2.0.8` and
+`seroval@1.6.3` are about 24 and 47 days old. The laptop is not a lockfile
+blocker: use the existing CI regeneration workflow and review every changed
+package age before importing its artifact. The pin watcher now covers both
+workspaces and version-qualified selectors, with three confirmed RED/GREEN
+controls (16 -> 19 focused tests). Lock regeneration and new-graph validation
+are still pending; no image or deployment is authorized. The separate dirty
+comprehensive UI validation worktree is preserved.
+
 **v0.55.36 merged and deployed to purplecliff dev, 2026-09-30:** PR #188
 merged as `d6e9a497315739b62ea11d2194a919944c376c31` after exact-tip CodeQL,
 CodeQL policy, image build, Trivy, validation and documentation gates passed.
