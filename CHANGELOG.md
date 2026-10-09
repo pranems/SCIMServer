@@ -7,6 +7,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.37] - 2026-10-09
+
+### Seven-day-compliant dependency remediation
+
+- Remove the advisory-only test and development chains instead of suppressing
+  them: Jest now uses a local TypeScript transpiler backed by the already
+  installed compiler, Node 24 supplies watch/debug restarts, and Size Limit
+  retains only its file plugin. Focused transformer and ESM `jose` proof
+  passes 45 tests. A follow-up mock-hoisting/cache contract plus the two suites
+  that exposed the gap pass 48 tests; clean lock regeneration and complete
+  audits remain required.
+- Accept public-runner lock regeneration run 37901990719. It removes 36 API
+  and 68 web entries without adding or changing a package version. Both clean
+  company-feed installs preserve the artifact bytes; provenance is public-host
+  and SHA-512-only. Web development audit is zero; API has zero critical/high
+  findings and 19 tracked Jest/coverage-chain moderate findings.
+- Select aged, company-feed-visible fixes for the API and web dependency
+  findings, including `proxy-addr@2.0.8` and `seroval@1.6.3`.
+- Preserve installed major lines for transitive overrides; pair Vitest and
+  its coverage provider at the patched 4.1.11 minimum.
+- Regenerate lockfiles only through the existing CI workflow, then verify
+  public resolved hosts, SHA-512 integrity and changed-package publish ages.
+  No quarantine control is lowered and no release image is published.
+- Findings without an available fixed version and the major-only `basic-ftp`
+  upgrade remain explicit follow-up items, not silent audit suppressions.
+- Pin review now covers API and web, including version-qualified overrides;
+  focused watcher tests increased from 16 to 19 with three confirmed
+  RED/GREEN controls. Live pin review: zero findings / zero unchecked names.
+- Rejected the first CI artifact because three floated Browserslist data
+  packages were under seven days old; constrain them to measured aged
+  compatible versions before regenerating again.
+- Accepted CI run 37890617600's 51 changed entries, all at least 7.159 days old.
+  Public hosts and SHA-512-only integrity were verified; owned installs
+  preserved both artifact lockfiles byte-for-byte.
+- Fresh production audits: API 11 -> 0 findings; web 1 -> 0. Full development
+  audits remain blocked (API: one critical / three high / 20 moderate; web:
+  11 high). No audit exception or suppression was added.
+- Master-based web coverage: 118 suites / 1,568 tests passed, with lines
+  85.40%, branches 75.37%, functions 75.22%, statements 82.68%. The unmerged
+  comprehensive UI branch's additional tests remain separate evidence.
+
+### Comprehensive browser validation checkpoint
+
+- Exact-tip consolidation proof passes 118 Prisma E2E suites / 2,486 tests,
+  119 web coverage suites / 1,577 tests, and 250 Chromium cases with only the
+  12 canonical-dev pixel comparisons skipped.
+- Fail browser runs at global setup when the configured token cannot read the
+  endpoint inventory. This replaces a 217-failure cascade from a mismatched
+  API secret with one causal HTTP 401.
+- Allow up to 15 seconds only for authenticated SSE connection establishment;
+  the cross-tab mutation refetch remains bounded at five seconds. The focused
+  journey passes against the exact-tip API and UI.
+- Treat SSE HTTP 401/403 as terminal authentication failures: clear the stored
+  credential, open the existing token gate and stop retrying. Transient retries
+  now read the current token instead of reusing the value captured at mount.
+  Four RED controls across both consumers are GREEN. The focused transport,
+  consumer and token-gate set passes 60 tests, and a real Chromium regression
+  verifies token removal, the visible re-authentication gate and no retry loop.
+- Register the token-invalid listener in a layout effect so a fast SSE 401
+  cannot race the gate's mount. A component RED/GREEN control reproduces the
+  child-passive-effect ordering that exposed the issue in the browser.
+- Persisted the unmerged UI/runtime work as four logical feature commits so
+  endpoint identity, authenticated streaming, cache correctness and validation
+  infrastructure retain independent history.
+- Combined aged dependencies and the feature overlay pass 250 real Chromium
+  cases with 12 canonical pixel comparisons skipped, plus 1,700 live HTTP
+  assertions and all four API backend lanes.
+- Replaced the two behavioral browser skips with real authenticated SSE and
+  cold-route hover-prefetch journeys. Negative controls fail when their claimed
+  triggers are suppressed.
+- Canonical dev pixels, reviewed consolidation and deployment remain pending.
+
+### Comprehensive browser validation and release-gate hardening
+
+- Add durable `RequestLog.endpointName` snapshots so global Logs and dashboard
+  activity keep a human-readable endpoint identity after endpoint deletion.
+  Legacy rows without a snapshot render as `Deleted endpoint (<id>...)`, and
+  dead quick-open actions are suppressed.
+- Replace token-bearing EventSource URLs with one authenticated Fetch SSE
+  adapter shared by query invalidation and the live-log drawer. Focused tests
+  pass 49/49; a real browser records zero 401s, zero page errors, no token in
+  the URL, and `System status: Healthy`.
+- Add measured Playwright coverage for global Logs, endpoint Logs, and Activity
+  at wide and narrow viewports, including endpoint-name persistence across
+  deletion, real row values, column bounds, active truncation, and dead-link
+  suppression.
+- Harden the full deployment pipeline: task-owned PostgreSQL, current-base
+  Docker validation, non-shipping local image tags, one CI-built digest across
+  GHCR/ACR, immutable semantic tags, and exact revision readiness before live
+  credentials are minted.
+- Fix the local-node live harness on port 6000 by routing Node corpus requests
+  through one `node:http`/`node:https` adapter. Final local InMemory live result:
+  **1,700 passed, 0 failed**, including the new durable endpoint-name section
+  and zero leaked endpoints.
+- Inspect Dashboard visual diffs before regenerating only the two confirmed
+  stale baselines. The current baseline includes the `Self-service /Me`
+  navigation label and Healthy realtime status; blank-frame captures were not
+  accepted as baseline changes.
+- Keep User, Group and custom-resource saves pending until their resource list
+  and endpoint overview refreshes complete. A full Docker browser run exposed
+  a stale reopened extension value despite correct PATCH/GET payloads; three
+  deterministic unit REDs now lock the cache-settlement boundary. Final GREEN
+  is **105 focused units**, **1,577 full web tests with coverage**, and
+  **248 real Docker browser passes / 14 documented skips / zero failures**
+  across 262 cases. Final local browser regressions pass **2/2**.
+- Add opt-in browser traversal of all six `seed-shape-coverage` endpoints,
+  persisted User/Group values, schema support, actual settings, bearer
+  accept/reject, HR extension edits, strict Group ETag restoration and Device
+  CRUD. Schema-qualified field wrappers distinguish duplicate extension leaf
+  names without changing existing labels or test IDs.
+- Keep PATCH operation envelopes out of cached User/Group resource fields.
+  Two additional REDs reproduced replacement of the resource schema by the
+  `PatchOp` URN; the guard preserves flat-body optimistic updates and rollback.
+  Final focused mutation/form/drawer evidence is **105/105 units**.
+- Record blocked dependency gates rather than declaring release readiness:
+  production audits report critical `proxy-addr` (API) and `seroval` (web);
+  full audits also contain development dependency high/critical findings.
+  No dependency manifests, lockfiles or published artifacts were changed.
+
 ### Release assurance follow-up
 
 - Correct the backend-matrix gate so a missing `DATABASE_URL` exits 2 before

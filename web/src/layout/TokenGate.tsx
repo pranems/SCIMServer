@@ -7,7 +7,12 @@
  *
  * Also listens for TOKEN_INVALID_EVENT (401 from API) to re-show the dialog.
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import {
   Dialog,
   DialogSurface,
@@ -56,7 +61,7 @@ export const TokenGate: React.FC<{ children: React.ReactNode }> = ({ children })
   const pendingRef = useRef(false);
 
   // Listen for 401 token-invalid events from fetchWithAuth
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handler = () => {
       setShowDialog(true);
       setError('Token expired or invalid. Please enter a new token.');

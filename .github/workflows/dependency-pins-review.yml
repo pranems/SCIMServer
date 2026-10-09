@@ -2,7 +2,7 @@ name: Dependency pins review
 
 # WHY THIS EXISTS
 # ---------------
-# api/package.json pins transitive packages via `overrides`, each one added to
+# API and web package manifests pin transitive packages via `overrides`, each added to
 # resolve a HIGH CVE. Two properties make that list dangerous over time:
 #
 #   1. An override FREEZES the version. The tree can never float off it, so the
@@ -35,7 +35,7 @@ on:
     branches: [master]
     # Re-run whenever the pins themselves change, so a bad pin is caught at the
     # moment it lands rather than up to a week later.
-    paths: ["api/package.json"]
+    paths: ["api/package.json", "web/package.json"]
 
 permissions:
   contents: read

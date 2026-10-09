@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
+const { liveFetch } = require('./live-test-http.cjs');
 
 const argumentsByName = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -15,7 +16,7 @@ async function request(method, path, body, ifMatch, base = baseUrl) {
   const headers = { Authorization: `Bearer ${token}` };
   if (body !== undefined) headers['Content-Type'] = 'application/scim+json';
   if (ifMatch !== undefined) headers['If-Match'] = ifMatch;
-  const response = await fetch(`${base.replace(/\/$/, '')}${path}`, {
+  const response = await liveFetch(`${base.replace(/\/$/, '')}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),

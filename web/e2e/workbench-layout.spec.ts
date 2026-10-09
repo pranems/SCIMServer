@@ -32,14 +32,15 @@ test.describe('Workbench layout toggle', () => {
   test('switches request and response cards between stacked and side-by-side layouts', async ({ page }) => {
     await authenticate(page);
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 20_000 });
     await page.evaluate((layoutKey) => window.localStorage.removeItem(layoutKey), LAYOUT_STORAGE_KEY);
-    await page.getByRole('link', { name: /workbench/i }).click();
+    await page.getByTestId('nav-workbench').click();
 
     const wrapper = page.getByTestId('workbench-body-response-wrapper');
     const toggle = page.getByTestId('workbench-layout-toggle');
     const requestCard = page.getByTestId('workbench-body-card');
     const responseCard = page.getByTestId('workbench-response-card');
+    await expect(wrapper).toBeVisible({ timeout: 20_000 });
 
     await expect(wrapper).toHaveAttribute('data-layout', 'vertical');
     await expect(toggle).toHaveText(/side-by-side/i);
@@ -67,9 +68,8 @@ test.describe('Workbench layout toggle', () => {
     expect(horizontalRequest?.width ?? 0).toBeGreaterThan(300);
     expect(horizontalResponse?.width ?? 0).toBeGreaterThan(300);
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('link', { name: /workbench/i }).click();
+    await page.reload();
+    await expect(wrapper).toBeVisible({ timeout: 20_000 });
     await expect(wrapper).toHaveAttribute('data-layout', 'horizontal');
   });
 });

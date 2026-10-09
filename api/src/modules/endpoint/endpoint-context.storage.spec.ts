@@ -1,5 +1,6 @@
 import { EndpointContextStorage } from './endpoint-context.storage';
 import { endpointProfileRevision } from '../../domain/repositories/profile-revision';
+import { getCorrelationContext, ScimLogger } from '../logging/scim-logger.service';
 
 describe('EndpointContextStorage', () => {
   let storage: EndpointContextStorage;
@@ -9,6 +10,19 @@ describe('EndpointContextStorage', () => {
   });
 
   describe('setContext and getContext', () => {
+    it('enriches the existing request correlation context with the endpoint name snapshot', () => {
+      const logger = new ScimLogger();
+      logger.runWithContext({ requestId: 'request-1' }, () => {
+        storage.setContext({
+          endpointId: 'endpoint-1',
+          endpointName: 'Endpoint Display Name',
+          baseUrl: 'http://localhost:3000/scim/endpoints/endpoint-1',
+        });
+
+        expect(getCorrelationContext()?.endpointName).toBe('Endpoint Display Name');
+      });
+    });
+
     it('should set and retrieve context', () => {
       const context = {
         endpointId: 'endpoint-1',

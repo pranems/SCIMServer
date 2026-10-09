@@ -28,7 +28,16 @@
  * @see docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getStoredToken } from '../auth/token';
+import {
+  clearStoredToken,
+  getStoredToken,
+  notifyTokenInvalid,
+} from '../auth/token';
+import {
+  isAuthenticatedSseAuthError,
+  openAuthenticatedSse,
+  type AuthenticatedSseConnection,
+} from './authenticated-sse';
 
 /** RFC-compatible level keywords this hook understands. */
 export type LogStreamLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
@@ -151,59 +160,69 @@ export function useLogStream(options: UseLogStreamOptions = {}): UseLogStreamRes
   pausedRef.current = paused;
   maxRef.current = maxEntries;
 
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const connectionRef = useRef<AuthenticatedSseConnection | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCount = useRef(0);
 
   useEffect(() => {
-    if (!enabled || typeof EventSource === 'undefined') {
+    if (!enabled || typeof fetch === 'undefined') {
       setConnectionState('closed');
       return;
     }
 
-    const token = getStoredToken();
-    const fullUrl = token ? `${url}&token=${encodeURIComponent(token)}` : url;
+    let disposed = false;
 
     const connect = () => {
+      if (disposed) return;
       setConnectionState('connecting');
-      const es = new EventSource(fullUrl);
-      eventSourceRef.current = es;
-
-      es.onopen = () => {
-        retryCount.current = 0;
-        setConnectionState('open');
-      };
-
-      es.onmessage = (event) => {
-        if (pausedRef.current) return;
-        try {
-          const payload: unknown = JSON.parse(event.data);
-          if (!isLogEntry(payload)) return;
-          setEntries((prev) => {
-            const next = [...prev, payload];
-            const cap = maxRef.current;
-            if (next.length > cap) return next.slice(next.length - cap);
-            return next;
-          });
-        } catch {
-          // Non-JSON SSE message (server keepalive / comment) - ignore.
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        eventSourceRef.current = null;
-        setConnectionState('reconnecting');
-        const delay = Math.min(1_000 * Math.pow(2, retryCount.current), 30_000);
-        retryCount.current++;
-        setTimeout(connect, delay);
-      };
+      connectionRef.current = openAuthenticatedSse({
+        url,
+        token: getStoredToken() ?? undefined,
+        onOpen: () => {
+          retryCount.current = 0;
+          setConnectionState('open');
+        },
+        onMessage: (message) => {
+          if (pausedRef.current) return;
+          try {
+            const payload: unknown = JSON.parse(message);
+            if (!isLogEntry(payload)) return;
+            setEntries((prev) => {
+              const next = [...prev, payload];
+              const cap = maxRef.current;
+              if (next.length > cap) return next.slice(next.length - cap);
+              return next;
+            });
+          } catch {
+            // Non-JSON SSE message (server keepalive / comment) - ignore.
+          }
+        },
+        onError: (error) => {
+          if (disposed) return;
+          connectionRef.current?.close();
+          connectionRef.current = null;
+          if (isAuthenticatedSseAuthError(error)) {
+            clearStoredToken();
+            notifyTokenInvalid();
+            setConnectionState('closed');
+            return;
+          }
+          setConnectionState('reconnecting');
+          const delay = Math.min(1_000 * Math.pow(2, retryCount.current), 30_000);
+          retryCount.current++;
+          retryTimerRef.current = setTimeout(connect, delay);
+        },
+      });
     };
 
     connect();
 
     return () => {
-      eventSourceRef.current?.close();
-      eventSourceRef.current = null;
+      disposed = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+      connectionRef.current?.close();
+      connectionRef.current = null;
       setConnectionState('closed');
     };
   }, [enabled, url]);

@@ -26,9 +26,18 @@
  */
 import { useEffect, useRef } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { getStoredToken } from '../auth/token';
+import {
+  clearStoredToken,
+  getStoredToken,
+  notifyTokenInvalid,
+} from '../auth/token';
 import { queryKeys } from '../api/queries';
 import { useUIStore } from '../store/ui-store';
+import {
+  openAuthenticatedSse,
+  isAuthenticatedSseAuthError,
+  type AuthenticatedSseConnection,
+} from './authenticated-sse';
 import {
   appendNotification,
   bucketKey,
@@ -203,62 +212,64 @@ export function useSSE(options: UseSSEOptions = {}) {
   const { enabled = true, url = '/scim/admin/log-config/stream?level=INFO' } = options;
   const queryClient = useQueryClient();
   const retryCount = useRef(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const connectionRef = useRef<AuthenticatedSseConnection | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!enabled || typeof EventSource === 'undefined') return;
+    if (!enabled || typeof fetch === 'undefined') return;
 
-    const token = getStoredToken();
-    const fullUrl = token ? `${url}&token=${encodeURIComponent(token)}` : url;
+    let disposed = false;
 
     const connect = () => {
+      if (disposed) return;
       // K2 - mark connecting BEFORE constructing the EventSource so the
       // <HealthRollup /> Realtime substatus reflects the in-flight
       // attempt, not the previous lifecycle state.
       useUIStore.getState().setSseConnectionState('connecting');
-      const es = new EventSource(fullUrl);
-      eventSourceRef.current = es;
-
-      es.onopen = () => {
-        retryCount.current = 0;
-        useUIStore.getState().setSseConnectionState('open');
-      };
-
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const eventType = data?.type ?? data?.event;
-          if (!isSupportedEvent(eventType)) return;
-          dispatchInvalidations(queryClient, eventType, data?.endpointId);
-          // Phase N1 - push every supported SCIM event into the
-          // notifications store so the Bell icon + drawer can render
-          // a human-visible feed alongside the cache invalidation.
-          pushNotification(eventType, data?.endpointId, data?.timestamp);
-        } catch {
-          // Non-JSON SSE message (keepalive, etc.) - ignore
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        eventSourceRef.current = null;
-        // K2 - signal "reconnecting" so the rollup shows degraded
-        // (yellow) instead of jumping straight to down (red) - the
-        // hook is about to schedule the next attempt.
-        useUIStore.getState().setSseConnectionState('reconnecting');
-
-        // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
-        const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
-        retryCount.current++;
-        setTimeout(connect, delay);
-      };
+      connectionRef.current = openAuthenticatedSse({
+        url,
+        token: getStoredToken() ?? undefined,
+        onOpen: () => {
+          retryCount.current = 0;
+          useUIStore.getState().setSseConnectionState('open');
+        },
+        onMessage: (message) => {
+          try {
+            const data = JSON.parse(message);
+            const eventType = data?.type ?? data?.event;
+            if (!isSupportedEvent(eventType)) return;
+            dispatchInvalidations(queryClient, eventType, data?.endpointId);
+            pushNotification(eventType, data?.endpointId, data?.timestamp);
+          } catch {
+            // Non-JSON SSE message (keepalive, etc.) - ignore
+          }
+        },
+        onError: (error) => {
+          if (disposed) return;
+          connectionRef.current?.close();
+          connectionRef.current = null;
+          if (isAuthenticatedSseAuthError(error)) {
+            clearStoredToken();
+            notifyTokenInvalid();
+            useUIStore.getState().setSseConnectionState('closed');
+            return;
+          }
+          useUIStore.getState().setSseConnectionState('reconnecting');
+          const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
+          retryCount.current++;
+          retryTimerRef.current = setTimeout(connect, delay);
+        },
+      });
     };
 
     connect();
 
     return () => {
-      eventSourceRef.current?.close();
-      eventSourceRef.current = null;
+      disposed = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+      connectionRef.current?.close();
+      connectionRef.current = null;
       // K2 - mark closed on unmount so the rollup correctly reflects
       // that no realtime channel is active.
       useUIStore.getState().setSseConnectionState('closed');

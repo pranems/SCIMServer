@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const fs = require("node:fs");
 const { API, testGuard } = require("./p1-validation/safety.cjs");
+const { liveFetch } = require("./live-test-http.cjs");
 
 async function runLiveP1(baseUrl, secret) {
   await testGuard();
@@ -31,7 +32,7 @@ async function runP1Contract(baseUrl, secret) {
   let assertions = 0;
   const eq = (actual, expected) => { assert.deepEqual(actual, expected); assertions++; };
   async function http(method, route, body) {
-    const response = await fetch(`${baseUrl}${route}`, {
+    const response = await liveFetch(`${baseUrl}${route}`, {
       method, headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/scim+json" },
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(10000),
@@ -70,7 +71,7 @@ async function runP1Contract(baseUrl, secret) {
         eq(after.etag, read.etag);
       }
     } finally {
-      const deleted = await fetch(`${baseUrl}/scim/admin/endpoints/${endpoint.body.id}`, {
+      const deleted = await liveFetch(`${baseUrl}/scim/admin/endpoints/${endpoint.body.id}`, {
         method: "DELETE", headers: { Authorization: `Bearer ${secret}` },
       });
       eq(deleted.status, 204);

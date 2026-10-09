@@ -58,7 +58,8 @@ foreach ($required in @(
     'github-workflow-run.ps1',
     'Select-GithubWorkflowRun',
     '-ExpectedHeadSha',
-    'Version/latest image mismatch'
+    'Semantic tag matches runtime source SHA digest',
+    'GHCR and ACR version/latest digest parity'
 )) {
     if (-not $pipeline.Contains($required)) {
         throw "Deployment pipeline is missing required workflow-run guard: $required"

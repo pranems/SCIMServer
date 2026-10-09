@@ -46,6 +46,14 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+const visualBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:4000';
+const visualHost = new URL(visualBaseUrl).hostname;
+const localVisualTarget = visualHost === 'localhost' || visualHost === '127.0.0.1';
+test.skip(
+  localVisualTarget && process.env.E2E_VISUAL_BASELINES !== '1',
+  'Pixel baselines are canonical on dev; set E2E_VISUAL_BASELINES=1 for an explicit local baseline run.',
+);
+
 test.beforeEach(async ({ page }) => {
   const token = process.env.E2E_TOKEN || 'changeme-scim';
   await page.addInitScript(
@@ -151,7 +159,7 @@ const SNAPSHOT_OPTIONS = {
 async function createSnapshotEndpoint(page: Page): Promise<string | null> {
   const token = process.env.E2E_TOKEN || 'changeme-scim';
   await page.goto('/endpoints');
-  await page.waitForLoadState('networkidle');
+  await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
   return page.evaluate(async (t: string) => {
     const res = await fetch('/scim/admin/endpoints', {
       method: 'POST',
@@ -184,7 +192,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Dashboard (light theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'light'));
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('dashboard-light.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
@@ -195,7 +203,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Dashboard (dark theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'dark'));
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('dashboard-dark.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
@@ -205,7 +213,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Endpoints list', async ({ page }) => {
     await page.goto('/endpoints');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('endpoints-list.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, ENDPOINTS_LIVE_SELECTORS),
@@ -216,7 +224,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Logs page (light theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'light'));
     await page.goto('/logs');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('logs-light.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, NON_DETERMINISTIC_SELECTORS),
@@ -231,7 +239,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Logs page (dark theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'dark'));
     await page.goto('/logs');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('logs-dark.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, NON_DETERMINISTIC_SELECTORS),
@@ -242,7 +250,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Settings page', async ({ page }) => {
     await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('settings.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, SETTINGS_LIVE_SELECTORS),
@@ -261,7 +269,6 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     // and never catches the routing bug. Every visual baseline MUST prove
     // its page loaded first.
     await expect(page.getByTestId('manual-provision-page')).toBeVisible({ timeout: 30_000 });
-    await page.waitForLoadState('networkidle');
     await expect(page).toHaveScreenshot('manual-provision.png', {
       ...SNAPSHOT_OPTIONS,
       fullPage: true,
@@ -270,7 +277,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Command Palette (Cmd+K open state)', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
     await page.getByTestId('app-shell').click({ position: { x: 5, y: 5 } });
     // Open the palette via keyboard shortcut so the screenshot exercises
     // the same code path as the user.
@@ -285,7 +292,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Keyboard Shortcuts Help (? open state)', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
     await page.getByTestId('app-shell').click({ position: { x: 5, y: 5 } });
     // Playwright's Shift+/ emits key='/' with shiftKey rather than key='?'.
     await page.keyboard.press('?');
@@ -310,7 +317,7 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     test.skip(!id, 'Could not create the snapshot fixture endpoint');
     try {
       await page.goto(`/endpoints/${id}`);
-      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('tab-overview')).toBeVisible({ timeout: 30_000 });
       await expect(page).toHaveScreenshot('endpoint-detail-overview.png', {
         ...SNAPSHOT_OPTIONS,
         mask: locatorsFor(page, [
@@ -337,9 +344,9 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     test.skip(!id, 'Could not create the snapshot fixture endpoint');
     try {
       await page.goto(`/endpoints/${id}`);
-      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
       await page.getByRole('tab', { name: /users/i }).click();
-      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('users-tab')).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId('endpoint-detail-page')).toBeVisible();
       await expect(page.getByTestId('endpoint-edit-button')).toBeVisible();
       await expect(page.getByRole('tab', { name: /users/i })).toHaveAttribute('aria-selected', 'true');
@@ -366,9 +373,9 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     test.skip(!id, 'Could not create the snapshot fixture endpoint');
     try {
       await page.goto(`/endpoints/${id}`);
-      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
       await page.getByRole('tab', { name: /schemas/i }).click();
-      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('tab-schemas')).toBeVisible({ timeout: 30_000 });
       await expect(page).toHaveScreenshot('endpoint-detail-schemas.png', {
         ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, [

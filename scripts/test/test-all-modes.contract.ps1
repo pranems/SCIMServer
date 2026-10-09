@@ -74,17 +74,25 @@ foreach ($mode in @(
     Invoke-Assert -Description "registers mode '$mode'" -Condition ($content -match [regex]::Escape("'$mode'"))
 }
 
-# 5. Script restores environment variables in finally block (no leak
+# 5. Prisma E2E suites share one database and must not run concurrently.
+$prismaE2EBlock = [regex]::Match(
+    $content,
+    "(?s)-Mode 'api-e2e-prisma'.*?(?=# ─── Mode 5)"
+).Value
+Invoke-Assert -Description 'serializes Prisma E2E suites against the shared database' `
+    -Condition ($prismaE2EBlock -match "npm run test:e2e -- --runInBand")
+
+# 6. Script restores environment variables in finally block (no leak
 #    between modes - this is the most common silent-breakage source).
 Invoke-Assert -Description 'env-var stash + restore via finally block' `
     -Condition (($content -match 'finally\s*\{') -and ($content -match 'SetEnvironmentVariable.*stashedEnv'))
 
-# 6. Script declares non-zero exit code on any failure.
+# 7. Script declares non-zero exit code on any failure.
 Invoke-Assert -Description 'exits 1 when any mode fails' -Condition ($content -match 'exit\s+1')
 Invoke-Assert -Description 'exits 0 when all modes pass' -Condition ($content -match 'exit\s+0')
 Invoke-Assert -Description 'exits 2 on prerequisite failure' -Condition ($content -match 'exit\s+2')
 
-# 7. Missing PostgreSQL configuration must fail before any test mode runs.
+# 8. Missing PostgreSQL configuration must fail before any test mode runs.
 #    Only an explicit -SkipPrisma is allowed to reduce the backend matrix.
 $sandbox = Join-Path $env:TEMP ('test-all-modes-contract-' + [guid]::NewGuid().ToString('N'))
 $savedPath = $env:PATH

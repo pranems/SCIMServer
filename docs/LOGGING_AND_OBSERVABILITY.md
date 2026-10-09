@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.37`
 
 Global and endpoint Logs share filters for URL, HTTP method, status, time range,
 errors-only, minimum duration, and request ID. Custom ResourceType URLs remain
@@ -522,7 +522,7 @@ Every HTTP request is persisted to the database (Prisma/PostgreSQL or in-memory)
 ### Record Fields
 
 Each `RequestLog` row contains:
-- `id` (UUID), `endpointId` (correlation), `method`, `url`, `status`, `durationMs`, `createdAt`
+- `id` (UUID), `endpointId` (correlation), `endpointName` (display-name snapshot), `method`, `url`, `status`, `durationMs`, `createdAt`
 - `requestHeaders`, `requestBody` (JSON stringified; secret-redacted unless `PersistRequestSecrets`)
 - `responseHeaders`, `responseBody` (JSON stringified)
 - `errorMessage`, `errorStack`
@@ -543,8 +543,14 @@ endpoint MUST still exist and stay queryable by that `endpointId`. Consequences:
 
 - **Orphaned-but-retained.** Deleting an endpoint does NOT delete or null its request
   logs. The rows keep their `endpointId` and remain queryable (`GET /scim/admin/logs?endpointId=...`).
-  In the dashboard/UI the endpoint *name* simply no longer resolves (the endpoint is
-  gone) - the row still shows its method/url/status/auth.
+  Rows that reach controller endpoint resolution also keep the endpoint's
+  display-name snapshot in `endpointName`, so
+  the dashboard and global Logs remain human-readable after deletion. Rows created
+  before the snapshot migration are labeled `Deleted endpoint (<id>...)` rather
+  than pretending a raw UUID is a current endpoint name.
+  Authentication failures before controller resolution can still have a null
+  snapshot and use that same bounded fallback after deletion. Snapshot capture
+  reuses the controller lookup; it does not add a database lookup before auth.
 - **Pruned by age, never by cascade.** Orphaned logs do not accumulate forever - the
   auto-prune deletes rows older than the retention window (default 21 days,
   `LOG_RETENTION_DAYS`), regardless of endpoint lifecycle.
@@ -1007,6 +1013,11 @@ On boot, the server prints these log lines to console (useful for verifying conf
 ```
 
 These URLs are clickable in most terminals and provide instant access to the log infrastructure.
+
+The browser uses a shared Fetch/ReadableStream SSE adapter so the bearer token
+travels in the `Authorization` header. Tokens are never appended to the stream
+URL or query string. Native `EventSource` is not used because it cannot set the
+required header.
 
 ### Runtime Version & Diagnostics Endpoint
 

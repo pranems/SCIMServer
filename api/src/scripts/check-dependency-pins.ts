@@ -117,7 +117,15 @@ export function satisfiesGhsaRange(version: string, range: string): boolean {
     const [, op, bound] = m;
     const c = compareVersions(version, bound);
     const ok =
-      op === '>=' ? c >= 0 : op === '<=' ? c <= 0 : op === '>' ? c > 0 : op === '<' ? c < 0 : c === 0;
+      op === '>='
+        ? c >= 0
+        : op === '<='
+          ? c <= 0
+          : op === '>'
+            ? c > 0
+            : op === '<'
+              ? c < 0
+              : c === 0;
     if (!ok) return false;
   }
   return true;
@@ -127,13 +135,19 @@ export function satisfiesGhsaRange(version: string, range: string): boolean {
  * Given the `overrides` map and the advisories fetched for those packages,
  * return one finding per pin that sits inside a vulnerable range.
  */
+function overridePackageName(selector: string): string {
+  const versionSeparator = selector.lastIndexOf('@');
+  return versionSeparator > 0 ? selector.slice(0, versionSeparator) : selector;
+}
+
 export function evaluatePins(
   pins: Readonly<Record<string, string>>,
   advisories: ReadonlyArray<PackageAdvisory>,
 ): PinFinding[] {
   const findings: PinFinding[] = [];
 
-  for (const [packageName, pinnedVersion] of Object.entries(pins)) {
+  for (const [selector, pinnedVersion] of Object.entries(pins)) {
+    const packageName = overridePackageName(selector);
     for (const adv of advisories.filter((a) => a.packageName === packageName)) {
       const hitIndex = adv.vulnerableRanges.findIndex((r) => satisfiesGhsaRange(pinnedVersion, r));
       if (hitIndex === -1) continue;
@@ -164,6 +178,7 @@ export function evaluatePins(
 export interface PinReportContext {
   pinCount: number;
   now: string;
+  packageJsonPath?: string;
 }
 
 /** Render a Markdown report suitable for a GitHub Issue body. */
@@ -172,15 +187,18 @@ export function renderPinReport(
   ctx: PinReportContext,
 ): string {
   const lines: string[] = [];
+  const packageJsonPath = ctx.packageJsonPath ?? 'api/package.json';
   lines.push('# Pinned dependency review');
   lines.push('');
   lines.push(`Date:  ${ctx.now}`);
-  lines.push(`Pins:  ${ctx.pinCount} in \`api/package.json\` \`overrides\``);
+  lines.push(`Pins:  ${ctx.pinCount} in \`${packageJsonPath}\` \`overrides\``);
   lines.push(`Flagged: ${findings.length}`);
   lines.push('');
 
   if (findings.length === 0) {
-    lines.push(`All ${ctx.pinCount} pinned versions are clear of known advisories. No action required.`);
+    lines.push(
+      `All ${ctx.pinCount} pinned versions are clear of known advisories. No action required.`,
+    );
     return lines.join('\n');
   }
 
@@ -196,9 +214,13 @@ export function renderPinReport(
     lines.push(`- **Advisory**: ${f.ghsaId}${f.cveId ? ` (${f.cveId})` : ''} - ${f.severity}`);
     lines.push(`- **Summary**: ${f.summary}`);
     if (f.recommendedVersion) {
-      lines.push(`- **Move to**: \`${f.recommendedVersion}\` (smallest patched version at or above the current pin)`);
+      lines.push(
+        `- **Move to**: \`${f.recommendedVersion}\` (smallest patched version at or above the current pin)`,
+      );
     } else {
-      lines.push('- **Move to**: no patched version at or above the current pin. Needs a human decision.');
+      lines.push(
+        '- **Move to**: no patched version at or above the current pin. Needs a human decision.',
+      );
     }
     lines.push('');
   }
@@ -211,16 +233,20 @@ export function renderPinReport(
   lines.push('');
   lines.push('## What to do');
   lines.push('');
-  lines.push('1. Edit the version in `api/package.json` `overrides`.');
+  lines.push(`1. Edit the version in \`${packageJsonPath}\` \`overrides\`.`);
   lines.push(
     '2. Check the target is at least 7 days old (`npm view <pkg> time --json`). If it is younger, do NOT take it - add a `Class: quarantine-window` entry to `.trivyignore` with `Fix-available-from` set to publish date + 7 days, and take the fix on that date.',
   );
   lines.push(
     '3. Regenerate the lockfile with the **regen-lockfile** workflow. Do NOT run `npm install --package-lock-only` on a corp-managed device - it rewrites `resolved` to an internal feed and downgrades `integrity` from sha512 to sha1.',
   );
-  lines.push('4. Commit the regenerated lockfile, and drop any `.trivyignore` entry the fix retires in the same commit.');
+  lines.push(
+    '4. Commit the regenerated lockfile, and drop any `.trivyignore` entry the fix retires in the same commit.',
+  );
   lines.push('');
-  lines.push('Close this issue once the pins are updated. The workflow re-runs on schedule and will reopen if anything regresses.');
+  lines.push(
+    'Close this issue once the pins are updated. The workflow re-runs on schedule and will reopen if anything regresses.',
+  );
   return lines.join('\n');
 }
 
@@ -263,7 +289,9 @@ export async function fetchAdvisories(
 
   const res = await fetch(url, { headers });
   if (!res.ok) {
-    throw new Error(`GitHub advisories query failed for ${packageName}: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `GitHub advisories query failed for ${packageName}: ${res.status} ${res.statusText}`,
+    );
   }
   const body = (await res.json()) as GhAdvisory[];
 
@@ -277,7 +305,9 @@ export async function fetchAdvisories(
       cveId: a.cve_id,
       severity: a.severity,
       summary: a.summary,
-      vulnerableRanges: rel.map((v) => v.vulnerable_version_range ?? '').filter((s) => s.length > 0),
+      vulnerableRanges: rel
+        .map((v) => v.vulnerable_version_range ?? '')
+        .filter((s) => s.length > 0),
       firstPatchedVersions: rel
         .map((v) => v.first_patched_version ?? '')
         .filter((s) => s.length > 0),
@@ -290,27 +320,36 @@ export async function fetchAdvisories(
  * gate, while the scheduled workflow turns the report into an Issue.
  */
 export async function runCli(): Promise<number> {
-  const pkgPath = path.resolve(__dirname, '..', '..', 'package.json');
-  const pins = await readPins(pkgPath);
-  const names = Object.keys(pins);
+  const repoPath = path.resolve(__dirname, '..', '..', '..');
   const token = process.env.GITHUB_TOKEN;
 
-  const advisories: PackageAdvisory[] = [];
+  const findings: PinFinding[] = [];
+  const reports: string[] = [];
   const failed: string[] = [];
-  for (const name of names) {
-    try {
-      advisories.push(...(await fetchAdvisories(name, token)));
-    } catch (err) {
-      // A network failure must not read as "all clear".
-      failed.push(`${name}: ${(err as Error).message}`);
+  for (const workspace of ['api', 'web']) {
+    const pins = await readPins(path.join(repoPath, workspace, 'package.json'));
+    const names = [...new Set(Object.keys(pins).map(overridePackageName))];
+    const advisories: PackageAdvisory[] = [];
+    for (const name of names) {
+      try {
+        advisories.push(...(await fetchAdvisories(name, token)));
+      } catch (err) {
+        // A network failure must not read as "all clear".
+        failed.push(`${workspace}/${name}: ${(err as Error).message}`);
+      }
     }
+    const workspaceFindings = evaluatePins(pins, advisories);
+    findings.push(...workspaceFindings);
+    reports.push(
+      renderPinReport(workspaceFindings, {
+        pinCount: Object.keys(pins).length,
+        now: new Date().toISOString().slice(0, 10),
+        packageJsonPath: `${workspace}/package.json`,
+      }),
+    );
   }
 
-  const findings = evaluatePins(pins, advisories);
-  let report = renderPinReport(findings, {
-    pinCount: names.length,
-    now: new Date().toISOString().slice(0, 10),
-  });
+  let report = reports.join('\n\n');
   if (failed.length > 0) {
     report += `\n\n## Could not be checked\n\nThese lookups failed, so their status is UNKNOWN - not clean:\n\n${failed
       .map((f) => `- ${f}`)

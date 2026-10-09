@@ -9,9 +9,9 @@ const config: Config = {
     '^@app/(.*)$': '<rootDir>/src/$1'
   },
   transform: {
-    // `allowJs` lets ts-jest down-compile the ESM-only `jose` package (see
-    // transformIgnorePatterns below) from ESM to CommonJS for the CJS test runtime.
-    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: { allowJs: true } }]
+    // The local TypeScript transformer also down-compiles ESM-only `jose`
+    // JavaScript to CommonJS for Jest's CJS runtime.
+    '^.+\\.(t|j)s$': '<rootDir>/test/jest-typescript-transformer.cjs'
   },
   // `jose` v6 is published ESM-only. Jest runs the suite as CommonJS, so the
   // package must be transformed rather than left to the runtime `require()`

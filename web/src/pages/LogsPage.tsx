@@ -163,6 +163,8 @@ interface LogRow {
   createdAt: string | Date;
   /** X6 - the endpoint this request targeted, so the row can show its name. */
   endpointId?: string;
+  /** Endpoint display-name snapshot retained after the endpoint is deleted. */
+  endpointName?: string;
   /** P3 - the X-Request-Id correlation id echoed on each list item (U12). */
   requestId?: string;
   /** V10 - the auth decision persisted on the row itself (durable, instant). */
@@ -398,24 +400,30 @@ export const LogsPage: React.FC<{ routeSince?: string }> = ({ routeSince }) => {
                   {log.endpointId ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
                       <CopyableField
-                        value={endpointNameById.get(log.endpointId) ?? log.endpointId}
+                        value={
+                          log.endpointName ??
+                          endpointNameById.get(log.endpointId) ??
+                          `Deleted endpoint (${log.endpointId.slice(0, 8)}...)`
+                        }
                         truncate
                         maxWidth="100%"
                         data-testid={`log-row-endpoint-${log.id}`}
                       />
-                      <Tooltip content="Open this endpoint" relationship="label" positioning="above">
-                        <Button
-                          appearance="subtle"
-                          size="small"
-                          icon={<Open16Regular />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void navigate({ to: '/endpoints/$endpointId', params: { endpointId: log.endpointId! } });
-                          }}
-                          aria-label={`Open endpoint ${endpointNameById.get(log.endpointId) ?? log.endpointId}`}
-                          data-testid={`log-row-endpoint-open-${log.id}`}
-                        />
-                      </Tooltip>
+                      {endpointNameById.has(log.endpointId) && (
+                        <Tooltip content="Open this endpoint" relationship="label" positioning="above">
+                          <Button
+                            appearance="subtle"
+                            size="small"
+                            icon={<Open16Regular />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void navigate({ to: '/endpoints/$endpointId', params: { endpointId: log.endpointId! } });
+                            }}
+                            aria-label={`Open endpoint ${log.endpointName ?? endpointNameById.get(log.endpointId)}`}
+                            data-testid={`log-row-endpoint-open-${log.id}`}
+                          />
+                        </Tooltip>
+                      )}
                     </div>
                   ) : (
                     <Caption1 data-testid={`log-row-endpoint-${log.id}`}>-</Caption1>

@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.37`
 
-> **Version:** 0.55.36 - **Updated:** 2026-09-28
+> **Version:** 0.55.37 - **Updated:** 2026-10-01
 > **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
@@ -1193,6 +1193,7 @@ Authorization: Bearer changeme-scim
 |-------|------|---------|-------------|
 | `page` | number | 1 | Page number |
 | `pageSize` | number | 50 | Results per page |
+| `endpointId` | UUID | (all) | Filter to one endpoint |
 | `method` | string | (all) | HTTP method filter |
 | `status` | number | (all) | Status code filter |
 | `hasError` | boolean | (all) | Filter for error responses |
@@ -1203,6 +1204,12 @@ Authorization: Bearer changeme-scim
 | `includeAdmin` | boolean | false | Include admin API requests |
 | `hideKeepalive` | boolean | false | Hide keepalive/health requests |
 | `minDurationMs` | number | (all) | Minimum request duration |
+
+Each list item includes nullable `endpointId` and `endpointName`. The name is a
+request-time audit snapshot, so it can remain available after endpoint
+deletion. Older rows created before the snapshot migration can return
+`endpointName: null`; clients should then use the endpoint ID as a bounded
+fallback rather than assume the referenced endpoint still exists.
 
 ---
 

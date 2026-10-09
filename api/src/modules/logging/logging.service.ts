@@ -92,6 +92,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     method: string;
     url: string;
     endpointId: string | null;
+    endpointName: string | null;
     status: number | null;
     durationMs: number | null;
     createdAt: Date;
@@ -245,6 +246,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     const authMethod = authCtx?.authMethod ?? null;
     const authReason = authCtx?.authReason ?? null;
     const authCredentialId = authCtx?.authCredentialId ?? null;
+    const endpointName = authCtx?.endpointName ?? null;
     // W1 - the full redacted AuthDecisionTrace (JSON), so the detail renders the
     // diff permanently. Capped like any stored body.
     const authDecision = capStoredBodyString(authCtx?.authDecision) ?? null;
@@ -269,6 +271,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         method,
         url: storedUrl,
         endpointId: toStorableEndpointId(endpointId),
+        endpointName,
         status: status ?? null,
         durationMs: durationMs ?? null,
         createdAt: new Date(),
@@ -319,6 +322,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       // insert (no per-row UPDATE backfill). `identifier` is a real column.
       identifier: identifier ?? null,
       endpointId: toStorableEndpointId(endpointId),
+      endpointName,
       requestId: toStorableRequestId(requestId),
       authOutcome,
       authMethod,
@@ -597,6 +601,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
         requestId: r.requestId ?? undefined,
         endpointId: r.endpointId ?? undefined,
+        endpointName: r.endpointName ?? undefined,
         authOutcome: r.authOutcome ?? undefined,
         authMethod: r.authMethod ?? undefined,
         authReason: r.authReason ?? undefined,
@@ -726,6 +731,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       errorMessage: string | null;
       requestId: string | null;
       endpointId: string | null;
+      endpointName: string | null;
       authOutcome: string | null;
       authMethod: string | null;
       authReason: string | null;
@@ -751,6 +757,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
             errorMessage: true,
             requestId: true,
             endpointId: true,
+            endpointName: true,
             authOutcome: true,
             authMethod: true,
             authReason: true,
@@ -813,6 +820,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     errorMessage: string | null;
     requestId?: string | null;
     endpointId?: string | null;
+    endpointName?: string | null;
     authOutcome?: string | null;
     authMethod?: string | null;
     authReason?: string | null;
@@ -840,6 +848,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       reportableIdentifier: identifier,
       requestId: r.requestId ?? undefined,
       endpointId: r.endpointId ?? undefined,
+      endpointName: r.endpointName ?? undefined,
       authOutcome: r.authOutcome ?? undefined,
       authMethod: r.authMethod ?? undefined,
       authReason: r.authReason ?? undefined,
@@ -952,6 +961,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       return {
         id: row.id,
         endpointId: row.endpointId ?? undefined,
+        endpointName: row.endpointName ?? undefined,
         method: row.method,
         url: row.url,
         status: row.status ?? undefined,
@@ -998,6 +1008,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     return {
       id: row.id,
       endpointId: row.endpointId ?? undefined,
+      endpointName: row.endpointName ?? undefined,
       method: row.method,
       url: row.url,
       status: row.status ?? undefined,

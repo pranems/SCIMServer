@@ -157,6 +157,25 @@ describe('TokenGate', () => {
     expect(screen.getByText(/Token expired or invalid/i)).toBeInTheDocument();
   });
 
+  it('reconciles a token invalidated while the gate listener is mounting', async () => {
+    mockGetStoredToken.mockReturnValue('existing-token');
+    const InvalidatingChild = () => {
+      React.useEffect(() => {
+        window.dispatchEvent(new CustomEvent('scimserver:token-invalid'));
+      }, []);
+      return <div data-testid="children">app content</div>;
+    };
+
+    render(
+      <TokenGate>
+        <InvalidatingChild />
+      </TokenGate>,
+    );
+
+    expect(await screen.findByTestId('fluent-dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Token expired or invalid/i)).toBeInTheDocument();
+  });
+
   it('does not save an empty/whitespace-only token', () => {
     renderGate(false);
     const saveBtn = screen.getByTestId('token-save');

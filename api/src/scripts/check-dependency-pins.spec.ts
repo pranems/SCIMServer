@@ -25,8 +25,10 @@ import {
   satisfiesGhsaRange,
   evaluatePins,
   renderPinReport,
+  runCli,
   type PackageAdvisory,
 } from './check-dependency-pins';
+import fs from 'fs/promises';
 
 describe('compareVersions', () => {
   it('orders by numeric segment, not lexically', () => {
@@ -120,6 +122,24 @@ describe('evaluatePins', () => {
     expect(evaluatePins({ multer: '2.2.0' }, [fastUriAdvisory])).toEqual([]);
   });
 
+  it('checks version-qualified override selectors against the package advisory', () => {
+    const findings = evaluatePins({ 'fast-uri@^3.0.0': '3.1.4', 'fast-uri@^4.0.0': '4.1.2' }, [
+      fastUriAdvisory,
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].packageName).toBe('fast-uri');
+    expect(findings[0].pinnedVersion).toBe('3.1.4');
+  });
+
+  it('preserves scoped names when removing the version selector', () => {
+    const advisory = { ...fastUriAdvisory, packageName: '@example/fast-uri' };
+    expect(
+      evaluatePins({ '@example/fast-uri@^3.0.0': '3.1.4', '@example/fast-uri': '4.1.2' }, [
+        advisory,
+      ]),
+    ).toHaveLength(1);
+  });
+
   it('evaluates every pin, not just the first match', () => {
     const other: PackageAdvisory = {
       ...fastUriAdvisory,
@@ -163,5 +183,44 @@ describe('renderPinReport', () => {
     const md = renderPinReport([], { pinCount: 8, now: '2026-08-04' });
     expect(md).toMatch(/8/);
     expect(md).not.toMatch(/GHSA-/);
+  });
+});
+
+describe('runCli', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('reads both workspaces and queries package names, not version selectors', async () => {
+    const read = jest
+      .spyOn(fs, 'readFile')
+      .mockResolvedValueOnce(JSON.stringify({ overrides: { 'fast-uri@^3.0.0': '3.1.5' } }))
+      .mockResolvedValueOnce(JSON.stringify({ overrides: { seroval: '1.6.3' } }));
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('[]', { status: 200 }));
+    const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    expect(await runCli()).toBe(0);
+    expect(read).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(/[\\/]api[\\/]package\.json$/),
+      'utf8',
+    );
+    expect(read).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/[\\/]web[\\/]package\.json$/),
+      'utf8',
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('affects=fast-uri&'),
+      expect.any(Object),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('affects=seroval&'),
+      expect.any(Object),
+    );
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('web/package.json'));
   });
 });

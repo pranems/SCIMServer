@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.37`
 
-> **Status:** Active | **Last Updated:** 2026-09-24 | **Version:** 0.55.36
+> **Status:** Active | **Last Updated:** 2026-10-01 | **Version:** 0.55.37
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -196,6 +196,16 @@ Two details worth knowing:
 
 **Users** and **Groups** are paginated lists of the SCIM resources on this endpoint. Each has a visible Create action, including in the empty state. The form is generated from that endpoint's `/Schemas` and `/ResourceTypes` and starts with a working example. Its request JSON is fully editable: changing a known JSON member updates the corresponding control, and changing a control updates the JSON without dropping unrelated members. Selecting a row opens the same profile-driven field set in a detail drawer. Save emits only changed writable attributes, including extension-qualified paths, and carries the current ETag as `If-Match`. If the endpoint's profile does not serve that resource type the tab renders an explicit *unsupported* state rather than an error, which is the difference between "this endpoint has no users" and "this endpoint does not do users".
 
+**Unmerged validation follow-up, 2026-10-08:** User, Group and custom-resource
+updates now keep Save pending until the resource list and endpoint overview
+have refreshed. This prevents reopening a successfully saved drawer with stale
+field values. Tests address same-named fields from different extensions through
+their existing schema-qualified identifiers, without changing the field labels
+or layout. User/Group PATCH operation envelopes are no longer optimistically
+merged into resource rows as if their `schemas` and `Operations` were resource
+attributes; legacy flat-body optimistic changes remain supported.
+These changes are being verified locally in Docker, not yet deployed.
+
 **Activity** is the provisioning story rather than the raw request log: the server parses requests into human events, each with a severity badge. Filter by **type** (`user`, `group`, `resource`, `system`), by **severity** (`info`, `success`, `warning`, `error`), or by free text. Custom operations identify their ResourceType, endpoint path, and resource id. The filters live **in the URL**, so a filtered view is a shareable link - useful when handing an investigation to someone else. Use Activity to answer "what did this provisioning job actually do?"; use **Logs** when you need the wire detail behind one of those events.
 
 **Bulk** turns a CSV into a single SCIM Bulk request (RFC 7644 section 3.7).
@@ -330,6 +340,13 @@ The canonical dev endpoint `PRTest-Auth-Methods-ISV-1` is the post-deployment de
 ## 12. Logs
 
 The recorded request-history table across endpoints. It answers what requests happened; Operations answers what resources exist now. Filters include **URL contains**, **Endpoint**, **Method**, **Status**, **Time range**, **Minimum duration**, **Request ID**, and **Errors only**. Each row shows Method, URL, endpoint display name, Status, authentication outcome, Duration, and Time. **View current resources** pivots to Operations.
+
+The endpoint column uses the current endpoint display name when the endpoint
+still exists and the durable request-time name snapshot after deletion. Legacy
+rows without a snapshot show `Deleted endpoint (<short-id>...)`. Deleted
+endpoints are plain text rather than broken quick-open links. The table uses
+fixed, measured column bounds so long URLs and endpoint names truncate inside
+their own columns instead of hiding Status, authentication, Duration, or Time.
 
 ![Logs](screenshots/prod-08-logs.png)
 

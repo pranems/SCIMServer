@@ -54,6 +54,7 @@ async function freshSession(page: import('@playwright/test').Page): Promise<void
   await page.evaluate(() => {
     try {
       window.localStorage.clear();
+      window.localStorage.setItem('scimserver.onboarding.completedAt', 'token-gate-e2e');
       window.sessionStorage.clear();
     } catch {
       /* ignored */

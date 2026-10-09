@@ -437,3 +437,95 @@ packages would therefore be incorrect.
 ### Day-to-day effect
 
 Nothing changes for ordinary work. `npm ci` is unaffected, and neither check blocks a push - both open an Issue, because both need the network and a flaky blocking gate is worse than a reliable nagging one. What changes is that a suppression now has to say **which kind** it is, a timing hold cannot quietly become a quarter, and a rotting pin gets noticed by a scheduled job instead of by a failed required status check after an image build.
+
+### 2026-10-09 remediation in progress
+
+The company-feed lookup confirms that the production-critical fixes
+`proxy-addr@2.0.8` and `seroval@1.6.3` are already about 24 and 47 days old.
+They are eligible now, not blocked by the laptop. The isolated
+`chore/regen-lockfile-quarantine-20261009` branch selects aged fixes and uses
+the existing regeneration workflow. Vitest and its coverage provider are
+pinned together at 4.1.11. Every changed lock entry must still pass the
+seven-day review before the generated artifact is accepted.
+
+Version-qualified overrides preserve the existing major lines of
+`brace-expansion` and `nanoid`. The pin watcher now strips selectors before
+advisory lookup and evaluation, and reads both API and web manifests.
+The scheduled workflow watches both manifests too. Three new controls went
+RED against the old watcher and GREEN after the fix: qualified names,
+qualified scoped names, and CLI traversal of both workspaces. Focused
+coverage increased from 16 to 19 passing tests.
+
+| Remaining finding | Measured disposition |
+|---|---|
+| `handlebars@4.7.9` | [GHSA-xw65-4hp5-5hc7](https://github.com/advisories/GHSA-xw65-4hp5-5hc7) names 4.7.10, but the configured feed returns E404 for that version. Package publication time is unverified. Do not derive `Fix-available-from` from the advisory date or fabricate a quarantine exception. |
+| `braces`, `sprintf-js`, `extract-zip` | No fixed version was verified in the feed/advisory evidence. Keep these visible as residual findings. |
+| `basic-ftp` | The measured fixed candidate is a major upgrade to 6.2.1, not a compatible leaf override. Review the owning dependency rather than silently forcing a new major. |
+
+No audit suppression, registry bypass, seven-day relaxation, image publication
+or deployment is part of this preparation. A manifest edit is not proof that
+the installed graph is fixed; that requires the generated lockfiles and a new
+audit and applicable validation.
+
+**First artifact rejected, not installed:** [run 37889553539](https://github.com/pranems/SCIMServer/actions/runs/37889553539)
+produced public-host/SHA-512 lockfiles, but its age report showed three
+quarantined transitive selections: `caniuse-lite@1.0.30001815` (1.8 days),
+`electron-to-chromium@1.5.452` (0.1 days), and `node-releases@2.0.58`
+(0.8 days). These were floated by the patched Browserslist dependency,
+not deliberately selected fixes. Rejecting the artifact is the policy's
+intended behavior; a successful regeneration job is not acceptance.
+Feed-visible pins 1.0.30001814, 1.5.444 and 2.0.57 satisfy the parent's
+declared ranges and are 8.86, 7.15 and 15.88 days old respectively.
+Regenerate again with these pins and review the entire changed graph.
+
+**Second artifact accepted:** [run 37890617600](https://github.com/pranems/SCIMServer/actions/runs/37890617600)
+generated 51 changed entries. Every publication timestamp was checked through
+the company feed; the minimum observed age was 7.159 days. API and web
+lockfiles contain 720 and 463 SHA-512 entries respectively, with only public
+resolved hosts. Owned, non-junction `npm ci` installations succeeded and left
+both files byte-identical to the downloaded artifact.
+
+Fresh production audits now report **zero findings in both workspaces**.
+Full development graphs remain blocked: API has one critical, three high
+and 20 moderate package findings; web has 11 high package findings. The leaf
+causes are the five residual packages listed above; dependent packages account
+for the larger totals. This is not an all-green dependency gate or permission
+to deploy. Do not apply the audit's proposed `ts-jest` or size-limit downgrade
+blindly. The live pin review reports zero findings and zero unchecked names.
+
+The separate master-based dependency worktree's web coverage run passes
+118 suites / 1,568 tests, with lines 85.40%, branches 75.37%, functions 75.22%
+and statements 82.68%. These counts differ from the dirty UI validation
+worktree because its unmerged UI regression additions are not in this branch.
+The dependency branch does not recertify that other source overlay.
+
+| Issue | Type / severity | Symptom and root cause | Resolution and why it works | Detection / prevention |
+|---|---|---|---|---|
+| SP-3 | Gate correctness / High | Qualified override names matched no package advisories and returned zero findings. The watcher compared selectors to plain package names. | Normalize only the trailing version selector, retaining scoped names. Both lookup and evaluation use the same normalization. | Two focused RED/GREEN controls caught this before lock generation. Earliest applicable gate: pin-watcher unit tests. |
+| SP-4 | Gate coverage / High | New web overrides had no scheduled watcher; CLI and workflow covered API only. | Read both manifests and trigger on either manifest. A mocked CLI test asserts both paths and actual queried names. | Focused RED/GREEN caught this before publishing the new pins. Earliest applicable gate: CLI wiring test. |
+| SP-5 | Tooling / Low | The fresh worktree could not find Jest because it had no installed dependencies. | Temporarily use an explicitly owned junction to the existing cache for watcher tests only. Do not install into the shared target; install the regenerated graph in an owned directory later. | Caught at the first focused test. Existing dependency ownership discipline applies. |
+| SP-6 | Evidence parsing / Low | PowerShell lock parsing rejected the empty root key, and date coercion shifted an early eligibility probe by six hours. | Parse lock maps with a hashtable or Node, and calculate ages from raw ISO timestamps in Node. The retained classification uses that path. | Metadata review caught this before selecting pins. Compare raw publication timestamps, not reparsed display dates. |
+| SP-7 | Tooling / Low | Prisma generation in a fresh worktree lacked `DATABASE_URL`, causing downstream missing-client compile errors. The same setup gap recurred when consolidation reused an installed dependency graph without its ignored generated source. | Supply a non-routable placeholder for generation only and generate into the worktree-local `src/generated/prisma` output. Generation requires configuration but does not connect to that database. | Caught by setup/build before both pushes. Inspect generator output and require generation success before interpreting downstream compile errors. |
+| SP-8 | Quarantine timing / Medium | CI floated three Browserslist data dependencies younger than seven days, despite every intended advisory fix being aged. | Reject the artifact before installation and pin feed-visible, aged versions within the parent's declared ranges, then regenerate. | The existing CI age report and local changed-entry review caught this at artifact acceptance, the earliest stage with the complete new graph. Check every changed entry, not only manually selected fixes. |
+| SP-9 | Evidence parsing / Low | A receipt query treated the custom E2E report's suite-level test count as an iterable test list. | Read the top-level `tests` records and `summary`; no test result changed. | Caught by the evidence query itself. Use the report's actual schema, not Jest's standard JSON shape. |
+| SP-10 | Dependency ownership / High | Every residual high/critical finding had no safe patched leaf: Handlebars 4.7.10 was absent, and Braces, `basic-ftp` and `extract-zip` advisories covered all available compatible versions. Leaf overrides could only hide or break the problem. | Remove the owning optional toolchains. An existing TypeScript compiler replaces `ts-jest`, Node 24 replaces `ts-node-dev`, and Size Limit keeps its direct file plugin without the browser timing preset. This removes the vulnerable code from the graph rather than asserting that an affected version is safe. | The complete development audit and lock ownership traversal exposed the owners. A local transformer contract and real ESM `jose` tests are GREEN; accept the change only after CI lock regeneration, clean install, full audits, API unit/E2E and web size gates. |
+| SP-11 | Test correctness / High | The first full unit gate after replacing `ts-jest` failed 17 tests in two suites. Plain TypeScript transpilation moved imports ahead of Jest mocks, and Jest reused stale transformed output because the custom transformer had no implementation-sensitive cache key. | Hoist supported top-level Jest calls through a TypeScript AST transformer before CommonJS emission, and hash the transformer source, TypeScript version, test source, path and Jest options in `getCacheKey`. This restores mock registration before imports and invalidates output whenever transformation semantics change. | Normal pre-push caught the failure before publication. The transformer contract now asserts executable TypeScript/ESM, mock order and cache sensitivity; both formerly failing Prisma suites are included in the 48-test focused GREEN. |
+| SP-12 | Tool configuration / Medium | Removing `@size-limit/time` made every existing `running: false` option invalid, so all 25 file budgets stopped before measuring a bundle. The option belonged to the removed plugin even though its value disabled execution. | Delete the plugin-owned option from every budget and retain the direct file plugin plus gzip limits. All 25 budgets measure and pass without launching Chromium. | The required size gate caught the coupling immediately. Whenever a plugin is removed, run its real command and remove its configuration namespace rather than assuming a disabled value is inert. |
+| SP-13 | Validation probe / Low | The first Node watch smoke probe timed out while the replacement command had already started successfully. The probe requested `/health`; this application exposes `/scim/health`. | Probe the published health route and inspect startup output before diagnosing the process. The corrected request returned HTTP 200, then the exact owned process tree was stopped. | Caught during focused startup validation. Read the bound route from startup evidence or the health controller instead of inventing a conventional path. |
+
+**Design/architecture disposition: applied.** The small existing watcher remains
+one cohesive service; both workspaces and qualified names reuse it without a
+new abstraction. **Test/gate self-improvement: applied.** The new negative
+controls prevent qualified selectors and web overrides from looking checked
+when they are not.
+
+**Owner-level remediation accepted:** [run 37901990719](https://github.com/pranems/SCIMServer/actions/runs/37901990719)
+removed 36 API entries and 68 web entries; it added or changed no package
+version, so no new publication-age decision was required. The resulting locks
+contain only `registry.npmjs.org` resolutions and SHA-512 integrity (684 API,
+395 web entries). Clean installs through the configured company feed preserved
+both artifact hashes exactly. The web development audit is now zero. The API
+development audit has zero critical/high findings and 19 moderate findings in
+the Jest/Istanbul `js-yaml` and `sprintf-js` chain. Those moderates remain
+visible because the advisory ranges cover the available compatible leaves;
+the standing gate blocks critical/high findings and tracks moderate findings.

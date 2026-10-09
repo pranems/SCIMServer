@@ -2,10 +2,10 @@
  * useLogStream.test.ts - Phase K4 live SSE log stream hook contract.
  *
  * Asserts:
- *   - Opens an EventSource only when `enabled=true`
+ *   - Opens an authenticated SSE stream only when `enabled=true`
  *   - Appends parsed log entries into a ring buffer capped at the
  *     configured `maxEntries` (default 5,000)
- *   - Surfaces a `connectionState` derived from the EventSource
+ *   - Surfaces a `connectionState` derived from the stream
  *     lifecycle (connecting / open / reconnecting / closed)
  *   - Pauses ingestion on `setPaused(true)` (drops messages instead
  *     of buffering, so the buffer reflects what the operator chose
@@ -20,7 +20,7 @@
  * @see docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md S6.6
  * @see docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   useLogStream,
@@ -29,55 +29,67 @@ import {
   type LogStreamLevel,
 } from './useLogStream';
 
-// ─── Mock EventSource (mirrors useSSE.test.ts pattern) ──────────────
-
-class MockEventSource {
-  static instances: MockEventSource[] = [];
-  url: string;
-  onopen: ((ev: Event) => void) | null = null;
-  onmessage: ((ev: MessageEvent) => void) | null = null;
-  onerror: ((ev: Event) => void) | null = null;
-  readyState = 0;
-  close = vi.fn();
-
-  constructor(url: string) {
-    this.url = url;
-    MockEventSource.instances.push(this);
-    setTimeout(() => {
-      this.readyState = 1;
-      this.onopen?.(new Event('open'));
-    }, 0);
-  }
-
-  emit(entry: Partial<LogStreamEntry>) {
-    const full: LogStreamEntry = {
-      timestamp: '2026-05-12T20:00:00Z',
-      level: 'INFO',
-      category: 'http',
-      message: 'sample',
-      ...entry,
+const sseMock = vi.hoisted(() => {
+  const instances: Array<{
+    options: {
+      url: string;
+      token?: string;
+      onOpen: () => void;
+      onMessage: (data: string) => void;
+      onError: (error: Error) => void;
     };
-    this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(full) }));
-  }
+    close: ReturnType<typeof vi.fn>;
+    emit: (entry: Partial<LogStreamEntry>) => void;
+    emitRaw: (data: string) => void;
+    fail: (error?: Error) => void;
+  }> = [];
+  const open = vi.fn((options: typeof instances[number]['options']) => {
+    const connection = {
+      options,
+      close: vi.fn(),
+      completed: Promise.resolve(),
+      emit: (entry: Partial<LogStreamEntry>) => options.onMessage(JSON.stringify({
+        timestamp: '2026-05-12T20:00:00Z',
+        level: 'INFO',
+        category: 'http',
+        message: 'sample',
+        ...entry,
+      })),
+      emitRaw: (data: string) => options.onMessage(data),
+      fail: (error = new Error('test stream failure')) => options.onError(error),
+    };
+    instances.push(connection);
+    setTimeout(() => options.onOpen(), 0);
+    return connection;
+  });
+  return { instances, open };
+});
 
-  emitRaw(data: string) {
-    this.onmessage?.(new MessageEvent('message', { data }));
-  }
-}
+vi.mock('./authenticated-sse', () => ({
+  openAuthenticatedSse: sseMock.open,
+  isAuthenticatedSseAuthError: (error: Error & { status?: number }) =>
+    error.status === 401 || error.status === 403,
+}));
+
+const tokenMock = vi.hoisted(() => ({
+  get: vi.fn(() => 'test-token'),
+  clear: vi.fn(),
+  notifyInvalid: vi.fn(),
+}));
 
 vi.mock('../auth/token', () => ({
-  getStoredToken: vi.fn(() => 'test-token'),
+  getStoredToken: tokenMock.get,
+  clearStoredToken: tokenMock.clear,
+  notifyTokenInvalid: tokenMock.notifyInvalid,
 }));
 
 beforeEach(() => {
-  MockEventSource.instances = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).EventSource = MockEventSource;
-});
-
-afterEach(() => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete (globalThis as any).EventSource;
+  sseMock.instances.length = 0;
+  sseMock.open.mockClear();
+  tokenMock.get.mockReset();
+  tokenMock.get.mockReturnValue('test-token');
+  tokenMock.clear.mockClear();
+  tokenMock.notifyInvalid.mockClear();
 });
 
 // ─── Pure filter function tests ─────────────────────────────────────
@@ -127,23 +139,25 @@ describe('filterEntries (pure)', () => {
 // ─── Hook integration tests ─────────────────────────────────────────
 
 describe('useLogStream', () => {
-  it('does NOT open an EventSource when enabled=false', () => {
+  it('does NOT open a stream when enabled=false', () => {
     renderHook(() => useLogStream({ enabled: false }));
-    expect(MockEventSource.instances).toHaveLength(0);
+    expect(sseMock.instances).toHaveLength(0);
   });
 
-  it('opens an EventSource at /scim/admin/log-config/stream when enabled', async () => {
+  it('opens an authenticated stream without putting the token in the URL', async () => {
     renderHook(() => useLogStream({ enabled: true }));
-    expect(MockEventSource.instances).toHaveLength(1);
-    expect(MockEventSource.instances[0].url).toContain('/scim/admin/log-config/stream');
+    expect(sseMock.instances).toHaveLength(1);
+    expect(sseMock.instances[0].options.url).toContain('/scim/admin/log-config/stream');
+    expect(sseMock.instances[0].options.url).not.toContain('test-token');
+    expect(sseMock.instances[0].options.token).toBe('test-token');
     // K4 - drawer requests DEBUG-level so the operator can see everything.
-    expect(MockEventSource.instances[0].url).toContain('level=DEBUG');
+    expect(sseMock.instances[0].options.url).toContain('level=DEBUG');
   });
 
   it('appends incoming log entries into the buffer', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     act(() => { es.emit({ message: 'first' }); });
     act(() => { es.emit({ message: 'second' }); });
     expect(result.current.entries).toHaveLength(2);
@@ -154,7 +168,7 @@ describe('useLogStream', () => {
   it('caps the buffer at maxEntries (oldest dropped first)', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true, maxEntries: 3 }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     act(() => {
       es.emit({ message: 'a' });
       es.emit({ message: 'b' });
@@ -166,7 +180,7 @@ describe('useLogStream', () => {
     expect(result.current.entries.map((e) => e.message)).toEqual(['c', 'd', 'e']);
   });
 
-  it('exposes a connectionState that reflects the EventSource lifecycle', async () => {
+  it('exposes a connectionState that reflects the stream lifecycle', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true }));
     // The constructor schedules the onopen callback in a microtask.
     expect(result.current.connectionState).toBe('connecting');
@@ -174,14 +188,14 @@ describe('useLogStream', () => {
     // React 19 commits the 'open' transition synchronously.
     await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
     expect(result.current.connectionState).toBe('open');
-    act(() => { MockEventSource.instances[0].onerror?.(new Event('error')); });
+    act(() => { sseMock.instances[0].fail(); });
     expect(result.current.connectionState).toBe('reconnecting');
   });
 
   it('drops incoming messages while paused (paused buffer is intentional)', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     act(() => { es.emit({ message: 'before pause' }); });
     act(() => { result.current.setPaused(true); });
     act(() => { es.emit({ message: 'while paused 1' }); });
@@ -194,7 +208,7 @@ describe('useLogStream', () => {
   it('clear() empties the buffer without closing the connection', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     act(() => {
       es.emit({ message: 'a' });
       es.emit({ message: 'b' });
@@ -211,7 +225,7 @@ describe('useLogStream', () => {
   it('ignores non-JSON SSE messages (e.g. keepalive comments)', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     act(() => { es.emitRaw(': ping 2026-05-12T20:00:00Z'); });
     act(() => { es.emit({ message: 'real' }); });
     expect(result.current.entries).toHaveLength(1);
@@ -221,33 +235,64 @@ describe('useLogStream', () => {
   it('ignores SCIM mutation event payloads (those have type: scim.x.y, no level/message)', async () => {
     const { result } = renderHook(() => useLogStream({ enabled: true }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     act(() => { es.emitRaw(JSON.stringify({ type: 'scim.user.created', endpointId: 'ep-1' })); });
     act(() => { es.emit({ message: 'real log' }); });
     expect(result.current.entries).toHaveLength(1);
     expect(result.current.entries[0].message).toBe('real log');
   });
 
-  it('closes the EventSource on unmount', async () => {
+  it('closes the stream on unmount', async () => {
     const { unmount } = renderHook(() => useLogStream({ enabled: true }));
     await new Promise((r) => setTimeout(r, 5));
-    const es = MockEventSource.instances[0];
+    const es = sseMock.instances[0];
     unmount();
     expect(es.close).toHaveBeenCalled();
   });
 
-  it('reconnects with exponential backoff after onerror', async () => {
+  it('reconnects with exponential backoff after a stream error', async () => {
     vi.useFakeTimers();
     try {
       renderHook(() => useLogStream({ enabled: true }));
       // Drain initial microtask
       await vi.advanceTimersByTimeAsync(0);
-      expect(MockEventSource.instances).toHaveLength(1);
-      const first = MockEventSource.instances[0];
-      act(() => { first.onerror?.(new Event('error')); });
+      expect(sseMock.instances).toHaveLength(1);
+      const first = sseMock.instances[0];
+      act(() => { first.fail(); });
       // Backoff at attempt 0 = 1 s
       await vi.advanceTimersByTimeAsync(1100);
-      expect(MockEventSource.instances).toHaveLength(2);
+      expect(sseMock.instances).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not reconnect after an authentication failure', async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useLogStream({ enabled: true }));
+      sseMock.instances[0].fail(Object.assign(new Error('forbidden'), { status: 403 }));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(tokenMock.clear).toHaveBeenCalledTimes(1);
+      expect(tokenMock.notifyInvalid).toHaveBeenCalledTimes(1);
+      expect(result.current.connectionState).toBe('closed');
+      expect(sseMock.instances).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads the current token again before a transient reconnect', async () => {
+    vi.useFakeTimers();
+    try {
+      tokenMock.get.mockReturnValueOnce('first-token').mockReturnValue('rotated-token');
+      renderHook(() => useLogStream({ enabled: true }));
+      sseMock.instances[0].fail();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(sseMock.instances).toHaveLength(2);
+      expect(sseMock.instances[1].options.token).toBe('rotated-token');
     } finally {
       vi.useRealTimers();
     }

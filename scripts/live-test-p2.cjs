@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const fs = require("node:fs");
 const { API, testGuard } = require("./p1-validation/safety.cjs");
+const { liveFetch } = require("./live-test-http.cjs");
 
 async function runLiveP2(baseUrl, secret) {
   await testGuard();
@@ -23,7 +24,7 @@ async function runP2Contract(baseUrl, secret) {
   let assertions = 0;
   const eq = (actual, expected) => { assert.deepEqual(actual, expected); assertions++; };
   const http = async (method, route, body) => {
-    const response = await fetch(`${baseUrl}${route}`, {
+    const response = await liveFetch(`${baseUrl}${route}`, {
       method, signal: AbortSignal.timeout(10000),
       headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/scim+json" },
       ...(body ? { body: JSON.stringify(body) } : {}),

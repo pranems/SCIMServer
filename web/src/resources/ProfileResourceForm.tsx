@@ -187,7 +187,11 @@ export const ProfileResourceForm: React.FC<ProfileResourceFormProps> = ({
   return (
     <div className={classes.root} data-testid={testId}>
       {shape.fields.map((field) => (
-        <div key={field.id} className={field.extension ? classes.extension : undefined}>
+        <div
+          key={field.id}
+          data-profile-field-id={field.id}
+          className={field.extension ? classes.extension : undefined}
+        >
           <FieldEditor
             field={field}
             value={values[field.id]}

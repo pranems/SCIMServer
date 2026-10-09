@@ -45,13 +45,44 @@ test.describe('endpoint write conflict (C)', () => {
     });
   });
 
-  test('C-P1: a save built on a stale view raises the conflict dialog', async ({ page, request, baseURL }) => {
+  async function openResourceTypes(page: import('@playwright/test').Page): Promise<{
+    body: string;
+    etag?: string;
+  }> {
+    const endpointRead = page.waitForResponse((response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes(`/scim/admin/endpoints/${endpointId}`) &&
+      response.ok());
     await page.goto(`/endpoints/${endpointId}/resource-types`);
+    const response = await endpointRead;
     await expect(page.getByTestId('resource-types-tab')).toBeVisible();
-    // Let EVERY initial read settle first. The page records the endpoint's
-    // version on each GET, so a query still in flight would re-record the
-    // version AFTER the competing edit below and quietly erase the collision.
-    await page.waitForLoadState('networkidle');
+    return {
+      body: await response.text(),
+      etag: response.headers().etag,
+    };
+  }
+
+  async function freezeEndpointReads(
+    page: import('@playwright/test').Page,
+    snapshot: { body: string; etag?: string },
+  ): Promise<void> {
+    await page.route(`**/scim/admin/endpoints/${endpointId}`, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: snapshot.etag ? { ETag: snapshot.etag } : undefined,
+        body: snapshot.body,
+      });
+    });
+  }
+
+  test('C-P1: a save built on a stale view raises the conflict dialog', async ({ page, request, baseURL }) => {
+    const snapshot = await openResourceTypes(page);
+    await freezeEndpointReads(page, snapshot);
 
     // The other operator. The UI still holds the version it loaded with, which
     // is what makes the next save a genuine mid-air collision.
@@ -72,9 +103,8 @@ test.describe('endpoint write conflict (C)', () => {
   });
 
   test('C-P2: force-overwrite applies the operator edit and the type appears', async ({ page, request, baseURL }) => {
-    await page.goto(`/endpoints/${endpointId}/resource-types`);
-    await expect(page.getByTestId('resource-types-tab')).toBeVisible();
-    await page.waitForLoadState('networkidle');
+    const snapshot = await openResourceTypes(page);
+    await freezeEndpointReads(page, snapshot);
 
     await request.patch(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
@@ -88,6 +118,7 @@ test.describe('endpoint write conflict (C)', () => {
     await page.getByTestId('resource-types-create-dialog-submit').click();
     await expect(page.getByTestId('conflict-dialog')).toBeVisible();
 
+    await page.unroute(`**/scim/admin/endpoints/${endpointId}`);
     await page.getByTestId('conflict-force-overwrite').click();
     await expect(page.getByTestId('conflict-dialog')).toBeHidden();
 

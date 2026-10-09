@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-09-24 - **Product version:** `0.55.36`
+> **Status:** Implemented locally - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
 
 ## Purpose
 
@@ -77,7 +77,25 @@ Operations and Logs are complementary, not duplicate:
 
 Each page links to the other. Operations says "what exists now"; Logs says "what happened."
 
+Logs preserves endpoint identity as history: a row prefers the live display
+name, then the request-time endpoint-name snapshot, then a bounded deleted-ID
+fallback for legacy rows. A quick-open action appears only while the endpoint
+still exists. This prevents a deleted endpoint from turning historical rows
+into raw UUIDs or dead navigation.
+
 The Logs **Errors only** filter uses a boolean in typed router state and `true`/`false` text in the URL. Both forms are accepted by the same schema. This prevents the former `invalid_value` route error when the toolbar supplied native `true`.
+
+## Authentication session recovery
+
+The global token gate also owns recovery when an authenticated realtime stream
+reports HTTP 401 or 403. The stream clears the expired credential, stops
+reconnecting, and opens the same authentication gate used on first load.
+Transient stream failures continue to reconnect and read the current token on
+each attempt.
+
+The gate registers its invalid-token listener before child passive effects
+start their streams. This prevents a fast authentication failure during mount
+from clearing storage without presenting the re-authentication surface.
 
 ## Manual Provision
 
@@ -108,6 +126,7 @@ Manual Provision also stacks its form and result cards into one bounded column b
 | Self-service `/Me` | 9/9, including zero `/Me` calls under shared-secret auth |
 | Manual Provision | 12/12, including endpoint-local handoff |
 | Operations and Logs | 33/33 |
+| Authentication recovery | 60/60 focused component and SSE tests; Chromium verifies token removal, visible re-authentication, and one stream attempt |
 | Review closure | 78/78 focused tests for drawer URL state, stale links, keyboard access, and branch truncation |
 | Browser | 6/6 in Chromium, including endpoint Logs drawer restoration and Manual Provision 390px stacking |
 | Visual | Desktop Operations, Logs, Manual Provision, and `/Me` inspected; narrow Logs inspected after deterministic data readiness |

@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.37`
 
 Custom ResourceType operations are first-class Activity entries with
 `resourceType`, `resourceEndpoint`, and `resourceIdentifier`. Create, update,
@@ -153,7 +153,9 @@ Every entry ([scim-logger.service.ts](../api/src/modules/logging/scim-logger.ser
 
 - **Pretty vs JSON** output (`LOG_FORMAT`) - human-readable in dev, machine JSON in production.
 - **Ring buffer** - the recent-N entries in memory, queried at `GET /scim/admin/log-config/recent` (filterable by level/category/requestId).
-- **SSE live stream** - a Server-Sent-Events feed the UI subscribes to for live logs.
+- **SSE live stream** - a Server-Sent-Events feed the UI consumes through
+  authenticated Fetch streaming. The bearer token is sent only in the
+  `Authorization` header, never in the URL.
 - **Rotating file transport** - size-based rotation on disk.
 
 ---
@@ -168,7 +170,13 @@ Every entry ([scim-logger.service.ts](../api/src/modules/logging/scim-logger.ser
 > first when diagnostic history is shorter than expected: the value that governs behaviour is the
 > **running** one, which a runtime `PUT` can change independently of the environment variable.
 
-Each request (except successful health probes) becomes a durable `RequestLog` row ([logging.service.ts](../api/src/modules/logging/logging.service.ts)), at parity across the Prisma and InMemory backends. Fields include `method`, `url`, `status`, `durationMs`, the request/response headers + bodies (redaction-gated), `errorMessage`, a derived reportable `identifier`, the `requestId`, and - since V10 - the persisted auth summary `authOutcome` / `authMethod` / `authReason` / `authCredentialId` (see [auth/CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md](auth/CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md)).
+Each request (except successful health probes) becomes a durable `RequestLog` row ([logging.service.ts](../api/src/modules/logging/logging.service.ts)), at parity across the Prisma and InMemory backends. Fields include `method`, `url`, `status`, `durationMs`, the request/response headers + bodies (redaction-gated), `errorMessage`, a derived reportable `identifier`, the `requestId`, the endpoint identity snapshot `endpointId` / `endpointName`, and - since V10 - the persisted auth summary `authOutcome` / `authMethod` / `authReason` / `authCredentialId` (see [auth/CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md](auth/CREDENTIAL_LIFECYCLE_AND_AUTH_IN_LOGS_PLAN.md)).
+
+`endpointName` is captured when endpoint context is resolved and remains on the
+request row after the endpoint is deleted. Global Logs and dashboard Activity
+therefore retain a human-readable audit identity without relying on a join to
+the live endpoint table. Legacy rows without the snapshot display a bounded
+`Deleted endpoint (<short-id>...)` fallback.
 
 A list item from `GET /scim/admin/logs`:
 
@@ -183,6 +191,7 @@ A list item from `GET /scim/admin/logs`:
   "errorMessage": "Http Exception",
   "reportableIdentifier": null,
   "requestId": "a16360c6-db64-4949-ae7c-3bb49084a32e",
+  "endpointName": "Contoso Production",
   "authOutcome": "reject",
   "authMethod": "oauth_client",
   "authReason": "oauth_client_auth_failed"

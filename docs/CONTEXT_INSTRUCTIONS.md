@@ -1,13 +1,67 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.36
-> **Last Updated**: September 30, 2026
-> **Last verified:** 2026-09-30
+> **Version**: 0.55.37
+> **Last Updated**: October 9, 2026
+> **Last verified:** 2026-10-09
 
 ---
 
 ## Active Delivery Process
+
+**Unmerged follow-up, 2026-10-08:** the local
+`fix/comprehensive-ui-validation-20260930` branch contains durable request-log
+endpoint names, authenticated Fetch streaming and validation/deployment
+hardening. Local Chromium is 238 pass / 15 skip / zero fail; local InMemory
+and isolated Docker/PostgreSQL live checks each pass 1,700 assertions with
+zero leaked endpoints. Serial Prisma E2E passes 118 suites / 2,486 tests.
+Final Docker Chromium passes 248 tests / 14 documented skips / zero failures
+across 262 cases, including all six seeded profiles and extension/Group/Device
+mutation journeys. Final local regression browsers pass 2/2.
+Current web units and coverage pass 119 suites / 1,577 tests: lines 85.49%,
+branches 75.39%, functions 75.31%, statements 82.72%.
+Resource saves now await cache refresh; PATCH envelopes no longer replace
+resource schemas in optimistic cache. Final focused tests pass 105/105.
+None of these local changes has been committed, merged or deployed.
+Production dependency audit blocks release with critical `proxy-addr` (API)
+and `seroval` (web) findings. Reviewed release, dependency remediation, Azure
+proof and operator visual sign-off remain separate outstanding claims.
+The disposable Docker estate was cleaned by exact owner-verified IDs.
+Existing Compose containers and local processes were preserved.
+No fresh Compose-specific or formal baseline-relative performance gate was run.
+
+**Separate dependency preparation, 2026-10-09:** branch
+`chore/regen-lockfile-quarantine-20261009` is pushed at `6075ad3d`, based on
+the same merged master, without modifying this UI branch's manifests.
+The established company-feed/seven-day procedure was followed: reject the
+first under-age CI artifact, pin aged compatible transitive versions, and
+accept the second artifact only after reviewing all 51 changed entries.
+Exact-tip CI reproduces the accepted public-host/SHA-512 lock bytes.
+Owned installations and fresh production audits pass with zero findings
+for API and web. New-graph evidence: 20 Fast pre-push gates, 6,007 API units,
+2,426 default InMemory E2E passes / four PostgreSQL-only skips, another
+55/55 explicitly executed hook-excluded logging tests, 1,568 web tests and
+coverage, and passing size/pin checks. Full development audits remain blocked
+by five residual leaf dependencies. No merge, image publication or deployment
+occurred. These counts belong to the separate master-based dependency graph,
+not this unmerged UI overlay; combined-source and deployment proof remains
+necessary. The dependency receipt is retained in that worktree's
+`test-results/dependency-validation-receipt-20261009.json`.
+
+The feature branch is no longer an uncommitted single risk unit. Four
+constituent commits preserve durable endpoint identity, authenticated streaming
+and tables, cache/profile fixes, and validation-runner hardening. Combined
+dependency + feature Compose proof passes 250 browser cases with 12
+pixel-only skips, 1,700 live assertions and all four API backend lanes.
+The complete web coverage lane passes 1,577 tests. Two earlier behavioral
+browser skips now execute against the real API and have inspected negative
+controls. The dashboard PNG changes remain unstaged pending canonical dev
+pixel execution; do not accept or regenerate them from local Compose.
+
+Start substantive updates with completed / in-progress / remaining tasks.
+The operator has a shared 50,000-credit monthly AI budget across this project
+and SyncFabric. Reuse unchanged evidence and keep investigation bounded.
+Do not infer exact credit balance or numeric context capacity.
 
 **v0.55.36 dev deployment is complete.** PR #188 merged as
 `d6e9a497315739b62ea11d2194a919944c376c31` after exact-tip CodeQL, Trivy and
@@ -268,7 +322,7 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The current source release candidate is v0.55.36. It consolidates the SCIM
+The current source release candidate is v0.55.37. It consolidates the SCIM
 correctness work. The previous clean consolidation tip completed local
 exact-artifact acceptance on InMemory and PostgreSQL 17.8. Release-candidate
 triage additionally fixed runtime-only schema caches changing profile revisions

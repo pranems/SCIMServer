@@ -101,7 +101,7 @@ export class EndpointScimGroupsController {
       // to a 200 empty ListResponse + warning; item reads + writes still 404.
       const enforce = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES);
       if (opts?.relaxableList && !enforce) {
-        this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
+        this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
         return { baseUrl, config, profile, resourceTypeUnsupported: true, endpointName: endpoint.name };
       }
       throw createScimError({
@@ -112,7 +112,7 @@ export class EndpointScimGroupsController {
       });
     }
 
-    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
 
     return { baseUrl, config, profile };
   }
