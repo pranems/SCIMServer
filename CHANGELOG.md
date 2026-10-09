@@ -62,8 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Treat SSE HTTP 401/403 as terminal authentication failures: clear the stored
   credential, open the existing token gate and stop retrying. Transient retries
   now read the current token instead of reusing the value captured at mount.
-  Four RED controls across both consumers are GREEN; the focused SSE set passes
-  53 tests.
+  Four RED controls across both consumers are GREEN. The focused transport,
+  consumer and token-gate set passes 60 tests, and a real Chromium regression
+  verifies token removal, the visible re-authentication gate and no retry loop.
+- Register the token-invalid listener in a layout effect so a fast SSE 401
+  cannot race the gate's mount. A component RED/GREEN control reproduces the
+  child-passive-effect ordering that exposed the issue in the browser.
 - Persisted the unmerged UI/runtime work as four logical feature commits so
   endpoint identity, authenticated streaming, cache correctness and validation
   infrastructure retain independent history.

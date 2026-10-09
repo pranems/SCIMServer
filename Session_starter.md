@@ -49,7 +49,10 @@ The authenticated SSE journey passes with a 15-second connection allowance
 while retaining the five-second mutation-refetch assertion. Final diff review
 found stale-token retry behavior: 401/403 now clears the credential, opens the
 token gate and stops retries, while transient reconnects re-read the token.
-Four RED controls are GREEN and the focused SSE set passes 53 tests.
+Four RED controls are GREEN. A real Chromium regression then exposed a
+mount-order race where a fast child SSE failure could precede the gate's
+passive listener. The listener now registers in a layout effect; 60 focused
+component/transport/consumer tests and the expired-token browser case pass.
 
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,

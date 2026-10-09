@@ -73,3 +73,36 @@ test('Tab A creates a User; authenticated SSE refreshes Tab B without reloading'
     }
   }
 });
+
+test('expired SSE credentials clear the token and open the authentication gate without retrying', async ({ page }) => {
+  let streamAttempts = 0;
+  await page.route(
+    '**/*',
+    async (route) => {
+      if (new URL(route.request().url()).pathname !== '/scim/admin/log-config/stream') {
+        await route.fallback();
+        return;
+      }
+      streamAttempts += 1;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Expired test credential' }),
+      });
+    },
+  );
+  await seedAuthToken(page);
+
+  await page.goto('/endpoints');
+
+  await expect.poll(() => streamAttempts).toBe(1);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('scimserver.authToken')))
+    .toBeNull();
+  await expect(page.getByText('Authentication Required')).toBeVisible();
+  await expect(page.getByText('Token expired or invalid. Please enter a new token.')).toBeVisible();
+  await expect(page.getByTestId('token-input')).toBeVisible();
+
+  await page.waitForTimeout(1_500);
+  expect(streamAttempts).toBe(1);
+});
