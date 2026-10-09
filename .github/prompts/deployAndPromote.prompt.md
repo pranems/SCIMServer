@@ -54,7 +54,9 @@ There are TWO live prod instances (kept in lockstep, same image per promotion) +
    - Otherwise, read from `api/package.json` and append a patch bump
 2. Trigger the publish workflow:
    ```powershell
-   gh workflow run "publish-ghcr.yml" -f version="<tag>" -f pushLatest="true"
+   git fetch origin master
+   $expectedSha = (git rev-parse origin/master).Trim()
+   gh workflow run "publish-ghcr.yml" --ref master -f version="<tag>" -f pushLatest="true" -f expectedSha=$expectedSha
    ```
 3. Wait for workflow completion (poll every 15s):
    ```powershell

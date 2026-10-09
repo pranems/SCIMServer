@@ -110,8 +110,11 @@ The checked-in defaults bind the API to host port `8080`, PostgreSQL to host
 port `5432`, and use the established `scimserver-api` and
 `scimserver-postgres` names. To run an isolated second estate without stopping
 an existing one, set `COMPOSE_PROJECT_NAME`, `API_HOST_PORT`,
-`POSTGRES_HOST_PORT`, `API_CONTAINER_NAME`, and `POSTGRES_CONTAINER_NAME`.
-The full validation pipeline assigns these automatically.
+`POSTGRES_HOST_PORT`, `API_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME`, and
+optionally `BIND_HOST_IP`. The full validation pipeline assigns a unique
+project and names, binds to loopback, and passes port `0` so Docker reserves
+both ephemeral ports atomically. It removes the validation containers, network
+and volume when finished unless `-KeepDocker` is supplied for diagnosis.
 
 ```bash
 # Start (build if needed)

@@ -73,6 +73,16 @@ fresh build, healthy v0.55.37 and 1,700/1,700 live assertions. Full
 merged-master pipeline rerun and the nine reviewer-judgement gates remain
 required.
 
+**Post-review validation hardening, 2026-10-09:** PR #195 review found three
+authority gaps beyond the first fix. Publication now requires local HEAD to
+equal `origin/master`, passes that exact SHA into the workflow, and rejects a
+moving-master mismatch before registry login. Docker, rather than an early
+probe, atomically allocates loopback ports at service start. Validation estates
+are removed with their network and volume by default; `-KeepDocker` is an
+explicit diagnostic exception. RED contracts failed on all three gaps and are
+green after the correction. A real PostgreSQL Compose control received
+`127.0.0.1:32779` and left no container, network or volume behind.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:

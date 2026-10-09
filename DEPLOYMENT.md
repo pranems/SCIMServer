@@ -418,7 +418,7 @@ All data lives in `Map`-based in-memory stores. No PostgreSQL required. Data is 
 
 | Workflow | Trigger | Image Tag |
 |----------|---------|-----------|
-| `publish-ghcr.yml` | Manual dispatch (version input) | `<version>`, optionally `latest` |
+| `publish-ghcr.yml` | Manual dispatch (`version` and exact `expectedSha` inputs) | `<version>`, optionally `latest`; rejects a moving-ref mismatch before registry login |
 | `build-test.yml` | Push to `test/**`, `dev/**`, `feature/**` | `test-<branch>` |
 
 ---

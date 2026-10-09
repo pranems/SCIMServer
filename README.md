@@ -264,7 +264,8 @@ The server starts at **http://localhost:8080** with PostgreSQL 17.
 Those remain the default host bindings. When either port is already in use,
 set `API_HOST_PORT` and `POSTGRES_HOST_PORT` before `docker compose up`.
 Container names can likewise be isolated with `API_CONTAINER_NAME` and
-`POSTGRES_CONTAINER_NAME`.
+`POSTGRES_CONTAINER_NAME`; `BIND_HOST_IP` optionally restricts both published
+ports to one host interface.
 
 ```bash
 # Verify health

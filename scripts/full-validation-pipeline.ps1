@@ -12,12 +12,15 @@
 .PARAMETER Verbose
     Pass -Verbose to live-test.ps1 for full HTTP request/response output.
 .PARAMETER DockerPort
-    Host port for the validation API. Zero selects an available loopback port.
+    Host port for the validation API. Zero asks Docker to allocate the port.
 .PARAMETER DockerPostgresPort
     Host port for the validation PostgreSQL service. Zero selects an available
-    loopback port.
+    Docker-allocated port.
 .PARAMETER DockerProjectName
-    Isolated Compose project name. Defaults to a process-specific name.
+    Isolated Compose project name. Defaults to a per-run GUID name.
+.PARAMETER KeepDocker
+    Keep the isolated validation estate after the run. By default its
+    containers, network, and PostgreSQL volume are removed.
 #>
 
 param(
@@ -26,7 +29,8 @@ param(
     [switch]$VerboseTests,
     [ValidateRange(0, 65535)] [int]$DockerPort = 0,
     [ValidateRange(0, 65535)] [int]$DockerPostgresPort = 0,
-    [string]$DockerProjectName = ''
+    [string]$DockerProjectName = '',
+    [switch]$KeepDocker
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,38 +41,18 @@ $liveTestScript = Join-Path $scriptDir "live-test.ps1"
 
 $localPort = 6000
 
-function Get-FreeTcpPort {
-    $listener = [System.Net.Sockets.TcpListener]::new(
-        [System.Net.IPAddress]::Loopback,
-        0
-    )
-    try {
-        $listener.Start()
-        return ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
-    }
-    finally {
-        $listener.Stop()
-    }
-}
-
-if ($DockerPort -eq 0) {
-    $DockerPort = Get-FreeTcpPort
-}
-if ($DockerPostgresPort -eq 0) {
-    do {
-        $DockerPostgresPort = Get-FreeTcpPort
-    } while ($DockerPostgresPort -eq $DockerPort)
-}
 if ([string]::IsNullOrWhiteSpace($DockerProjectName)) {
-    $DockerProjectName = "scimserver-validation-$PID"
+    $runId = [guid]::NewGuid().ToString('N').Substring(0, 12)
+    $DockerProjectName = "scimserver-validation-$runId"
 }
 
 $dockerPort = $DockerPort
 $localBaseUrl = "http://localhost:$localPort"
-$dockerBaseUrl = "http://127.0.0.1:$dockerPort"
+$dockerBaseUrl = $null
 $dockerSecret = "devscimsharedsecret"
 $dockerOAuthSecret = "devscimclientsecret"
 $env:COMPOSE_PROJECT_NAME = $DockerProjectName
+$env:BIND_HOST_IP = '127.0.0.1'
 $env:API_HOST_PORT = [string]$DockerPort
 $env:POSTGRES_HOST_PORT = [string]$DockerPostgresPort
 $env:API_CONTAINER_NAME = "$DockerProjectName-api"
@@ -90,6 +74,25 @@ function Write-Result($label, $success) {
     } else {
         Write-Host "  ❌ $label" -ForegroundColor Red
     }
+}
+
+function Stop-ValidationCompose {
+    docker compose --project-directory $repoRoot down --volumes --remove-orphans 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to clean Compose project $DockerProjectName."
+    }
+}
+
+function Complete-ValidationCompose {
+    if ($KeepDocker) {
+        Write-Host "`n  Docker validation estate retained by -KeepDocker:" -ForegroundColor Yellow
+        docker compose --project-directory $repoRoot ps 2>&1 | Out-Host
+        Write-Host "  Cleanup: `$env:COMPOSE_PROJECT_NAME='$DockerProjectName'; docker compose --project-directory '$repoRoot' down --volumes --remove-orphans" -ForegroundColor Yellow
+        return
+    }
+
+    Stop-ValidationCompose
+    Write-Host "`n  Docker validation estate removed." -ForegroundColor Green
 }
 
 function Wait-ForEndpoint($url, $timeoutSeconds = 60, $label = "endpoint") {
@@ -226,7 +229,7 @@ if (-not $SkipDocker) {
     Write-Result "Existing containers removed" $true
 
     Write-Host "  Compose project: $DockerProjectName" -ForegroundColor DarkGray
-    Write-Host "  Host ports: API=$DockerPort PostgreSQL=$DockerPostgresPort" -ForegroundColor DarkGray
+    Write-Host "  Requested host ports: API=$DockerPort PostgreSQL=$DockerPostgresPort (0 means Docker allocated)" -ForegroundColor DarkGray
 
     # Step 7: Build Docker image (no-cache)
     Write-Phase 2 2 "Build Docker Image (no-cache)"
@@ -256,6 +259,7 @@ if (-not $SkipDocker) {
         Write-Result "Docker image built in ${buildDuration}s" $true
     } catch {
         Write-Result "Docker build FAILED: $_" $false
+        Complete-ValidationCompose
         Pop-Location
         exit 1
     }
@@ -267,9 +271,17 @@ if (-not $SkipDocker) {
         $env:OAUTH_CLIENT_SECRET = $dockerOAuthSecret
         docker compose up -d 2>&1
         if ($LASTEXITCODE -ne 0) { throw "Docker compose up failed" }
+        $apiBinding = (docker compose port api 8080 2>&1 | Select-Object -First 1).ToString().Trim()
+        if ($LASTEXITCODE -ne 0 -or $apiBinding -notmatch ':(?<port>\d+)$') {
+            throw "Could not resolve Docker-allocated API port from '$apiBinding'."
+        }
+        $dockerPort = [int]$Matches.port
+        $dockerBaseUrl = "http://127.0.0.1:$dockerPort"
+        Write-Host "  Docker allocated API host port $dockerPort" -ForegroundColor DarkGray
         Write-Host "  Containers starting..." -ForegroundColor Yellow
     } catch {
         Write-Result "Docker start FAILED: $_" $false
+        Complete-ValidationCompose
         Pop-Location
         exit 1
     }
@@ -281,6 +293,7 @@ if (-not $SkipDocker) {
         Write-Host "  Docker logs:" -ForegroundColor Red
         docker compose logs --tail 30 api
         Write-Result "Docker health check FAILED" $false
+        Complete-ValidationCompose
         Pop-Location
         exit 1
     }
@@ -324,9 +337,7 @@ if (-not $SkipDocker) {
     Write-Host "   Live tests:   $phase2Result" -ForegroundColor White
     Write-Host "────────────────────────────────────────" -ForegroundColor Cyan
 
-    # NOTE: Docker containers intentionally left running per user request
-    Write-Host "`n  📦 Docker containers are still running:" -ForegroundColor Yellow
-    docker compose ps 2>&1
+    Complete-ValidationCompose
 }
 
 # ══════════════════════════════════════════════════════════════

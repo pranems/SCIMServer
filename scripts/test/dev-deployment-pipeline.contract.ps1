@@ -111,15 +111,16 @@ Invoke-Assert -Description 'local Docker validation refreshes base images even w
 
 $isolatesDockerValidation = ($fullValidationContent -match '\$DockerProjectName') -and
     ($fullValidationContent -match '\$env:COMPOSE_PROJECT_NAME') -and
-    ($fullValidationContent -match '\$env:API_HOST_PORT') -and
-    ($fullValidationContent -match '\$env:POSTGRES_HOST_PORT') -and
-    ($fullValidationContent -match 'Get-FreeTcpPort')
-Invoke-Assert -Description 'local Docker validation uses a unique Compose project and available host ports' `
+    ($fullValidationContent -match '\$env:API_HOST_PORT\s*=\s*\[string\]\$DockerPort') -and
+    ($fullValidationContent -match '\$env:POSTGRES_HOST_PORT\s*=\s*\[string\]\$DockerPostgresPort') -and
+    ($fullValidationContent -match 'docker compose port api 8080') -and
+    ($fullValidationContent -notmatch 'Get-FreeTcpPort')
+Invoke-Assert -Description 'local Docker validation lets Docker atomically allocate host ports for a unique Compose project' `
     -Condition $isolatesDockerValidation
 
 $composeContent = Get-Content -LiteralPath (Join-Path $repoRoot 'docker-compose.yml') -Raw
-$parameterizesCompose = ($composeContent -match '\$\{API_HOST_PORT:-8080\}:8080') -and
-    ($composeContent -match '\$\{POSTGRES_HOST_PORT:-5432\}:5432') -and
+$parameterizesCompose = ($composeContent -match '\$\{BIND_HOST_IP:-0\.0\.0\.0\}:\$\{API_HOST_PORT:-8080\}:8080') -and
+    ($composeContent -match '\$\{BIND_HOST_IP:-0\.0\.0\.0\}:\$\{POSTGRES_HOST_PORT:-5432\}:5432') -and
     ($composeContent -match '\$\{API_CONTAINER_NAME:-scimserver-api\}') -and
     ($composeContent -match '\$\{POSTGRES_CONTAINER_NAME:-scimserver-postgres\}')
 Invoke-Assert -Description 'docker-compose keeps standard defaults while allowing isolated validation bindings' `
@@ -148,6 +149,20 @@ $checksLiveExitCodes = ([regex]::Matches(
 ).Count -eq 2)
 Invoke-Assert -Description 'full validation turns both child live-test exit codes into gate failures' `
     -Condition $checksLiveExitCodes
+
+$cleansValidationEstate = ($fullValidationContent -match '\[switch\]\$KeepDocker') -and
+    ($fullValidationContent -match '(?m)^function Stop-ValidationCompose') -and
+    ($fullValidationContent -match '(?m)^function Complete-ValidationCompose') -and
+    ($fullValidationContent -match 'docker compose --project-directory \$repoRoot down --volumes --remove-orphans') -and
+    ($fullValidationContent -match 'if\s*\(\$KeepDocker\)') -and
+    ([regex]::Matches($fullValidationContent, 'Complete-ValidationCompose').Count -ge 5)
+Invoke-Assert -Description 'full validation removes its containers, network, and volume by default with explicit opt-in retention' `
+    -Condition $cleansValidationEstate
+
+$usesRunUniqueProject = ($fullValidationContent -match '\[guid\]::NewGuid\(\)') -and
+    ($fullValidationContent -notmatch 'scimserver-validation-\$PID')
+Invoke-Assert -Description 'default validation project identity remains unique after the launching process exits' `
+    -Condition $usesRunUniqueProject
 
 Write-Host ''
 if ($failures.Count -eq 0) {

@@ -96,7 +96,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 
 4.1. **Docker compose build + live tests** (`pwsh scripts/full-validation-pipeline.ps1 -SkipLocal`) - clean rebuild, compose up, `scripts/live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret <docker-oauth>`. Must be ≥ baseline (currently 1,027 passing).
 4.2. **Tag + push to ACR** - `docker tag scimserver-api acrscimsrv09.azurecr.io/scimserver:<SHA>` and `:latest`; `az acr login --name acrscimsrv09`; `docker push <SHA>` and `docker push latest`.
-4.3. **Tag + push to GHCR (public path)** - `gh workflow run publish-ghcr.yml -f version=<version-from-package-json> -f pushLatest=true`. Wait for green via `gh run watch`.
+4.3. **Tag + push to GHCR (public path)** - fetch `origin/master`, require local `HEAD` to equal it, then run `gh workflow run publish-ghcr.yml --ref master -f version=<version-from-package-json> -f pushLatest=true -f expectedSha=<full-origin-master-sha>`. The workflow rejects a moving-ref mismatch before registry login. Wait for green via `gh run watch`.
 4.4. **Verify anonymous GHCR pull** - `docker logout ghcr.io && docker pull ghcr.io/pranems/scimserver:latest` (proves the public local-run path).
 4.5. **Live test the public local-run path** - `docker run -d --name scim-public-verify -p 3000:8080 -e PERSISTENCE_BACKEND=inmemory ... ghcr.io/pranems/scimserver:latest` + `scripts/live-test.ps1 -BaseUrl http://localhost:3000 -ClientSecret <test-oauth>`. Cleanup after.
 4.6. **Deploy to dev** - `az containerapp update -n scimserver-dev -g scimserver-dev --image <chosen-registry>/scimserver:<SHA> --revision-suffix v<SHA>`. Wait for new revision Healthy + 100% traffic + pod hostname reflects new revision.

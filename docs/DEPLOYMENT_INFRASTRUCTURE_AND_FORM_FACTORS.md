@@ -186,12 +186,16 @@ Its operator-facing defaults remain host port `8080` for the API, host port
 `POSTGRES_CONTAINER_NAME` overrides.
 
 [scripts/full-validation-pipeline.ps1](../scripts/full-validation-pipeline.ps1)
-uses those overrides with a process-specific Compose project and two available
-loopback ports. It addresses the API through numeric loopback and exits nonzero
+uses those overrides with a GUID-unique Compose project and asks Docker
+to allocate both loopback ports atomically when the services start. It queries
+the assigned API port, addresses it through numeric loopback and exits nonzero
 when either live-test lane fails. Validation therefore exercises the complete
 Compose form factor without stopping, reusing, or writing into an unrelated
 local Compose estate, and a failed live contract cannot be reported as a
-successful wrapper process. Both live-test invocations use named PowerShell
+successful wrapper process. It removes its containers, network and PostgreSQL
+volume by default; `-KeepDocker` retains them after any setup, health, or test
+failure only for explicit diagnosis and prints the cleanup command. Both
+live-test invocations use named PowerShell
 hashtable splatting so parameter names cannot be mistaken for positional URL
 values.
 
@@ -252,7 +256,7 @@ Seven workflows build, validate or audit; none of them deploy. The first three b
 |---|---|---|
 | [build-test.yml](../.github/workflows/build-test.yml) | push to `test/** dev/** feature/** feat/** ci/** fix/** release/**`, PR to `master`, dispatch | Verifies **lockfile provenance** (public `resolved` hosts + sha512 `integrity` only) before installing anything, then the full validate job, then pushes `ghcr.io/pranems/scimserver:test-<branch>` + `:sha-<sha>`, runs a **container smoke test** (boots the image on the inmemory backend, requires `/scim/health` `status=ok`, requires `ServiceProviderConfig` to carry its SCIM schema URN, and asserts npm/npx are absent), then **Trivy** (`HIGH,CRITICAL`, `exit-code: 1`, `ignore-unfixed: true`, `trivyignores: .trivyignore`) |
 | [build-and-push.yml](../.github/workflows/build-and-push.yml) | push tag `v*`, dispatch | Semver + `latest` + `sha-` tags to GHCR, Trivy gate |
-| [publish-ghcr.yml](../.github/workflows/publish-ghcr.yml) | dispatch only, inputs `version` (required) and `pushLatest` | `:<version>` and `:sha-<sha>`; `latest` created via `docker buildx imagetools create`. **This is the workflow the dev pipeline drives.** |
+| [publish-ghcr.yml](../.github/workflows/publish-ghcr.yml) | dispatch only, inputs `version`, `expectedSha` (required) and `pushLatest` | Rejects a mutable-ref mismatch before registry login, then publishes `:<version>` and `:sha-<sha>`; `latest` is created via `docker buildx imagetools create`. **This is the workflow the dev pipeline drives.** |
 | [codeql.yml](../.github/workflows/codeql.yml) | push `master`/`feat/**`, PR to `master`, Mondays 04:00 UTC, dispatch | CodeQL `security-extended,security-and-quality` for `javascript-typescript` |
 | [trivyignore-review.yml](../.github/workflows/trivyignore-review.yml) | **Daily** 04:00 UTC, dispatch, push touching `.trivyignore` | Opens/updates/closes a `[security] .trivyignore review needed` issue. Explicitly non-blocking. **Daily, not weekly**, since 2026-08-04: entries now carry a `Class`, and a `quarantine-window` entry is a hold of at most 7 days - a weekly cron cannot police a seven-day deadline |
 | [dependency-pins-review.yml](../.github/workflows/dependency-pins-review.yml) | Mondays 03:30 UTC, dispatch, push to `master` touching API or web `package.json` | Queries the GitHub Advisory Database for both workspaces' overrides, normalizing version-qualified selectors to package names, and opens/updates/closes a `[security] pinned dependency review needed` issue. Non-blocking (needs network). Exists because an override **freezes** a version and **Dependabot does not manage the `overrides` block**, so a pin added to FIX one advisory silently becomes the VULNERABLE version of the next. Strictly broader than the Trivy gate, which is HIGH+CRITICAL only. Source-only verification on 2026-10-09 does not recertify the captured Azure estate. |
