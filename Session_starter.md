@@ -114,6 +114,9 @@ five-connection PostgreSQL pool (22 Dashboard, 4 Endpoints, 3 Activity summary,
 14.462 seconds; each Dashboard request also transferred every qualifying
 24-hour request-log timestamp to Node. Both hot paths now aggregate in
 PostgreSQL with one connection and bounded result rows.
+The corrected image then passed the isolated Prisma Docker lane with
+1,700/1,700 live assertions; its GUID-owned containers, network, and volume
+were removed after the run.
 
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
