@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.38] - 2026-10-09
+
 ### Post-merge validation hardening
 
+- Release the validated runtime correction as v0.55.38. The first exact-master
+  deployment pipeline passed local static, unit, Prisma E2E, web coverage,
+  six-mode, dependency, and isolated Docker live gates, then correctly blocked
+  publication while the runtime still reported v0.55.37.
 - Replace three fixed/default browser readiness windows that flaked only under
   the complete three-worker Azure run: route-shell loading, the second-tab SSE
   create affordance, and post-purge cache settlement now each receive an
