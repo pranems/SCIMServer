@@ -784,7 +784,8 @@ when the request-log table is large.
 
 Paginated request-log counts and row reads are also sequential. This preserves
 the same response while limiting each list request to one active database
-connection at a time.
+connection at a time, including optional user display-name resolution for each
+returned row.
 
 **PowerShell:**
 

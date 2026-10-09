@@ -792,10 +792,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       });
     }
 
-    // Map records with async user resolution
-    const items = await Promise.all(
-      records.map((r) => this.mapLog(r, identifierMap))
-    );
+    // Keep optional display-name lookups bounded to one connection. A
+    // Promise.all over a full page can otherwise acquire up to `pageSize`
+    // connections at once.
+    const items = [];
+    for (const record of records) {
+      items.push(await this.mapLog(record, identifierMap));
+    }
 
     return {
       total,

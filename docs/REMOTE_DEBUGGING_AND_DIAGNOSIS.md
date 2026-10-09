@@ -871,7 +871,8 @@ The summary endpoint uses one 30-day-bounded database aggregate rather than
 four concurrent count scans. Dashboard hourly request counts are grouped into
 UTC buckets in PostgreSQL before the compact series is returned. Dashboard and
 request-log list queries are sequenced to avoid exhausting the bounded
-connection pool when several browser pages load together.
+connection pool when several browser pages load together, including per-row
+user display-name resolution.
 
 ---
 

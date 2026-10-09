@@ -381,7 +381,8 @@ Dashboard hourly request series are aggregated into UTC buckets in PostgreSQL,
 so the response transfers at most 24 count rows instead of materializing every
 matching request-log timestamp in the API process. Endpoint listing, recent-log
 listing, and series aggregation run sequentially so one Dashboard request does
-not fan out across the bounded database pool.
+not fan out across the bounded database pool. Optional per-row user display-name
+lookups are also ordered rather than launched as a page-sized burst.
 
 ---
 
