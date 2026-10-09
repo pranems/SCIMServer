@@ -16,9 +16,12 @@ Limit time/browser chain at their owners rather than overriding unfixed leaves;
 focused transformer/ESM proof passes 45 tests. The first full unit run exposed
 missing Jest mock-hoisting and stale-transform-cache semantics; explicit hoist
 and cache-key controls plus both affected suites pass 48 tests. CI lock
-regeneration, clean audits and full applicable validation remain required. Reviewed PR, release
-publication, dev deployment, canonical pixel classification and operator
-visual sign-off remain pending. No image or deployment is authorized.
+regeneration run 37901990719 removes 104 entries and adds/changes none. Clean
+company-feed installs preserve both artifacts byte-for-byte. Web audit is zero;
+API is zero critical/high with 19 non-blocking Jest/coverage-chain moderates.
+Full applicable validation remains required. Reviewed PR, release publication,
+dev deployment, canonical pixel classification and operator visual sign-off
+remain pending. No image or deployment is authorized.
 
 **Dependency remediation preparation, 2026-10-09:** the isolated
 `chore/regen-lockfile-quarantine-20261009` branch selects company-feed-visible,
@@ -115,6 +118,7 @@ capacity or remaining credit balance without host telemetry.
 
 | Date | Summary |
 |---|---|
+| 2026-10-09 | Accepted public-runner lock regeneration run 37901990719 after reviewing all 104 removals, public/SHA-512 provenance and byte-identical company-feed installs. Web audit is zero; API critical/high are zero with 19 tracked Jest/coverage-chain moderates. |
 | 2026-10-09 | Exact-tip consolidation Fast gates passed and the branch was pushed. Began owner-level removal of the residual vulnerable development toolchains; focused local transformer and ESM compatibility proof passes 45 tests, with CI lock regeneration and clean-graph audits pending. |
 | 2026-10-09 | Combined the dependency and comprehensive UI branches through ordinary merge commits on a current-master consolidation branch, preserving all constituent history. Exact-tip validation and release/deployment gates remain pending. |
 | 2026-10-09 | Persisted the comprehensive feature work as four logical commits; combined dependency/UI Compose browsers pass 250 / 12 pixel skips / zero failures and live checks pass 1,700. Restored real SSE and observable hover-prefetch browser cases with negative controls. |

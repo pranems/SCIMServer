@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes 45 tests. A follow-up mock-hoisting/cache contract plus the two suites
   that exposed the gap pass 48 tests; clean lock regeneration and complete
   audits remain required.
+- Accept public-runner lock regeneration run 37901990719. It removes 36 API
+  and 68 web entries without adding or changing a package version. Both clean
+  company-feed installs preserve the artifact bytes; provenance is public-host
+  and SHA-512-only. Web development audit is zero; API has zero critical/high
+  findings and 19 tracked Jest/coverage-chain moderate findings.
 - Select aged, company-feed-visible fixes for the API and web dependency
   findings, including `proxy-addr@2.0.8` and `seroval@1.6.3`.
 - Preserve installed major lines for transitive overrides; pair Vitest and
