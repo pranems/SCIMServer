@@ -10,7 +10,7 @@ For actual supported shapes and integration limits, see
 Keep strict validation enabled for Entra; diagnose the request and effective
 schema before applying a targeted compatibility setting.
 
-[![Version](https://img.shields.io/badge/version-0.55.37-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.38-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
