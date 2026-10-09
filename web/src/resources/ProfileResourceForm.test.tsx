@@ -56,6 +56,41 @@ function Harness({ onValidityChange }: { onValidityChange: (valid: boolean) => v
 }
 
 describe('ProfileResourceForm', () => {
+  it('distinguishes same-named attributes by their existing schema-qualified field IDs', () => {
+    const extensionUrn = 'urn:example:extension:User';
+    const shape = resolveEffectiveResourceShape(
+      { ...resourceType, schemaExtensions: [{ schema: extensionUrn }] },
+      [
+        { id: USER_URN, attributes: [{ name: 'employeeNumber', type: 'string' }] },
+        { id: extensionUrn, attributes: [{ name: 'employeeNumber', type: 'string' }] },
+      ],
+    );
+    const onChange = vi.fn();
+    const { container } = render(
+      <FluentProvider theme={webLightTheme}>
+        <ProfileResourceForm
+          shape={shape}
+          values={{
+            [`${USER_URN}|employeeNumber`]: 'CORE-100',
+            [`${extensionUrn}|employeeNumber`]: 'EXT-100',
+          }}
+          onChange={onChange}
+        />
+      </FluentProvider>,
+    );
+    const core = container.querySelector(
+      `[data-profile-field-id="${USER_URN}|employeeNumber"] input`,
+    );
+    const extension = container.querySelector(
+      `[data-profile-field-id="${extensionUrn}|employeeNumber"] input`,
+    );
+    expect(core).toHaveValue('CORE-100');
+    expect(extension).toHaveValue('EXT-100');
+    if (!extension) throw new Error('Missing schema-qualified extension input');
+    fireEvent.change(extension, { target: { value: 'EXT-200' } });
+    expect(onChange).toHaveBeenCalledWith(`${extensionUrn}|employeeNumber`, 'EXT-200');
+  });
+
   it('renders profile fields with working examples and emits typed changes', async () => {
     const user = userEvent.setup();
     const onValidityChange = vi.fn();

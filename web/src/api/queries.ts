@@ -35,6 +35,7 @@ import { rememberEndpointVersion, getEndpointVersion } from './endpoint-version'
 // ─── Base fetch wrapper ──────────────────────────────────────────────
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const SCIM_PATCH_OP_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 
 /**
  * Is this an endpoint-scoped SCIM route (the "data plane") rather than an
@@ -2316,10 +2317,10 @@ export function useUpdateResource(endpointId: string, resourceEndpoint: string) 
           headers: ifMatchHeaders(ifMatch),
         },
       ),
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.resources.all(endpointId, resourceEndpoint) });
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
-    },
+    onSettled: () => Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.resources.all(endpointId, resourceEndpoint) }),
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) }),
+    ]),
   });
 }
 
@@ -2347,9 +2348,10 @@ export function useDeleteResource(endpointId: string, resourceEndpoint: string) 
 }
 
 /**
- * PATCH a SCIM User. Optimistic: applies the body shallow-merge to
- * every cached list page that contains the target row, then rolls
- * back on error. Forwards `If-Match` when supplied so endpoints with
+ * PATCH a SCIM User. Flat resource bodies are merged optimistically.
+ * PATCH operation envelopes wait for the server refresh instead of being
+ * merged as resource fields. Rolls back flat-body updates on error.
+ * Forwards `If-Match` when supplied so endpoints with
  * `RequireIfMatch` enforce the ETag (RFC 7644 S3.1).
  */
 export function useUpdateUser(endpointId: string) {
@@ -2368,6 +2370,9 @@ export function useUpdateUser(endpointId: string) {
       }),
     onMutate: async (args) => {
       await qc.cancelQueries({ queryKey: queryKeys.users.all(endpointId) });
+      if (Array.isArray(args.body.schemas) && args.body.schemas.includes(SCIM_PATCH_OP_SCHEMA)) {
+        return { prevLists: [] };
+      }
       const prevLists = patchListsContaining(
         qc,
         queryKeys.users.all(endpointId),
@@ -2384,10 +2389,10 @@ export function useUpdateUser(endpointId: string) {
     onError: (_err, _vars, context) => {
       if (context?.prevLists) restoreListSnapshots(qc, context.prevLists);
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) });
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
-    },
+    onSettled: () => Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) }),
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) }),
+    ]),
   });
 }
 
@@ -2439,9 +2444,9 @@ export function useDeleteUser(endpointId: string) {
 }
 
 /**
- * PATCH a SCIM Group. Optimistic: shallow-merges `body` into every
- * cached list page that contains the target row, then rolls back on
- * error. Forwards `If-Match` when supplied.
+ * PATCH a SCIM Group. Flat resource bodies are merged optimistically;
+ * PATCH operation envelopes wait for the server refresh. Rolls back
+ * flat-body updates on error. Forwards `If-Match` when supplied.
  */
 export function useUpdateGroup(endpointId: string) {
   const qc = useQueryClient();
@@ -2459,6 +2464,9 @@ export function useUpdateGroup(endpointId: string) {
       }),
     onMutate: async (args) => {
       await qc.cancelQueries({ queryKey: queryKeys.groups.all(endpointId) });
+      if (Array.isArray(args.body.schemas) && args.body.schemas.includes(SCIM_PATCH_OP_SCHEMA)) {
+        return { prevLists: [] };
+      }
       const prevLists = patchListsContaining(
         qc,
         queryKeys.groups.all(endpointId),
@@ -2475,10 +2483,10 @@ export function useUpdateGroup(endpointId: string) {
     onError: (_err, _vars, context) => {
       if (context?.prevLists) restoreListSnapshots(qc, context.prevLists);
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) });
-      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
-    },
+    onSettled: () => Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) }),
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) }),
+    ]),
   });
 }
 
@@ -2812,4 +2820,3 @@ export function useUpdateLogConfig() {
     },
   });
 }
-

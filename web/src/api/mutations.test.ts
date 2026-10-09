@@ -115,6 +115,70 @@ function seedGroupList(qc: QueryClient, id: string, extra: Record<string, unknow
   return list;
 }
 
+describe('resource update completion', () => {
+  it.each(['user', 'group'] as const)(
+    '%s does not merge a PATCH operation envelope into the cached resource',
+    async (kind) => {
+      const { wrapper, queryClient } = createWrapper();
+      const resourceSchemas = ['urn:example:resource'];
+      if (kind === 'user') seedUserList(queryClient, 'r-1', { schemas: resourceSchemas });
+      else seedGroupList(queryClient, 'r-1', { schemas: resourceSchemas });
+      const { result } = renderHook(
+        () => kind === 'user' ? useUpdateUser(EP_ID) : useUpdateGroup(EP_ID),
+        { wrapper },
+      );
+      await act(async () => {
+        await result.current.mutateAsync({
+          userId: 'r-1',
+          groupId: 'r-1',
+          body: {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'replace', path: 'active', value: false }],
+          },
+        });
+      });
+      const key = kind === 'user'
+        ? queryKeys.users.byEndpoint(EP_ID, { startIndex: 1, count: 20 })
+        : queryKeys.groups.byEndpoint(EP_ID, { startIndex: 1, count: 20 });
+      const list = queryClient.getQueryData<ScimListResponse>(key);
+      expect(list?.Resources[0].schemas).toEqual(resourceSchemas);
+      expect(list?.Resources[0]).not.toHaveProperty('Operations');
+    },
+  );
+
+  it.each(['user', 'group', 'custom'] as const)(
+    '%s stays pending until its refreshed resource cache is ready',
+    async (kind) => {
+      const { wrapper, queryClient } = createWrapper();
+      let releaseRefresh: () => void = () => undefined;
+      const refresh = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+      const invalidation = vi.spyOn(queryClient, 'invalidateQueries').mockReturnValue(refresh);
+      const { result } = renderHook(() => {
+        if (kind === 'user') return useUpdateUser(EP_ID);
+        if (kind === 'group') return useUpdateGroup(EP_ID);
+        return useUpdateResource(EP_ID, '/Devices');
+      }, { wrapper });
+      let settled = false;
+      await act(async () => {
+        const pending = result.current.mutateAsync({
+          userId: 'u-1',
+          groupId: 'g-1',
+          resourceId: 'd-1',
+          body: { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [] },
+        }).then(() => { settled = true; });
+        try {
+          await waitFor(() => expect(invalidation).toHaveBeenCalledTimes(2));
+          expect(settled).toBe(false);
+        } finally {
+          releaseRefresh();
+          await pending;
+        }
+      });
+      expect(settled).toBe(true);
+    },
+  );
+});
+
 // ─── useCreateCredential ─────────────────────────────────────────────
 
 describe('useCreateCredential', () => {

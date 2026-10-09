@@ -151,12 +151,16 @@ test('creates and edits built-in extension and custom ResourceType fields', asyn
   await userRow.click();
   await expect(page.getByTestId('drawer-profile-form-employeeNumber-input')).toHaveValue('EMP-100');
   await page.getByTestId('drawer-profile-form-employeeNumber-input').fill('EMP-200');
-  const updatedUserRefresh = page.waitForResponse((response) =>
-    response.request().method() === 'GET' &&
-    response.url().includes(`/scim/endpoints/${endpointId}/Users?`) &&
-    response.ok());
+  const updatedUserResponse = page.waitForResponse((response) =>
+    response.request().method() === 'PATCH' &&
+    response.url().includes(`/scim/endpoints/${endpointId}/Users/`));
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await updatedUserRefresh;
+  const updatedUser = await updatedUserResponse;
+  expect(updatedUser.status()).toBe(200);
+  expect(await updatedUser.json()).toMatchObject({
+    [ENTERPRISE_URN]: { employeeNumber: 'EMP-200' },
+  });
+  await expect(page.getByTestId('resource-detail-drawer-footer')).toHaveCount(0);
   await userRow.click();
   await expect(page.getByTestId('drawer-profile-form-employeeNumber-input')).toHaveValue('EMP-200');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -182,12 +186,14 @@ test('creates and edits built-in extension and custom ResourceType fields', asyn
   await expect(deviceRow).toBeVisible();
   await deviceRow.click();
   await page.getByTestId('drawer-profile-form-serialNumber-input').fill('SN-200');
-  const updatedDeviceRefresh = page.waitForResponse((response) =>
-    response.request().method() === 'GET' &&
-    response.url().includes(`/scim/endpoints/${endpointId}/Devices?`) &&
-    response.ok());
+  const updatedDeviceResponse = page.waitForResponse((response) =>
+    response.request().method() === 'PATCH' &&
+    response.url().includes(`/scim/endpoints/${endpointId}/Devices/`));
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await updatedDeviceRefresh;
+  const updatedDevice = await updatedDeviceResponse;
+  expect(updatedDevice.status()).toBe(200);
+  expect(await updatedDevice.json()).toMatchObject({ serialNumber: 'SN-200' });
+  await expect(page.getByTestId('resource-detail-drawer-footer')).toHaveCount(0);
   const updatedDeviceRow = page.locator('[data-testid^="custom-resource-row-"]').filter({ hasText: 'SN-200' });
   await expect(updatedDeviceRow).toBeVisible();
   await updatedDeviceRow.click();
