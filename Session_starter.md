@@ -83,6 +83,17 @@ explicit diagnostic exception. RED contracts failed on all three gaps and are
 green after the correction. A real PostgreSQL Compose control received
 `127.0.0.1:32779` and left no container, network or volume behind.
 
+**Authoritative merged-master deployment, 2026-10-09:** exact master
+`f501b557` deployed as revision `scimserver-dev--vf501b557` at 100% traffic.
+All static, unit, Prisma, six-mode, isolated Docker (1,700/1,700), registry
+digest-parity, live-dev, data-integrity and revision-hygiene gates passed.
+Playwright passed 248 cases with 10 intentional skips and one stale Settings
+pixel baseline. Inspection found the intentional `31176497` global navigation
+change in Settings and both Dashboard themes. Those three baselines were
+classified as intended before refresh; the complete 12-case visual spec now
+passes. All nine reviewer-judgement gates were performed and recorded on
+PR #195 rather than treated as unperformed pipeline placeholders.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:

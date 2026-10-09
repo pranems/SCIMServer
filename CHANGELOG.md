@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Post-merge validation hardening
 
+- Refresh the three inspected Dashboard light, Dashboard dark, and Settings
+  pixel baselines for the intended global workflow-context navigation shipped
+  by `31176497`: header back/forward controls and the clearer
+  `Self-service /Me` label. The exact dev run passed 248 browser cases before
+  this stale-baseline failure; all 12 canonical visual cases pass after the
+  reviewed refresh.
 - Make the unsupported-uniqueness E2E assertion concurrency-safe by proving
   that the rejected endpoint name was not published instead of comparing the
   entire server-wide endpoint inventory while other suites mutate it.
