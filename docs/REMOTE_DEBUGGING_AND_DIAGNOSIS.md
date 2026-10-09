@@ -1,6 +1,6 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.38`
 
 > **Version:** 3.2 - **Source-verified against:** v0.55.36 - **Updated:** 2026-10-01
 > Request-history identity and authenticated stream transport re-verified against v0.55.36 on 2026-10-01; the full line-by-line pass dates from v0.53.0.

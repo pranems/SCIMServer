@@ -4,6 +4,13 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
+**Release candidate:** v0.55.38 contains the merged request-log aggregation and
+browser-readiness fixes from PR #197. The first exact-master deployment pipeline
+passed all local static, unit, Prisma E2E, web coverage, six-mode, dependency,
+and isolated Docker live gates, then correctly blocked publication because the
+runtime change still reported v0.55.37. The leaked browser fixture from the
+old-image run was deleted by exact ID and verified absent with HTTP 404.
+
 ### Active Execution Reference
 
 **Consolidation checkpoint, 2026-10-09:** the dependency and comprehensive UI
