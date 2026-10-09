@@ -98,6 +98,30 @@ three-repeat Dashboard/Settings stress cases pass. All nine reviewer-judgement
 gates were performed and recorded on PR #195 rather than treated as unperformed
 pipeline placeholders.
 
+**Merged-master browser consolidation, 2026-10-09:** the suite now contains
+263 cases. Two complete three-worker Azure runs exposed three unrelated
+fixed/default readiness-window failures: credential purge settlement, Logs
+shell readiness, and the Tab A empty-state action in the cross-tab SSE flow.
+Each passed when isolated; explicit 30-second outcome waits now cover only
+navigation/render/cache settlement while the SSE refresh SLA remains five
+seconds.
+
+The next complete run exposed a shared backend constraint rather than ten
+independent UI failures: from 15:45:20Z through 15:50:17Z, Azure dev logged 31
+`timeout exceeded when trying to connect` failures while acquiring the
+five-connection PostgreSQL pool (22 Dashboard, 4 Endpoints, 3 Activity summary,
+2 Logs). One Activity summary call held four concurrent count scans and lasted
+14.462 seconds; each Dashboard request also transferred every qualifying
+24-hour request-log timestamp to Node. Both hot paths now aggregate in
+PostgreSQL with one connection and bounded result rows.
+The corrected image then passed the isolated Prisma Docker lane with
+1,700/1,700 live assertions; its GUID-owned containers, network, and volume
+were removed after the run.
+Post-review local Docker revalidation was blocked before compilation by two
+consecutive corporate-feed HTTP 504 responses on different unchanged packages.
+Both GUID-owned partial estates were removed. The feed and seven-day quarantine
+were not bypassed; GitHub CI is the required build proof for the UTC follow-up.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:

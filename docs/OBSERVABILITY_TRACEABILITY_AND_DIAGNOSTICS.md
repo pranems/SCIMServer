@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.37`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
 
 Custom ResourceType operations are first-class Activity entries with
 `resourceType`, `resourceEndpoint`, and `resourceIdentifier`. Create, update,
@@ -376,6 +376,10 @@ All admin surfaces require a bearer (OAuth token or the SCIM shared secret); the
 | Reason catalog | `GET /scim/docs/auth-errors?plane=` (public) | Machine-readable reason codes |
 | Dashboard | `GET /scim/admin/dashboard` | Request series + health rollup |
 | Version | `GET /scim/admin/version` | Build + runtime + storage facts |
+
+Dashboard hourly request series are aggregated into UTC buckets in PostgreSQL,
+so the response transfers at most 24 count rows instead of materializing every
+matching request-log timestamp in the API process.
 
 ---
 

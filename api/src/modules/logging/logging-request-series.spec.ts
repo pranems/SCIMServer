@@ -18,7 +18,10 @@ import { ScimLogger } from './scim-logger.service';
 
 describe('LoggingService - getRequestSeries (Phase D4)', () => {
   let service: LoggingService;
-  let prisma: { requestLog: { findMany: jest.Mock; count: jest.Mock; deleteMany: jest.Mock; create: jest.Mock; createMany: jest.Mock } };
+  let prisma: {
+    $queryRaw: jest.Mock;
+    requestLog: { findMany: jest.Mock; count: jest.Mock; deleteMany: jest.Mock; create: jest.Mock; createMany: jest.Mock };
+  };
   let logger: { info: jest.Mock; error: jest.Mock; debug: jest.Mock; warn: jest.Mock; trace: jest.Mock };
   const savedBackend = process.env.PERSISTENCE_BACKEND;
   const savedPrune = process.env.LOG_AUTO_PRUNE;
@@ -28,6 +31,7 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
     process.env.LOG_AUTO_PRUNE = 'false';
 
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       requestLog: {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
@@ -76,21 +80,21 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
     });
 
     it('returns zero-filled when no rows match', async () => {
-      prisma.requestLog.findMany.mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValue([]);
       const series = await service.getRequestSeries({ hours: 24 });
       expect(series).toEqual(new Array(24).fill(0));
     });
   });
 
   describe('bucketing', () => {
-    it('passes a 24h-cutoff `gte` to Prisma findMany', async () => {
+    it('passes the oldest visible bucket cutoff to one aggregate query', async () => {
       const before = Date.now();
       await service.getRequestSeries({ hours: 24 });
       const after = Date.now();
 
-      expect(prisma.requestLog.findMany).toHaveBeenCalledTimes(1);
-      const args = prisma.requestLog.findMany.mock.calls[0][0];
-      const gte: Date = args.where.createdAt.gte;
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.requestLog.findMany).not.toHaveBeenCalled();
+      const gte = prisma.$queryRaw.mock.calls[0].find((arg) => arg instanceof Date) as Date;
       expect(gte).toBeInstanceOf(Date);
       // gte is the start of the OLDEST visible bucket. The current bucket
       // is the one containing `now`; the oldest is 23 buckets earlier.
@@ -104,10 +108,12 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
       expect(gteMs).toBeLessThanOrEqual(upperBound);
     });
 
-    it('selects only createdAt (no large columns)', async () => {
+    it('aggregates in PostgreSQL instead of materializing request-log rows', async () => {
       await service.getRequestSeries({ hours: 24 });
-      const args = prisma.requestLog.findMany.mock.calls[0][0];
-      expect(args.select).toEqual({ createdAt: true });
+      const query = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join(' ');
+      expect(query).toContain(`date_trunc('hour', "createdAt", 'UTC')`);
+      expect(query).toContain('COUNT(*)::int');
+      expect(query).toContain('GROUP BY');
     });
 
     it('counts rows into the correct hourly bucket', async () => {
@@ -121,17 +127,11 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
       const currentBucketStart = Math.floor(now / hourMs) * hourMs;
       const halfHour = 30 * 60 * 1000;
       const rows = [
-        // Inside current bucket (idx=23): use NOW itself - guaranteed
-        // to fall in [currentBucketStart, currentBucketStart + hourMs).
-        { createdAt: new Date(now) },
-        // Halfway through previous bucket (idx=22).
-        { createdAt: new Date(currentBucketStart - halfHour) },
-        // Halfway through previous bucket again (idx=22, 2nd row).
-        { createdAt: new Date(currentBucketStart - halfHour) },
-        // Halfway through bucket 22 hours back (idx=1).
-        { createdAt: new Date(currentBucketStart - 22 * hourMs + halfHour) },
+        { bucket: new Date(currentBucketStart), count: 1 },
+        { bucket: new Date(currentBucketStart - hourMs), count: 2 },
+        { bucket: new Date(currentBucketStart - 22 * hourMs), count: 1 },
       ];
-      prisma.requestLog.findMany.mockResolvedValue(rows);
+      prisma.$queryRaw.mockResolvedValue(rows);
 
       const series = await service.getRequestSeries({ hours: 24 });
 
@@ -146,10 +146,10 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
       const now = Date.now();
       const hourMs = 60 * 60 * 1000;
       const rows = [
-        { createdAt: new Date(now - 25 * hourMs) }, // older than 24h
-        { createdAt: new Date(now - 100 * hourMs) },
+        { bucket: new Date(now - 25 * hourMs), count: 1 },
+        { bucket: new Date(now - 100 * hourMs), count: 1 },
       ];
-      prisma.requestLog.findMany.mockResolvedValue(rows);
+      prisma.$queryRaw.mockResolvedValue(rows);
 
       const series = await service.getRequestSeries({ hours: 24 });
       expect(series.reduce((a, b) => a + b, 0)).toBe(0);
@@ -157,20 +157,18 @@ describe('LoggingService - getRequestSeries (Phase D4)', () => {
   });
 
   describe('admin / health exclusion', () => {
-    it('passes a where-clause that excludes /scim/admin/, /, and /health', async () => {
+    it('excludes /scim/admin/, /, and /health in the aggregate query', async () => {
       await service.getRequestSeries({ hours: 24 });
-      const args = prisma.requestLog.findMany.mock.calls[0][0];
-      const ands = args.where.AND as Array<Record<string, unknown>>;
-      expect(ands).toHaveLength(3);
-      expect(ands[0]).toEqual({ url: { not: { contains: '/scim/admin/' } } });
-      expect(ands[1]).toEqual({ url: { not: { equals: '/' } } });
-      expect(ands[2]).toEqual({ url: { not: { equals: '/health' } } });
+      const query = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join(' ');
+      expect(query).toContain('/scim/admin/');
+      expect(query).toContain("'/'");
+      expect(query).toContain("'/health'");
     });
   });
 
   describe('error handling', () => {
     it('returns zeros and logs error when Prisma throws (no 500)', async () => {
-      prisma.requestLog.findMany.mockRejectedValueOnce(new Error('connection refused'));
+      prisma.$queryRaw.mockRejectedValueOnce(new Error('connection refused'));
       const series = await service.getRequestSeries({ hours: 24 });
       expect(series).toEqual(new Array(24).fill(0));
       expect(logger.error).toHaveBeenCalled();

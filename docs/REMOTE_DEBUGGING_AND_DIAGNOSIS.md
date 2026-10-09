@@ -1,6 +1,6 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.37`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
 
 > **Version:** 3.2 - **Source-verified against:** v0.55.36 - **Updated:** 2026-10-01
 > Request-history identity and authenticated stream transport re-verified against v0.55.36 on 2026-10-01; the full line-by-line pass dates from v0.53.0.
@@ -866,6 +866,10 @@ SCIMServer is designed for environments where operators have **no SSH/shell acce
 | `GET` | `/scim/admin/activity/summary` | Activity summary stats (last 24h, last week, by type) |
 
 The activity feed converts raw request logs into human-readable entries with icons, severity levels, and Entra keepalive detection. Query params: `page`, `limit`, `type` (user/group/system), `severity` (info/success/warning/error), `search`, `hideKeepalive` (true/false).
+
+The summary endpoint uses one 30-day-bounded database aggregate rather than
+four concurrent count scans. Dashboard hourly request counts are grouped into
+UTC buckets in PostgreSQL before the compact series is returned.
 
 ---
 

@@ -261,68 +261,59 @@ export class ActivityController {
       };
     }
 
-    // Get recent activity counts
+    // Aggregate all four counters in one bounded scan. Four parallel count()
+    // calls previously occupied four of the five pool connections for the
+    // duration of the scans, starving unrelated UI reads under browser load.
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-    // Common exclusion: admin traffic should never count as SCIM operations
-    const notAdmin = { url: { not: { contains: '/admin/' } } };
-
-    // SQL-level keepalive exclusion - Entra keepalive probes are:
-    // method=GET + url contains /Users + identifier IS NULL + status < 400 + url has ?filter=
-    // We EXCLUDE these by using NOT { AND: [all keepalive conditions] }
-    const notKeepalive = {
-      NOT: {
-        AND: [
-          { method: 'GET' },
-          { url: { contains: '/Users' } },
-          { identifier: null },
-          { OR: [{ status: null }, { status: { lt: 400 } }] },
-          { url: { contains: '?filter=' } },
-        ],
-      },
-    };
-
-    const [last24Hours, lastWeek, userOperations, groupOperations] = await Promise.all([
-      // Last 24h: non-admin, non-keepalive count
-      this.prisma.requestLog.count({
-        where: {
-          createdAt: { gte: oneDayAgo },
-          ...notAdmin,
-          ...notKeepalive,
-        },
-      }),
-      // Last 7d: non-admin, non-keepalive count
-      this.prisma.requestLog.count({
-        where: {
-          createdAt: { gte: oneWeekAgo },
-          ...notAdmin,
-          ...notKeepalive,
-        },
-      }),
-      // User operations: last 30 days, non-admin, non-keepalive, URL contains /Users
-      // Bounded to 30 days to avoid full table scans on burstable DB tiers.
-      this.prisma.requestLog.count({
-        where: {
-          AND: [
-            { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
-            { url: { contains: '/Users' } },
-            notAdmin,
-            notKeepalive,
-          ],
-        },
-      }),
-      // Group operations: last 30 days, non-admin count (keepalive only targets /Users, not /Groups)
-      this.prisma.requestLog.count({
-        where: {
-          AND: [
-            { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
-            { url: { contains: '/Groups' } },
-            notAdmin,
-          ],
-        },
-      }),
-    ]);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [counts] = await this.prisma.$queryRaw<Array<{
+      last24Hours: number;
+      lastWeek: number;
+      userOperations: number;
+      groupOperations: number;
+    }>>`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE "createdAt" >= ${oneDayAgo}
+            AND NOT (
+              "method" = 'GET'
+              AND "url" LIKE '%/Users%'
+              AND "identifier" IS NULL
+              AND ("status" IS NULL OR "status" < 400)
+              AND "url" LIKE '%?filter=%'
+            )
+        )::int AS "last24Hours",
+        COUNT(*) FILTER (
+          WHERE "createdAt" >= ${oneWeekAgo}
+            AND NOT (
+              "method" = 'GET'
+              AND "url" LIKE '%/Users%'
+              AND "identifier" IS NULL
+              AND ("status" IS NULL OR "status" < 400)
+              AND "url" LIKE '%?filter=%'
+            )
+        )::int AS "lastWeek",
+        COUNT(*) FILTER (
+          WHERE "url" LIKE '%/Users%'
+            AND NOT (
+              "method" = 'GET'
+              AND "identifier" IS NULL
+              AND ("status" IS NULL OR "status" < 400)
+              AND "url" LIKE '%?filter=%'
+            )
+        )::int AS "userOperations",
+        COUNT(*) FILTER (WHERE "url" LIKE '%/Groups%')::int AS "groupOperations"
+      FROM "RequestLog"
+      WHERE "createdAt" >= ${thirtyDaysAgo}
+        AND "url" NOT LIKE '%/admin/%'
+    `;
+    const {
+      last24Hours = 0,
+      lastWeek = 0,
+      userOperations = 0,
+      groupOperations = 0,
+    } = counts ?? {};
 
     return {
       summary: {
