@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Module = require('node:module');
+const { liveFetch } = require('../live-test-http.cjs');
 
 async function runRetainedEntryPut(baseUrl, token) {
   assert.ok(['http:', 'https:'].includes(new URL(baseUrl).protocol));
@@ -20,7 +21,7 @@ async function runRetainedEntryPut(baseUrl, token) {
   const outcomes = [];
   const eq = (actual, expected) => { assert.deepEqual(actual, expected); assertions++; };
   async function http(method, route, body) {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}${route}`, {
+    const response = await liveFetch(`${baseUrl.replace(/\/$/, '')}${route}`, {
       method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/scim+json' },
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(10000),

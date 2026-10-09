@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { testGuard } = require("./p1-validation/safety.cjs");
 const { cases, runCase } = require("../api/test/e2e/corpus/put-entry-preservation.cjs");
+const { liveFetch } = require("./live-test-http.cjs");
 
 async function runLivePutPreservation(baseUrl, secret) {
   await testGuard();
@@ -17,7 +18,7 @@ async function runPutPreservationContract(baseUrl, secret) {
   const results = [];
   for (const test of cases) {
     results.push(await runCase(test, async (method, path, body) => {
-      const response = await fetch(`${baseUrl}${path}`, {
+      const response = await liveFetch(`${baseUrl}${path}`, {
         method, headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/scim+json" },
         ...(body ? { body: JSON.stringify(body) } : {}),
         signal: AbortSignal.timeout(10000),

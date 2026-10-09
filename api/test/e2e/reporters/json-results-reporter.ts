@@ -105,7 +105,13 @@ class JsonResultsReporter implements Reporter {
   ): void {
     const finishTime = new Date();
     const durationMs = finishTime.getTime() - this.startTime.getTime();
-    const runId = `e2e-${finishTime.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)}`;
+    const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
+    const runId = [
+      'e2e',
+      finishTime.toISOString().replace(/[:.]/g, '-').replace('T', '_'),
+      backend,
+      process.pid,
+    ].join('-');
     const flowSteps = getE2eFlowTrace();
 
     // Collect all tests and suites
@@ -192,8 +198,7 @@ class JsonResultsReporter implements Reporter {
         platform: process.platform,
         arch: process.arch,
         hostname: os.hostname(),
-        persistenceBackend:
-          process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma',
+        persistenceBackend: backend,
         jestVersion: jestPkg,
       },
       summary: {

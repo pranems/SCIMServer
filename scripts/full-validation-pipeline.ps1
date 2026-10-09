@@ -221,7 +221,7 @@ if (-not $SkipDocker) {
 
     try {
         $buildStart = Get-Date
-        docker compose build --no-cache 2>&1 | Tee-Object -Variable buildOutput
+        docker compose build --no-cache --pull 2>&1 | Tee-Object -Variable buildOutput
         if ($LASTEXITCODE -ne 0) { throw "Docker build failed" }
         $buildDuration = [math]::Round(((Get-Date) - $buildStart).TotalSeconds)
         Write-Result "Docker image built in ${buildDuration}s" $true
