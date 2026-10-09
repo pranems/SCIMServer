@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by `31176497`: header back/forward controls and the clearer
   `Self-service /Me` label. The exact dev run passed 248 browser cases before
   this stale-baseline failure; all 12 canonical visual cases pass after the
-  reviewed refresh.
+  reviewed refresh. The visual fixture now waits for the expanded application
+  shell, loaded Dashboard analytics, and loaded Settings secret/log/JWKS/
+  security sections so masked-region geometry cannot capture a loading race.
 - Make the unsupported-uniqueness E2E assertion concurrency-safe by proving
   that the rejected endpoint name was not published instead of comparing the
   entire server-wide endpoint inventory while other suites mutate it.

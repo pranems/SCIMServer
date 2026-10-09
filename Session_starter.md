@@ -91,8 +91,12 @@ Playwright passed 248 cases with 10 intentional skips and one stale Settings
 pixel baseline. Inspection found the intentional `31176497` global navigation
 change in Settings and both Dashboard themes. Those three baselines were
 classified as intended before refresh; the complete 12-case visual spec now
-passes. All nine reviewer-judgement gates were performed and recorded on
-PR #195 rather than treated as unperformed pipeline placeholders.
+passes. Review then rejected a first Dashboard refresh that also captured the
+analytics loading height. Explicit shell and data-readiness assertions now
+stabilize all three shared-shell cases: 12/12 complete visuals plus 9/9
+three-repeat Dashboard/Settings stress cases pass. All nine reviewer-judgement
+gates were performed and recorded on PR #195 rather than treated as unperformed
+pipeline placeholders.
 
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,

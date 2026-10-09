@@ -57,10 +57,26 @@ test.skip(
 test.beforeEach(async ({ page }) => {
   const token = process.env.E2E_TOKEN || 'changeme-scim';
   await page.addInitScript(
-    ({ key, value }) => {
-      try { window.localStorage.setItem(key, value); } catch {}
+    ({ key, value, preferencesKey, preferences }) => {
+      try {
+        window.localStorage.setItem(key, value);
+        window.localStorage.setItem(preferencesKey, preferences);
+      } catch {}
     },
-    { key: 'scimserver.authToken', value: token },
+    {
+      key: 'scimserver.authToken',
+      value: token,
+      preferencesKey: 'scimserver.preferences.v1',
+      preferences: JSON.stringify({
+        v: 1,
+        prefs: {
+          defaultPageSize: 20,
+          denseMode: false,
+          sidebarCollapsedDefault: false,
+          telemetryOptIn: true,
+        },
+      }),
+    },
   );
   await page.goto('/');
   await page.addStyleTag({ content: '.TanStackRouterDevtools { display: none !important; }' });
@@ -68,6 +84,28 @@ test.beforeEach(async ({ page }) => {
   // prompt in the screenshot. Same pattern as the existing specs.
   await page.evaluate((t) => localStorage.setItem('scim_token', t), token);
 });
+
+async function expectStableAppShell(page: Page): Promise<void> {
+  await expect(page.getByTestId('global-history-back')).toBeVisible();
+  await expect(page.getByTestId('global-history-forward')).toBeVisible();
+  for (const key of [
+    'dashboard',
+    'endpoints',
+    'manual-provision',
+    'me',
+    'discovery',
+    'operations',
+    'workbench',
+    'logs',
+    'settings',
+  ]) {
+    await expect(page.getByTestId(`nav-${key}`)).toBeVisible();
+  }
+  await expect.poll(async () => {
+    const bounds = await page.getByTestId('app-sidebar').boundingBox();
+    return bounds?.width ?? 0;
+  }).toBeGreaterThan(200);
+}
 
 /**
  * Selectors that legitimately change between runs and would cause
@@ -193,6 +231,8 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'light'));
     await page.goto('/');
     await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Activity analytics', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectStableAppShell(page);
     await expect(page).toHaveScreenshot('dashboard-light.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
@@ -204,6 +244,8 @@ test.describe('Phase H3 - Visual regression baselines', () => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'dark'));
     await page.goto('/');
     await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Activity analytics', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectStableAppShell(page);
     await expect(page).toHaveScreenshot('dashboard-dark.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
@@ -251,6 +293,11 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   test('Settings page', async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 30_000 });
+    await expectStableAppShell(page);
+    await expect(page.getByTestId('server-conn-shared-secret')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Log configuration', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('jwks-hosts-list')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('security-visibility-always')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveScreenshot('settings.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, SETTINGS_LIVE_SELECTORS),
