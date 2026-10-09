@@ -28,8 +28,13 @@
  * @see docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getStoredToken } from '../auth/token';
 import {
+  clearStoredToken,
+  getStoredToken,
+  notifyTokenInvalid,
+} from '../auth/token';
+import {
+  isAuthenticatedSseAuthError,
   openAuthenticatedSse,
   type AuthenticatedSseConnection,
 } from './authenticated-sse';
@@ -165,7 +170,6 @@ export function useLogStream(options: UseLogStreamOptions = {}): UseLogStreamRes
       return;
     }
 
-    const token = getStoredToken() ?? undefined;
     let disposed = false;
 
     const connect = () => {
@@ -173,7 +177,7 @@ export function useLogStream(options: UseLogStreamOptions = {}): UseLogStreamRes
       setConnectionState('connecting');
       connectionRef.current = openAuthenticatedSse({
         url,
-        token,
+        token: getStoredToken() ?? undefined,
         onOpen: () => {
           retryCount.current = 0;
           setConnectionState('open');
@@ -193,10 +197,16 @@ export function useLogStream(options: UseLogStreamOptions = {}): UseLogStreamRes
             // Non-JSON SSE message (server keepalive / comment) - ignore.
           }
         },
-        onError: () => {
+        onError: (error) => {
           if (disposed) return;
           connectionRef.current?.close();
           connectionRef.current = null;
+          if (isAuthenticatedSseAuthError(error)) {
+            clearStoredToken();
+            notifyTokenInvalid();
+            setConnectionState('closed');
+            return;
+          }
           setConnectionState('reconnecting');
           const delay = Math.min(1_000 * Math.pow(2, retryCount.current), 30_000);
           retryCount.current++;

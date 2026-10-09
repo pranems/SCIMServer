@@ -46,7 +46,10 @@ statements. Full Chromium passes 250 with only 12 canonical-dev pixel skips.
 An earlier 217-failure cascade used a stale API with a mismatched shared secret;
 the global browser preflight now fails once on an authenticated endpoint check.
 The authenticated SSE journey passes with a 15-second connection allowance
-while retaining the five-second mutation-refetch assertion.
+while retaining the five-second mutation-refetch assertion. Final diff review
+found stale-token retry behavior: 401/403 now clears the credential, opens the
+token gate and stops retries, while transient reconnects re-read the token.
+Four RED controls are GREEN and the focused SSE set passes 53 tests.
 
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
@@ -127,6 +130,7 @@ capacity or remaining credit balance without host telemetry.
 
 | Date | Summary |
 |---|---|
+| 2026-10-09 | Final changed-set review found stale-token SSE retries. Both consumers now stop on 401/403, invoke the existing invalid-token flow and re-read credentials on transient reconnect; four RED controls are GREEN and 53 focused tests pass. |
 | 2026-10-09 | Exact-tip consolidation passes 2,486 Prisma E2E tests, 1,577 web coverage tests and 250 Chromium cases with 12 canonical pixel skips. Added authenticated browser preflight and a bounded SSE connection allowance after inspected negative/failure evidence. |
 | 2026-10-09 | Accepted public-runner lock regeneration run 37901990719 after reviewing all 104 removals, public/SHA-512 provenance and byte-identical company-feed installs. Web audit is zero; API critical/high are zero with 19 tracked Jest/coverage-chain moderates. |
 | 2026-10-09 | Exact-tip consolidation Fast gates passed and the branch was pushed. Began owner-level removal of the residual vulnerable development toolchains; focused local transformer and ESM compatibility proof passes 45 tests, with CI lock regeneration and clean-graph audits pending. |

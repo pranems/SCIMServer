@@ -26,11 +26,16 @@
  */
 import { useEffect, useRef } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { getStoredToken } from '../auth/token';
+import {
+  clearStoredToken,
+  getStoredToken,
+  notifyTokenInvalid,
+} from '../auth/token';
 import { queryKeys } from '../api/queries';
 import { useUIStore } from '../store/ui-store';
 import {
   openAuthenticatedSse,
+  isAuthenticatedSseAuthError,
   type AuthenticatedSseConnection,
 } from './authenticated-sse';
 import {
@@ -213,7 +218,6 @@ export function useSSE(options: UseSSEOptions = {}) {
   useEffect(() => {
     if (!enabled || typeof fetch === 'undefined') return;
 
-    const token = getStoredToken() ?? undefined;
     let disposed = false;
 
     const connect = () => {
@@ -224,7 +228,7 @@ export function useSSE(options: UseSSEOptions = {}) {
       useUIStore.getState().setSseConnectionState('connecting');
       connectionRef.current = openAuthenticatedSse({
         url,
-        token,
+        token: getStoredToken() ?? undefined,
         onOpen: () => {
           retryCount.current = 0;
           useUIStore.getState().setSseConnectionState('open');
@@ -240,10 +244,16 @@ export function useSSE(options: UseSSEOptions = {}) {
             // Non-JSON SSE message (keepalive, etc.) - ignore
           }
         },
-        onError: () => {
+        onError: (error) => {
           if (disposed) return;
           connectionRef.current?.close();
           connectionRef.current = null;
+          if (isAuthenticatedSseAuthError(error)) {
+            clearStoredToken();
+            notifyTokenInvalid();
+            useUIStore.getState().setSseConnectionState('closed');
+            return;
+          }
           useUIStore.getState().setSseConnectionState('reconnecting');
           const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30_000);
           retryCount.current++;

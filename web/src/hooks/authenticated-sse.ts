@@ -12,6 +12,23 @@ export interface AuthenticatedSseConnection {
   completed: Promise<void>;
 }
 
+export class AuthenticatedSseError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'AuthenticatedSseError';
+  }
+}
+
+export function isAuthenticatedSseAuthError(error: Error): boolean {
+  return (
+    error instanceof AuthenticatedSseError &&
+    (error.status === 401 || error.status === 403)
+  );
+}
+
 function eventData(block: string): string | undefined {
   const lines = block
     .split('\n')
@@ -37,10 +54,13 @@ export function openAuthenticatedSse(options: AuthenticatedSseOptions): Authenti
         signal: controller.signal,
       });
       if (!response.ok) {
-        throw new Error(`SSE request failed with ${response.status}`);
+        throw new AuthenticatedSseError(
+          `SSE request failed with ${response.status}`,
+          response.status,
+        );
       }
       if (!response.body) {
-        throw new Error('SSE response has no readable body');
+        throw new AuthenticatedSseError('SSE response has no readable body');
       }
 
       options.onOpen();
@@ -62,7 +82,9 @@ export function openAuthenticatedSse(options: AuthenticatedSseOptions): Authenti
         }
 
         if (done) {
-          if (!closed) options.onError(new Error('SSE stream ended'));
+          if (!closed) {
+            options.onError(new AuthenticatedSseError('SSE stream ended'));
+          }
           return;
         }
       }

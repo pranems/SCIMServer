@@ -41,7 +41,7 @@ const sseMock = vi.hoisted(() => {
     close: ReturnType<typeof vi.fn>;
     emit: (entry: Partial<LogStreamEntry>) => void;
     emitRaw: (data: string) => void;
-    fail: () => void;
+    fail: (error?: Error) => void;
   }> = [];
   const open = vi.fn((options: typeof instances[number]['options']) => {
     const connection = {
@@ -56,7 +56,7 @@ const sseMock = vi.hoisted(() => {
         ...entry,
       })),
       emitRaw: (data: string) => options.onMessage(data),
-      fail: () => options.onError(new Error('test stream failure')),
+      fail: (error = new Error('test stream failure')) => options.onError(error),
     };
     instances.push(connection);
     setTimeout(() => options.onOpen(), 0);
@@ -67,15 +67,29 @@ const sseMock = vi.hoisted(() => {
 
 vi.mock('./authenticated-sse', () => ({
   openAuthenticatedSse: sseMock.open,
+  isAuthenticatedSseAuthError: (error: Error & { status?: number }) =>
+    error.status === 401 || error.status === 403,
+}));
+
+const tokenMock = vi.hoisted(() => ({
+  get: vi.fn(() => 'test-token'),
+  clear: vi.fn(),
+  notifyInvalid: vi.fn(),
 }));
 
 vi.mock('../auth/token', () => ({
-  getStoredToken: vi.fn(() => 'test-token'),
+  getStoredToken: tokenMock.get,
+  clearStoredToken: tokenMock.clear,
+  notifyTokenInvalid: tokenMock.notifyInvalid,
 }));
 
 beforeEach(() => {
   sseMock.instances.length = 0;
   sseMock.open.mockClear();
+  tokenMock.get.mockReset();
+  tokenMock.get.mockReturnValue('test-token');
+  tokenMock.clear.mockClear();
+  tokenMock.notifyInvalid.mockClear();
 });
 
 // ─── Pure filter function tests ─────────────────────────────────────
@@ -248,6 +262,37 @@ describe('useLogStream', () => {
       // Backoff at attempt 0 = 1 s
       await vi.advanceTimersByTimeAsync(1100);
       expect(sseMock.instances).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not reconnect after an authentication failure', async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useLogStream({ enabled: true }));
+      sseMock.instances[0].fail(Object.assign(new Error('forbidden'), { status: 403 }));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(tokenMock.clear).toHaveBeenCalledTimes(1);
+      expect(tokenMock.notifyInvalid).toHaveBeenCalledTimes(1);
+      expect(result.current.connectionState).toBe('closed');
+      expect(sseMock.instances).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads the current token again before a transient reconnect', async () => {
+    vi.useFakeTimers();
+    try {
+      tokenMock.get.mockReturnValueOnce('first-token').mockReturnValue('rotated-token');
+      renderHook(() => useLogStream({ enabled: true }));
+      sseMock.instances[0].fail();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(sseMock.instances).toHaveLength(2);
+      expect(sseMock.instances[1].options.token).toBe('rotated-token');
     } finally {
       vi.useRealTimers();
     }

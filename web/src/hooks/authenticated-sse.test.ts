@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { openAuthenticatedSse } from './authenticated-sse';
+import {
+  AuthenticatedSseError,
+  isAuthenticatedSseAuthError,
+  openAuthenticatedSse,
+} from './authenticated-sse';
 
 function streamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -65,6 +69,12 @@ describe('openAuthenticatedSse', () => {
 
     await connection.completed;
 
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'SSE request failed with 401' }));
+    const error = onError.mock.calls[0][0];
+    expect(error).toBeInstanceOf(AuthenticatedSseError);
+    expect(error).toMatchObject({
+      message: 'SSE request failed with 401',
+      status: 401,
+    });
+    expect(isAuthenticatedSseAuthError(error)).toBe(true);
   });
 });

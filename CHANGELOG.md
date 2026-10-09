@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow up to 15 seconds only for authenticated SSE connection establishment;
   the cross-tab mutation refetch remains bounded at five seconds. The focused
   journey passes against the exact-tip API and UI.
+- Treat SSE HTTP 401/403 as terminal authentication failures: clear the stored
+  credential, open the existing token gate and stop retrying. Transient retries
+  now read the current token instead of reusing the value captured at mount.
+  Four RED controls across both consumers are GREEN; the focused SSE set passes
+  53 tests.
 - Persisted the unmerged UI/runtime work as four logical feature commits so
   endpoint identity, authenticated streaming, cache correctness and validation
   infrastructure retain independent history.
