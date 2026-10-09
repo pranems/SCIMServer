@@ -10,9 +10,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "npx prisma migrate deploy && node dist/main.js",
-    "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "start:debug": "npx ts-node-dev --respawn --transpile-only --inspect=9229 src/main.ts",
-    "start:debug:log": "npx ts-node-dev --respawn --transpile-only --inspect=9229 src/main.ts 2>&1 | tee scimserver.log",
+    "start:dev": "node --watch --require ts-node/register/transpile-only src/main.ts",
+    "start:debug": "node --watch --inspect=9229 --require ts-node/register/transpile-only src/main.ts",
+    "start:debug:log": "node --watch --inspect=9229 --require ts-node/register/transpile-only src/main.ts 2>&1 | tee scimserver.log",
     "lint": "eslint ./src",
     "format": "prettier --check \"src/**/*.ts\"",
     "format:fix": "prettier --write \"src/**/*.ts\"",
@@ -75,9 +75,7 @@
     "prettier": "^3.9.1",
     "prisma": "^7.8.0",
     "supertest": "^7.2.2",
-    "ts-jest": "^29.4.11",
     "ts-node": "10.9.2",
-    "ts-node-dev": "2.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0"
   },

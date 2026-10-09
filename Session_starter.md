@@ -9,9 +9,14 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 **Consolidation checkpoint, 2026-10-09:** the dependency and comprehensive UI
 branches are combined through ordinary merge commits on
 `integrate/ui-dependencies-20261009`, preserving every constituent commit.
-Exact-tip consolidation validation, reviewed PR, release publication, dev
-deployment, canonical pixel classification and operator visual sign-off remain
-pending. No image or deployment is authorized.
+Its exact-tip Fast gate is green: API build/lint, web type/build, static gates,
+6,006 API units and 2,426 InMemory E2E passes with four PostgreSQL-only skips.
+The follow-up dependency pass removes `ts-jest`, `ts-node-dev` and the Size
+Limit time/browser chain at their owners rather than overriding unfixed leaves;
+focused transformer/ESM proof passes 45 tests. CI lock regeneration, clean
+audits and full applicable validation remain required. Reviewed PR, release
+publication, dev deployment, canonical pixel classification and operator
+visual sign-off remain pending. No image or deployment is authorized.
 
 **Dependency remediation preparation, 2026-10-09:** the isolated
 `chore/regen-lockfile-quarantine-20261009` branch selects company-feed-visible,
@@ -108,6 +113,7 @@ capacity or remaining credit balance without host telemetry.
 
 | Date | Summary |
 |---|---|
+| 2026-10-09 | Exact-tip consolidation Fast gates passed and the branch was pushed. Began owner-level removal of the residual vulnerable development toolchains; focused local transformer and ESM compatibility proof passes 45 tests, with CI lock regeneration and clean-graph audits pending. |
 | 2026-10-09 | Combined the dependency and comprehensive UI branches through ordinary merge commits on a current-master consolidation branch, preserving all constituent history. Exact-tip validation and release/deployment gates remain pending. |
 | 2026-10-09 | Persisted the comprehensive feature work as four logical commits; combined dependency/UI Compose browsers pass 250 / 12 pixel skips / zero failures and live checks pass 1,700. Restored real SSE and observable hover-prefetch browser cases with negative controls. |
 | 2026-10-09 | Followed the existing seven-day company-feed/CI lockfile procedure in an isolated branch; rejected an under-age artifact, accepted 51 aged changes, passed new-graph units/E2E/web coverage and bundle gates, and explicitly ran 55 hook-excluded logging tests. Production audits are clean there; residual development advisories, integration with this UI branch and release validation remain blocked/pending. |

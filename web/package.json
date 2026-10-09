@@ -32,7 +32,6 @@
     "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.61.1",
     "@size-limit/file": "^12.1.0",
-    "@size-limit/preset-app": "^12.1.0",
     "@tanstack/router-devtools": "^1.166.13",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -64,176 +63,151 @@
       "name": "Main entry bundle (gzipped) - Phase O TODO: code-split back under 250 KB",
       "path": "dist/assets/index-*.js",
       "limit": "400 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "DashboardPage",
       "path": "dist/assets/DashboardPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "EndpointsPage",
       "path": "dist/assets/EndpointsPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "EndpointDetailPage",
       "path": "dist/assets/EndpointDetailPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "OverviewTab",
       "path": "dist/assets/OverviewTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "UsersTab",
       "path": "dist/assets/UsersTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "GroupsTab",
       "path": "dist/assets/GroupsTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "ActivityTab",
       "path": "dist/assets/ActivityTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "SchemasTab",
       "path": "dist/assets/SchemasTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "CredentialsTab",
       "path": "dist/assets/CredentialsTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "BulkTab",
       "path": "dist/assets/BulkTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "ResourceTypesTab",
       "path": "dist/assets/ResourceTypesTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "ServiceProviderConfigTab",
       "path": "dist/assets/ServiceProviderConfigTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "GenericResourcesTab",
       "path": "dist/assets/GenericResourcesTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "LogsTab",
       "path": "dist/assets/LogsTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "SettingsTab",
       "path": "dist/assets/SettingsTab-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "LogsPage",
       "path": "dist/assets/LogsPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "ManualProvisionPage",
       "path": "dist/assets/ManualProvisionPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "SettingsPage",
       "path": "dist/assets/SettingsPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "CreateEndpointWizard",
       "path": "dist/assets/CreateEndpointWizard-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "EditEndpointPage",
       "path": "dist/assets/EditEndpointPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "MeProfilePage",
       "path": "dist/assets/MeProfilePage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "DiscoveryExplorerPage",
       "path": "dist/assets/DiscoveryExplorerPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "OperationsPage",
       "path": "dist/assets/OperationsPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     },
     {
       "name": "WorkbenchPage",
       "path": "dist/assets/WorkbenchPage-*.js",
       "limit": "110 KB",
-      "gzip": true,
-      "running": false
+      "gzip": true
     }
   ]
 }
