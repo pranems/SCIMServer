@@ -170,6 +170,22 @@ When working on development projects:
 
 Every URL-carried identifier and every SCIM attribute identifier is matched case-insensitively. This includes endpoint UUID/name segments, built-in and custom ResourceType paths, ResourceType ids/names/endpoints, Schema URNs, Bulk operation paths, and PATCH attribute/valuePath segments. Preserve configured canonical casing in responses and locations. Do not fix one controller with a local lowercase comparison: use the owning shared resolver or property-key helper. Every new identifier surface requires lowercase, uppercase, and mixed-case positive tests at the nearest unit boundary plus an HTTP or live contract. Endpoint names additionally require database-enforced case-insensitive uniqueness so concurrent case-only creates cannot race past application checks.
 
+## Disposable Database Ownership Rule (CRITICAL - added 2026-09-30)
+
+Validation and deployment gates must never reuse a database because it is listening on a known port, and must never remove a container because it has a familiar fixed name. Each gate creates a uniquely named container with task and run labels, binds it to a Docker-assigned loopback port, uses tmpfs storage unless persistence is the behavior under test, passes the exact generated connection string to every database-backed lane, verifies labels before cleanup, removes only the captured full container ID, and verifies that exact ID is absent afterward. An inherited or shared database is not valid release evidence.
+
+## Mutable Tag Registry Parity Rule (CRITICAL - added 2026-09-30)
+
+Every shipping tag replicated across GHCR and ACR must come from one authoritative CI build and resolve to the same manifest digest in every registry. Never assign `latest`, a semantic version, or a promotion tag to a separately rebuilt local image. Optional local validation images use only a visibly non-shipping `local-<sha>` tag. A no-cache local build must also use `--pull` when it claims current base-image parity because `--no-cache` alone can reuse a stale `FROM` image. Registry replication is incomplete until version and mutable tags exist and their digests equal the authoritative source digest.
+
+## Semantic Release Tag Immutability Rule (CRITICAL - added 2026-09-30)
+
+An existing semantic image tag is immutable and must never be rebuilt or overwritten by a validation rerun. On merged master, compare runtime image inputs with the first parent: if they changed and the package version did not, fail before publication. If the semantic tag already exists, reuse it without dispatching another build. Resolve the last first-parent commit that changed runtime image inputs, require its `sha-<commit>` tag to have the same digest as the semantic tag, copy that artifact across registries by digest, and deploy only `registry/repository@sha256:<digest>`. Tag parity alone is not provenance and does not close a time-of-check/time-of-use substitution window.
+
+## Browser Streaming Authentication Rule (CRITICAL - added 2026-09-30)
+
+Browser realtime streams must authenticate through an Authorization header. Never place shared secrets, OAuth tokens, endpoint credentials, or assertion material in an EventSource URL, query string, route segment, reconnect log, or browser history. Native EventSource cannot set headers; use the shared Fetch/ReadableStream SSE adapter instead of weakening the server guard to accept query credentials. Tests must assert that the token is present in the header, absent from the URL, errors trigger bounded reconnect, unmount aborts the stream, and a real browser reaches an open/Healthy state without 401 requests.
+
 ## Credential Secret Surface Rule (CRITICAL - added 2026-09-24)
 
 Recoverable bearer and OAuth client secrets are retained encrypted and displayed automatically on authenticated admin surfaces. They MUST be included in the corresponding credential, method, endpoint, clipboard, and download JSON exports. WIF trusts carry no shared secret. The retired `once` policy is rejected for new writes; a legacy credential whose encrypted copy was already purged is marked rotation-required and is never reconstructed. Plaintext credentials MUST NOT enter public SCIM discovery, unauthenticated metadata, endpoint overview/list projections, durable RequestLog rows, Workbench history, or console/file logs. Every secret-bearing admin change needs both a positive admin sentinel assertion and negative public/durable sentinel assertions.
@@ -494,6 +510,7 @@ Whenever the operator asks to "deploy to dev", "prepare for prod", "run full val
 3. NEVER skip Stage 5.3 (Playwright vs dev) because "Playwright is slow". The earliest such miss (v0.52.3 dev-deploy run, 2026-05-29) is exactly why this rule exists.
 4. NEVER defer Stage 1.6 (size-limit) failures as "pre-existing baseline". Either fix the config or fix the bundle. The v0.52.3 run treated a real failure as deferrable, then the operator surfaced it.
 5. NEVER promote to prod without an explicit `promote to prod` confirmation message from the operator.
+6. A semantic version response is not deployment identity. Before live tests, require the exact intended revision to be latest, ready, Healthy, running at least one replica, and serving 100% traffic, followed by two consecutive authenticated probes. This is required even when old and new revisions share the same version, because revision-local signing keys or caches make a version-only check a false green.
 
 References: [scripts/dev-deployment-pipeline.ps1](scripts/dev-deployment-pipeline.ps1) - orchestrator. [.github/prompts/devDeploymentPipeline.prompt.md](.github/prompts/devDeploymentPipeline.prompt.md) - authoritative gate walk. Both are kept in lockstep with this section.
 
@@ -833,7 +850,7 @@ These deployments are retired and not live. Any tooling, doc, or script referenc
 | Tenant-migration era (pre-2026-05-19) | `scimserver2` | `scimserver-rg` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | RETIRED (mgmt-plane expired during 2026-05-19 cross-tenant migration; data-plane was read-only during the migration window) |
 | Pre-tenant-migration dev | `scimserver-dev` | `scimserver-rg-dev` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` | RETIRED (same tenant-migration cutover) |
 
-**Image registry note:** the runtime registry for the parallel proudbush prod + dev is Azure Container Registry (`acrscimsrv09.azurecr.io`); the customer-facing calmsand prod pulls from GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). Both publish the same image per commit (CI workflow [publish-ghcr.yml](.github/workflows/publish-ghcr.yml) + local `docker push` to ACR). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
+**Image registry note:** GHCR is the authoritative image builder. ACR version and `latest` tags are server-side imports of that same GHCR manifest and must match its digest. Local Compose builds use only `local-<sha>` tags and are never promotion artifacts. The customer-facing calmsand prod pulls from GitHub Container Registry (`ghcr.io/pranems/scimserver`, anonymous pull). The documented public path remains `docker pull ghcr.io/pranems/scimserver:latest` and `pwsh bootstrap.ps1 -> setup.ps1 -> deploy-azure.ps1` - see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)

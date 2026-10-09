@@ -1,9 +1,9 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.36`
 
-> **Version:** 3.2 - **Source-verified against:** v0.55.6 - **Updated:** 2026-07-31  
-> Route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  
+> **Version:** 3.2 - **Source-verified against:** v0.55.36 - **Updated:** 2026-10-01
+> Request-history identity and authenticated stream transport re-verified against v0.55.36 on 2026-10-01; the full line-by-line pass dates from v0.53.0.
 > Complete guide for diagnosing production issues without SSH access.
 
 ---
@@ -362,6 +362,8 @@ Authorization: Bearer changeme-scim
       "status": 409,
       "durationMs": 23,
       "createdAt": "2026-04-13T10:30:45.000Z",
+      "endpointId": "f8e7d6c5-...",
+      "endpointName": "Contoso Production",
       "errorMessage": "A resource with userName 'jsmith@contoso.com' already exists.",
       "reportableIdentifier": "jsmith@contoso.com"
     }
@@ -1009,19 +1011,42 @@ data: {"timestamp":"...","level":"ERROR","category":"http","message":"Unhandled 
 ### JavaScript/Browser
 
 ```javascript
-const source = new EventSource('/scim/admin/log-config/stream?level=WARN');
-
-source.addEventListener('connected', (e) => {
-  console.log('Connected:', JSON.parse(e.data));
+const response = await fetch('/scim/admin/log-config/stream?level=WARN', {
+  headers: {
+    Accept: 'text/event-stream',
+    Authorization: `Bearer ${token}`,
+  },
+  signal: abortController.signal,
 });
 
-source.onmessage = (e) => {
-  const entry = JSON.parse(e.data);
-  console.log(`[${entry.level}] ${entry.category}: ${entry.message}`);
-};
+if (!response.ok || !response.body) {
+  throw new Error(`Log stream failed with HTTP ${response.status}`);
+}
 
-source.onerror = () => console.log('SSE connection lost, retrying...');
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) {
+    break;
+  }
+
+  buffer += decoder.decode(value, { stream: true });
+  const frames = buffer.split('\n\n');
+  buffer = frames.pop() ?? '';
+
+  for (const frame of frames) {
+    console.log(frame);
+  }
+}
 ```
+
+Native `EventSource` cannot attach the required `Authorization` header. Do not
+put a bearer token in the query string; URLs are copied into browser history,
+proxy logs, and request logs. Use authenticated Fetch streaming as above or the
+shared admin UI adapter.
 
 ### Protocol Details
 
@@ -1104,6 +1129,11 @@ Supports: `page`, `pageSize`, `method`, `status`, `search`, `since`, `until`, `m
 ## 8. Persistent Log History
 
 Beyond the ring buffer, every request is persisted to the database with full request/response payloads.
+
+Each row also retains nullable `endpointId` and a request-time `endpointName`
+snapshot. The snapshot is the durable human identity to use when the endpoint
+has since been deleted. Rows created before the snapshot migration can have no
+name and should be rendered with a bounded ID fallback.
 
 ### List Logs
 

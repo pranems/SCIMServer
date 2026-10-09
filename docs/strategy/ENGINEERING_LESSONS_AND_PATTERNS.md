@@ -16,6 +16,23 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### A completed resource write must settle the read model before reopening
+
+The October 8 Docker browser run saved an extension successfully but reopened
+its drawer from a stale cached list. Both PATCH and subsequent GET bodies were
+correct; mutation callbacks had discarded the list-refresh promises. Returning
+the existing invalidation promises keeps the save lifecycle pending until the
+read model is ready. Deferred-refresh units now cover User, Group and custom
+resources; browser checks verify saved values and reopened values independently.
+Do not fix this by resetting every editable draft on arbitrary background
+refetches, which would overwrite unsaved work. See RC-I36 in the
+[integration ledger](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
+The same run exposed duplicate leaf-name selectors when Enterprise and HR
+extensions both declare `employeeNumber`. Address extension fields through the
+existing schema-qualified descriptor ID, not a newly invented namespace parser
+or an arbitrary first/last matching input.
+
 ### Retained-array identity must survive restoration
 
 The [PUT correction](../SCIM_PUT_ENTRY_PRESERVATION_RCA.md) found three incompatible
@@ -161,13 +178,13 @@ Patterns are grouped by category. Each carries: the **anti-pattern** (the sympto
 
 ```mermaid
 pie showData
-    title Patterns by category (35)
-    "A Test/gate integrity" : 13
-    "B Environment/deploy" : 4
+    title Patterns by category (41)
+    "A Test/gate integrity" : 14
+    "B Environment/deploy" : 7
     "C Framework/middleware" : 4
-    "D Security at sinks" : 2
+    "D Security at sinks" : 3
     "E Process/introspection" : 5
-    "F Design/architecture" : 3
+    "F Design/architecture" : 4
     "G Config/op defaults" : 4
 ```
 
@@ -198,6 +215,7 @@ The most dangerous class: a gate that is GREEN but proves nothing. Every pattern
 | **PA-11** | A locked invariant must compare the representation that commits | Case-aliased JSON keys changed interpretation after JSONB reordered them; a schema-URN substring selected the wrong namespace; retained append bypassed the new check | Force different owners to compete, reject ambiguous keys before storage, carry explicit schema identity, and enumerate every mutating repository port | Atomic invariant representation rule plus unit/HTTP/native PostgreSQL gates | [P3b U9-U11](../SCIM_UNIQUENESS_EXECUTION_RCA.md) |
 | **PA-12** | A reduced matrix must require an explicit opt-out | `test-all-modes.ps1` converted a missing `DATABASE_URL` into `SkipPrisma=true`, ran four of six modes, and exited zero while the deployment receipt called it a six-mode pass | Infrastructure absence is a prerequisite failure, not permission to weaken an authoritative gate. Exit non-zero before tests unless the caller explicitly requests the reduced scope, and record that opt-out as such | Stage 2.6 rule plus a functional subprocess contract for both missing-database failure and explicit `-SkipPrisma` success | SCIM correctness RC-I16 |
 | **PA-13** | Aggregate counts need item-level diagnostic evidence | The final dev browser rerun retained `247 passed / 5 skipped`, but `.last-run.json` stored no skipped tests or annotations, making the aggregate impossible to audit later | A pass count proves completion, not why exclusions were intentional. Keep a human reporter plus a structured reporter containing every test outcome and annotation | Dev deployment writes timestamped Playwright JSON beside its Markdown report; a pre-push contract locks the reporter and environment cleanup | SCIM correctness RC-I17 |
+| **PA-14** | A disposable database must prove ownership, not availability | The deployment pipeline reused whichever container published host port 5432 and could remove a fixed-name container before starting its own prerequisite | A reachable port or familiar name proves only availability. Create a unique run-labeled container, bind it to a Docker-assigned loopback port, keep data in tmpfs, pass its exact URL to the gates, and verify labels before exact-ID cleanup | Dev deployment pipeline contract plus the Disposable Database Ownership Rule | SCIM correctness RC-I22 |
 
 ### Category B - Cross-environment and deployment drift
 
@@ -209,6 +227,9 @@ Values that differ silently across local / Docker / Azure.
 | **PB-2** | Probe readiness with a contract endpoint | `/health` 404'd on Docker (assumed path); guessing a health route wastes a cycle | Use a real contract call (token issuance, a discovery GET) as the readiness probe - it proves more than a health ping | (convention) | auth I-09 |
 | **PB-3** | **Check WHICH ENDPOINT was contacted before concluding the network is blocked** | A failing `npm` call was diagnosed with `npm view <pkg> --registry https://registry.npmjs.org`, which **explicitly overrode the machine's configured registry**, hit a deliberately egress-blocked public endpoint, and produced the conclusion "the npm registry is BLOCKED on this machine, do not chase npm". npm actually worked fine through the corporate feed proxy the whole time. The wrong conclusion reached agent memory AND two committed docs, and cost a full session of working around a functioning tool (a CVE fix deferred, image builds routed to CI, a compose override written) | A blocked-network diagnosis MUST start from the **configured** endpoint (`npm config get registry`, `git config remote.origin.url`, the proxy env vars), not from a hand-specified one. Overriding the configuration and then blaming the network inverts cause and effect. Corollary: a corporate control that is WORKING often presents exactly like a broken machine - egress-blocked public endpoints, TLS alerts, mysterious timeouts - so establish intent before declaring breakage | Rule N2 in [NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md](NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md); memory corrected | 2026-07-30 |
 | **PB-4** | **Normalize CLI transport noise at one adapter before parsing structured output** | `gh run list --json` emitted ANSI cursor-control bytes before JSON. The publish workflow succeeded, but local `ConvertFrom-Json` failed and cascaded into premature pull/import/deploy failures | Machine-readable CLI output is still terminal output. Strip ANSI CSI sequences and a leading BOM in one helper, then parse; keep exact-SHA/time selection separate from transport cleanup | `ConvertFrom-GithubCliJson()` + 10/10 selector contract | v0.55.29 CRO-22 |
+| **PB-5** | One shipping tag means one digest, not one version string | GHCR and ACR `latest` were independently built from the same source version. The local ACR build used a stale cached Node/Alpine base, so sizes, configs and every layer differed while the tag names looked equivalent | Build once, replicate that manifest to every shipping registry, and compare digests. Keep local validation builds under visibly non-shipping tags. `--no-cache` does not refresh `FROM`; use `--pull` when current-base validation is the claim | Mutable Tag Registry Parity Rule plus the deployment pipeline digest contract | SCIM correctness RC-I24 |
+| **PB-6** | A semantic version is not a live revision identity | A same-version dev redeploy passed its version readiness check against the old revision. A live token minted there failed after ingress switched to the new revision's independently generated ephemeral key | Require the exact expected revision to be latest, ready, healthy, replicated and at 100% traffic, then prove consecutive authenticated requests before starting live validation | Dev Deployment Pipeline Rule item 6 plus the exact-revision source contract | SCIM correctness RC-I26 |
+| **PB-7** | A form-factor URL must be legal in every harness runtime | PowerShell validated the local node on port 6000 while nine Node Fetch corpora rejected the same URL as a forbidden port | Centralize non-browser live HTTP in one raw HTTP adapter, or choose a port accepted by every runtime. Do not assume a URL proven by one client is valid in another | Shared `live-test-http.cjs` plus 1,700-assertion local live gate | SCIM correctness RC-I32 |
 
 ### Category C - Framework and middleware behavior
 
@@ -234,6 +255,7 @@ Place the guard where the dangerous operation happens, structurally.
 |---|---|---|---|---|---|
 | **PD-1** | Defense-in-depth at the write sink | CodeQL flagged `obj[userKey] = value` sinks where `userKey` could be `__proto__` (CWE-1321), even behind an upstream path-guard | Guard the FINAL key at the sink with a single-source `isUnsafeObjectKey`, not only the path upstream; one helper used everywhere beats per-site ad-hoc | (security guard + tests) | auth I-10 |
 | **PD-2** | **Fix the CLASS, not the instance: enumerate every column of a constrained type reachable from caller input** | v0.54.85 closed an audit-log destruction vector on `RequestLog.requestId` (`@db.Uuid`, fed from the client's `X-Request-Id`). It stopped there. `RequestLog.endpointId` is the **same column type, same table, same batch insert**, fed from a raw URL path segment (`originalUrl.match(/\/endpoints\/([^/]+)/)`) - so the identical vector stayed open for months. Because rows flush via one `createMany` and the buffer is drained **before** the insert, one poisoned row still destroyed up to 49 unrelated audit rows, reachable **unauthenticated** | When a defect is "untrusted input reaches a column/API with a narrower type than `string`", the unit of remediation is the **type**, not the call site. Enumerate every column of that type (`grep '@db.Uuid'`), trace each to its source, and guard them together behind **one** helper - two helpers are how the halves drift. Then name the class in the security gate map so the next column is caught at review. Same reasoning the repo already applies to `node-lts.ps1` (one LTS table, two consumers) | Security Gate Map row "Non-uuid input reaching a `@db.Uuid` column"; [storable-uuid.ts](../../api/src/modules/logging/storable-uuid.ts) | v0.54.85 + v0.54.89 |
+| **PD-3** | Browser streaming credentials belong in headers, never URLs | Both realtime hooks appended the bearer secret to an EventSource query string. The server rejected it because guards authenticate headers, while browser/proxy/server logs retained the secret-bearing URL | Use one Fetch/ReadableStream SSE adapter that can send Authorization. Do not weaken the backend to accept URL credentials. Test network URL, header placement, split-frame parsing, error/reconnect and cleanup | Browser Streaming Authentication Rule plus authenticated SSE unit and real-browser checks | SCIM correctness RC-I29 |
 
 ### Category E - Process and introspection (the meta-patterns)
 
@@ -281,6 +303,7 @@ Structural decay that a correctness-only gate never sees; only an explicit desig
 | **PF-1** | Keep orchestrators thin; decouple by seam | `SharedSecretGuard` grew to 491 lines / ~7 responsibilities by inlining every resource-plane auth method (global secret + bearer + oauth_client + JWT + legacy + trace + flags); the mint plane's `client_secret` path is likewise inlined in the controller while WIF is a clean strategy - the asymmetry hid the drift | A guard/controller/service is an ORCHESTRATOR; each auth method (or per-case behavior) is a STRATEGY behind a seam (mirror the existing `IAssertionTokenProvider` + repository DI-token patterns). Adding the next method should EXTEND (a class + registration), not EDIT a god-file. Counter-check with YAGNI: a seam needs >=2 real impls or one concrete near-term one | Rule: "Design & Architecture Self-Improvement Gate" (copilot-instructions.md) | X12 2026-07-23 |
 | **PF-2** | Render the authoritative effective state, not a writable shadow | Connect displayed and wrote flat auth flags while `profile.authentication.methods[]` could override them in the runtime resolver; a switch could persist successfully yet leave enforcement unchanged | A control for a layered setting must consume the same effective resolver as enforcement. If another source wins, show provenance and disable the local write path. Tests need conflicting values so the precedence assertion discriminates | Rule R11: authoritative effective control state | v0.55.24 UX-2 2026-09-17 |
 | **PF-3** | Policy-sensitive shared state needs policy-sensitive identity | JWKS cache, single-flight, stale fallback, refresh, and unknown-kid state were keyed only by URI while 11 endpoint-specific controls changed whether that state was admissible. A lenient endpoint could seed two keys for 24 h and a stricter endpoint would reuse them despite `maxKeys:1` or a 60 s TTL | Every policy dimension that changes admissibility, lifetime, capacity, retry, or security posture must participate in shared-state identity. Test at least two tenants/endpoints with the same resource identity and conflicting policies; same-policy tests cannot expose cross-policy leakage | Rule R12: policy-sensitive shared-state identity | v0.55.32 EP-09 2026-09-24 |
+| **PF-4** | Durable audit rows must snapshot the human identity they outlive | RequestLog intentionally survived endpoint deletion but stored only endpointId. The UI could resolve names only from the live endpoint list, so deleted-endpoint history degraded to raw UUIDs | If an audit row outlives its source entity, persist the human label needed to interpret the event at write time. Keep the stable ID too, use the snapshot before a live join, and mark legacy rows explicitly when no snapshot exists | RequestLog endpointName migration plus unit, E2E, live and Playwright contracts | SCIM correctness RC-I28 |
 
 **P6b application of PF-3 and PD-1 (2026-09-28):** a field name is not a
 complete policy identity. Flattening two schema-qualified `code` fields

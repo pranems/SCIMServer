@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Comprehensive browser validation checkpoint
+
+- Persisted the unmerged UI/runtime work as four logical feature commits so
+  endpoint identity, authenticated streaming, cache correctness and validation
+  infrastructure retain independent history.
+- Combined aged dependencies and the feature overlay pass 250 real Chromium
+  cases with 12 canonical pixel comparisons skipped, plus 1,700 live HTTP
+  assertions and all four API backend lanes.
+- Replaced the two behavioral browser skips with real authenticated SSE and
+  cold-route hover-prefetch journeys. Negative controls fail when their claimed
+  triggers are suppressed.
+- Canonical dev pixels, reviewed consolidation and deployment remain pending.
+
+### Comprehensive browser validation and release-gate hardening
+
+- Add durable `RequestLog.endpointName` snapshots so global Logs and dashboard
+  activity keep a human-readable endpoint identity after endpoint deletion.
+  Legacy rows without a snapshot render as `Deleted endpoint (<id>...)`, and
+  dead quick-open actions are suppressed.
+- Replace token-bearing EventSource URLs with one authenticated Fetch SSE
+  adapter shared by query invalidation and the live-log drawer. Focused tests
+  pass 49/49; a real browser records zero 401s, zero page errors, no token in
+  the URL, and `System status: Healthy`.
+- Add measured Playwright coverage for global Logs, endpoint Logs, and Activity
+  at wide and narrow viewports, including endpoint-name persistence across
+  deletion, real row values, column bounds, active truncation, and dead-link
+  suppression.
+- Harden the full deployment pipeline: task-owned PostgreSQL, current-base
+  Docker validation, non-shipping local image tags, one CI-built digest across
+  GHCR/ACR, immutable semantic tags, and exact revision readiness before live
+  credentials are minted.
+- Fix the local-node live harness on port 6000 by routing Node corpus requests
+  through one `node:http`/`node:https` adapter. Final local InMemory live result:
+  **1,700 passed, 0 failed**, including the new durable endpoint-name section
+  and zero leaked endpoints.
+- Inspect Dashboard visual diffs before regenerating only the two confirmed
+  stale baselines. The current baseline includes the `Self-service /Me`
+  navigation label and Healthy realtime status; blank-frame captures were not
+  accepted as baseline changes.
+- Keep User, Group and custom-resource saves pending until their resource list
+  and endpoint overview refreshes complete. A full Docker browser run exposed
+  a stale reopened extension value despite correct PATCH/GET payloads; three
+  deterministic unit REDs now lock the cache-settlement boundary. Final GREEN
+  is **105 focused units**, **1,577 full web tests with coverage**, and
+  **248 real Docker browser passes / 14 documented skips / zero failures**
+  across 262 cases. Final local browser regressions pass **2/2**.
+- Add opt-in browser traversal of all six `seed-shape-coverage` endpoints,
+  persisted User/Group values, schema support, actual settings, bearer
+  accept/reject, HR extension edits, strict Group ETag restoration and Device
+  CRUD. Schema-qualified field wrappers distinguish duplicate extension leaf
+  names without changing existing labels or test IDs.
+- Keep PATCH operation envelopes out of cached User/Group resource fields.
+  Two additional REDs reproduced replacement of the resource schema by the
+  `PatchOp` URN; the guard preserves flat-body optimistic updates and rollback.
+  Final focused mutation/form/drawer evidence is **105/105 units**.
+- Record blocked dependency gates rather than declaring release readiness:
+  production audits report critical `proxy-addr` (API) and `seroval` (web);
+  full audits also contain development dependency high/critical findings.
+  No dependency manifests, lockfiles or published artifacts were changed.
+
 ### Release assurance follow-up
 
 - Correct the backend-matrix gate so a missing `DATABASE_URL` exits 2 before

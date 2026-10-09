@@ -165,6 +165,7 @@ erDiagram
     RequestLog {
         uuid id PK
         uuid endpointId "correlation, NOT a FK"
+        string endpointName "display-name snapshot"
         string method
         string url
         int status
