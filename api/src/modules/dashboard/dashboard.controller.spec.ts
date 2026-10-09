@@ -151,6 +151,30 @@ describe('DashboardController', () => {
   });
 
   describe('GET /admin/dashboard', () => {
+    it('does not fan endpoint, log, and series queries out across the database pool', async () => {
+      let releaseEndpoints!: (value: Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>) => void;
+      const endpointsPending = new Promise<Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>>(
+        (resolve) => { releaseEndpoints = resolve; },
+      );
+      mockEndpointWithGet.listEndpoints.mockReturnValueOnce(endpointsPending);
+
+      const request = controller.getDashboard();
+      await Promise.resolve();
+
+      expect(mockEndpointWithGet.listEndpoints).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.listLogs).not.toHaveBeenCalled();
+      expect(mockLoggingService.getRequestSeries).not.toHaveBeenCalled();
+
+      releaseEndpoints({
+        totalResults: 0,
+        endpoints: [],
+      });
+      await request;
+
+      expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.getRequestSeries).toHaveBeenCalledTimes(1);
+    });
+
     it('should return a DashboardResponse with all sections', async () => {
       const result: DashboardResponse = await controller.getDashboard();
 

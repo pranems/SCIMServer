@@ -379,7 +379,9 @@ All admin surfaces require a bearer (OAuth token or the SCIM shared secret); the
 
 Dashboard hourly request series are aggregated into UTC buckets in PostgreSQL,
 so the response transfers at most 24 count rows instead of materializing every
-matching request-log timestamp in the API process.
+matching request-log timestamp in the API process. Endpoint listing, recent-log
+listing, and series aggregation run sequentially so one Dashboard request does
+not fan out across the bounded database pool.
 
 ---
 

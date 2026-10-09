@@ -59,6 +59,24 @@ describe('LoggingService.recordRequest - health-probe filter', () => {
     await service.onModuleDestroy();
   });
 
+  it('does not acquire count and row-query connections concurrently', async () => {
+    let releaseCount!: (value: number) => void;
+    prisma.requestLog.count.mockReturnValueOnce(new Promise<number>((resolve) => {
+      releaseCount = resolve;
+    }));
+
+    const request = service.listLogs({ page: 1, pageSize: 20 });
+    await Promise.resolve();
+
+    expect(prisma.requestLog.count).toHaveBeenCalledTimes(1);
+    expect(prisma.requestLog.findMany).not.toHaveBeenCalled();
+
+    releaseCount(0);
+    await request;
+
+    expect(prisma.requestLog.findMany).toHaveBeenCalledTimes(1);
+  });
+
   // Helper that fires a recordRequest call and forces the buffer to flush so
   // we can observe whether createMany was called.
   async function recordAndFlush(opts: Parameters<LoggingService['recordRequest']>[0]): Promise<void> {

@@ -782,6 +782,10 @@ The four values are produced by one 30-day-bounded PostgreSQL aggregate. This
 avoids occupying four database-pool connections with concurrent count scans
 when the request-log table is large.
 
+Paginated request-log counts and row reads are also sequential. This preserves
+the same response while limiting each list request to one active database
+connection at a time.
+
 **PowerShell:**
 
 ```powershell

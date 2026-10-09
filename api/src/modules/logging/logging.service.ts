@@ -739,32 +739,30 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     };
     let records: RequestLogRow[] = [];
     try {
-      [total, records] = await Promise.all([
-        this.prisma.requestLog.count({ where }),
-        this.prisma.requestLog.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: pageSize,
-          // Limit fields to mitigate potential large string conversion issues
-          select: {
-            id: true,
-            method: true,
-            url: true,
-            status: true,
-            durationMs: true,
-            createdAt: true,
-            errorMessage: true,
-            requestId: true,
-            endpointId: true,
-            endpointName: true,
-            authOutcome: true,
-            authMethod: true,
-            authReason: true,
-            authCredentialId: true
-          }
-        })
-      ]);
+      total = await this.prisma.requestLog.count({ where });
+      records = await this.prisma.requestLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+        // Limit fields to mitigate potential large string conversion issues
+        select: {
+          id: true,
+          method: true,
+          url: true,
+          status: true,
+          durationMs: true,
+          createdAt: true,
+          errorMessage: true,
+          requestId: true,
+          endpointId: true,
+          endpointName: true,
+          authOutcome: true,
+          authMethod: true,
+          authReason: true,
+          authCredentialId: true
+        }
+      });
     } catch (err) {
       this.logger.error(
         LogCategory.DATABASE,
