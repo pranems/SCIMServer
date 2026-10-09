@@ -39,6 +39,15 @@ remain blocked by one API critical / three API high / 20 API moderate and
 No image or deployment is authorized. The separate dirty comprehensive UI
 validation worktree is preserved.
 
+**Exact-tip consolidation evidence, 2026-10-09:** Prisma E2E passes 118 suites
+/ 2,486 tests against an isolated database. Web coverage passes 119 suites /
+1,577 tests at 85.51% lines, 75.41% branches, 75.31% functions and 82.74%
+statements. Full Chromium passes 250 with only 12 canonical-dev pixel skips.
+An earlier 217-failure cascade used a stale API with a mismatched shared secret;
+the global browser preflight now fails once on an authenticated endpoint check.
+The authenticated SSE journey passes with a 15-second connection allowance
+while retaining the five-second mutation-refetch assertion.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:
@@ -118,6 +127,7 @@ capacity or remaining credit balance without host telemetry.
 
 | Date | Summary |
 |---|---|
+| 2026-10-09 | Exact-tip consolidation passes 2,486 Prisma E2E tests, 1,577 web coverage tests and 250 Chromium cases with 12 canonical pixel skips. Added authenticated browser preflight and a bounded SSE connection allowance after inspected negative/failure evidence. |
 | 2026-10-09 | Accepted public-runner lock regeneration run 37901990719 after reviewing all 104 removals, public/SHA-512 provenance and byte-identical company-feed installs. Web audit is zero; API critical/high are zero with 19 tracked Jest/coverage-chain moderates. |
 | 2026-10-09 | Exact-tip consolidation Fast gates passed and the branch was pushed. Began owner-level removal of the residual vulnerable development toolchains; focused local transformer and ESM compatibility proof passes 45 tests, with CI lock regeneration and clean-graph audits pending. |
 | 2026-10-09 | Combined the dependency and comprehensive UI branches through ordinary merge commits on a current-master consolidation branch, preserving all constituent history. Exact-tip validation and release/deployment gates remain pending. |

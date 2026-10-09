@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Comprehensive browser validation checkpoint
 
+- Exact-tip consolidation proof passes 118 Prisma E2E suites / 2,486 tests,
+  119 web coverage suites / 1,577 tests, and 250 Chromium cases with only the
+  12 canonical-dev pixel comparisons skipped.
+- Fail browser runs at global setup when the configured token cannot read the
+  endpoint inventory. This replaces a 217-failure cascade from a mismatched
+  API secret with one causal HTTP 401.
+- Allow up to 15 seconds only for authenticated SSE connection establishment;
+  the cross-tab mutation refetch remains bounded at five seconds. The focused
+  journey passes against the exact-tip API and UI.
 - Persisted the unmerged UI/runtime work as four logical feature commits so
   endpoint identity, authenticated streaming, cache correctness and validation
   infrastructure retain independent history.

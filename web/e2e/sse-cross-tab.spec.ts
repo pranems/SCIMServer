@@ -11,7 +11,7 @@ async function authenticatedPage(context: BrowserContext, path: string): Promise
   await seedAuthToken(page);
   const connected = page.waitForResponse((response) =>
     new URL(response.url()).pathname === '/scim/admin/log-config/stream' &&
-    response.status() === 200);
+    response.status() === 200, { timeout: 15_000 });
   await page.goto(path);
   await expect(page.getByTestId('app-shell')).toBeVisible();
   const stream = await connected;

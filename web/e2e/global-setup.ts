@@ -14,6 +14,17 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
         `Playwright SCIM preflight failed for ${baseURL}: /scim/health returned HTTP ${response.status()}.`,
       );
     }
+
+    const token = process.env.E2E_TOKEN || 'changeme-scim';
+    const authenticated = await api.get('/scim/admin/endpoints', {
+      headers: { Authorization: ['Bearer', token].join(' ') },
+      timeout: 10_000,
+    });
+    if (!authenticated.ok()) {
+      throw new Error(
+        `Playwright authentication preflight failed for ${baseURL}: /scim/admin/endpoints returned HTTP ${authenticated.status()}.`,
+      );
+    }
   } finally {
     await api.dispose();
   }
