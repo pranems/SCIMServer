@@ -542,20 +542,15 @@ export class ActivityParserService {
             }
           }
 
-          // Resolve all names
-          const addedMemberNames = await Promise.all(
-            addedMemberIds.map(async (id: string) => {
-              if (id === 'Unknown') return id;
-              return await this.resolveUserName(id);
-            })
-          );
+          const addedMemberNames: string[] = [];
+          for (const id of addedMemberIds) {
+            addedMemberNames.push(id === 'Unknown' ? id : await this.resolveUserName(id));
+          }
 
-          const removedMemberNames = await Promise.all(
-            removedMemberIds.map(async (id: string) => {
-              if (id === 'Unknown') return id;
-              return await this.resolveUserName(id);
-            })
-          );
+          const removedMemberNames: string[] = [];
+          for (const id of removedMemberIds) {
+            removedMemberNames.push(id === 'Unknown' ? id : await this.resolveUserName(id));
+          }
 
           const addedMembers = addedMemberIds.map((id, idx) => ({ id, name: addedMemberNames[idx] }));
           const removedMembers = removedMemberIds.map((id, idx) => ({ id, name: removedMemberNames[idx] }));

@@ -3,9 +3,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoggingService } from '../logging/logging.service';
 import { ActivityParserService, ActivitySummary } from './activity-parser.service';
 
+interface ActivitySummaryResponse {
+  summary: {
+    last24Hours: number;
+    lastWeek: number;
+    operations: {
+      users: number;
+      groups: number;
+    };
+  };
+}
+
 @Controller('admin/activity')
 export class ActivityController {
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+  private summaryInFlight?: Promise<ActivitySummaryResponse>;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -186,24 +198,22 @@ export class ActivityController {
       }
       total = 0;
     } else {
-      [logs, total] = await Promise.all([
-        this.prisma.requestLog.findMany({
-          where,
-          skip,
-          take: limitNum,
-          orderBy: { createdAt: 'desc' },
-          select: logSelect,
-        }),
-        this.prisma.requestLog.count({ where }),
-      ]);
+      logs = await this.prisma.requestLog.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: 'desc' },
+        select: logSelect,
+      });
+      total = await this.prisma.requestLog.count({ where });
     }
 
-    // Parse each log into an activity summary
-    // Parse each log into an activity summary.
-    // Use allSettled to prevent one malformed log from crashing the entire page.
-    const results = await Promise.allSettled(
-      logs.map(async log =>
-        await this.activityParser.parseActivity({
+    // Parsing can resolve resource names through Prisma. Keep it ordered so one
+    // page cannot launch a lookup per row against the bounded connection pool.
+    let activities: ActivitySummary[] = [];
+    for (const log of logs) {
+      const [result] = await Promise.allSettled([
+        this.activityParser.parseActivity({
           id: log.id,
           method: log.method,
           url: log.url,
@@ -212,12 +222,12 @@ export class ActivityController {
           responseBody: log.responseBody || undefined,
           createdAt: log.createdAt.toISOString(),
           identifier: log.identifier || undefined,
-        })
-      )
-    );
-    let activities: ActivitySummary[] = results
-      .filter((r): r is PromiseFulfilledResult<ActivitySummary> => r.status === 'fulfilled')
-      .map(r => r.value);
+        }),
+      ]);
+      if (result.status === 'fulfilled') {
+        activities.push(result.value);
+      }
+    }
 
     // Apply client-side filters
     if (type) {
@@ -249,7 +259,7 @@ export class ActivityController {
   }
 
   @Get('summary')
-  async getActivitySummary() {
+  async getActivitySummary(): Promise<ActivitySummaryResponse> {
     if (this.isInMemoryBackend) {
       // InMemory mode: return zeroed summary (no persistent request logs)
       return {
@@ -261,6 +271,22 @@ export class ActivityController {
       };
     }
 
+    if (this.summaryInFlight) {
+      return this.summaryInFlight;
+    }
+
+    const request = this.queryActivitySummary();
+    this.summaryInFlight = request;
+    try {
+      return await request;
+    } finally {
+      if (this.summaryInFlight === request) {
+        this.summaryInFlight = undefined;
+      }
+    }
+  }
+
+  private async queryActivitySummary(): Promise<ActivitySummaryResponse> {
     // Aggregate all four counters in one bounded scan. Four parallel count()
     // calls previously occupied four of the five pool connections for the
     // duration of the scans, starving unrelated UI reads under browser load.
@@ -347,13 +373,14 @@ export class ActivityController {
       const pageSize = 200;
       const first = await this.loggingService.listLogs({ ...listFilters, page: 1, pageSize });
       const pageCount = Math.ceil(first.total / pageSize);
-      const remaining = pageCount > 1
-        ? await Promise.all(
-          Array.from({ length: pageCount - 1 }, (_, index) =>
-            this.loggingService.listLogs({ ...listFilters, page: index + 2, pageSize })
-          )
-        )
-        : [];
+      const remaining: Awaited<ReturnType<LoggingService['listLogs']>>[] = [];
+      for (let index = 0; index < pageCount - 1; index++) {
+        remaining.push(await this.loggingService.listLogs({
+          ...listFilters,
+          page: index + 2,
+          pageSize,
+        }));
+      }
       logs = [first, ...remaining].flatMap(result => result.items ?? []);
       sourceTotal = first.total;
     } else {
@@ -362,9 +389,9 @@ export class ActivityController {
       sourceTotal = result.total ?? logs.length;
     }
 
-    let activities: ActivitySummary[] = await Promise.all(
-      logs.map(async (log: any) =>
-        await this.activityParser.parseActivity({
+    let activities: ActivitySummary[] = [];
+    for (const log of logs) {
+      activities.push(await this.activityParser.parseActivity({
           id: log.id ?? `inmem-${Date.now()}-${Math.random()}`,
           method: log.method,
           url: log.url,
@@ -373,9 +400,8 @@ export class ActivityController {
           responseBody: log.responseBody || undefined,
           createdAt: log.createdAt ? new Date(log.createdAt).toISOString() : new Date().toISOString(),
           identifier: log.reportableIdentifier || undefined,
-        })
-      )
-    );
+      }));
+    }
 
     if (type) activities = activities.filter(a => a.type === type);
     if (severity) activities = activities.filter(a => a.severity === severity);

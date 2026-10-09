@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.39`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.40`
 
 Custom ResourceType operations are first-class Activity entries with
 `resourceType`, `resourceEndpoint`, and `resourceIdentifier`. Create, update,
@@ -382,7 +382,10 @@ so the response transfers at most 24 count rows instead of materializing every
 matching request-log timestamp in the API process. Endpoint listing, recent-log
 listing, and series aggregation run sequentially so one Dashboard request does
 not fan out across the bounded database pool. Optional per-row user display-name
-lookups are also ordered rather than launched as a page-sized burst.
+lookups are also ordered rather than launched as a page-sized burst. Concurrent
+Dashboard callers share one in-flight response, and Activity summary callers
+share one in-flight aggregate. Completed responses are not retained, so
+mutation and server-sent-event refetches observe current state.
 
 ---
 

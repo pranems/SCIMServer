@@ -90,6 +90,8 @@ function getVersion(): string {
 
 @Controller('admin')
 export class DashboardController {
+  private dashboardInFlight?: Promise<DashboardResponse>;
+
   constructor(
     private readonly statsService: StatsProjectionService,
     private readonly endpointService: EndpointService,
@@ -114,6 +116,22 @@ export class DashboardController {
    */
   @Get('dashboard')
   async getDashboard(): Promise<DashboardResponse> {
+    if (this.dashboardInFlight) {
+      return this.dashboardInFlight;
+    }
+
+    const request = this.buildDashboard();
+    this.dashboardInFlight = request;
+    try {
+      return await request;
+    } finally {
+      if (this.dashboardInFlight === request) {
+        this.dashboardInFlight = undefined;
+      }
+    }
+  }
+
+  private async buildDashboard(): Promise<DashboardResponse> {
     const persistenceBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase();
 
     // Keep database work sequential. listLogs performs two queries and the
@@ -216,11 +234,12 @@ export class DashboardController {
     // Throws NotFoundException for unknown endpoints - propagates as 404.
     const endpoint = await this.endpointService.getEndpoint(endpointId, 'full');
 
-    // Parallel: credentials + last 10 logs. Stats are in-memory (sync).
-    const [credentialRows, recentLogs] = await Promise.all([
-      this.credentialRepo.findByEndpoint(endpoint.id),
-      this.loggingService.listLogs({ endpointId: endpoint.id, page: 1, pageSize: 10 }),
-    ]);
+    const credentialRows = await this.credentialRepo.findByEndpoint(endpoint.id);
+    const recentLogs = await this.loggingService.listLogs({
+      endpointId: endpoint.id,
+      page: 1,
+      pageSize: 10,
+    });
 
     const stats = this.statsService.getEndpointStats(endpoint.id);
 

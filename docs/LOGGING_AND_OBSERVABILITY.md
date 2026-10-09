@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.39`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.40`
 
 Global and endpoint Logs share filters for URL, HTTP method, status, time range,
 errors-only, minimum duration, and request ID. Custom ResourceType URLs remain
@@ -780,12 +780,14 @@ Returns aggregate activity statistics.
 
 The four values are produced by one 30-day-bounded PostgreSQL aggregate. This
 avoids occupying four database-pool connections with concurrent count scans
-when the request-log table is large.
+when the request-log table is large. Concurrent callers share one in-flight
+aggregate so several browser workers do not repeat the same long scan.
 
 Paginated request-log counts and row reads are also sequential. This preserves
 the same response while limiting each list request to one active database
 connection at a time, including optional user display-name resolution for each
-returned row.
+returned row. Activity pages apply the same ordering to row/count reads,
+additional pages, parsed rows, and group-member name resolution.
 
 **PowerShell:**
 

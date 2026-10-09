@@ -4,12 +4,13 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Release candidate:** v0.55.39 contains the request-log aggregation,
-browser-readiness, and database pool fan-out corrections. The first exact-master deployment pipeline
-passed all local static, unit, Prisma E2E, web coverage, six-mode, dependency,
-and isolated Docker live gates, then correctly blocked publication because the
-runtime change still reported v0.55.37. The leaked browser fixture from the
-old-image run was deleted by exact ID and verified absent with HTTP 404.
+**Release candidate:** v0.55.40 extends the request-log aggregation and
+browser-readiness corrections with bounded Activity and Dashboard concurrency.
+The exact v0.55.39 three-worker run passed 204 tests, skipped 12, failed 47,
+and measured 705 raw connection-acquire timeout records. Activity summary took
+17.702 seconds and Dashboard took 8.463 seconds even at idle. v0.55.40
+coalesces overlapping analytics reads while they are in flight and serializes
+remaining page, row, member-name, and endpoint-overview database work.
 
 ### Active Execution Reference
 

@@ -495,6 +495,50 @@ describe('ActivityController', () => {
   // ── getActivitySummary - one bounded aggregate query ──────────────────────
 
   describe('getActivitySummary - SQL-level counting', () => {
+    it('shares one in-flight aggregate across concurrent browser loads without serving stale completed data', async () => {
+      let releaseAggregate!: (value: Array<{
+        last24Hours: number;
+        lastWeek: number;
+        userOperations: number;
+        groupOperations: number;
+      }>) => void;
+      const aggregatePending = new Promise<Array<{
+        last24Hours: number;
+        lastWeek: number;
+        userOperations: number;
+        groupOperations: number;
+      }>>((resolve) => { releaseAggregate = resolve; });
+      (prismaService.$queryRaw as jest.Mock).mockReturnValue(aggregatePending);
+
+      const first = controller.getActivitySummary();
+      const second = controller.getActivitySummary();
+      await Promise.resolve();
+
+      expect(prismaService.$queryRaw).toHaveBeenCalledTimes(1);
+
+      releaseAggregate([{
+        last24Hours: 10,
+        lastWeek: 20,
+        userOperations: 30,
+        groupOperations: 40,
+      }]);
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+
+      expect(secondResult).toBe(firstResult);
+      expect(prismaService.$queryRaw).toHaveBeenCalledTimes(1);
+
+      (prismaService.$queryRaw as jest.Mock).mockResolvedValueOnce([{
+        last24Hours: 11,
+        lastWeek: 21,
+        userOperations: 31,
+        groupOperations: 41,
+      }]);
+      const refreshedResult = await controller.getActivitySummary();
+
+      expect(refreshedResult.summary.last24Hours).toBe(11);
+      expect(prismaService.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+
     it('should use one aggregate query for all summary fields', async () => {
       (prismaService.$queryRaw as jest.Mock).mockResolvedValue([{
         last24Hours: 100,
@@ -513,6 +557,57 @@ describe('ActivityController', () => {
       expect(prismaService.requestLog.findMany).not.toHaveBeenCalled();
       expect(prismaService.requestLog.count).not.toHaveBeenCalled();
       expect(prismaService.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    describe('getActivities - bounded database concurrency', () => {
+      it('finishes the row query before starting the count query', async () => {
+        let releaseRows!: (value: ReturnType<typeof createMockLog>[]) => void;
+        const rowsPending = new Promise<ReturnType<typeof createMockLog>[]>(
+          (resolve) => { releaseRows = resolve; },
+        );
+        jest.spyOn(prismaService.requestLog, 'findMany').mockReturnValueOnce(rowsPending as never);
+        jest.spyOn(prismaService.requestLog, 'count').mockResolvedValueOnce(1);
+        jest.spyOn(activityParserService, 'parseActivity').mockImplementation(
+          async (log: any) => mockActivitySummary(log),
+        );
+
+        const request = controller.getActivities('1', '50');
+        await Promise.resolve();
+
+        expect(prismaService.requestLog.findMany).toHaveBeenCalledTimes(1);
+        expect(prismaService.requestLog.count).not.toHaveBeenCalled();
+
+        releaseRows([createMockLog()]);
+        await request;
+
+        expect(prismaService.requestLog.count).toHaveBeenCalledTimes(1);
+      });
+
+      it('parses rows in order instead of launching page-sized lookup bursts', async () => {
+        const logs = [createMockLog({ id: 'first' }), createMockLog({ id: 'second' })];
+        jest.spyOn(prismaService.requestLog, 'findMany').mockResolvedValueOnce(logs);
+        jest.spyOn(prismaService.requestLog, 'count').mockResolvedValueOnce(logs.length);
+        const resolvers: Array<(value: ReturnType<typeof mockActivitySummary>) => void> = [];
+        jest.spyOn(activityParserService, 'parseActivity').mockImplementation(
+          (log: any) => new Promise((resolve) => {
+            resolvers.push(resolve);
+          }),
+        );
+
+        const request = controller.getActivities('1', '50');
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(activityParserService.parseActivity).toHaveBeenCalledTimes(1);
+
+        resolvers[0](mockActivitySummary(logs[0]));
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(activityParserService.parseActivity).toHaveBeenCalledTimes(2);
+
+        resolvers[1](mockActivitySummary(logs[1]));
+        await request;
+      });
     });
 
     it('should bound the scan and exclude admin and keepalive traffic', async () => {

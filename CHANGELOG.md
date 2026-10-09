@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.40] - 2026-10-09
+
+### Activity and Dashboard pool-pressure hotfix
+
+- Close the remaining database fan-out exposed by the exact v0.55.39
+  three-worker browser run. That run passed 204 tests, skipped 12, failed 47,
+  and produced 705 raw PostgreSQL connection-acquire timeout records while
+  Activity summary took 17.702 seconds and Dashboard took 8.463 seconds at
+  idle.
+- Share overlapping Dashboard and Activity-summary reads while they are in
+  flight, without caching completed responses that would defeat mutation and
+  server-sent-event refetches. Serialize Activity row/count reads, page
+  fetches, row parsing, group-member name resolution, and endpoint overview
+  reads so a browser page cannot launch a query per row or branch.
+- Add deferred-promise regression contracts for each concurrency boundary.
+  The focused Dashboard, Activity-controller, and Activity-parser suites pass
+  68 tests; API build and lint remain green.
+
 ## [0.55.39] - 2026-10-09
 
 ### Database pool fan-out hotfix

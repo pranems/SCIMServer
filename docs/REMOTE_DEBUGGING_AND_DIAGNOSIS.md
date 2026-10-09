@@ -1,6 +1,6 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.39`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.40`
 
 > **Version:** 3.2 - **Source-verified against:** v0.55.36 - **Updated:** 2026-10-01
 > Request-history identity and authenticated stream transport re-verified against v0.55.36 on 2026-10-01; the full line-by-line pass dates from v0.53.0.
@@ -872,7 +872,8 @@ four concurrent count scans. Dashboard hourly request counts are grouped into
 UTC buckets in PostgreSQL before the compact series is returned. Dashboard and
 request-log list queries are sequenced to avoid exhausting the bounded
 connection pool when several browser pages load together, including per-row
-user display-name resolution.
+user display-name resolution. Dashboard and Activity summary also coalesce
+overlapping in-flight requests without retaining completed responses.
 
 ---
 
