@@ -618,17 +618,28 @@ if (-not $SkipDeploy) {
     # The 2026-05-29 lesson was the mirror image of this - the workflow defaulted
     # to master while the work sat on a feature branch, shipping a STALE image.
     # Both failures are the same root cause: the built ref and the shipped ref
-    # disagreed. Asserting HEAD is contained in master removes the disagreement
-    # instead of trading one direction of it for the other.
+    # disagreed. Require exact equality and pass that immutable SHA into the
+    # workflow so a later master advance fails before registry login.
     $publishRef = 'master'
-    $shippingRefReady = Invoke-Gate '4.3a' 'HEAD is merged into origin/master (shipping ref check)' {
+    $script:expectedHeadSha = $null
+    $shippingRefReady = Invoke-Gate '4.3a' 'HEAD equals origin/master (shipping ref check)' {
         git fetch origin master --quiet
-        $head = (git rev-parse HEAD).Trim()
-        git merge-base --is-ancestor $head origin/master
         if ($LASTEXITCODE -ne 0) {
-            throw "HEAD ($($head.Substring(0,8))) is NOT contained in origin/master. Merge before publishing - a shipping image must be built from master."
+            throw 'Failed to fetch origin/master before publication.'
         }
-        Write-Host "    HEAD $($head.Substring(0,8)) is contained in origin/master" -ForegroundColor DarkGray
+        $head = (git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($head)) {
+            throw 'Failed to resolve the local HEAD before publication.'
+        }
+        $script:expectedHeadSha = (git rev-parse "origin/$publishRef").Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($script:expectedHeadSha)) {
+            throw 'Failed to resolve origin/master before publication.'
+        }
+        $expectedHeadSha = $script:expectedHeadSha
+        if ($head -ne $expectedHeadSha) {
+            throw "HEAD ($($head.Substring(0,8))) does not equal origin/master ($($script:expectedHeadSha.Substring(0,8))). Run from the exact merged master commit."
+        }
+        Write-Host "    HEAD $($head.Substring(0,8)) equals origin/master" -ForegroundColor DarkGray
     }
 
     $firstParent = (git rev-parse 'HEAD^1').Trim()
@@ -668,9 +679,9 @@ if (-not $SkipDeploy) {
             -Detail "semantic version tag already exists; reusing immutable artifact $existingVersionDigest"
     } else {
         $releaseArtifactReady = Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $publishRef)" {
-            $expectedHeadSha = (git rev-parse $publishRef).Trim()
+            $expectedHeadSha = $script:expectedHeadSha
             $dispatchedAfter = [DateTimeOffset]::UtcNow.AddSeconds(-5)
-            gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true
+            gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true -f expectedSha=$expectedHeadSha
             if ($LASTEXITCODE -ne 0) {
                 throw 'Failed to dispatch publish-ghcr.yml.'
             }

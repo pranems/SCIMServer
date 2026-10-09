@@ -11,12 +11,26 @@
     Skip Phase 2 (Docker build & test).
 .PARAMETER Verbose
     Pass -Verbose to live-test.ps1 for full HTTP request/response output.
+.PARAMETER DockerPort
+    Host port for the validation API. Zero asks Docker to allocate the port.
+.PARAMETER DockerPostgresPort
+    Host port for the validation PostgreSQL service. Zero selects an available
+    Docker-allocated port.
+.PARAMETER DockerProjectName
+    Isolated Compose project name. Defaults to a per-run GUID name.
+.PARAMETER KeepDocker
+    Keep the isolated validation estate after the run. By default its
+    containers, network, and PostgreSQL volume are removed.
 #>
 
 param(
     [switch]$SkipLocal,
     [switch]$SkipDocker,
-    [switch]$VerboseTests
+    [switch]$VerboseTests,
+    [ValidateRange(0, 65535)] [int]$DockerPort = 0,
+    [ValidateRange(0, 65535)] [int]$DockerPostgresPort = 0,
+    [string]$DockerProjectName = '',
+    [switch]$KeepDocker
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,11 +40,23 @@ $apiDir = Join-Path $repoRoot "api"
 $liveTestScript = Join-Path $scriptDir "live-test.ps1"
 
 $localPort = 6000
-$dockerPort = 8080
+
+if ([string]::IsNullOrWhiteSpace($DockerProjectName)) {
+    $runId = [guid]::NewGuid().ToString('N').Substring(0, 12)
+    $DockerProjectName = "scimserver-validation-$runId"
+}
+
+$dockerPort = $DockerPort
 $localBaseUrl = "http://localhost:$localPort"
-$dockerBaseUrl = "http://localhost:$dockerPort"
+$dockerBaseUrl = $null
 $dockerSecret = "devscimsharedsecret"
 $dockerOAuthSecret = "devscimclientsecret"
+$env:COMPOSE_PROJECT_NAME = $DockerProjectName
+$env:BIND_HOST_IP = '127.0.0.1'
+$env:API_HOST_PORT = [string]$DockerPort
+$env:POSTGRES_HOST_PORT = [string]$DockerPostgresPort
+$env:API_CONTAINER_NAME = "$DockerProjectName-api"
+$env:POSTGRES_CONTAINER_NAME = "$DockerProjectName-postgres"
 
 # Tracking
 $phase1Result = $null
@@ -48,6 +74,25 @@ function Write-Result($label, $success) {
     } else {
         Write-Host "  ❌ $label" -ForegroundColor Red
     }
+}
+
+function Stop-ValidationCompose {
+    docker compose --project-directory $repoRoot down --volumes --remove-orphans 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to clean Compose project $DockerProjectName."
+    }
+}
+
+function Complete-ValidationCompose {
+    if ($KeepDocker) {
+        Write-Host "`n  Docker validation estate retained by -KeepDocker:" -ForegroundColor Yellow
+        docker compose --project-directory $repoRoot ps 2>&1 | Out-Host
+        Write-Host "  Cleanup: `$env:COMPOSE_PROJECT_NAME='$DockerProjectName'; docker compose --project-directory '$repoRoot' down --volumes --remove-orphans" -ForegroundColor Yellow
+        return
+    }
+
+    Stop-ValidationCompose
+    Write-Host "`n  Docker validation estate removed." -ForegroundColor Green
 }
 
 function Wait-ForEndpoint($url, $timeoutSeconds = 60, $label = "endpoint") {
@@ -138,9 +183,12 @@ if (-not $SkipLocal) {
     # Step 5: Live tests against local
     Write-Phase 1 5 "Live Tests (local)"
     try {
-        $liveArgs = @("-BaseUrl", $localBaseUrl)
-        if ($VerboseTests) { $liveArgs += "-Verbose" }
-        & $liveTestScript @liveArgs 2>&1 | Tee-Object -Variable liveOutput
+        $localLiveArgs = @{ BaseUrl = $localBaseUrl }
+        if ($VerboseTests) { $localLiveArgs.Verbose = $true }
+        & $liveTestScript @localLiveArgs 2>&1 | Tee-Object -Variable liveOutput
+        if ($LASTEXITCODE -ne 0) {
+            throw "Live tests (local) exited with $LASTEXITCODE."
+        }
         $liveLine = ($liveOutput | Select-String "passed").Line | Select-Object -Last 1
         Write-Result "Live tests (local) - $liveLine" $true
         $phase1Result = $liveLine
@@ -180,24 +228,8 @@ if (-not $SkipDocker) {
     docker compose down --remove-orphans 2>&1 | Out-Null
     Write-Result "Existing containers removed" $true
 
-    # `compose down` only reaches THIS project. The pipeline's own E2E database
-    # from Stage 2 is a different project and still owns 5432, so compose up
-    # fails much later with an opaque "Bind for 0.0.0.0:5432 failed". Retire the
-    # containers we own; refuse to touch anything else.
-    $ownedTestDbs = @('scim-dev-pipeline-pg')
-    foreach ($name in $ownedTestDbs) {
-        if (docker ps --filter "name=^/$name$" --format '{{.Names}}' 2>$null) {
-            docker stop $name 2>&1 | Out-Null
-            Write-Host "  stopped $name (pipeline-owned test database) to free its host port" -ForegroundColor Yellow
-        }
-    }
-
-    $portHogs = docker ps --format '{{.Names}} {{.Ports}}' 2>$null | Where-Object { $_ -match '0\.0\.0\.0:(5432|8080)->' }
-    if ($portHogs) {
-        Write-Host "  Ports needed by docker-compose are held by containers outside this project:" -ForegroundColor Red
-        $portHogs | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
-        throw "Host port conflict: stop the listed container(s) before running the Docker phase."
-    }
+    Write-Host "  Compose project: $DockerProjectName" -ForegroundColor DarkGray
+    Write-Host "  Requested host ports: API=$DockerPort PostgreSQL=$DockerPostgresPort (0 means Docker allocated)" -ForegroundColor DarkGray
 
     # Step 7: Build Docker image (no-cache)
     Write-Phase 2 2 "Build Docker Image (no-cache)"
@@ -227,6 +259,7 @@ if (-not $SkipDocker) {
         Write-Result "Docker image built in ${buildDuration}s" $true
     } catch {
         Write-Result "Docker build FAILED: $_" $false
+        Complete-ValidationCompose
         Pop-Location
         exit 1
     }
@@ -238,9 +271,17 @@ if (-not $SkipDocker) {
         $env:OAUTH_CLIENT_SECRET = $dockerOAuthSecret
         docker compose up -d 2>&1
         if ($LASTEXITCODE -ne 0) { throw "Docker compose up failed" }
+        $apiBinding = (docker compose port api 8080 2>&1 | Select-Object -First 1).ToString().Trim()
+        if ($LASTEXITCODE -ne 0 -or $apiBinding -notmatch ':(?<port>\d+)$') {
+            throw "Could not resolve Docker-allocated API port from '$apiBinding'."
+        }
+        $dockerPort = [int]$Matches.port
+        $dockerBaseUrl = "http://127.0.0.1:$dockerPort"
+        Write-Host "  Docker allocated API host port $dockerPort" -ForegroundColor DarkGray
         Write-Host "  Containers starting..." -ForegroundColor Yellow
     } catch {
         Write-Result "Docker start FAILED: $_" $false
+        Complete-ValidationCompose
         Pop-Location
         exit 1
     }
@@ -252,6 +293,7 @@ if (-not $SkipDocker) {
         Write-Host "  Docker logs:" -ForegroundColor Red
         docker compose logs --tail 30 api
         Write-Result "Docker health check FAILED" $false
+        Complete-ValidationCompose
         Pop-Location
         exit 1
     }
@@ -269,12 +311,16 @@ if (-not $SkipDocker) {
     # Step 10: Live tests against Docker
     Write-Phase 2 5 "Live Tests (Docker)"
     try {
-        $liveArgs = @(
-            "-BaseUrl", $dockerBaseUrl,
-            "-ClientSecret", $dockerOAuthSecret
-        )
-        if ($VerboseTests) { $liveArgs += "-Verbose" }
-        & $liveTestScript @liveArgs 2>&1 | Tee-Object -Variable dockerLiveOutput
+        $dockerLiveArgs = @{
+            BaseUrl = $dockerBaseUrl
+            ClientSecret = $dockerOAuthSecret
+            SharedSecret = $dockerSecret
+        }
+        if ($VerboseTests) { $dockerLiveArgs.Verbose = $true }
+        & $liveTestScript @dockerLiveArgs 2>&1 | Tee-Object -Variable dockerLiveOutput
+        if ($LASTEXITCODE -ne 0) {
+            throw "Live tests (Docker) exited with $LASTEXITCODE."
+        }
         $dockerLiveLine = ($dockerLiveOutput | Select-String "passed").Line | Select-Object -Last 1
         Write-Result "Live tests (Docker) - $dockerLiveLine" $true
         $phase2Result = $dockerLiveLine
@@ -291,9 +337,7 @@ if (-not $SkipDocker) {
     Write-Host "   Live tests:   $phase2Result" -ForegroundColor White
     Write-Host "────────────────────────────────────────" -ForegroundColor Cyan
 
-    # NOTE: Docker containers intentionally left running per user request
-    Write-Host "`n  📦 Docker containers are still running:" -ForegroundColor Yellow
-    docker compose ps 2>&1
+    Complete-ValidationCompose
 }
 
 # ══════════════════════════════════════════════════════════════
@@ -313,6 +357,11 @@ if ($phase2Result) {
     Write-Host "  Phase 2 (Docker):" -ForegroundColor White
     Write-Host "    Build: ${buildDuration}s" -ForegroundColor White
     Write-Host "    Live:  $phase2Result" -ForegroundColor White
+}
+
+if ($phase1Result -eq "FAILED" -or $phase2Result -eq "FAILED") {
+    Write-Host "`nPipeline failed." -ForegroundColor Red
+    exit 1
 }
 
 Write-Host "`nPipeline complete." -ForegroundColor Green

@@ -3,6 +3,12 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $helperPath = Join-Path $repoRoot 'scripts/github-workflow-run.ps1'
 $pipelinePath = Join-Path $repoRoot 'scripts/dev-deployment-pipeline.ps1'
+$workflowPath = Join-Path $repoRoot '.github/workflows/publish-ghcr.yml'
+$publishInstructionPaths = @(
+    (Join-Path $repoRoot '.github/prompts/deployAndPromote.prompt.md'),
+    (Join-Path $repoRoot '.github/prompts/devDeploymentPipeline.prompt.md'),
+    (Join-Path $repoRoot 'docs/TENANT_09_MIGRATION_PLAN.md')
+)
 $promotePath = Join-Path $repoRoot 'scripts/promote-to-prod.ps1'
 $prePushPath = Join-Path $repoRoot 'scripts/pre-push-checks.ps1'
 if (-not (Test-Path $helperPath)) {
@@ -54,10 +60,15 @@ if ($null -ne $none) {
 }
 
 $pipeline = Get-Content $pipelinePath -Raw
+$workflow = Get-Content $workflowPath -Raw
 foreach ($required in @(
     'github-workflow-run.ps1',
     'Select-GithubWorkflowRun',
     '-ExpectedHeadSha',
+    'git rev-parse "origin/$publishRef"',
+    'Failed to fetch origin/master before publication',
+    '$head -ne $expectedHeadSha',
+    '-f expectedSha=$expectedHeadSha',
     'Semantic tag matches runtime source SHA digest',
     'GHCR and ACR version/latest digest parity'
 )) {
@@ -67,6 +78,27 @@ foreach ($required in @(
 }
 if ($pipeline.Contains("--limit 1 --json databaseId --jq '.[0].databaseId'")) {
     throw 'Deployment pipeline still selects the newest run without matching the expected SHA.'
+}
+if ($pipeline.Contains('(git rev-parse $publishRef)')) {
+    throw 'Deployment pipeline still resolves the expected workflow SHA from a potentially stale local branch.'
+}
+foreach ($required in @(
+    'expectedSha:',
+    'github.sha != inputs.expectedSha',
+    'Refuse mutable-ref mismatch before registry login'
+)) {
+    if (-not $workflow.Contains($required)) {
+        throw "Publish workflow is missing immutable source guard: $required"
+    }
+    foreach ($instructionPath in $publishInstructionPaths) {
+        $lineNumber = 0
+        foreach ($line in Get-Content -LiteralPath $instructionPath) {
+            $lineNumber++
+            if ($line -match 'gh workflow run publish-ghcr\.yml' -and $line -notmatch 'expectedSha') {
+                throw "Publish instruction omits expectedSha at ${instructionPath}:$lineNumber"
+            }
+        }
+    }
 }
 foreach ($required in @(
     'docker compose images -q api',

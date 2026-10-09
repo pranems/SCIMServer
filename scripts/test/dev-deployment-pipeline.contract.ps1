@@ -109,6 +109,61 @@ Invoke-Assert -Description 'dev readiness requires the exact intended revision h
 Invoke-Assert -Description 'local Docker validation refreshes base images even when layer cache is disabled' `
     -Condition ($fullValidationContent -match 'docker\s+compose\s+build\s+--no-cache\s+--pull')
 
+$isolatesDockerValidation = ($fullValidationContent -match '\$DockerProjectName') -and
+    ($fullValidationContent -match '\$env:COMPOSE_PROJECT_NAME') -and
+    ($fullValidationContent -match '\$env:API_HOST_PORT\s*=\s*\[string\]\$DockerPort') -and
+    ($fullValidationContent -match '\$env:POSTGRES_HOST_PORT\s*=\s*\[string\]\$DockerPostgresPort') -and
+    ($fullValidationContent -match 'docker compose port api 8080') -and
+    ($fullValidationContent -notmatch 'Get-FreeTcpPort')
+Invoke-Assert -Description 'local Docker validation lets Docker atomically allocate host ports for a unique Compose project' `
+    -Condition $isolatesDockerValidation
+
+$composeContent = Get-Content -LiteralPath (Join-Path $repoRoot 'docker-compose.yml') -Raw
+$parameterizesCompose = ($composeContent -match '\$\{BIND_HOST_IP:-0\.0\.0\.0\}:\$\{API_HOST_PORT:-8080\}:8080') -and
+    ($composeContent -match '\$\{BIND_HOST_IP:-0\.0\.0\.0\}:\$\{POSTGRES_HOST_PORT:-5432\}:5432') -and
+    ($composeContent -match '\$\{API_CONTAINER_NAME:-scimserver-api\}') -and
+    ($composeContent -match '\$\{POSTGRES_CONTAINER_NAME:-scimserver-postgres\}')
+Invoke-Assert -Description 'docker-compose keeps standard defaults while allowing isolated validation bindings' `
+    -Condition $parameterizesCompose
+
+$usesNumericLoopback = $fullValidationContent -match '\$dockerBaseUrl\s*=\s*"http://127\.0\.0\.1:\$dockerPort"'
+Invoke-Assert -Description 'isolated Docker live tests use numeric loopback rather than host DNS' `
+    -Condition $usesNumericLoopback
+
+$failsWhenLiveTestsFail = ($fullValidationContent -match '\$phase1Result\s+-eq\s+"FAILED"') -and
+    ($fullValidationContent -match '\$phase2Result\s+-eq\s+"FAILED"') -and
+    ($fullValidationContent -match 'exit 1')
+Invoke-Assert -Description 'full validation exits nonzero when either live-test lane fails' `
+    -Condition $failsWhenLiveTestsFail
+
+$usesNamedLiveArguments = ($fullValidationContent -match '\$localLiveArgs\s*=\s*@\{') -and
+    ($fullValidationContent -match '\$dockerLiveArgs\s*=\s*@\{') -and
+    ($fullValidationContent -match '&\s+\$liveTestScript\s+@localLiveArgs') -and
+    ($fullValidationContent -match '&\s+\$liveTestScript\s+@dockerLiveArgs')
+Invoke-Assert -Description 'full validation invokes both live lanes with named hashtable splatting' `
+    -Condition $usesNamedLiveArguments
+
+$checksLiveExitCodes = ([regex]::Matches(
+    $fullValidationContent,
+    'if\s*\(\$LASTEXITCODE\s+-ne\s+0\)\s*\{\s*throw\s+"Live tests'
+).Count -eq 2)
+Invoke-Assert -Description 'full validation turns both child live-test exit codes into gate failures' `
+    -Condition $checksLiveExitCodes
+
+$cleansValidationEstate = ($fullValidationContent -match '\[switch\]\$KeepDocker') -and
+    ($fullValidationContent -match '(?m)^function Stop-ValidationCompose') -and
+    ($fullValidationContent -match '(?m)^function Complete-ValidationCompose') -and
+    ($fullValidationContent -match 'docker compose --project-directory \$repoRoot down --volumes --remove-orphans') -and
+    ($fullValidationContent -match 'if\s*\(\$KeepDocker\)') -and
+    ([regex]::Matches($fullValidationContent, 'Complete-ValidationCompose').Count -ge 5)
+Invoke-Assert -Description 'full validation removes its containers, network, and volume by default with explicit opt-in retention' `
+    -Condition $cleansValidationEstate
+
+$usesRunUniqueProject = ($fullValidationContent -match '\[guid\]::NewGuid\(\)') -and
+    ($fullValidationContent -notmatch 'scimserver-validation-\$PID')
+Invoke-Assert -Description 'default validation project identity remains unique after the launching process exits' `
+    -Condition $usesRunUniqueProject
+
 Write-Host ''
 if ($failures.Count -eq 0) {
     Write-Host 'All deployment evidence assertions passed.' -ForegroundColor Green

@@ -10,6 +10,9 @@ on:
         description: "Also push the latest tag"
         required: false
         default: "false"
+      expectedSha:
+        description: "Exact commit SHA the caller authorized for publication"
+        required: true
 
 permissions:
   contents: read
@@ -26,6 +29,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Refuse mutable-ref mismatch before registry login (github.sha != inputs.expectedSha)
+        env:
+          EXPECTED_SHA: ${{ inputs.expectedSha }}
+        run: |
+          if [ "${GITHUB_SHA}" != "${EXPECTED_SHA}" ]; then
+            echo "::error::Resolved workflow SHA ${GITHUB_SHA} does not match authorized SHA ${EXPECTED_SHA}"
+            exit 1
+          fi
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

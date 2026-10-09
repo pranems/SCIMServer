@@ -1,6 +1,6 @@
 # Docker Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.37`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
 
 > **Version:** 0.55.37 - **Updated:** June 3, 2026
 > **Source of truth:** [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml)
@@ -105,6 +105,16 @@ volumes:
 ```
 
 ### Commands
+
+The checked-in defaults bind the API to host port `8080`, PostgreSQL to host
+port `5432`, and use the established `scimserver-api` and
+`scimserver-postgres` names. To run an isolated second estate without stopping
+an existing one, set `COMPOSE_PROJECT_NAME`, `API_HOST_PORT`,
+`POSTGRES_HOST_PORT`, `API_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME`, and
+optionally `BIND_HOST_IP`. The full validation pipeline assigns a unique
+project and names, binds to loopback, and passes port `0` so Docker reserves
+both ephemeral ports atomically. It removes the validation containers, network
+and volume when finished unless `-KeepDocker` is supplied for diagnosis.
 
 ```bash
 # Start (build if needed)

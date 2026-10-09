@@ -54,6 +54,35 @@ mount-order race where a fast child SSE failure could precede the gate's
 passive listener. The listener now registers in a layout effect; 60 focused
 component/transport/consumer tests and the expired-token browser case pass.
 
+**Merged-master pipeline continuation, 2026-10-09:** PR #193 merged with full
+constituent history as `11ee40fe`. The first authoritative pipeline passed all
+static gates, units, web tests/coverage, the six-mode backend matrix and data
+integrity, but exposed three independent harness defects before deployment:
+two Prisma assertions compared a mutable global endpoint inventory, workflow
+selection resolved stale local `master` instead of `origin/master`, and local
+Compose required ports owned by an unrelated worktree. RED/GREEN controls now
+pass: the focused Prisma suite is 9/9, workflow selection uses the remote
+shipping ref, and Docker validation uses an isolated project with available
+loopback ports while preserving standard Compose defaults. The visual failure
+was inspected and classified as a stale-deployment cascade; no baseline was
+updated. The first isolated Docker rerun then exposed host DNS and false-green
+exit handling; numeric loopback passed all 1,700 live assertions, and new
+RED/GREEN contracts require named hashtable splatting plus nonzero exit on
+either failed live lane. The complete isolated Docker wrapper is now green:
+fresh build, healthy v0.55.37 and 1,700/1,700 live assertions. Full
+merged-master pipeline rerun and the nine reviewer-judgement gates remain
+required.
+
+**Post-review validation hardening, 2026-10-09:** PR #195 review found three
+authority gaps beyond the first fix. Publication now requires local HEAD to
+equal `origin/master`, passes that exact SHA into the workflow, and rejects a
+moving-master mismatch before registry login. Docker, rather than an early
+probe, atomically allocates loopback ports at service start. Validation estates
+are removed with their network and volume by default; `-KeepDocker` is an
+explicit diagnostic exception. RED contracts failed on all three gaps and are
+green after the correction. A real PostgreSQL Compose control received
+`127.0.0.1:32779` and left no container, network or volume behind.
+
 **Current unmerged validation branch, 2026-10-08:** work continues in the
 `SCIMServer-master` worktree on `fix/comprehensive-ui-validation-20260930`,
 based at `1c3fc78efec4386900d59f40a84450fbfcae2742`. Changes remain local:

@@ -877,7 +877,7 @@ Driven by [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), which already
 
 | # | Step |
 |---|---|
-| P3.1 | Ensure the target version is on GHCR: `gh workflow run publish-ghcr.yml --ref <branch> -f version=<ver> -f pushLatest=false`, then `gh run watch <id> --exit-status` |
+| P3.1 | Ensure the target version is on GHCR: fetch the branch, resolve its full remote SHA, run `gh workflow run publish-ghcr.yml --ref <branch> -f version=<ver> -f pushLatest=false -f expectedSha=<full-remote-sha>`, then `gh run watch <id> --exit-status` |
 | P3.2 | Import into the new ACR without a local build: `az acr import --name <newacr> --source ghcr.io/pranems/scimserver:<ver> --image scimserver:<ver>` |
 | P3.3 | Verify the tag landed: `az acr repository show-tags -n <newacr> --repository scimserver --orderby time_desc --top 5` |
 
@@ -1226,7 +1226,9 @@ $newDomain
 ### A.4 Image supply without a local build
 
 ```powershell
-gh workflow run publish-ghcr.yml --ref feat/tenant-migration-09 -f version=0.55.3 -f pushLatest=false
+git fetch origin feat/tenant-migration-09
+$expectedSha = (git rev-parse origin/feat/tenant-migration-09).Trim()
+gh workflow run publish-ghcr.yml --ref feat/tenant-migration-09 -f version=0.55.3 -f pushLatest=false -f expectedSha=$expectedSha
 gh run watch <runId> --exit-status
 
 az acr import --name <newacr> --source ghcr.io/pranems/scimserver:0.55.3 --image scimserver:0.55.3
