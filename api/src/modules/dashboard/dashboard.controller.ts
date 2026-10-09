@@ -154,7 +154,7 @@ export class DashboardController {
     // NAME (not just the id) so the dashboard activity row can render the same
     // auth-method chip + a quick-open link the Logs page has.
     const endpointNameById = new Map<string, string>(
-      endpointList.endpoints.map((ep) => [ep.id, ep.name]),
+      endpointList.endpoints.map((ep) => [ep.id, ep.displayName ?? ep.name]),
     );
     const recentActivity: DashboardActivity[] = recentLogs.items.map((log: any) => ({
       id: log.id,
@@ -164,7 +164,7 @@ export class DashboardController {
       statusCode: log.status ?? 0,
       durationMs: log.durationMs ?? 0,
       endpointId: log.endpointId ?? '',
-      endpointName: log.endpointId ? endpointNameById.get(log.endpointId) : undefined,
+      endpointName: log.endpointName ?? (log.endpointId ? endpointNameById.get(log.endpointId) : undefined),
       requestId: log.requestId ?? undefined,
       authOutcome: log.authOutcome ?? undefined,
       authMethod: log.authMethod ?? undefined,

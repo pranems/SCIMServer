@@ -81,7 +81,7 @@ export class EndpointScimDiscoveryController {
 
     const profile = endpoint.profile;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
   }
 
   // ===== Schemas =====

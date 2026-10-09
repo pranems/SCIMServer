@@ -389,6 +389,57 @@ describe('Log Configuration API (E2E)', () => {
     });
   });
 
+  describe('durable endpoint identity', () => {
+    it('keeps the endpoint name snapshot after the endpoint is deleted', async () => {
+      const authHeader = ['Bearer', token].join(' ');
+      const endpointName = `log-name-snapshot-${Date.now()}`;
+      let endpointId: string | undefined;
+
+      try {
+        const created = await request(app.getHttpServer())
+          .post('/scim/admin/endpoints')
+          .set('Authorization', authHeader)
+          .send({
+            name: endpointName,
+            displayName: 'Durable Log Endpoint',
+            profilePreset: 'rfc-standard',
+          })
+          .expect(201);
+        endpointId = created.body.id as string;
+
+        const requestId = randomUUID();
+        await request(app.getHttpServer())
+          .get(`/scim/v2/endpoints/${endpointId}/Users?count=1`)
+          .set('Authorization', authHeader)
+          .set('X-Request-Id', requestId)
+          .expect(200);
+
+        const beforeDelete = await waitForLogRowByRequestId(app, token, requestId);
+        expect(beforeDelete).toMatchObject({
+          endpointId,
+          endpointName: 'Durable Log Endpoint',
+        });
+
+        await request(app.getHttpServer())
+          .delete(`/scim/admin/endpoints/${endpointId}`)
+          .set('Authorization', authHeader)
+          .expect(204);
+        endpointId = undefined;
+
+        const afterDelete = await waitForLogRowByRequestId(app, token, requestId);
+        expect(afterDelete).toMatchObject({
+          endpointName: 'Durable Log Endpoint',
+        });
+      } finally {
+        if (endpointId) {
+          await request(app.getHttpServer())
+            .delete(`/scim/admin/endpoints/${endpointId}`)
+            .set('Authorization', authHeader);
+        }
+      }
+    });
+  });
+
   // ─── Stream Logs (SSE) ───────────────────────────────────────────
 
   describe('GET /scim/admin/log-config/stream', () => {

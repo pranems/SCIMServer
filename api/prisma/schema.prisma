@@ -35,6 +35,7 @@ model Endpoint {
 model RequestLog {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   endpointId       String?  @db.Uuid
+  endpointName     String?
   method           String
   url              String
   status           Int?
@@ -212,4 +213,3 @@ model ServerSetting {
   value     String   @db.Text
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz
 }
-

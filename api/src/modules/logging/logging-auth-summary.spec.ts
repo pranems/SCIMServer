@@ -120,6 +120,21 @@ describe('LoggingService - auth summary on RequestLog (V10)', () => {
     expect(detail?.authCredentialId).toBe('cred-oauth-9');
   });
 
+  it('persists the endpoint name snapshot for list and detail after the endpoint can no longer be resolved', async () => {
+    seedWithAuth({
+      endpointId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      endpointName: 'Deleted Endpoint Snapshot',
+      authOutcome: 'accept',
+      authMethod: 'shared_secret',
+    });
+
+    const list = await service.listLogs({});
+    expect(list.items[0].endpointName).toBe('Deleted Endpoint Snapshot');
+
+    const detail = await service.getLog(list.items[0].id);
+    expect(detail?.endpointName).toBe('Deleted Endpoint Snapshot');
+  });
+
   it('leaves the auth fields undefined when no auth decision was stamped', async () => {
     service.recordRequest({
       method: 'GET',
