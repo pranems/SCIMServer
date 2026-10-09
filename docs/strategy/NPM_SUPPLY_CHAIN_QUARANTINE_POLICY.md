@@ -478,6 +478,27 @@ Feed-visible pins 1.0.30001814, 1.5.444 and 2.0.57 satisfy the parent's
 declared ranges and are 8.86, 7.15 and 15.88 days old respectively.
 Regenerate again with these pins and review the entire changed graph.
 
+**Second artifact accepted:** [run 37890617600](https://github.com/pranems/SCIMServer/actions/runs/37890617600)
+generated 51 changed entries. Every publication timestamp was checked through
+the company feed; the minimum observed age was 7.159 days. API and web
+lockfiles contain 720 and 463 SHA-512 entries respectively, with only public
+resolved hosts. Owned, non-junction `npm ci` installations succeeded and left
+both files byte-identical to the downloaded artifact.
+
+Fresh production audits now report **zero findings in both workspaces**.
+Full development graphs remain blocked: API has one critical, three high
+and 20 moderate package findings; web has 11 high package findings. The leaf
+causes are the five residual packages listed above; dependent packages account
+for the larger totals. This is not an all-green dependency gate or permission
+to deploy. Do not apply the audit's proposed `ts-jest` or size-limit downgrade
+blindly. The live pin review reports zero findings and zero unchecked names.
+
+The separate master-based dependency worktree's web coverage run passes
+118 suites / 1,568 tests, with lines 85.40%, branches 75.37%, functions 75.22%
+and statements 82.68%. These counts differ from the dirty UI validation
+worktree because its unmerged UI regression additions are not in this branch.
+The dependency branch does not recertify that other source overlay.
+
 | Issue | Type / severity | Symptom and root cause | Resolution and why it works | Detection / prevention |
 |---|---|---|---|---|
 | SP-3 | Gate correctness / High | Qualified override names matched no package advisories and returned zero findings. The watcher compared selectors to plain package names. | Normalize only the trailing version selector, retaining scoped names. Both lookup and evaluation use the same normalization. | Two focused RED/GREEN controls caught this before lock generation. Earliest applicable gate: pin-watcher unit tests. |
@@ -486,6 +507,7 @@ Regenerate again with these pins and review the entire changed graph.
 | SP-6 | Evidence parsing / Low | PowerShell lock parsing rejected the empty root key, and date coercion shifted an early eligibility probe by six hours. | Parse lock maps with a hashtable or Node, and calculate ages from raw ISO timestamps in Node. The retained classification uses that path. | Metadata review caught this before selecting pins. Compare raw publication timestamps, not reparsed display dates. |
 | SP-7 | Tooling / Low | Prisma generation in the fresh worktree lacked `DATABASE_URL`, causing downstream missing-client compile errors. | Supply a non-routable placeholder for generation only and generate into the worktree-local `src/generated/prisma` output. Generation requires configuration but does not connect to that database. | Caught by setup/build before pushing. Inspect generator output and require generation success before interpreting downstream compile errors. |
 | SP-8 | Quarantine timing / Medium | CI floated three Browserslist data dependencies younger than seven days, despite every intended advisory fix being aged. | Reject the artifact before installation and pin feed-visible, aged versions within the parent's declared ranges, then regenerate. | The existing CI age report and local changed-entry review caught this at artifact acceptance, the earliest stage with the complete new graph. Check every changed entry, not only manually selected fixes. |
+| SP-9 | Evidence parsing / Low | A receipt query treated the custom E2E report's suite-level test count as an iterable test list. | Read the top-level `tests` records and `summary`; no test result changed. | Caught by the evidence query itself. Use the report's actual schema, not Jest's standard JSON shape. |
 
 **Design/architecture disposition: applied.** The small existing watcher remains
 one cohesive service; both workspaces and qualified names reuse it without a

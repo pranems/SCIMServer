@@ -13,9 +13,14 @@ seven-day-eligible fixes. Production-critical `proxy-addr@2.0.8` and
 blocker: use the existing CI regeneration workflow and review every changed
 package age before importing its artifact. The pin watcher now covers both
 workspaces and version-qualified selectors, with three confirmed RED/GREEN
-controls (16 -> 19 focused tests). Lock regeneration and new-graph validation
-are still pending; no image or deployment is authorized. The separate dirty
-comprehensive UI validation worktree is preserved.
+controls (16 -> 19 focused tests). CI run 37890617600's locks were accepted
+after reviewing all 51 changed entries (minimum age 7.159 days), public hosts
+and SHA-512 integrity. Owned installs preserved artifact bytes. Fresh
+production audits are clean in both workspaces; full development audits
+remain blocked by one API critical / three API high / 20 API moderate and
+11 web high package findings. New-graph web coverage passes 1,568 tests.
+No image or deployment is authorized. The separate dirty comprehensive UI
+validation worktree is preserved.
 
 **v0.55.36 merged and deployed to purplecliff dev, 2026-09-30:** PR #188
 merged as `d6e9a497315739b62ea11d2194a919944c376c31` after exact-tip CodeQL,

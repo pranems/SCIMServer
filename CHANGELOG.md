@@ -20,10 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   upgrade remain explicit follow-up items, not silent audit suppressions.
 - Pin review now covers API and web, including version-qualified overrides;
   focused watcher tests increased from 16 to 19 with three confirmed
-  RED/GREEN controls. Full new-graph evidence remains pending lock generation.
+  RED/GREEN controls. Live pin review: zero findings / zero unchecked names.
 - Rejected the first CI artifact because three floated Browserslist data
   packages were under seven days old; constrain them to measured aged
   compatible versions before regenerating again.
+- Accepted CI run 37890617600's 51 changed entries, all at least 7.159 days old.
+  Public hosts and SHA-512-only integrity were verified; owned installs
+  preserved both artifact lockfiles byte-for-byte.
+- Fresh production audits: API 11 -> 0 findings; web 1 -> 0. Full development
+  audits remain blocked (API: one critical / three high / 20 moderate; web:
+  11 high). No audit exception or suppression was added.
+- Master-based web coverage: 118 suites / 1,568 tests passed, with lines
+  85.40%, branches 75.37%, functions 75.22%, statements 82.68%. The unmerged
+  comprehensive UI branch's additional tests remain separate evidence.
 
 ### Release assurance follow-up
 
