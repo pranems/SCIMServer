@@ -1,6 +1,6 @@
 # Schema Customization Guide - Operator Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.36`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.37`
 
 > **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.

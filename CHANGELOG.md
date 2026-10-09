@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.37] - 2026-10-09
+
 ### Seven-day-compliant dependency remediation
 
 - Remove the advisory-only test and development chains instead of suppressing
