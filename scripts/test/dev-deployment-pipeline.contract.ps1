@@ -109,6 +109,46 @@ Invoke-Assert -Description 'dev readiness requires the exact intended revision h
 Invoke-Assert -Description 'local Docker validation refreshes base images even when layer cache is disabled' `
     -Condition ($fullValidationContent -match 'docker\s+compose\s+build\s+--no-cache\s+--pull')
 
+$isolatesDockerValidation = ($fullValidationContent -match '\$DockerProjectName') -and
+    ($fullValidationContent -match '\$env:COMPOSE_PROJECT_NAME') -and
+    ($fullValidationContent -match '\$env:API_HOST_PORT') -and
+    ($fullValidationContent -match '\$env:POSTGRES_HOST_PORT') -and
+    ($fullValidationContent -match 'Get-FreeTcpPort')
+Invoke-Assert -Description 'local Docker validation uses a unique Compose project and available host ports' `
+    -Condition $isolatesDockerValidation
+
+$composeContent = Get-Content -LiteralPath (Join-Path $repoRoot 'docker-compose.yml') -Raw
+$parameterizesCompose = ($composeContent -match '\$\{API_HOST_PORT:-8080\}:8080') -and
+    ($composeContent -match '\$\{POSTGRES_HOST_PORT:-5432\}:5432') -and
+    ($composeContent -match '\$\{API_CONTAINER_NAME:-scimserver-api\}') -and
+    ($composeContent -match '\$\{POSTGRES_CONTAINER_NAME:-scimserver-postgres\}')
+Invoke-Assert -Description 'docker-compose keeps standard defaults while allowing isolated validation bindings' `
+    -Condition $parameterizesCompose
+
+$usesNumericLoopback = $fullValidationContent -match '\$dockerBaseUrl\s*=\s*"http://127\.0\.0\.1:\$dockerPort"'
+Invoke-Assert -Description 'isolated Docker live tests use numeric loopback rather than host DNS' `
+    -Condition $usesNumericLoopback
+
+$failsWhenLiveTestsFail = ($fullValidationContent -match '\$phase1Result\s+-eq\s+"FAILED"') -and
+    ($fullValidationContent -match '\$phase2Result\s+-eq\s+"FAILED"') -and
+    ($fullValidationContent -match 'exit 1')
+Invoke-Assert -Description 'full validation exits nonzero when either live-test lane fails' `
+    -Condition $failsWhenLiveTestsFail
+
+$usesNamedLiveArguments = ($fullValidationContent -match '\$localLiveArgs\s*=\s*@\{') -and
+    ($fullValidationContent -match '\$dockerLiveArgs\s*=\s*@\{') -and
+    ($fullValidationContent -match '&\s+\$liveTestScript\s+@localLiveArgs') -and
+    ($fullValidationContent -match '&\s+\$liveTestScript\s+@dockerLiveArgs')
+Invoke-Assert -Description 'full validation invokes both live lanes with named hashtable splatting' `
+    -Condition $usesNamedLiveArguments
+
+$checksLiveExitCodes = ([regex]::Matches(
+    $fullValidationContent,
+    'if\s*\(\$LASTEXITCODE\s+-ne\s+0\)\s*\{\s*throw\s+"Live tests'
+).Count -eq 2)
+Invoke-Assert -Description 'full validation turns both child live-test exit codes into gate failures' `
+    -Condition $checksLiveExitCodes
+
 Write-Host ''
 if ($failures.Count -eq 0) {
     Write-Host 'All deployment evidence assertions passed.' -ForegroundColor Green

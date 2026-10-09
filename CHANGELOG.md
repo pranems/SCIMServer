@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Post-merge validation hardening
+
+- Make the unsupported-uniqueness E2E assertion concurrency-safe by proving
+  that the rejected endpoint name was not published instead of comparing the
+  entire server-wide endpoint inventory while other suites mutate it.
+- Resolve dispatched workflow identity from `origin/master`, not a potentially
+  stale local `master` branch in a detached merged-master worktree.
+- Keep normal Docker Compose defaults at API port 8080 and PostgreSQL port
+  5432, while full validation uses a unique project, unique container names
+  and available loopback ports. Existing unrelated Compose estates are neither
+  stopped nor reused.
+- Use numeric loopback for isolated Docker live tests and return a nonzero
+  process exit whenever either local or Docker live validation fails.
+- Invoke both live-test lanes through named PowerShell hashtable splatting and
+  promote each child script's nonzero exit code to a wrapper failure. The full
+  isolated Docker lane builds from scratch, reports healthy v0.55.37 and passes
+  all 1,700 live assertions.
+
 ## [0.55.37] - 2026-10-09
 
 ### Seven-day-compliant dependency remediation

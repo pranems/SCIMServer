@@ -1,6 +1,6 @@
 # Docker Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.37`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
 
 > **Version:** 0.55.37 - **Updated:** June 3, 2026
 > **Source of truth:** [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml)
@@ -105,6 +105,13 @@ volumes:
 ```
 
 ### Commands
+
+The checked-in defaults bind the API to host port `8080`, PostgreSQL to host
+port `5432`, and use the established `scimserver-api` and
+`scimserver-postgres` names. To run an isolated second estate without stopping
+an existing one, set `COMPOSE_PROJECT_NAME`, `API_HOST_PORT`,
+`POSTGRES_HOST_PORT`, `API_CONTAINER_NAME`, and `POSTGRES_CONTAINER_NAME`.
+The full validation pipeline assigns these automatically.
 
 ```bash
 # Start (build if needed)

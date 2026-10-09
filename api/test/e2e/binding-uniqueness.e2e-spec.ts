@@ -67,7 +67,6 @@ describe('binding-qualified uniqueness at admission and resource HTTP boundaries
     const name = `invalid-unique-${randomUUID()}`;
     const profile = bindingUniquenessProfile();
     profile.schemas[1].attributes.push({ name: 'unsupported', type, multiValued: false, required: false, uniqueness: 'server' });
-    const before = await http('get', '/scim/admin/endpoints');
     const response = await http('post', '/scim/admin/endpoints', { name, profile });
     if (response.status === 201) endpoints.push(response.body.id);
     expect(response.status).toBe(400);
@@ -76,7 +75,11 @@ describe('binding-qualified uniqueness at admission and resource HTTP boundaries
       detail: expect.stringContaining('ResourceType "Other": Unsupported uniqueness declaration') as unknown,
     });
     for (const key of Object.keys(response.body)) expect(['schemas', 'status', 'detail', 'urn:scimserver:api:messages:2.0:Diagnostics']).toContain(key);
-    expect((await http('get', '/scim/admin/endpoints')).body).toEqual(before.body);
+    const published = await http('get', '/scim/admin/endpoints');
+    expect(published.status).toBe(200);
+    expect(published.body.endpoints).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name })]),
+    );
   });
   it('rejects an unsupported profile update without changing the published profile or token', async () => {
     const profile = bindingUniquenessProfile();

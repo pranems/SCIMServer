@@ -58,6 +58,7 @@ foreach ($required in @(
     'github-workflow-run.ps1',
     'Select-GithubWorkflowRun',
     '-ExpectedHeadSha',
+    'git rev-parse "origin/$publishRef"',
     'Semantic tag matches runtime source SHA digest',
     'GHCR and ACR version/latest digest parity'
 )) {
@@ -67,6 +68,9 @@ foreach ($required in @(
 }
 if ($pipeline.Contains("--limit 1 --json databaseId --jq '.[0].databaseId'")) {
     throw 'Deployment pipeline still selects the newest run without matching the expected SHA.'
+}
+if ($pipeline.Contains('(git rev-parse $publishRef)')) {
+    throw 'Deployment pipeline still resolves the expected workflow SHA from a potentially stale local branch.'
 }
 foreach ($required in @(
     'docker compose images -q api',

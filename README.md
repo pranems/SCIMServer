@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.37`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.37`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -261,6 +261,10 @@ docker compose up --build -d
 ```
 
 The server starts at **http://localhost:8080** with PostgreSQL 17.
+Those remain the default host bindings. When either port is already in use,
+set `API_HOST_PORT` and `POSTGRES_HOST_PORT` before `docker compose up`.
+Container names can likewise be isolated with `API_CONTAINER_NAME` and
+`POSTGRES_CONTAINER_NAME`.
 
 ```bash
 # Verify health

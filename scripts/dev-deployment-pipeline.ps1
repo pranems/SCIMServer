@@ -668,7 +668,7 @@ if (-not $SkipDeploy) {
             -Detail "semantic version tag already exists; reusing immutable artifact $existingVersionDigest"
     } else {
         $releaseArtifactReady = Invoke-Gate '4.3' "GHCR publish v$version + latest (publish-ghcr.yml @ $publishRef)" {
-            $expectedHeadSha = (git rev-parse $publishRef).Trim()
+            $expectedHeadSha = (git rev-parse "origin/$publishRef").Trim()
             $dispatchedAfter = [DateTimeOffset]::UtcNow.AddSeconds(-5)
             gh workflow run publish-ghcr.yml --ref $publishRef -f version=$version -f pushLatest=true
             if ($LASTEXITCODE -ne 0) {
