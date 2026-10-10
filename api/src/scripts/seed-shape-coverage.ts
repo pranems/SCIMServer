@@ -26,7 +26,7 @@
  *   shape-soft-delete-only    entra-id-minimal preset; UserSoftDeleteEnabled=true,
  *                             UserHardDeleteEnabled=false, GroupHardDeleteEnabled=false
  *   shape-per-endpoint-creds  entra-id preset; dedicated bearer and OAuth enabled,
- *                             plus 1 EndpointCredential row (bcrypt of "shape-secret")
+ *                             plus 1 EndpointCredential row (bcrypt of "shape-dev-secret")
  *   shape-custom-resource     INLINE custom profile: User + Group + custom Device
  *                             resourceType with its own URN + custom extension on User.
  *                             VerbosePatchSupported=true. Tests custom resource type
@@ -430,7 +430,7 @@ const stats = {
   users:     { created: 0, updated: 0 },
   groups:    { created: 0, updated: 0 },
   members:   { created: 0 },
-  creds:     { created: 0, skipped: 0 },
+  creds:     { created: 0, updated: 0 },
 };
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -642,30 +642,46 @@ async function upsertGroup(
 
 async function upsertEndpointCredential(db: PrismaClient, endpointId: string): Promise<void> {
   const label = 'shape-dev-bearer';
-  const existing = await db.endpointCredential.findFirst({
-    where: { endpointId, label },
+  const id = deterministicUuid(`cred:${endpointId}:${label}`);
+  const existing = await db.endpointCredential.findUnique({
+    where: { id },
     select: { id: true },
   });
-  if (existing) {
-    stats.creds.skipped++;
-    return;
-  }
   if (DRY_RUN) {
-    stats.creds.created++;
+    if (existing) stats.creds.updated++;
+    else stats.creds.created++;
     return;
   }
+
   const hash = await bcrypt.hash(SHAPE_DEV_BEARER_PLAINTEXT, DEV_BCRYPT_COST);
-  await db.endpointCredential.create({
-    data: {
-      id: deterministicUuid(`cred:${endpointId}:${label}`),
+  await db.endpointCredential.deleteMany({
+    where: { endpointId, label, id: { not: id } },
+  });
+  await db.endpointCredential.upsert({
+    where: { id },
+    create: {
+      id,
       endpointId,
       credentialType: 'bearer',
       credentialHash: hash,
       label,
       active: true,
     },
+    update: {
+      credentialType: 'bearer',
+      credentialHash: hash,
+      label,
+      metadata: Prisma.JsonNull,
+      secretEnvelope: null,
+      active: true,
+      expiresAt: null,
+      lookupKey: null,
+      secretHash: null,
+      hashAlgo: 'bcrypt',
+    },
   });
-  stats.creds.created++;
+  if (existing) stats.creds.updated++;
+  else stats.creds.created++;
 }
 
 // ─── Output helpers ─────────────────────────────────────────────────────────
@@ -685,7 +701,7 @@ function summary(): void {
   log(`   users       : created=${stats.users.created} updated=${stats.users.updated}`);
   log(`   groups      : created=${stats.groups.created} updated=${stats.groups.updated}`);
   log(`   memberships : created=${stats.members.created}`);
-  log(`   credentials : created=${stats.creds.created} skipped=${stats.creds.skipped}`);
+  log(`   credentials : created=${stats.creds.created} updated=${stats.creds.updated}`);
   log('-----------------------------------------------------------------');
   log('Note: per-endpoint bearer for shape-per-endpoint-creds = "shape-dev-secret"');
 }

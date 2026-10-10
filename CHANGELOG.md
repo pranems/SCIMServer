@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Validation tooling
+
+- Align endpoint error-recovery Playwright coverage with v0.55.41's page-owned
+  query errors, remove credential-test reload races, and make shared-secret
+  Connect coverage deterministic.
+- Reconcile the deterministic `shape-dev-secret` credential on every synthetic
+  shape seed. This repairs credential-rotation drift instead of silently
+  accepting any same-label row. Deployed-dev focused browser proof passes
+  14/14, deterministic Connect coverage passes 9/9, and the opt-in six-profile
+  matrix passes 9/9.
+
 ## [0.55.41] - 2026-10-10
 
 ### Browser shell readiness and measured database capacity

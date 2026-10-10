@@ -174,9 +174,13 @@ intentionally omits the Group resourceType).
 - Users upserted by **(endpointId, userName)**.
 - Groups upserted by **(endpointId, displayName)** with member rows replaced
   in a single transaction-style delete + re-insert.
-- Endpoint credentials upserted by **(endpointId, label)**.
+- The known bearer credential is reconciled by its deterministic ID. Re-running
+  the seed reactivates it, refreshes its documented bcrypt verifier, and removes
+  same-label replacements from this owned synthetic endpoint.
 
-Re-running stage 2 produces zero duplicates and updates the rows in place.
+Re-running stage 2 produces zero duplicates and updates the rows in place. This
+also repairs the fixture if a browser or manual credential rotation replaced the
+known `shape-dev-secret` row.
 
 ### 5.4 Per-endpoint bearer credential
 

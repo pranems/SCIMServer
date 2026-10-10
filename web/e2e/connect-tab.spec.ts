@@ -45,9 +45,15 @@ test.afterEach(async ({ page }) => {
 
 async function openFirstEndpointConnect(page: Page): Promise<void> {
   test.setTimeout(120_000);
-  fixtureEndpointId = await createFixtureEndpoint(page, { namePrefix: 'e2e-connect' });
+  fixtureEndpointId = await createFixtureEndpoint(page, {
+    namePrefix: 'e2e-connect',
+    settings: { SharedSecretBearerAuthEnabled: true },
+  });
   await page.goto(`/endpoints/${fixtureEndpointId}/connect`);
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('credentials-method-tab-shared_secret')).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 test.describe('Endpoint detail - Connect tab (WI-5)', () => {
@@ -62,7 +68,6 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
   test('W12: the ConnectionPanel is scoped to the shared-secret tab (no method selector)', async ({ page }) => {
     await openFirstEndpointConnect(page);
     const sharedTab = page.getByTestId('credentials-method-tab-shared_secret');
-    test.skip((await sharedTab.count()) === 0, 'Endpoint has no shared-secret method.');
     await sharedTab.click();
     await expect(page.getByTestId('connect-tab-panel')).toBeVisible();
     await expect(page.getByTestId('connect-tab-panel-copy-json')).toBeVisible();
@@ -76,11 +81,9 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
   test('the Tenant URL field carries a copy button on the shared-secret panel', async ({ page }) => {
     await openFirstEndpointConnect(page);
     const sharedTab = page.getByTestId('credentials-method-tab-shared_secret');
-    test.skip((await sharedTab.count()) === 0, 'Endpoint has no shared-secret method.');
     await sharedTab.click();
     // The shared-secret method surfaces a tenantUrl field with a copy button.
     const tenantValue = page.getByTestId('connect-tab-panel-value-tenantUrl');
-    test.skip((await tenantValue.count()) === 0, 'Shared-secret panel has no tenantUrl field.');
     await expect(tenantValue).toBeVisible();
     await expect(page.getByTestId('connect-tab-panel-value-tenantUrl-copy-button')).toBeVisible();
     // The URL is the leading /scim/v2 form (WI-1).
@@ -106,7 +109,6 @@ test.describe('Endpoint detail - Connect tab (WI-5)', () => {
     const methodTab = page
       .locator('[data-testid^="credentials-method-tab-"]:not([data-testid="credentials-method-tab-all"])')
       .first();
-    test.skip((await methodTab.count()) === 0, 'Endpoint has no per-method auth tabs enabled.');
     const tabTestId = (await methodTab.getAttribute('data-testid')) ?? '';
     const method = tabTestId.replace('credentials-method-tab-', '');
     await methodTab.click();

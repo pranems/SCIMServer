@@ -152,15 +152,14 @@ test.describe('Connect tab - migration surface (P7)', () => {
   });
 
   test('a credential card shows its Connect params with no click, and has no Connect button', async ({ page }) => {
-    await openConnect(page);
-    // Ensure the bearer method is on, then create a credential to inspect.
-    await page.getByTestId('connect-auth-methods').getByRole('button').click();
-    const bearerFlag = page.getByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled');
-    if (!(await bearerFlag.isChecked())) {
-      await bearerFlag.click();
-      await page.reload();
-      await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
-    }
+    test.setTimeout(120_000);
+    fixtureEndpointId = await createFixtureEndpoint(page, {
+      namePrefix: 'e2e-p7',
+      settings: { SecretTokenBearerAuthEnabled: true },
+    });
+    await page.goto(`/endpoints/${fixtureEndpointId}/connect`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('credentials-method-tab-bearer').click();
     await page.getByTestId('credentials-create-button').click();
     await page.getByTestId('credentials-create-dialog-submit').click();
     // Dismiss the one-time-secret view to get back to the card list.
@@ -179,14 +178,14 @@ test.describe('Connect tab - migration surface (P7)', () => {
   });
 
   test('Rotate is on the card, and a newly minted credential is badged Keyed', async ({ page }) => {
-    await openConnect(page);
-    await page.getByTestId('connect-auth-methods').getByRole('button').click();
-    const bearerFlag = page.getByTestId('connect-auth-flag-SecretTokenBearerAuthEnabled');
-    if (!(await bearerFlag.isChecked())) {
-      await bearerFlag.click();
-      await page.reload();
-      await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
-    }
+    test.setTimeout(120_000);
+    fixtureEndpointId = await createFixtureEndpoint(page, {
+      namePrefix: 'e2e-p7',
+      settings: { SecretTokenBearerAuthEnabled: true },
+    });
+    await page.goto(`/endpoints/${fixtureEndpointId}/connect`);
+    await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('credentials-method-tab-bearer').click();
     await page.getByTestId('credentials-create-button').click();
     await page.getByTestId('credentials-create-dialog-submit').click();
     const done = page.getByTestId('credentials-create-dialog-submit');
