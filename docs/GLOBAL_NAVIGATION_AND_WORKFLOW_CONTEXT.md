@@ -51,6 +51,11 @@ One endpoint control shape is not correct everywhere. The UI uses one identity m
 
 This prevents opaque UUID prefixes from being the primary identity while preserving IDs in API calls, links, copy surfaces, and diagnostics.
 
+Navigation does not await route data before rendering the application shell.
+Each destination owns its loading and error states while TanStack Query warms
+or reuses the route cache. A failed background read must remain visibly
+distinct from a legitimate empty endpoint list or unavailable server value.
+
 ## Self-service `/Me`
 
 Self-service `/Me` is not the SCIMServer administrator's account page. It exercises RFC 7644 section 3.11 for the SCIM User represented by the current OAuth token.

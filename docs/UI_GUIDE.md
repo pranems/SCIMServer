@@ -124,7 +124,9 @@ After authentication the app shell renders: a brand bar, a collapsible sidebar w
 loading state immediately while data prefetch continues in the background.
 Slow Dashboard, Endpoints, Logs, discovery, or settings reads do not replace
 the shell with a blank page. Hover prefetch still warms route data, and
-TanStack Query shares an in-flight request with the mounted page.
+TanStack Query shares an in-flight request with the mounted page. If a
+background read fails, the destination page renders an explicit error instead
+of presenting missing data as an empty or successful state.
 
 **Header actions (right side):** environment warning indicator, notifications bell, **pulse icon** (live log stream drawer), **key icon** (token dialog), and the **theme toggle** (light/dark).
 
