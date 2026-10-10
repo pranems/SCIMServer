@@ -1,23 +1,21 @@
 /**
  * router-loaders.test.ts - asserts that every production route in
  * web/src/router.ts has a `loader` wired up to its matching
- * queryOptions helper.
+ * queryOptions helper without blocking route rendering.
  *
  * Phase A4 added per-route loaders so navigation feels instant: hovering
  * a `<Link>` triggers the loader (via `defaultPreload: 'intent'`) which
- * pre-warms the TanStack Query cache via `ensureQueryData`. By the time
- * the user clicks, the data is already in cache and the component
- * renders synchronously without a spinner.
+ * starts warming the TanStack Query cache via `prefetchQuery`. A warm
+ * response is reused, while a slow response leaves the application shell
+ * and the page-owned loading state visible.
  *
- * These tests don't *invoke* the loaders (that would require mocking
- * fetch end-to-end and is covered by integration tests). They just lock
- * in the contract that every route declares `options.loader: Function`,
- * preventing accidental regressions where someone removes a loader and
- * silently breaks the prefetch behavior.
+ * The tests lock both structural loader presence and the nonblocking source
+ * contract. Integration and Playwright tests cover runtime behavior.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { router, routeTree } from './router';
+import { dashboardLoader } from './routes/index';
 
 interface RouteShape {
   id?: string;
@@ -35,6 +33,11 @@ function flattenRoutes(node: RouteShape, acc: RouteShape[] = []): RouteShape[] {
 }
 
 describe('router loaders (Phase A4)', () => {
+  const routeSources = import.meta.glob('./routes/*.tsx', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  });
   const allRoutes = flattenRoutes(routeTree as unknown as RouteShape);
   const routesNeedingLoaders = [
     { fullPath: '/endpoints', label: '/endpoints' },
@@ -64,6 +67,28 @@ describe('router loaders (Phase A4)', () => {
     const indexMatch = allRoutes.find((r) => r.id === '/');
     expect(indexMatch, 'dashboard index route should be present').toBeDefined();
     expect(typeof indexMatch?.options?.loader).toBe('function');
+  });
+
+  it('dashboard loader starts prefetch without blocking the application shell', () => {
+    const neverSettles = new Promise<never>(() => {});
+    const prefetchQuery = vi.fn().mockReturnValue(neverSettles);
+
+    const result = dashboardLoader({
+      context: {
+        queryClient: { prefetchQuery },
+      },
+    });
+
+    expect(result).toBeUndefined();
+    expect(prefetchQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps every route loader nonblocking so slow data cannot hide the shell', () => {
+    const blockingRoutes = Object.entries(routeSources)
+      .filter(([, source]) => String(source).includes('ensureQueryData'))
+      .map(([path]) => path);
+
+    expect(blockingRoutes).toEqual([]);
   });
 
   it('router context exposes a queryClient so loaders can ensureQueryData', () => {

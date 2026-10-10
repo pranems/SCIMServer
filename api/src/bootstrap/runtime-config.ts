@@ -119,7 +119,7 @@ export const RUNTIME_CONFIG_SPECS = {
   database: {
     // A GLOBAL budget: poolMax * maxReplicas must stay under the server's
     // max_connections. Re-derive when the replica ceiling or DB tier changes.
-    poolMax: { kind: 'number', env: 'DB_POOL_MAX', default: 5, min: 1, max: 100, integer: true },
+    poolMax: { kind: 'number', env: 'DB_POOL_MAX', default: 10, min: 1, max: 100, integer: true },
     // Restores the bound Prisma v6 had as `pool_timeout` (X15-F3).
     poolAcquireTimeoutMs: {
       kind: 'number',

@@ -24,6 +24,7 @@ export const editEndpointRoute = createRoute({
     const { endpointId } = editEndpointRoute.useParams();
     return <EditEndpointPage endpointId={endpointId} />;
   },
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(endpointDetailQueryOptions(params.endpointId)),
+  loader: ({ context, params }) => {
+    void context.queryClient.prefetchQuery(endpointDetailQueryOptions(params.endpointId));
+  },
 });

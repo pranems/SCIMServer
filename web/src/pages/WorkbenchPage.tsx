@@ -90,6 +90,7 @@ import {
   CopyJsonButton,
 } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
+import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { clickableProps } from '../utils/interactive';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
@@ -567,6 +568,10 @@ export const WorkbenchPage: React.FC = () => {
   const canExport = path.trim().length > 0;
   const canUndoBody = bodyCursor > 0;
   const canRedoBody = bodyCursor < bodyHistory.length - 1;
+
+  if (endpoints.error) {
+    return <ScimErrorMessage error={endpoints.error} />;
+  }
 
   return (
     <div className={classes.page} data-testid="workbench-page">

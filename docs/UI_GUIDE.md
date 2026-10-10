@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.40`
+> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.41`
 
-> **Status:** Active | **Last Updated:** 2026-10-01 | **Version:** 0.55.40
+> **Status:** Active | **Last Updated:** 2026-10-01 | **Version:** 0.55.41
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -119,6 +119,14 @@ After authentication the app shell renders: a brand bar, a collapsible sidebar w
 | Settings | `/settings` | Server info, health, log configuration |
 
 **Header navigation (left side):** global **Back** and **Forward** icons restore exact route and URL-owned workflow state. Direct loads start with both disabled; moving Back enables Forward until a new navigation branch replaces it.
+
+**Route loading:** navigation renders the app shell and the destination page's
+loading state immediately while data prefetch continues in the background.
+Slow Dashboard, Endpoints, Logs, discovery, or settings reads do not replace
+the shell with a blank page. Hover prefetch still warms route data, and
+TanStack Query shares an in-flight request with the mounted page. If a
+background read fails, the destination page renders an explicit error instead
+of presenting missing data as an empty or successful state.
 
 **Header actions (right side):** environment warning indicator, notifications bell, **pulse icon** (live log stream drawer), **key icon** (token dialog), and the **theme toggle** (light/dark).
 

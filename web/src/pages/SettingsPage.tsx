@@ -67,8 +67,8 @@ const useStyles = makeStyles({
 
 export const SettingsPage: React.FC = () => {
   const classes = useStyles();
-  const { data: version, isLoading: vLoading } = useVersion();
-  const { data: health, isLoading: hLoading } = useHealth();
+  const { data: version, isLoading: vLoading, error: versionError } = useVersion();
+  const { data: health, isLoading: hLoading, error: healthError } = useHealth();
 
   if (vLoading || hLoading) {
     // G1 - card-shaped skeleton mirrors the final 3-card layout.
@@ -86,6 +86,10 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (versionError || healthError) {
+    return <ScimErrorMessage error={versionError ?? healthError} />;
   }
 
   return (

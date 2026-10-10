@@ -26,6 +26,7 @@ export const settingsTabRoute = createRoute({
   getParentRoute: () => endpointDetailRoute,
   path: 'settings',
   component: SettingsTabRouteComponent,
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(endpointStatsQueryOptions(params.endpointId)),
+  loader: ({ context, params }) => {
+    void context.queryClient.prefetchQuery(endpointStatsQueryOptions(params.endpointId));
+  },
 });

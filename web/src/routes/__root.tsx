@@ -15,8 +15,8 @@
  *
  * Phase A4 (loaders): the root route is created with
  * `createRootRouteWithContext<{ queryClient }>()` so per-route `loader`
- * functions can call `context.queryClient.ensureQueryData(...)` to
- * pre-fetch data while the next route renders.
+ * functions can call `context.queryClient.prefetchQuery(...)` without
+ * blocking the application shell while the next route renders.
  *
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2/A4
  */
@@ -30,8 +30,7 @@ import { LoadingSkeleton } from '../components/primitives';
 
 /**
  * Type of the router context. Loaders receive an object of this shape
- * via `loader: ({ context }) => ...` so they can call
- * `context.queryClient.ensureQueryData(opts)`.
+ * via `loader: ({ context }) => ...` so they can start background prefetch.
  */
 export interface RouterContext {
   queryClient: QueryClient;

@@ -183,6 +183,17 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
       writable: true,
       configurable: true,
     });
+
+  });
+
+  it('renders an explicit error when the endpoint list fails', () => {
+    mockUseEndpoints.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('endpoint list unavailable'),
+    });
+    renderWithProviders(<DiscoveryExplorerPage />);
+    expect(screen.getByText(/endpoint list unavailable/i)).toBeInTheDocument();
   });
 
   // ─── 1. Sub-tabs render ────────────────────────────────────────────

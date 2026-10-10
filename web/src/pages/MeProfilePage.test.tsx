@@ -127,6 +127,7 @@ describe('MeProfilePage', () => {
       isLoading: false,
       error: null,
     });
+
     mockUseMe.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -136,6 +137,16 @@ describe('MeProfilePage', () => {
     mockPatchMutateAsync.mockResolvedValue({});
     mockDeleteMutateAsync.mockResolvedValue(undefined);
     setStoredToken(makeJwt({ sub: 'admin@example.com' }));
+  });
+
+  it('renders an explicit error when the endpoint list fails', () => {
+    mockUseEndpoints.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('endpoint list unavailable'),
+    });
+    renderWithProviders(<MeProfilePage />);
+    expect(screen.getByText(/endpoint list unavailable/i)).toBeInTheDocument();
   });
 
   it('explains that My Profile is OAuth self-service for the token subject', () => {

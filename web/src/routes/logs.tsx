@@ -42,9 +42,9 @@ export const logsRoute = createRoute({
     hasError: search.hasError,
     minDurationMs: search.minDurationMs,
   }),
-  loader: async ({ context, deps }) => {
+  loader: ({ context, deps }) => {
     const since = timeRangeToSince(deps.timeRange);
-    await context.queryClient.ensureQueryData(
+    void context.queryClient.prefetchQuery(
       globalLogsQueryOptions({
         pageSize: deps.pageSize,
         urlContains: deps.urlContains,

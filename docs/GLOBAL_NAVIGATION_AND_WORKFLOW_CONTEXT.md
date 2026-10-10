@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-10-09 - **Product version:** `0.55.40`
+> **Status:** Implemented locally - **Last verified:** 2026-10-09 - **Product version:** `0.55.41`
 
 ## Purpose
 
@@ -50,6 +50,11 @@ One endpoint control shape is not correct everywhere. The UI uses one identity m
 | Work inside endpoint route | No redundant selector | Endpoint context comes from the route and detail header |
 
 This prevents opaque UUID prefixes from being the primary identity while preserving IDs in API calls, links, copy surfaces, and diagnostics.
+
+Navigation does not await route data before rendering the application shell.
+Each destination owns its loading and error states while TanStack Query warms
+or reuses the route cache. A failed background read must remain visibly
+distinct from a legitimate empty endpoint list or unavailable server value.
 
 ## Self-service `/Me`
 

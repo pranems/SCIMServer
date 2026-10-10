@@ -27,6 +27,12 @@ describe('runtime-config', () => {
   });
 
   describe('env resolution', () => {
+    it('defaults the pool to the measured ten-connection per-revision budget', () => {
+      const cfg = resolveRuntimeConfig(emptyGet);
+      expect(cfg.groups.database.poolMax.effective).toBe(10);
+      expect(cfg.groups.database.poolMax.source).toBe('default');
+    });
+
     it('reads a valid env value and records the source', () => {
       const cfg = resolveRuntimeConfig(getFrom({ DB_POOL_MAX: '10' }));
       expect(cfg.groups.database.poolMax.effective).toBe(10);

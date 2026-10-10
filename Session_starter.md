@@ -1,16 +1,16 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-09
+**Last verified:** 2026-10-10
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Release candidate:** v0.55.40 extends the request-log aggregation and
-browser-readiness corrections with bounded Activity and Dashboard concurrency.
-The exact v0.55.39 three-worker run passed 204 tests, skipped 12, failed 47,
-and measured 705 raw connection-acquire timeout records. Activity summary took
-17.702 seconds and Dashboard took 8.463 seconds even at idle. v0.55.40
-coalesces overlapping analytics reads while they are in flight and serializes
-remaining page, row, member-name, and endpoint-overview database work.
+**Release candidate:** v0.55.41 makes Dashboard route loading non-blocking,
+raises the bounded PostgreSQL pool from 5 to 10 after measuring a 50-connection
+server ceiling, one replica, and two retained revisions, and indexes
+`RequestLog.url` with PostgreSQL trigrams. Exact v0.55.40 browser validation
+passed 215 tests, skipped 10, failed 38, and measured 98 raw connection-acquire
+timeouts. The new browser contract fails on deployed v0.55.40 and passes
+against the branch while Dashboard analytics are deliberately held pending.
 
 ### Active Execution Reference
 

@@ -22,5 +22,7 @@ export const meRoute = createRoute({
   path: '/me',
   validateSearch: (search) => meSearchSchema.parse(search),
   component: MeProfilePage,
-  loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(endpointsQueryOptions());
+  },
 });
