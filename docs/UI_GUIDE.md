@@ -120,6 +120,12 @@ After authentication the app shell renders: a brand bar, a collapsible sidebar w
 
 **Header navigation (left side):** global **Back** and **Forward** icons restore exact route and URL-owned workflow state. Direct loads start with both disabled; moving Back enables Forward until a new navigation branch replaces it.
 
+**Route loading:** navigation renders the app shell and the destination page's
+loading state immediately while data prefetch continues in the background.
+Slow Dashboard, Endpoints, Logs, discovery, or settings reads do not replace
+the shell with a blank page. Hover prefetch still warms route data, and
+TanStack Query shares an in-flight request with the mounted page.
+
 **Header actions (right side):** environment warning indicator, notifications bell, **pulse icon** (live log stream drawer), **key icon** (token dialog), and the **theme toggle** (light/dark).
 
 The sidebar collapses to an icon rail via the chevron at its bottom, persisting the choice across reloads. Below 720px it becomes an icon rail automatically so the active workflow remains usable.
