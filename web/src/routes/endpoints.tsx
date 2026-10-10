@@ -24,5 +24,7 @@ export const endpointsRoute = createRoute({
   path: '/endpoints',
   component: EndpointsPage,
   validateSearch: endpointsSearchSchema,
-  loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(endpointsQueryOptions());
+  },
 });

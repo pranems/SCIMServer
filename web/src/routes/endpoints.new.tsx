@@ -26,5 +26,7 @@ export const createEndpointRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/endpoints/new',
   component: CreateEndpointWizard,
-  loader: ({ context }) => context.queryClient.ensureQueryData(presetsQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(presetsQueryOptions());
+  },
 });

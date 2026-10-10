@@ -25,5 +25,7 @@ export const workbenchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/workbench',
   component: WorkbenchPage,
-  loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(endpointsQueryOptions());
+  },
 });

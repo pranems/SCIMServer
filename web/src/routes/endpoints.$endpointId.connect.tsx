@@ -28,6 +28,7 @@ export const connectTabRoute = createRoute({
   path: 'connect',
   component: ConnectTabRouteComponent,
   validateSearch: connectSearchSchema,
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(endpointOverviewQueryOptions(params.endpointId)),
+  loader: ({ context, params }) => {
+    void context.queryClient.prefetchQuery(endpointOverviewQueryOptions(params.endpointId));
+  },
 });

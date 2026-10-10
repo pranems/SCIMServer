@@ -28,10 +28,13 @@ export const genericResourcesTabRoute = createRoute({
   getParentRoute: () => endpointDetailRoute,
   path: 'resources/$resourceTypeId',
   component: GenericResourcesTabRouteComponent,
-  loader: async ({ context, params }) => {
-    await Promise.all([
-      context.queryClient.ensureQueryData(endpointSchemasQueryOptions(params.endpointId)),
-      context.queryClient.ensureQueryData(endpointResourceTypesQueryOptions(params.endpointId)),
-    ]);
+  loader: ({ context, params }) => {
+    void context.queryClient
+      .prefetchQuery(endpointSchemasQueryOptions(params.endpointId))
+      .then(() =>
+        context.queryClient.prefetchQuery(
+          endpointResourceTypesQueryOptions(params.endpointId),
+        ),
+      );
   },
 });

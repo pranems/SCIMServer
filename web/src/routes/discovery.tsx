@@ -25,5 +25,7 @@ export const discoveryRoute = createRoute({
   path: '/discovery',
   component: DiscoveryExplorerPage,
   validateSearch: discoverySearchSchema,
-  loader: ({ context }) => context.queryClient.ensureQueryData(endpointsQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(endpointsQueryOptions());
+  },
 });

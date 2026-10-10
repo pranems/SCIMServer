@@ -26,6 +26,7 @@ export const schemasTabRoute = createRoute({
   getParentRoute: () => endpointDetailRoute,
   path: 'schemas',
   component: SchemasTabRouteComponent,
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(endpointSchemasQueryOptions(params.endpointId)),
+  loader: ({ context, params }) => {
+    void context.queryClient.prefetchQuery(endpointSchemasQueryOptions(params.endpointId));
+  },
 });

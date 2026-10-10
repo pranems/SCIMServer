@@ -18,6 +18,9 @@ export const serviceProviderConfigTabRoute = createRoute({
   getParentRoute: () => endpointDetailRoute,
   path: 'service-provider-config',
   component: ServiceProviderConfigRouteComponent,
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(endpointServiceProviderConfigQueryOptions(params.endpointId)),
+  loader: ({ context, params }) => {
+    void context.queryClient.prefetchQuery(
+      endpointServiceProviderConfigQueryOptions(params.endpointId),
+    );
+  },
 });

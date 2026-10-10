@@ -31,6 +31,7 @@ export const endpointDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/endpoints/$endpointId',
   component: EndpointDetailRouteComponent,
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(endpointDetailQueryOptions(params.endpointId)),
+  loader: ({ context, params }) => {
+    void context.queryClient.prefetchQuery(endpointDetailQueryOptions(params.endpointId));
+  },
 });

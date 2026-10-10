@@ -11,10 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Browser shell readiness and measured database capacity
 
-- Start Dashboard data prefetch without awaiting it in the route loader, so
-  the application shell and existing Dashboard loading skeleton render while
-  analytics are pending. A real-browser regression fails on deployed
-  v0.55.40 when the Dashboard request is held and passes against the branch.
+- Start every route's data prefetch without awaiting it, so the application
+  shell and page-owned loading states render while API reads are pending. A
+  real-browser regression fails on deployed v0.55.40 when the Dashboard
+  request is held and passes against the branch. In the focused 84-case
+  shell/chrome run, all accessibility, command-palette, keyboard,
+  notification, onboarding, visual-shell, and Workbench failures became
+  green; the remaining router failures exposed and closed the same blocking
+  pattern in Endpoints and Logs loaders.
 - Raise the default PostgreSQL pool from 5 to 10 only after measuring the dev
   server's 50-connection ceiling, one-replica limit, and two-revision
   retention. Worst-case application demand is 20 connections, leaving 30 for

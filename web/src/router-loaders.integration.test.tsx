@@ -1,11 +1,10 @@
 /**
  * router-loaders.integration.test.tsx - end-to-end check that a route
- * loader actually populates the QueryClient cache before the matched
- * component mounts.
+ * loader starts cache prefetch without blocking the matched component.
  *
  * This complements router-loaders.test.ts (which is structural) by
  * actually instantiating an in-memory router with loaders and a
- * fake fetch, then asserting the cache was warmed.
+ * fake fetch, then asserting the component renders while the cache warms.
  */
 
 import React from 'react';
@@ -21,6 +20,7 @@ import {
 } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { dashboardQueryOptions } from './api/queries';
+import { dashboardLoader } from './routes/index';
 
 // fetchWithAuth now short-circuits when getStoredToken() returns null
 // (Bug 2 fix, RCA 2026-05-20). Stub the token module so the loader's
@@ -51,14 +51,28 @@ describe('Phase A4 loaders pre-warm the QueryClient cache', () => {
     }) as unknown as typeof fetch;
   });
 
-  it('component sees loader-populated data on first render (no spinner)', async () => {
+  it('component renders while loader prefetch is pending, then receives the shared result', async () => {
+    let releaseFetch: () => void;
+    const fetchPending = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    globalThis.fetch = vi.fn().mockImplementation(async () => {
+      await fetchPending;
+      return {
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ sentinel: 'from-loader' }),
+        text: () => Promise.resolve(''),
+      };
+    }) as unknown as typeof fetch;
+
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
 
     function Probe(): React.JSX.Element {
-      // Same queryOptions the loader used - so this useQuery should
-      // hit the warm cache immediately.
+      // Same queryOptions the loader used, so TanStack Query shares the
+      // in-flight prefetch instead of launching a duplicate request.
       const { data, isFetching } = useQuery(dashboardQueryOptions());
       return (
         <div>
@@ -75,7 +89,7 @@ describe('Phase A4 loaders pre-warm the QueryClient cache', () => {
       getParentRoute: () => rootRoute,
       path: '/',
       component: Probe,
-      loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQueryOptions()),
+      loader: dashboardLoader,
     });
     const router = createRouter({
       routeTree: rootRoute.addChildren([homeRoute]),
@@ -89,17 +103,16 @@ describe('Phase A4 loaders pre-warm the QueryClient cache', () => {
       </QueryClientProvider>,
     );
 
-    // The loader ran before the component mounted, so on the very first
-    // observable render the cache is already warm: data is the sentinel,
-    // isFetching is false (no spinner needed).
     const payload = await findByTestId('payload');
-    expect(payload).toHaveTextContent('from-loader');
+    expect(payload).toHaveTextContent('cold');
+    expect(await findByTestId('fetching')).toHaveTextContent('true');
+
+    releaseFetch!();
     await waitFor(() => {
       expect(payload).toHaveTextContent('from-loader');
     });
 
-    // Sanity: fetch was called exactly once (the loader); the component's
-    // useQuery did NOT re-fetch because the cache was already populated.
+    // The component shared the loader's in-flight query.
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 });

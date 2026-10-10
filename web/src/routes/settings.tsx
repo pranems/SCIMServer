@@ -18,9 +18,9 @@ export const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: SettingsPage,
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(versionQueryOptions()),
-      context.queryClient.ensureQueryData(healthQueryOptions()),
-    ]),
+  loader: ({ context }) => {
+    void context.queryClient
+      .prefetchQuery(versionQueryOptions())
+      .then(() => context.queryClient.prefetchQuery(healthQueryOptions()));
+  },
 });

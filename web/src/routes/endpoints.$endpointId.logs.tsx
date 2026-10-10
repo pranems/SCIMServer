@@ -43,7 +43,7 @@ export const logsTabRoute = createRoute({
     // Phase N4: fall back to the persisted user preference when the URL
     // has no explicit `?pageSize`.
     const pageSize = deps.pageSize ?? usePreferencesStore.getState().defaultPageSize;
-    return context.queryClient.ensureQueryData(
+    void context.queryClient.prefetchQuery(
       endpointLogsQueryOptions({
         endpointId: params.endpointId,
         page: deps.page,
