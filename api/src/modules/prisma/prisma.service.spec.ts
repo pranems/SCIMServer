@@ -40,6 +40,7 @@ jest.mock('../../generated/prisma/client', () => ({
 
 import pg from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { RUNTIME_CONFIG_SPECS } from '../../bootstrap/runtime-config';
 
 describe('PrismaService', () => {
   const originalDbUrl = process.env.DATABASE_URL;
@@ -76,7 +77,7 @@ describe('PrismaService', () => {
       expect(pg.Pool).toHaveBeenCalledWith(
         expect.objectContaining({
           connectionString: 'postgresql://scim:scim@localhost:5432/scimdb',
-          max: 5,
+          max: RUNTIME_CONFIG_SPECS.database.poolMax.default,
         }),
       );
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -93,7 +94,7 @@ describe('PrismaService', () => {
       expect(pg.Pool).toHaveBeenCalledWith(
         expect.objectContaining({
           connectionString: 'postgresql://custom:custom@custom-host:5433/customdb',
-          max: 5,
+          max: RUNTIME_CONFIG_SPECS.database.poolMax.default,
         }),
       );
     });
@@ -118,11 +119,11 @@ describe('PrismaService', () => {
       expect(PrismaPg).toHaveBeenCalledWith(mockPool);
     });
 
-    it('should configure pool with max 5 connections', () => {
+    it('should configure the pool with the documented default', () => {
       new PrismaService();
 
       expect(pg.Pool).toHaveBeenCalledWith(
-        expect.objectContaining({ max: 5 }),
+        expect.objectContaining({ max: RUNTIME_CONFIG_SPECS.database.poolMax.default }),
       );
     });
   });
