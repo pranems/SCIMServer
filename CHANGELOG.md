@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.42] - 2026-10-10
+
+### Validation tooling
+
+- Align endpoint error-recovery Playwright coverage with v0.55.41's page-owned
+  query errors, remove credential-test reload races, and make shared-secret
+  Connect coverage deterministic.
+- Reconcile the deterministic `shape-dev-secret` credential on every synthetic
+  shape seed. This repairs credential-rotation drift instead of silently
+  accepting any same-label row. Deployed-dev focused browser proof passes
+  14/14, deterministic Connect coverage passes 9/9, and the opt-in six-profile
+  matrix passes 9/9.
+
+### Activity summary performance
+
+- Add a concurrent covering index over the five narrow `RequestLog` columns
+  used by the 30-day Activity summary. Exact v0.55.41 browser telemetry
+  measured p50 14.788 seconds and p95 21.835 seconds despite zero pool-acquire
+  timeouts.
+- On the 467,866-row dev window, PostgreSQL changed from a 91,531-block
+  parallel sequential scan taking 20.650 seconds to an index-only scan taking
+  0.630 seconds. The 51 MB index built concurrently in 25.174 seconds, and all
+  26 migrations replayed successfully on PostgreSQL 17. A follow-up concurrent
+  migration removes the redundant older three-column prefix index only after
+  the covering index succeeds.
+
 ## [0.55.41] - 2026-10-10
 
 ### Browser shell readiness and measured database capacity

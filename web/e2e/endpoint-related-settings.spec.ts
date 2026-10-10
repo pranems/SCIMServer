@@ -101,17 +101,23 @@ test.describe('Endpoint contextual settings', () => {
 
     await page.getByTestId('credentials-method-tab-bearer').click();
     await expect(page.getByTestId('connect-related-settings-bearer')).toBeVisible({ timeout: 30_000 });
-    await page.getByTestId('connect-related-settings-bearer').getByRole('button').click();
+    const bearerSettingsToggle = page
+      .getByTestId('connect-related-settings-bearer')
+      .getByRole('button');
+    await bearerSettingsToggle.click();
     await expect(
       page.getByTestId('connect-related-settings-bearer-MaxActiveBearerCredentials'),
     ).toBeVisible();
+    await bearerSettingsToggle.click();
+    await expect(bearerSettingsToggle).toHaveAttribute('aria-expanded', 'false');
 
     await page.getByTestId('credentials-method-tab-wif').click();
     await expect(page.getByTestId('connect-related-settings-wif')).toBeVisible();
-    await page
+    const wifSettingsToggle = page
       .getByTestId('connect-related-settings-wif')
-      .getByRole('button', { name: /WIF trust and JWKS settings/i })
-      .click();
+      .getByRole('button', { name: /WIF trust and JWKS settings/i });
+    await wifSettingsToggle.click();
+    await expect(wifSettingsToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByTestId('connect-related-settings-wif-MaxActiveWifTrusts')).toBeVisible();
     await expect(
       page.getByTestId('connect-related-settings-wif-effective-JwksMaxKeys'),

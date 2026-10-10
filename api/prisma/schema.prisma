@@ -77,7 +77,7 @@ model RequestLog {
   @@index([identifier])
   @@index([requestId])
   @@index([authOutcome])
-  @@index([createdAt, method, url])  // Composite for activity summary count queries
+  @@index([createdAt, method, url, identifier, status], map: "RequestLog_activity_summary_idx")
   @@index([url(ops: raw("gin_trgm_ops"))], type: Gin, map: "RequestLog_url_trgm_idx")
 }
 
