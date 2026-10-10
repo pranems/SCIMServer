@@ -273,6 +273,10 @@ export const DiscoveryExplorerPage: React.FC = () => {
   // ─── No endpoints state ──────────────────────────────────────────
 
   if (!endpoints.isLoading && endpointList.length === 0) {
+    if (endpoints.error) {
+      return <ScimErrorMessage error={endpoints.error} />;
+    }
+
     return (
       <div className={classes.page} data-testid="discovery-page">
         <Subtitle1>Discovery Explorer</Subtitle1>

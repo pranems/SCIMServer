@@ -93,12 +93,23 @@ describe('WorkbenchPage (Phase M1)', () => {
       requestId: 'req-x',
       body: { ok: true },
     });
+
     mockUseSearch.mockReturnValue({});
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: vi.fn(() => Promise.resolve()) },
       writable: true,
       configurable: true,
     });
+  });
+
+  it('renders an explicit error when the endpoint list fails', () => {
+    mockUseEndpoints.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('endpoint list unavailable'),
+    });
+    renderWithProviders(<WorkbenchPage />);
+    expect(screen.getByText(/endpoint list unavailable/i)).toBeInTheDocument();
   });
 
   // ─── 1. Top toolbar renders ────────────────────────────────────────

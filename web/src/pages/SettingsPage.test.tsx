@@ -57,6 +57,21 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('settings-page-loading')).toBeInTheDocument();
   });
 
+  it('renders an explicit error when version or health loading fails', () => {
+    (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('version unavailable'),
+    });
+    (useHealth as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
+    wrap(<SettingsPage />);
+    expect(screen.getByText(/version unavailable/i)).toBeInTheDocument();
+  });
+
   it('renders version and health info', () => {
     (useVersion as ReturnType<typeof vi.fn>).mockReturnValue({
       data: {

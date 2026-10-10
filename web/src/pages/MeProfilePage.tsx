@@ -174,6 +174,10 @@ export const MeProfilePage: React.FC = () => {
     }
   };
 
+  if (endpoints.error) {
+    return <ScimErrorMessage error={endpoints.error} />;
+  }
+
   return (
     <div className={classes.page} data-testid="me-profile-page">
       <Subtitle1>Self-service profile (/Me)</Subtitle1>
