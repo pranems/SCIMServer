@@ -1,8 +1,8 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.40`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.41`
 
-> **Version:** 0.55.40 - **Updated:** September 29, 2026
+> **Version:** 0.55.41 - **Updated:** September 29, 2026
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)
 > 37 registered settings: 20 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 other typed values. `PersistRequestSecrets` is inert and `CredentialSecretVisibility` supports only `always`. See the [behavioral evidence and explicit coverage gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) and [Entra compatibility guide](SCIM_ENTRA_COMPATIBILITY.md). Registry membership is not evidence of enforcement.
 > 6 value types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).

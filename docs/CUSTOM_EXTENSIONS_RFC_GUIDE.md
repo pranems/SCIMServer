@@ -1,6 +1,6 @@
 # Custom Resource Extensions - RFC-Compliant Authoring Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.40`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.41`
 
 > **Local P7a update, not deployed:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > adds declaration/type/cardinality checks, required extension enforcement,

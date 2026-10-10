@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.41] - 2026-10-10
+
+### Browser shell readiness and measured database capacity
+
+- Start Dashboard data prefetch without awaiting it in the route loader, so
+  the application shell and existing Dashboard loading skeleton render while
+  analytics are pending. A real-browser regression fails on deployed
+  v0.55.40 when the Dashboard request is held and passes against the branch.
+- Raise the default PostgreSQL pool from 5 to 10 only after measuring the dev
+  server's 50-connection ceiling, one-replica limit, and two-revision
+  retention. Worst-case application demand is 20 connections, leaving 30 for
+  deployment overlap, administration, and database headroom.
+- Add a PostgreSQL trigram index for `RequestLog.url`, the field used by
+  Activity-summary path classification, so leading-wildcard URL predicates
+  no longer require an unindexed URL scan.
+
 ## [0.55.40] - 2026-10-09
 
 ### Activity and Dashboard pool-pressure hotfix

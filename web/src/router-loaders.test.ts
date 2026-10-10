@@ -16,8 +16,9 @@
  * silently breaks the prefetch behavior.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { router, routeTree } from './router';
+import { dashboardLoader } from './routes/index';
 
 interface RouteShape {
   id?: string;
@@ -64,6 +65,20 @@ describe('router loaders (Phase A4)', () => {
     const indexMatch = allRoutes.find((r) => r.id === '/');
     expect(indexMatch, 'dashboard index route should be present').toBeDefined();
     expect(typeof indexMatch?.options?.loader).toBe('function');
+  });
+
+  it('dashboard loader starts prefetch without blocking the application shell', () => {
+    const neverSettles = new Promise<never>(() => {});
+    const prefetchQuery = vi.fn().mockReturnValue(neverSettles);
+
+    const result = dashboardLoader({
+      context: {
+        queryClient: { prefetchQuery },
+      },
+    });
+
+    expect(result).toBeUndefined();
+    expect(prefetchQuery).toHaveBeenCalledTimes(1);
   });
 
   it('router context exposes a queryClient so loaders can ensureQueryData', () => {
