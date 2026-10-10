@@ -17,6 +17,16 @@ The nine opt-in seeded-profile cases were then executed explicitly: one exposed
 a drifted known bearer fixture, deterministic seed reconciliation repaired it,
 and the complete six-profile matrix now passes 9/9.
 
+**v0.55.42 release candidate:** the corrected 264-case browser run produced
+zero pool-acquire timeouts across 12,253 console records, but Activity summary
+still measured p50 14.788 seconds and p95 21.835 seconds. PostgreSQL plan
+evidence showed a 20.650-second parallel sequential scan over 467,866 rows and
+91,531 shared blocks. A 51 MB covering index changed the plan to an index-only
+scan at 0.630 seconds, a 32.8x improvement, and built concurrently in 25.174
+seconds. All 26 migrations replay on PostgreSQL 17, including removal of the
+redundant older three-column prefix index. Reviewed merge, exact-master
+deployment, and post-deploy telemetry remain pending.
+
 ### Active Execution Reference
 
 **Consolidation checkpoint, 2026-10-09:** the dependency and comprehensive UI
@@ -1068,8 +1078,10 @@ Implemented TDD approach with comprehensive test coverage:
 - [x] ✅ COMPLETED - Merge and deploy v0.55.41 from exact master with GHCR/ACR digest parity, live SCIM proof, 73-endpoint integrity and revision hygiene
 - [x] ✅ COMPLETED - Correct all six authoritative Playwright failures and pass the affected deployed-dev browser specs 14/14
 - [x] ✅ COMPLETED - Execute the nine opt-in six-profile browser cases, repair deterministic credential drift and pass 9/9
-- [ ] Run the corrected complete Chromium suite against exact deployed v0.55.41 and require zero unexpected cases
-- [ ] Measure exact v0.55.41 connection-acquire timeouts and cold Dashboard/endpoint Logs readiness
+- [x] ✅ COMPLETED - Run the corrected complete Chromium suite against exact deployed v0.55.41: 264 passed, zero skipped, zero failed
+- [x] ✅ COMPLETED - Measure exact v0.55.41 pool evidence: zero acquire timeouts across 12,253 records
+- [ ] Merge and deploy v0.55.42, then verify Activity summary latency against the covering index
+- [ ] Measure cold Dashboard and endpoint Logs readiness
 - [ ] Complete and record the nine reviewer-judgement gates, then request operator visual verification
 - [x] ✅ COMPLETED - Create and validate the canonical endpoint-profile/discovery/authentication design and reconcile the highest-risk stale authorities
 - [x] ✅ COMPLETED - Merge PR #157 and validate v0.55.24 on dev without touching canary or customer prod
