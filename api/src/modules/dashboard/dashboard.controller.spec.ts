@@ -151,7 +151,7 @@ describe('DashboardController', () => {
   });
 
   describe('GET /admin/dashboard', () => {
-    it('shares one in-flight dashboard read across concurrent browser loads', async () => {
+    it('shares one in-flight dashboard read and caches the completed response for 30 seconds', async () => {
       let releaseEndpoints!: (value: Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>) => void;
       const endpointsPending = new Promise<Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>>(
         (resolve) => { releaseEndpoints = resolve; },
@@ -171,6 +171,24 @@ describe('DashboardController', () => {
       expect(secondResult).toBe(firstResult);
       expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(1);
       expect(mockLoggingService.getRequestSeries).toHaveBeenCalledTimes(1);
+
+      const cachedResult = await controller.getDashboard();
+      expect(cachedResult).toBe(firstResult);
+      expect(mockEndpointWithGet.listEndpoints).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes the cached dashboard after 30 seconds', async () => {
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+
+      const first = await controller.getDashboard();
+      now.mockReturnValue(1_030_001);
+      const refreshed = await controller.getDashboard();
+
+      expect(refreshed).not.toBe(first);
+      expect(mockEndpointWithGet.listEndpoints).toHaveBeenCalledTimes(2);
+      expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(2);
+      expect(mockLoggingService.getRequestSeries).toHaveBeenCalledTimes(2);
+      now.mockRestore();
     });
 
     it('does not fan endpoint, log, and series queries out across the database pool', async () => {

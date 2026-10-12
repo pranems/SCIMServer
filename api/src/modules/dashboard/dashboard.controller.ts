@@ -88,9 +88,15 @@ function getVersion(): string {
   return cachedVersion!;
 }
 
+const DASHBOARD_CACHE_TTL_MS = 30_000;
+
 @Controller('admin')
 export class DashboardController {
   private dashboardInFlight?: Promise<DashboardResponse>;
+  private dashboardCache?: {
+    expiresAt: number;
+    value: DashboardResponse;
+  };
 
   constructor(
     private readonly statsService: StatsProjectionService,
@@ -116,6 +122,10 @@ export class DashboardController {
    */
   @Get('dashboard')
   async getDashboard(): Promise<DashboardResponse> {
+    if (this.dashboardCache && this.dashboardCache.expiresAt > Date.now()) {
+      return this.dashboardCache.value;
+    }
+
     if (this.dashboardInFlight) {
       return this.dashboardInFlight;
     }
@@ -123,7 +133,12 @@ export class DashboardController {
     const request = this.buildDashboard();
     this.dashboardInFlight = request;
     try {
-      return await request;
+      const value = await request;
+      this.dashboardCache = {
+        expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+        value,
+      };
+      return value;
     } finally {
       if (this.dashboardInFlight === request) {
         this.dashboardInFlight = undefined;
