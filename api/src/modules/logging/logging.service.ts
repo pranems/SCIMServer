@@ -28,6 +28,58 @@ export interface CreateRequestLogOptions {
   requestId?: string;
 }
 
+export interface ListLogsFilters {
+  page?: number;
+  pageSize?: number;
+  method?: string;
+  status?: number;
+  hasError?: boolean;
+  urlContains?: string;
+  since?: Date;
+  until?: Date;
+  search?: string;
+  includeAdmin?: boolean;
+  hideKeepalive?: boolean;
+  minDurationMs?: number;
+  /** Filter by indexed endpointId column (preferred over urlContains). */
+  endpointId?: string;
+  /** P3 - filter by the X-Request-Id correlation id (auth-decision bridge). */
+  requestId?: string;
+  /**
+   * Set false for internal recent-row projections that do not expose an
+   * exact total. The public paginated APIs retain the default exact count.
+   */
+  includeTotal?: boolean;
+}
+
+export interface ListLogsItem {
+  id: string;
+  method: string;
+  url: string;
+  status?: number;
+  durationMs?: number;
+  createdAt: Date;
+  errorMessage?: string;
+  reportableIdentifier?: string;
+  requestId?: string;
+  endpointId?: string;
+  endpointName?: string;
+  authOutcome?: string;
+  authMethod?: string;
+  authReason?: string;
+  authCredentialId?: string;
+}
+
+export interface ListLogsResult<TTotal extends number | undefined> {
+  total: TTotal;
+  page: number;
+  pageSize: number;
+  count: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  items: ListLogsItem[];
+}
+
 @Injectable()
 export class LoggingService implements OnModuleDestroy, OnModuleInit {
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
@@ -507,24 +559,10 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     this.lastPrunedCount = count;
   }
 
-  async listLogs(filters: {
-    page?: number;
-    pageSize?: number;
-    method?: string;
-    status?: number;
-    hasError?: boolean;
-    urlContains?: string;
-    since?: Date;
-    until?: Date;
-    search?: string;
-    includeAdmin?: boolean;
-    hideKeepalive?: boolean;
-    minDurationMs?: number;
-    /** Filter by indexed endpointId column (preferred over urlContains) */
-    endpointId?: string;
-    /** P3 - filter by the X-Request-Id correlation id (auth-decision bridge). */
-    requestId?: string;
-  } = {}) {
+  async listLogs(filters: ListLogsFilters & { includeTotal: false }): Promise<ListLogsResult<undefined>>;
+  async listLogs(filters?: ListLogsFilters & { includeTotal?: true }): Promise<ListLogsResult<number>>;
+  async listLogs(filters: ListLogsFilters): Promise<ListLogsResult<number | undefined>>;
+  async listLogs(filters: ListLogsFilters = {}): Promise<ListLogsResult<number | undefined>> {
     if (this.isInMemoryBackend) {
       const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
       const page = Math.max(filters.page ?? 1, 1);
@@ -608,13 +646,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         authCredentialId: r.authCredentialId ?? undefined,
       }));
 
-      const total = filtered.length;
+      const total = filters.includeTotal === false ? undefined : filtered.length;
       return {
         total,
         page,
         pageSize,
         count: items.length,
-        hasNext: skip + items.length < total,
+        hasNext: skip + items.length < filtered.length,
         hasPrev: page > 1,
         items,
       };
@@ -739,12 +777,16 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     };
     let records: RequestLogRow[] = [];
     try {
-      total = await this.prisma.requestLog.count({ where });
+      const includeTotal = filters.includeTotal !== false;
+      if (includeTotal) {
+        total = await this.prisma.requestLog.count({ where });
+      }
       records = await this.prisma.requestLog.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip,
-        take: pageSize,
+        // One extra row gives count-free callers an accurate hasNext value.
+        take: pageSize + (includeTotal ? 0 : 1),
         // Limit fields to mitigate potential large string conversion issues
         select: {
           id: true,
@@ -771,6 +813,11 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         { where: JSON.stringify(where), page, pageSize },
       );
       throw err; // rethrow for controller to handle
+    }
+
+    const hasExtraRecord = filters.includeTotal === false && records.length > pageSize;
+    if (hasExtraRecord) {
+      records = records.slice(0, pageSize);
     }
 
     // Try to pull identifiers in one raw query (ignore if column not present)
@@ -801,11 +848,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     }
 
     return {
-      total,
+      total: filters.includeTotal === false ? undefined : total,
       page,
       pageSize,
       count: records.length,
-      hasNext: skip + records.length < total,
+      hasNext: filters.includeTotal === false
+        ? hasExtraRecord
+        : skip + records.length < total,
       hasPrev: page > 1,
       items
     };
@@ -826,7 +875,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     authMethod?: string | null;
     authReason?: string | null;
     authCredentialId?: string | null;
-  }, identifierMap?: Record<string, string | null>) {
+  }, identifierMap?: Record<string, string | null>): Promise<ListLogsItem> {
     let identifier = identifierMap?.[r.id] || this.deriveIdentifierFromUrl(r.url);
 
     // Resolve user display names for better readability
