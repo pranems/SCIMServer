@@ -1632,6 +1632,25 @@ function invalidateEndpointAuthReadModels(
   void qc.invalidateQueries({ queryKey: queryKeys.endpoints.connectionReveals(endpointId) });
 }
 
+function setCachedCredentialActive(
+  qc: ReturnType<typeof useQueryClient>,
+  endpointId: string,
+  credentialId: string,
+  active: boolean,
+): void {
+  qc.setQueryData<EndpointOverviewResponse>(
+    queryKeys.endpoints.overview(endpointId),
+    (current) => current
+      ? {
+          ...current,
+          credentials: current.credentials.map((credential) =>
+            credential.id === credentialId ? { ...credential, active } : credential,
+          ),
+        }
+      : current,
+  );
+}
+
 export function useCreateCredential(endpointId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -2088,7 +2107,8 @@ export function useActivateCredential(endpointId: string) {
       fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/activate`, {
         method: 'POST',
       }),
-    onSuccess: () => {
+    onSuccess: (_data, credentialId) => {
+      setCachedCredentialActive(qc, endpointId, credentialId, true);
       invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });
@@ -2102,7 +2122,8 @@ export function useDeactivateCredential(endpointId: string) {
       fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}/deactivate`, {
         method: 'POST',
       }),
-    onSuccess: () => {
+    onSuccess: (_data, credentialId) => {
+      setCachedCredentialActive(qc, endpointId, credentialId, false);
       invalidateEndpointAuthReadModels(qc, endpointId);
     },
   });

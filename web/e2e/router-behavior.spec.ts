@@ -168,6 +168,13 @@ test.describe('Phase A3 router contract - URL search params', () => {
 
 test.describe('Phase A4 router contract - hover-prefetch', () => {
   test('hovering the cold Logs route fetches its data before click and reuses it on navigation', async ({ page }) => {
+    await page.route('**/scim/admin/log-config/stream**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: '',
+      }),
+    );
     // Onboarding warms Endpoints. Logs stays cold, so this observes prefetch
     // without changing product behavior or substituting a vacuous skeleton check.
     const requests: string[] = [];

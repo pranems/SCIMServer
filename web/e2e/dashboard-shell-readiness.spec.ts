@@ -46,6 +46,13 @@ test('refetches Dashboard after the browser deduplication window', async ({ page
     ({ key, value }) => window.localStorage.setItem(key, value),
     { key: TOKEN_STORAGE_KEY, value: token },
   );
+  await page.route('**/scim/admin/log-config/stream**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: '',
+    }),
+  );
 
   let dashboardRequests = 0;
   await page.route('**/scim/admin/dashboard', async (route) => {

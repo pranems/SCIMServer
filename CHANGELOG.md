@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Endpoint log query resilience
+
+- Add the missing `RequestLog(endpointId, createdAt)` index used by endpoint
+  Logs and Overview reads. On the 484,327-row dev table, the prior plan
+  scanned 225,568 unrelated timeline rows and took 43.041 seconds to return
+  20 rows. The indexed plan takes 16.989 ms, while the exact count improved
+  from 3.047 seconds to 12.444 ms.
+- Update credential activate and deactivate mutations in the browser cache
+  immediately before invalidating server-backed read models. This prevents a
+  concurrent server-sent event refetch from leaving the row visibly stale.
+- Isolate cache-timing Playwright cases from unrelated mutation events emitted
+  by parallel workers. The focused rerun of all 15 previously failing browser
+  files improved from 46 failures to 105 passes and two isolated failures;
+  the two corrected files then passed 9/9.
+
 ## [0.55.44] - 2026-10-12
 
 ### Dashboard load resilience
