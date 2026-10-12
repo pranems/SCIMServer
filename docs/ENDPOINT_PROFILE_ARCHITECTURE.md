@@ -208,7 +208,8 @@ request-log correlation. Per-endpoint token routes use that value to preserve
 the request-time endpoint name in append-only audit history without adding a
 database query. The value is observability metadata only: a cache miss leaves
 the name unset and never changes authentication acceptance, rejection, status,
-or timing through a fallback database lookup.
+or timing through a fallback database lookup. UUID cache keys are normalized
+to lowercase so equivalent uppercase route values preserve the same snapshot.
 
 ---
 

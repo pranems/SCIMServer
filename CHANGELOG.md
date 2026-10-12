@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve the normalized domain model. Mutable endpoint-owned tables continue
   to store endpoint IDs; only the append-only RequestLog retains the
   request-time endpoint-name snapshot.
-- RED/GREEN evidence passes 24 focused API tests and 26 LogsPage tests. The
+- RED/GREEN evidence passes 25 focused API tests and 26 LogsPage tests,
+  including uppercase UUID cache-key normalization. The
   endpoint OAuth integration suite passes 21/21, covering accepted, rejected,
   and server-wide RequestLog rows. A real Chromium case passes against the
   current local API and verifies both rendered labels and zero per-row endpoint

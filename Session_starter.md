@@ -32,7 +32,7 @@ pending.
 requests now snapshot the warmed endpoint display name into RequestLog without
 a database lookup or authentication behavior change. Server-level OAuth rows
 remain endpoint-null and the Logs UI renders them as `Server-wide`. Focused
-evidence passes 24 API unit tests, 26 LogsPage tests, 21 API E2E cases, and one
+evidence passes 25 API unit tests, 26 LogsPage tests, 21 API E2E cases, and one
 real Chromium case that verifies both labels plus zero per-row endpoint-detail
 requests. Full live, merged-master deployment, zero-skip browser, telemetry,
 and operator visual evidence remain pending.

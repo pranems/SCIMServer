@@ -208,7 +208,7 @@ export class EndpointService implements OnModuleInit {
   }
 
   getCachedEndpointDisplayName(endpointId: string): string | undefined {
-    const endpoint = this.cacheById.get(endpointId);
+    const endpoint = this.cacheById.get(endpointId.toLowerCase());
     return endpoint?.displayName?.trim() || endpoint?.name;
   }
 

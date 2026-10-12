@@ -97,6 +97,12 @@ describe('Persistent endpoint cache freshness', () => {
     expect(prisma.endpoint.findFirst).not.toHaveBeenCalled();
   });
 
+  it('resolves warmed endpoint identity for an uppercase UUID route value', () => {
+    expect(service.getCachedEndpointDisplayName(id.toUpperCase())).toBe('Fresh endpoint');
+    expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    expect(prisma.endpoint.findFirst).not.toHaveBeenCalled();
+  });
+
   it('does not serve a warmed endpoint after another writer deletes it', async () => {
     prisma.endpoint.findUnique.mockResolvedValue(null);
     prisma.endpoint.findFirst.mockResolvedValue(null);

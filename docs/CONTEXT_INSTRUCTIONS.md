@@ -27,7 +27,7 @@ sign-off remains pending; neither canary nor customer production is promoted.
 correlation from a warmed, cache-only endpoint display-name read. Accepted and
 rejected token rows preserve endpoint ID plus request-time name without a
 database lookup or authentication behavior change. Global `/scim/oauth/token`
-rows remain endpoint-null and render `Server-wide`. Focused evidence passes 24
+rows remain endpoint-null and render `Server-wide`. Focused evidence passes 25
 API units, 26 web tests, 21 API E2E cases, and one real Chromium case that also
 proves the Logs page makes no endpoint-detail request per row. Full merged-tip
 pipeline, deployment, zero-skip browser, and telemetry evidence remain pending.
