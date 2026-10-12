@@ -14,10 +14,16 @@ interface ActivitySummaryResponse {
   };
 }
 
+const ACTIVITY_SUMMARY_CACHE_TTL_MS = 60_000;
+
 @Controller('admin/activity')
 export class ActivityController {
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
   private summaryInFlight?: Promise<ActivitySummaryResponse>;
+  private summaryCache?: {
+    expiresAt: number;
+    value: ActivitySummaryResponse;
+  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -271,6 +277,10 @@ export class ActivityController {
       };
     }
 
+    if (this.summaryCache && this.summaryCache.expiresAt > Date.now()) {
+      return this.summaryCache.value;
+    }
+
     if (this.summaryInFlight) {
       return this.summaryInFlight;
     }
@@ -278,7 +288,12 @@ export class ActivityController {
     const request = this.queryActivitySummary();
     this.summaryInFlight = request;
     try {
-      return await request;
+      const value = await request;
+      this.summaryCache = {
+        expiresAt: Date.now() + ACTIVITY_SUMMARY_CACHE_TTL_MS,
+        value,
+      };
+      return value;
     } finally {
       if (this.summaryInFlight === request) {
         this.summaryInFlight = undefined;

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.43] - 2026-10-12
+
+### Activity summary resilience
+
+- Cache each completed Activity summary for one minute, matching the browser
+  query's existing stale-time contract. Concurrent callers still share the
+  same in-flight aggregate, while separate browser contexts no longer repeat a
+  full 30-day audit-log scan immediately after the preceding scan completes.
+- Tune `RequestLog` autovacuum and auto-analyze thresholds for its append and
+  retention workload. The v0.55.42 deployment selected the new covering index,
+  but 120,495 heap fetches caused by stale visibility-map pages increased the
+  measured plan from 0.630 seconds to 56.886 seconds and triggered 3,494
+  timeout-related console records during the authoritative pipeline.
+- A targeted `VACUUM (ANALYZE)` reduced heap fetches from 120,495 to 10,
+  reduced the cold plan to 2.670 seconds, and produced three warm executions
+  at 449 ms. The lower table-specific thresholds make that maintenance
+  automatic before the cluster-wide defaults permit the same degradation.
+
+### Validation reliability
+
+- Replace mutable estate-wide before/after assertions in the credential
+  migration E2E suite with fixture-owned credential and public work-queue
+  assertions. The prior test expected a global keyed count of 89 while a
+  parallel suite legitimately raised it to 91.
+- Focused evidence passes 23 Activity-controller tests, 11 credential
+  migration E2E tests, and all 27 migrations on PostgreSQL 17. The migration
+  replay also verifies all six `RequestLog` autovacuum reloptions.
+
 ## [0.55.42] - 2026-10-10
 
 ### Validation tooling
