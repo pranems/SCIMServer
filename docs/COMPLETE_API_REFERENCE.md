@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.46`
+> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
 
-> **Version:** 0.55.46 - **Updated:** 2026-10-01
+> **Version:** 0.55.47 - **Updated:** 2026-10-12
 > **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
@@ -2403,6 +2403,9 @@ Content-Type: application/json
 | `client_secret` | Set via `OAUTH_CLIENT_SECRET` env var |
 | `scope` | Space-separated: `scim.read`, `scim.write`, `scim.manage` |
 
+The RequestLog row for this server-level token route has no `endpointId` or
+`endpointName`, because no endpoint was selected.
+
 ---
 
 ### POST /scim/endpoints/:endpointId/oauth/token
@@ -2443,7 +2446,10 @@ The **per-endpoint** token endpoint. Distinct from the server-level `/scim/oauth
 
 Send exactly one of `client_secret` or `client_assertion`; sending both is `mutually_exclusive_credentials` and sending neither is `missing_credentials`. For WIF, the token lifetime is **capped to the assertion's own lifetime**, so a token can never outlive the authorization that produced it. A decoded issuer that matches no active RFC 7523 trust returns `401 invalid_client` with `reason_code: wif_issuer_mismatch` before any unrelated trust's JWKS is fetched. Failure reason codes are listed in [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md).
 
-> The minted token is **never written to the request log**. A token-mint log row records only `clientId`, `endpointId`, `expiresIn` and `scopes`.
+> The minted token is **never written to the request log**. A token-mint log row
+> records only safe metadata such as `clientId`, `endpointId`, the request-time
+> endpoint-name snapshot, `expiresIn`, and `scopes`. Name enrichment uses the
+> warmed endpoint cache and does not affect token acceptance or rejection.
 
 ---
 

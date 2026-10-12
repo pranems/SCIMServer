@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.46
+> **Version**: 0.55.47
 > **Last Updated**: October 12, 2026
 > **Last verified:** 2026-10-12
 
@@ -23,13 +23,14 @@ endpoint-list p50/p95/max are 164/603/2,455 ms. The removed exact count measured
 1,605.2 ms versus 9.9 ms for the required bounded query. Operator visual
 sign-off remains pending; neither canary nor customer production is promoted.
 
-**Token-log endpoint identity gap:** RequestLog already stores nullable
-`endpointId` and `endpointName` snapshots. The 396 global `/scim/oauth/token`
-rows correctly have neither and should render `Server-wide`. All 7,100 sampled
-per-endpoint token-mint rows have an endpoint ID but no endpoint-name snapshot.
-Populate the existing snapshot at per-endpoint token resolution time rather
-than adding read-time per-row lookups or duplicating endpoint names into
-mutable domain tables.
+**v0.55.47 release candidate:** per-endpoint token routes now enrich RequestLog
+correlation from a warmed, cache-only endpoint display-name read. Accepted and
+rejected token rows preserve endpoint ID plus request-time name without a
+database lookup or authentication behavior change. Global `/scim/oauth/token`
+rows remain endpoint-null and render `Server-wide`. Focused evidence passes 24
+API units, 26 web tests, 21 API E2E cases, and one real Chromium case that also
+proves the Logs page makes no endpoint-detail request per row. Full merged-tip
+pipeline, deployment, zero-skip browser, and telemetry evidence remain pending.
 
 **Unmerged follow-up, 2026-10-08:** the local
 `fix/comprehensive-ui-validation-20260930` branch contains durable request-log

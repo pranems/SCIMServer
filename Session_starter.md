@@ -4,7 +4,7 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.45 is deployed from merged master
+**Current dev release:** v0.55.46 is deployed from merged master
 `ca98e19160aec5f1e955e584bafad060b4eaca96` as revision
 `scimserver-dev--vca98e191`, with GHCR and ACR on digest
 `sha256:23c2262da948097e305db4625dfa538f43b10de8c36ac8d6abfe252849be86b8`.
@@ -26,10 +26,16 @@ requests found zero HTTP 500 responses and zero PostgreSQL connection/pool
 timeout errors. Dashboard p50/p95/max were 168/965/2,146 ms and endpoint-list
 p50/p95/max were 164/603/2,455 ms. The removed count measured 1,605.2 ms versus
 9.9 ms for the required bounded query. Operator visual verification remains
-pending. A separate observed gap remains: all 7,100 deployed per-endpoint token
-mint rows carry endpoint IDs but no endpoint-name snapshot, while 396 global
-token rows correctly have no endpoint identity and should render
-`Server-wide`.
+pending.
+
+**v0.55.47 release candidate:** accepted and rejected per-endpoint OAuth token
+requests now snapshot the warmed endpoint display name into RequestLog without
+a database lookup or authentication behavior change. Server-level OAuth rows
+remain endpoint-null and the Logs UI renders them as `Server-wide`. Focused
+evidence passes 24 API unit tests, 26 LogsPage tests, 21 API E2E cases, and one
+real Chromium case that verifies both labels plus zero per-row endpoint-detail
+requests. Full live, merged-master deployment, zero-skip browser, telemetry,
+and operator visual evidence remain pending.
 
 ### Active Execution Reference
 
