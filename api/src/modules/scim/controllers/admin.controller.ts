@@ -8,6 +8,7 @@ import {
   Query,
   Param,
   NotFoundException,
+  ParseUUIDPipe,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -134,6 +135,15 @@ export class AdminController {
     return created.id;
   }
 
+  private async resolveManualEndpointId(selectedEndpointId?: string): Promise<string> {
+    if (!selectedEndpointId) {
+      return this.getDefaultEndpointId();
+    }
+
+    await this.endpointService.getEndpoint(selectedEndpointId, 'summary');
+    return selectedEndpointId;
+  }
+
   /**
    * W2 - decode (never verify) a JWT / encoded token so an operator can inspect
    * what a `Bearer` / `client_assertion` / `access_token` value contains. A JWT
@@ -231,9 +241,11 @@ export class AdminController {
   @Header('Content-Type', 'application/scim+json')
   async createManualUser(
     @Body() dto: ManualUserDto,
-    @Req() request: Request
+    @Req() request: Request,
+    @Query('endpointId', new ParseUUIDPipe({ version: '4', optional: true }))
+    selectedEndpointId?: string
   ): Promise<ScimUserResource> {
-    const endpointId = await this.getDefaultEndpointId();
+    const endpointId = await this.resolveManualEndpointId(selectedEndpointId);
     const baseUrl = `${buildBaseUrl(request)}/endpoints/${endpointId}`;
     const userName = dto.userName.trim();
     const payload: CreateUserDto = {
@@ -308,9 +320,11 @@ export class AdminController {
   @Header('Content-Type', 'application/scim+json')
   async createManualGroup(
     @Body() dto: ManualGroupDto,
-    @Req() request: Request
+    @Req() request: Request,
+    @Query('endpointId', new ParseUUIDPipe({ version: '4', optional: true }))
+    selectedEndpointId?: string
   ): Promise<ScimGroupResource> {
-    const endpointId = await this.getDefaultEndpointId();
+    const endpointId = await this.resolveManualEndpointId(selectedEndpointId);
     const baseUrl = `${buildBaseUrl(request)}/endpoints/${endpointId}`;
     const displayName = dto.displayName.trim();
     const members = dto.memberIds

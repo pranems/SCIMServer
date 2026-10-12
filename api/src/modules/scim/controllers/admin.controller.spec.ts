@@ -51,6 +51,7 @@ describe('AdminController', () => {
     mockEndpointService = {
       listEndpoints: jest.fn().mockResolvedValue({ endpoints: [{ id: 'ep-1', name: 'default' }] }),
       createEndpoint: jest.fn().mockResolvedValue({ id: 'ep-new', name: 'default' }),
+      getEndpoint: jest.fn().mockResolvedValue({ id: 'ep-selected', name: 'selected' }),
     };
 
     const module = await Test.createTestingModule({
@@ -215,6 +216,21 @@ describe('AdminController', () => {
       expect(payload.emails).toEqual([{ value: 'bob@test.com', type: 'work', primary: true }]);
       expect(payload.active).toBe(false);
     });
+
+    it('should create the user in the explicitly selected endpoint', async () => {
+      await controller.createManualUser(
+        { userName: 'selected-user' },
+        mockRequest,
+        'ep-selected',
+      );
+
+      expect(mockUsersService.createUserForEndpoint).toHaveBeenCalledWith(
+        expect.objectContaining({ userName: 'selected-user' }),
+        'https://example.com/scim/v2/endpoints/ep-selected',
+        'ep-selected',
+      );
+      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('ep-selected', 'summary');
+    });
   });
 
   // ── createManualGroup ──────────────────────────────────────────────
@@ -241,6 +257,21 @@ describe('AdminController', () => {
       );
       const payload = mockGroupsService.createGroupForEndpoint.mock.calls[0][0];
       expect(payload.members).toEqual([{ value: 'u1' }, { value: 'u2' }]);
+    });
+
+    it('should create the group in the explicitly selected endpoint', async () => {
+      await controller.createManualGroup(
+        { displayName: 'Selected Group' },
+        mockRequest,
+        'ep-selected',
+      );
+
+      expect(mockGroupsService.createGroupForEndpoint).toHaveBeenCalledWith(
+        expect.objectContaining({ displayName: 'Selected Group' }),
+        'https://example.com/scim/v2/endpoints/ep-selected',
+        'ep-selected',
+      );
+      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('ep-selected', 'summary');
     });
   });
 

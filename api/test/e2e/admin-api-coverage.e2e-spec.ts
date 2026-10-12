@@ -269,7 +269,7 @@ describe('Admin API Coverage (E2E)', () => {
     describe('POST /admin/users/manual', () => {
       it('should create a user via simplified form', async () => {
         const res = await request(app.getHttpServer())
-          .post('/scim/admin/users/manual')
+          .post(`/scim/admin/users/manual?endpointId=${endpointId}`)
           .set('Authorization', `Bearer ${token}`)
           .set('Content-Type', 'application/json')
           .send({
@@ -294,12 +294,30 @@ describe('Admin API Coverage (E2E)', () => {
           .send({ userName: 'noauth@test.com' })
           .expect(401);
       });
+
+      it('should reject a malformed explicit endpoint ID', async () => {
+        await request(app.getHttpServer())
+          .post('/scim/admin/users/manual?endpointId=not-a-uuid')
+          .set('Authorization', ['Bearer', token].join(' '))
+          .set('Content-Type', 'application/json')
+          .send({ userName: 'invalid-endpoint@test.com' })
+          .expect(400);
+      });
+
+      it('should reject an explicit endpoint ID that does not exist', async () => {
+        await request(app.getHttpServer())
+          .post('/scim/admin/users/manual?endpointId=00000000-0000-4000-8000-000000000000')
+          .set('Authorization', ['Bearer', token].join(' '))
+          .set('Content-Type', 'application/json')
+          .send({ userName: 'missing-endpoint@test.com' })
+          .expect(404);
+      });
     });
 
     describe('POST /admin/groups/manual', () => {
       it('should create a group via simplified form', async () => {
         const res = await request(app.getHttpServer())
-          .post('/scim/admin/groups/manual')
+          .post(`/scim/admin/groups/manual?endpointId=${endpointId}`)
           .set('Authorization', `Bearer ${token}`)
           .set('Content-Type', 'application/json')
           .send({

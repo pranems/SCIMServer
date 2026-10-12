@@ -19,6 +19,7 @@ import {
   deactivateUserPatch,
   resetFixtureCounter,
 } from './helpers/fixtures';
+import { waitForLogRow } from './helpers/log-wait.helper';
 
 /**
  * Test Gaps Audit #4 - Cross-feature integration & HTTP compliance gaps:
@@ -94,8 +95,17 @@ describe('Test Gaps Audit #4 - Cross-feature integration & HTTP compliance (E2E)
       // Perform a SCIM operation to generate a log entry
       await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
 
-      // Allow time for async log flush
-      await new Promise(resolve => setTimeout(resolve, 4000));
+      const matchingLog = await waitForLogRow(
+        app,
+        token,
+        `endpointId=${encodeURIComponent(endpointId)}&pageSize=100&includeAdmin=true`,
+        (row) =>
+          row.method === 'POST' &&
+          typeof row.url === 'string' &&
+          row.url.includes(`/endpoints/${endpointId}/Users`),
+        { timeoutMs: 12_000 },
+      );
+      expect(matchingLog).toBeDefined();
 
       // Query endpoint-scoped history
       const res = await request(app.getHttpServer())
@@ -105,7 +115,6 @@ describe('Test Gaps Audit #4 - Cross-feature integration & HTTP compliance (E2E)
 
       expect(res.body.total).toBeGreaterThanOrEqual(1);
       expect(res.body.items.length).toBeGreaterThanOrEqual(1);
-      // Verify the log contains this endpoint's URL path
       const endpointLogs = res.body.items.filter(
         (item: any) => item.url && item.url.includes(endpointId),
       );

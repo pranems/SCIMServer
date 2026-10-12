@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.43`
+> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.44`
 
 Custom ResourceType operations are first-class Activity entries with
 `resourceType`, `resourceEndpoint`, and `resourceIdentifier`. Create, update,
@@ -384,11 +384,15 @@ listing, and series aggregation run sequentially so one Dashboard request does
 not fan out across the bounded database pool. Optional per-row user display-name
 lookups are also ordered rather than launched as a page-sized burst. Concurrent
 Dashboard callers share one in-flight response, and Activity summary callers
-share one in-flight aggregate. A completed Activity summary is retained for one
-minute, matching the browser query's stale-time contract, so independent
-browser contexts do not repeatedly scan the 30-day audit window. The
-`RequestLog` table uses lower table-specific autovacuum thresholds to preserve
-the visibility map required by the covering index's index-only scan.
+share one in-flight aggregate. A successful Dashboard response is retained for
+30 seconds, while SCIM mutation events immediately advance its cache
+generation. A build from an older generation cannot repopulate the cache after
+a mutation. The browser uses only a one-second deduplication interval, so its
+freshness period does not extend the server window. A completed Activity
+summary is retained for one minute, matching that browser query's stale-time
+contract. Rejected builds are never cached. The `RequestLog` table uses lower
+table-specific autovacuum thresholds to preserve the visibility map required
+by the covering index's index-only scan.
 
 ---
 

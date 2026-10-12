@@ -1,8 +1,8 @@
 # Endpoint Lifecycle & Usage Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-28 - **Product version:** `0.55.43`
+> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.44`
 
-> **Version:** 0.55.43 - **Updated:** June 3, 2026
+> **Version:** 0.55.44 - **Updated:** June 3, 2026
 > Quick-start recipes for common SCIMServer operations
 
 ---
@@ -79,6 +79,22 @@ curl http://localhost:8080/scim/admin/endpoints/{id}/stats \
 curl -N http://localhost:8080/scim/endpoints/{id}/logs/stream \
   -H "Authorization: Bearer changeme-scim"
 ```
+
+For simplified admin-form provisioning, select the endpoint explicitly rather
+than relying on the legacy first-endpoint fallback:
+
+```bash
+curl -X POST "http://localhost:8080/scim/admin/users/manual?endpointId={id}" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userName": "manual.user@example.com",
+    "active": true
+  }'
+```
+
+The selector must be an existing version-4 UUID. Invalid UUIDs return 400 and
+unknown endpoint IDs return 404.
 
 ### 5. Deactivate
 

@@ -39,3 +39,45 @@ test('renders application chrome and Dashboard loading state while analytics are
   releaseDashboard?.();
   await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
 });
+
+test('refetches Dashboard after the browser deduplication window', async ({ page }) => {
+  const token = process.env.E2E_TOKEN || 'local-secret';
+  await page.addInitScript(
+    ({ key, value }) => window.localStorage.setItem(key, value),
+    { key: TOKEN_STORAGE_KEY, value: token },
+  );
+
+  let dashboardRequests = 0;
+  await page.route('**/scim/admin/dashboard', async (route) => {
+    dashboardRequests++;
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        health: { status: 'ok', uptime: 1, dbType: 'test' },
+        stats: { totalEndpoints: 0, totalUsers: 0, totalGroups: 0 },
+        endpoints: [],
+        recentActivity: [],
+        requestsLast24hSeries: Array.from({ length: 24 }, () => 0),
+        version: { version: 'test', node: 'test', uptime: 1 },
+      }),
+    });
+  });
+  await page.route('**/scim/admin/endpoints**', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ endpoints: [], total: 0 }),
+    }),
+  );
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => dashboardRequests).toBe(1);
+
+  await page.getByTestId('nav-endpoints').click();
+  await expect(page).toHaveURL(/\/endpoints$/);
+  await page.waitForTimeout(1_100);
+  await page.getByTestId('nav-dashboard').click();
+  await expect(page).toHaveURL(/\/$/);
+
+  await expect.poll(() => dashboardRequests).toBe(2);
+});

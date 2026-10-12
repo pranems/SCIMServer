@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.43`
+> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.44`
 
-> **Version:** 0.55.43 - **Updated:** 2026-10-01
+> **Version:** 0.55.44 - **Updated:** 2026-10-01
 > **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
@@ -1560,10 +1560,14 @@ Authorization: Bearer changeme-scim
 
 ### POST /scim/admin/users/manual
 
-Create a user via simplified form (bypasses SCIM schema requirements).
+Create a user via simplified form. Pass `endpointId` to select the endpoint
+explicitly. When it is omitted, the server retains the legacy behavior of
+using the first endpoint or creating a default endpoint when none exists. An
+explicit selector must be a version-4 UUID and identify an existing endpoint;
+invalid and missing selectors return 400 and 404 respectively.
 
 ```http
-POST /scim/admin/users/manual HTTP/1.1
+POST /scim/admin/users/manual?endpointId=11111111-1111-4111-8111-111111111111 HTTP/1.1
 Host: localhost:8080
 Authorization: Bearer changeme-scim
 Content-Type: application/json
@@ -1579,16 +1583,18 @@ Content-Type: application/json
 }
 ```
 
-**Response (200):** SCIM User resource (Content-Type: application/scim+json)
+**Response (201):** SCIM User resource (Content-Type: application/scim+json)
 
 ---
 
 ### POST /scim/admin/groups/manual
 
-Create a group via simplified form.
+Create a group via simplified form. Pass `endpointId` to avoid dependence on
+the legacy first-endpoint fallback. Selector validation and 400/404 behavior
+match the manual-user operation.
 
 ```http
-POST /scim/admin/groups/manual HTTP/1.1
+POST /scim/admin/groups/manual?endpointId=11111111-1111-4111-8111-111111111111 HTTP/1.1
 Host: localhost:8080
 Authorization: Bearer changeme-scim
 Content-Type: application/json
