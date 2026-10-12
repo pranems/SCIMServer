@@ -4,40 +4,24 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.44 is deployed from merged master
-`24af28d1` as revision `scimserver-dev--v24af28d1`, with GHCR and ACR on digest
-`sha256:8737fa892a384d25ecb7336abc6ad0b26fc807935bf6d6999e26b8303590b940`.
-A 30-second successful Dashboard cache
-preserves in-flight sharing without caching failures. SCIM mutation events
-advance a cache generation, stale in-flight work cannot repopulate it, and the
-browser now owns only a one-second deduplication window so freshness periods do
-not add to nearly 60 seconds. Simplified manual admin operations accept a
-validated, resolved endpoint selector, eliminating parallel dependence on the
-mutable first endpoint and preventing InMemory orphan partitions. The
-endpoint-history E2E test now polls eventual RequestLog durability through the
-established flush helper rather than sleeping for four seconds. Focused
-controller tests pass 55/55, admin E2E passes 20/20 on both backends, the full
-parallel Prisma suite passes 118 suites and 2,486/2,486 tests, and Fast
-pre-push passes all 20 gates, including 6,023 API units and 2,426 InMemory E2E
-tests. The merged-master pipeline passed 33 gates but exposed a missing
-`RequestLog(endpointId, createdAt)` index: the endpoint timeline fetch scanned
-225,548 unrelated rows and took 43.041 seconds. The additive index reduced it
-to 16.989 ms; live Logs and Overview now respond in 270 ms and 97 ms. The
-focused rerun of all previously failing browser files passes 105 cases with
-two isolated failures, and their fixes pass 9/9. Fourteen exact fixture leaks
-were removed, restoring the verified 73 endpoints with no baseline ID missing.
-The complete live rerun passes 1,698/1,700 with no endpoint leak. Its two
-remaining checks observed eventual state too early: fixture log-level cleanup
-and buffered custom-resource DELETE logging were both present after the run.
-The harness now polls the exact owned state and exact method set. Independent
-review also removed `IF NOT EXISTS` from the concurrent index migration so an
-invalid interrupted build cannot be accepted.
-The complete browser matrix now executes 265 cases with zero skips: 263 passed,
-the not-yet-deployed credential cache fix accounts for one failure, and one
-ambient-card smoke race was corrected with a fixture-owned endpoint and passes
-independently. The run preserved exactly 73 endpoints.
-Full live/browser validation, remaining reviewer gates, exact merged
-deployment of the follow-up, and operator visual verification remain pending.
+**Current dev release:** v0.55.45 is deployed from merged master
+`ca98e19160aec5f1e955e584bafad060b4eaca96` as revision
+`scimserver-dev--vca98e191`, with GHCR and ACR on digest
+`sha256:23c2262da948097e305db4625dfa538f43b10de8c36ac8d6abfe252849be86b8`.
+The exact deployment passes 1,700/1,700 live assertions and 265/265 Chromium
+cases with zero skips or failures while retaining exactly 73 endpoints.
+Dashboard caching, the endpoint timeline index, credential cache settlement,
+eventual-log polling, and fixture-owned smoke navigation are deployed.
+One Chromium request retried after `GET /scim/admin/endpoints` waited 10.025
+seconds for a PostgreSQL connection. The interval contained overlapping
+mutation-triggered Dashboard builds. The v0.55.46 follow-up branch
+`fix/v05546-requestlog-count-pressure` is backed up at `45c41a28`; it removes
+the exact RequestLog counts that Dashboard and endpoint Overview never use.
+The removed count measured 1,605.2 ms versus 9.9 ms for the required bounded
+query. API build, 387 focused tests, independent review, and all 20 Fast
+pre-push gates pass, including 6,023 API units and 2,428 InMemory E2E tests.
+Exact merge, deployment, zero-timeout telemetry, complete live/browser reruns,
+and operator visual verification remain pending for v0.55.46.
 
 ### Active Execution Reference
 

@@ -1,13 +1,28 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.45
-> **Last Updated**: October 10, 2026
-> **Last verified:** 2026-10-10
+> **Version**: 0.55.46
+> **Last Updated**: October 12, 2026
+> **Last verified:** 2026-10-12
 
 ---
 
 ## Active Delivery Process
+
+**v0.55.45 deployed evidence and v0.55.46 follow-up:** merged master
+`ca98e19160aec5f1e955e584bafad060b4eaca96` is healthy on dev as revision
+`scimserver-dev--vca98e191` with matching GHCR/ACR digest
+`sha256:23c2262da948097e305db4625dfa538f43b10de8c36ac8d6abfe252849be86b8`.
+It passes 1,700/1,700 live assertions and 265/265 Chromium cases with zero
+skips or failures, preserving exactly 73 endpoints. One retried browser request
+received a 10.025-second PostgreSQL connection timeout while
+mutation-triggered Dashboard rebuilds overlapped. The backed-up v0.55.46
+branch removes exact RequestLog counts from Dashboard and endpoint Overview,
+which never expose those totals. Live measurement was 1,605.2 ms for the
+removed count versus 9.9 ms for the bounded latest-row query. API build, 387
+focused tests, independent review, and all 20 Fast pre-push gates pass.
+Merged deployment, zero-timeout telemetry, full live/Chromium reruns, and
+operator visual sign-off remain pending. Do not describe v0.55.46 as deployed.
 
 **Unmerged follow-up, 2026-10-08:** the local
 `fix/comprehensive-ui-validation-20260930` branch contains durable request-log

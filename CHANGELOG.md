@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.46] - 2026-10-12
+
+### Dashboard count-pressure correction
+
+- Stop calculating exact RequestLog totals for the Dashboard's latest 20
+  activity rows and endpoint Overview's latest ten rows. Neither response
+  exposes or consumes the total. Public paginated Logs APIs retain exact
+  totals by default.
+- Preserve accurate count-free `hasNext` behavior by requesting one lookahead
+  row, and use overloads that distinguish exact-total, count-free, and
+  dynamically selected call sites without weakening existing callers.
+- On the 484,000-row dev RequestLog table, the removed filtered count took
+  1,605.2 ms while the bounded latest-21-row query took 9.9 ms.
+- RED/GREEN coverage proves the Prisma count is skipped and both Dashboard
+  call sites opt into count-free reads. API build, 387 logging/Dashboard
+  tests, all 20 Fast pre-push gates, 6,023 API unit tests, and 2,428 InMemory
+  E2E tests pass. Independent review found and verified the overload
+  correction. Exact merged deployment, zero-timeout telemetry, full live and
+  Playwright reruns, and operator visual verification remain pending.
+
 ## [0.55.45] - 2026-10-12
 
 ### Endpoint log query resilience
@@ -34,6 +54,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   endpoint instead of selecting the newest ambient card. The full browser run
   passed 263/265 with zero skips and no endpoint leak; the corrected smoke
   journey then passed independently.
+- PR #205 merged normally as `ca98e19160aec5f1e955e584bafad060b4eaca96`.
+  The exact image is healthy on dev as revision
+  `scimserver-dev--vca98e191` at digest
+  `sha256:23c2262da948097e305db4625dfa538f43b10de8c36ac8d6abfe252849be86b8`;
+  GHCR and ACR semantic/latest tags resolve to that digest.
+- Final deployed evidence passes 1,700/1,700 live assertions and 265/265
+  Chromium cases with zero skips and zero failures. Endpoint integrity stayed
+  exactly 73 before and after both runs.
+- One browser request retried after `GET /scim/admin/endpoints` received a
+  10.025-second PostgreSQL connection timeout. Correlation found overlapping
+  mutation-triggered Dashboard rebuilds, which motivated v0.55.46's removal
+  of the remaining unused exact count.
+- Dev required explicit migration reconciliation because incident response
+  had already created the new index before the unconditional migration ran.
+  Database inspection proved the index valid, ready, and definition-identical
+  before the exact migration was marked applied and the revision restarted.
 
 ## [0.55.44] - 2026-10-12
 

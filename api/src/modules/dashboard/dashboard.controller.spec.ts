@@ -170,6 +170,11 @@ describe('DashboardController', () => {
 
       expect(secondResult).toBe(firstResult);
       expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(1);
+      expect(mockLoggingService.listLogs).toHaveBeenCalledWith({
+        pageSize: 20,
+        page: 1,
+        includeTotal: false,
+      });
       expect(mockLoggingService.getRequestSeries).toHaveBeenCalledTimes(1);
 
       const cachedResult = await controller.getDashboard();
@@ -617,7 +622,7 @@ describe('DashboardController', () => {
       // listLogs invoked with endpointId filter (not global) so we don't
       // ship cross-endpoint activity.
       expect(mockLoggingService.listLogs).toHaveBeenCalledWith(
-        expect.objectContaining({ endpointId, pageSize: 10 }),
+        expect.objectContaining({ endpointId, pageSize: 10, includeTotal: false }),
       );
     });
 

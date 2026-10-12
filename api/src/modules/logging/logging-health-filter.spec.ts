@@ -85,6 +85,23 @@ describe('LoggingService.recordRequest - health-probe filter', () => {
     expect(prisma.requestLog.findMany).toHaveBeenCalledTimes(1);
   });
 
+  it('skips the exact count for recent-row callers that do not use the total', async () => {
+    prisma.requestLog.findMany.mockResolvedValueOnce([]);
+
+    const result = await service.listLogs({
+      page: 1,
+      pageSize: 20,
+      includeTotal: false,
+    });
+
+    expect(prisma.requestLog.count).not.toHaveBeenCalled();
+    expect(prisma.requestLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0, take: 21 }),
+    );
+    expect(result.total).toBeUndefined();
+    expect(result.hasNext).toBe(false);
+  });
+
   it('does not fan user display-name lookups out across the pool', async () => {
     prisma.requestLog.count.mockResolvedValueOnce(2);
     prisma.requestLog.findMany.mockResolvedValueOnce([

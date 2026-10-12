@@ -190,7 +190,11 @@ export class DashboardController {
     // series is an aggregate scan; fanning three dashboard branches out let
     // one request consume most of the five-connection production pool.
     const endpointList = await this.endpointService.listEndpoints();
-    const recentLogs = await this.loggingService.listLogs({ pageSize: 20, page: 1 });
+    const recentLogs = await this.loggingService.listLogs({
+      pageSize: 20,
+      page: 1,
+      includeTotal: false,
+    });
     const requestsLast24hSeries = await this.loggingService.getRequestSeries({ hours: 24 });
 
     // Global stats from in-memory projection (0 DB queries)
@@ -291,6 +295,7 @@ export class DashboardController {
       endpointId: endpoint.id,
       page: 1,
       pageSize: 10,
+      includeTotal: false,
     });
 
     const stats = this.statsService.getEndpointStats(endpoint.id);

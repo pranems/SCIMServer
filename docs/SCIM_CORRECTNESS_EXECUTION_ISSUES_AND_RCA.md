@@ -1,6 +1,6 @@
 # SCIM correctness implementation: issues and lessons
 
-> **Last verified:** 2026-10-10
+> **Last verified:** 2026-10-12
 >
 > **Status:** Implementation ledger, updated when an issue is confirmed
 >
@@ -124,6 +124,16 @@ cases and the PATCH-envelope cache guard. The companion receipt is
 | RC-I94 | Live-test correctness / Medium | Custom Device Logs occasionally omitted DELETE while the same row appeared after the suite | The loop exited when any three log rows existed, so POST, GET and PATCH could satisfy it before the buffered DELETE became durable. The tight loop also added avoidable read load | Flush the RequestLog buffer, recompute the exact method set, require POST/PATCH/DELETE plus Activity rows, and sleep between bounded polls | Complete dev live rerun / presence-count assertion was weaker than the promised method outcome | Applied: the assertion now waits on the exact contract it later verifies |
 | RC-I95 | Migration recovery / Medium | Independent review found the concurrent index migration could report success while an interrupted invalid index remained | PostgreSQL `IF NOT EXISTS` checks relation-name existence, not `pg_index.indisvalid` | Use unconditional `CREATE INDEX CONCURRENTLY`; recovery must inspect and explicitly drop an invalid index before replay | Independent changed-file review / additive migration lint does not model interrupted concurrent DDL | Applied before merge; migration lint remains 20/20 |
 | RC-I96 | Browser fixture ownership / Medium | The full browser matrix clicked a Dashboard card and landed on a 404 because that endpoint was deleted between render and navigation | The smoke journey selected the newest ambient endpoint while three workers created and deleted fixtures; the shared helper already documents this exact cross-spec interference pattern | Create an RFC-standard endpoint owned by the smoke case, click its exact card ID, verify every tab, and delete it in `finally` | Complete three-worker Playwright run / isolated smoke runs did not race endpoint cleanup | Applied: the fixture-owned journey passes and the failed full run still finished with exactly 73 baseline endpoints |
+| RC-I97 | Database performance / High | The final 265/265 browser run retried one `GET /scim/admin/endpoints` after a 10.025-second PostgreSQL connection timeout | Successful mutation-triggered Dashboard rebuilds still calculated an exact filtered RequestLog total for 20 recent rows, while endpoint Overview did the same for ten rows. Neither caller exposes the total. The live count took 1,605.2 ms versus 9.9 ms for the bounded row query | Add an explicit count-free recent-row mode with one-row lookahead, and use it only in Dashboard and endpoint Overview. Public paginated Logs APIs retain exact totals | Final deployed timeout-only telemetry / the green browser gate retried the isolated 500 and did not require zero server errors | Applied in v0.55.46 source: RED/GREEN coverage proves no count call and accurate `hasNext`; exact deployment plus zero-timeout telemetry remains required |
+| RC-I98 | Type safety / Medium | API build and independent review found that the first count-free signature either weakened all callers to `number | undefined` or falsely promised a number for a widened filter containing `includeTotal: false` | One broad filter interface represented three contracts: exact totals, explicit count-free reads, and runtime-selected behavior | Add ordered overloads for literal false, omitted/true, and widened boolean inputs. Existing callers retain numeric totals while dynamic callers must handle undefined | API TypeScript build and independent review / focused runtime tests cannot prove overload soundness | Applied before push; API build and independent re-review pass |
+
+**v0.55.46 self-improvement disposition:** applied. The final browser gate is
+now supplemented by error-only telemetry review rather than treating a retried
+265/265 result as proof of zero server failures. **Design disposition:
+accepted.** `includeTotal` extends the existing query seam and has two concrete
+internal users; a second recent-log service would duplicate filtering and row
+mapping. The one-row lookahead preserves pagination truth without speculative
+abstraction.
 
 **2026-10-09 combined-source continuation:** the aged dependency commit
 `6075ad3d` plus the preserved UI/runtime overlay is now exercised in a
