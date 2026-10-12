@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.45] - 2026-10-12
+
 ### Endpoint log query resilience
 
 - Add the missing `RequestLog(endpointId, createdAt)` index used by endpoint
