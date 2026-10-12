@@ -495,7 +495,7 @@ describe('ActivityController', () => {
   // ── getActivitySummary - one bounded aggregate query ──────────────────────
 
   describe('getActivitySummary - SQL-level counting', () => {
-    it('shares one in-flight aggregate across concurrent browser loads without serving stale completed data', async () => {
+    it('shares one in-flight aggregate and caches the completed summary for one minute', async () => {
       let releaseAggregate!: (value: Array<{
         last24Hours: number;
         lastWeek: number;
@@ -527,16 +527,36 @@ describe('ActivityController', () => {
       expect(secondResult).toBe(firstResult);
       expect(prismaService.$queryRaw).toHaveBeenCalledTimes(1);
 
-      (prismaService.$queryRaw as jest.Mock).mockResolvedValueOnce([{
-        last24Hours: 11,
-        lastWeek: 21,
-        userOperations: 31,
-        groupOperations: 41,
-      }]);
-      const refreshedResult = await controller.getActivitySummary();
+      const cachedResult = await controller.getActivitySummary();
 
-      expect(refreshedResult.summary.last24Hours).toBe(11);
+      expect(cachedResult).toBe(firstResult);
+      expect(prismaService.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes the cached summary after one minute', async () => {
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      (prismaService.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([{
+          last24Hours: 10,
+          lastWeek: 20,
+          userOperations: 30,
+          groupOperations: 40,
+        }])
+        .mockResolvedValueOnce([{
+          last24Hours: 11,
+          lastWeek: 21,
+          userOperations: 31,
+          groupOperations: 41,
+        }]);
+
+      const first = await controller.getActivitySummary();
+      now.mockReturnValue(1_060_001);
+      const refreshed = await controller.getActivitySummary();
+
+      expect(first.summary.last24Hours).toBe(10);
+      expect(refreshed.summary.last24Hours).toBe(11);
       expect(prismaService.$queryRaw).toHaveBeenCalledTimes(2);
+      now.mockRestore();
     });
 
     it('should use one aggregate query for all summary fields', async () => {

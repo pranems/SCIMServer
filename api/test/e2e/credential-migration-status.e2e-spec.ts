@@ -70,7 +70,6 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       SecretTokenBearerAuthEnabled: true,
     });
-    const before = (await status().expect(200)).body;
 
     await request(app.getHttpServer())
       .post(`/scim/admin/endpoints/${endpointId}/credentials`)
@@ -79,26 +78,29 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
       .expect(201);
 
     const after = (await status().expect(200)).body;
-    expect(after.keyed.total).toBe(before.keyed.total + 1);
-    expect(after.legacy.total).toBe(before.legacy.total);
+    const credentials = await repo.findByEndpoint(endpointId);
+    expect(credentials).toHaveLength(1);
+    expect(credentials[0].hashAlgo).toBe(HASH_ALGO_HMAC_V1);
+    expect(after.byAlgo[HASH_ALGO_HMAC_V1]).toBeGreaterThan(0);
+    expect(after.endpoints.some((e: { endpointId: string }) => e.endpointId === endpointId))
+      .toBe(false);
   });
 
   it('P4-X3: a planted legacy row appears in the tail and closes the phase-5 gate', async () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       SecretTokenBearerAuthEnabled: true,
     });
-    const before = (await status().expect(200)).body;
-
     await plantLegacy(endpointId);
 
     const after = (await status().expect(200)).body;
-    expect(after.legacy.total).toBe(before.legacy.total + 1);
     expect(after.readyToRetireLegacyPath).toBe(false);
     expect(after.byAlgo[HASH_ALGO_BCRYPT]).toBeGreaterThan(0);
 
     const row = after.endpoints.find((e: { endpointId: string }) => e.endpointId === endpointId);
     expect(row).toBeDefined();
     expect(row.legacyTotal).toBe(1);
+    expect(row.legacyActive).toBe(1);
+    expect(row.keyedTotal).toBe(0);
     expect(row.endpointName).toBeTruthy();
   });
 
@@ -110,7 +112,6 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
       SecretTokenBearerAuthEnabled: true,
     });
     const planted = await plantLegacy(endpointId);
-    const before = (await status().expect(200)).body;
 
     await request(app.getHttpServer())
       .delete(`/scim/admin/endpoints/${endpointId}/credentials/${planted.id}`)
@@ -118,9 +119,12 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
       .expect(204);
 
     const after = (await status().expect(200)).body;
-    expect(after.legacy.total).toBe(before.legacy.total);
-    expect(after.legacy.inactive).toBe(before.legacy.inactive + 1);
-    expect(after.legacy.active).toBe(before.legacy.active - 1);
+    const credentials = await repo.findByEndpoint(endpointId);
+    expect(credentials).toHaveLength(1);
+    expect(credentials[0].active).toBe(false);
+    expect(credentials[0].hashAlgo).toBe(HASH_ALGO_BCRYPT);
+    expect(after.endpoints.some((e: { endpointId: string }) => e.endpointId === endpointId))
+      .toBe(false);
   });
 
   it('P4-X5: rotating a legacy credential moves it OUT of the tail - rotation is the migration path', async () => {
@@ -128,7 +132,6 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
       SecretTokenBearerAuthEnabled: true,
     });
     const planted = await plantLegacy(endpointId);
-    const before = (await status().expect(200)).body;
 
     await request(app.getHttpServer())
       .post(`/scim/admin/endpoints/${endpointId}/credentials/${planted.id}/rotate`)
@@ -136,10 +139,14 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
       .expect(201);
 
     const after = (await status().expect(200)).body;
-    // The rotated-away row is deactivated but still bcrypt, so the legacy TOTAL
-    // is unchanged - what moves is that a keyed row now exists in its place.
-    expect(after.keyed.total).toBe(before.keyed.total + 1);
-    expect(after.legacy.active).toBe(before.legacy.active - 1);
+    const credentials = await repo.findByEndpoint(endpointId);
+    expect(credentials).toHaveLength(2);
+    expect(credentials).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: planted.id, active: false, hashAlgo: HASH_ALGO_BCRYPT }),
+      expect.objectContaining({ active: true, hashAlgo: HASH_ALGO_HMAC_V1 }),
+    ]));
+    expect(after.endpoints.some((e: { endpointId: string }) => e.endpointId === endpointId))
+      .toBe(false);
   });
 
   it('P4-X6: the counts reconcile - total equals legacy plus keyed, and byAlgo sums to it', async () => {
@@ -182,8 +189,6 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
     const endpointId = await createEndpointWithConfig(app, token, {
       SecretTokenBearerAuthEnabled: true,
     });
-    const before = (await status().expect(200)).body;
-
     await repo.create({
       endpointId,
       credentialType: 'wif',
@@ -193,8 +198,15 @@ describe('P1 phase 4 - credential migration status (E2E)', () => {
     });
 
     const after = (await status().expect(200)).body;
-    expect(after.secretless.total).toBe(before.secretless.total + 1);
-    expect(after.legacy.total).toBe(before.legacy.total);
+    const grouped = await repo.countByHashAlgo();
+    expect(grouped).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        endpointId,
+        credentialType: 'wif',
+        active: true,
+        count: 1,
+      }),
+    ]));
 
     const row = after.endpoints.find((e: { endpointId: string }) => e.endpointId === endpointId);
     expect(row).toBeUndefined();
