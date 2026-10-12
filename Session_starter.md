@@ -32,6 +32,10 @@ and buffered custom-resource DELETE logging were both present after the run.
 The harness now polls the exact owned state and exact method set. Independent
 review also removed `IF NOT EXISTS` from the concurrent index migration so an
 invalid interrupted build cannot be accepted.
+The complete browser matrix now executes 265 cases with zero skips: 263 passed,
+the not-yet-deployed credential cache fix accounts for one failure, and one
+ambient-card smoke race was corrected with a fixture-owned endpoint and passes
+independently. The run preserved exactly 73 endpoints.
 Full live/browser validation, remaining reviewer gates, exact merged
 deployment of the follow-up, and operator visual verification remain pending.
 

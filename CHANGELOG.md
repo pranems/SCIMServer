@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks rather than missing final state.
 - Keep the concurrent index creation unconditional so a failed build cannot
   leave an invalid same-name index that a retry silently accepts.
+- Make the Dashboard card smoke journey create, click, and clean up its own
+  endpoint instead of selecting the newest ambient card. The full browser run
+  passed 263/265 with zero skips and no endpoint leak; the corrected smoke
+  journey then passed independently.
 
 ## [0.55.44] - 2026-10-12
 

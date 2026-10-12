@@ -13,6 +13,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createFixtureEndpoint, deleteFixtureEndpoint } from './endpoint-fixture';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -311,17 +312,22 @@ test.describe('Smoke Test - Complete User Flows', () => {
   });
 
   test('12. Click endpoint card navigates to detail page + all tabs load', async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
-    await page.reload();
-    await page.waitForTimeout(5000);
+    let endpointId: string | null = null;
+    try {
+      endpointId = await createFixtureEndpoint(page, {
+        namePrefix: 'e2e-smoke-card',
+        profilePreset: 'rfc-standard',
+      });
+      await page.goto('/');
+      await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
 
-    // Find first endpoint card on dashboard
-    const card = page.locator('[data-testid^="endpoint-card-"]').first();
-    if (await card.isVisible({ timeout: 5000 }).catch(() => false)) {
+      // Use a fixture-owned card. The newest ambient endpoint can be deleted
+      // by another parallel spec between Dashboard render and this click.
+      const card = page.getByTestId(`endpoint-card-${endpointId}`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
       await screenshot(page, '30-before-card-click');
       await card.click();
-      await page.waitForTimeout(3000);
+      await expect(page).toHaveURL(new RegExp(`/endpoints/${endpointId}`));
       await screenshot(page, '31-endpoint-detail-from-card');
 
       // MUST see the detail page
@@ -368,6 +374,8 @@ test.describe('Smoke Test - Complete User Flows', () => {
       // Verify we're back on a page (not 404)
       const body = await page.textContent('body') ?? '';
       expect(body).not.toContain('Cannot GET');
+    } finally {
+      endpointId = await deleteFixtureEndpoint(page, endpointId);
     }
   });
 
