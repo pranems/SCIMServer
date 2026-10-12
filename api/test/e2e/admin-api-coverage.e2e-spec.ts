@@ -269,7 +269,7 @@ describe('Admin API Coverage (E2E)', () => {
     describe('POST /admin/users/manual', () => {
       it('should create a user via simplified form', async () => {
         const res = await request(app.getHttpServer())
-          .post('/scim/admin/users/manual')
+          .post(`/scim/admin/users/manual?endpointId=${endpointId}`)
           .set('Authorization', `Bearer ${token}`)
           .set('Content-Type', 'application/json')
           .send({
@@ -299,7 +299,7 @@ describe('Admin API Coverage (E2E)', () => {
     describe('POST /admin/groups/manual', () => {
       it('should create a group via simplified form', async () => {
         const res = await request(app.getHttpServer())
-          .post('/scim/admin/groups/manual')
+          .post(`/scim/admin/groups/manual?endpointId=${endpointId}`)
           .set('Authorization', `Bearer ${token}`)
           .set('Content-Type', 'application/json')
           .send({

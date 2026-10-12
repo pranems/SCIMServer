@@ -231,9 +231,10 @@ export class AdminController {
   @Header('Content-Type', 'application/scim+json')
   async createManualUser(
     @Body() dto: ManualUserDto,
-    @Req() request: Request
+    @Req() request: Request,
+    @Query('endpointId') selectedEndpointId?: string
   ): Promise<ScimUserResource> {
-    const endpointId = await this.getDefaultEndpointId();
+    const endpointId = selectedEndpointId?.trim() || await this.getDefaultEndpointId();
     const baseUrl = `${buildBaseUrl(request)}/endpoints/${endpointId}`;
     const userName = dto.userName.trim();
     const payload: CreateUserDto = {
@@ -308,9 +309,10 @@ export class AdminController {
   @Header('Content-Type', 'application/scim+json')
   async createManualGroup(
     @Body() dto: ManualGroupDto,
-    @Req() request: Request
+    @Req() request: Request,
+    @Query('endpointId') selectedEndpointId?: string
   ): Promise<ScimGroupResource> {
-    const endpointId = await this.getDefaultEndpointId();
+    const endpointId = selectedEndpointId?.trim() || await this.getDefaultEndpointId();
     const baseUrl = `${buildBaseUrl(request)}/endpoints/${endpointId}`;
     const displayName = dto.displayName.trim();
     const members = dto.memberIds
