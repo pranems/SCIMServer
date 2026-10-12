@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.47] - 2026-10-12
+
+### Token-log endpoint identity
+
+- Snapshot the warmed endpoint display name into the existing RequestLog
+  `endpointName` field for accepted and rejected per-endpoint OAuth token
+  requests. The lookup is cache-only, adds no database read, and does not
+  participate in token authentication or invalid-client responses.
+- Keep `/scim/oauth/token` correctly server-scoped with no invented endpoint
+  identity. The global Logs table now renders these rows as `Server-wide`
+  instead of an unexplained blank endpoint cell.
+- Preserve the normalized domain model. Mutable endpoint-owned tables continue
+  to store endpoint IDs; only the append-only RequestLog retains the
+  request-time endpoint-name snapshot.
+- RED/GREEN evidence passes 25 focused API tests and 26 LogsPage tests,
+  including uppercase UUID cache-key normalization. The
+  endpoint OAuth integration suite passes 21/21, covering accepted, rejected,
+  and server-wide RequestLog rows. A real Chromium case passes against the
+  current local API and verifies both rendered labels and zero per-row endpoint
+  detail requests.
+- The complete live, zero-skip browser, exact-image, and post-deployment
+  telemetry results will be appended after reviewed merge and deployment.
+
 ## [0.55.46] - 2026-10-12
 
 ### Dashboard count-pressure correction

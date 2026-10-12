@@ -27,6 +27,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
   let adminToken: string;
   let endpointA: string;
   let endpointB: string;
+  let endpointAName: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -44,6 +45,11 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       OAuthClientCredentialsAuthEnabled: 'True',
       MaxActiveOAuthClientCredentials: 25,
     });
+    const endpointResponse = await request(app.getHttpServer())
+      .get(`/scim/admin/endpoints/${endpointA}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    endpointAName = endpointResponse.body.displayName ?? endpointResponse.body.name;
   });
 
   afterAll(async () => {
@@ -90,6 +96,14 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     const payload = decodePayload(res.body.access_token);
     expect(payload.endpoint_id).toBe(endpointA);
     expect(payload.client_id).toBe(clientId);
+
+    const requestId = res.headers['x-request-id'];
+    expect(typeof requestId).toBe('string');
+    const tokenRow = await waitForLogRowByRequestId(app, adminToken, requestId);
+    expect(tokenRow).toMatchObject({
+      endpointId: endpointA,
+      endpointName: endpointAName,
+    });
   });
 
   it('mints a per-endpoint token when credentials arrive via Authorization: Basic (client_secret_basic)', async () => {
@@ -182,6 +196,27 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(tokenRow!.authOutcome).toBe('reject');
     expect(tokenRow!.authMethod).toBe('oauth_client');
     expect(tokenRow!.authReason).toBe('oauth_client_auth_failed');
+    expect(tokenRow!.endpointId).toBe(endpointA);
+    expect(tokenRow!.endpointName).toBe(endpointAName);
+  });
+
+  it('keeps the server-wide OAuth token log free of invented endpoint identity', async () => {
+    const globalToken = await request(app.getHttpServer())
+      .post('/scim/oauth/token')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: 'e2e-client',
+        client_secret: 'e2e-client-secret',
+      })
+      .expect(200);
+    const requestId = globalToken.headers['x-request-id'];
+    expect(typeof requestId).toBe('string');
+
+    const tokenRow = await waitForLogRowByRequestId(app, adminToken, requestId);
+    expect(tokenRow).toBeDefined();
+    expect(tokenRow!.url).toBe('/scim/oauth/token');
+    expect(tokenRow!.endpointId).toBeUndefined();
+    expect(tokenRow!.endpointName).toBeUndefined();
   });
 
   it('W1: the request-log row detail carries the FULL auth decision trace (durable, no store)', async () => {

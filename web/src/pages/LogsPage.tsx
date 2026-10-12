@@ -426,7 +426,7 @@ export const LogsPage: React.FC<{ routeSince?: string }> = ({ routeSince }) => {
                       )}
                     </div>
                   ) : (
-                    <Caption1 data-testid={`log-row-endpoint-${log.id}`}>-</Caption1>
+                    <Caption1 data-testid={`log-row-endpoint-${log.id}`}>Server-wide</Caption1>
                   )}
                 </td>
                 <td className={classes.td}>

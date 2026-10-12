@@ -166,3 +166,108 @@ test('request tables retain endpoint names and stay bounded across endpoint dele
   await expect(page.getByTestId(`log-row-endpoint-${historicalLog!.id}`)).toContainText(endpointLabel);
   await expect(page.getByTestId(`log-row-endpoint-open-${historicalLog!.id}`)).toHaveCount(0);
 });
+
+test('token-mint rows distinguish endpoint snapshots from server-wide activity', async ({ page }) => {
+  test.setTimeout(180_000);
+  endpointId = await createFixtureEndpoint(page, {
+    namePrefix: 'e2e-token-log',
+    settings: {
+      OAuthClientCredentialsAuthEnabled: 'True',
+    },
+  });
+
+  const endpointResponse = await page.request.get(`/scim/admin/endpoints/${endpointId}`, {
+    headers: { Authorization: authorization },
+  });
+  expect(endpointResponse.status()).toBe(200);
+  const endpoint = await endpointResponse.json() as { name: string; displayName?: string };
+  const endpointLabel = endpoint.displayName ?? endpoint.name;
+
+  const credentialResponse = await page.request.post(
+    `/scim/admin/endpoints/${endpointId}/credentials`,
+    {
+      headers: {
+        Authorization: authorization,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        credentialType: 'oauth_client',
+        label: 'token-log-identity',
+      },
+    },
+  );
+  expect(credentialResponse.status()).toBe(201);
+  const credential = await credentialResponse.json() as {
+    clientId: string;
+    clientSecret: string;
+  };
+
+  const endpointTokenResponse = await page.request.post(
+    `/scim/endpoints/${endpointId}/oauth/token`,
+    {
+      form: {
+        grant_type: 'client_credentials',
+        client_id: credential.clientId,
+        client_secret: credential.clientSecret,
+      },
+    },
+  );
+  expect(endpointTokenResponse.status()).toBe(200);
+  const endpointRequestId = endpointTokenResponse.headers()['x-request-id'];
+  expect(endpointRequestId).toBeTruthy();
+
+  const globalTokenResponse = await page.request.post('/scim/oauth/token', {
+    headers: { 'Content-Type': 'application/json' },
+    data: {
+      grant_type: 'client_credentials',
+      client_id: 'scimserver-client',
+      client_secret: 'changeme-oauth',
+    },
+  });
+  expect(globalTokenResponse.status()).toBe(200);
+  const globalRequestId = globalTokenResponse.headers()['x-request-id'];
+  expect(globalRequestId).toBeTruthy();
+
+  let endpointLog: LogItem | undefined;
+  let globalLog: LogItem | undefined;
+  await expect.poll(async () => {
+    const [flush, endpointLogs, globalLogs] = await Promise.all([
+      page.request.post('/scim/admin/logs/flush', {
+        headers: { Authorization: authorization },
+      }),
+      page.request.get(
+        `/scim/admin/logs?requestId=${encodeURIComponent(endpointRequestId)}&includeAdmin=true&pageSize=10`,
+        { headers: { Authorization: authorization } },
+      ),
+      page.request.get(
+        `/scim/admin/logs?requestId=${encodeURIComponent(globalRequestId)}&includeAdmin=true&pageSize=10`,
+        { headers: { Authorization: authorization } },
+      ),
+    ]);
+    if (!flush.ok() || !endpointLogs.ok() || !globalLogs.ok()) return 0;
+    endpointLog = ((await endpointLogs.json()) as { items?: LogItem[] }).items?.[0];
+    globalLog = ((await globalLogs.json()) as { items?: LogItem[] }).items?.[0];
+    return endpointLog && globalLog ? 2 : 0;
+  }, { timeout: 30_000 }).toBe(2);
+
+  expect(endpointLog).toMatchObject({
+    endpointId,
+    endpointName: endpointLabel,
+  });
+  expect(globalLog?.endpointId).toBeUndefined();
+  expect(globalLog?.endpointName).toBeUndefined();
+
+  const endpointDetailRequests: string[] = [];
+  page.on('request', (browserRequest) => {
+    const url = new URL(browserRequest.url());
+    if (/\/scim\/admin\/endpoints\/[^/]+$/.test(url.pathname)) {
+      endpointDetailRequests.push(url.pathname);
+    }
+  });
+  await page.goto('/logs?page=1');
+  await expect(page.getByTestId('global-logs-page')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId(`log-row-endpoint-${endpointLog!.id}`)).toHaveText(endpointLabel);
+  await expect(page.getByTestId(`log-row-endpoint-${globalLog!.id}`)).toHaveText('Server-wide');
+  await expect(page.getByTestId(`log-row-endpoint-open-${globalLog!.id}`)).toHaveCount(0);
+  expect(endpointDetailRequests).toEqual([]);
+});

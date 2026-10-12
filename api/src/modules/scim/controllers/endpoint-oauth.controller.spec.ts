@@ -14,7 +14,14 @@ import { ClientSecretTokenProvider } from './client-secret-token-provider';
 const ENDPOINT_ID = '11111111-1111-1111-1111-111111111111';
 const JWT_BEARER = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
-const logger: any = { warn: jest.fn(), info: jest.fn(), debug: jest.fn(), error: jest.fn(), trace: jest.fn() };
+const logger: any = {
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn(),
+  error: jest.fn(),
+  trace: jest.fn(),
+  enrichContext: jest.fn(),
+};
 
 function makeController(opts: {
   assertionProvider?: { mintFromAssertion: jest.Mock };
@@ -28,6 +35,12 @@ function makeController(opts: {
   const credentialRepo: any = {
     findActiveByEndpoint: jest.fn().mockResolvedValue(opts.credentials ?? []),
   };
+  const endpointService = opts.endpointService
+    ? {
+        getCachedEndpointDisplayName: jest.fn().mockReturnValue(undefined),
+        ...opts.endpointService,
+      }
+    : null;
   // W2.3 - the controller delegates the client_secret mint to the real provider,
   // constructed here with the mock repo + oauthService so the existing setup
   // (credentials + secrets) still drives the mint through the extracted logic.
@@ -37,7 +50,7 @@ function makeController(opts: {
     logger,
     opts.assertionProvider ?? null,
     opts.decisionStore ?? null,
-    opts.endpointService ?? null,
+    endpointService,
   );
   return { controller, oauthService, credentialRepo };
 }
@@ -55,6 +68,50 @@ async function expectStatus(promise: Promise<unknown>, status: number, error?: s
 }
 
 describe('EndpointOAuthController routing cascade (A3)', () => {
+  it('enriches per-endpoint token requests from the warmed endpoint identity cache', async () => {
+    logger.enrichContext.mockClear();
+    const assertionProvider = {
+      mintFromAssertion: jest.fn().mockResolvedValue({
+        accessToken: 'wif-token',
+        expiresIn: 3600,
+        scope: 'scim.read',
+      }),
+    };
+    const endpointService = {
+      getCachedEndpointDisplayName: jest.fn().mockReturnValue('Payroll EU'),
+    };
+    const { controller } = makeController({ assertionProvider, endpointService });
+
+    await controller.getToken(ENDPOINT_ID, {
+      grant_type: 'client_credentials',
+      client_assertion: '******',
+      client_assertion_type: JWT_BEARER,
+    });
+
+    expect(endpointService.getCachedEndpointDisplayName).toHaveBeenCalledWith(ENDPOINT_ID);
+    expect(logger.enrichContext).toHaveBeenCalledWith({ endpointName: 'Payroll EU' });
+  });
+
+  it('does not invent an endpoint name when the route identity is not cached', async () => {
+    logger.enrichContext.mockClear();
+    const endpointService = {
+      getCachedEndpointDisplayName: jest.fn().mockReturnValue(undefined),
+    };
+    const { controller } = makeController({ endpointService });
+
+    await expectStatus(
+      controller.getToken(ENDPOINT_ID, {
+        grant_type: 'client_credentials',
+        client_id: 'unknown',
+        client_secret: 'wrong',
+      }),
+      401,
+      'invalid_client',
+    );
+
+    expect(logger.enrichContext).not.toHaveBeenCalled();
+  });
+
   it('dispatches a client_assertion request to the assertion provider, NOT the secret path', async () => {
     const assertionProvider = { mintFromAssertion: jest.fn().mockResolvedValue({ accessToken: 'wif-token', expiresIn: 3600, scope: 'scim.read' }) };
     const { controller, oauthService } = makeController({ assertionProvider });

@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-01 - **Product version:** `0.55.46`
+> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
 
-> **Status:** Active | **Last Updated:** 2026-10-01 | **Version:** 0.55.46
+> **Status:** Active | **Last Updated:** 2026-10-12 | **Version:** 0.55.47
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -355,6 +355,10 @@ rows without a snapshot show `Deleted endpoint (<short-id>...)`. Deleted
 endpoints are plain text rather than broken quick-open links. The table uses
 fixed, measured column bounds so long URLs and endpoint names truncate inside
 their own columns instead of hiding Status, authentication, Duration, or Time.
+Requests that do not belong to an endpoint, including the server-level
+`POST /scim/oauth/token` flow, show `Server-wide`. Per-endpoint token-mint
+rows retain the request-time endpoint-name snapshot without issuing a
+per-row endpoint lookup.
 
 ![Logs](screenshots/prod-08-logs.png)
 

@@ -107,6 +107,28 @@ describe('LogsPage', () => {
     expect(screen.getByTestId('log-row-endpoint-open-l1')).toBeInTheDocument();
   });
 
+  it('labels a global token-mint log as server-wide without an endpoint quick-open button', async () => {
+    mockUseGlobalLogs.mockReturnValue({
+      data: {
+        total: 1,
+        items: [{
+          ...sampleLogs.items[0],
+          id: 'global-token',
+          method: 'POST',
+          url: '/scim/oauth/token',
+          endpointId: null,
+          endpointName: null,
+        }],
+      },
+      isLoading: false,
+      error: null,
+    });
+    wrap(<LogsPage />);
+
+    expect(await screen.findByTestId('log-row-endpoint-global-token')).toHaveTextContent('Server-wide');
+    expect(screen.queryByTestId('log-row-endpoint-open-global-token')).not.toBeInTheDocument();
+  });
+
   it('shows EmptyState (R4 - replaces "No logs found" text) when total=0', async () => {
     mockUseGlobalLogs.mockReturnValue({ data: { total: 0, items: [] }, isLoading: false, error: null });
     wrap(<LogsPage />);

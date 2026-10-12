@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-10-09 - **Product version:** `0.55.46`
+> **Status:** Implemented locally - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
 
 ## Purpose
 
@@ -87,6 +87,11 @@ name, then the request-time endpoint-name snapshot, then a bounded deleted-ID
 fallback for legacy rows. A quick-open action appears only while the endpoint
 still exists. This prevents a deleted endpoint from turning historical rows
 into raw UUIDs or dead navigation.
+
+Rows with no endpoint identity are explicitly labeled `Server-wide`. This
+includes the global OAuth token endpoint. Per-endpoint OAuth token rows use the
+request-time endpoint-name snapshot populated from the warmed endpoint cache,
+so Logs does not issue one endpoint-detail request per row.
 
 The Logs **Errors only** filter uses a boolean in typed router state and `true`/`false` text in the URL. Both forms are accepted by the same schema. This prevents the former `invalid_value` route error when the toolbar supplied native `true`.
 

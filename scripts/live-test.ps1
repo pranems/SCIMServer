@@ -13726,6 +13726,7 @@ try {
         name = "live-test-authsummary-$(Get-Random)"; profilePreset = "rfc-standard"
     } | ConvertTo-Json)
     $bmId = $bmEp.id
+    $bmExpectedName = if ([string]::IsNullOrWhiteSpace($bmEp.displayName)) { $bmEp.name } else { $bmEp.displayName }
     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId" -Method PATCH -Headers $headers -Body (@{
         profile = @{ settings = @{ OAuthClientCredentialsAuthEnabled = "True" } }
     } | ConvertTo-Json -Depth 6) | Out-Null
@@ -13767,6 +13768,18 @@ try {
     Test-Result -Success ($bmRejectRow.authMethod -eq "oauth_client") -Message "9z-BM.T4: rejected row authMethod=oauth_client (V11)"
     Test-Result -Success ($bmRejectRow.authReason -eq "oauth_client_auth_failed") -Message "9z-BM.T5: rejected row authReason carries the reason code (V12 durable fail)"
     Test-Result -Success ($null -ne $bmAcceptRow -and $bmAcceptRow.authOutcome -eq "accept") -Message "9z-BM.T6: accepted token request-log row carries authOutcome=accept (V10)"
+    Test-Result -Success ($bmRejectRow.endpointId -eq $bmId -and $bmRejectRow.endpointName -eq $bmExpectedName) -Message "9z-BM.T7: rejected per-endpoint token row snapshots endpoint id and name"
+    Test-Result -Success ($bmAcceptRow.endpointId -eq $bmId -and $bmAcceptRow.endpointName -eq $bmExpectedName) -Message "9z-BM.T8: accepted per-endpoint token row snapshots endpoint id and name"
+
+    $bmGlobalToken = Invoke-WebRequest -Uri "$baseUrl/scim/oauth/token" -Method POST `
+        -ContentType "application/x-www-form-urlencoded" `
+        -Body @{ grant_type = "client_credentials"; client_id = $ClientId; client_secret = $ClientSecret } `
+        -SkipHttpErrorCheck
+    $bmGlobalRequestId = $bmGlobalToken.Headers['X-Request-Id'] | Select-Object -First 1
+    Test-Result -Success ($bmGlobalToken.StatusCode -eq 200 -and -not [string]::IsNullOrWhiteSpace($bmGlobalRequestId)) -Message "9z-BM.T9: server-wide OAuth mint exposes a request id"
+    $bmGlobalRow = if ($bmGlobalRequestId) { Get-LogDetailByRequestId $bmGlobalRequestId } else { $null }
+    Test-Result -Success ($null -ne $bmGlobalRow -and $bmGlobalRow.url -eq "/scim/oauth/token") -Message "9z-BM.T10: server-wide OAuth mint has a durable request-log row"
+    Test-Result -Success ($null -ne $bmGlobalRow -and $null -eq $bmGlobalRow.endpointId -and $null -eq $bmGlobalRow.endpointName) -Message "9z-BM.T11: server-wide OAuth row does not invent endpoint identity"
 
     # Cleanup
     try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bmId" -Method DELETE -Headers $headers | Out-Null } catch {}

@@ -1,8 +1,8 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.46`
+> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
 
-> **Updated:** 2026-09-29
+> **Updated:** 2026-10-12
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 >
 > **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines the portability boundary, discovery translation, authentication provenance, API/DB ownership, and target UX. This document remains authoritative for current profile expansion and PATCH merge semantics.
@@ -202,6 +202,14 @@ sequenceDiagram
     ES-->>EC: EndpointResponse
     EC-->>Op: 201 Created
 ```
+
+The same warmed endpoint cache exposes a cache-only display-name read for
+request-log correlation. Per-endpoint token routes use that value to preserve
+the request-time endpoint name in append-only audit history without adding a
+database query. The value is observability metadata only: a cache miss leaves
+the name unset and never changes authentication acceptance, rejection, status,
+or timing through a fallback database lookup. UUID cache keys are normalized
+to lowercase so equivalent uppercase route values preserve the same snapshot.
 
 ---
 

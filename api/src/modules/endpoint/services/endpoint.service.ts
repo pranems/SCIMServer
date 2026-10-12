@@ -207,6 +207,11 @@ export class EndpointService implements OnModuleInit {
     return this.cacheById.get(endpointId)?.profile?.settings;
   }
 
+  getCachedEndpointDisplayName(endpointId: string): string | undefined {
+    const endpoint = this.cacheById.get(endpointId.toLowerCase());
+    return endpoint?.displayName?.trim() || endpoint?.name;
+  }
+
   /**
    * On module init: warm the endpoint cache from the database and restore
    * per-endpoint log levels. For InMemory backend, cache starts empty.

@@ -79,11 +79,28 @@ describe('Persistent endpoint cache freshness', () => {
         settings: { StrictSchemaValidation: false, logFileEnabled: false },
       },
     });
+
     const result = await service.getEndpoint(id);
     expect(result.profile?.settings?.StrictSchemaValidation).toBe(false);
     expect(listener).toHaveBeenCalledWith(id, expect.objectContaining({
       settings: expect.objectContaining({ StrictSchemaValidation: false }),
     }));
+  });
+
+  it('exposes the warmed display name without a database read', () => {
+    const cachedIdentityReader = service as unknown as {
+      getCachedEndpointDisplayName(endpointId: string): string | undefined;
+    };
+
+    expect(cachedIdentityReader.getCachedEndpointDisplayName(id)).toBe('Fresh endpoint');
+    expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    expect(prisma.endpoint.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('resolves warmed endpoint identity for an uppercase UUID route value', () => {
+    expect(service.getCachedEndpointDisplayName(id.toUpperCase())).toBe('Fresh endpoint');
+    expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    expect(prisma.endpoint.findFirst).not.toHaveBeenCalled();
   });
 
   it('does not serve a warmed endpoint after another writer deletes it', async () => {
