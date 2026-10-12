@@ -9,20 +9,27 @@
 
 ## Active Delivery Process
 
-**v0.55.45 deployed evidence and v0.55.46 follow-up:** merged master
-`ca98e19160aec5f1e955e584bafad060b4eaca96` is healthy on dev as revision
-`scimserver-dev--vca98e191` with matching GHCR/ACR digest
-`sha256:23c2262da948097e305db4625dfa538f43b10de8c36ac8d6abfe252849be86b8`.
-It passes 1,700/1,700 live assertions and 265/265 Chromium cases with zero
-skips or failures, preserving exactly 73 endpoints. One retried browser request
-received a 10.025-second PostgreSQL connection timeout while
-mutation-triggered Dashboard rebuilds overlapped. The backed-up v0.55.46
-branch removes exact RequestLog counts from Dashboard and endpoint Overview,
-which never expose those totals. Live measurement was 1,605.2 ms for the
-removed count versus 9.9 ms for the bounded latest-row query. API build, 387
-focused tests, independent review, and all 20 Fast pre-push gates pass.
-Merged deployment, zero-timeout telemetry, full live/Chromium reruns, and
-operator visual sign-off remain pending. Do not describe v0.55.46 as deployed.
+**v0.55.46 deployed evidence:** merged master
+`415f884469ecb2cd03f860d42cec99afc5234fd4` is healthy on dev as revision
+`scimserver-dev--v415f8844` with matching GHCR/ACR digest
+`sha256:7660a47638202e67f4f88caac8109f085e2c314f646580eb19eb020c08af4b9f`.
+The authoritative pipeline passes 36 executable gates with zero failures,
+1,700/1,700 live assertions, and 73-to-73 endpoint integrity. The complete
+opt-in browser follow-up passes 265/265 cases with zero skips or failures and
+again retains exactly 73 endpoints. Error-only telemetry across 26,185
+persisted requests contains zero HTTP 500 responses and zero PostgreSQL
+connection/pool timeout errors. Dashboard p50/p95/max are 168/965/2,146 ms;
+endpoint-list p50/p95/max are 164/603/2,455 ms. The removed exact count measured
+1,605.2 ms versus 9.9 ms for the required bounded query. Operator visual
+sign-off remains pending; neither canary nor customer production is promoted.
+
+**Token-log endpoint identity gap:** RequestLog already stores nullable
+`endpointId` and `endpointName` snapshots. The 396 global `/scim/oauth/token`
+rows correctly have neither and should render `Server-wide`. All 7,100 sampled
+per-endpoint token-mint rows have an endpoint ID but no endpoint-name snapshot.
+Populate the existing snapshot at per-endpoint token resolution time rather
+than adding read-time per-row lookups or duplicating endpoint names into
+mutable domain tables.
 
 **Unmerged follow-up, 2026-10-08:** the local
 `fix/comprehensive-ui-validation-20260930` branch contains durable request-log
