@@ -4,17 +4,10 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.43 is deployed from merged master
-`e2bc0287` as revision `scimserver-dev--ve2bc0287`, with GHCR and ACR on digest
-`sha256:cb6c31f7c0c69c5e646716eb30d6436acd9f77d1c4a5fa40c78921a193a69d7c`.
-The Activity-summary cache and table-specific autovacuum settings are active.
-The authoritative pipeline passed 32 gates and failed four downstream gates
-under overlapping browser and live database load. It produced 5,168
-browser-phase timeout records and leaked 25 browser fixtures. Those exact 25
-IDs were verified against immutable before/after artifacts and current live
-names, then deleted. Dev is back to 73 endpoints with no baseline ID missing.
-
-**v0.55.44 release candidate:** a 30-second successful Dashboard cache
+**Current dev release:** v0.55.44 is deployed from merged master
+`24af28d1` as revision `scimserver-dev--v24af28d1`, with GHCR and ACR on digest
+`sha256:8737fa892a384d25ecb7336abc6ad0b26fc807935bf6d6999e26b8303590b940`.
+A 30-second successful Dashboard cache
 preserves in-flight sharing without caching failures. SCIM mutation events
 advance a cache generation, stale in-flight work cannot repopulate it, and the
 browser now owns only a one-second deduplication window so freshness periods do
@@ -26,9 +19,25 @@ established flush helper rather than sleeping for four seconds. Focused
 controller tests pass 55/55, admin E2E passes 20/20 on both backends, the full
 parallel Prisma suite passes 118 suites and 2,486/2,486 tests, and Fast
 pre-push passes all 20 gates, including 6,023 API units and 2,426 InMemory E2E
-tests. Exact merged deployment, focused live reproduction, full live/browser
-validation, remaining reviewer gates, and operator visual verification remain
-pending.
+tests. The merged-master pipeline passed 33 gates but exposed a missing
+`RequestLog(endpointId, createdAt)` index: the endpoint timeline fetch scanned
+225,548 unrelated rows and took 43.041 seconds. The additive index reduced it
+to 16.989 ms; live Logs and Overview now respond in 270 ms and 97 ms. The
+focused rerun of all previously failing browser files passes 105 cases with
+two isolated failures, and their fixes pass 9/9. Fourteen exact fixture leaks
+were removed, restoring the verified 73 endpoints with no baseline ID missing.
+The complete live rerun passes 1,698/1,700 with no endpoint leak. Its two
+remaining checks observed eventual state too early: fixture log-level cleanup
+and buffered custom-resource DELETE logging were both present after the run.
+The harness now polls the exact owned state and exact method set. Independent
+review also removed `IF NOT EXISTS` from the concurrent index migration so an
+invalid interrupted build cannot be accepted.
+The complete browser matrix now executes 265 cases with zero skips: 263 passed,
+the not-yet-deployed credential cache fix accounts for one failure, and one
+ambient-card smoke race was corrected with a fixture-owned endpoint and passes
+independently. The run preserved exactly 73 endpoints.
+Full live/browser validation, remaining reviewer gates, exact merged
+deployment of the follow-up, and operator visual verification remain pending.
 
 ### Active Execution Reference
 

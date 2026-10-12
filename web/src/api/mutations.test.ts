@@ -19,6 +19,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useCreateCredential,
   useDeleteCredential,
+  useActivateCredential,
   useDeactivateCredential,
   usePurgeCredential,
   useUpdateEndpointConfig,
@@ -290,6 +291,43 @@ describe('useDeleteCredential', () => {
 });
 
 describe('credential lifecycle mutations', () => {
+  it.each([
+    ['deactivate', useDeactivateCredential, false],
+    ['activate', useActivateCredential, true],
+  ] as const)('%s updates the cached overview before refetch completes', async (
+    _action,
+    useCredentialMutation,
+    expectedActive,
+  ) => {
+    const { wrapper, queryClient } = createWrapper();
+    const seedOverview: EndpointOverviewResponse = {
+      endpoint: { id: EP_ID, name: 'x', preset: null, active: true, scimBasePath: '', createdAt: '' },
+      stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
+      credentials: [{
+        id: 'c1',
+        credentialType: 'bearer',
+        label: 'X',
+        active: !expectedActive,
+        createdAt: '',
+        expiresAt: null,
+      }],
+      recentActivity: [],
+      configFlags: {},
+      connectionInfo: SEED_CONNECTION_INFO,
+    };
+    queryClient.setQueryData(queryKeys.endpoints.overview(EP_ID), seedOverview);
+    const { result } = renderHook(() => useCredentialMutation(EP_ID), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync('c1');
+    });
+
+    const cached = queryClient.getQueryData<EndpointOverviewResponse>(
+      queryKeys.endpoints.overview(EP_ID),
+    );
+    expect(cached?.credentials[0].active).toBe(expectedActive);
+  });
+
   it('uses the explicit POST deactivate route', async () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useDeactivateCredential(EP_ID), { wrapper });

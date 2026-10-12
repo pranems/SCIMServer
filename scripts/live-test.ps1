@@ -2859,11 +2859,20 @@ try {
     Test-Result -Success $false -Message "Deleted log-ci-ep"
 }
 
-# Verify cleanup cleared log-config
-$logConfigFinal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
-$finalEp1 = $logConfigFinal.endpointLevels.$logLevelEndpointId
-$finalEp2 = $logConfigFinal.endpointLevels.$mixedEndpointId
-$finalEp3 = $logConfigFinal.endpointLevels.$ciEndpointId
+# Endpoint deletion publishes an event and the logger consumes it
+# asynchronously. Poll only the three fixture-owned IDs instead of racing the
+# listener or asserting against unrelated endpoint overrides.
+$logConfigFinal = $null
+$finalEp1 = $finalEp2 = $finalEp3 = $true
+$logLevelCleanupDeadline = [DateTime]::UtcNow.AddSeconds(10)
+do {
+    $logConfigFinal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+    $finalEp1 = $logConfigFinal.endpointLevels.$logLevelEndpointId
+    $finalEp2 = $logConfigFinal.endpointLevels.$mixedEndpointId
+    $finalEp3 = $logConfigFinal.endpointLevels.$ciEndpointId
+    if ($finalEp1 -eq $null -and $finalEp2 -eq $null -and $finalEp3 -eq $null) { break }
+    Start-Sleep -Milliseconds 200
+} while ([DateTime]::UtcNow -lt $logLevelCleanupDeadline)
 Test-Result -Success ($finalEp1 -eq $null -and $finalEp2 -eq $null -and $finalEp3 -eq $null) -Message "All endpoint levels cleaned from log-config after delete"
 
 # ============================================
@@ -16097,13 +16106,21 @@ try {
 
     $cnLogs = $null
     $cnActivity = $null
+    $cnMethods = @()
     $cnDeadline = [DateTime]::UtcNow.AddSeconds(12)
     do {
+        try {
+            $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs/flush" -Method POST -Headers $headers
+        } catch {
+            # The method-set assertion below remains authoritative.
+        }
         $cnLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/logs?endpointId=$cnEndpointId&urlContains=Devices&pageSize=100" -Headers $headers
         $cnActivity = Invoke-RestMethod -Uri "$baseUrl/scim/admin/activity?endpointId=$cnEndpointId&type=resource&search=Devices&limit=100" -Headers $headers
-    } while ((@($cnLogs.items).Count -lt 3 -or @($cnActivity.activities).Count -lt 3) -and [DateTime]::UtcNow -lt $cnDeadline)
+        $cnMethods = @($cnLogs.items | ForEach-Object method | Sort-Object -Unique)
+        if ($cnMethods -contains 'POST' -and $cnMethods -contains 'PATCH' -and $cnMethods -contains 'DELETE' -and @($cnActivity.activities).Count -ge 3) { break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $cnDeadline)
 
-    $cnMethods = @($cnLogs.items | ForEach-Object method | Sort-Object -Unique)
     Test-Result -Success ($cnMethods -contains 'POST' -and $cnMethods -contains 'PATCH' -and $cnMethods -contains 'DELETE') `
         -Message "9z-CN.T8: endpoint Logs contains custom POST, PATCH, and DELETE"
     Test-Result -Success (@($cnLogs.items | Where-Object { $_.url -like '*/Devices*' }).Count -ge 3) `

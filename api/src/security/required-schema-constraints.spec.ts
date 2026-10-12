@@ -27,6 +27,14 @@ interface RequiredConstraint {
 
 const REQUIRED_CONSTRAINTS: ReadonlyArray<RequiredConstraint> = [
   {
+    id: 'RequestLog endpoint timeline lookup',
+    model: 'RequestLog',
+    declaration:
+      '@@index([endpointId, createdAt], map: "RequestLog_endpointId_createdAt_idx")',
+    rationale:
+      'Prevents endpoint Logs and Overview reads from scanning the global RequestLog timeline.',
+  },
+  {
     id: 'Migration-history RequestLog auth outcome index',
     model: 'RequestLog',
     declaration: '@@index([authOutcome])',
