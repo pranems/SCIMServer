@@ -83,6 +83,11 @@ export class EndpointOAuthController {
     @Body() body: EndpointTokenRequest,
     @Headers('authorization') authorization?: string,
   ) {
+    const endpointName = this.endpointService?.getCachedEndpointDisplayName(endpointId);
+    if (endpointName) {
+      this.logger.enrichContext({ endpointName });
+    }
+
     // W2.2 - the strict parser produces a discriminated union (client_assertion
     // / client_secret / invalid) from the raw form + Authorization header. The
     // controller no longer re-derives the method by hand: it just routes the
