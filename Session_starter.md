@@ -26,6 +26,12 @@ to 16.989 ms; live Logs and Overview now respond in 270 ms and 97 ms. The
 focused rerun of all previously failing browser files passes 105 cases with
 two isolated failures, and their fixes pass 9/9. Fourteen exact fixture leaks
 were removed, restoring the verified 73 endpoints with no baseline ID missing.
+The complete live rerun passes 1,698/1,700 with no endpoint leak. Its two
+remaining checks observed eventual state too early: fixture log-level cleanup
+and buffered custom-resource DELETE logging were both present after the run.
+The harness now polls the exact owned state and exact method set. Independent
+review also removed `IF NOT EXISTS` from the concurrent index migration so an
+invalid interrupted build cannot be accepted.
 Full live/browser validation, remaining reviewer gates, exact merged
 deployment of the follow-up, and operator visual verification remain pending.
 

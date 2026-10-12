@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by parallel workers. The focused rerun of all 15 previously failing browser
   files improved from 46 failures to 105 passes and two isolated failures;
   the two corrected files then passed 9/9.
+- Make live validation wait for fixture-owned asynchronous log-level cleanup
+  and for the exact POST/PATCH/DELETE RequestLog method set. The first complete
+  rerun after the database correction passed 1,698/1,700 assertions with zero
+  leaked endpoints; both remaining failures were premature eventual-state
+  checks rather than missing final state.
+- Keep the concurrent index creation unconditional so a failed build cannot
+  leave an invalid same-name index that a retry silently accepts.
 
 ## [0.55.44] - 2026-10-12
 
