@@ -24,8 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call sites opt into count-free reads. API build, 387 logging/Dashboard
   tests, all 20 Fast pre-push gates, 6,023 API unit tests, and 2,428 InMemory
   E2E tests pass. Independent review found and verified the overload
-  correction. Exact merged deployment, zero-timeout telemetry, full live and
-  Playwright reruns, and operator visual verification remain pending.
+  correction.
+- PR #206 merged normally as `415f884469ecb2cd03f860d42cec99afc5234fd4`.
+  Exact v0.55.46 is healthy on dev as revision
+  `scimserver-dev--v415f8844` at digest
+  `sha256:7660a47638202e67f4f88caac8109f085e2c314f646580eb19eb020c08af4b9f`;
+  GHCR and ACR semantic/latest tags resolve to that digest.
+- The authoritative pipeline passes 36 executable gates with zero failures,
+  1,700/1,700 deployed live assertions, and 73-to-73 endpoint integrity. Its
+  default browser lane passes 256 and intentionally skips nine opt-in
+  profile-shape cases. The required follow-up enables those fixtures and
+  passes the complete 265/265 Chromium matrix with zero skips or failures,
+  again preserving 73 endpoints.
+- Error-only telemetry across 26,185 persisted requests from deployment
+  through the zero-skip run contains zero HTTP 500 responses and zero
+  PostgreSQL connection/pool timeout errors. Dashboard p50/p95/max were
+  168/965/2,146 ms; endpoint-list p50/p95/max were 164/603/2,455 ms.
+  Operator visual verification remains pending.
 
 ## [0.55.45] - 2026-10-12
 

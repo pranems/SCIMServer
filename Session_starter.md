@@ -14,14 +14,22 @@ Dashboard caching, the endpoint timeline index, credential cache settlement,
 eventual-log polling, and fixture-owned smoke navigation are deployed.
 One Chromium request retried after `GET /scim/admin/endpoints` waited 10.025
 seconds for a PostgreSQL connection. The interval contained overlapping
-mutation-triggered Dashboard builds. The v0.55.46 follow-up branch
-`fix/v05546-requestlog-count-pressure` is backed up at `45c41a28`; it removes
-the exact RequestLog counts that Dashboard and endpoint Overview never use.
-The removed count measured 1,605.2 ms versus 9.9 ms for the required bounded
-query. API build, 387 focused tests, independent review, and all 20 Fast
-pre-push gates pass, including 6,023 API units and 2,428 InMemory E2E tests.
-Exact merge, deployment, zero-timeout telemetry, complete live/browser reruns,
-and operator visual verification remain pending for v0.55.46.
+mutation-triggered Dashboard builds. The v0.55.46 RequestLog count-pressure correction merged as `415f8844` and is
+healthy at 100% on revision `scimserver-dev--v415f8844`, digest
+`sha256:7660a47638202e67f4f88caac8109f085e2c314f646580eb19eb020c08af4b9f`.
+The authoritative pipeline passed 36 executable gates with zero failures,
+1,700/1,700 live assertions, and 73-to-73 endpoint integrity. Its default
+browser lane passed 256 with nine documented shape-matrix skips; the required
+opt-in follow-up passed the complete 265/265 matrix with zero skips or failures
+and again retained 73 endpoints. Error-only telemetry over 26,185 persisted
+requests found zero HTTP 500 responses and zero PostgreSQL connection/pool
+timeout errors. Dashboard p50/p95/max were 168/965/2,146 ms and endpoint-list
+p50/p95/max were 164/603/2,455 ms. The removed count measured 1,605.2 ms versus
+9.9 ms for the required bounded query. Operator visual verification remains
+pending. A separate observed gap remains: all 7,100 deployed per-endpoint token
+mint rows carry endpoint IDs but no endpoint-name snapshot, while 396 global
+token rows correctly have no endpoint identity and should render
+`Server-wide`.
 
 ### Active Execution Reference
 
