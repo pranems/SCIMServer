@@ -17,6 +17,7 @@ import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { createEndpoint } from './helpers/request.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
+import { waitForLogRowByRequestId } from './helpers/log-wait.helper';
 
 describe('Global Logs filters (E2E) - Phase D5', () => {
   let app: INestApplication;
@@ -41,14 +42,13 @@ describe('Global Logs filters (E2E) - Phase D5', () => {
 
     // Drive a SCIM request against each endpoint so log rows exist.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    await request(app.getHttpServer() as any)
+    const traffic = await request(app.getHttpServer() as any)
       .get(`/scim/endpoints/${epA}/Users`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    // Wait for the buffered logger to flush. In-memory backend writes
-    // synchronously so this is harmless on inmemory.
-    await new Promise((r) => setTimeout(r, 3500));
+    const trafficRequestId = traffic.headers['x-request-id'] as string;
+    expect(await waitForLogRowByRequestId(app, token, trafficRequestId)).toBeDefined();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     const scopedToA = await request(app.getHttpServer() as any)
@@ -119,8 +119,7 @@ describe('Global Logs filters (E2E) - Phase D5', () => {
     const requestId = scimRes.headers['x-request-id'] as string;
     expect(requestId).toBeTruthy();
 
-    // Wait for the buffered logger to flush.
-    await new Promise((r) => setTimeout(r, 3500));
+    expect(await waitForLogRowByRequestId(app, token, requestId)).toBeDefined();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     const scoped = await request(app.getHttpServer() as any)
