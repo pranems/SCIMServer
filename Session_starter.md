@@ -4,26 +4,27 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.42 is deployed from merged master
-`39267226` as revision `scimserver-dev--v39267226`, with GHCR and ACR on digest
-`sha256:e7b01e3f89feeb25a2f56ed266541a43ff7fc8d9330d216288bba0a9418a3482`.
-The covering Activity-summary index is valid, and the redundant prefix index is
-removed. The full pipeline passed 32 gates and failed four downstream gates
-after database saturation. Representative endpoint-create failures were
-Prisma connection-acquire timeouts, and 19 owned browser fixtures leaked.
-Those exact 19 endpoints were verified against the before/after artifacts and
-removed; the estate is back to 73 endpoints with no baseline ID missing.
+**Current dev release:** v0.55.43 is deployed from merged master
+`e2bc0287` as revision `scimserver-dev--ve2bc0287`, with GHCR and ACR on digest
+`sha256:cb6c31f7c0c69c5e646716eb30d6436acd9f77d1c4a5fa40c78921a193a69d7c`.
+The Activity-summary cache and table-specific autovacuum settings are active.
+The authoritative pipeline passed 32 gates and failed four downstream gates
+under overlapping browser and live database load. It produced 5,168
+browser-phase timeout records and leaked 25 browser fixtures. Those exact 25
+IDs were verified against immutable before/after artifacts and current live
+names, then deleted. Dev is back to 73 endpoints with no baseline ID missing.
 
-**v0.55.43 release candidate:** post-failure measurement found the Activity
-summary at 56.886 seconds despite using the covering index because visibility
-churn forced 120,495 heap fetches. A targeted vacuum reduced heap fetches to 10,
-the cold plan to 2.670 seconds, and three warm runs to 449 ms. The controller
-now caches successful summaries for one minute, while a new migration lowers
-the high-churn `RequestLog` autovacuum thresholds. Activity units pass 23/23,
-credential migration E2E passes 11/11 after replacing parallel-unsafe global
-count deltas with fixture-owned assertions, and all 27 migrations replay on
-PostgreSQL 17 with all six table reloptions verified. Full static, test,
-deployment, browser, reviewer, and operator-visual gates remain pending.
+**v0.55.44 release candidate:** a 30-second successful Dashboard cache now
+matches the web client's freshness window and preserves in-flight sharing
+without caching failures. Simplified manual admin operations accept an
+explicit endpoint selector, eliminating parallel dependence on the mutable
+first endpoint. The endpoint-history E2E test now polls eventual RequestLog
+durability through the established flush helper rather than sleeping for four
+seconds. Focused controller tests pass 54/54, focused Prisma E2E passes 35/35,
+and Fast pre-push passes all 20 gates in 391.2 seconds, including 6,023 API
+units and 2,426 InMemory E2E tests. Exact merged deployment, focused live
+reproduction, full live/browser validation, reviewer gates, and operator
+visual verification remain pending.
 
 ### Active Execution Reference
 

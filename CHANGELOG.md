@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.44] - 2026-10-12
+
+### Dashboard load resilience
+
+- Cache each successful Dashboard response for 30 seconds, matching the web
+  query's existing stale-time contract. Concurrent callers continue to share
+  one in-flight build, completed responses are reused across browser contexts,
+  and failures remain uncached.
+- This closes the remaining repeated-read amplifier observed after the
+  Activity-summary correction. The v0.55.43 browser interval executed only
+  three Activity summaries, but overlapping Dashboard reads still contributed
+  to 5,168 timeout-related browser-phase console records.
+
+### Parallel validation reliability
+
+- Let simplified manual user and group operations select an explicit
+  `endpointId` query parameter. Omitting it retains the backward-compatible
+  default-endpoint behavior.
+- Scope manual-operation E2E fixtures to their owned endpoint instead of the
+  mutable first endpoint in a parallel database.
+- Replace a fixed four-second RequestLog sleep with the established
+  flush-and-poll helper, while retaining the actual endpoint-history response
+  assertions.
+- Focused evidence passes 54 controller tests and 35 Prisma E2E tests. Fast
+  pre-push passes all 20 gates, including 6,023 API unit tests and 2,426
+  InMemory E2E tests with four documented PostgreSQL-only skips. Exact merged
+  deployment, live, full browser, performance, and operator-visual evidence
+  remains required before production consideration.
+
 ## [0.55.43] - 2026-10-12
 
 ### Activity summary resilience
