@@ -1562,7 +1562,9 @@ Authorization: Bearer changeme-scim
 
 Create a user via simplified form. Pass `endpointId` to select the endpoint
 explicitly. When it is omitted, the server retains the legacy behavior of
-using the first endpoint or creating a default endpoint when none exists.
+using the first endpoint or creating a default endpoint when none exists. An
+explicit selector must be a version-4 UUID and identify an existing endpoint;
+invalid and missing selectors return 400 and 404 respectively.
 
 ```http
 POST /scim/admin/users/manual?endpointId=11111111-1111-4111-8111-111111111111 HTTP/1.1
@@ -1588,7 +1590,8 @@ Content-Type: application/json
 ### POST /scim/admin/groups/manual
 
 Create a group via simplified form. Pass `endpointId` to avoid dependence on
-the legacy first-endpoint fallback.
+the legacy first-endpoint fallback. Selector validation and 400/404 behavior
+match the manual-user operation.
 
 ```http
 POST /scim/admin/groups/manual?endpointId=11111111-1111-4111-8111-111111111111 HTTP/1.1

@@ -350,10 +350,50 @@
       "post": { "tags": ["Admin - General"], "summary": "Clear all logs", "operationId": "clearLogs", "security": [{ "bearerAuth": [] }], "responses": { "204": { "description": "Cleared" } } }
     },
     "/admin/users/manual": {
-      "post": { "tags": ["Admin - General"], "summary": "Create user (simplified form)", "operationId": "createManualUser", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManualUser" } } } }, "responses": { "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } } } }
+      "post": {
+        "tags": ["Admin - General"],
+        "summary": "Create user (simplified form)",
+        "operationId": "createManualUser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "endpointId",
+            "in": "query",
+            "required": false,
+            "description": "Target endpoint UUID. Uses the legacy default-endpoint fallback when omitted.",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManualUser" } } } },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } },
+          "400": { "description": "Invalid endpoint UUID or request body" },
+          "404": { "description": "Selected endpoint not found" }
+        }
+      }
     },
     "/admin/groups/manual": {
-      "post": { "tags": ["Admin - General"], "summary": "Create group (simplified form)", "operationId": "createManualGroup", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManualGroup" } } } }, "responses": { "201": { "description": "Created" } } }
+      "post": {
+        "tags": ["Admin - General"],
+        "summary": "Create group (simplified form)",
+        "operationId": "createManualGroup",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "endpointId",
+            "in": "query",
+            "required": false,
+            "description": "Target endpoint UUID. Uses the legacy default-endpoint fallback when omitted.",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManualGroup" } } } },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "description": "Invalid endpoint UUID or request body" },
+          "404": { "description": "Selected endpoint not found" }
+        }
+      }
     },
     "/admin/users/{id}/delete": {
       "post": { "tags": ["Admin - General"], "summary": "Delete user by PK or SCIM ID", "operationId": "adminDeleteUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } } }

@@ -191,6 +191,18 @@ describe('DashboardController', () => {
       now.mockRestore();
     });
 
+    it('drops the completed cache after a SCIM mutation', async () => {
+      const first = await controller.getDashboard();
+
+      controller.invalidateDashboardCache();
+      const refreshed = await controller.getDashboard();
+
+      expect(refreshed).not.toBe(first);
+      expect(mockEndpointWithGet.listEndpoints).toHaveBeenCalledTimes(2);
+      expect(mockLoggingService.listLogs).toHaveBeenCalledTimes(2);
+      expect(mockLoggingService.getRequestSeries).toHaveBeenCalledTimes(2);
+    });
+
     it('does not fan endpoint, log, and series queries out across the database pool', async () => {
       let releaseEndpoints!: (value: Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>) => void;
       const endpointsPending = new Promise<Awaited<ReturnType<typeof mockEndpointWithGet.listEndpoints>>>(

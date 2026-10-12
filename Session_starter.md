@@ -14,17 +14,21 @@ browser-phase timeout records and leaked 25 browser fixtures. Those exact 25
 IDs were verified against immutable before/after artifacts and current live
 names, then deleted. Dev is back to 73 endpoints with no baseline ID missing.
 
-**v0.55.44 release candidate:** a 30-second successful Dashboard cache now
-matches the web client's freshness window and preserves in-flight sharing
-without caching failures. Simplified manual admin operations accept an
-explicit endpoint selector, eliminating parallel dependence on the mutable
-first endpoint. The endpoint-history E2E test now polls eventual RequestLog
-durability through the established flush helper rather than sleeping for four
-seconds. Focused controller tests pass 54/54, focused Prisma E2E passes 35/35,
-and Fast pre-push passes all 20 gates in 391.2 seconds, including 6,023 API
-units and 2,426 InMemory E2E tests. Exact merged deployment, focused live
-reproduction, full live/browser validation, reviewer gates, and operator
-visual verification remain pending.
+**v0.55.44 release candidate:** a 30-second successful Dashboard cache
+preserves in-flight sharing without caching failures. SCIM mutation events
+advance a cache generation, stale in-flight work cannot repopulate it, and the
+browser now owns only a one-second deduplication window so freshness periods do
+not add to nearly 60 seconds. Simplified manual admin operations accept a
+validated, resolved endpoint selector, eliminating parallel dependence on the
+mutable first endpoint and preventing InMemory orphan partitions. The
+endpoint-history E2E test now polls eventual RequestLog durability through the
+established flush helper rather than sleeping for four seconds. Focused
+controller tests pass 55/55, admin E2E passes 20/20 on both backends, the full
+parallel Prisma suite passes 118 suites and 2,486/2,486 tests, and Fast
+pre-push passes all 20 gates, including 6,023 API units and 2,426 InMemory E2E
+tests. Exact merged deployment, focused live reproduction, full live/browser
+validation, remaining reviewer gates, and operator visual verification remain
+pending.
 
 ### Active Execution Reference
 

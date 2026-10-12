@@ -345,7 +345,7 @@ export const queryKeys = {
 export const dashboardQueryOptions = () => ({
   queryKey: queryKeys.dashboard,
   queryFn: () => fetchWithAuth<DashboardResponse>('/scim/admin/dashboard'),
-  staleTime: 30_000,
+  staleTime: 1_000,
 });
 
 export const healthQueryOptions = () => ({

@@ -11,10 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dashboard load resilience
 
-- Cache each successful Dashboard response for 30 seconds, matching the web
-  query's existing stale-time contract. Concurrent callers continue to share
-  one in-flight build, completed responses are reused across browser contexts,
-  and failures remain uncached.
+- Cache each successful Dashboard response for 30 seconds. Concurrent callers
+  continue to share one in-flight build, completed responses are reused across
+  browser contexts, and failures remain uncached. SCIM mutation events advance
+  the cache generation immediately, and stale in-flight work cannot repopulate
+  a newer generation.
+- Reduce the browser query's own freshness window to a one-second
+  deduplication interval. This prevents client and server freshness windows
+  from composing into nearly 60 seconds of stale data while preserving
+  same-navigation request sharing.
 - This closes the remaining repeated-read amplifier observed after the
   Activity-summary correction. The v0.55.43 browser interval executed only
   three Activity summaries, but overlapping Dashboard reads still contributed
@@ -25,12 +30,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Let simplified manual user and group operations select an explicit
   `endpointId` query parameter. Omitting it retains the backward-compatible
   default-endpoint behavior.
+- Validate explicit selectors as version-4 UUIDs and resolve the endpoint
+  before provisioning. Malformed values return 400, missing endpoints return
+  404, and InMemory cannot create orphaned endpoint partitions.
+- Publish the optional selector and its 400/404 responses in the authoritative
+  OpenAPI document.
 - Scope manual-operation E2E fixtures to their owned endpoint instead of the
   mutable first endpoint in a parallel database.
 - Replace a fixed four-second RequestLog sleep with the established
   flush-and-poll helper, while retaining the actual endpoint-history response
   assertions.
-- Focused evidence passes 54 controller tests and 35 Prisma E2E tests. Fast
+- Focused evidence passes 55 controller tests and 36 Prisma E2E tests across
+  both persistence backends. The complete parallel Prisma suite passes 118
+  suites and 2,486/2,486 tests. Fast
   pre-push passes all 20 gates, including 6,023 API unit tests and 2,426
   InMemory E2E tests with four documented PostgreSQL-only skips. Exact merged
   deployment, live, full browser, performance, and operator-visual evidence

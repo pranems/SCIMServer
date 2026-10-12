@@ -385,10 +385,12 @@ not fan out across the bounded database pool. Optional per-row user display-name
 lookups are also ordered rather than launched as a page-sized burst. Concurrent
 Dashboard callers share one in-flight response, and Activity summary callers
 share one in-flight aggregate. A successful Dashboard response is retained for
-30 seconds, and a completed Activity summary is retained for one minute,
-matching each browser query's stale-time contract. Independent browser
-contexts therefore do not repeat the same database reads during a freshness
-window. Rejected builds are never cached. The `RequestLog` table uses lower
+30 seconds, while SCIM mutation events immediately advance its cache
+generation. A build from an older generation cannot repopulate the cache after
+a mutation. The browser uses only a one-second deduplication interval, so its
+freshness period does not extend the server window. A completed Activity
+summary is retained for one minute, matching that browser query's stale-time
+contract. Rejected builds are never cached. The `RequestLog` table uses lower
 table-specific autovacuum thresholds to preserve the visibility map required
 by the covering index's index-only scan.
 

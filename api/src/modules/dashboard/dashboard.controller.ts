@@ -14,9 +14,11 @@
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase B1
  */
 import { Controller, Get, Inject, Optional, Param, Req } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import type { Request } from 'express';
 
 import { StatsProjectionService } from '../stats/stats-projection.service';
+import { SCIM_EVENTS } from '../stats/scim-events';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { LoggingService } from '../logging/logging.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
@@ -92,9 +94,14 @@ const DASHBOARD_CACHE_TTL_MS = 30_000;
 
 @Controller('admin')
 export class DashboardController {
-  private dashboardInFlight?: Promise<DashboardResponse>;
+  private dashboardGeneration = 0;
+  private dashboardInFlight?: {
+    generation: number;
+    request: Promise<DashboardResponse>;
+  };
   private dashboardCache?: {
     expiresAt: number;
+    generation: number;
     value: DashboardResponse;
   };
 
@@ -122,28 +129,58 @@ export class DashboardController {
    */
   @Get('dashboard')
   async getDashboard(): Promise<DashboardResponse> {
-    if (this.dashboardCache && this.dashboardCache.expiresAt > Date.now()) {
+    const generation = this.dashboardGeneration;
+    if (
+      this.dashboardCache &&
+      this.dashboardCache.generation === generation &&
+      this.dashboardCache.expiresAt > Date.now()
+    ) {
       return this.dashboardCache.value;
     }
 
-    if (this.dashboardInFlight) {
-      return this.dashboardInFlight;
+    if (this.dashboardInFlight?.generation === generation) {
+      return this.dashboardInFlight.request;
     }
 
     const request = this.buildDashboard();
-    this.dashboardInFlight = request;
+    this.dashboardInFlight = { generation, request };
     try {
       const value = await request;
-      this.dashboardCache = {
-        expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
-        value,
-      };
+      if (this.dashboardGeneration === generation) {
+        this.dashboardCache = {
+          expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+          generation,
+          value,
+        };
+      }
       return value;
     } finally {
-      if (this.dashboardInFlight === request) {
+      if (this.dashboardInFlight?.request === request) {
         this.dashboardInFlight = undefined;
       }
     }
+  }
+
+  @OnEvent(SCIM_EVENTS.USER_CREATED)
+  @OnEvent(SCIM_EVENTS.USER_UPDATED)
+  @OnEvent(SCIM_EVENTS.USER_DELETED)
+  @OnEvent(SCIM_EVENTS.USER_STATUS_CHANGED)
+  @OnEvent(SCIM_EVENTS.GROUP_CREATED)
+  @OnEvent(SCIM_EVENTS.GROUP_UPDATED)
+  @OnEvent(SCIM_EVENTS.GROUP_DELETED)
+  @OnEvent(SCIM_EVENTS.GROUP_STATUS_CHANGED)
+  @OnEvent(SCIM_EVENTS.RESOURCE_CREATED)
+  @OnEvent(SCIM_EVENTS.RESOURCE_UPDATED)
+  @OnEvent(SCIM_EVENTS.RESOURCE_DELETED)
+  @OnEvent(SCIM_EVENTS.CREDENTIAL_CREATED)
+  @OnEvent(SCIM_EVENTS.CREDENTIAL_REVOKED)
+  @OnEvent(SCIM_EVENTS.ENDPOINT_CREATED)
+  @OnEvent(SCIM_EVENTS.ENDPOINT_UPDATED)
+  @OnEvent(SCIM_EVENTS.ENDPOINT_DELETED)
+  @OnEvent(SCIM_EVENTS.SECURITY_SETTINGS_UPDATED)
+  invalidateDashboardCache(): void {
+    this.dashboardGeneration++;
+    this.dashboardCache = undefined;
   }
 
   private async buildDashboard(): Promise<DashboardResponse> {

@@ -51,6 +51,7 @@ describe('AdminController', () => {
     mockEndpointService = {
       listEndpoints: jest.fn().mockResolvedValue({ endpoints: [{ id: 'ep-1', name: 'default' }] }),
       createEndpoint: jest.fn().mockResolvedValue({ id: 'ep-new', name: 'default' }),
+      getEndpoint: jest.fn().mockResolvedValue({ id: 'ep-selected', name: 'selected' }),
     };
 
     const module = await Test.createTestingModule({
@@ -228,6 +229,7 @@ describe('AdminController', () => {
         'https://example.com/scim/v2/endpoints/ep-selected',
         'ep-selected',
       );
+      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('ep-selected', 'summary');
     });
   });
 
@@ -269,6 +271,7 @@ describe('AdminController', () => {
         'https://example.com/scim/v2/endpoints/ep-selected',
         'ep-selected',
       );
+      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('ep-selected', 'summary');
     });
   });
 
