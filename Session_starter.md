@@ -4,38 +4,39 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.46 is deployed from merged master
-`ca98e19160aec5f1e955e584bafad060b4eaca96` as revision
-`scimserver-dev--vca98e191`, with GHCR and ACR on digest
-`sha256:23c2262da948097e305db4625dfa538f43b10de8c36ac8d6abfe252849be86b8`.
-The exact deployment passes 1,700/1,700 live assertions and 265/265 Chromium
-cases with zero skips or failures while retaining exactly 73 endpoints.
-Dashboard caching, the endpoint timeline index, credential cache settlement,
-eventual-log polling, and fixture-owned smoke navigation are deployed.
-One Chromium request retried after `GET /scim/admin/endpoints` waited 10.025
-seconds for a PostgreSQL connection. The interval contained overlapping
-mutation-triggered Dashboard builds. The v0.55.46 RequestLog count-pressure correction merged as `415f8844` and is
-healthy at 100% on revision `scimserver-dev--v415f8844`, digest
-`sha256:7660a47638202e67f4f88caac8109f085e2c314f646580eb19eb020c08af4b9f`.
-The authoritative pipeline passed 36 executable gates with zero failures,
-1,700/1,700 live assertions, and 73-to-73 endpoint integrity. Its default
-browser lane passed 256 with nine documented shape-matrix skips; the required
-opt-in follow-up passed the complete 265/265 matrix with zero skips or failures
-and again retained 73 endpoints. Error-only telemetry over 26,185 persisted
-requests found zero HTTP 500 responses and zero PostgreSQL connection/pool
-timeout errors. Dashboard p50/p95/max were 168/965/2,146 ms and endpoint-list
-p50/p95/max were 164/603/2,455 ms. The removed count measured 1,605.2 ms versus
-9.9 ms for the required bounded query. Operator visual verification remains
-pending.
+**Current dev release:** v0.55.47 runtime merge
+`e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy at 100% on revision
+`scimserver-dev--ve4192b0e`, with GHCR and ACR on digest
+`sha256:94020fb9cdaaa9665b824136f29e19ea553432c39cc1853e45297bc00bad9684`.
+Accepted and rejected per-endpoint OAuth token requests now snapshot the warmed
+endpoint display name into RequestLog without a database lookup or
+authentication behavior change. Server-level OAuth rows remain endpoint-null
+and the Logs UI renders them as `Server-wide`.
 
-**v0.55.47 release candidate:** accepted and rejected per-endpoint OAuth token
-requests now snapshot the warmed endpoint display name into RequestLog without
-a database lookup or authentication behavior change. Server-level OAuth rows
-remain endpoint-null and the Logs UI renders them as `Server-wide`. Focused
-evidence passes 25 API unit tests, 26 LogsPage tests, 21 API E2E cases, and one
-real Chromium case that verifies both labels plus zero per-row endpoint-detail
-requests. Full live, merged-master deployment, zero-skip browser, telemetry,
-and operator visual evidence remain pending.
+The deployed live suite passes 1,700/1,700 assertions. The merged-master
+six-mode matrix passes all six lanes, including the formerly failing Prisma E2E
+lane after fixed sleeps were replaced with flush-and-poll durability checks.
+The complete mutation-enabled and seeded-profile Chromium matrix passes 266/266
+with zero skips in 5.9 minutes and preserves endpoint integrity at 73-to-73
+with zero missing or new IDs. During that browser interval, persisted telemetry
+contains zero HTTP 500 responses, zero `P2024` signals, and zero connection
+timeout signals. Sampled token rows retain identity on every per-endpoint row
+and retain no identity on every server-wide row.
+
+A 50-sample deployed benchmark measures per-endpoint token mint p50/p95/p99 at
+43.03/49.69/72.29 ms and server-wide token mint at 25.20/32.27/45.95 ms. All 50
+per-endpoint RequestLog rows became durable with endpoint ID and name. The
+temporary endpoint was deleted and the estate returned to 73 endpoints. A
+controlled 200-sample-per-version InMemory container comparison measures
+v0.55.46 at 7.17/10.56/21.78 ms and v0.55.47 at 7.16/10.17/12.18 ms
+p50/p95/p99, passing the no-greater-than-10% regression criterion at every
+percentile.
+PR #210 closes the Prisma durability race. PR #211 makes seeded shape coverage
+mandatory in the authoritative pipeline, fails on any skipped browser case,
+and prevents dev-only flags from reaching promotion verification. Both merged
+through normal merge commits with exact-tip CI green. No runtime redeploy was
+needed for these non-runtime test and pipeline changes. Operator visual verification remains
+pending; neither canary nor customer production is promoted.
 
 ### Active Execution Reference
 
@@ -241,6 +242,7 @@ capacity or remaining credit balance without host telemetry.
 
 | Date | Summary |
 |---|---|
+| 2026-10-12 | Closed v0.55.47 validation on merged master: six of six backend/test lanes and 266/266 zero-skip deployed Chromium pass, endpoint integrity remains 73-to-73, telemetry has zero HTTP 500/pool-timeout signals, and token identity/performance evidence is recorded. PRs #210 and #211 merged the durability and zero-skip pipeline corrections without a runtime redeploy. |
 | 2026-10-09 | Final changed-set review found stale-token SSE retries. Both consumers now stop on 401/403, invoke the existing invalid-token flow and re-read credentials on transient reconnect; four RED controls are GREEN and 53 focused tests pass. |
 | 2026-10-09 | Exact-tip consolidation passes 2,486 Prisma E2E tests, 1,577 web coverage tests and 250 Chromium cases with 12 canonical pixel skips. Added authenticated browser preflight and a bounded SSE connection allowance after inspected negative/failure evidence. |
 | 2026-10-09 | Accepted public-runner lock regeneration run 37901990719 after reviewing all 104 removals, public/SHA-512 provenance and byte-identical company-feed installs. Web audit is zero; API critical/high are zero with 19 tracked Jest/coverage-chain moderates. |
