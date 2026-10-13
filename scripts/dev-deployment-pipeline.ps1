@@ -909,23 +909,53 @@ if (-not $SkipDeploy -and -not $SkipPlaywright) {
     Invoke-Gate '5.3' 'Playwright vs dev' {
         $env:E2E_BASE_URL = "https://$DevFqdn"
         $env:E2E_TOKEN = 'changeme-scim'
+        $previousE2EAllowMutations = [Environment]::GetEnvironmentVariable(
+            'E2E_ALLOW_MUTATIONS',
+            'Process'
+        )
+        $previousE2EShapeCoverage = [Environment]::GetEnvironmentVariable(
+            'E2E_SHAPE_COVERAGE',
+            'Process'
+        )
         # The create/delete wizard specs are gated behind this so they never run
         # against a customer-facing estate. Dev is ours and every spec cleans up
         # after itself, so enable them here - otherwise the primary
         # endpoint-creation flow has no browser coverage at all.
         $env:E2E_ALLOW_MUTATIONS = '1'
+        # Seeded profile-shape cases are safe on the owned dev estate and clean up
+        # their mutations. The authoritative lane must not silently omit them.
+        $env:E2E_SHAPE_COVERAGE = '1'
         $previousPlaywrightJsonOutput = [Environment]::GetEnvironmentVariable(
             'PLAYWRIGHT_JSON_OUTPUT_FILE',
             'Process'
         )
         try {
-            $env:PLAYWRIGHT_JSON_OUTPUT_FILE = Join-Path $ReportDir "playwright-dev-$timestamp.json"
+            $playwrightJsonPath = Join-Path $ReportDir "playwright-dev-$timestamp.json"
+            $env:PLAYWRIGHT_JSON_OUTPUT_FILE = $playwrightJsonPath
             npx playwright test --reporter=line,json
+            if ($LASTEXITCODE -ne 0) {
+                throw "Playwright exited with code $LASTEXITCODE."
+            }
+            $playwrightResult = Get-Content -LiteralPath $playwrightJsonPath -Raw | ConvertFrom-Json
+            $skippedBrowserCases = [int]$playwrightResult.stats.skipped
+            if ($skippedBrowserCases -ne 0) {
+                throw "Playwright reported $skippedBrowserCases skipped case(s); the authoritative dev lane requires zero skips."
+            }
         }
         finally {
             [Environment]::SetEnvironmentVariable(
                 'PLAYWRIGHT_JSON_OUTPUT_FILE',
                 $previousPlaywrightJsonOutput,
+                'Process'
+            )
+            [Environment]::SetEnvironmentVariable(
+                'E2E_ALLOW_MUTATIONS',
+                $previousE2EAllowMutations,
+                'Process'
+            )
+            [Environment]::SetEnvironmentVariable(
+                'E2E_SHAPE_COVERAGE',
+                $previousE2EShapeCoverage,
                 'Process'
             )
         }
