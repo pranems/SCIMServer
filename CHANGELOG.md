@@ -36,8 +36,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and server-wide RequestLog rows. A real Chromium case passes against the
   current local API and verifies both rendered labels and zero per-row endpoint
   detail requests.
-- The complete live, zero-skip browser, exact-image, and post-deployment
-  telemetry results will be appended after reviewed merge and deployment.
+- Runtime merge `e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy at 100%
+  on dev revision `scimserver-dev--ve4192b0e`. GHCR and ACR resolve to
+  `sha256:94020fb9cdaaa9665b824136f29e19ea553432c39cc1853e45297bc00bad9684`.
+  Deployed live validation passes 1,700/1,700 assertions.
+- All six backend/test matrix lanes pass. The complete mutation-enabled and
+  seeded-profile Chromium matrix passes 266/266 with zero skips in 5.9 minutes
+  and preserves endpoint integrity at 73-to-73 with zero missing or new IDs.
+- Browser-interval telemetry contains zero HTTP 500 responses, zero `P2024`
+  signals, and zero connection-timeout signals. Sampled per-endpoint token rows
+  all retain endpoint identity; sampled server-wide rows retain none.
+- A 50-sample deployed benchmark measures per-endpoint token mint
+  p50/p95/p99 at 43.03/49.69/72.29 ms. All 50 RequestLog rows became durable
+  with endpoint ID and name, and fixture cleanup returned the estate to 73
+  endpoints. A controlled 200-sample-per-version InMemory container comparison
+  measures v0.55.46 at 7.17/10.56/21.78 ms and v0.55.47 at
+  7.16/10.17/12.18 ms p50/p95/p99. No percentile exceeds the 10% regression
+  limit.
+- PR #210 replaces the two fixed Prisma RequestLog sleeps with flush-and-poll
+  durability checks. PR #211 makes zero-skip seeded shape coverage mandatory
+  and isolates dev-only browser flags from promotion verification. Both are
+  non-runtime test and pipeline follow-ups, so the deployed application digest
+  remains authoritative.
 
 ## [0.55.46] - 2026-10-12
 

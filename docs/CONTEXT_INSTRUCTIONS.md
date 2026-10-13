@@ -9,30 +9,36 @@
 
 ## Active Delivery Process
 
-**v0.55.46 deployed evidence:** merged master
-`415f884469ecb2cd03f860d42cec99afc5234fd4` is healthy on dev as revision
-`scimserver-dev--v415f8844` with matching GHCR/ACR digest
-`sha256:7660a47638202e67f4f88caac8109f085e2c314f646580eb19eb020c08af4b9f`.
-The authoritative pipeline passes 36 executable gates with zero failures,
-1,700/1,700 live assertions, and 73-to-73 endpoint integrity. The complete
-opt-in browser follow-up passes 265/265 cases with zero skips or failures and
-again retains exactly 73 endpoints. Error-only telemetry across 26,185
-persisted requests contains zero HTTP 500 responses and zero PostgreSQL
-connection/pool timeout errors. Dashboard p50/p95/max are 168/965/2,146 ms;
-endpoint-list p50/p95/max are 164/603/2,455 ms. The removed exact count measured
-1,605.2 ms versus 9.9 ms for the required bounded query. Operator visual
-sign-off remains pending; neither canary nor customer production is promoted.
+**v0.55.47 deployed evidence:** runtime merge
+`e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy on dev as revision
+`scimserver-dev--ve4192b0e` with matching GHCR/ACR digest
+`sha256:94020fb9cdaaa9665b824136f29e19ea553432c39cc1853e45297bc00bad9684`.
+Per-endpoint token routes enrich RequestLog correlation from a warmed,
+cache-only endpoint display-name read. Accepted and rejected rows retain
+endpoint ID plus request-time name without a database lookup or authentication
+behavior change. Global `/scim/oauth/token` rows remain endpoint-null and render
+`Server-wide`.
 
-**v0.55.47 release candidate:** per-endpoint token routes now enrich RequestLog
-correlation from a warmed, cache-only endpoint display-name read. Accepted and
-rejected token rows preserve endpoint ID plus request-time name without a
-database lookup or authentication behavior change. Global `/scim/oauth/token`
-rows remain endpoint-null and render `Server-wide`. Focused evidence passes 25
-API units, 26 web tests, 21 API E2E cases, and one real Chromium case that also
-proves the Logs page makes no endpoint-detail request per row. Full merged-tip
-pipeline, deployment, zero-skip browser, and telemetry evidence remain pending.
+Deployed live validation passes 1,700/1,700 assertions. All six backend/test
+matrix lanes pass after replacing two fixed RequestLog sleeps with the shared
+flush-and-poll helper. The complete Chromium matrix passes 266/266 with
+mutations and seeded profile shapes enabled, zero skips, and 73-to-73 endpoint
+integrity. Error-only telemetry for the browser interval contains zero HTTP 500,
+`P2024`, or connection-timeout rows. A 50-sample deployed benchmark measures
+per-endpoint token mint p50/p95/p99 at 43.03/49.69/72.29 ms; all 50 rows became
+durable with endpoint identity. A controlled 200-sample-per-version InMemory
+container comparison
+measures v0.55.46 at 7.17/10.56/21.78 ms and v0.55.47 at
+7.16/10.17/12.18 ms p50/p95/p99, with no percentile regressing beyond the 10%
+limit. PR #211 now makes this zero-skip shape coverage
+an enforced pipeline contract and isolates dev-only flags from promotion
+verification. Non-runtime test and pipeline PRs #210 and #211 required no
+application redeploy.
+Operator visual sign-off remains pending; neither canary nor customer
+production is promoted.
 
-**Unmerged follow-up, 2026-10-08:** the local
+**Historical pre-merge checkpoint, 2026-10-08 (superseded by v0.55.47 above):**
+At that time, the local
 `fix/comprehensive-ui-validation-20260930` branch contains durable request-log
 endpoint names, authenticated Fetch streaming and validation/deployment
 hardening. Local Chromium is 238 pass / 15 skip / zero fail; local InMemory
@@ -45,7 +51,8 @@ Current web units and coverage pass 119 suites / 1,577 tests: lines 85.49%,
 branches 75.39%, functions 75.31%, statements 82.72%.
 Resource saves now await cache refresh; PATCH envelopes no longer replace
 resource schemas in optimistic cache. Final focused tests pass 105/105.
-None of these local changes has been committed, merged or deployed.
+At that checkpoint, none of those local changes had been committed, merged, or
+deployed.
 Production dependency audit blocks release with critical `proxy-addr` (API)
 and `seroval` (web) findings. Reviewed release, dependency remediation, Azure
 proof and operator visual sign-off remain separate outstanding claims.
@@ -345,7 +352,8 @@ mixed-scope PRs. W3.5 is the completed reference execution: PR #155 merged as
 verified on dev and canary. Wave 4 and process-automation refactors remain
 separate future changes.
 
-The current source release candidate is v0.55.41. It makes Dashboard route
+**Historical v0.55.41 release-candidate checkpoint (superseded):** this change
+made Dashboard route
 prefetch non-blocking so the shell and loading skeleton render immediately,
 raises the measured per-revision PostgreSQL pool from 5 to 10 within the
 50-connection estate budget, and adds a trigram RequestLog URL index. It
@@ -355,7 +363,7 @@ exact-artifact acceptance on InMemory and PostgreSQL 17.8. Release-candidate
 triage additionally fixed runtime-only schema caches changing profile revisions
 and restored structured malformed-filter diagnostics. API build/lint, API unit
 6,000/6,000, InMemory API E2E 2,481 passed plus 4 skipped, and the focused
-Workbench incident regression are green. Publication still requires the
+Workbench incident regression are green. At that checkpoint, publication still required the
 remaining browser/static/documentation gates, a reviewed exact-tip PR,
 merged-master build, and purplecliff dev validation. Guarded PostgreSQL unit and E2E parity pass
 6,000/6,000 and 2,485/2,485; the exact built artifact passes 166/166 live
