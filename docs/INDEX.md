@@ -49,6 +49,7 @@
 | Preserve page, tab, filter, pagination, comparison, and drawer state through Back | [CONTEXT_PRESERVING_NAVIGATION.md](CONTEXT_PRESERVING_NAVIGATION.md) |
 | Use global Back/Forward and understand Operations, Logs, `/Me`, Manual Provision, and endpoint context | [GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md](GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md) |
 | Review the operator-observed UI readability issues and next-release acceptance criteria | [UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md](UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md) |
+| Follow the measured Entra gallery provisioning gate issues, fixes, and prevention checks | [ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) |
 | Inspect and edit effective WIF/JWKS runtime egress values | [EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md](EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md) |
 | Run ready-to-use server, admin, endpoint, and profile-aware SCIM requests | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) |
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
