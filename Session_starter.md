@@ -38,6 +38,28 @@ through normal merge commits with exact-tip CI green. No runtime redeploy was
 needed for these non-runtime test and pipeline changes. Operator visual verification remains
 pending; neither canary nor customer production is promoted.
 
+The 2026-10-12 operator visual review is captured in
+`docs/UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md`. Dashboard Recent Activity
+alignment and long Operations endpoint labels are the first measured
+readability fixes for the next UI release. Endpoint-card density, persistent
+filters, Discovery selectors and selected-state treatment, comparison-tab
+order, Dashboard duplication, Operations purpose, and `/Me` purpose are
+recorded with real-browser acceptance criteria. No item is currently proven
+to be a v0.55.47 data, authorization, routing, or API-contract defect.
+
+The reusable Entra gallery provisioning gate is implemented in
+`scripts/entra-gallery-scim-e2e.ps1` with its repository skill and static
+contract. Measured dev results are SecretToken 14 PASS / 0 FAIL, OAuth client
+credentials 10 PASS / 0 FAIL, plan-only 3 PASS / 0 FAIL, and the independent
+temporary-application WIF protocol proof 50 PASS / 0 FAIL with a final 37 ms
+warm mint median against a 150 ms budget. The real gallery WorkloadIdentity mode is
+explicitly BLOCKED because Microsoft Graph beta rejects the required hidden
+`EntraApplicationIdentifier` connector field; omitting it causes the
+provisioning job to quarantine for that exact field. The gate is therefore not
+wired into the authoritative deployment pipeline yet: running only the two
+green modes would create a false-complete release signal. No production
+connector, canary, or customer-production deployment was changed.
+
 ### Active Execution Reference
 
 **Consolidation checkpoint, 2026-10-09:** the dependency and comprehensive UI
@@ -242,6 +264,7 @@ capacity or remaining credit balance without host telemetry.
 
 | Date | Summary |
 |---|---|
+| 2026-10-12 | Added the reusable owned Entra gallery provisioning gate and temporary-app real-Entra WIF proof. SecretToken passed 14 checks, OAuth passed 10, the WIF protocol proof passed 50 with exact cleanup, and the gallery WIF configuration dependency remains an explicit required blocker. |
 | 2026-10-12 | Closed v0.55.47 validation on merged master: six of six backend/test lanes and 266/266 zero-skip deployed Chromium pass, endpoint integrity remains 73-to-73, telemetry has zero HTTP 500/pool-timeout signals, and token identity/performance evidence is recorded. PRs #210 and #211 merged the durability and zero-skip pipeline corrections without a runtime redeploy. |
 | 2026-10-09 | Final changed-set review found stale-token SSE retries. Both consumers now stop on 401/403, invoke the existing invalid-token flow and re-read credentials on transient reconnect; four RED controls are GREEN and 53 focused tests pass. |
 | 2026-10-09 | Exact-tip consolidation passes 2,486 Prisma E2E tests, 1,577 web coverage tests and 250 Chromium cases with 12 canonical pixel skips. Added authenticated browser preflight and a bounded SSE connection allowance after inspected negative/failure evidence. |

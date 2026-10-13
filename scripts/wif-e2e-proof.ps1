@@ -53,7 +53,7 @@
 [CmdletBinding()]
 param(
     [string] $BaseUrl = "https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io",
-    [string] $AdminToken = "changeme-scim",
+    [string] $AdminToken = $(if ($env:WIF_PROOF_ADMIN_TOKEN) { $env:WIF_PROOF_ADMIN_TOKEN } else { "changeme-scim" }),
     [string] $AppId = $env:WIF_TEST_APPID,
     [string] $TenantId = $env:WIF_TEST_TENANT,
     [string] $ClientSecret = $env:WIF_TEST_SECRET,
