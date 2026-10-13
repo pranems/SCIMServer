@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Validation pipeline
+
+- Enable seeded profile-shape coverage in the authoritative dev Playwright
+  lane, parse its JSON result, and fail the gate on any skipped case. Restore
+  the dev-only shape and mutation flags after the dev run, and explicitly clear
+  inherited values in promotion verification so canary runs cannot mutate data
+  or require dev-only fixtures. Deployment-pipeline contract tests prevent
+  these guarantees from being silently removed.
+
 ## [0.55.47] - 2026-10-12
 
 ### Token-log endpoint identity

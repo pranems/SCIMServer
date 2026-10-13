@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $pipeline = Join-Path $repoRoot 'scripts\dev-deployment-pipeline.ps1'
 $fullValidationPipeline = Join-Path $repoRoot 'scripts\full-validation-pipeline.ps1'
+$verifyDeployment = Join-Path $repoRoot 'scripts\verify-deployment.ps1'
 $failures = @()
 
 function Invoke-Assert {
@@ -33,14 +34,36 @@ Invoke-Assert -Description 'pipeline script parses without errors' -Condition ($
 
 $content = Get-Content -LiteralPath $pipeline -Raw
 $fullValidationContent = Get-Content -LiteralPath $fullValidationPipeline -Raw
+$verifyDeploymentContent = Get-Content -LiteralPath $verifyDeployment -Raw
 Invoke-Assert -Description 'Playwright keeps the readable line reporter' `
     -Condition ($content -match 'playwright\s+test\s+--reporter=line,json')
-$writesJsonReport = ($content -match 'PLAYWRIGHT_JSON_OUTPUT_FILE\s*=\s*Join-Path\s+\$ReportDir') -and ($content -match 'playwright-dev-\$timestamp\.json')
+$writesJsonReport = ($content -match '\$playwrightJsonPath\s*=\s*Join-Path\s+\$ReportDir') -and
+    ($content -match 'PLAYWRIGHT_JSON_OUTPUT_FILE\s*=\s*\$playwrightJsonPath') -and
+    ($content -match 'playwright-dev-\$timestamp\.json')
 Invoke-Assert -Description 'Playwright writes machine-readable results under the deployment report directory' `
     -Condition $writesJsonReport
 $restoresJsonReporter = ($content -match 'previousPlaywrightJsonOutput') -and ($content -match "(?s)SetEnvironmentVariable\(\s*'PLAYWRIGHT_JSON_OUTPUT_FILE'")
 Invoke-Assert -Description 'Playwright reporter environment is restored after the gate' `
     -Condition $restoresJsonReporter
+$enablesCompleteShapeCoverage = $content -match "E2E_SHAPE_COVERAGE\s*=\s*'1'"
+Invoke-Assert -Description 'Playwright enables the complete seeded profile-shape matrix' `
+    -Condition $enablesCompleteShapeCoverage
+$rejectsSkippedBrowserCases = ($content -match 'stats\.skipped') -and
+    ($content -match 'Playwright reported \$skippedBrowserCases skipped case')
+Invoke-Assert -Description 'Playwright fails the authoritative gate when any browser case is skipped' `
+    -Condition $rejectsSkippedBrowserCases
+$restoresDevOnlyBrowserFlags = ($content -match 'previousE2EAllowMutations') -and
+    ($content -match 'previousE2EShapeCoverage') -and
+    ($content -match "(?s)SetEnvironmentVariable\(\s*'E2E_ALLOW_MUTATIONS'") -and
+    ($content -match "(?s)SetEnvironmentVariable\(\s*'E2E_SHAPE_COVERAGE'")
+Invoke-Assert -Description 'Playwright restores dev-only browser flags before later promotion stages' `
+    -Condition $restoresDevOnlyBrowserFlags
+$promotionClearsDevOnlyBrowserFlags = ($verifyDeploymentContent -match 'previousE2EAllowMutations') -and
+    ($verifyDeploymentContent -match 'previousE2EShapeCoverage') -and
+    ($verifyDeploymentContent -match '(?s)SetEnvironmentVariable\(\s*''E2E_ALLOW_MUTATIONS'',\s*\$null') -and
+    ($verifyDeploymentContent -match '(?s)SetEnvironmentVariable\(\s*''E2E_SHAPE_COVERAGE'',\s*\$null')
+Invoke-Assert -Description 'promotion verification clears inherited dev-only browser flags' `
+    -Condition $promotionClearsDevOnlyBrowserFlags
 
 $usesOwnedPostgres = ($content -match 'scimserver\.owner=dev-deployment-pipeline') -and
     ($content -match 'scimserver\.run=\$postgresRunId') -and

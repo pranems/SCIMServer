@@ -253,10 +253,22 @@ if ($RunPlaywright) {
     Write-Section "4. Playwright browser cycle ($Label)"
     $webDir = Join-Path $repoRoot 'web'
     if (Test-Path $webDir) {
+        $previousE2EAllowMutations = [Environment]::GetEnvironmentVariable(
+            'E2E_ALLOW_MUTATIONS',
+            'Process'
+        )
+        $previousE2EShapeCoverage = [Environment]::GetEnvironmentVariable(
+            'E2E_SHAPE_COVERAGE',
+            'Process'
+        )
         Push-Location $webDir
         try {
             $env:E2E_BASE_URL = $BaseUrl
             $env:E2E_TOKEN = $ScimToken
+            # Promotion verification is read-only. Never inherit dev-only mutation
+            # or seeded-fixture flags from the shell that launched the pipeline.
+            [Environment]::SetEnvironmentVariable('E2E_ALLOW_MUTATIONS', $null, 'Process')
+            [Environment]::SetEnvironmentVariable('E2E_SHAPE_COVERAGE', $null, 'Process')
             # Pixel-baseline specs (visual-regression.spec.ts / visual-snapshots.spec.ts)
             # are captured against a FIXED fixture and are data-coupled: the rendered
             # content (e.g. an endpoint's Schemas card height) depends on the SCIM data in
@@ -303,6 +315,16 @@ if ($RunPlaywright) {
                 Write-Host "   ✅ Playwright suite passed" -ForegroundColor Green
             }
         } finally {
+            [Environment]::SetEnvironmentVariable(
+                'E2E_ALLOW_MUTATIONS',
+                $previousE2EAllowMutations,
+                'Process'
+            )
+            [Environment]::SetEnvironmentVariable(
+                'E2E_SHAPE_COVERAGE',
+                $previousE2EShapeCoverage,
+                'Process'
+            )
             Pop-Location
         }
     } else {

@@ -106,7 +106,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 
 5.1. `uiTestAndValidation` - full vitest + a11y + visual sanity pass.
 5.2. `playwrightSpecHygieneAudit` - delete stale specs (specs targeting deleted Phase I components: `raw-logs`, `manual-provision`, `database-browser`, `app-shell`, `activity-feed`, `live-data-verification`, `new-ui`). Run BEFORE 5.3 so the signal is trustworthy.
-5.3. **Playwright vs dev** - `cd web; $env:E2E_BASE_URL='https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io'; $env:E2E_TOKEN='changeme-scim'; npx playwright test --reporter=line`. **All currently-shipped UI flows must pass.** Failures fall into:
+5.3. **Playwright vs dev** - resolve the current dev base URL from `scripts/scim-estates.ps1`, then run `cd web; $env:E2E_BASE_URL='<resolved-dev-url>'; $env:E2E_TOKEN='changeme-scim'; $env:E2E_ALLOW_MUTATIONS='1'; $env:E2E_SHAPE_COVERAGE='1'; npx playwright test --reporter=line`. **All currently-shipped UI flows must pass with zero skips.** Failures fall into:
    - **Stale spec** → delete it (cite as Stage 5.2 finding)
    - **Real UI regression** → fix code, re-loop entire pipeline
    - **Flaky test** → not allowed; either stabilize the test or delete it
