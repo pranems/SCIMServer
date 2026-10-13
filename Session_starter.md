@@ -38,6 +38,15 @@ through normal merge commits with exact-tip CI green. No runtime redeploy was
 needed for these non-runtime test and pipeline changes. Operator visual verification remains
 pending; neither canary nor customer production is promoted.
 
+The 2026-10-12 operator visual review is captured in
+`docs/UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md`. Dashboard Recent Activity
+alignment and long Operations endpoint labels are the first measured
+readability fixes for the next UI release. Endpoint-card density, persistent
+filters, Discovery selectors and selected-state treatment, comparison-tab
+order, Dashboard duplication, Operations purpose, and `/Me` purpose are
+recorded with real-browser acceptance criteria. No item is currently proven
+to be a v0.55.47 data, authorization, routing, or API-contract defect.
+
 ### Active Execution Reference
 
 **Consolidation checkpoint, 2026-10-09:** the dependency and comprehensive UI
