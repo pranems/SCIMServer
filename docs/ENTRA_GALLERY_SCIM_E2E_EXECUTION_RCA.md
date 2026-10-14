@@ -173,6 +173,7 @@ be unnecessary.
 | ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
 |---|---|---|---|---|---|
 | EG-I28 | Release documentation | Low | The first v0.55.48 metadata push was blocked by C13: the README version badge still claimed 0.55.47. The freshness formatter restamps current headers but does not rewrite badges or historical evidence. | Update only the live badge; the source-truth content audit now passes all 26 documents. No historical release claims were relabeled. | Run both freshness and content checks for release metadata. The existing pre-push gate caught the mismatch before tests, CI, or deployment; no new gate is needed. |
+| EG-I29 | Consolidation environment | Low | Validate-mode push passed static, unit, and InMemory E2E gates, then Prisma generation failed because `DATABASE_URL` was absent in the fresh shell. Prisma's `env()` throws before a nullish fallback can run. | Supply a non-secret local datasource URL to generation and the hook process; targeted Prisma generation passes without connecting to or changing a database. | Establish Validate-mode environment before its owning run. Detection was at Prisma generation; a targeted prerequisite check could have caught it before the preceding suites. No production-code workaround is needed. |
 
 **Test/gate improvement: accepted.** The existing content audit caught the
 release badge mismatch at the earliest owning pre-push stage.
