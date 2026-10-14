@@ -210,6 +210,9 @@ Invoke-Gate -Name 'docs: mermaid gate negative controls' -WorkingDir $repoRoot -
 
 Invoke-Gate -Name 'supply chain: lockfile regeneration controls' -WorkingDir $repoRoot -Action {
     node scripts/test-lockfile-regeneration.mjs 2>&1 | Out-Host
+    if ($LASTEXITCODE -eq 0) {
+        node scripts/test-root-lock-provenance.mjs 2>&1 | Out-Host
+    }
 }
 
 Invoke-Gate -Name 'docs: mermaid diagrams render' -WorkingDir $repoRoot -Action {

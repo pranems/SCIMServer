@@ -13,8 +13,11 @@ controls before the full render.
 Renderer discovery previously selected an arbitrary bundled `version` literal.
 It now reads Mermaid's identified info-diagram database and treats placeholders
 or unattributed versions as unknown. No package or lockfile changes are part
-of this work. The current editor bundle reports **11.17.0**, while the gate
-remains pinned to **11.15.0**. Editor equivalence is **not verified**.
+of the original checkpoint. A separately authorized continuation now aligns
+the root gate and identified editor bundle at **11.17.0**, using a CI-generated
+root-only lockfile. Real strict/light/dark rendering and the installed info SVG
+confirm 11.17.0. Version alignment is verified; the behavior of an already-open
+editor preview remains a separate check.
 
 ## Required versus diagnostic behavior
 
@@ -84,9 +87,9 @@ different future bundle without that source is conservatively unknown.
 
 The existing newest-directory heuristic is unchanged and is not proof of which
 editor process or preview script is currently loaded. Neither matching a parsed
-version nor a successful pinned-gate render proves editor equivalence. Resolve
-the identified 11.15.0 versus 11.17.0 drift in a separately approved dependency
-change, respecting the corporate proxy/quarantine and CI lockfile policy.
+version nor a successful pinned-gate render proves editor equivalence. The
+original 11.15.0 versus 11.17.0 gap was resolved in the separately authorized
+root-tooling continuation below, respecting proxy/quarantine and CI lock policy.
 Do not install or downgrade to `0.0.0`.
 
 ## Execution issues and root-cause analysis
@@ -148,7 +151,7 @@ and pre-push remains a thin orchestrator. No new strategy, framework, or
 dependency is justified for these bounded responsibilities.
 
 Remaining release checks: review and exact-tip CI, parent sequencing, and
-separate resolution of genuine editor-version drift. No merge or deployment
+active-editor preview verification. No merge or deployment
 is authorized by this change.
 
 ## Authorized root-tooling alignment continuation
@@ -219,4 +222,81 @@ This is **MG-I10**, dependency scope / Medium, caught by CI artifact diff
 before installation/commit. The mechanism was deleting a contaminated lock
 without retaining its version choices. The first artifact is not treated as
 a minimal diff merely because provenance and age checks passed. Final
-transitive-minimization receipt remains pending.
+transitive-minimization receipt is recorded below.
+
+### Accepted CI artifact and aligned rendering
+
+Run `38530411570` on `7da126aa` passed the existing regeneration workflow.
+The artifact contains only `package-lock.json` and `publish-ages.json`.
+The root lock SHA256 is
+`C876B343430DB45F525E8F6B966E04ACC1ADE6307228D78E46807F3C7976D60A`.
+Every one of 157 changed entries has a public HTTPS registry URL, sha512
+integrity and a publication timestamp at least seven days old; the youngest
+was **55.934 days** at `2026-10-14T07:45:36.670Z`.
+
+| Dependency identity | Before | After | Reason |
+|---|---|---|---|
+| mermaid | 11.15.0 | 11.17.0 | Match identified editor package version. |
+| @mermaid-js/parser | 1.2.0 | 1.2.1 | Mermaid 11.17.0 requires ^1.2.1; npm places it under mermaid. |
+| fastdom | Absent | 1.0.12 | New exact Mermaid dependency. |
+| strictdom | Absent | 1.0.1 | fastdom requires ^1.0.1. |
+
+All other existing dependency versions, including markdown-it 14.3.0 and
+jsdom 26.1.0, are unchanged. The large URL/hash diff corrects historical
+provenance, not additional version upgrades. No API/web manifest or lockfile
+changed.
+
+After importing the artifact, `npm ls mermaid` measured the old junction's
+11.15.0 as invalid for the requested 11.17.0. Only this worktree's junction was
+removed; the source dependencies were verified present. `npm ci` through the
+unchanged corporate proxy restored a private root installation and left the
+CI lock hash identical. No local lockfile generation or npm settings changes
+occurred. Chromium's actual info-diagram SVG reports 11.17.0; the changed
+diagram renders under strict configuration in both themes. The doctor exits
+zero and identifies gate/editor Mermaid 11.17.0 without version drift.
+
+During this continuation a newer user-local VS Code installation appeared at
+`C:\Users\v-prasrane\AppData\Local\Programs\Microsoft VS Code\8c19d9191d`.
+It splits/minifies Mermaid's info database into `infoDiagram-*.js`, rather than
+the original monolithic constant. Discovery initially conservatively returned
+unknown. A RED/GREEN control now covers the actual format: only the named info
+module's version object referenced by its `getVersion` getter is accepted.
+Arbitrary version literals and placeholders remain rejected.
+
+**MG-I11**, environment/format drift / Medium: new installation layout caused
+unknown discovery during real aligned rendering; the focused actual-format
+control was the earliest discriminating check. The fix reads the identified
+split module, not an arbitrary minified variable from another library.
+
+**MG-I12**, tooling friction / Low: the editor Problems tool timed out during
+the continuation. Node syntax checks, YAML parsing and behavioral contracts
+provided explicit fallback validation; the timed-out tool was not counted as
+a clean diagnostics receipt. One patch context mismatch was corrected by
+reading the exact target lines before retrying; it caused no source changes.
+
+Root npm audit reports **zero High/Critical**, two Moderate and two Low
+findings. The underlying dompurify 3.4.12, markdown-it 14.3.0 and katex 0.16.47
+versions are unchanged from the baseline; Mermaid's Low finding is inherited
+from katex. These are not represented as a clean audit or fixed here. Follow-up:
+the parent should schedule a separately scoped root dependency remediation
+under the same quarantine/CI-lock policy. Receipts and advisory URLs are in
+`test-results/root-aligned-audit.json`.
+
+**MG-I8 closure:** the normal provenance checker now uses the same strict
+validator for root/API/web. Four subprocess controls prove clean root passes
+and internal URL, weak integrity and missing integrity fail. Together with
+17 regeneration controls, 11 Mermaid controls and three registered-action
+controls, these checks run in the normal push hook.
+
+**Test/gate disposition: applied.** Root provenance is no longer outside the
+normal gate's scope; split-module discovery and minimal dependency retention
+have direct negative/positive controls.
+
+**Design/architecture disposition: accepted.** The workflow remains an
+orchestrator; selection, validation and CI-only generation share one cohesive
+dependency helper. The transient manifest is restored even on failure, and
+npm alone owns the lockfile. No generalized dependency resolver or new testing
+framework was introduced.
+
+Final normal-hook complete rendering and exact-tip CI remain to be recorded in
+the PR handoff. No editor UI, shared estate, deployment or promotion is claimed.

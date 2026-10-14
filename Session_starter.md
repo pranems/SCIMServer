@@ -6,9 +6,11 @@
 required render command on missing tooling and removes the pre-push passed
 skip. Behavioral controls cover CLI exits, actual registered-action invocation,
 FAIL/PASS summaries, and identified versus placeholder bundle versions. The
-current discovered editor Mermaid is 11.17.0; the gate pin remains 11.15.0,
-so editor equivalence is not verified. No runtime/UI/package/deployment changes
-belong to this branch. See
+discovered editor Mermaid and root gate are now aligned at 11.17.0 through a
+separately authorized, CI-generated root-only lockfile. Real strict/light/dark
+rendering and the actual info SVG confirm installed 11.17.0; active-editor
+preview behavior still requires its own verification. No API/web dependency,
+runtime/UI or deployment changes belong to this branch. See
 [gate evidence and RCA](docs/strategy/MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
 
 **Active consolidation:** v0.55.48 metadata is being prepared on

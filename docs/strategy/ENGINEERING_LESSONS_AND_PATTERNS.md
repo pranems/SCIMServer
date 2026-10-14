@@ -27,6 +27,13 @@ version discovery must identify the owning library: a profiling placeholder
 or React version is not a Mermaid pin. See
 [the gate hardening evidence and RCA](MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
 
+The root documentation-tooling lock must participate in the same provenance
+gate as API/web. CI-only cleanup must preserve version choices rather than
+silently upgrading unrelated packages, and publication-age reports must include
+same-version provenance rewrites. The accepted root correction uses npm with
+a temporary version seed, restores the real manifest, and validates every
+changed entry before artifact upload; no integrity hashes are synthesized.
+
 ### Revision identity belongs to persisted state, not a normalized view
 
 When compatibility normalization renames or removes legacy settings,

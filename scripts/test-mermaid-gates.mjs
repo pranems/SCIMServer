@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -78,6 +78,17 @@ try {
       writeFileSync(bundle, 'DEFAULT_INFO_DB={version:"11.15.0"};');
       assert.equal(discover(), '11.15.0');
     });
+    check('split minified info-diagram module identifies its getter-owned version', () => {
+      writeFileSync(bundle, 'import "./infoDiagram-test.js";');
+      const info = join(bundleDir, 'markdown-preview-out', 'infoDiagram-test.js');
+      try {
+        writeFileSync(info, 'globalThis.injected={version:"0.0.0"};' +
+          'var m={version:"11.17.0"},v=r(()=>m.version,"getVersion"),d={getVersion:v};');
+        assert.equal(discover(), '11.17.0');
+      } finally {
+        unlinkSync(info);
+      }
+    });
     const mermaidDir = join(root, 'node_modules', 'mermaid');
     mkdirSync(mermaidDir, { recursive: true });
     writeFileSync(join(mermaidDir, 'package.json'), '{"version":"11.15.0"}');
@@ -132,5 +143,5 @@ try {
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
-console.log(`Mermaid gate controls: ${10 - failures} passed, ${failures} failed.`);
+console.log(`Mermaid gate controls: ${11 - failures} passed, ${failures} failed.`);
 process.exitCode = failures ? 1 : 0;

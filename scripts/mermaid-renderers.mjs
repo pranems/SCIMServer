@@ -20,13 +20,20 @@
  * and the diagnostic can never disagree about which Mermaid actually renders.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 
 const HOME = process.env.USERPROFILE || process.env.HOME || '';
 
 /** Read Mermaid's info-diagram version, not another bundled library's version. */
 function versionFromBundle(files) {
-  for (const f of files) {
+  const candidates = [...files];
+  for (const dir of new Set(files.map(dirname))) {
+    if (!existsSync(dir)) continue;
+    candidates.push(...readdirSync(dir)
+      .filter((name) => /^infoDiagram-.*\.m?js$/.test(name))
+      .map((name) => join(dir, name)));
+  }
+  for (const f of candidates) {
     if (!existsSync(f)) continue;
     let content;
     try {
@@ -36,6 +43,10 @@ function versionFromBundle(files) {
     }
     const m = content.match(/\bDEFAULT_INFO_DB\s*=\s*\{\s*version:\s*["'](\d+\.\d+\.\d+)["']/);
     if (m && m[1] !== '0.0.0') return m[1];
+    if (/^infoDiagram-/.test(basename(f))) {
+      const info = content.match(/\b([\w$]+)\s*=\s*\{\s*version:\s*["'](\d+\.\d+\.\d+)["']\s*\}\s*,\s*[\w$]+\s*=\s*[\w$]+\s*\(\s*\(\)\s*=>\s*\1\.version\s*,\s*["']getVersion["']/);
+      if (info && info[2] !== '0.0.0') return info[2];
+    }
   }
   return null;
 }
