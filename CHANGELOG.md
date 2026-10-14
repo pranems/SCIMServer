@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Copilot Agent Skill migration
+
+- Convert all 34 workspace prompt files on latest master into explicit-only
+  project Agent Skills and migrate the separate SyncFabric authentication
+  workflow into the same portable structure. Preserve the existing Entra
+  gallery skill for 36 project skills total.
+- Move workflow memory beside its owning skill, split the two generated
+  workflows over 500 lines into progressively loaded references, and update
+  relative links and self-update targets for their new locations.
+- Make the mandatory gate walker and dev deployment pipeline register
+  `SkillPath` entries and slash-invoked skills instead of deleted prompt
+  files. Keep `-SkipPrompts` and `-NoPrompt` as compatibility aliases.
+- Add a pre-push customization contract that validates skill discovery
+  metadata, explicit-only behavior, relative resources, legacy-reference
+  removal, split-workflow self-update targets, selected Git-tree state, and
+  gate-walker integration.
+- Record migration issues, root causes, escape analysis, and prevention in the
+  Agent Skills migration execution ledger.
+
 ### Validation pipeline
 
 - Align both Prisma E2E owners on serial quiet-console execution. Quiet mode
@@ -5025,7 +5044,7 @@ No runtime cost - just hands the singleton to loaders.
 **Web UI Test Infrastructure (NEW):**
 - Vitest + @testing-library/react: 16 test files, 152 component tests
 - Playwright E2E: 6 spec files, 86 live browser tests against running server
-- Self-improving audit prompt: `.github/prompts/uiTestAndValidation.prompt.md`
+- Self-improving audit prompt: `.github/skills/uitestandvalidation/SKILL.md`
 - New documentation: `docs/WEB_UI_FLOWS_AND_BEHAVIORS.md` (20 sections, 7 Mermaid diagrams)
 
 **API E2E Gap Closure:**

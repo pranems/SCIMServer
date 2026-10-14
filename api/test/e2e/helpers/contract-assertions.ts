@@ -8,7 +8,7 @@
  *  - Deep recursive scanning for nested object leaks
  *  - SCIM-compliant response shapes (ListResponse, Error, Meta)
  *
- * @see .github/prompts/apiContractVerification.prompt.md
+ * @see .github/skills/apicontractverification/SKILL.md
  */
 
 // ─── Global Denylist ────────────────────────────────────────────────────────

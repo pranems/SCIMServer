@@ -76,7 +76,7 @@ Functionally, this turns SCIMServer into a **drop-in behavioral replica** of an 
 
 ## 3. Operating Principles Used in This Evaluation
 
-These principles come from the [deepIdeaEvaluation prompt](../.github/prompts/deepIdeaEvaluation.prompt.md) and are stated up-front so reviewers can challenge any deviation:
+These principles come from the [deepideaevaluation skill](../.github/skills/deepideaevaluation/SKILL.md) and are stated up-front so reviewers can challenge any deviation:
 
 - Be a critic, not a cheerleader. Default stance is skeptical.
 - Disagree explicitly with the user when evidence supports it.
