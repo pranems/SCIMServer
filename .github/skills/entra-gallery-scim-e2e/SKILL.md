@@ -17,6 +17,10 @@ Use this skill when validating the real Microsoft Entra provisioning service aga
 6. Never print or persist bearer tokens, OAuth client secrets, WIF values, Graph tokens, or user passwords.
 7. Treat `BLOCKED`, `UNSUPPORTED`, or `SKIPPED` as a failed required gate. Every mode must prove Group/membership and the reviewed custom mapping; arbitrary mappings remain outside the finite coverage claim.
 8. Do not promote or change production as part of this skill.
+9. Obtain an explicit handoff from any active dev validation or deployment
+   owner before provisioning. Zero gallery jobs does not prove the estate is
+   free: another run may be capturing endpoint integrity or executing browser
+   checks. Do not overlap those runs or delete another run's fixtures.
 
 ## Run sequence
 
@@ -31,6 +35,13 @@ Then run the complete required authentication matrix:
 ```powershell
 pwsh -NoProfile -File scripts\entra-gallery-scim-e2e.ps1
 ```
+
+When authoring or changing a mapping, first smoke the affected flow with
+`-Modes SecretToken` before spending time on the complete matrix. The focused
+result is diagnostic evidence, not a three-mode release pass. Do not repeat
+unchanged full runs immediately before their owning pipeline. An explicitly
+empty mode selection is invalid and must never become a successful zero-test
+run.
 
 The resource application ID is resolved from the reviewed WIF reference's
 `connectivityParameters`. An optional `ENTRA_WIF_APPLICATION_ID` override must
@@ -77,7 +88,8 @@ The executable gate owns all behavior. Do not reproduce its Graph or SCIM mutati
 
 The authoritative dev deployment pipeline invokes this skill's executable
 matrix as Stage 4.8 after exact revision readiness. It checks the child exit,
-runtime version, three auth modes, semantic User outcomes, and cleanup. The
+runtime version, all three auth modes, User lifecycle including reenable,
+Group lifecycle and membership, custom create/update values, and cleanup. The
 pipeline gate remains distinct from the independent WIF protocol proof and
 the real-browser Playwright lane.
 
@@ -87,9 +99,10 @@ Report:
 
 - exact PASS, FAIL, BLOCKED, UNSUPPORTED, and SKIPPED counts;
 - outcome per authentication mode;
-- User create, update, disable, and deprovision results;
+- User create, update, disable, reenable, and deprovision results;
 - Group create, update, membership add/remove, and deprovision results;
-- gallery schema and custom-extension disposition;
+- gallery schema and custom-extension disposition, including exact create
+  and update values for every requested mode;
 - cleanup verification;
 - SCIMServer version and elapsed time.
 
