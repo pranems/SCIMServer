@@ -16,6 +16,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or require dev-only fixtures. Deployment-pipeline contract tests prevent
   these guarantees from being silently removed.
 
+## [0.55.49] - 2026-10-14
+
+### Activity and endpoint readability
+
+- Reserve six aligned Dashboard activity fields, including `Server-wide`
+  for requests without an endpoint. Reuse shared `TruncatedText` for long
+  paths and names while preserving endpoint navigation and full identity.
+- Bound Operations User/Group endpoint links inside percentage-based columns.
+  A 480 px table floor and Card-owned horizontal scrolling keep mobile
+  labels readable without widening the document.
+- Preserve constituent commits `e2758b04` and `a5c1c603`; normal merge
+  `c90602dd` incorporates runtime v0.55.48 without rewriting history.
+- Implementation browser proof is nine Chromium cases at 1440/900/390 px;
+  measured labels are 193/85/68 px for 1,710 px content and rows remain
+  61.25 px high. Pre-consolidation affected Vitest proof passes 25 tests.
+  Raw web type diagnostics were 66 baseline / 66 current, zero added, not
+  a clean raw type check.
+- Prior release consolidation counts are 6,035 API units, 2,432 InMemory
+  E2E passes with four PostgreSQL-only exclusions, and 1,591 web tests.
+  UI consolidation counts, CI-only lock receipts, exact-tip CI, and all
+  merged-image form-factor evidence remain pending; no fresh counts are
+  inferred from prior release results.
+- Test/gate improvement is applied through mobile geometry and file-backed
+  receipts, not presence-only or CSS-property assertions. Design disposition:
+  accepted; presentation-only changes reuse existing primitives without new
+  dependency edges or speculative abstractions.
+- Deployment waits for explicit runtime-owner handoff and parent gallery
+  lease coordination. No operator visual sign-off or production promotion
+  is claimed. See [the implementation evidence](docs/UI_ACTIVITY_ENDPOINT_READABILITY.md).
+
 ## [0.55.48] - 2026-10-14
 
 ### Persisted legacy-profile revision correction

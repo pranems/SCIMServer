@@ -18,7 +18,10 @@ See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and nine execution
 issues, reconciled against the full raw session event stream.
 No deployed UI or operator approval is claimed.
 
-**Active consolidation:** PR #215 merged normally at `99cdeda3` for
+**Active consolidation:** v0.55.49 metadata is being prepared for PR #216.
+Normal merge `c90602dd` preserves UI commits `e2758b04` and `a5c1c603`.
+CI-only API/web lock regeneration and reviewed exact-tip CI remain pending.
+PR #215 merged normally at `99cdeda3` for
 v0.55.48, preserving its runtime and permanent live-test commits. Its full
 merged-master dev pipeline and legacy-reference proof remain owned by the
 runtime consolidation chat. PR #216 owns only UI-01/UI-02 release preparation

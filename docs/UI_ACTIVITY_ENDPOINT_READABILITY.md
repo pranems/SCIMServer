@@ -1,7 +1,7 @@
 # Activity and endpoint identity readability
 
-**Status:** Implemented locally, deployment pending
-**Last verified:** 2026-10-13
+**Status:** v0.55.49 consolidation in progress, deployment pending
+**Last verified:** 2026-10-14
 
 ## Executive summary
 
@@ -91,15 +91,27 @@ alone.
 
 **Gate follow-up scheduled:** Release-assurance tooling owner, target
 2026-10-14: distinguish an unavailable required Mermaid check from PASS and
-diagnose the built-in `0.0.0` version warning in a separate gate-hardening
+finish renderer-version discovery in a separate gate-hardening
 change. Root tooling has been restored for this worktree, so actual rendering
-is no longer skipped here.
+is no longer skipped here. The independent owner has since identified the
+built-in version as 11.17.0 against root 11.15.0. Actual strict light/dark
+rendering passed, but renderer equivalence remains unverified; no tooling
+installation or gate edits are included in this release.
 
 **Design/architecture disposition accepted:** Small presentation-only changes
 reuse the existing truncation primitive and percentage columns. No new service,
 dependency edge, endpoint identity model, or speculative abstraction is needed.
 
 ## Remaining release boundaries
+
+Normal merge `c90602dd` incorporates runtime master `99cdeda3` and retains
+both original UI commits. The only conflict was current session ownership
+context; both runtime and UI handoffs were retained with their actual states.
+CI-only API/web release locks and post-merge targeted checks are pending.
+Runtime #215's pipeline and legacy-reference proof remain separately owned.
+Shared dev/live/directory mutation requires explicit runtime handoff and
+coordination with the parent's bounded gallery validation lease. No original
+analysis checkout, other owned worktree, or shared database is modified.
 
 Final-source normal hooks passed, with the explicit exceptions above.
 Exact-tip CI, deployed browser validation, and

@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.48
+> **Version**: 0.55.49
 > **Last Updated**: October 14, 2026
 > **Last verified:** 2026-10-14
 
@@ -9,14 +9,28 @@
 
 ## Active Delivery Process
 
-**v0.55.48 consolidation, not deployment:** PR #215 corrects false
+**v0.55.49 UI consolidation, not deployment:** PR #216 preserves UI commits
+`e2758b04` and `a5c1c603` through normal runtime-master merge `c90602dd`.
+UI-01/UI-02 align six Dashboard activity tracks and bound Operations endpoint
+identity with a 480 px table floor and Card-owned mobile scrolling. Nine real
+Chromium geometry/identity/navigation cases passed at 1440/900/390 px before
+consolidation. Fresh post-merge focused proof, CI-only locks, reviewed exact-tip
+CI, and authoritative merged-image validation remain pending. No deployed UI,
+operator visual approval, or production promotion is claimed. Runtime #215's
+pipeline and legacy proof are separately owned; shared mutations require
+explicit handoff and coordination with the parent's gallery validation lease.
+UI-03 through UI-10 and Mermaid gate hardening remain separately owned.
+
+**v0.55.48 runtime merged, deployment separately owned:** PR #215 merged
+normally at `99cdeda3` and corrects false
 profile-revision conflicts by capturing raw persisted revision and normalized
 request view in one snapshot. All six controllers forward the revision.
 Focused units pass 281/281; HTTP proof passes 12/12 per backend; built-runtime
 live proof passes 65 checks. The implementation pre-push InMemory E2E result
 is 2,432 passes with four explicit PostgreSQL-only exclusions. CI-only lock
-regeneration, reviewed exact-tip merge, full authoritative dev pipeline, and
-direct legacy-reference verification are pending. No stored profile workaround,
+regeneration and reviewed exact-tip merge completed in that release.
+Its full authoritative dev pipeline and direct legacy-reference verification
+remain with the runtime owner; their outcome is not inferred here. No stored profile workaround,
 customer-prod promotion, UI backlog implementation, or visual sign-off is
 authorized in this phase.
 
