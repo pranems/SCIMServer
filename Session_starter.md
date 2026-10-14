@@ -17,6 +17,15 @@ matrix passes 6,035 units in each backend and 2,488 InMemory E2E tests with
 four PostgreSQL-only exclusions. Web units and coverage passed earlier in
 the second attempt. This is not a complete or green pipeline.
 
+An isolated, instrumented serial Prisma diagnostic subsequently passes all
+118 suites and 2,492 tests with zero skips in 1,417.31 seconds. It uses quiet
+console output and an explicit Prisma backend. Its measured StatsModule
+startup peaks at 8,705 ms across accumulated fixtures. This is standalone
+recovery evidence, not proof of the earlier timeout's sole cause or a green
+deployment pipeline. All diagnostic databases were removed by exact owned ID.
+The parent holds a bounded dev/gallery lease for its mapping smoke and
+three-auth matrix; runtime must obtain explicit return before live work.
+
 Dev still serves v0.55.47. Valid fixtures on the original dev reference
 `aa69213c-1ba8-4feb-a507-a6e2fe90d6bd` reproduce User and Group POST 409s,
 while its raw legacy setting and persisted revision remain unchanged.
@@ -28,7 +37,42 @@ sign-off remain separate parent work. No production promotion is authorized.
 
 | Date | Summary |
 |---|---|
-| 2026-10-14 | Merged v0.55.48 correction and CI-only release locks; persisted two failed no-skip dev attempts and unchanged legacy-reference baseline. Deployment remains blocked by Prisma bootstrap timeouts. |
+| 2026-10-14 | Merged v0.55.48 correction and CI-only release locks; retained two failed pipeline receipts and a complete 2,492-test isolated Prisma diagnostic. Authoritative deployment proof remains outstanding. |
+
+**UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
+separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
+pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor
+with panel-owned scrolling; endpoint labels measure 193/85/68 px and rows
+remain 61 px high. JSON geometry receipts are file-backed and retained.
+Commit `e2758b04` is pushed through the normal Fast hook. API InMemory E2E
+passed 2,429 cases with four PostgreSQL-only skips. Final-source web build and
+size budgets pass. A misleading Mermaid hook PASS was actually a tooling
+skip; matching installed root dependencies were restored and all four changed
+document blocks really rendered. Independent gate-owner diagnosis identifies
+built-in Mermaid 11.17.0 against root 11.15.0; renderer equivalence remains
+unverified. Gate hardening is separately owned and is not part of this PR.
+See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and nine execution
+issues, reconciled against the full raw session event stream.
+No deployed UI or operator approval is claimed.
+
+**Separate UI consolidation:** v0.55.49 merged through PR #216 at `4a4719cc`.
+Normal merge `c90602dd` preserves UI commits `e2758b04` and `a5c1c603`.
+CI-only API/web lock run `38524477274` changes release roots only; all 1,079
+dependency entries remain identical with public npm/SHA-512 provenance.
+Owning Validate push at `d5024d0f` passes 23/23 gates: 6,035 API units,
+2,432 InMemory E2E passes / four PostgreSQL-only skips, and 1,591 web tests.
+Fresh post-merge local Chromium passes 9/9 in 32.0 seconds with retained
+geometry receipts. First-push source-scan timeout converged on unchanged
+focused and full-hook retries. Its merge does not establish deployed UI proof.
+PR #215 merged normally at `99cdeda3` for
+v0.55.48, preserving its runtime and permanent live-test commits. Its full
+merged-master dev pipeline and legacy-reference proof remain owned by the
+runtime consolidation chat. PR #216 owns only UI-01/UI-02 release preparation
+in its isolated worktree, with a normal master merge preserving both UI commits.
+Shared live/dev/directory mutation requires an explicit runtime-owner handoff
+and coordination with the parent's separate gallery validation lease.
+The original dirty analysis worktree and other owned worktrees remain untouched.
+No customer-prod promotion or operator visual sign-off is authorized.
 
 **WIF follow-up:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not

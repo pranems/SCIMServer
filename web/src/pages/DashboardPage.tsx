@@ -41,7 +41,7 @@ import {
 import { useDashboard, useActivitySummary } from '../api/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { DashboardResponse, DashboardEndpoint } from '@scim/types/dashboard.types';
-import { EmptyState, KpiChart, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, KpiChart, LoadingSkeleton, TruncatedText } from '../components/primitives';
 import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 
 const useStyles = makeStyles({
@@ -102,9 +102,12 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
+    overflowX: 'auto',
   },
   activityItem: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '64px minmax(60px, 2fr) minmax(80px, 1fr) 48px minmax(90px, 1fr) 64px',
+    minWidth: '590px',
     alignItems: 'center',
     gap: '12px',
     padding: '8px 12px',
@@ -117,6 +120,17 @@ const useStyles = makeStyles({
     fontFamily: 'monospace',
     minWidth: '56px',
     textAlign: 'center' as const,
+  },
+  activityEndpoint: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    minWidth: 0,
+  },
+  activityEndpointName: {
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   errorItem: {
     color: tokens.colorPaletteRedForeground1,
@@ -335,14 +349,18 @@ export const DashboardPage: React.FC = () => {
                 >
                   {activity.method}
                 </Badge>
-                <Caption1 style={{ fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {activity.path}
-                </Caption1>
-                {activity.endpointId && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
-                    <Caption1 style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activity.endpointName ?? activity.endpointId}>
-                      {activity.endpointName ?? '(endpoint)'}
-                    </Caption1>
+                <TruncatedText
+                  text={activity.path}
+                  monospace
+                  data-testid={`dashboard-activity-path-${activity.id}`}
+                />
+                <span className={classes.activityEndpoint}>
+                  <TruncatedText
+                    text={activity.endpointId ? activity.endpointName ?? activity.endpointId : 'Server-wide'}
+                    className={classes.activityEndpointName}
+                    data-testid={`dashboard-activity-endpoint-${activity.id}`}
+                  />
+                  {activity.endpointId && (
                     <Tooltip content="Open this endpoint" relationship="label" positioning="above">
                       <Button
                         appearance="subtle"
@@ -354,10 +372,11 @@ export const DashboardPage: React.FC = () => {
                         }}
                         aria-label={`Open endpoint ${activity.endpointName ?? activity.endpointId}`}
                         data-testid={`dashboard-activity-endpoint-open-${activity.id}`}
+                        style={{ flexShrink: 0 }}
                       />
                     </Tooltip>
-                  </span>
-                )}
+                  )}
+                </span>
                 <Badge
                   appearance="outline"
                   color={activity.statusCode >= 400 ? 'danger' : 'success'}

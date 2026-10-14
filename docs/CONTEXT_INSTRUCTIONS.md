@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.48
+> **Version**: 0.55.49
 > **Last Updated**: October 14, 2026
 > **Last verified:** 2026-10-14
 
@@ -9,7 +9,26 @@
 
 ## Active Delivery Process
 
-**v0.55.48 consolidation, blocked before deployment:** PR #215 corrects false
+**v0.55.49 UI consolidation, not deployment:** PR #216 preserves UI commits
+`e2758b04` and `a5c1c603` through normal runtime-master merge `c90602dd`.
+UI-01/UI-02 align six Dashboard activity tracks and bound Operations endpoint
+identity with a 480 px table floor and Card-owned mobile scrolling. Nine real
+Chromium geometry/identity/navigation cases passed at 1440/900/390 px before
+consolidation. Fresh post-merge local Chromium passes 9/9 in 32.0 seconds;
+affected Vitest passes 25/25. The owning Validate push passes all 23 gates:
+6,035 API units, 2,432 InMemory E2E passes / four PostgreSQL-only skips, and
+1,591 web tests. CI-only lock run `38524477274` changes release roots only,
+preserving all 1,079 dependency entries and public npm/SHA-512 provenance.
+Bounded read-only PR review found no significant issues. Reviewed exact-tip
+CI completed before normal merge `4a4719cc`; authoritative merged-image
+validation remains pending. No deployed UI,
+operator visual approval, or production promotion is claimed. Runtime #215's
+pipeline and legacy proof are separately owned; shared mutations require
+explicit handoff and coordination with the parent's gallery validation lease.
+UI-03 through UI-10 and Mermaid gate hardening remain separately owned.
+
+**v0.55.48 runtime merged, deployment separately owned:** PR #215 merged
+normally at `99cdeda3` and corrects false
 profile-revision conflicts by capturing raw persisted revision and normalized
 request view in one snapshot. All six controllers forward the revision.
 Focused units pass 281/281; HTTP proof passes 12/12 per backend; built-runtime
@@ -23,7 +42,13 @@ Its partial matrix passes 6,035 units per backend and 2,488 InMemory E2E
 tests with four PostgreSQL-only exclusions. Dev remains v0.55.47; valid
 original-reference User and Group creates still reproduce 409 with unchanged
 raw profile revision. Image publication, complete pipeline, and fresh dev
-live/gallery/browser proof remain blocked. No stored profile workaround,
+live/gallery/browser proof remain blocked. A later isolated serial Prisma
+diagnostic passes all 118 suites and 2,492 tests with zero skips in
+1,417.31 seconds, with quiet console output and explicit Prisma selection.
+It does not establish the previous timeout's sole cause or replace the
+authoritative pipeline. The parent holds the bounded mapping-smoke and
+three-auth gallery lease; runtime must explicitly reacquire before live work.
+No stored profile workaround,
 customer-prod promotion, UI backlog implementation, or visual sign-off is
 authorized in this phase.
 
