@@ -16,6 +16,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or require dev-only fixtures. Deployment-pipeline contract tests prevent
   these guarantees from being silently removed.
 
+## [0.55.48] - 2026-10-14
+
+### Persisted legacy-profile revision correction
+
+- Preserve the raw persisted profile revision before compatibility
+  normalization and atomically pair it with the normalized request snapshot.
+  All six SCIM controller surfaces forward that revision. This removes false
+  HTTP 409 responses for unchanged legacy profiles while retaining genuine
+  concurrent-profile-edit rejection.
+- Repository comparisons, resource ETags, public response fields, database
+  schema, and stored customer profiles remain unchanged.
+- Focused proof passes 281 unit tests across nine suites, 12 HTTP tests per
+  backend, and 65 built-runtime live checks. Restoring normalized hashing
+  reproduces three PostgreSQL legacy-create failures; the corrected complete
+  PostgreSQL suite returns to 12/12.
+- Permanent live section `9z-DP` covers schema-derived response allowlists,
+  ETag-coordinated CRUD, exact resource cleanup, and an explicitly selected
+  existing endpoint without rewriting its profile.
+- Before this correction, the deployed legacy reference returned false 409
+  on User create. The implementation pre-push run passes 2,432 tests with zero failures and
+  four PostgreSQL-only exclusions. Consolidated release counts and deployed
+  proof remain pending; v0.55.47's 266 browser passes are prior-release
+  evidence, not validation of this release.
+- The previously merged gallery gate proves 33 checks across SecretToken,
+  OAuth, and WIF with 13/13 cleanup checks. Group repetition under OAuth/WIF
+  and arbitrary custom extension mappings remain explicit coverage exclusions.
+  Authoritative pipeline Stage 4.8 will execute fresh gallery evidence.
+- Test/gate improvement: applied through actual legacy-storage negative
+  controls and value-level revision assertions. Design disposition: accepted;
+  the existing snapshot and repository seams remain cohesive, and another
+  abstraction would be speculative.
+- Release preparation is pending CI-only lockfile regeneration, exact-tip
+  reviewed merge, immutable-image publication, full dev pipeline, and direct
+  legacy-reference proof. No production promotion or operator visual sign-off
+  is claimed.
+
 ## [0.55.47] - 2026-10-12
 
 ### Token-log endpoint identity

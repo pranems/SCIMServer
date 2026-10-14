@@ -2,6 +2,17 @@
 
 **Last verified:** 2026-10-14
 
+**Active consolidation:** v0.55.48 metadata is being prepared on
+`fix/persisted-profile-revision-20261013` in the isolated release worktree.
+PR #215 contains durable runtime and permanent live-test commits
+`46bca59a` and `897693ea`. CI-only lockfile regeneration, exact-tip reviewed
+merge, the full merged-master dev pipeline, and existing legacy-reference
+verification remain pending. Prior-release browser and gallery receipts are
+not substitutes for this release's deployment matrix. The original dirty
+analysis worktree and the shared PostgreSQL container must remain untouched.
+No customer-prod promotion is authorized. Custom gallery mappings, UI
+readability, and operator visual sign-off remain separate parent work.
+
 **WIF follow-up:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
 `secrets`. The corrected focused gallery flow passes 11 checks with zero
