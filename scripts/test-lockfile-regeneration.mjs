@@ -99,6 +99,26 @@ try {
       assert.throws(() => mod.releaseAge(undefined, now), /unknown/);
       assert.throws(() => mod.releaseAge('invalid', now), /unknown/);
     });
+    check('CI seed retains existing versions without changing requested Mermaid or nested identities', () => {
+      const manifest = { name: 'fixture', devDependencies: { mermaid: '11.17.0', 'markdown-it': '^14.3.0' } };
+      const before = { packages: {
+        '': { name: 'fixture', devDependencies: { mermaid: '11.15.0', 'markdown-it': '^14.3.0' } },
+        'node_modules/mermaid': { version: '11.15.0' },
+        'node_modules/markdown-it': { version: '14.3.0' },
+        'node_modules/transitive': { version: '1.2.3' },
+        'node_modules/parent/node_modules/transitive': { version: '0.9.0' },
+      } };
+      assert.deepEqual(mod.seedManifest(manifest, before).devDependencies,
+        { mermaid: '11.17.0', 'markdown-it': '14.3.0', transitive: '1.2.3' });
+      assert.equal(manifest.devDependencies['markdown-it'], '^14.3.0');
+    });
+    check('root regeneration cannot execute outside CI', () => {
+      const result = spawnSync(process.execPath, [script, 'regenerate-root', 'root'], {
+        cwd: scratch, encoding: 'utf8', env: { ...process.env, GITHUB_ACTIONS: 'false' },
+      });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /CI only/);
+    });
   }
 } finally {
   rmSync(scratch, { recursive: true, force: true });

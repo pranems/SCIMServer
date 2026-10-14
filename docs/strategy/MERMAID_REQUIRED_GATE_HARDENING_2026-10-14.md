@@ -197,3 +197,26 @@ comparison now includes those entries. This is **MG-I9**, test correctness /
 Medium, caught by focused RED before CI; prevention is the provenance-only
 behavioral control. The workflow uses a seven-day `--before` resolution cutoff
 and independently rejects young/unknown timestamps before publishing artifacts.
+
+### CI receipt and transitive-minimization checkpoint
+
+Run `38528990421` on `fa01a487` succeeded using the public registry and uploaded
+only the root lock and publication-age report. All 157 output dependency
+entries passed; minimum age was 9.079 days. Mermaid 11.17.0 was 55.925 days old.
+The initial clean solve also advanced unrelated versions, including markdown-it.
+That artifact is retained for evidence but is not accepted as the final lock.
+
+To minimize unrelated churn without editing any lockfile URL/hash, root CI now
+uses npm twice: an exact-version seed manifest retains the old top-level
+dependency versions except intentionally changed direct requirements; the
+original manifest is restored in `finally`, then npm prunes temporary direct
+entries. New requirements resolve normally, under the same seven-day cutoff.
+Only npm writes the lockfile. Explicit CI/Linux guards prevent executing this
+generation path locally. Seventeen focused controls pass, including seed
+preservation, nested-name exclusion and non-CI rejection.
+
+This is **MG-I10**, dependency scope / Medium, caught by CI artifact diff
+before installation/commit. The mechanism was deleting a contaminated lock
+without retaining its version choices. The first artifact is not treated as
+a minimal diff merely because provenance and age checks passed. Final
+transitive-minimization receipt remains pending.

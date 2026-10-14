@@ -73,10 +73,11 @@ jobs:
           for d in $(node scripts/lockfile-regeneration.mjs workspaces "$ws"); do
             test -f "$d/package.json"
             echo "::group::npm install --package-lock-only ($d)"
-            # Root's historical lock carries internal URLs on every entry.
-            # npm must regenerate it, not preserve poisoned provenance.
-            if [ "$d" = "." ]; then rm package-lock.json; fi
-            ( cd "$d" && npm install --package-lock-only --no-audit --no-fund --ignore-scripts --before="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" )
+            if [ "$d" = "." ]; then
+              node scripts/lockfile-regeneration.mjs regenerate-root root
+            else
+              ( cd "$d" && npm install --package-lock-only --no-audit --no-fund --ignore-scripts --before="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" )
+            fi
             echo "::endgroup::"
           done
 

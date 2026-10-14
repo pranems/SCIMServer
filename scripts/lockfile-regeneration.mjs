@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -44,6 +44,41 @@ export function releaseAge(published, now = Date.now()) {
   return days;
 }
 
+export function seedManifest(manifest, lock) {
+  const baseline = packages(lock);
+  const devDependencies = { ...manifest.devDependencies };
+  for (const [path, entry] of Object.entries(baseline)) {
+    const match = path.match(/^node_modules\/(@[^/]+\/[^/]+|[^/]+)$/);
+    if (!match || !entry.version || entry.link) continue;
+    const name = match[1];
+    if (Object.hasOwn(manifest.dependencies ?? {}, name)) continue;
+    if (Object.hasOwn(devDependencies, name) &&
+        manifest.devDependencies[name] !== baseline['']?.devDependencies?.[name]) continue;
+    devDependencies[name] = entry.version;
+  }
+  return { ...manifest, devDependencies };
+}
+
+function regenerateRoot() {
+  if (process.env.GITHUB_ACTIONS !== 'true') throw new Error('Root lockfile generation is CI only');
+  if (process.platform !== 'linux') throw new Error('Root lockfile generation requires the existing Linux CI runner');
+  const original = readFileSync('package.json', 'utf8');
+  const manifest = JSON.parse(original);
+  const baseline = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+  const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const args = ['install', '--package-lock-only', '--no-audit', '--no-fund', '--ignore-scripts', `--before=${cutoff}`];
+  // Seed exact existing versions in a temporary manifest. npm resolves new
+  // requirements, then prunes temporary direct entries using the real manifest.
+  try {
+    writeFileSync('package.json', JSON.stringify(seedManifest(manifest, baseline), null, 2) + '\n');
+    unlinkSync('package-lock.json');
+    execFileSync('npm', args, { stdio: 'inherit' });
+  } finally {
+    writeFileSync('package.json', original);
+  }
+  execFileSync('npm', args, { stdio: 'inherit' });
+}
+
 function npmView(name, version) {
   const args = ['view', `${name}@${version}`, 'time', '--json'];
   const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] };
@@ -62,6 +97,11 @@ function main([command, selection, reportPath]) {
   const directories = workspaces(selection);
   if (command === 'workspaces') {
     console.log(directories.join(' '));
+    return;
+  }
+  if (command === 'regenerate-root') {
+    if (selection !== 'root') throw new Error('Root regeneration requires root selection');
+    regenerateRoot();
     return;
   }
   if (!['verify', 'ages'].includes(command)) throw new Error(`Unknown command: ${command}`);
