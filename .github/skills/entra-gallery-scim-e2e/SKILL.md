@@ -12,7 +12,7 @@ Use this skill when validating the real Microsoft Entra provisioning service aga
 1. Run only against the registry-resolved `dev` estate.
 2. Use the dedicated `PRTest Entra Gallery Provisioning Test app` service principal only when it has zero pre-existing synchronization jobs.
 3. Never modify the existing `SCIMValidation-*` production jobs. The WIF reference job is read-only and its secret values remain in memory.
-4. Create source Users, Groups, app assignments, synchronization jobs, and SCIM endpoints with a unique run ID.
+4. Create source Users, Groups, app assignments, synchronization jobs, SCIM endpoints, and one federated identity credential with a unique run ID. The credential is added to the reviewed dev WIF resource application, never to a production application in another estate.
 5. Remove every owned object by exact ID in `finally`, then verify no new job or endpoint remains.
 6. Never print or persist bearer tokens, OAuth client secrets, WIF values, Graph tokens, or user passwords.
 7. Treat a required mode reported as `BLOCKED`, `UNSUPPORTED`, or `SKIPPED` as a failed gate. Capability exclusions such as custom extension mappings remain explicit in the report.
@@ -29,18 +29,23 @@ pwsh -NoProfile -File scripts\entra-gallery-scim-e2e.ps1 -PlanOnly
 Then run the complete required authentication matrix:
 
 ```powershell
-$env:ENTRA_WIF_APPLICATION_ID = '<current tenant WIF resource application id>'
 pwsh -NoProfile -File scripts\entra-gallery-scim-e2e.ps1
 ```
 
-`ENTRA_WIF_APPLICATION_ID` is a non-secret Entra resource application ID. Resolve it from the current tenant's reviewed WIF setup; do not hardcode tenant-specific IDs in the gate.
+The resource application ID is resolved from the reviewed WIF reference's
+`connectivityParameters`. An optional `ENTRA_WIF_APPLICATION_ID` override must
+match that reference. The gate derives an owned federated credential from the
+reference's tenant-bound subject and creates a fresh endpoint and WIF trust.
 
-The current dev tenant is expected to return a required `BLOCKED` result for
-WorkloadIdentity: Microsoft Graph beta rejects the hidden
-`EntraApplicationIdentifier` connector field, while omitting it causes the
-provisioning job to quarantine for that exact missing field. This must remain a
-failing matrix result until the dedicated gallery connector can be configured
-through a supported Entra administration path.
+WIF application identifiers use `PATCH synchronization/connectivityParameters`,
+not `PUT synchronization/secrets`. The gate writes the complete WIF connectivity
+configuration and verifies every saved field before provisioning. The corrected
+complete gallery matrix passed 33 checks with zero failures in 672 seconds.
+All three auth modes passed and all 13 cleanup entries succeeded. Group
+repetition under OAuth/WIF and custom mappings remain explicit exclusions.
+Each mode deletes its job before another mode can configure the principal.
+Do not treat a static
+contract or the independent protocol proof as a replacement for this live flow.
 
 Run the independent real-Entra WIF protocol proof through the temporary-app
 wrapper:
@@ -54,7 +59,7 @@ application and service principal, keeps the one-time credential in process
 memory, runs `wif-e2e-proof.ps1`, and deletes both directory objects by exact ID
 in `finally`. The proof covers assertion acquisition, RFC 7523 token minting,
 SCIM User and Group CRUD, negative cases, and exact cleanup. It does not replace
-the blocked gallery provisioning-service claim.
+the gallery provisioning-service claim.
 
 For focused diagnosis, select one or more modes:
 
@@ -65,6 +70,12 @@ pwsh -NoProfile -File scripts\entra-gallery-scim-e2e.ps1 -Modes SecretToken
 The executable gate owns all behavior. Do not reproduce its Graph or SCIM mutation logic in chat or in another skill.
 
 ## Evidence
+
+The authoritative dev deployment pipeline invokes this skill's executable
+matrix as Stage 4.8 after exact revision readiness. It checks the child exit,
+runtime version, three auth modes, semantic User outcomes, and cleanup. The
+pipeline gate remains distinct from the independent WIF protocol proof and
+the real-browser Playwright lane.
 
 Read the generated `test-results/entra-gallery-scim-e2e/<run-id>/result.json` and `summary.md`.
 

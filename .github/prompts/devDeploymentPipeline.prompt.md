@@ -101,6 +101,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 4.5. **Live test the public local-run path** - `docker run -d --name scim-public-verify -p 3000:8080 -e PERSISTENCE_BACKEND=inmemory ... ghcr.io/pranems/scimserver:latest` + `scripts/live-test.ps1 -BaseUrl http://localhost:3000 -ClientSecret <test-oauth>`. Cleanup after.
 4.6. **Deploy to dev** - `az containerapp update -n scimserver-dev -g scimserver-dev --image <chosen-registry>/scimserver:<SHA> --revision-suffix v<SHA>`. Wait for new revision Healthy + 100% traffic + pod hostname reflects new revision.
 4.7. **Live SCIM tests vs dev** - `scripts/live-test.ps1 -BaseUrl https://scimserver-dev... -ClientSecret changeme-oauth`. Must be ≥ Stage 4.1 baseline.
+4.8. **Real Entra gallery provisioning vs dev** - run `scripts/entra-gallery-scim-e2e.ps1` with its default complete authentication matrix and an output directory under the pipeline report directory. Requires the registry-resolved delegated dev tenant profile and unused dedicated gallery principal. Run only after exact dev revision readiness. Require all three modes PASS, no failed/blocked/skipped checks, verified cleanup, and the intended runtime version in `result.json`. Custom mappings and Group repetition exclusions remain explicit and are not counted as covered. A missing prerequisite is a failed gate, never a silent omission. This gate is dev-only and must not run against customer production.
 
 ### Stage 5 - UI gates (mandatory; no "I'll do it next time")
 

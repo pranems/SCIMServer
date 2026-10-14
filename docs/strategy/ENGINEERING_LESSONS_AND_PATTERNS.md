@@ -16,6 +16,20 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Shared remote configuration requires a verified per-scenario boundary
+
+The Entra gallery harness passed focused auth runs but its first combined
+matrix failed because the template permits one job per service principal.
+Global cleanup was too late: a failed scheduled job could remain active while
+the next scenario rewrote principal-wide credentials. Remove and verify each
+owned job in the scenario's finally before changing shared configuration.
+Propagate failed teardown and retain its ownership for final cleanup retry.
+Three executable controls now verify removal, unowned refusal, and failed
+convergence. Read back the complete saved auth configuration before starting
+fixtures, and allowlist assigned-only scope rather than copying reference
+policy. See EG-I16 through EG-I21 in
+[the gallery execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
 ### Advisory lookup must use package identity, not an override selector
 
 The 2026-10-09 dependency review reproduced a false-green: an npm override
