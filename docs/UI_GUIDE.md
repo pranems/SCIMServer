@@ -17,6 +17,14 @@
 
 ## Table of Contents
 
+**Local, unreleased readability follow-up:** Recent Activity reserves stable
+fields and explicitly labels server-wide requests. Operations endpoint labels
+truncate within their columns, retain full identity on hover, and use locally
+scrollable tables on mobile. Nine responsive Chromium cases cover these
+outcomes. See [validation and release boundaries](UI_ACTIVITY_ENDPOINT_READABILITY.md).
+The screenshots below still describe their recorded deployment, not this
+unreleased correction.
+
 1. [Overview](#1-overview)
 2. [Accessing the UI](#2-accessing-the-ui)
 3. [Authentication (Token Gate)](#3-authentication-token-gate)

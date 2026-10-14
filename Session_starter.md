@@ -2,6 +2,16 @@
 
 **Last verified:** 2026-10-14
 
+**UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
+separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
+pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor
+with panel-owned scrolling; endpoint labels measure 193/85/68 px and rows
+remain 61 px high. JSON geometry receipts are file-backed and retained.
+See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and seven execution
+issues. No deployed UI or operator approval is claimed. Runtime revision fix
+release/deployment is separately owned by the consolidation chat for PR #215;
+do not infer that the older pending statements below describe its latest state.
+
 **WIF follow-up:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
 `secrets`. The corrected focused gallery flow passes 11 checks with zero

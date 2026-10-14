@@ -116,6 +116,7 @@ const useStyles = makeStyles({
   },
   rowTable: {
     width: '100%',
+    minWidth: '480px',
     borderCollapse: 'collapse',
     fontSize: tokens.fontSizeBase300,
     // R5 (copilot-instructions.md): a table whose cells truncate MUST use
@@ -126,6 +127,11 @@ const useStyles = makeStyles({
     // grid reads as a single-column list. Fixed layout makes the <th>
     // widths below authoritative and lets the inner TruncatedText clip.
     tableLayout: 'fixed',
+  },
+  tableCard: {
+    padding: 0,
+    minWidth: 0,
+    overflowX: 'auto',
   },
   rowHeader: {
     textAlign: 'left',
@@ -398,7 +404,7 @@ const UsersSection: React.FC<{
         />
       )}
       {!isLoading && !error && rows.length > 0 && (
-        <Card style={{ padding: 0 }}>
+        <Card className={classes.tableCard}>
           <table className={classes.rowTable}>
             <thead>
               <tr>
@@ -562,7 +568,7 @@ const GroupsSection: React.FC<{
         />
       )}
       {!isLoading && !error && rows.length > 0 && (
-        <Card style={{ padding: 0 }}>
+        <Card className={classes.tableCard}>
           <table className={classes.rowTable}>
             <thead>
               <tr>
@@ -678,10 +684,13 @@ const EndpointBadgeLink: React.FC<{
       onClick={handleClick}
       data-testid={testId}
       title={`${identity?.label ?? endpointId} (${identity?.name ?? endpointId}, ${endpointId})`}
-      style={{ textDecoration: 'none' }}
+      style={{ textDecoration: 'none', display: 'block', maxWidth: '100%' }}
     >
-      <Badge appearance="outline" size="small">
-        {identity?.label ?? endpointId.slice(0, 8)}
+      <Badge appearance="outline" size="small" style={{ maxWidth: '100%', minWidth: 0 }}>
+        <TruncatedText
+          text={identity?.label ?? endpointId.slice(0, 8)}
+          data-testid={`${testId}-label`}
+        />
       </Badge>
     </a>
   );

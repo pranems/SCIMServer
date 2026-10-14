@@ -8,6 +8,13 @@ The operator's post-deployment review found two concrete readability problems an
 
 This backlog records the supplied visual evidence without committing the original screenshots. Each item includes a measurable browser acceptance criterion so a future fix cannot pass on element presence alone.
 
+**Local implementation checkpoint:** UI-01 and UI-02 are implemented with nine
+measured Chromium cases at 1440, 900, and 390 px, including real clipping,
+stable fields, readable mobile columns, and navigation. See
+[readability evidence and RCA](UI_ACTIVITY_ENDPOINT_READABILITY.md).
+These two items are not yet deployed or operator-approved. UI-03 through UI-10
+remain open; the original current-release dispositions below are preserved.
+
 ## Current surface intent
 
 | Surface | Intended job | Why it is not a duplicate |
@@ -59,4 +66,3 @@ Presence-only assertions do not satisfy these checks. Layout claims must use ren
 
 - **Test/gate:** applied to this backlog. Every visual complaint has an outcome-level browser acceptance check, including measured bounds for the two reported layout problems.
 - **Design/architecture:** accepted for intake. No new shared primitive is introduced until at least Discovery plus one additional surface prove the abstraction has two real consumers.
-

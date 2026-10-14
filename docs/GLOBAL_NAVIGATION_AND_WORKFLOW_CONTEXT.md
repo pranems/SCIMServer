@@ -51,6 +51,14 @@ One endpoint control shape is not correct everywhere. The UI uses one identity m
 
 This prevents opaque UUID prefixes from being the primary identity while preserving IDs in API calls, links, copy surfaces, and diagnostics.
 
+The local readability follow-up bounds Operations provenance links inside
+their table columns and retains full identity in the title. At mobile widths,
+each table scrolls within its own panel instead of collapsing the endpoint
+column. Dashboard activity reserves the same six fields on every row, with
+`Server-wide` for requests that do not belong to an endpoint. See
+[measured local evidence](UI_ACTIVITY_ENDPOINT_READABILITY.md); deployed
+verification is still pending.
+
 Navigation does not await route data before rendering the application shell.
 Each destination owns its loading and error states while TanStack Query warms
 or reuses the route cache. A failed background read must remain visibly
