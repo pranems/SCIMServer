@@ -2,7 +2,7 @@
 
 > **Status:** Coordination deployed; legacy-profile correction validated locally, not deployed
 > **Last verified:** 2026-10-14
-> **Product version:** `0.55.47`
+> **Product version:** `0.55.48`
 
 ## Problem
 
@@ -96,6 +96,24 @@ read current discovery/profile state, rebuild the request deliberately, and
 retry. The server does not reinterpret or silently retry a stale candidate.
 
 ## Coverage and evidence
+
+### Release consolidation receipt
+
+The configured Validate-mode pre-push passes all 23 gates, including
+6,035 API units, 2,432 InMemory E2E passes with four PostgreSQL-only
+exclusions, and 1,591 web tests. These whole-suite results supplement, rather
+than replace, the focused PostgreSQL, negative-control, and built-live proof.
+The read-only consolidation review found no significant issues in raw revision
+capture, atomic snapshot forwarding, genuine-edit guards, or existing-endpoint
+cleanup safety.
+
+CI lockfile workflow run `38503638725`, source `d4e368b3`, generated the
+v0.55.48 lockfiles. All 684 API and 395 web dependency entries are unchanged;
+only root release versions differ. Every resolved host remains public npm
+and every integrity value remains SHA-512. No package upgrade, local lock
+regeneration, or quarantine exception occurred. Exact-tip CI, reviewed normal
+merge, immutable publication, complete dev pipeline, and direct legacy-reference
+verification are still pending.
 
 | Boundary | Outcome |
 |---|---|

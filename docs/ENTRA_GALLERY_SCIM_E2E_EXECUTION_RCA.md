@@ -1,6 +1,6 @@
 # Entra Gallery to SCIMServer E2E - Execution Issues and RCA
 
-> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.47`
+> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.48`
 
 ## Purpose and scope
 
@@ -180,3 +180,11 @@ release badge mismatch at the earliest owning pre-push stage.
 **Design disposition: accepted.** Targeted metadata edits preserve historical
 evidence; using the broad local bump script would rewrite history and violate
 CI-only lockfile generation.
+
+The corrected configured Validate-mode push passes all 23 gates: 6,035
+API units, 2,432 InMemory E2E passes with four PostgreSQL-only exclusions,
+and 1,591 web tests. CI run `38503638725` regenerated both release locks
+with zero changed package versions and byte-equivalent dependency-entry maps
+(684 API, 395 web). Public-registry and SHA-512 checks pass. The read-only
+consolidation review found no significant issues. Merge and dev proof remain
+pending; these results do not imply deployment.

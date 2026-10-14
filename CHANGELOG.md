@@ -47,7 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   controls and value-level revision assertions. Design disposition: accepted;
   the existing snapshot and repository seams remain cohesive, and another
   abstraction would be speculative.
-- Release preparation is pending CI-only lockfile regeneration, exact-tip
+- Consolidation Validate-mode pre-push passes all 23 gates: 6,035 API units,
+  2,432 InMemory E2E passes with four PostgreSQL-only exclusions, and 1,591
+  web tests. CI lock regeneration run `38503638725` changes only release-root
+  versions; all 1,079 dependency entries retain their graph and public
+  npm/SHA-512 provenance. Read-only consolidation review found no significant
+  issues.
+- Release preparation is pending exact-tip
   reviewed merge, immutable-image publication, full dev pipeline, and direct
   legacy-reference proof. No production promotion or operator visual sign-off
   is claimed.
