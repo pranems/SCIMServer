@@ -6,7 +6,7 @@
  * response shapes: SCIM resources, list envelopes, error bodies, discovery,
  * and admin write operations.
  *
- * @see .github/prompts/apiContractVerification.prompt.md
+ * @see .github/skills/apicontractverification/SKILL.md
  */
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';

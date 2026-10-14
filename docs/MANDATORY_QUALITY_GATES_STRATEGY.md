@@ -1,10 +1,11 @@
 # Mandatory Quality Gates Strategy
 
 > **Date:** 2026-05-16
+> **Last verified:** 2026-10-14
 > **Status:** Active standing rule (in effect as of commit `cb7fe7b`)
 > **Owner:** Repo maintainers + AI coding assistants
 > **Companions:** [.github/copilot-instructions.md](../.github/copilot-instructions.md) (the operational reference) and [AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md](strategy/AI_EFFICIENT_CHANGE_DELIVERY_PROCESS.md) (change sizing, validation frequency, Git, session, and AI-efficiency process); this doc is the gate deliberation + rationale.
-> **Why this exists:** two real defects (Finding-B inmemory parity gap, Finding-C 121 false Playwright failures) escaped the prior gate suite in May 2026. This doc captures the full deliberation that produced the new 7-stage strategy + 10 new self-improving prompts + Cross-Cutting Security Gate Map + Standing Backlog.
+> **Why this exists:** two real defects (Finding-B inmemory parity gap, Finding-C 121 false Playwright failures) escaped the prior gate suite in May 2026. This doc captures the full deliberation that produced the new 7-stage strategy + 10 new self-improving skills + Cross-Cutting Security Gate Map + Standing Backlog.
 
 ---
 
@@ -14,10 +15,10 @@
 2. [What Was Wrong Before](#2-what-was-wrong-before)
 3. [Design Principles](#3-design-principles)
 4. [The 7-Stage Sequence](#4-the-7-stage-sequence)
-5. [10 New Self-Improving Prompts](#5-10-new-self-improving-prompts)
+5. [10 New Self-Improving Skills](#5-10-new-self-improving-skills)
 6. [Cross-Cutting Security Gate Map](#6-cross-cutting-security-gate-map)
 7. [Stage X: Meta / Strategy Evolution](#7-stage-m-meta--strategy-evolution)
-8. [Hard Constraints on Meta Prompts](#8-hard-constraints-on-meta-prompts)
+8. [Hard Constraints on Meta Skills](#8-hard-constraints-on-meta-skills)
 9. [Standing Backlog](#9-standing-backlog)
 10. [Real Precedents That Drove Each Addition](#10-real-precedents-that-drove-each-addition)
 11. [Risk Register](#11-risk-register)
@@ -36,10 +37,13 @@ This strategy reorganizes gates into a **7-stage sequence** (Stage 0 -> 6 + Stag
 - Each gate has a precedent traceable to a real failure or a documented standard.
 - Cheap gates run first (left-shift bug catch).
 - Security is threaded through every stage and made visible via a dedicated **Cross-Cutting Security Gate Map**.
-- A **Stage X (Meta)** layer formalizes proactive strategy evolution via two periodic prompts: `gateStrategySelfAudit` (internal drift + external standards) and `securityBestPracticesIntake` (10-category security-landscape scan).
+- A **Stage X (Meta)** layer formalizes proactive strategy evolution via two periodic skills: `gateStrategySelfAudit` (internal drift + external standards) and `securityBestPracticesIntake` (10-category security-landscape scan).
 - A **Standing Backlog** captures concrete deferred items (mostly security tools) with cost + value, so they can be promoted in order.
 
-The prompt library grew from 22 to 32 files (+10 new self-improving prompts).
+At strategy adoption, the workflow library grew from 22 to 32 files. After the
+2026-10-14 Copilot harness migration, the repository has 36 project Agent
+Skills: 35 explicit-only workflows plus the auto-discoverable Entra gallery
+E2E skill.
 
 ### 1.1 Execution-frequency overlay (2026-09-16)
 
@@ -96,8 +100,8 @@ The new strategy is built on six principles. Each principle traces to a real pre
 |---|---|---|---|
 | 1 | **Left-shift bug catch** | A bug caught in Stage 1 costs seconds. The same bug caught in Stage 4 costs minutes. The same bug shipped to prod costs days. Gates are ordered cheapest-fastest first. | Finding-B was a 2-second unit-test gap that took ~10 min to surface at the live layer. |
 | 2 | **No gate replaces another** | Static gates don't replace unit tests. Unit tests don't replace E2E. E2E doesn't replace live. Coverage is by layer, not by substitution. | Phase D4 listLogs gap was missed by unit tests AND E2E; only the in-memory live run found it. |
-| 3 | **Self-improvement is mandatory** | Every escape pattern that surfaces gets a new gate. The standing-rules file has a `Gate-Strategy Self-Improvement Loop` section that records every gate's precedent. Stage X.1 formalizes the loop into a periodic prompt. | The 7-stage list itself was triggered by Finding-B + Finding-C. |
-| 4 | **Stage 3 split by SCOPE** | A 9-prompt Stage 3 with no sub-grouping invites skipping. Splitting into 3a (test completeness) -> 3b (cross-cutting impl) -> 3c (hygiene + docs) makes the dependency order obvious and the cost of skipping any sub-stage visible. | The flat list put `securityAudit` next to `auditAndUpdateDocs` - prompts that have nothing in common except being prompts. |
+| 3 | **Self-improvement is mandatory** | Every escape pattern that surfaces gets a new gate. The standing-rules file has a `Gate-Strategy Self-Improvement Loop` section that records every gate's precedent. Stage X.1 formalizes the loop into a periodic skill. | The 7-stage list itself was triggered by Finding-B + Finding-C. |
+| 4 | **Stage 3 split by SCOPE** | A 9-skill Stage 3 with no sub-grouping invites skipping. Splitting into 3a (test completeness) -> 3b (cross-cutting impl) -> 3c (hygiene + docs) makes the dependency order obvious and the cost of skipping any sub-stage visible. | The flat list put `securityAudit` next to `auditAndUpdateDocs` - skills that have nothing in common except being skills. |
 | 5 | **Cost ordering matches risk** | Slow gates (Playwright, Azure deploy) come last so we never pay their cost for code that would fail Stage 1. | Pre-strategy, operators sometimes ran Playwright before Stage 1 and wasted 8 minutes per fail. |
 | 6 | **Baselines ratchet, never raise** | Test counts, lint warning ceiling, web tsc error count, web bundle size - all are ceilings that can only ratchet down (`raise without explicit justification = blocked`). | API lint baseline of 465 warnings has been stable for 3 weeks; bundle gz floor of 153 KB has held since Phase K1. |
 
@@ -157,17 +161,17 @@ flowchart TD
 | **0** | TDD discipline | 4 sub-rules | every commit | n/a (process) | Catches design bugs at zero cost |
 | **1** | Local static | 9 gates | every commit | ~1 min | Tsc/lint catch ~30% of mechanical bugs |
 | **2** | Local tests | 6 gates | every commit | ~5-10 min | Unit/E2E catch ~50% of behavioural bugs; parity audit catches the rest |
-| **3a** | Test completeness | 3 prompts | every feature/fix | ~10 min | Surfaces tests-you-should-have-written |
-| **3b** | Cross-cutting impl | 6 prompts | every feature/fix | ~10-15 min | Surfaces logging/RFC/security/perf gaps |
-| **3c** | Code hygiene + docs | 2 prompts | every feature/fix | ~5 min | Prevents god-class growth + doc rot |
+| **3a** | Test completeness | 3 skills | every feature/fix | ~10 min | Surfaces tests-you-should-have-written |
+| **3b** | Cross-cutting impl | 6 skills | every feature/fix | ~10-15 min | Surfaces logging/RFC/security/perf gaps |
+| **3c** | Code hygiene + docs | 2 skills | every feature/fix | ~5 min | Prevents god-class growth + doc rot |
 | **4** | Multi-mode deploy | 4 gates | every sub-phase ship | ~15-20 min | Catches deploy-shape bugs; last line before user impact |
 | **5** | UI-specific | 4 gates | when web/ touched | ~10 min | Locks Playwright/a11y/visual + spec hygiene |
 | **6** | Commit hygiene + release | 5 gates | every commit ready to push | ~2 min | Closes the loop; locks audit trail |
-| **M** | Meta / strategy evolution | 2 prompts | release / monthly / on-demand / incident | 30-60 min/run | Compounds across multiple commits |
+| **M** | Meta / strategy evolution | 2 skills | release / monthly / on-demand / incident | 30-60 min/run | Compounds across multiple commits |
 
 ---
 
-## 5. 10 New Self-Improving Prompts
+## 5. 10 New Self-Improving Skills
 
 ```mermaid
 graph LR
@@ -205,20 +209,20 @@ graph LR
     style P10 fill:#ffe1ff
 ```
 
-### Prompt-by-prompt purpose
+### Skill-by-skill purpose
 
-| # | Prompt | Stage | Bug class prevented | Real precedent that motivated it |
+| # | Skill | Stage | Bug class prevented | Real precedent that motivated it |
 |---|---|---|---|---|
-| 1 | [`lintAndStaticAnalysis`](../.github/prompts/lintAndStaticAnalysis.prompt.md) | 1.1 | Inconsistent static enforcement; secret/em-dash/console.log leakage | Operationalizes 6 inline Stage-1 gates that were previously documented but not consistently run |
-| 2 | [`bundleBudgetAudit`](../.github/prompts/bundleBudgetAudit.prompt.md) | 1.8 | "Lazy route ships unbounded" - new TanStack route with no size-limit entry | Phase K1/L1/M1 manually-added budgets - workflow was tribal knowledge until v0.52.x |
-| 3 | [`prismaMigrationAudit`](../.github/prompts/prismaMigrationAudit.prompt.md) | 1.9 | "Schema edited but migration not generated" CD blocker | Cross-cutting concern; CD-class risk on every `api/prisma/` touch |
-| 4 | [`crossBackendParityAudit`](../.github/prompts/crossBackendParityAudit.prompt.md) | 2.5 | InMemory vs Prisma divergence | Finding-B (2026-05-16) + Phase D4 (2026-05-08) listLogs |
-| 5 | [`endpointConfigFlagAudit`](../.github/prompts/endpointConfigFlagAudit.prompt.md) | 3b.3 | "Added a flag but forgot doc / UI Switch / live test" | Codebase-specific 14-flag architecture; 10-cell completeness matrix |
-| 6 | [`dependencyCveSweep`](../.github/prompts/dependencyCveSweep.prompt.md) | 3b.5 | Critical/High CVE in transitive deps | Continuous CVE DB updates need cadence-based scan separate from per-commit `securityAudit` |
-| 7 | [`codeReviewSelfAudit`](../.github/prompts/codeReviewSelfAudit.prompt.md) | 3c.1 | God-class growth, helper-bloat, naming drift | May 2026 Design Deep Analysis: SchemaValidator 1,467 lines + service-helpers 1,230 lines |
-| 8 | [`playwrightSpecHygieneAudit`](../.github/prompts/playwrightSpecHygieneAudit.prompt.md) | 5.2 | Stale specs vs deleted UI inflating failure noise | Finding-C (2026-05-16): 121 false fails for 7 weeks |
-| 9 | [`gateStrategySelfAudit`](../.github/prompts/gateStrategySelfAudit.prompt.md) | X.1 | Drift in baselines/prompts/coverage/docs; missed RFC errata; recurring escape patterns | Meta - formalizes the previously-ad-hoc self-improvement loop |
-| 10 | [`securityBestPracticesIntake`](../.github/prompts/securityBestPracticesIntake.prompt.md) | X.2 | Missed security-landscape changes (OAuth 2.1, SLSA, npm provenance, OWASP LLM Top 10) | xz-utils precedent + OAuth 2.0 BCP (RFC 9700) shipped Apr 2025; no existing prompt would have intaken either |
+| 1 | [`lintAndStaticAnalysis`](../.github/skills/lintandstaticanalysis/SKILL.md) | 1.1 | Inconsistent static enforcement; secret/em-dash/console.log leakage | Operationalizes 6 inline Stage-1 gates that were previously documented but not consistently run |
+| 2 | [`bundleBudgetAudit`](../.github/skills/bundlebudgetaudit/SKILL.md) | 1.8 | "Lazy route ships unbounded" - new TanStack route with no size-limit entry | Phase K1/L1/M1 manually-added budgets - workflow was tribal knowledge until v0.52.x |
+| 3 | [`prismaMigrationAudit`](../.github/skills/prismamigrationaudit/SKILL.md) | 1.9 | "Schema edited but migration not generated" CD blocker | Cross-cutting concern; CD-class risk on every `api/prisma/` touch |
+| 4 | [`crossBackendParityAudit`](../.github/skills/crossbackendparityaudit/SKILL.md) | 2.5 | InMemory vs Prisma divergence | Finding-B (2026-05-16) + Phase D4 (2026-05-08) listLogs |
+| 5 | [`endpointConfigFlagAudit`](../.github/skills/endpointconfigflagaudit/SKILL.md) | 3b.3 | "Added a flag but forgot doc / UI Switch / live test" | Codebase-specific 14-flag architecture; 10-cell completeness matrix |
+| 6 | [`dependencyCveSweep`](../.github/skills/dependencycvesweep/SKILL.md) | 3b.5 | Critical/High CVE in transitive deps | Continuous CVE DB updates need cadence-based scan separate from per-commit `securityAudit` |
+| 7 | [`codeReviewSelfAudit`](../.github/skills/codereviewselfaudit/SKILL.md) | 3c.1 | God-class growth, helper-bloat, naming drift | May 2026 Design Deep Analysis: SchemaValidator 1,467 lines + service-helpers 1,230 lines |
+| 8 | [`playwrightSpecHygieneAudit`](../.github/skills/playwrightspechygieneaudit/SKILL.md) | 5.2 | Stale specs vs deleted UI inflating failure noise | Finding-C (2026-05-16): 121 false fails for 7 weeks |
+| 9 | [`gateStrategySelfAudit`](../.github/skills/gatestrategyselfaudit/SKILL.md) | X.1 | Drift in baselines/skills/coverage/docs; missed RFC errata; recurring escape patterns | Meta - formalizes the previously-ad-hoc self-improvement loop |
+| 10 | [`securityBestPracticesIntake`](../.github/skills/securitybestpracticesintake/SKILL.md) | X.2 | Missed security-landscape changes (OAuth 2.1, SLSA, npm provenance, OWASP LLM Top 10) | xz-utils precedent + OAuth 2.0 BCP (RFC 9700) shipped Apr 2025; no existing skill would have intaken either |
 
 ---
 
@@ -319,23 +323,23 @@ If security intake stayed as one of four sub-sections inside `gateStrategySelfAu
 7. Web/UI security (CSP, HSTS, COOP/COEP, Trusted Types)
 8. Privacy/PII (GDPR, CCPA, PIPL)
 9. Cloud-specific (Azure Security Baselines, Managed Identity, WAF)
-10. AI/LLM-specific (OWASP LLM Top 10, prompt injection, model supply chain)
+10. AI/LLM-specific (OWASP LLM Top 10, skill injection, model supply chain)
 
 Findings tagged `[LLM]` have different action paths from traditional security findings.
 
 ---
 
-## 8. Hard Constraints on Meta Prompts
+## 8. Hard Constraints on Meta Skills
 
-Both X.1 and X.2 enforce six constraints. These exist to prevent the LLM-running-the-prompt from inventing advisories or proposing prompt-library bloat.
+Both X.1 and X.2 enforce six constraints. These exist to prevent the LLM-running-the-skill from inventing advisories or proposing skill-library bloat.
 
 | # | Constraint | What it prevents |
 |---|---|---|
 | 1 | **URL citation MANDATORY for every external claim.** No URL = tagged `"SPECULATIVE - verify before action"`. | LLM hallucinating CVEs / RFCs / advisories that don't exist. The strongest anti-hallucination defense. |
 | 2 | **Confidence level mandatory.** `Critical / High / Medium / Speculative` for X.2; `High / Medium / Speculative` for X.1. | Bare assertions that look authoritative but aren't. |
 | 3 | **Owner action mandatory per finding.** | "This seems off" findings that no human knows what to do with. |
-| 4 | **2-escape threshold for new prompts.** A new prompt is only proposed when >=2 historical bug-escape patterns match it. Single-escape patterns extend an existing prompt. | Prompt-library bloat. |
-| 5 | **30-day no-fire evidence for retirement.** A silent prompt may be having deterrent effect; we don't retire on first absence. | Premature deletion of gates that are doing prophylactic work. |
+| 4 | **2-escape threshold for new skills.** A new skill is only proposed when >=2 historical bug-escape patterns match it. Single-escape patterns extend an existing skill. | Skill-library bloat. |
+| 5 | **30-day no-fire evidence for retirement.** A silent skill may be having deterrent effect; we don't retire on first absence. | Premature deletion of gates that are doing prophylactic work. |
 | 6 | **Baseline ratchets require measured snapshot.** "Tighten the warning ceiling from 465 to 442" requires today's `npm run lint` output AND 442 must be supported by the measurement. | Aspirational ratchets that immediately get bypassed. |
 
 Plus two X.2-specific:
@@ -353,8 +357,8 @@ Items recorded with cost + value but NOT yet promoted to active gates. Each can 
 
 | Item | Notes | Estimated cost |
 |---|---|---|
-| `backwardCompatAudit` prompt | "Does this change break a previously-published contract?" Partially covered by `apiContractVerification`. Specialize after next public-contract-breaking incident. | 1 day to scope |
-| CI-time runner for Stage X.1 + X.2 | Both prompts are operator-invoked today. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar). | 1-2 days |
+| `backwardCompatAudit` skill | "Does this change break a previously-published contract?" Partially covered by `apiContractVerification`. Specialize after next public-contract-breaking incident. | 1 day to scope |
+| CI-time runner for Stage X.1 + X.2 | Both skills are operator-invoked today. A scheduled GitHub Actions runner on the 1st of each month would automate Trigger B (calendar). | 1-2 days |
 | Auto-creation of `docs/strategy/*_<date>.md` | X.1 and X.2 outputs are structured Markdown; a small script could open a PR with the report attached. | 0.5 day |
 
 ### Security tool gates (surfaced by X.2 / `securityBestPracticesIntake`)
@@ -382,15 +386,15 @@ The Gate-Strategy Self-Improvement Loop section in `copilot-instructions.md` rec
 | Standing rule | Precedent | What it costs to NOT have | What it costs to have |
 |---|---|---|---|
 | **Schema-Characteristic Test Rule** | May 2026 Group.displayName uniqueness flip from `none` to `server` (Phase L5 RFC sweep) - every test that asserted `expect(attr.uniqueness).toBe('none')` red-failed even though the schema change was correct | Tests churn on every legitimate schema tightening; silent regressions when schema relaxes | Test pattern `expectCharacteristicIn(attr, key, VALID_KEYWORD)` + `Get-EffectiveUniqueness` PS helper; modest one-time refactor cost |
-| **Stage 2.5 + 2.6 cross-backend parity** | Finding-B (May 2026) + Phase D4 (May 2026) listLogs | Inmemory developer-experience path silently broken; one bug class per quarter | `crossBackendParityAudit` prompt + `test-all-modes.ps1` orchestrator; ~30s per commit to walk the matrix |
-| **Stage 5.2 Playwright spec hygiene** | Finding-C (May 2026): 121 false fails for 7 weeks | Operators distrust the signal; real regressions hide in noise; -67% confidence in UI testing | `playwrightSpecHygieneAudit` prompt; ~1 min static audit per commit that touches `web/` |
-| **Stage 1.8 bundleBudgetAudit** | Phase K1/L1/M1 manual budget-add discipline that worked until it didn't (caught only by code review) | New route ships unbounded; bundle bloat undetected until next size measurement | `bundleBudgetAudit` prompt; ~10s per route added |
-| **Stage 1.9 prismaMigrationAudit** | Cross-cutting CD concern; classic "schema edited but no migration generated" 500s in fresh-DB deploys | Dev/prod deploys 500 on first request after schema change | `prismaMigrationAudit` prompt; ~5s per `api/prisma/` touch |
-| **Stage 3b.3 endpointConfigFlagAudit** | 14-flag ProfileSettings architecture; the "added a flag but forgot the UI Switch / live test / doc" pattern | New flag ships incomplete; users can't actually use it | `endpointConfigFlagAudit` prompt with 10-cell completeness matrix per flag |
+| **Stage 2.5 + 2.6 cross-backend parity** | Finding-B (May 2026) + Phase D4 (May 2026) listLogs | Inmemory developer-experience path silently broken; one bug class per quarter | `crossBackendParityAudit` skill + `test-all-modes.ps1` orchestrator; ~30s per commit to walk the matrix |
+| **Stage 5.2 Playwright spec hygiene** | Finding-C (May 2026): 121 false fails for 7 weeks | Operators distrust the signal; real regressions hide in noise; -67% confidence in UI testing | `playwrightSpecHygieneAudit` skill; ~1 min static audit per commit that touches `web/` |
+| **Stage 1.8 bundleBudgetAudit** | Phase K1/L1/M1 manual budget-add discipline that worked until it didn't (caught only by code review) | New route ships unbounded; bundle bloat undetected until next size measurement | `bundleBudgetAudit` skill; ~10s per route added |
+| **Stage 1.9 prismaMigrationAudit** | Cross-cutting CD concern; classic "schema edited but no migration generated" 500s in fresh-DB deploys | Dev/prod deploys 500 on first request after schema change | `prismaMigrationAudit` skill; ~5s per `api/prisma/` touch |
+| **Stage 3b.3 endpointConfigFlagAudit** | 14-flag ProfileSettings architecture; the "added a flag but forgot the UI Switch / live test / doc" pattern | New flag ships incomplete; users can't actually use it | `endpointConfigFlagAudit` skill with 10-cell completeness matrix per flag |
 | **Stage 3b.5 dependencyCveSweep** | CVE freshness discipline separate from feature-driven `securityAudit` (continuous DB updates) | Transitive CVEs lurk for weeks/months | `dependencyCveSweep`; ~30s per package.json change + weekly schedule |
-| **Stage 3c.1 codeReviewSelfAudit** | May 2026 Design Deep Analysis: SchemaValidator god class 1,467 lines + service-helpers Swiss army 1,230 lines | God-class growth compounds; refactor cost grows quadratically | `codeReviewSelfAudit` prompt scoped to CHANGED files only; suggestions not blocks |
-| **Stage X.1 gateStrategySelfAudit** | May 2026 meta-audit need; the standing rules said "update this section after a bug escapes" but had no formal engine for proactive review | Reactive-only loop; every new escape pattern costs ~10 min real-time detection + the underlying bug | X.1 prompt; 20-60 min per run on cadence triggers |
-| **Stage X.2 securityBestPracticesIntake** | May 2026 security-intake gap; external advisories (xz-utils Mar 2024, OAuth BCP RFC 9700 Apr 2025, OWASP LLM Top 10 2024) had no intake mechanism | Missed mitigations for known-attack-classes; potential supply-chain / auth-bypass / RCE | X.2 prompt; 30-90 min per run on cadence triggers; URL-citation + tool-deferred discipline |
+| **Stage 3c.1 codeReviewSelfAudit** | May 2026 Design Deep Analysis: SchemaValidator god class 1,467 lines + service-helpers Swiss army 1,230 lines | God-class growth compounds; refactor cost grows quadratically | `codeReviewSelfAudit` skill scoped to CHANGED files only; suggestions not blocks |
+| **Stage X.1 gateStrategySelfAudit** | May 2026 meta-audit need; the standing rules said "update this section after a bug escapes" but had no formal engine for proactive review | Reactive-only loop; every new escape pattern costs ~10 min real-time detection + the underlying bug | X.1 skill; 20-60 min per run on cadence triggers |
+| **Stage X.2 securityBestPracticesIntake** | May 2026 security-intake gap; external advisories (xz-utils Mar 2024, OAuth BCP RFC 9700 Apr 2025, OWASP LLM Top 10 2024) had no intake mechanism | Missed mitigations for known-attack-classes; potential supply-chain / auth-bypass / RCE | X.2 skill; 30-90 min per run on cadence triggers; URL-citation + tool-deferred discipline |
 
 ---
 
@@ -400,12 +404,12 @@ Risks introduced by the new strategy itself (not by the bugs it prevents):
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Strategy over-engineering** - 7 stages + 32 prompts looks complex; smaller projects may copy-paste then drop most of it | Medium | Medium | Each stage explicitly has its own trigger condition (e.g. Stage 5 only when `web/` touched). The cost-vs-value table at Section 4 makes the per-stage budget visible. |
-| **Prompt-library bloat** | Medium | Low | 2-escape threshold for new prompts (Section 8); 30-day retirement evidence rule. X.1 specifically reports on prompt-rot. |
+| **Strategy over-engineering** - 7 stages + 36 skills looks complex; smaller projects may copy-paste then drop most of it | Medium | Medium | Each stage explicitly has its own trigger condition (e.g. Stage 5 only when `web/` touched). The cost-vs-value table at Section 4 makes the per-stage budget visible. |
+| **Skill-library bloat** | Medium | Low | 2-escape threshold for new skills (Section 8); 30-day retirement evidence rule. X.1 specifically reports on skill-rot. |
 | **LLM hallucinating security advisories in X.2** | High (without mitigation) | Critical | URL-citation requirement + `SPECULATIVE` tag (Section 8 Constraint 1). |
-| **Operators skipping Stage 3 when prompted** | Medium | High | Stage 3 split into 3a/3b/3c by SCOPE means each sub-stage is a meaningful unit. Per-commit gate sequence is explicit in standing rules. |
+| **Operators skipping Stage 3 when the skills are presented** | Medium | High | Stage 3 split into 3a/3b/3c by SCOPE means each sub-stage is a meaningful unit. Per-commit gate sequence is explicit in standing rules. |
 | **Baseline ratchets becoming aspirational, then bypassed** | Medium | Medium | Constraint 6: ratchet requires measured snapshot. Today's baselines are written in the standing rules with measurement date. |
-| **Meta prompts triggering churn on every run** | Low | Medium | X.1/X.2 produce structured reports; operator reviews and accepts deltas. Reports go under `docs/strategy/` for review trail. |
+| **Meta skills triggering churn on every run** | Low | Medium | X.1/X.2 produce structured reports; operator reviews and accepts deltas. Reports go under `docs/strategy/` for review trail. |
 | **CI-runner debt** - X.1/X.2 are operator-invoked today; Trigger B (calendar) not actually triggered | Medium | Medium | Documented in Standing Backlog; first X.2 run will recommend the GHA workflow. |
 | **Cross-Cutting Security Gate Map drift** | Low | Medium | Map must be updated in the same commit when any DEFERRED item is promoted to active gate (explicit rule in standing rules). |
 
@@ -432,16 +436,16 @@ gantt
     GHA action SHA pinning sweep :sb_2, after m2_2, 7d
     Cosign image signing :sb_3, after m2_4, 7d
     SAST gate (semgrep) :sb_4, after m2_4, 14d
-    section Prompt library
-    backwardCompatAudit (after first contract-break incident) :prompt_1, 2026-09-01, 14d
-    CI-time X.1/X.2 runner :prompt_2, 2026-09-15, 7d
+    section Skill library
+    backwardCompatAudit (after first contract-break incident) :skill_1, 2026-09-01, 14d
+    CI-time X.1/X.2 runner :skill_2, 2026-09-15, 7d
 ```
 
 The expectation is that 6-12 months from now:
 
 - The Standing Backlog will have shrunk by ~5-8 items (the high-ROI security tools promoted).
-- Two or three new prompts will be in the library, each with documented 2-escape precedents.
-- One or two prompts will be retired (30-day no-fire evidence accumulated).
+- Two or three new skills will be in the library, each with documented 2-escape precedents.
+- One or two skills will be retired (30-day no-fire evidence accumulated).
 - Baselines will have ratcheted down 3-5% on average (lint warnings, web tsc, coverage thresholds).
 - The Cross-Cutting Security Gate Map will have fewer DEFERRED rows.
 
@@ -463,7 +467,7 @@ If after 12 months none of this happens, the strategy itself is the bug - run X.
 8. Stage 5 - if web touched, `playwrightSpecHygieneAudit` then Playwright vs dev. 10 min.
 9. Stage 6 - version bump, CHANGELOG, Session_starter, `generateCommitMessage`. 2 min.
 
-Total: 1-1.5 hours per feature commit. Most of the audit prompts produce empty findings on small changes - that's fine; the cost is bounded.
+Total: 1-1.5 hours per feature commit. Most of the audit skills produce empty findings on small changes - that's fine; the cost is bounded.
 
 ### For a defect fix commit
 
@@ -491,7 +495,7 @@ NEVER per-commit. Cost too high; signal too noisy at that frequency.
 ## See also
 
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md) - the operational standing-rules file (Mandatory Quality Gates section + Cross-Cutting Security Gate Map + Standing Backlog + Gate-Strategy Self-Improvement Loop).
-- [.github/prompts/](../.github/prompts/) - the 32 prompt files (10 new in this strategy revision).
+- [.github/skills/](../.github/skills/) - the 36 project Agent Skills used by the Copilot harness and compatible agents.
 - [DELIVERY_PLAN.md](DELIVERY_PLAN.md) - companion 6-week delivery plan that uses these gates.
 - [DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md](DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md) - the May 2026 design audit whose findings motivated `codeReviewSelfAudit`.
 - [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) - companion quality audit that motivated `logging-verification` and `error-handling-verification`.

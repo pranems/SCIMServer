@@ -98,17 +98,17 @@ Full 10-ISV matrix + per-pattern detail: [ISV sections 2-4](ISV_AUTH_PATTERNS_AN
 
 ---
 
-## SyncFabric interoperability artifacts (mirrored, not authored here)
+## SyncFabric interoperability artifacts
 
-Three files in this folder are **mirrors** of artifacts owned outside the repository. They are vendored
-so the design travels with the code, and they must be refreshed from their canonical source rather than
-edited here. Editing a mirror in place creates two drifting definitions.
+The architecture guide remains a mirror of an externally owned artifact. The workflow and durable
+memory now live in one committed project Agent Skill so every skills-compatible Copilot surface uses
+the same repository-owned source of truth.
 
-| Mirror in this folder | Canonical source | What it is |
+| Artifact | Canonical source | What it is |
 |---|---|---|
 | [SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md](SCIMSERVER_SYNCFABRIC_WIF_ARCHITECTURE_AND_IMPLEMENTATION_GUIDE.md) | `OneDrive - Microsoft\Documents\SCIMServer\auth\` | The cross-repository architecture and implementation guide for SyncFabric-to-SCIMServer workload identity federation. **SCIMServer implements from it**: roughly 100 references across 37 source files cite its wave and section labels (`W2.2`, `W3.4`, `W3.7`, `WI-11`..`WI-17`). Section 9.8 is the implementation status ledger; section 3.4.6 is the documentation-drift ledger this README's own corrections came from. |
-| [syncfabricScimserverAuthEvolution.prompt.md](syncfabricScimserverAuthEvolution.prompt.md) | `%APPDATA%\Code\User\prompts\` | The self-improving workflow that regenerates the guide from current source in both repositories. |
-| [syncfabricScimserverAuthEvolution.memory.md](syncfabricScimserverAuthEvolution.memory.md) | `%APPDATA%\Code\User\prompts\.memory\` | That workflow's persistent memory: verified invariants, superseded conclusions, and open empirical gates. |
+| [`syncfabric-scimserver-auth-evolution` skill](../../.github/skills/syncfabric-scimserver-auth-evolution/SKILL.md) | This repository | The self-improving workflow that regenerates the guide from current source in both repositories. Invoke it as `/syncfabric-scimserver-auth-evolution`. |
+| [Skill memory](../../.github/skills/syncfabric-scimserver-auth-evolution/references/memory.md) | This repository | That workflow's persistent memory: verified invariants, superseded conclusions, and open empirical gates. |
 
 > **Do not trust a `(1)` or `(2)` filename suffix on any copy of the guide.** Those are browser-download
 > artifacts and do not indicate recency; the highest-numbered copy has historically been the **oldest**.

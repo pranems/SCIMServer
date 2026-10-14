@@ -60,12 +60,18 @@ if ($parseErrors.Count -gt 0) {
     $parseErrors | ForEach-Object { Write-Host "      $_" }
 }
 
-# 3. Script declares all 4 documented switches / params.
+# 3. Script declares all 4 documented switches / params and preserves
+#    aliases for callers that still use the pre-skill parameter names.
 $content = Get-Content $orchestrator -Raw
-Invoke-Assert -Description 'declares [switch]$SkipPrompts' -Condition ($content -match '\[switch\]\$SkipPrompts')
+Invoke-Assert -Description 'declares [switch]$SkipSkills' -Condition ($content -match '\[switch\]\$SkipSkills')
 Invoke-Assert -Description 'declares [int]$Stage'           -Condition ($content -match '\[(int|Nullable\[int\])\]\$Stage')
 Invoke-Assert -Description 'declares [switch]$DryRun'       -Condition ($content -match '\[switch\]\$DryRun')
-Invoke-Assert -Description 'declares [switch]$NoPrompt'     -Condition ($content -match '\[switch\]\$NoPrompt')
+Invoke-Assert -Description 'declares [switch]$NoSkillAcknowledgement' `
+    -Condition ($content -match '\[switch\]\$NoSkillAcknowledgement')
+Invoke-Assert -Description 'preserves -SkipPrompts compatibility alias' `
+    -Condition ($content -match "\[Alias\('SkipPrompts'\)\]")
+Invoke-Assert -Description 'preserves -NoPrompt compatibility alias' `
+    -Condition ($content -match "\[Alias\('NoPrompt'\)\]")
 
 # 4. Script registers all 7 documented stage labels (Stage 0 -> 6;
 #    Stage X is META and intentionally NOT walked by the orchestrator).
@@ -100,9 +106,9 @@ foreach ($gate in @(
     Invoke-Assert -Description "registry references '$gate'" -Condition ($content.ToLower().Contains($gate.ToLower()))
 }
 
-# 6. Script registers the canonical AI prompt gates from
-#    .github/prompts/ that the strategy says must run per commit.
-foreach ($prompt in @(
+# 6. Script registers the canonical Agent Skill gates from
+#    .github/skills/ that the strategy says must run per commit.
+foreach ($skill in @(
     'lintAndStaticAnalysis',
     'bundleBudgetAudit',
     'prismaMigrationAudit',
@@ -116,8 +122,12 @@ foreach ($prompt in @(
     'auditAndUpdateDocs',
     'playwrightSpecHygieneAudit'
 )) {
-    Invoke-Assert -Description "registry references prompt '$prompt'" -Condition ($content.Contains($prompt))
+    Invoke-Assert -Description "registry references skill '$skill'" -Condition ($content.Contains($skill))
 }
+Invoke-Assert -Description 'registry uses SkillPath entries' -Condition ($content -match '\bSkillPath\s*=')
+Invoke-Assert -Description 'registry has no PromptPath entries' -Condition ($content -notmatch '\bPromptPath\s*=')
+Invoke-Assert -Description 'skill gates print their slash invocation' `
+    -Condition ($content -match 'invoke:\s*/\$skillName')
 
 # 7. Script declares the documented exit-code contract.
 Invoke-Assert -Description 'exits 0 when all gates pass'      -Condition ($content -match 'exit\s+0')
@@ -146,10 +156,10 @@ Invoke-Assert -Description 'auto-skip-no-op for prismaMigrationAudit referenced'
 Invoke-Assert -Description 'auto-skip-no-op for crossBackendParityAudit referenced' `
     -Condition ($content -match 'isInMemoryBackend' -and $content -match 'crossBackendParityAudit')
 
-# 13. Script pauses for explicit ack on prompt gates unless -NoPrompt
-#     is set (Section D.1 "smoke-screen" mitigation).
-Invoke-Assert -Description 'NoPrompt skips operator pause' `
-    -Condition ($content -match '\$NoPrompt' -and ($content -match 'Read-Host' -or $content -match 'ReadKey'))
+# 13. Script pauses for explicit acknowledgement on skill gates unless
+#     -NoSkillAcknowledgement is set (Section D.1 "smoke-screen" mitigation).
+Invoke-Assert -Description 'NoSkillAcknowledgement skips operator pause' `
+    -Condition ($content -match '\$NoSkillAcknowledgement' -and ($content -match 'Read-Host' -or $content -match 'ReadKey'))
 
 # 14. Script results section uses pass/fail/skipped/partial vocabulary.
 foreach ($status in @('PASS', 'FAIL', 'SKIPPED', 'PARTIAL')) {

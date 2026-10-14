@@ -36,7 +36,7 @@
 > **Revision identity warning (extended at revision 5).** Copies of this guide exist in several
 > locations, and **neither filename suffix nor location indicates recency.** Verify by the revision
 > number in this header. A file cannot state its own hash, so the authoritative hash for each revision
-> is recorded in the run log of `syncfabricScimserverAuthEvolution.memory.md`.
+> is recorded in the run log of `.github/skills/syncfabric-scimserver-auth-evolution/references/memory.md`.
 >
 > | Location | Revision | Lines | Identity |
 > |---|---|---:|---|
@@ -6464,7 +6464,7 @@ Performed against the finished file:
 - Secret scan: every JWT-shaped string decoded and confirmed to be a placeholder.
 
 Results and the on-disk SHA-256 for this revision are recorded in the run log of
-`syncfabricScimserverAuthEvolution.memory.md`. A file cannot state its own hash.
+`.github/skills/syncfabric-scimserver-auth-evolution/references/memory.md`. A file cannot state its own hash.
 
 ### 37.9 Post-publication correction, same day
 

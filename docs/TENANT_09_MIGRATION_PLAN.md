@@ -368,7 +368,7 @@ Classification:
 | Group | Files | Nature |
 |---|---|---|
 | Repository instructions | [.github/copilot-instructions.md](../.github/copilot-instructions.md) lines 260, 445, 527, 636-680 | Deployment topology tables and the Stage 4.4 / Stage 5.3 gate commands |
-| Prompt files | `.github/prompts/deployAndPromote.prompt.md`, `.github/prompts/devDeploymentPipeline.prompt.md` | Estate tables and copy-paste commands |
+| Agent Skills | `.github/skills/deployandpromote/SKILL.md`, `.github/skills/devdeploymentpipeline/SKILL.md` | Estate tables and copy-paste commands |
 | Canonical infra doc | [docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) | Every measured fact in section 3 above appears here and must be re-measured |
 | Auth docs | [docs/AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md), [docs/auth/WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md](auth/WIF_END_TO_END_PROOF_AND_AUTH_METHOD_REFERENCE.md), [docs/auth/AUTH_ERROR_DIAGNOSTICS_AND_OBSERVABILITY.md](auth/AUTH_ERROR_DIAGNOSTICS_AND_OBSERVABILITY.md), [docs/perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md](perf/WIF_TOKEN_MINT_LATENCY_ANALYSIS.md) | Real tenant-08 GUIDs inside sample issuers, JWKS URIs, and decoded token claims |
 | Operator guides | [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md), [docs/UI_GUIDE.md](UI_GUIDE.md), [docs/ENDPOINT_CREATION_WIKI.md](ENDPOINT_CREATION_WIKI.md), [docs/ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md), [docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md](PATCH_OPERATIONS_COMPLETE_GUIDE.md), [docs/OBSERVABILITY_TRACEABILITY_AND_DIAGNOSTICS.md](OBSERVABILITY_TRACEABILITY_AND_DIAGNOSTICS.md), [docs/SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md](SCHEMA_ATTRIBUTE_CUSTOMIZATION_GUIDE.md) | Example `Host:` headers and base URLs |
@@ -941,7 +941,7 @@ The only irreversible-feeling step, and it is still just text.
 | P7.1 | Request and receive the agreed short freeze from the other sessions |
 | P7.2 | Final delta carry, then re-run P6 validation |
 | P7.3 | Flip defaults: `dev-deployment-pipeline.ps1`, `run-all-gates.ps1`, `wif-e2e-proof.ps1`, `capture-*.ps1`, `migrate-old-prod.ps1` |
-| P7.4 | Flip prose: `.github/copilot-instructions.md`, both prompt files, and every doc in [5.2](#52-cosmetic-items-prose-comments-examples) except the historical records |
+| P7.4 | Flip prose: `.github/copilot-instructions.md`, `.github/skills/deployandpromote/SKILL.md`, `.github/skills/devdeploymentpipeline/SKILL.md`, and every doc in [5.2](#52-cosmetic-items-prose-comments-examples) except the historical records |
 | P7.5 | Re-measure and rewrite [docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md) against tenant 09, bump `Last verified` |
 | P7.6 | Add `proudbush-ae90986e` to the C10 `RETIRED` list in [scripts/audit-doc-content.mjs](../scripts/audit-doc-content.mjs), and mark the historical mentions as retired |
 | P7.7 | Remove the tenant-08 URLs from the C4 estate list |
