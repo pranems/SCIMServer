@@ -104,6 +104,37 @@ dependency edge, endpoint identity model, or speculative abstraction is needed.
 
 ## Remaining release boundaries
 
+### Consolidation checks and issue receipts
+
+- Post-runtime-merge affected Vitest: 2 suites / 25 passed in 231.41 seconds.
+  The editor test tool found no registered tests in this separate worktree;
+  the existing Vitest CLI supplied the actual result. Changed production and
+  browser-spec editor diagnostics are empty.
+- Bounded read-only PR diff review found no significant correctness issues.
+  The reviewer accepted the design and the outcome-level browser assertions;
+  it did not claim to execute tests or review unrelated runtime work.
+- The first release Validate push was correctly blocked: 6,034 API unit
+  tests passed and one asynchronous source-scan test exceeded its unchanged
+  30-second timeout. No forbidden-pattern assertion failed. All earlier gates
+  passed, including actual strict light/dark Mermaid rendering in 223.1 seconds.
+  E2E and later Validate gates did not execute, so this is not a green push.
+
+| ID | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest detection |
+|---|---|---|---|---|
+| UR-10 | Tool registration / Low | Editor runner reported no tests for the isolated worktree's two existing Vitest files. | Use the existing workspace Vitest CLI, which executed 25/25; no new test framework or dependency installation. | Targeted test discovery / targeted test discovery |
+| UR-11 | Harness timing / Medium | One sequential source scan exceeded 30 seconds under the full unit run. The failure is a time budget, not a forbidden-pattern match; the exact source passes all six checks in 2.039 seconds when run alone. The underlying host I/O contention mechanism is not proven. | Focused retry confirms unchanged assertions with the unchanged timeout. Retry the owning normal push instead of increasing timeouts or bypassing the gate. Full-hook convergence remains required. | Owning unit hook / owning unit hook |
+
+UR-11 prevention disposition: accepted for this bounded release with retained
+failure and focused retry receipts. Do not overlap discretionary local browser
+processes with the retry. Broader host I/O diagnosis and gate redesign would be
+speculative and outside this presentation-only rollback unit.
+Receipts are `test-results/ui-readability-release-prepush-1.log`,
+`test-results/ui-readability-postmerge-vitest.log`, and
+`test-results/ui-readability-source-scan-retry.log` in the assigned worktree.
+These consolidation entries are reconciled against every tool result in this
+fresh consolidation conversation; the earlier 45,085-event implementation
+reconciliation remains historical, not a claim about this conversation.
+
 Normal merge `c90602dd` incorporates runtime master `99cdeda3` and retains
 both original UI commits. The only conflict was current session ownership
 context; both runtime and UI handoffs were retained with their actual states.
