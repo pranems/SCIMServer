@@ -2,16 +2,40 @@
 
 **Last verified:** 2026-10-14
 
-**Active consolidation:** v0.55.48 metadata is being prepared on
-`fix/persisted-profile-revision-20261013` in the isolated release worktree.
-PR #215 contains durable runtime and permanent live-test commits
-`46bca59a` and `897693ea`. CI-only lockfile regeneration, exact-tip reviewed
-merge, the full merged-master dev pipeline, and existing legacy-reference
-verification remain pending. Prior-release browser and gallery receipts are
-not substitutes for this release's deployment matrix. The original dirty
-analysis worktree and the shared PostgreSQL container must remain untouched.
-No customer-prod promotion is authorized. Custom gallery mappings, UI
-readability, and operator visual sign-off remain separate parent work.
+**UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
+separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
+pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor
+with panel-owned scrolling; endpoint labels measure 193/85/68 px and rows
+remain 61 px high. JSON geometry receipts are file-backed and retained.
+Commit `e2758b04` is pushed through the normal Fast hook. API InMemory E2E
+passed 2,429 cases with four PostgreSQL-only skips. Final-source web build and
+size budgets pass. A misleading Mermaid hook PASS was actually a tooling
+skip; matching installed root dependencies were restored and all four changed
+document blocks really rendered. Independent gate-owner diagnosis identifies
+built-in Mermaid 11.17.0 against root 11.15.0; renderer equivalence remains
+unverified. Gate hardening is separately owned and is not part of this PR.
+See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and nine execution
+issues, reconciled against the full raw session event stream.
+No deployed UI or operator approval is claimed.
+
+**Active consolidation:** v0.55.49 metadata is being prepared for PR #216.
+Normal merge `c90602dd` preserves UI commits `e2758b04` and `a5c1c603`.
+CI-only API/web lock run `38524477274` changes release roots only; all 1,079
+dependency entries remain identical with public npm/SHA-512 provenance.
+Owning Validate push at `d5024d0f` passes 23/23 gates: 6,035 API units,
+2,432 InMemory E2E passes / four PostgreSQL-only skips, and 1,591 web tests.
+Fresh post-merge local Chromium passes 9/9 in 32.0 seconds with retained
+geometry receipts. First-push source-scan timeout converged on unchanged
+focused and full-hook retries. Reviewed exact-tip CI remains pending.
+PR #215 merged normally at `99cdeda3` for
+v0.55.48, preserving its runtime and permanent live-test commits. Its full
+merged-master dev pipeline and legacy-reference proof remain owned by the
+runtime consolidation chat. PR #216 owns only UI-01/UI-02 release preparation
+in its isolated worktree, with a normal master merge preserving both UI commits.
+Shared live/dev/directory mutation requires an explicit runtime-owner handoff
+and coordination with the parent's separate gallery validation lease.
+The original dirty analysis worktree and other owned worktrees remain untouched.
+No customer-prod promotion or operator visual sign-off is authorized.
 
 **WIF follow-up:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
