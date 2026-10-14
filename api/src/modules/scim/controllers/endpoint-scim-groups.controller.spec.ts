@@ -51,6 +51,9 @@ describe('EndpointScimGroupsController', () => {
 
   const mockEndpointService = {
     getEndpoint: jest.fn(),
+    async getEndpointForRequest(endpointId: string): Promise<{ endpoint: unknown; profileRevision: string }> {
+      return { endpoint: await this.getEndpoint(endpointId), profileRevision: 'persisted-profile-revision' };
+    },
   };
 
   const mockEndpointContext = {
@@ -99,6 +102,9 @@ describe('EndpointScimGroupsController', () => {
       const resource = { id: 'group-1', displayName: 'Search', members: [{ value: 'user-1' }] };
       mockGroupsService.listGroupsForEndpoint.mockResolvedValue({ Resources: [resource], totalResults: 1 });
       const result = await controller.searchGroups('endpoint-1', { excludedAttributes: ['members'] }, mockRequest);
+      expect(mockEndpointContext.setContext).toHaveBeenCalledWith(expect.objectContaining({
+        profileRevision: 'persisted-profile-revision',
+      }));
       expect(result.Resources).toEqual([{ id: 'group-1', displayName: 'Search' }]);
       expect(resource.members).toEqual([{ value: 'user-1' }]);
     });

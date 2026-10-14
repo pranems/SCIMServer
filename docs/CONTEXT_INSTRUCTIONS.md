@@ -1,13 +1,24 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.47
-> **Last Updated**: October 12, 2026
-> **Last verified:** 2026-10-12
+> **Version**: 0.55.48
+> **Last Updated**: October 14, 2026
+> **Last verified:** 2026-10-14
 
 ---
 
 ## Active Delivery Process
+
+**v0.55.48 consolidation, not deployment:** PR #215 corrects false
+profile-revision conflicts by capturing raw persisted revision and normalized
+request view in one snapshot. All six controllers forward the revision.
+Focused units pass 281/281; HTTP proof passes 12/12 per backend; built-runtime
+live proof passes 65 checks. The implementation pre-push InMemory E2E result
+is 2,432 passes with four explicit PostgreSQL-only exclusions. CI-only lock
+regeneration, reviewed exact-tip merge, full authoritative dev pipeline, and
+direct legacy-reference verification are pending. No stored profile workaround,
+customer-prod promotion, UI backlog implementation, or visual sign-off is
+authorized in this phase.
 
 **v0.55.47 deployed evidence:** runtime merge
 `e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy on dev as revision

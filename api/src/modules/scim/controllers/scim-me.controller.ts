@@ -75,7 +75,7 @@ export class ScimMeController {
     endpointId: string,
     req: Request,
   ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined }> {
-    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    const { endpoint, profileRevision } = await this.endpointService.getEndpointForRequest(endpointId);
 
     if (!endpoint.active) {
       throw new ForbiddenException(
@@ -99,7 +99,7 @@ export class ScimMeController {
 
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, profileRevision, config });
 
     return { baseUrl, config, profile };
   }

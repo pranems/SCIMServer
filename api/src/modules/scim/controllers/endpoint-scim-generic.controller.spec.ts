@@ -13,7 +13,7 @@ describe('P2 custom-resource PATCH controller', () => {
     const result = { schemas: [DEVICE, CONTOSO], id: 'device',
       requested: 'not-supplied', [CONTOSO]: { requested: 'supplied' } };
     const controller = new EndpointScimGenericController(
-      { getEndpoint: jest.fn().mockResolvedValue({ active: true, profile: typedPatchProfile(true) }) } as unknown as EndpointService,
+      { getEndpointForRequest: jest.fn().mockResolvedValue({ endpoint: { active: true, profile: typedPatchProfile(true) }, profileRevision: 'persisted-profile-revision' }) } as unknown as EndpointService,
       { setContext: jest.fn(), getWarnings: () => [] } as unknown as EndpointContextStorage,
       { patchResource: jest.fn().mockImplementation(() => { dto.Operations = []; return result; }),
         getAlwaysReturnedByParent: () => new Map(),
@@ -35,13 +35,17 @@ describe('P2 custom-resource PATCH controller', () => {
     ] };
     const result = { schemas: [DEVICE, CONTOSO], id: 'device', meta: {}, [CONTOSO]: { contacts: [{ type: 'work', value: 'selected' }] } };
     const patchResource = jest.fn().mockResolvedValue(result);
+    const setContext = jest.fn();
     const controller = new EndpointScimGenericController(
-      { getEndpoint: jest.fn().mockResolvedValue(endpoint) } as unknown as EndpointService,
-      { setContext: jest.fn(), getWarnings: () => [] } as unknown as EndpointContextStorage,
+      { getEndpointForRequest: jest.fn().mockResolvedValue({ endpoint, profileRevision: 'persisted-profile-revision' }) } as unknown as EndpointService,
+      { setContext, getWarnings: () => [] } as unknown as EndpointContextStorage,
       { patchResource, getAlwaysReturnedByParent: () => new Map(), getRequestReturnedByParent: () => new Map() } as unknown as EndpointScimGenericService,
     );
     const req = { protocol: 'http', get: () => 'localhost', headers: { 'if-match': 'W/"1"' } } as unknown as Request;
     expect(await controller.patchResource('endpoint', 'Devices', 'device', dto, req)).toEqual(result);
+    expect(setContext).toHaveBeenCalledWith(expect.objectContaining({
+      profileRevision: 'persisted-profile-revision',
+    }));
     expect(patchResource.mock.calls[0][1]).toEqual(dto);
     expect(patchResource.mock.calls[0][6]).toBe('W/"1"');
     expect(Object.keys(result).sort()).toEqual(['schemas', 'id', 'meta', CONTOSO].sort());

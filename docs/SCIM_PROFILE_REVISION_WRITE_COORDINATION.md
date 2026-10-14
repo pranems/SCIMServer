@@ -1,8 +1,8 @@
 # Endpoint Profile Revision and Resource Write Coordination
 
-> **Status:** Implemented locally and included in the release candidate
-> **Last verified:** 2026-09-30
-> **Product version:** `0.55.36`
+> **Status:** Coordination deployed; legacy-profile correction validated locally, not deployed
+> **Last verified:** 2026-10-14
+> **Product version:** `0.55.48`
 
 ## Problem
 
@@ -36,8 +36,18 @@ sequenceDiagram
     end
 ```
 
-The request context captures a SHA-256 content revision of the normalized
-profile. Object keys are canonicalized recursively, so equivalent JSON object
+The request context captures a SHA-256 content revision of the persisted
+profile, before runtime normalization. The service clones the persisted JSON
+before removing caches or migrating deprecated settings. Its internal
+`getEndpointForRequest()` method returns the normalized endpoint response
+and the original revision from the same resolved cache snapshot. Users,
+Groups, custom resources, Bulk, discovery, and `/Me` explicitly use that
+revision. It is not added to public endpoint responses.
+
+Hashing the normalized view is incorrect for an older persisted profile:
+renaming or dropping a deprecated setting changes the hash without a
+concurrent edit. The repository must continue hashing persisted content,
+not ignore legacy keys or bypass comparison. Object keys are canonicalized recursively, so equivalent JSON object
 ordering does not create a false conflict. Arrays remain ordered because schema
 and ResourceType array order is part of the persisted profile representation.
 
@@ -87,6 +97,24 @@ retry. The server does not reinterpret or silently retry a stale candidate.
 
 ## Coverage and evidence
 
+### Release consolidation receipt
+
+The configured Validate-mode pre-push passes all 23 gates, including
+6,035 API units, 2,432 InMemory E2E passes with four PostgreSQL-only
+exclusions, and 1,591 web tests. These whole-suite results supplement, rather
+than replace, the focused PostgreSQL, negative-control, and built-live proof.
+The read-only consolidation review found no significant issues in raw revision
+capture, atomic snapshot forwarding, genuine-edit guards, or existing-endpoint
+cleanup safety.
+
+CI lockfile workflow run `38503638725`, source `d4e368b3`, generated the
+v0.55.48 lockfiles. All 684 API and 395 web dependency entries are unchanged;
+only root release versions differ. Every resolved host remains public npm
+and every integrity value remains SHA-512. No package upgrade, local lock
+regeneration, or quarantine exception occurred. Exact-tip CI, reviewed normal
+merge, immutable publication, complete dev pipeline, and direct legacy-reference
+verification are still pending.
+
 | Boundary | Outcome |
 |---|---|
 | User, Group, and custom create | Controlled pause after validation; profile change wins; each stale create returns 409 and publishes no row |
@@ -106,6 +134,40 @@ removed. See the
 [validation receipt](evidence/scim-profile-revision-20260929/validation.json).
 
 ## Scope
+
+### Legacy-profile regression evidence, 2026-10-14
+
+The service regression first failed because reading a legacy profile mutated
+the supplied persisted object. The corrected service preserves the raw object
+and pairs its revision with the normalized runtime view. Nine focused unit
+suites pass 281 tests, including a controller assertion on the actual
+forwarded revision value.
+
+The owned PostgreSQL database `scim_profile_revision_20261014` contains raw
+legacy fixtures, introduced directly into test storage because the public
+admin API correctly rejects retired setting names. Users, Groups, and Devices
+each pass POST, PUT, PATCH, GET, and DELETE without rewriting that profile.
+The same suite passes normalized-profile CRUD in InMemory. Both backends pass
+all nine genuine concurrent-edit rejection cases: **12/12 per backend,
+zero skips**.
+
+A negative control deliberately restored hashing the normalized request
+profile. All three PostgreSQL legacy CRUD cases then failed with expected
+201 versus actual 409. After restoring the persisted snapshot revision,
+the complete PostgreSQL suite passed 12/12 again. The nine selector-filtered
+cases in that negative-control run are not missing final matrix evidence.
+This evidence is local, not a deployed reference-endpoint or complete
+deployment-pipeline result.
+
+The permanent `9z-DP` section in `scripts/live-test.ps1` now exercises User,
+Group, and Device CRUD with response-key allowlists and exact cleanup.
+Its first built-runtime smoke passes **24/24 per backend**. A separate
+raw-legacy endpoint in the isolated PostgreSQL database passes **17/17**
+User/Group live checks, including equality of the raw persisted revision
+before and after writes. The helper accepts `ExistingEndpointId` for an
+explicit reference-endpoint proof without changing that endpoint's profile;
+it owns and removes only its temporary resources. It has not yet been
+run against the deployed dev reference endpoint.
 
 This change does not alter client resource ETag policy, profile merge policy,
 schema declarations, endpoint defaults, database schema, release metadata, or

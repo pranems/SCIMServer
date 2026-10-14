@@ -1,6 +1,6 @@
 # Entra Gallery to SCIMServer E2E - Execution Issues and RCA
 
-> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.47`
+> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.48`
 
 ## Purpose and scope
 
@@ -121,3 +121,70 @@ This gives a concrete mismatch path even with no concurrent profile edit.
 No database row was changed. A targeted regression and runtime fix remain
 pending on a separate coherent change; the connector gate does not suppress
 the 409 or weaken the revision check.
+
+## Legacy-profile correction, 2026-10-14
+
+The previously pending runtime correction is now implemented and locally
+verified on its own branch. It is not deployed. PR #214 is merged through
+normal merge commit `df012da94b4800f95d3db14d357a7afc5a439288`, preserving
+all three connector and pipeline commits with exact-tip CI green.
+
+| ID | Type | Severity | Symptom and root cause | Fix and why it works | Prevention and escape analysis |
+|---|---|---|---|---|---|
+| EG-I23 | Runtime / persisted versus normalized identity | High | Accepted gallery WIF was followed by User HTTP 409 without a concurrent edit. Request context hashed a normalized profile while the repository hashed raw persisted legacy settings. Reading also mutated the supplied storage object. | Clone before normalization; capture the raw revision and return it atomically with the normalized endpoint snapshot; forward it through all six SCIM controller surfaces. Repository comparison remains unchanged. | Unit RED confirms source mutation; 281 focused units pass. Raw legacy User/Group/Device HTTP CRUD and nine actual-edit rejections pass 12/12 in PostgreSQL; normalized CRUD and the same races pass 12/12 in memory. A normalized-hash negative control fails all three legacy cases with 409. Escaped to gallery export; earliest possible detection was a raw persisted-profile unit/HTTP fixture. |
+| EG-I24 | Regression fixture correctness | Medium | First HTTP run produced 12 failures from one setup HTTP 400. The new fixture tried to submit a retired setting through the public admin API, which intentionally rejects it. | Keep valid public endpoint creation, then inject legacy JSON only into the exact owned PostgreSQL fixture. InMemory test names explicitly describe normalized rather than raw persisted profiles. | Whole suite is green on both backends. Setup failures are classified once with dependent failures as cascades; never weaken public validation to seed old data. Caught at first HTTP fixture creation, the earliest applicable gate. |
+| EG-I25 | Editing tool friction | Low | One multi-file patch was rejected before any file changed because an empty extra hunk marker preceded the next file header. | Remove the empty hunk and apply the complete patch successfully. | Parser refusal prevented a partial edit; inspect patch grammar before submitting. Caught at edit-time, no escape. |
+
+The complete PostgreSQL rerun after the negative control has zero failures
+and zero skips. No dev database row was modified as a workaround. The local
+test database is isolated from development and customer data.
+
+**Test/gate improvement: applied.** Raw legacy storage fixtures and a
+negative control prove the new assertions detect the original failure.
+**Design/architecture disposition: applied.** One explicit snapshot method
+keeps profile and revision coherent without a second asynchronous read,
+public metadata, a new repository abstraction, or weaker concurrency checks.
+
+### Built-runtime live gate
+
+The runtime correction is saved in logical commit `46bca59a`. The reusable
+`9z-DP` live section runs before cleanup, validates actual CRUD values and
+published response keys, and preserves endpoint profiles. It passes 24/24
+against each owned InMemory and PostgreSQL built API. A raw-legacy fixture
+on the isolated PostgreSQL database passes 17/17 further live checks,
+including unchanged raw profile revision. All owned endpoints and resources
+are removed. These are **65 focused live checks**, not the complete live
+matrix, a Docker application result, or a deployed dev result.
+
+| ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
+|---|---|---|---|---|---|
+| EG-I26 | Live contract fixture | Medium | The first allowlisted live run failed one endpoint-key check per backend because its manually transcribed key set omitted documented `_links` hypermedia. Resource CRUD and cleanup passed. | Match the existing response serializer's documented keys, including `_links`; report unexpected key names explicitly. The corrected full smoke passes 48/48, followed by 17/17 raw-legacy checks. | Allowlist checks must use the published contract, not assume every underscore-prefixed key is internal. Caught at first built live contract run, no API change needed. |
+| EG-I27 | Local process readiness | Low | An immediate probe of the detached API returned connection refused while the application was still initializing. | Verify its running process, wait for readiness, and confirm `/scim/health` before executing live checks. Both owned runtimes respond with `ok`; no application failure occurred. | Startup confirmation and readiness are separate claims. The deployment orchestrator already owns bounded readiness; ad-hoc probes must honor it too. Caught before any live fixture was created. |
+
+**Test/gate improvement: applied.** The permanent live section checks
+outcome values, published-key allowlists, profile preservation, and exact
+cleanup, including conditional-write headers.
+**Design disposition: accepted.** One cohesive live helper follows existing
+section conventions; a new test framework or generic provisioning DSL would
+be unnecessary.
+
+### Release consolidation
+
+| ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
+|---|---|---|---|---|---|
+| EG-I28 | Release documentation | Low | The first v0.55.48 metadata push was blocked by C13: the README version badge still claimed 0.55.47. The freshness formatter restamps current headers but does not rewrite badges or historical evidence. | Update only the live badge; the source-truth content audit now passes all 26 documents. No historical release claims were relabeled. | Run both freshness and content checks for release metadata. The existing pre-push gate caught the mismatch before tests, CI, or deployment; no new gate is needed. |
+| EG-I29 | Consolidation environment | Low | Validate-mode push passed static, unit, and InMemory E2E gates, then Prisma generation failed because `DATABASE_URL` was absent in the fresh shell. Prisma's `env()` throws before a nullish fallback can run. | Supply a non-secret local datasource URL to generation and the hook process; targeted Prisma generation passes without connecting to or changing a database. | Establish Validate-mode environment before its owning run. Detection was at Prisma generation; a targeted prerequisite check could have caught it before the preceding suites. No production-code workaround is needed. |
+
+**Test/gate improvement: accepted.** The existing content audit caught the
+release badge mismatch at the earliest owning pre-push stage.
+**Design disposition: accepted.** Targeted metadata edits preserve historical
+evidence; using the broad local bump script would rewrite history and violate
+CI-only lockfile generation.
+
+The corrected configured Validate-mode push passes all 23 gates: 6,035
+API units, 2,432 InMemory E2E passes with four PostgreSQL-only exclusions,
+and 1,591 web tests. CI run `38503638725` regenerated both release locks
+with zero changed package versions and byte-equivalent dependency-entry maps
+(684 API, 395 web). Public-registry and SHA-512 checks pass. The read-only
+consolidation review found no significant issues. Merge and dev proof remain
+pending; these results do not imply deployment.
