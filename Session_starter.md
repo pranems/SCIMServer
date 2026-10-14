@@ -2,6 +2,43 @@
 
 **Last verified:** 2026-10-14
 
+**Active consolidation - blocked before deployment:** v0.55.48 runtime,
+metadata, and CI-generated locks merged normally through PR #215 at
+`99cdeda35861049b05908f5b507e404b3318e33d`. Exact-tip CI and all 23
+Validate pre-push gates passed. A one-line direct Prisma scheduling alignment
+merged normally through PR #217 at `f96f31b506a7a77b8d84b62420d5475cc1f66280`,
+also exact-tip green. No release image was published or deployed by this phase.
+
+Both full no-skip pipeline attempts failed the direct Prisma E2E gate.
+The second serial run improves to 112/118 suites and 2,348 passes but retains
+140 bootstrap-timeout cascade failures and four skips. Its process then
+terminated with exit -1 during the six-mode matrix. The confirmed partial
+matrix passes 6,035 units in each backend and 2,488 InMemory E2E tests with
+four PostgreSQL-only exclusions. Web units and coverage passed earlier in
+the second attempt. This is not a complete or green pipeline.
+
+An isolated, instrumented serial Prisma diagnostic subsequently passes all
+118 suites and 2,492 tests with zero skips in 1,417.31 seconds. It uses quiet
+console output and an explicit Prisma backend. Its measured StatsModule
+startup peaks at 8,705 ms across accumulated fixtures. This is standalone
+recovery evidence, not proof of the earlier timeout's sole cause or a green
+deployment pipeline. All diagnostic databases were removed by exact owned ID.
+The parent holds a bounded dev/gallery lease for its mapping smoke and
+three-auth matrix; runtime must obtain explicit return before live work.
+
+Dev still serves v0.55.47. Valid fixtures on the original dev reference
+`aa69213c-1ba8-4feb-a507-a6e2fe90d6bd` reproduce User and Group POST 409s,
+while its raw legacy setting and persisted revision remain unchanged.
+Fresh v0.55.48 live, gallery, seeded browser, and after-deploy performance
+proof are BLOCKED. All exact owned test containers were removed; the shared
+PostgreSQL container remains running. The original dirty worktree is untouched.
+Custom gallery mappings, next-release UI readability, and operator visual
+sign-off remain separate parent work. No production promotion is authorized.
+
+| Date | Summary |
+|---|---|
+| 2026-10-14 | Merged v0.55.48 correction and CI-only release locks; retained two failed pipeline receipts and a complete 2,492-test isolated Prisma diagnostic. Authoritative deployment proof remains outstanding. |
+
 **UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
 separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
 pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor
@@ -18,7 +55,7 @@ See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and nine execution
 issues, reconciled against the full raw session event stream.
 No deployed UI or operator approval is claimed.
 
-**Active consolidation:** v0.55.49 metadata is being prepared for PR #216.
+**Separate UI consolidation:** v0.55.49 merged through PR #216 at `4a4719cc`.
 Normal merge `c90602dd` preserves UI commits `e2758b04` and `a5c1c603`.
 CI-only API/web lock run `38524477274` changes release roots only; all 1,079
 dependency entries remain identical with public npm/SHA-512 provenance.
@@ -26,7 +63,7 @@ Owning Validate push at `d5024d0f` passes 23/23 gates: 6,035 API units,
 2,432 InMemory E2E passes / four PostgreSQL-only skips, and 1,591 web tests.
 Fresh post-merge local Chromium passes 9/9 in 32.0 seconds with retained
 geometry receipts. First-push source-scan timeout converged on unchanged
-focused and full-hook retries. Reviewed exact-tip CI remains pending.
+focused and full-hook retries. Its merge does not establish deployed UI proof.
 PR #215 merged normally at `99cdeda3` for
 v0.55.48, preserving its runtime and permanent live-test commits. Its full
 merged-master dev pipeline and legacy-reference proof remain owned by the
@@ -54,13 +91,14 @@ The existing reference endpoint separately returned profile-revision HTTP 409
 on User create after accepted WIF authentication. A read-only database probe
 confirmed different persisted/runtime profile revisions: the persisted
 settings retain `PerEndpointCredentialsEnabled`, which runtime normalization
-drops. The fix and regression proof are still pending; isolated-target success
-must not be represented as its fix.
+drops. The correction and local regression proof are now merged, but deployed
+reference proof remains blocked as recorded above; isolated-target success
+must not be represented as its deployed fix.
 See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I22.
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.47 runtime merge
+**Current dev release, prior-release evidence not renewed by this phase:** v0.55.47 runtime merge
 `e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy at 100% on revision
 `scimserver-dev--ve4192b0e`, with GHCR and ACR on digest
 `sha256:94020fb9cdaaa9665b824136f29e19ea553432c39cc1853e45297bc00bad9684`.

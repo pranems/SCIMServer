@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Validation pipeline
 
+- Align both Prisma E2E owners on serial quiet-console execution. Quiet mode
+  suppresses application console chatter, not test assertions, suite summaries,
+  failure stacks, or the structured results reporter. Contracts were RED for
+  both missing switches and GREEN after the two command changes. An injected
+  causal exception remains visible and exits 1.
+- Retain the second pipeline's 2,348-pass/140-fail/four-skip Prisma receipt.
+  A later isolated diagnostic with explicit Prisma selection passes all
+  2,492 tests across 118 suites with zero skips in 1,417.31 seconds.
+  No tests or timeout limits changed. This diagnostic does not establish
+  the earlier timeout's sole cause or replace authoritative deployment proof.
 - Enable seeded profile-shape coverage in the authoritative dev Playwright
   lane, parse its JSON result, and fail the gate on any skipped case. Restore
   the dev-only shape and mutation flags after the dev run, and explicitly clear
@@ -93,10 +103,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions; all 1,079 dependency entries retain their graph and public
   npm/SHA-512 provenance. Read-only consolidation review found no significant
   issues.
-- Release preparation is pending exact-tip
-  reviewed merge, immutable-image publication, full dev pipeline, and direct
-  legacy-reference proof. No production promotion or operator visual sign-off
-  is claimed.
+- PR #215 merged normally at `99cdeda3` with exact-tip CI green.
+  PR #217 aligns direct Prisma E2E with the existing serial backend matrix
+  and merged normally at `f96f31b5`, also exact-tip green. The scheduling
+  contract went RED then GREEN; two earliest failed suites pass 47/47
+  serial tests on fresh owned PostgreSQL.
+- Deployment is blocked, not validated. Both full no-skip pipeline attempts
+  fail direct Prisma bootstrap hooks. The second serial run reports 2,348
+  passes, 140 failures, and four skips across 118 suites, then its process
+  terminates during the backend matrix. Confirmed partial matrix: 6,035 units
+  per backend and 2,488 InMemory E2E passes with four PostgreSQL-only
+  exclusions. Web units and coverage passed in that attempt.
+- Dev remains v0.55.47. Profile-conforming User and Group creates on the
+  explicitly selected original reference still return 409, with its raw
+  legacy setting and persisted revision unchanged. No immutable release image
+  publication, fresh dev gallery/browser result, production promotion, or
+  operator visual sign-off is claimed.
 
 ## [0.55.47] - 2026-10-12
 

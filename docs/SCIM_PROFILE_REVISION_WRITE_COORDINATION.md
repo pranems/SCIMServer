@@ -1,10 +1,19 @@
 # Endpoint Profile Revision and Resource Write Coordination
 
-> **Status:** Coordination deployed; legacy-profile correction validated locally, not deployed
+> **Status:** Legacy-profile correction merged for v0.55.48; deployment blocked
 > **Last verified:** 2026-10-14
 > **Product version:** `0.55.48`
 
 ## Problem
+
+**Recovery evidence, not deployed proof:** The later isolated serial Prisma
+diagnostic passes all 118 suites and 2,492 tests with zero skips in
+1,417.31 seconds. Both pipeline owners now use the exercised quiet-console
+configuration. Failure stacks and exit 1 remain visible in a negative control;
+test assertions, reporters, and timeouts are unchanged. The earlier timeout's
+sole cause remains unproven, and a complete authoritative merged-master
+deployment run is still required. The parent holds the shared gallery lease
+until explicit return; local recovery does not authorize live mutation.
 
 A resource request resolves an endpoint profile before it validates the
 candidate. Previously, the profile could change after that validation and
@@ -111,9 +120,32 @@ CI lockfile workflow run `38503638725`, source `d4e368b3`, generated the
 v0.55.48 lockfiles. All 684 API and 395 web dependency entries are unchanged;
 only root release versions differ. Every resolved host remains public npm
 and every integrity value remains SHA-512. No package upgrade, local lock
-regeneration, or quarantine exception occurred. Exact-tip CI, reviewed normal
-merge, immutable publication, complete dev pipeline, and direct legacy-reference
-verification are still pending.
+regeneration, or quarantine exception occurred. Exact-tip CI passed and PR #215 merged normally at `99cdeda3`.
+The direct Prisma scheduling follow-up merged normally through PR #217 at
+`f96f31b5`. Immutable publication and deployed proof remain blocked.
+
+Both authoritative no-skip pipeline attempts failed direct Prisma E2E
+bootstrap hooks. Serial execution reduced the second result to six failed
+suites, 2,348 passes, 140 failures, and four skips, but did not produce GREEN.
+The second process terminated with exit -1 during the six-mode matrix.
+Confirmed partial matrix evidence is 6,035 units per backend and 2,488
+InMemory E2E passes with four PostgreSQL-only exclusions. Neither attempt
+reached image publication or dev deployment.
+
+The original dev reference was explicitly selected, using its enabled bearer
+method and profile-conforming User and Group fixtures. Both POSTs reproduce
+409 on v0.55.47. Read-only PostgreSQL transactions before and after verify
+that the retired persisted setting remains present and the raw revision is
+unchanged. The minimal generic helper lacks the required User `displayName`
+for this particular profile, so the direct reference probe supplies it rather
+than weakening or rewriting the profile. This is before-deployment evidence,
+not proof that the correction is running.
+
+The remaining blocker is complete Prisma-bootstrap diagnosis and successful
+authoritative execution. Current-release live/gallery/browser proof and
+after-deployment latency comparison have not run. The old 266-browser and
+33-gallery receipts remain prior-release evidence. No production promotion
+or operator visual verification is claimed.
 
 | Boundary | Outcome |
 |---|---|
@@ -166,8 +198,9 @@ raw-legacy endpoint in the isolated PostgreSQL database passes **17/17**
 User/Group live checks, including equality of the raw persisted revision
 before and after writes. The helper accepts `ExistingEndpointId` for an
 explicit reference-endpoint proof without changing that endpoint's profile;
-it owns and removes only its temporary resources. It has not yet been
-run against the deployed dev reference endpoint.
+it owns and removes only its temporary resources. It has not completed a
+GREEN correction run against the deployed dev reference endpoint. The
+pre-deployment profile-conforming direct probe is recorded above.
 
 This change does not alter client resource ETag policy, profile merge policy,
 schema declarations, endpoint defaults, database schema, release metadata, or
