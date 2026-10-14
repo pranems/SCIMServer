@@ -11,13 +11,22 @@ Commit `e2758b04` is pushed through the normal Fast hook. API InMemory E2E
 passed 2,429 cases with four PostgreSQL-only skips. Final-source web build and
 size budgets pass. A misleading Mermaid hook PASS was actually a tooling
 skip; matching installed root dependencies were restored and all four changed
-document blocks really rendered. Built-in renderer version discovery reports
-`0.0.0`, so renderer equivalence remains unverified, not silently green.
+document blocks really rendered. Independent gate-owner diagnosis identifies
+built-in Mermaid 11.17.0 against root 11.15.0; renderer equivalence remains
+unverified. Gate hardening is separately owned and is not part of this PR.
 See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and nine execution
 issues, reconciled against the full raw session event stream.
-No deployed UI or operator approval is claimed. Runtime revision fix
-release/deployment is separately owned by the consolidation chat for PR #215;
-do not infer that the older pending statements below describe its latest state.
+No deployed UI or operator approval is claimed.
+
+**Active consolidation:** PR #215 merged normally at `99cdeda3` for
+v0.55.48, preserving its runtime and permanent live-test commits. Its full
+merged-master dev pipeline and legacy-reference proof remain owned by the
+runtime consolidation chat. PR #216 owns only UI-01/UI-02 release preparation
+in its isolated worktree, with a normal master merge preserving both UI commits.
+Shared live/dev/directory mutation requires an explicit runtime-owner handoff
+and coordination with the parent's separate gallery validation lease.
+The original dirty analysis worktree and other owned worktrees remain untouched.
+No customer-prod promotion or operator visual sign-off is authorized.
 
 **WIF follow-up:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
@@ -85,18 +94,25 @@ order, Dashboard duplication, Operations purpose, and `/Me` purpose are
 recorded with real-browser acceptance criteria. No item is currently proven
 to be a v0.55.47 data, authorization, routing, or API-contract defect.
 
-The reusable Entra gallery provisioning gate is implemented in
-`scripts/entra-gallery-scim-e2e.ps1` with its repository skill and static
-contract. Measured dev results are SecretToken 14 PASS / 0 FAIL, OAuth client
-credentials 10 PASS / 0 FAIL, plan-only 3 PASS / 0 FAIL, and the independent
-temporary-application WIF protocol proof 50 PASS / 0 FAIL with a final 37 ms
-warm mint median against a 150 ms budget. The real gallery WorkloadIdentity mode is
-explicitly BLOCKED because Microsoft Graph beta rejects the required hidden
-`EntraApplicationIdentifier` connector field; omitting it causes the
-provisioning job to quarantine for that exact field. The gate is therefore not
-wired into the authoritative deployment pipeline yet: running only the two
-green modes would create a false-complete release signal. No production
-connector, canary, or customer-production deployment was changed.
+The earlier gallery WIF blocker is resolved, not an external limitation.
+PR #214 is merged with exact-tip CI green, preserving its three constituent
+commits. The complete real gallery matrix passes 33 checks across SecretToken,
+OAuth, and WIF with zero failures/skips and 13/13 cleanup successes. Stage 4.8
+now enforces that evidence in the dev pipeline. Custom extension mapping is
+still unproven; the complete orchestrator has not been rerun.
+
+The separate legacy-profile false-409 correction is implemented locally:
+clone raw JSON, preserve its persisted revision, and atomically pair it with
+the normalized request view across all six SCIM controller surfaces. Focused
+units pass 281/281; HTTP CRUD and genuine-edit rejection pass 12/12 in each
+backend. A normalized-hash negative control reproduces all three PostgreSQL
+legacy-create 409s. Runtime release consolidation, live verification, and
+deployment remain pending. No customer data was edited as a workaround.
+Logical runtime commit `46bca59a` is saved. Permanent live section `9z-DP`
+now passes 24/24 per local built backend; an isolated raw-legacy fixture
+passes 17/17 more checks with unchanged persisted revision and exact cleanup.
+These 65 focused checks do not imply Docker application, current-dev,
+complete-pipeline, or renewed browser validation.
 
 ### Active Execution Reference
 

@@ -45,7 +45,7 @@ export class EndpointScimBulkController {
     endpointId: string,
     req: Request,
   ): Promise<{ baseUrl: string; config: EndpointConfig }> {
-    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    const { endpoint, profileRevision } = await this.endpointService.getEndpointForRequest(endpointId);
 
     if (!endpoint.active) {
       throw new ForbiddenException(
@@ -56,7 +56,7 @@ export class EndpointScimBulkController {
     const profile = endpoint.profile;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, profileRevision, config });
 
     return { baseUrl, config };
   }

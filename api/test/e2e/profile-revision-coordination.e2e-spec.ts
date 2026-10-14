@@ -8,6 +8,8 @@ import type { IUserRepository } from '../../src/domain/repositories/user.reposit
 import type { IGroupRepository } from '../../src/domain/repositories/group.repository.interface';
 import type { IGenericResourceRepository } from '../../src/domain/repositories/generic-resource.repository.interface';
 import { SCIM_DIAGNOSTICS_URN, SCIM_ERROR_SCHEMA } from '../../src/modules/scim/common/scim-constants';
+import { PrismaService } from '../../src/modules/prisma/prisma.service';
+import { endpointProfileRevision } from '../../src/domain/repositories/profile-revision';
 
 const USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
@@ -108,6 +110,57 @@ describe('endpoint profile revision coordinates resource writes', () => {
   });
 
   const cases = routes.flatMap(route => operations.map(operation => [route, operation] as const));
+
+  const profileSource = process.env.PERSISTENCE_BACKEND?.toLowerCase() === 'inmemory'
+    ? 'the normalized in-memory profile'
+    : 'the persisted legacy profile';
+  it.each(routes)(`allows %s CRUD using ${profileSource} without changing storage`, async route => {
+    const prisma = app.get(PrismaService);
+    const isPrisma = process.env.PERSISTENCE_BACKEND?.toLowerCase() !== 'inmemory';
+    let persistedRevision: string | undefined;
+    if (isPrisma) {
+      const stored = await prisma.endpoint.findUniqueOrThrow({ where: { id: endpointId } });
+      if (!stored.profile || typeof stored.profile !== 'object' || Array.isArray(stored.profile)) {
+        throw new Error('The owned endpoint must have an object profile');
+      }
+      const legacyProfile = {
+        ...stored.profile,
+        settings: { StrictSchemaValidation: strict, PerEndpointCredentialsEnabled: 'True' },
+      };
+      await prisma.endpoint.update({ where: { id: endpointId }, data: { profile: legacyProfile } });
+      persistedRevision = endpointProfileRevision(legacyProfile);
+    }
+    const endpoint = await http('get', `/scim/admin/endpoints/${endpointId}`);
+    expect(endpoint.status).toBe(200);
+    expect(endpoint.body.profile).not.toHaveProperty('settings.PerEndpointCredentialsEnabled');
+    if (isPrisma) expect(endpointProfileRevision(endpoint.body.profile)).not.toBe(persistedRevision);
+
+    const base = `/scim/v2/endpoints/${endpointId}/${route}`;
+    const created = await http('post', base, payload(route));
+    expect(created.status).toBe(201);
+    const item = `${base}/${created.body.id}`;
+    const field = route === 'Users' ? 'userName' : 'displayName';
+    const replacement = payload(route);
+    const replaced = await http('put', item, replacement);
+    expect(replaced.status).toBe(200);
+    expect(replaced.body[field]).toBe(replacement[field]);
+    const value = `legacy-patched-${randomUUID()}`;
+    const patched = await http('patch', item, {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: field, value }],
+    });
+    expect(patched.status).toBe(200);
+    const read = await http('get', item);
+    expect(read.status).toBe(200);
+    expect(read.body[field]).toBe(value);
+    const deleted = await http('delete', item);
+    expect(deleted.status).toBe(204);
+    expect((await http('get', item)).status).toBe(404);
+    if (isPrisma) {
+      const stored = await prisma.endpoint.findUniqueOrThrow({ where: { id: endpointId } });
+      expect(endpointProfileRevision(stored.profile)).toBe(persistedRevision);
+    }
+  });
 
   it.each(cases)('rejects a stale %s %s without publishing a mutation', async (route, operation) => {
     const repository = route === 'Users' ? users : route === 'Groups' ? groups : generic;

@@ -52,6 +52,9 @@ describe('EndpointScimUsersController', () => {
 
   const mockEndpointService = {
     getEndpoint: jest.fn(),
+    async getEndpointForRequest(endpointId: string): Promise<{ endpoint: unknown; profileRevision: string }> {
+      return { endpoint: await this.getEndpoint(endpointId), profileRevision: 'persisted-profile-revision' };
+    },
   };
 
   const mockEndpointContext = {
@@ -95,6 +98,14 @@ describe('EndpointScimUsersController', () => {
   });
 
   describe('User Operations', () => {
+    it('uses the persisted snapshot revision instead of hashing the normalized response', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.listUsersForEndpoint.mockResolvedValue({ Resources: [], totalResults: 0 });
+      await controller.searchUsers('endpoint-1', {}, mockRequest);
+      expect(mockEndpointContext.setContext).toHaveBeenCalledWith(expect.objectContaining({
+        profileRevision: 'persisted-profile-revision',
+      }));
+    });
     it('projects JSON search arrays after forwarding only list parameters', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockUsersService.listUsersForEndpoint.mockResolvedValue({
