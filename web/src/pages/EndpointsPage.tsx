@@ -1,5 +1,5 @@
 /**
- * EndpointsPage - card grid showing all endpoints with live stats.
+ * EndpointsPage - compact inventory with URL-owned filtering.
  *
  * Phase A3: free-text filter `q` lives in the URL via
  * endpointsSearchSchema. Empty input normalizes to undefined so URLs
@@ -18,23 +18,22 @@ import React from 'react';
 import {
   makeStyles,
   tokens,
-  Card,
-  CardHeader,
   Text,
   Badge,
   Button,
   SearchBox,
   Subtitle1,
-  Caption1,
 } from '@fluentui/react-components';
 import {
-  Server24Regular,
   Add24Regular,
 } from '@fluentui/react-icons';
 import { useEndpoints } from '../api/queries';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import type { EndpointsSearch } from '../routes/search-schemas';
 import { EmptyState, LoadingSkeleton, CopyableField } from '../components/primitives';
+import { TruncatedText } from '../components/primitives';
+import { FilteredResultsPanel } from '../components/primitives/FilteredResultsPanel';
+import { endpointProfileLabel, matchesEndpoint } from '../components/endpoints/endpoint-inventory';
 
 const ENDPOINTS_ROUTE_PATH = '/endpoints' as const;
 
@@ -50,28 +49,20 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: '16px',
+    flexWrap: 'wrap',
   },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: '16px',
   },
-  card: {
-    padding: '16px',
-    cursor: 'pointer',
-    ':hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-    },
+  table: {
+    tableLayout: 'fixed', width: '100%', minWidth: '640px', borderCollapse: 'collapse',
+    '& th': { textAlign: 'left', padding: '10px', backgroundColor: tokens.colorNeutralBackground2 },
+    '& td': { padding: '8px 10px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
   },
-  cardBody: {
-    display: 'flex',
-    gap: '16px',
-    marginTop: '8px',
-  },
-  stat: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
+  identity: {
+    display: 'flex', flexDirection: 'column', minWidth: 0, gap: '4px',
   },
   center: {
     display: 'flex',
@@ -126,25 +117,12 @@ export const EndpointsPage: React.FC = () => {
   }
 
   const endpoints = data?.endpoints ?? [];
-  const filtered = q
-    ? endpoints.filter(
-        (ep) =>
-          ep.name.toLowerCase().includes(q.toLowerCase()) ||
-          ep.displayName?.toLowerCase().includes(q.toLowerCase()),
-      )
-    : endpoints;
+  const filtered = endpoints.filter(ep => matchesEndpoint(ep, q));
 
   return (
     <div className={classes.page} data-testid="endpoints-page">
       <div className={classes.header}>
         <Subtitle1>Endpoints ({endpoints.length})</Subtitle1>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <SearchBox
-            placeholder="Filter endpoints..."
-            value={q}
-            onChange={(_, d) => setQ(d.value)}
-            data-testid="endpoints-search"
-          />
           {/* Phase L1 - Create endpoint button. */}
           <Button
             appearance="primary"
@@ -154,47 +132,49 @@ export const EndpointsPage: React.FC = () => {
           >
             Create endpoint
           </Button>
-        </div>
       </div>
 
-      <div className={classes.grid} data-testid="endpoints-grid">
+      <FilteredResultsPanel label="Endpoint inventory" data-testid="endpoints-results" toolbar={
+        <>
+          <SearchBox
+            aria-label="Filter endpoints by name, ID, profile or status"
+            placeholder="Filter endpoints..."
+            value={q}
+            onChange={(_, d) => setQ(d.value)}
+            data-testid="endpoints-search"
+          />
+          <Text role="status">{filtered.length} of {endpoints.length} endpoints</Text>
+        </>
+      }>
+      <table className={classes.table} data-testid="endpoints-table">
+        <thead><tr>
+          <th scope="col" style={{ width: '40%' }}>Endpoint</th>
+          <th scope="col" style={{ width: '25%' }}>ID</th>
+          <th scope="col" style={{ width: '20%' }}>Profile schemas</th>
+          <th scope="col" style={{ width: '15%' }}>Status</th>
+        </tr></thead>
+        <tbody>
         {filtered.map((ep) => (
-          <Card
-            key={ep.id}
-            className={classes.card}
-            data-testid={`endpoint-${ep.id}`}
-            onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: ep.id } })}
-          >
-            <CardHeader
-              image={<Server24Regular />}
-              header={
-                <Text weight="semibold">
-                  {ep.displayName ?? ep.name}
-                </Text>
-              }
-              description={<Caption1>{ep.name}</Caption1>}
-              action={
-                <Badge
-                  appearance="filled"
-                  color={ep.active ? 'success' : 'warning'}
-                >
-                  {ep.active ? 'Active' : 'Inactive'}
-                </Badge>
-              }
-            />
-            <div className={classes.cardBody}>
-              <CopyableField
-                value={ep.scimBasePath}
-                monospace
-                truncate
-                maxWidth="100%"
-                data-testid={`endpoint-${ep.id}-scim-base-path`}
-                ariaLabel={`Copy SCIM base path ${ep.scimBasePath}`}
-              />
-            </div>
-          </Card>
+          <tr key={ep.id} data-testid={`endpoint-${ep.id}`}>
+            <td>
+              <div className={classes.identity}>
+                <Button appearance="subtle" data-testid={`endpoint-${ep.id}-open`}
+                  title={`${ep.displayName ?? ep.name} (${ep.name})`}
+                  onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: ep.id } })}>
+                  <TruncatedText data-testid={`endpoint-${ep.id}-label`} maxWidth="100%" text={ep.displayName ?? ep.name} />
+                </Button>
+                <CopyableField value={ep.scimBasePath} monospace truncate maxWidth="100%"
+                  data-testid={`endpoint-${ep.id}-scim-base-path`} />
+              </div>
+            </td>
+            <td><CopyableField value={ep.id} truncate maxWidth="100%" /></td>
+            <td><CopyableField value={endpointProfileLabel(ep)} truncate maxWidth="100%" /></td>
+            <td><Badge appearance="tint" color={ep.active ? 'success' : 'warning'}>{ep.active ? 'Active' : 'Inactive'}</Badge></td>
+          </tr>
         ))}
-      </div>
+        </tbody>
+      </table>
+      </FilteredResultsPanel>
 
       {filtered.length === 0 && (
         // G2 - EmptyState replaces plain Text. CTA depends on whether

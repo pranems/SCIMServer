@@ -13,7 +13,11 @@ measured Chromium cases at 1440, 900, and 390 px, including real clipping,
 stable fields, readable mobile columns, and navigation. See
 [readability evidence and RCA](UI_ACTIVITY_ENDPOINT_READABILITY.md).
 These two items are not yet deployed or operator-approved. UI-03 through UI-10
-remain open; the original current-release dispositions below are preserved.
+are owned by the isolated inventory branch. UI-03/04/06/07/08 pass a finite
+15-case responsive Chromium matrix locally; UI-05 has its first shared-panel
+application. UI-09/10 intent verification remains in progress. See
+[inventory implementation and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+The original current-release dispositions below are preserved.
 
 ## Current surface intent
 

@@ -30,7 +30,7 @@ test.describe('Context-preserving Back navigation', () => {
     await page.goto(`/endpoints?q=${encodeURIComponent(prefix)}`);
     const search = page.getByPlaceholder('Filter endpoints...');
     await expect(search).toHaveValue(prefix);
-    await page.getByTestId(`endpoint-${fixtureEndpointId}`).click();
+    await page.getByTestId(`endpoint-${fixtureEndpointId}-open`).click();
     await expect(page.getByTestId('endpoint-detail-page')).toBeVisible({ timeout: 30_000 });
 
     await page.getByTestId('back-to-endpoints').click();
@@ -99,8 +99,10 @@ test.describe('Context-preserving Back navigation', () => {
     const discoveryUrl = `/discovery?primaryId=${fixtureEndpointId}&compare=true&secondaryId=${secondaryFixtureEndpointId}&tab=schemas`;
     await page.goto(discoveryUrl);
     await expect(page.getByTestId('discovery-tab-schemas')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId(`discovery-primary-option-${fixtureEndpointId}`)).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId(`discovery-secondary-option-${secondaryFixtureEndpointId}`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('discovery-primary-selector-selected')).toContainText(fixtureEndpointId!);
+    await expect(page.getByTestId('discovery-secondary-selector-selected')).toContainText(secondaryFixtureEndpointId!);
+    await expect(page.getByRole('button', { name: /Selected primary endpoint/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /Selected secondary endpoint/ })).toHaveAttribute('aria-pressed', 'true');
 
     await page.goBack();
     await expect(page).toHaveURL(operationsUrl);

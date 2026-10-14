@@ -7,6 +7,10 @@
 
 ### Start here
 
+| UI follow-up | Read |
+|---|---|
+| Review compact endpoint inventory, bounded Dashboard summary, Discovery selection and finite responsive evidence | [UI_INVENTORY_SELECTION_IMPLEMENTATION.md](UI_INVENTORY_SELECTION_IMPLEMENTATION.md) |
+
 | If you want to... | Read |
 |---|---|
 | Understand shared-schema uniqueness admission and runtime binding precedence without changing default externalId duplicates | [Binding-qualified integration](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29), [receipt](evidence/scim-binding-uniqueness-integration-20260929.json) |

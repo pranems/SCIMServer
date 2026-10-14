@@ -2,6 +2,15 @@
 
 **Last verified:** 2026-10-14
 
+**Isolated inventory checkpoint:** `fix/ui-inventory-selection-20261014`
+owns UI-03 through UI-10 only. UI-03/04/06/07/08 now pass 15 measured
+Chromium cases at 1440/900/390 px with an 80-endpoint fixture; 63 focused
+units, web build and size budgets pass. Dashboard is capped at five entries;
+Endpoints owns a searchable scrollable table; Discovery reuses the searchable
+context selector and defaults to Schemas. UI-05 Operations application and
+UI-09/10 intent proof remain in progress. No release, deployment or operator
+signoff is claimed. See `docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md`.
+
 **UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
 separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
 pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor
