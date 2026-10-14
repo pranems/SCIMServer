@@ -25,6 +25,15 @@ function Assert-Contract {
 Write-Host 'Entra gallery provisioning to SCIMServer E2E contract'
 
 Assert-Contract 'reviewed custom-mapping helper exists' (Test-Path -LiteralPath $mappingHelperPath)
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($gatePath, [ref]$null, [ref]$null)
+    $binding = [scriptblock]::Create("[CmdletBinding()]`n$($ast.ParamBlock.Extent.Text)`n`$Modes.Count")
+    $refused = $false
+    try { & $binding -Modes @() | Out-Null }
+    catch { $refused = $_.FullyQualifiedErrorId -like 'ParameterArgumentValidationError*' }
+    Assert-Contract 'behavior: empty auth selection is rejected before any remote action' $refused
+    Assert-Contract 'behavior: default auth selection retains all three transports' ((& $binding) -eq 3)
+}
 if (Test-Path -LiteralPath $mappingHelperPath) {
     & {
         . $mappingHelperPath
@@ -435,7 +444,8 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     $secretKeys = [System.Collections.Generic.HashSet[string]]::new()
     $OutputDirectory = Join-Path $repoRoot "test-results\gallery-report-contract\$([guid]::NewGuid())"
     try {
-        foreach ($case in @('valid', 'missing', 'duplicates', 'plan')) {
+        foreach ($case in @('valid', 'missing', 'duplicates', 'plan', 'empty modes')) {
+            $Modes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')
             $PlanOnly = $case -eq 'plan'
             $results = @(
                 foreach ($mode in $Modes) {
@@ -448,6 +458,7 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
             if ($case -eq 'duplicates') {
                 $results | ForEach-Object { $_.scenario = 'auth:SecretToken' }
             }
+            if ($case -eq 'empty modes') { $Modes = @() }
             Write-Reports
             $saved = Get-Content -LiteralPath (Join-Path $OutputDirectory 'result.json') -Raw | ConvertFrom-Json
             $expected = if ($case -eq 'valid') { 'PASS:*' } elseif ($case -eq 'plan') { 'NOT_RUN:*' } else { 'FAIL:*' }

@@ -70,17 +70,30 @@ The report requires exactly one custom create and update result for each
 requested mode. A total count is insufficient: six repeated SecretToken
 results cannot stand in for three independent transports. Plan-only intake
 reports `NOT_RUN` for the custom mapping rather than claiming coverage.
+An explicitly empty authentication selection is rejected during parameter
+binding, before any remote action. Report projection also refuses to turn an
+empty requested matrix into a custom-mapping PASS.
 
 | Validation | Result |
 |---|---|
 | Missing mapping helper / missing read-back verifier | Confirmed RED before implementation |
 | Profile preservation, target/source values, duplicate refusal, missing template, wrong saved expression | GREEN |
 | Actual gallery-template transformation | GREEN, read-only Graph request |
+| Actual dev `entra-id` preset plus reviewed extension | GREEN through the built runtime profile validator; no endpoint mutation |
 | Group orchestration under OAuth and WIF | Confirmed RED before removing the SecretToken-only branch; GREEN for all three modes afterwards |
 | Missing custom/membership evidence, unsupported result, failed disposition | Four pipeline controls RED before acceptance hardening; GREEN afterwards |
 | Duplicate-mode report evidence | Confirmed RED before per-mode identity checks; GREEN afterwards |
+| Empty authentication selection and vacuous report evidence | Both controls confirmed RED, then GREEN; default remains all three transports |
 | Real expanded gallery provisioning and cleanup | Pending shared-estate handoff |
 | New documentation diagram | Rendered in Chromium under strict security in both themes; the separate built-in version-discovery warning is not represented as renderer equivalence. |
+
+The focused checkpoint passes 70 gallery contract checks and 41 deployment
+pipeline contract checks. The first pushed implementation is `0a884263`; its
+normal Fast hook passed all required static, documentation, unit and InMemory
+E2E gates. That E2E run passed 2,432 tests with four PostgreSQL-only exclusions.
+The exclusions are not PostgreSQL validation, and Jest's worker-exit warning
+is not evidence of clean teardown. Neither the hook nor the contracts replace
+the pending real expanded provisioning matrix.
 
 Run the existing contracts together:
 

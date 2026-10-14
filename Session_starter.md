@@ -11,19 +11,23 @@ also passed. No expanded live provisioning is claimed: the runtime deployment
 owner still owns the shared validation environment. See
 `docs/ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md`. Earlier 33-check results
 below describe the reduced historical matrix, not this prepared expansion.
+Checkpoint `0a884263` is pushed. Its normal Fast hook passed, including 2,432
+InMemory E2E tests with four PostgreSQL-only exclusions. The next focused
+checkpoint rejects empty auth selections and vacuous coverage claims; all 70
+gallery and 41 pipeline contracts pass. A read-only actual dev preset passed
+the built runtime profile validator with the reviewed extension.
 
-**Active consolidation:** v0.55.48 metadata is being prepared on
-`fix/persisted-profile-revision-20261013` in the isolated release worktree.
-PR #215 contains durable runtime and permanent live-test commits
-`46bca59a` and `897693ea`. CI-only lockfile regeneration, exact-tip reviewed
-merge, the full merged-master dev pipeline, and existing legacy-reference
-verification remain pending. Prior-release browser and gallery receipts are
+**Runtime release checkpoint:** PR #215 merged normally at `99cdeda3` with
+v0.55.48 metadata and preserved runtime/live-test history. Its full
+merged-master dev pipeline and existing legacy-reference verification still
+belong to the runtime continuation; no final receipt is available here.
+Prior-release browser and gallery receipts are
 not substitutes for this release's deployment matrix. The original dirty
 analysis worktree and the shared PostgreSQL container must remain untouched.
 No customer-prod promotion is authorized. Custom gallery mappings, UI
 readability, and operator visual sign-off remain separate parent work.
 
-**WIF follow-up:** The gallery configuration blocker was a harness defect:
+**Historical WIF checkpoint:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
 `secrets`. The corrected focused gallery flow passes 11 checks with zero
 failures, using a fresh owned endpoint and an exact-cleaned federated
@@ -40,8 +44,8 @@ The existing reference endpoint separately returned profile-revision HTTP 409
 on User create after accepted WIF authentication. A read-only database probe
 confirmed different persisted/runtime profile revisions: the persisted
 settings retain `PerEndpointCredentialsEnabled`, which runtime normalization
-drops. The fix and regression proof are still pending; isolated-target success
-must not be represented as its fix.
+drops. This describes the pre-fix observation; the runtime correction is now merged
+through PR #215, while deployed legacy-reference proof remains pending.
 See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I22.
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.

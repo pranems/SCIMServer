@@ -16,9 +16,11 @@ dashboard and its live counts remain historical evidence.
 |---|---|---|---|---|---|
 | GM-I01 | Coverage / High | OAuth and WIF mode orchestration omitted Group CRUD/membership by a deliberate SecretToken-only branch. Broad matrix language could hide that reduction. | Remove the branch and execute the same owned Group flow in every mode. Existing scoped on-demand/scheduled provisioning and exact cleanup are reused. | Three behavioral mode controls require all Group outcomes and custom create/update; OAuth/WIF controls were RED before correction. | Mode contract / mode contract |
 | GM-I02 | Evidence acceptance / High | Stage 4.8 accepted reports missing custom/membership outcomes, containing UNSUPPORTED, or declaring custom coverage failed. It only required core User results. | Require exact per-mode User, Group, membership and custom outcomes, reject unsupported checks and unsuccessful custom disposition. Four adversarial acceptance controls turned RED then GREEN. | Behavioral execution of the actual Stage 4.8 scriptblock, not source-word checks. | Pipeline contract / pipeline contract |
-| GM-I03 | Report correctness / High | A total of six custom rows all attributed to SecretToken could falsely claim three-mode custom coverage. | Require exactly one create and update result for each requested scenario; duplicate-mode evidence now reports FAIL. | Four real report-projection cases: valid, missing, duplicated, and plan-only NOT_RUN. Duplicate evidence was RED before the fix. | Report contract / report contract |
+| GM-I03 | Report correctness / High | A total of six custom rows all attributed to SecretToken could falsely claim three-mode custom coverage. | Require exactly one create and update result for each requested scenario; duplicate-mode evidence now reports FAIL. | Real report-projection cases cover valid, missing, duplicated, empty-matrix, and plan-only NOT_RUN evidence. Duplicate evidence was RED before the fix. | Report contract / report contract |
 | GM-I04 | Tooling lookup / Low | An initial search expected a separate gallery acceptance script, but acceptance is inline in the dev pipeline. | Follow the actual Stage 4.8 invocation and reuse its existing AST-based contract harness. No speculative helper or second validator was added. | Search the known orchestrator before inventing a split-file location. | Repository lookup / repository lookup |
 | GM-I05 | Worktree tooling / Low | The fresh worktree lacked root Mermaid, web Playwright, and API TypeScript dependencies. | A required-tooling preflight failed explicitly; restore junctions to matching installed dependencies without installs or lockfile edits. The new diagram then rendered under strict security in both themes and the existing Prisma generator created the ignored client. | Probe required tooling before trusting a render-gate summary. The known built-in `0.0.0` version warning remains with the separate gate-hardening owner. | Tooling preflight / tooling preflight |
+| GM-I06 | Input / evidence correctness / High | An explicit empty Modes array passed binding, and the zero-iteration report predicate declared custom coverage PASS. The pipeline separately rejected absent semantic outcomes, but standalone execution could still be misleading. | Require a nonempty parameter and a positive requested-mode count before custom PASS. Both behavioral controls were RED and then GREEN; the default still selects three modes. | Execute the actual parameter AST and report function with empty input; never infer coverage from an empty universal predicate. | Binding/report contract / binding/report contract |
+| GM-I07 | Test harness / Low | The first GREEN rerun failed while resolving the internal PowerShell validation exception type in a catch predicate. | Match the public ErrorRecord identifier `ParameterArgumentValidationError` instead. The contract now distinguishes expected argument validation without depending on an inaccessible exception class. | Use public error identifiers for shell contract assertions; default-binding positive control remains GREEN. | Focused contract / focused contract |
 
 The reviewed helper also refuses an absent target department template or
 duplicate custom registration and checks the saved source expression. A
@@ -26,6 +28,13 @@ read-only real Graph template probe confirmed the measured directory/object
 names and department source metadata; no directory object or endpoint was
 created. Planned missing-helper and missing-verifier RED runs were intentional
 TDD controls, not product incidents.
+The actual dev `entra-id` preset also passed the built runtime's
+`validateAndExpandProfile` after the extension was added, with no live endpoint
+mutation. At this checkpoint, 70 gallery and 41 pipeline contract checks pass.
+The normal push of `0a884263` passed its full Fast hook, including 2,432
+InMemory E2E tests; four PostgreSQL-only tests were excluded, and a Jest
+worker-exit warning remains a teardown limitation rather than an assertion
+failure.
 
 **Self-improvement applied:** Negative controls cover the implementation's
 mode decisions and serialized evidence, closing the gap between code that

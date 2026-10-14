@@ -23,6 +23,7 @@
 #>
 [CmdletBinding()]
 param(
+    [ValidateNotNullOrEmpty()]
     [ValidateSet('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')]
     [string[]]$Modes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity'),
     [string]$GalleryServicePrincipalName = 'PRTest Entra Gallery Provisioning Test app',
@@ -1160,7 +1161,7 @@ function Write-Reports {
     $extensionDisposition = if ($PlanOnly) {
         'NOT_RUN: plan-only intake does not provision the reviewed custom mapping.'
     }
-    elseif ($missingExtensionChecks.Count -eq 0) {
+    elseif ($Modes.Count -gt 0 -and $missingExtensionChecks.Count -eq 0) {
         'PASS: the reviewed department-to-costCode mapping was verified on create and update in every requested auth mode.'
     }
     else {
