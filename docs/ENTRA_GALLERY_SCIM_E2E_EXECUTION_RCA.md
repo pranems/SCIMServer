@@ -41,7 +41,7 @@ final runs.
 |---|---|---|
 | Secret token | PASS | User create, update, disable, re-enable, and deprovision; Group create, update, membership add/remove, and deprovision. |
 | OAuth client credentials | PASS | User create, update, disable, re-enable, and deprovision. Group and membership repetition is explicitly unsupported because the same gallery mapping matrix is already covered through secret token. |
-| Workload identity | PASS, focused run: 11 checks | Corrected connectivity configuration, real gallery assertion acquisition, User create, update, disable, re-enable, deprovision, and exact owned cleanup. The combined matrix is still pending. |
+| Workload identity | PASS in the complete three-mode matrix | Corrected connectivity configuration, real gallery assertion acquisition, User create, update, disable, re-enable, deprovision, and exact owned cleanup. |
 | Custom SCIM extensions | UNSUPPORTED | The stock `isvonboarding` schema covers core User, enterprise User, and Group. Arbitrary custom extension transport requires a reviewed synchronization-schema mapping. |
 
 The independent reusable WIF proof passed 50 checks with zero failures against
@@ -75,3 +75,26 @@ job and its original federated credential were not edited. No production
 promotion occurred. Design disposition: **accepted**, reuse the existing
 endpoint helper and keep the configuration/write-readback lifecycle cohesive;
 no speculative provider framework was introduced.
+
+## Combined matrix correction and result
+
+| ID | Type | Severity | Symptom and mechanism | Resolution and verification | Prevention and detection stage |
+|---|---|---|---|---|---|
+| EG-I20 | Harness mode lifecycle | High | The first default matrix passed SecretToken, then OAuth and WIF failed with `ProvisioningTaskAlreadyExists`. Jobs were retained until global cleanup, but the gallery principal permits only one job for the template. A failed scheduled cycle could also stay active while the next mode changed principal-wide credentials. | Extract exact-owned job teardown into a shared helper and invoke it from each mode's finally. Confirm collection removal before allowing the next mode. Teardown failure propagates and aborts the mode loop; global cleanup retries remaining owned jobs. The complete matrix now passes all three modes. | Behavioral controls verify ownership refusal, successful removal, and failed-convergence propagation. Static contract locks per-mode finally. Earliest combined run, rather than focused per-mode runs, exposes this defect. |
+| EG-I21 | Harness scope / federation safety | High | Review found WIF copied reference `SyncAll` and deletion policy, potentially enrolling unowned users during scheduled fallback. A unique FIC name also did not prevent duplicate issuer/subject collisions. | Build an allowlisted WIF configuration with assigned-only scope, deletion enabled, and notifications disabled. Reuse an exact existing gallery federation without marking it owned; reject an audience mismatch. Deduplicate requested modes. | Contract rejects unrestricted reference-secret copying and requires collision detection. Independent review caught both paths before final consolidation. |
+
+**Combined measured result:** dev runtime `0.55.47`, 672 seconds, **33 PASS,
+zero FAIL, zero BLOCKED, zero SKIPPED**, all three required authentication
+modes PASS. All **13 cleanup entries** report removed. Three explicit
+`UNSUPPORTED` coverage entries remain: Group/membership repetition under OAuth,
+Group/membership repetition under WIF, and arbitrary custom-extension mappings.
+The first two are deliberate test-matrix reductions, not connector limitations;
+the Group lifecycle is proven once under SecretToken. Custom mappings are not
+proven by this stock-gallery matrix.
+
+The existing reference endpoint's profile-revision conflict remains unresolved.
+Pipeline wiring and operator visual sign-off are not implied by this result.
+Self-improvement: **applied**, executable teardown failure controls now test
+outcomes rather than only source markers. Design disposition: **applied**,
+one shared teardown helper removes duplicated cleanup and makes the
+transaction boundary explicit without introducing speculative abstractions.

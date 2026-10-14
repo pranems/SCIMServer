@@ -7,11 +7,15 @@ application identifiers belong in Graph `connectivityParameters`, not
 `secrets`. The corrected focused gallery flow passes 11 checks with zero
 failures, using a fresh owned endpoint and an exact-cleaned federated
 credential. A complete saved-configuration read-back is now required before
-provisioning. The combined matrix and pipeline integration remain pending.
+provisioning. The corrected default matrix passes all three modes: 33 PASS,
+zero FAIL/BLOCKED/SKIPPED in 672 seconds; all 13 cleanup checks succeeded.
+Three explicit coverage exclusions remain (Group repetition under OAuth/WIF
+and arbitrary custom mappings). Per-mode job teardown and bounded assigned-only
+WIF scope are now enforced. Pipeline integration remains pending.
 The existing reference endpoint separately returned profile-revision HTTP 409
 on User create after accepted WIF authentication; this is unresolved and the
 isolated-target success must not be represented as its fix.
-See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I19.
+See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I21.
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 

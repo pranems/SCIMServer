@@ -40,7 +40,11 @@ reference's tenant-bound subject and creates a fresh endpoint and WIF trust.
 WIF application identifiers use `PATCH synchronization/connectivityParameters`,
 not `PUT synchronization/secrets`. The gate writes the complete WIF connectivity
 configuration and verifies every saved field before provisioning. The corrected
-focused gallery run passed 11 checks with zero failures. Do not treat a static
+complete gallery matrix passed 33 checks with zero failures in 672 seconds.
+All three auth modes passed and all 13 cleanup entries succeeded. Group
+repetition under OAuth/WIF and custom mappings remain explicit exclusions.
+Each mode deletes its job before another mode can configure the principal.
+Do not treat a static
 contract or the independent protocol proof as a replacement for this live flow.
 
 Run the independent real-Entra WIF protocol proof through the temporary-app

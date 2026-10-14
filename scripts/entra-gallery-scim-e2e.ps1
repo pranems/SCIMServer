@@ -36,6 +36,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Modes = @($Modes | Select-Object -Unique)
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'scim-estates.ps1')
 
@@ -697,19 +698,13 @@ function New-ModeContext {
         } | Out-Null
 
         $pairs = @(
-            foreach ($pair in $referenceSecrets) {
-            $value = [string]$pair.value
-            if ($pair.key -eq 'BaseAddress') {
-                $value = $targetBase
-            }
-            elseif ($pair.key -eq 'Oauth2TokenExchangeUri') {
-                $value = "$baseUrl/scim/endpoints/$endpointId/oauth/token"
-            }
-            @{
-                key = [string]$pair.key
-                value = $value
-            }
-            }
+            @{ key = 'AuthenticationType'; value = 'WorkloadIdentityClientAuthentication' }
+            @{ key = 'BaseAddress'; value = $targetBase }
+            @{ key = 'Oauth2TokenExchangeUri'; value = "$baseUrl/scim/endpoints/$endpointId/oauth/token" }
+            @{ key = 'Oauth2ClientId'; value = "entra-gallery-e2e-$runId" }
+            @{ key = 'SyncNotificationSettings'; value = '{"Enabled":false,"DeleteThresholdEnabled":false}' }
+            @{ key = 'SkipOutOfScopeDeletions'; value = 'false' }
+            @{ key = 'SyncAll'; value = 'false' }
         )
         $filter = [uri]::EscapeDataString("appId eq '$resourceAppId'")
         $appResponse = Invoke-Graph -Method GET -Path "applications?`$filter=$filter&`$select=id"
@@ -729,13 +724,22 @@ function New-ModeContext {
         }
         $referenceFic = $referenceFics[0]
         $subject = $referenceFic.subject.Substring(0, $referenceFic.subject.Length - $referenceObjectId.Length) + $gallerySp.id
-        $fic = Invoke-Graph -Method POST -Path "applications/$applicationId/federatedIdentityCredentials" -Body @{
-            name = "entra-gallery-e2e-$runId"
-            issuer = $referenceFic.issuer
-            subject = $subject
-            audiences = @('api://AzureADTokenExchange')
+        $existingGalleryFics = @($ficResponse.value | Where-Object {
+            $_.issuer -eq $referenceFic.issuer -and $_.subject -eq $subject
+        })
+        if ($existingGalleryFics.Count -gt 1 -or
+            ($existingGalleryFics.Count -eq 1 -and $existingGalleryFics[0].audiences -notcontains 'api://AzureADTokenExchange')) {
+            throw 'Existing gallery federation does not match the reviewed token-exchange audience.'
         }
-        $createdFederatedCredentials.Add([pscustomobject]@{ ApplicationId = $applicationId; Id = [string]$fic.id })
+        if ($existingGalleryFics.Count -eq 0) {
+            $fic = Invoke-Graph -Method POST -Path "applications/$applicationId/federatedIdentityCredentials" -Body @{
+                name = "entra-gallery-e2e-$runId"
+                issuer = $referenceFic.issuer
+                subject = $subject
+                audiences = @('api://AzureADTokenExchange')
+            }
+            $createdFederatedCredentials.Add([pscustomobject]@{ ApplicationId = $applicationId; Id = [string]$fic.id })
+        }
 
         return [pscustomobject]@{
             Mode = $Mode
@@ -993,6 +997,45 @@ function Invoke-ModeScenario {
         $detail = "$modeStage`: $(Get-SafeExceptionDetail $_)"
         Add-Result $scenario 'mode outcome' 'FAIL' $detail
     }
+    finally {
+        if ($job) {
+            if ($KeepArtifacts) {
+                throw 'KeepArtifacts retains the current job; refusing to reconfigure its principal for another mode.'
+            }
+            Remove-OwnedSynchronizationJob -JobId $job.id
+        }
+    }
+}
+
+function Remove-OwnedSynchronizationJob {
+    param([Parameter(Mandatory)] [string]$JobId)
+
+    if ($JobId -notin $createdJobIds) {
+        throw "Refusing to delete synchronization job $JobId because this run does not own it."
+    }
+    Pause-SynchronizationJob -JobId $JobId
+    Start-Sleep -Seconds 3
+    foreach ($attempt in 1..3) {
+        try {
+            Invoke-Graph -Method DELETE -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$JobId" | Out-Null
+            break
+        }
+        catch {
+            if ($attempt -eq 3) { throw }
+            Start-Sleep -Seconds 5
+        }
+    }
+    foreach ($attempt in 1..12) {
+        $jobResponse = Invoke-Graph -Method GET -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs"
+        $jobIds = @($jobResponse.value | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_.id })
+        if ($JobId -notin $jobIds) {
+            [void]$createdJobIds.Remove($JobId)
+            Add-CleanupResult -Kind 'synchronizationJob' -Id $JobId -Removed $true -Detail 'Deleted by exact ID; collection removal converged.'
+            return
+        }
+        Start-Sleep -Seconds 5
+    }
+    throw "Synchronization job $JobId deletion did not converge."
 }
 
 function Remove-OwnedArtifacts {
@@ -1003,37 +1046,7 @@ function Remove-OwnedArtifacts {
 
     foreach ($jobId in @($createdJobIds)) {
         try {
-            Pause-SynchronizationJob -JobId $jobId
-            Start-Sleep -Seconds 3
-            $deleted = $false
-            foreach ($attempt in 1..3) {
-                try {
-                    Invoke-Graph -Method DELETE -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$jobId" | Out-Null
-                    $deleted = $true
-                    break
-                }
-                catch {
-                    if ($attempt -eq 3) { throw }
-                    Start-Sleep -Seconds 5
-                }
-            }
-            if (-not $deleted) {
-                throw "Synchronization job $jobId was not deleted."
-            }
-            $removedFromCollection = $false
-            foreach ($attempt in 1..12) {
-                $jobResponse = Invoke-Graph -Method GET -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs"
-                $jobIds = @($jobResponse.value | ForEach-Object { [string]$_.id })
-                if ($jobId -notin $jobIds) {
-                    $removedFromCollection = $true
-                    break
-                }
-                Start-Sleep -Seconds 5
-            }
-            if (-not $removedFromCollection) {
-                throw "Synchronization job $jobId deletion did not converge."
-            }
-            Add-CleanupResult -Kind 'synchronizationJob' -Id $jobId -Removed $true -Detail 'Deleted by exact ID; collection removal converged.'
+            Remove-OwnedSynchronizationJob -JobId $jobId
         }
         catch {
             Add-CleanupResult -Kind 'synchronizationJob' -Id $jobId -Removed $false -Detail $_.Exception.Message

@@ -125,6 +125,19 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $skillPath))
         $gate.Contains('federatedIdentityCredentials') -and
         $gate.Contains('Federated credential removal did not converge')
     )
+    Assert-Contract 'every mode tears down its job before the next mode can configure the principal' (
+        $gate -match 'finally\s*\{\s*if \(\$job\)' -and
+        $gate.Contains('Remove-OwnedSynchronizationJob -JobId $job.id') -and
+        $gate.Contains('$createdJobIds.Remove($JobId)')
+    )
+    Assert-Contract 'WIF configuration is allowlisted and cannot inherit tenant-wide sync policy' (
+        $gate -notmatch 'foreach \(\$pair in \$referenceSecrets\)' -and
+        $gate.Contains("key = 'SyncAll'; value = 'false'")
+    )
+    Assert-Contract 'existing federated trust is detected and requested modes are deduplicated' (
+        $gate.Contains('existingGalleryFics') -and
+        $gate.Contains('$Modes = @($Modes | Select-Object -Unique)')
+    )
     Assert-Contract 'skill invokes the executable gate instead of duplicating it' (
         $skill.Contains('scripts\entra-gallery-scim-e2e.ps1')
     )
@@ -158,6 +171,53 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         $wrapper.Contains('preexistingEndpointIds') -and
         $wrapper.Contains("name -like 'wif-proof-*'") -and
         $wrapper.Contains('cleanupFailed')
+    )
+}
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+        $gatePath, [ref]$null, [ref]$null
+    )
+    $definition = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Remove-OwnedSynchronizationJob'
+    }, $true)
+    if (-not $definition) {
+        Assert-Contract 'per-mode teardown function is available for behavioral controls' $false
+        return
+    }
+    . ([scriptblock]::Create($definition.Extent.Text))
+    $createdJobIds = [System.Collections.Generic.List[string]]::new()
+    $createdJobIds.Add('owned-job')
+    $gallerySp = @{ id = 'owned-principal' }
+    $state = @{ Deleted = $false; Retain = $false; Cleanup = $false; Calls = 0 }
+    function Pause-SynchronizationJob { param($JobId) }
+    function Start-Sleep { param($Seconds) }
+    function Add-CleanupResult { param($Kind, $Id, $Removed, $Detail) $state.Cleanup = $Removed }
+    function Invoke-Graph {
+        param($Method, $Path)
+        $state.Calls++
+        if ($Method -eq 'DELETE') { $state.Deleted = $true; return }
+        @{ value = if ($state.Retain) { @(@{ id = 'owned-job' }) } else { @() } }
+    }
+    Remove-OwnedSynchronizationJob -JobId 'owned-job'
+    Assert-Contract 'behavior: confirmed deletion releases the job for the next mode' (
+        $state.Deleted -and $state.Cleanup -and $createdJobIds.Count -eq 0
+    )
+    $callsBefore = $state.Calls
+    $refused = $false
+    try { Remove-OwnedSynchronizationJob -JobId 'unowned-job' } catch { $refused = $_.Exception.Message -like 'Refusing to delete*' }
+    Assert-Contract 'behavior: unowned job deletion is refused before Graph mutation' (
+        $refused -and $state.Calls -eq $callsBefore
+    )
+    $createdJobIds.Add('owned-job')
+    $state.Retain = $true
+    $state.Cleanup = $false
+    $failed = $false
+    try { Remove-OwnedSynchronizationJob -JobId 'owned-job' } catch { $failed = $_.Exception.Message -like '*deletion did not converge*' }
+    Assert-Contract 'behavior: unconfirmed deletion throws and retains ownership for final cleanup' (
+        $failed -and -not $state.Cleanup -and $createdJobIds.Contains('owned-job')
     )
 }
 
