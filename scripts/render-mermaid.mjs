@@ -223,7 +223,7 @@ for (const { label, config } of RENDER_CONFIGS) {
 
 await browser.close();
 
-console.log(`Mermaid blocks rendered: ${blocks.length} (x${RENDER_CONFIGS.length} themes, securityLevel=strict - matches the VS Code extension)`);
+console.log(`Mermaid blocks rendered: ${blocks.length} (x${RENDER_CONFIGS.length} themes, securityLevel=strict; editor equivalence requires separate verification)`);
 if (failures.length === 0) {
   console.log('All Mermaid diagrams render cleanly in a real browser.');
   process.exit(0);

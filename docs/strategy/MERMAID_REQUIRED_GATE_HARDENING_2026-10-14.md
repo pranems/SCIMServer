@@ -61,12 +61,13 @@ pwsh -NoProfile -File scripts/test/mermaid-pre-push.contract.ps1
 | Compact info-database literal | Additional format control | Identifies 11.15.0; rejects 0.0.0. |
 | Unknown renderer diagnostic | Output contract control | States unverified equivalence without recommending 0.0.0. |
 | Identified renderer drift diagnostic | Output contract control | Retains blocker and identifies 11.17.0 as the observed version. |
+| Render summary equivalence claim | Claimed matching the VS Code extension even after a drift warning | States actual configuration and requires separate editor verification. |
 
 The PowerShell test executes the actual gate action and runner extracted from
 the script's syntax tree. It stubs only the external renderer command; it does
 not infer behavior from substring presence in source. Node controls execute the
 real render CLI in owned temporary fixtures and clean them in `finally`.
-The focused result is nine Node controls and three PowerShell controls passing.
+The focused result is ten Node controls and three PowerShell controls passing.
 The positive render remains real Chromium with `securityLevel: strict` in
 both light/default and dark themes, including nonempty SVG and nondegenerate-size
 checks. Hook-owned full validation is not duplicated manually before pushing.
@@ -96,6 +97,7 @@ Do not install or downgrade to `0.0.0`.
 | MG-I2 | Tooling inference / High | Discovery recommended `mermaid@0.0.0`: first generic version belonged to profiling injection, not Mermaid. | Read the identified info database; null for placeholder/unattributed versions; unknown diagnostics explicitly disclaim equivalence. | Bundle inspection / fixture with multiple version identities | Test placeholder, real Mermaid, and unrelated library together and independently. |
 | MG-I3 | Environment / Low | Fresh-worktree API/web builds lacked tsc/vite; render lacked Playwright. | After measured failures, restore existing installed dependencies with identical dependency entries. Root uses a junction; API/web use private copies so generation cannot mutate owned worktrees. | Focused prerequisite checks / same | Compare dependency entries before reuse; no registry fetch, package or lockfile edits. |
 | MG-I4 | Test isolation / Low | Child doctor rediscovered the host instead of the scratch renderer; Windows restored ProgramFiles despite an explicit child environment override. | Feed the real scratch discovery result into the doctor's imported discovery seam in the scratch fixture; production discovery is unchanged. | Focused diagnostic control / same | Test output against identified fixture data; do not assume child environment overrides isolate system-known paths. |
+| MG-I5 | Evidence wording / Medium | Successful focused render ended with "matches the VS Code extension" despite identified version drift. | Report strict/two-theme configuration separately from unverified editor equivalence. | Positive browser receipt / summary output contract | A behavioral negative control rejects the equivalence claim in the render summary. |
 
 Dependency manifests matched the consolidation worktree. API/web lockfile
 dependency entries matched exactly; only release-level lock metadata differed.
@@ -109,7 +111,7 @@ RED/GREEN receipts are actual subprocess outputs from this bounded session.
 The available full `events.jsonl` session log was scanned at consolidation
 using failure-signal and diagnosis-phrase passes, including tool outputs and
 narration rather than compacted recollection. Diagnosed issues map to MG-I1
-through MG-I4. The missing-tool failures are
+through MG-I5. The missing-tool failures are
 intentional RED/prerequisite evidence, not unresolved runtime defects. The
 first discovery fixture format control already passed before the fix; it is
 not counted as a reproduced defect. Commit identities and final hook evidence

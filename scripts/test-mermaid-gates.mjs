@@ -114,8 +114,23 @@ try {
       else process.env[key] = value;
     }
   }
+  check('render summary does not certify editor equivalence', () => {
+    copyFileSync(join(scripts, 'mermaid-renderers.mjs'), join(root, 'scripts', 'mermaid-renderers.mjs'));
+    const mermaidDist = join(root, 'node_modules', 'mermaid', 'dist');
+    mkdirSync(mermaidDist);
+    writeFileSync(join(mermaidDist, 'mermaid.min.js'), '');
+    writeFileSync(join(playwright, 'index.js'),
+      'module.exports = { chromium: { launch: async () => ({\n' +
+      '  newPage: async () => ({ setContent: async () => {}, addScriptTag: async () => {}, evaluate: async () => {} }),\n' +
+      '  close: async () => {}\n' +
+      '}) } };\n');
+    const result = runRender();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /x2 themes, securityLevel=strict/);
+    assert.doesNotMatch(result.stdout, /matches the VS Code extension/);
+  });
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
-console.log(`Mermaid gate controls: ${9 - failures} passed, ${failures} failed.`);
+console.log(`Mermaid gate controls: ${10 - failures} passed, ${failures} failed.`);
 process.exitCode = failures ? 1 : 0;
