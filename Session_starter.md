@@ -3,13 +3,22 @@
 **Last verified:** 2026-10-14
 
 **Isolated inventory checkpoint:** `fix/ui-inventory-selection-20261014`
-owns UI-03 through UI-10 only. UI-03/04/06/07/08 now pass 15 measured
-Chromium cases at 1440/900/390 px with an 80-endpoint fixture; 63 focused
-units, web build and size budgets pass. Dashboard is capped at five entries;
+owns UI-03 through UI-10 only. All eight have verified local dispositions;
+49 distinct Chromium cases pass across focused runs at 1440/900/390 px,
+including parent readability and affected navigation regressions. Separate
+focused unit runs pass 63 and 38 tests with two overlapping selector tests.
+Web build and size budgets pass. Dashboard is capped at five entries;
 Endpoints owns a searchable scrollable table; Discovery reuses the searchable
-context selector and defaults to Schemas. UI-05 Operations application and
-UI-09/10 intent proof remain in progress. No release, deployment or operator
+context selector and defaults to Schemas. Operations shares persistent
+filters/results ownership; its current-resource intent and `/Me` OAuth-subject
+intent are verified, not merged away. Tsc retains 66 unchanged baseline errors
+(64 test, two production). First local commit: `892d0192`. No release,
+deployment or operator
 signoff is claimed. See `docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md`.
+
+| Date | Summary |
+|---|---|
+| 2026-10-14 | Isolated UI-03 through UI-10 implementation completed locally; finite measured browser evidence, exact status matching, durable geometry receipts, full raw-event RCA reconciliation and explicit design disposition recorded. PR/release/deployment and operator approval remain separate. |
 
 **UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
 separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases

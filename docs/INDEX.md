@@ -9,7 +9,7 @@
 
 | UI follow-up | Read |
 |---|---|
-| Review compact endpoint inventory, bounded Dashboard summary, Discovery selection and finite responsive evidence | [UI_INVENTORY_SELECTION_IMPLEMENTATION.md](UI_INVENTORY_SELECTION_IMPLEMENTATION.md) |
+| Review compact endpoint inventory, persistent Operations filters, Discovery selection and distinct `/Me` intent | [Implementation and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md), [generated geometry evidence](evidence/UI_INVENTORY_SELECTION_20261014.json) |
 
 | If you want to... | Read |
 |---|---|

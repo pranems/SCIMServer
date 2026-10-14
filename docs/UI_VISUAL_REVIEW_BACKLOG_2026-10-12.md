@@ -13,9 +13,13 @@ measured Chromium cases at 1440, 900, and 390 px, including real clipping,
 stable fields, readable mobile columns, and navigation. See
 [readability evidence and RCA](UI_ACTIVITY_ENDPOINT_READABILITY.md).
 These two items are not yet deployed or operator-approved. UI-03 through UI-10
-are owned by the isolated inventory branch. UI-03/04/06/07/08 pass a finite
-15-case responsive Chromium matrix locally; UI-05 has its first shared-panel
-application. UI-09/10 intent verification remains in progress. See
+are owned by the isolated inventory branch. All eight have explicit local
+dispositions: compact inventory and selectors, a bounded Dashboard summary,
+shared Endpoints/Operations filter-scroll ownership, contract-first tab order,
+and verified retention of distinct Operations and OAuth-subject `/Me` workflows.
+Forty-nine distinct responsive/navigation browser cases pass across focused
+runs, including nine parent readability regressions. This is not a claim of
+every possible combination, deployed validation or operator approval. See
 [inventory implementation and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
 The original current-release dispositions below are preserved.
 

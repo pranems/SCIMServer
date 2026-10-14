@@ -2,12 +2,27 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.47
-> **Last Updated**: October 12, 2026
-> **Last verified:** 2026-10-12
+> **Last Updated**: October 14, 2026
+> **Last verified:** 2026-10-14
 
 ---
 
 ## Active Delivery Process
+
+**Isolated unreleased UI continuation:** `fix/ui-inventory-selection-20261014`
+is based on `a5c1c603` and owns only UI-03 through UI-10. First local checkpoint
+`892d0192` implements compact inventory, bounded Dashboard and shared Discovery
+selectors. The follow-up completes shared Operations filter-scroll ownership
+and exact status matching, retaining distinct current-resource and OAuth-subject
+workflows. Forty-nine distinct local browser cases pass across focused runs;
+unit runs pass 63 and 38 tests with two overlapping selector tests. Whole-web
+tsc retains 64 unchanged test diagnostics and two unchanged production
+diagnostics. Geometry receipts are committed as a generated aggregate.
+See [implementation, RCA and handoff](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+Do not edit the original dirty analysis checkout or the parent readability/
+release worktrees. Parent owns PR/consolidation; runtime PR #215 is separately
+owned. No new version, deployment, shared Entra mutation or operator visual
+approval is claimed by this continuation.
 
 **v0.55.47 deployed evidence:** runtime merge
 `e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy on dev as revision

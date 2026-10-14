@@ -58,6 +58,11 @@ default and visual tab order is Schemas, ResourceTypes, ServiceProviderConfig.
 Endpoint list filters remain `q` URL state and sit outside the panel that
 owns result scrolling. Dashboard shows at most five entries in existing
 inventory order, then links to the complete Endpoints workspace.
+Operations Users and Groups reuse the same accessible panel: filters remain
+outside the 420 px results scroll owner, and Back/Forward restores URL filters
+and exact rows. An exact Active/Inactive inventory query means that status,
+not a substring match. The shared selector still rejects inactive action
+targets in Manual Provision while permitting read-only Discovery inspection.
 See [measured evidence and implementation boundaries](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
 
 The local readability follow-up bounds Operations provenance links inside

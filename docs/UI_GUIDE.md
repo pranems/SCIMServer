@@ -32,6 +32,11 @@ Discovery uses searchable endpoint selectors and the contract-first order
 Schemas, ResourceTypes, ServiceProviderConfig. The selected identities remain
 copyable, visibly marked and URL-owned. See
 [finite responsive evidence and release exclusions](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+Operations Users and Groups now reuse that persistent filter/results pattern:
+the toolbar stays outside the bounded results scroll owner while filters
+remain in URL state. Exact `Active` inventory searches exclude inactive
+endpoints. Operations and OAuth-subject `/Me` remain distinct workflows; their
+existing explanations and navigation are browser-verified, not removed.
 
 1. [Overview](#1-overview)
 2. [Accessing the UI](#2-accessing-the-ui)
