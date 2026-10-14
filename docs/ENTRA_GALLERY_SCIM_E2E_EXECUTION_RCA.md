@@ -188,3 +188,48 @@ with zero changed package versions and byte-equivalent dependency-entry maps
 (684 API, 395 web). Public-registry and SHA-512 checks pass. The read-only
 consolidation review found no significant issues. Merge and dev proof remain
 pending; these results do not imply deployment.
+
+### First authoritative v0.55.48 attempt
+
+PR #215 merged normally at `99cdeda35861049b05908f5b507e404b3318e33d`
+with final-tip CI green. The full pipeline was invoked without skip flags.
+Stages 0 and 1 passed, including 73-endpoint before-state capture. Stage 2.1
+passed; Stage 2.2 failed with 2,178 passes, 310 failures, and four skips
+across 118 suites (89 passed, 29 failed). Bootstrap-hook timeouts account
+for early cascades such as undefined `getHttpServer`; this is not 310
+independent runtime diagnoses. The direct gate used four workers while the
+existing backend matrix deliberately runs Prisma E2E serially.
+
+The attempt was stopped before publication or deployment rather than risk
+letting later work obscure the failed validation. Its exact owned PostgreSQL
+container `25b2f446d092` was removed after verifying owner and run labels.
+The shared `scimserver-combined-validation-postgres-20261009` remains running.
+No dev image or profile was changed.
+
+**EG-I30, validation scheduling, Medium:** the owning direct Prisma gate did
+not use the matrix's existing serial scheduling. Align the command with
+`--runInBand`; its new contract assertion is confirmed RED then GREEN.
+Actual full serial execution and complete pipeline recovery remain pending,
+so worker contention is a hypothesis supported by scheduling drift and
+bootstrap timeouts, not a verified sole cause. Detection was Stage 2.2;
+the command-consistency contract is the earliest structural check.
+Both earliest bootstrap-failed suites then pass serially on a fresh exact
+owned PostgreSQL container: 47/47 tests across two suites in 93.8 seconds.
+That container was removed by exact ID after its owner label was checked.
+This focused recovery supports the scheduling correction but does not replace
+the complete serial suite or full deployment matrix.
+
+**Reference proof preparation:** the generic live helper's minimal User body
+omits `displayName`, which this original dev profile publishes as required.
+That setup returned 400 before reaching the revision guard. An explicit
+profile-conforming fixture now confirms User and Group POST both return 409
+on deployed v0.55.47, while a read-only database transaction confirms the
+original raw legacy setting and unchanged revision. The gallery reference
+connector's BaseAddress names customer production; it is not a deployment
+target. Select the existing dev copy explicitly and resolve dev from the
+estate registry. No connector or profile rewrite is permitted.
+
+**Test/gate improvement: applied.** The direct Prisma scheduling contract
+detects drift from the established backend matrix. Full recovery is pending.
+**Design disposition: accepted.** Reuse existing serial execution rather than
+adding a runner, changing timeouts, removing assertions, or redesigning gates.
