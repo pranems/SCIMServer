@@ -1363,7 +1363,11 @@ Delete or rewrite statements invalidated by current source.
 Under `--write=guide-only`:
 
 - update only the canonical guide, this skill's memory, and low-risk skill metadata/changelog;
-- do not modify either source repository.
+- repository-owned skill resources are an explicit exception: memory and the
+  low-risk self-updates allowed by Phase 12.4 may be written only under `.github/skills/syncfabric-scimserver-auth-evolution/`
+  in the worktree from which this skill was invoked;
+- do not otherwise modify either source repository. This exception does not
+  authorize runtime edits, unrelated documentation changes, or edits in another worktree.
 
 Under `--write=repo-docs`:
 
@@ -1710,7 +1714,7 @@ End with:
 ## Skill metadata
 
 ```yaml
-skillVersion: 1.7.0
+skillVersion: 1.7.1
 created: 2026-07-23
 lastExecution: 2026-08-19
 executionCount: 6
@@ -1735,6 +1739,8 @@ authSurfaceCountNote: These are MEASUREMENTS at the snapshots above, recorded on
 > silently skipping the step.
 
 ## Skill changelog
+
+- 2026-10-14, v1.7.1: PR #222 resource review found the guide-only repository prohibition conflicted with repository-owned memory. Clarified the existing owning-resource allowance without permitting unrelated source edits; added a failing-then-passing customization contract (CSM-20).
 
 - 2026-10-14, v1.7.0: Migrated the workflow and durable memory into the committed project Agent Skill structure. VS Code Copilot harness, Copilot CLI, and other skills-compatible agents now use one slash command and one repository-owned source of truth.
 

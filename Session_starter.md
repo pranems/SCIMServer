@@ -28,6 +28,10 @@ SyncFabric duplicate is unchanged and did not override project slash resolution.
 All four focused contracts, seven changed-script parse checks, documentation
 freshness/source checks, and whitespace checks pass. Exact-tip CI and review
 remain required before merge. No version bump or deployment is part of this PR.
+Independent resource review found one contradictory SyncFabric write boundary;
+a narrow owning-skill exception and permanent RED/GREEN contract address it
+(CSM-20). Hosted Copilot review returned a billing configuration error, not an
+approval. No repository-required approval or CI protection may be bypassed.
 
 Both full no-skip pipeline attempts failed the direct Prisma E2E gate.
 The second serial run improves to 112/118 suites and 2,348 passes but retains

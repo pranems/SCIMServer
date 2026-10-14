@@ -235,6 +235,12 @@ Invoke-Assert -Description 'SyncFabric workflow evolves skillVersion metadata' `
         $syncFabricWorkflow -match 'increment the skill version' -and
         $syncFabricWorkflow -notmatch 'increment the prompt version'
     )
+Invoke-Assert -Description 'SyncFabric guide-only boundary permits its repository-owned resources without unrelated writes' `
+    -Condition (
+        $syncFabricWorkflow -match 'repository-owned skill resources are an explicit exception' -and
+        $syncFabricWorkflow -match 'only under `\.github/skills/syncfabric-scimserver-auth-evolution/`' -and
+        $syncFabricWorkflow -match 'do not otherwise modify either source repository'
+    )
 
 $tenantMigrationPlan = Get-TreeFileContent 'docs/TENANT_09_MIGRATION_PLAN.md'
 Invoke-Assert -Description 'tenant migration plan names Agent Skills at cutover' `

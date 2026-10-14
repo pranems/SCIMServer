@@ -12,7 +12,7 @@ The migration converted every active prompt workflow from latest master into a
 project Agent Skill, moved durable memory beside its owning skill, and rewired
 the gate and deployment automation to use skill paths and slash invocations.
 
-The review and consolidation found nineteen execution issues. Two were high severity because they
+The review and consolidation found twenty execution issues. Two were high severity because they
 could have produced a false-successful migration: stale generated content from
 another branch and an RFC audit whose instructions were trapped inside a code
 fence. Both now have structural prevention in
@@ -61,6 +61,7 @@ the completed state is green.
 | CSM-17 | Documentation coupling | Low | The second push passed seven gates but the deployment-document audit blocked because `dev-deployment-pipeline.ps1` is an infrastructure-coupled path. | Even reviewer-label-only changes to that script require a same-change review of the canonical infrastructure document. | Updated the document capture date/version and Section 15 with the measured no-runtime-change classification; re-reviewed the drift register. | The canonical document now states what changed and explicitly records that deployment, publication, estate, and promotion behavior did not. | Run `audit-deployment-doc.ps1` whenever any mechanically classified infrastructure path changes, even when behavior is unchanged. | Pre-push infrastructure audit / pre-push infrastructure audit |
 | CSM-18 | Harness acceptance / test correctness | Low | A fresh chat's skill tool returned `not found` for explicit-only project skills, initially suggesting discovery had failed. | `disable-model-invocation: true` intentionally removes skills from the model-visible inventory; explicit user slash dispatch is a separate harness surface. | Sent actual `/session-startup`, `/standupstatus`, and `/syncfabric-scimserver-auth-evolution` messages in a fresh chat bound to the migration worktree. Each injected project skill context successfully. | The test now exercises the intended user invocation path instead of treating model-tool visibility as a proxy. The auto-discoverable Entra skill was independently visible before filesystem enumeration. | For explicit-only skills, record injected context name and project base directory from an actual slash invocation. File inventory and model-tool calls alone do not prove user availability. | Fresh-session acceptance / fresh-session acceptance |
 | CSM-19 | GitHub review tooling | Low | `gh pr edit --add-reviewer copilot` could not resolve the reviewer; an API request without the bot suffix returned HTTP 422. | The installed GitHub CLI does not resolve that shorthand, and the REST endpoint needs the full reviewer bot login. | Requested review using `gh api --method POST repos/pranems/SCIMServer/pulls/222/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'`; the request succeeded. | The full bot identity selects GitHub's Copilot review integration rather than an ordinary collaborator lookup. Review completion is tracked separately from request acceptance. | Use the full bot login and inspect the eventual review and reviewed commit before claiming the PR is reviewed. | Review request / review request |
+| CSM-20 | Workflow semantics / write boundary | Medium | The default SyncFabric guide-only mode allowed memory updates but also prohibited modifying either source repository. | The relocated memory and self-update resources are repository-owned, so the general prohibition contradicted the specific owning-resource allowance. A path-existence check cannot detect contradictory instructions. | Clarified a narrow exception for the owning skill directory in the invoking worktree, retaining the prohibition on runtime, unrelated documentation, and other-worktree edits. | Mandatory memory maintenance and permitted low-risk self-updates are now compatible with the default boundary; no unrelated repository permission is granted. | New committed-tree assertion failed on the contradictory workflow before the clarification and passed after it. Resource review must check write-boundary semantics as well as link existence. | Independent resource review / post-relocation semantic review |
 
 ## Detection-stage escape analysis
 
@@ -85,6 +86,14 @@ the completed state is green.
 | CSM-17 | Pre-push deployment-doc audit | Pre-push deployment-doc audit | 0 | Canonical document updated and focused audit rerun green. |
 | CSM-18 | Actual explicit slash invocation | Fresh-session acceptance | 0 | Three representative explicit-only project skills loaded through user slash dispatch. |
 | CSM-19 | First reviewer request | First reviewer request | 0 | Full bot identity accepted; review completion remains a separate gate. |
+| CSM-20 | Post-relocation semantic review | Independent resource review | 1 phase | Narrow resource exception and permanent RED/GREEN assertion close the gap. |
+
+The hosted Copilot reviewer accepted the request but returned a billing-entity
+configuration error instead of reviewing code. An independent read-only
+resource review covered all 35 migrated workflow bodies, three durable-memory
+moves, and changed current operator documentation. Its one actionable finding
+is CSM-20. Hosted review availability is not represented as an approval;
+repository-required checks and any required human approval remain mandatory.
 
 ## Fresh-session discovery acceptance
 
@@ -113,8 +122,9 @@ runtime did not expose `VSCODE_TARGET_SESSION_LOG`, and the current session was
 not yet present in the local or cloud session store, so no separate JSONL
 transcript was available to scan.
 
-The PR consolidation continuation additionally reconciled CSM-18 and CSM-19
-against its fresh-chat acceptance replies and GitHub CLI tool results. No raw
+The PR consolidation continuation additionally reconciled CSM-18 through CSM-20
+against its fresh-chat acceptance replies, GitHub CLI tool results, independent
+resource-review result, and the exact failing contract assertion. No raw
 JSONL transcript path was exposed in that continuation either. The distinction
 between model-tool visibility and successful explicit slash dispatch was
 verified and dismissed as a repository defect; it remains a test-method lesson.
