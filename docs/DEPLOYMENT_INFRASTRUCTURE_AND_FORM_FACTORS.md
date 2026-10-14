@@ -7,6 +7,20 @@
 
 ---
 
+## Entra gallery validation gate
+
+The dev deployment orchestrator now runs Stage 4.8 after exact intended
+revision readiness and the live SCIM suite. It invokes the complete default
+matrix in [entra-gallery-scim-e2e.ps1](../scripts/entra-gallery-scim-e2e.ps1),
+retains structured evidence under the deployment report directory, and
+rejects missing modes, failed checks, skips, incomplete cleanup, or a runtime
+version mismatch. The owned dev tenant's delegated Graph profile is required;
+missing access fails the gate. No production connector is mutated and this
+gate is not used for customer-prod promotion. The standalone current-dev
+matrix passed 33 checks across three authentication modes with all 13 cleanup
+entries successful. Wiring validation does not imply that the complete
+deployment orchestrator was rerun.
+
 ## 0. Provenance and how to reproduce every fact
 
 Nothing in this document is inferred from memory. Every Azure value was read from the live control plane or the live data plane on the capture date; every repo value was read from the file cited.

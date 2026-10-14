@@ -11,11 +11,17 @@ provisioning. The corrected default matrix passes all three modes: 33 PASS,
 zero FAIL/BLOCKED/SKIPPED in 672 seconds; all 13 cleanup checks succeeded.
 Three explicit coverage exclusions remain (Group repetition under OAuth/WIF
 and arbitrary custom mappings). Per-mode job teardown and bounded assigned-only
-WIF scope are now enforced. Pipeline integration remains pending.
+WIF scope are now enforced. Pipeline Stage 4.8 is now wired, with seven
+behavioral acceptance/rejection controls and replay acceptance of the real
+matrix report. The full deployment orchestrator was not rerun in this
+continuation; consolidation and exact-tip CI remain pending.
 The existing reference endpoint separately returned profile-revision HTTP 409
-on User create after accepted WIF authentication; this is unresolved and the
-isolated-target success must not be represented as its fix.
-See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I21.
+on User create after accepted WIF authentication. A read-only database probe
+confirmed different persisted/runtime profile revisions: the persisted
+settings retain `PerEndpointCredentialsEnabled`, which runtime normalization
+drops. The fix and regression proof are still pending; isolated-target success
+must not be represented as its fix.
+See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I22.
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 

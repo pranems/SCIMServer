@@ -71,6 +71,12 @@ The executable gate owns all behavior. Do not reproduce its Graph or SCIM mutati
 
 ## Evidence
 
+The authoritative dev deployment pipeline invokes this skill's executable
+matrix as Stage 4.8 after exact revision readiness. It checks the child exit,
+runtime version, three auth modes, semantic User outcomes, and cleanup. The
+pipeline gate remains distinct from the independent WIF protocol proof and
+the real-browser Playwright lane.
+
 Read the generated `test-results/entra-gallery-scim-e2e/<run-id>/result.json` and `summary.md`.
 
 Report:

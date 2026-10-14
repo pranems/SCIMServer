@@ -35,6 +35,10 @@ Invoke-Assert -Description 'pipeline script parses without errors' -Condition ($
 $content = Get-Content -LiteralPath $pipeline -Raw
 $fullValidationContent = Get-Content -LiteralPath $fullValidationPipeline -Raw
 $verifyDeploymentContent = Get-Content -LiteralPath $verifyDeployment -Raw
+Invoke-Assert -Description 'Stage 4.8 executes the full Entra gallery gate without mode or retention overrides' `
+    -Condition ($content.Contains("Invoke-Gate '4.8' 'Entra gallery provisioning vs dev'") -and
+        $content.Contains('scripts/entra-gallery-scim-e2e.ps1 -OutputDirectory $galleryOutputDirectory') -and
+        $content.Contains('$galleryEvidence.serverVersion -ne $version'))
 Invoke-Assert -Description 'Playwright keeps the readable line reporter' `
     -Condition ($content -match 'playwright\s+test\s+--reporter=line,json')
 $writesJsonReport = ($content -match '\$playwrightJsonPath\s*=\s*Join-Path\s+\$ReportDir') -and
@@ -186,6 +190,59 @@ $usesRunUniqueProject = ($fullValidationContent -match '\[guid\]::NewGuid\(\)') 
     ($fullValidationContent -notmatch 'scimserver-validation-\$PID')
 Invoke-Assert -Description 'default validation project identity remains unique after the launching process exits' `
     -Condition $usesRunUniqueProject
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $command = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Invoke-Gate' -and
+        $node.CommandElements[1].Extent.Text -eq "'4.8'"
+    }, $true)
+    if (-not $command) {
+        Invoke-Assert 'gallery gate command exists for behavioral controls' $false
+        return
+    }
+    $gateBody = $command.CommandElements[3].ScriptBlock.GetScriptBlock()
+    $version = 'test-version'
+    $ReportDir = $env:TEMP
+    $timestamp = 'contract-only'
+    $state = @{ Exit = 0; Evidence = $null }
+    function pwsh { $global:LASTEXITCODE = $state.Exit }
+    function Get-Content { param($LiteralPath, [switch]$Raw) $state.Evidence | ConvertTo-Json -Depth 10 }
+    $originalExit = $global:LASTEXITCODE
+    try {
+        foreach ($case in @('valid', 'child failure', 'wrong version', 'missing mode', 'missing outcome', 'failed cleanup', 'skipped check')) {
+            $state.Exit = 0
+            $state.Evidence = @{
+                serverVersion = $version
+                modes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity') | ForEach-Object { @{ mode = $_; status = 'PASS' } }
+                results = @(
+                    foreach ($mode in @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')) {
+                        foreach ($check in @('create user', 'update user', 'disable user', 'deprovision user', 'mode outcome')) {
+                            @{ scenario = "auth:$mode"; check = $check; status = 'PASS' }
+                        }
+                    }
+                )
+                cleanup = @(@{ removed = $true })
+            }
+            switch ($case) {
+                'child failure' { $state.Exit = 1 }
+                'wrong version' { $state.Evidence.serverVersion = 'old-version' }
+                'missing mode' { $state.Evidence.modes = @($state.Evidence.modes | Select-Object -First 2) }
+                'missing outcome' { $state.Evidence.results = @() }
+                'failed cleanup' { $state.Evidence.cleanup[0].removed = $false }
+                'skipped check' { $state.Evidence.results += @{ status = 'SKIPPED' } }
+            }
+            $passed = $true
+            try { & $gateBody } catch { $passed = $false }
+            Invoke-Assert "gallery evidence behavior: $case" ($passed -eq ($case -eq 'valid'))
+        }
+    }
+    finally {
+        $global:LASTEXITCODE = $originalExit
+    }
+}
 
 Write-Host ''
 if ($failures.Count -eq 0) {

@@ -894,8 +894,40 @@ if (-not $SkipDeploy) {
         # not provably serving the new build we SKIP with a reason instead.
         if ($devReady) {
             Invoke-Gate '4.7' 'Live SCIM tests vs dev' { pwsh -NoProfile -File scripts/live-test.ps1 -BaseUrl "https://$DevFqdn" -ClientSecret 'changeme-oauth' } | Out-Null
+            Invoke-Gate '4.8' 'Entra gallery provisioning vs dev' {
+                $galleryOutputDirectory = Join-Path $ReportDir "entra-gallery-$timestamp"
+                pwsh -NoProfile -File scripts/entra-gallery-scim-e2e.ps1 -OutputDirectory $galleryOutputDirectory
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Entra gallery gate exited with code $LASTEXITCODE."
+                }
+                $galleryEvidence = Get-Content -LiteralPath (Join-Path $galleryOutputDirectory 'result.json') -Raw | ConvertFrom-Json
+                if ($galleryEvidence.serverVersion -ne $version) {
+                    throw 'Entra gallery evidence does not match the intended dev runtime version.'
+                }
+                $requiredGalleryModes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')
+                foreach ($requiredMode in $requiredGalleryModes) {
+                    $modeEvidence = @($galleryEvidence.modes | Where-Object mode -eq $requiredMode)
+                    if ($modeEvidence.Count -ne 1 -or $modeEvidence[0].status -ne 'PASS') {
+                        throw "Entra gallery mode $requiredMode is missing, duplicated, or not PASS."
+                    }
+                    foreach ($check in @('create user', 'update user', 'disable user', 'deprovision user', 'mode outcome')) {
+                        $outcome = @($galleryEvidence.results | Where-Object {
+                            $_.scenario -eq "auth:$requiredMode" -and $_.check -eq $check
+                        })
+                        if ($outcome.Count -ne 1 -or $outcome[0].status -ne 'PASS') {
+                            throw "Entra gallery $requiredMode does not prove $check."
+                        }
+                    }
+                }
+                if (@($galleryEvidence.results | Where-Object status -in @('FAIL', 'BLOCKED', 'SKIPPED')).Count -ne 0 -or
+                    @($galleryEvidence.cleanup).Count -eq 0 -or
+                    @($galleryEvidence.cleanup | Where-Object { -not $_.removed }).Count -ne 0) {
+                    throw 'Entra gallery evidence contains failed checks, skips, or unverified cleanup.'
+                }
+            } | Out-Null
         } else {
             Add-Result -Stage '4.7' -Gate 'Live SCIM tests vs dev' -Status 'SKIPPED' -Detail "dev is NOT serving $version - running these would validate the old image and report a false PASS"
+            Add-Result -Stage '4.8' -Gate 'Entra gallery provisioning vs dev' -Status 'SKIPPED' -Detail "dev is NOT serving $version; connector mutations must not validate a stale image"
         }
     }
 }

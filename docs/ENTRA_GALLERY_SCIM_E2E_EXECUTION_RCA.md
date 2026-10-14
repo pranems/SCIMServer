@@ -93,8 +93,31 @@ the Group lifecycle is proven once under SecretToken. Custom mappings are not
 proven by this stock-gallery matrix.
 
 The existing reference endpoint's profile-revision conflict remains unresolved.
-Pipeline wiring and operator visual sign-off are not implied by this result.
+Operator visual sign-off is not implied by this result.
 Self-improvement: **applied**, executable teardown failure controls now test
 outcomes rather than only source markers. Design disposition: **applied**,
 one shared teardown helper removes duplicated cleanup and makes the
 transaction boundary explicit without introducing speculative abstractions.
+
+## Pipeline enforcement and outstanding runtime diagnosis
+
+Stage 4.8 of the deployment orchestrator now invokes the complete default
+gallery matrix after exact dev revision readiness. It rejects child failure,
+wrong runtime version, missing/duplicated auth modes, missing User outcomes,
+skipped checks, and unverified cleanup. Seven behavioral controls pass, and
+the same acceptance block accepts the actual 33-PASS report in an explicit
+evidence replay. This is not a rerun of the full deployment orchestrator.
+
+| ID | Type | Severity | Symptom and mechanism | Resolution and verification | Prevention and detection stage |
+|---|---|---|---|---|---|
+| EG-I22 | Missing pipeline evidence | High | A repository-local standalone gate was not called by the authoritative deployment pipeline, so a normal deployment could omit the real gallery claim. | Wire Stage 4.8, validate the child exit and report outcomes, and keep the prompt and infrastructure document in sync. RED source contract failed before wiring; parser, seven behavioral controls, real-report acceptance, and deployment-doc audit now pass. | The pipeline contract locks the mandatory invocation and failure cases. Standalone success alone is never reported as full pipeline execution. |
+
+The reference endpoint conflict now has measured diagnostic evidence:
+a read-only transaction found different hashes for the persisted and runtime
+profiles. The persisted settings contain `PerEndpointCredentialsEnabled`;
+runtime normalization removes it. The repository compares a persisted profile
+revision to the request revision derived from the normalized cached profile.
+This gives a concrete mismatch path even with no concurrent profile edit.
+No database row was changed. A targeted regression and runtime fix remain
+pending on a separate coherent change; the connector gate does not suppress
+the 409 or weaken the revision check.
