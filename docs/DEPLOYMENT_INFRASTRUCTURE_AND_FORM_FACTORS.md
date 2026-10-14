@@ -17,6 +17,12 @@ changes scheduling, not selected tests, assertions, timeout limits, or backend.
 The deployment contract now prevents the direct gate from silently returning
 to a different concurrency policy. A fresh complete pipeline is still required;
 the scheduling contract alone is not backend or deployment proof.
+The serial recovery attempt still fails six bootstrap suites and terminates
+during the backend matrix. v0.55.48 is merged but not published or deployed
+by this phase; dev remains v0.55.47. Both exact owned PostgreSQL containers
+were removed, and the shared validation container was preserved. See the
+[execution ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) for the blocker
+and partial evidence. No production promotion was attempted.
 
 The dev deployment orchestrator now runs Stage 4.8 after exact intended
 revision readiness and the live SCIM suite. It invokes the complete default

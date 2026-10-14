@@ -53,10 +53,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions; all 1,079 dependency entries retain their graph and public
   npm/SHA-512 provenance. Read-only consolidation review found no significant
   issues.
-- Release preparation is pending exact-tip
-  reviewed merge, immutable-image publication, full dev pipeline, and direct
-  legacy-reference proof. No production promotion or operator visual sign-off
-  is claimed.
+- PR #215 merged normally at `99cdeda3` with exact-tip CI green.
+  PR #217 aligns direct Prisma E2E with the existing serial backend matrix
+  and merged normally at `f96f31b5`, also exact-tip green. The scheduling
+  contract went RED then GREEN; two earliest failed suites pass 47/47
+  serial tests on fresh owned PostgreSQL.
+- Deployment is blocked, not validated. Both full no-skip pipeline attempts
+  fail direct Prisma bootstrap hooks. The second serial run reports 2,348
+  passes, 140 failures, and four skips across 118 suites, then its process
+  terminates during the backend matrix. Confirmed partial matrix: 6,035 units
+  per backend and 2,488 InMemory E2E passes with four PostgreSQL-only
+  exclusions. Web units and coverage passed in that attempt.
+- Dev remains v0.55.47. Profile-conforming User and Group creates on the
+  explicitly selected original reference still return 409, with its raw
+  legacy setting and persisted revision unchanged. No immutable release image
+  publication, fresh dev gallery/browser result, production promotion, or
+  operator visual sign-off is claimed.
 
 ## [0.55.47] - 2026-10-12
 

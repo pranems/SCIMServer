@@ -2,16 +2,33 @@
 
 **Last verified:** 2026-10-14
 
-**Active consolidation:** v0.55.48 metadata is being prepared on
-`fix/persisted-profile-revision-20261013` in the isolated release worktree.
-PR #215 contains durable runtime and permanent live-test commits
-`46bca59a` and `897693ea`. CI-only lockfile regeneration, exact-tip reviewed
-merge, the full merged-master dev pipeline, and existing legacy-reference
-verification remain pending. Prior-release browser and gallery receipts are
-not substitutes for this release's deployment matrix. The original dirty
-analysis worktree and the shared PostgreSQL container must remain untouched.
-No customer-prod promotion is authorized. Custom gallery mappings, UI
-readability, and operator visual sign-off remain separate parent work.
+**Active consolidation - blocked before deployment:** v0.55.48 runtime,
+metadata, and CI-generated locks merged normally through PR #215 at
+`99cdeda35861049b05908f5b507e404b3318e33d`. Exact-tip CI and all 23
+Validate pre-push gates passed. A one-line direct Prisma scheduling alignment
+merged normally through PR #217 at `f96f31b506a7a77b8d84b62420d5475cc1f66280`,
+also exact-tip green. No release image was published or deployed by this phase.
+
+Both full no-skip pipeline attempts failed the direct Prisma E2E gate.
+The second serial run improves to 112/118 suites and 2,348 passes but retains
+140 bootstrap-timeout cascade failures and four skips. Its process then
+terminated with exit -1 during the six-mode matrix. The confirmed partial
+matrix passes 6,035 units in each backend and 2,488 InMemory E2E tests with
+four PostgreSQL-only exclusions. Web units and coverage passed earlier in
+the second attempt. This is not a complete or green pipeline.
+
+Dev still serves v0.55.47. Valid fixtures on the original dev reference
+`aa69213c-1ba8-4feb-a507-a6e2fe90d6bd` reproduce User and Group POST 409s,
+while its raw legacy setting and persisted revision remain unchanged.
+Fresh v0.55.48 live, gallery, seeded browser, and after-deploy performance
+proof are BLOCKED. All exact owned test containers were removed; the shared
+PostgreSQL container remains running. The original dirty worktree is untouched.
+Custom gallery mappings, next-release UI readability, and operator visual
+sign-off remain separate parent work. No production promotion is authorized.
+
+| Date | Summary |
+|---|---|
+| 2026-10-14 | Merged v0.55.48 correction and CI-only release locks; persisted two failed no-skip dev attempts and unchanged legacy-reference baseline. Deployment remains blocked by Prisma bootstrap timeouts. |
 
 **WIF follow-up:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
@@ -30,13 +47,14 @@ The existing reference endpoint separately returned profile-revision HTTP 409
 on User create after accepted WIF authentication. A read-only database probe
 confirmed different persisted/runtime profile revisions: the persisted
 settings retain `PerEndpointCredentialsEnabled`, which runtime normalization
-drops. The fix and regression proof are still pending; isolated-target success
-must not be represented as its fix.
+drops. The correction and local regression proof are now merged, but deployed
+reference proof remains blocked as recorded above; isolated-target success
+must not be represented as its deployed fix.
 See `docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md`, EG-I16 through EG-I22.
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
-**Current dev release:** v0.55.47 runtime merge
+**Current dev release, prior-release evidence not renewed by this phase:** v0.55.47 runtime merge
 `e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy at 100% on revision
 `scimserver-dev--ve4192b0e`, with GHCR and ACR on digest
 `sha256:94020fb9cdaaa9665b824136f29e19ea553432c39cc1853e45297bc00bad9684`.

@@ -9,14 +9,21 @@
 
 ## Active Delivery Process
 
-**v0.55.48 consolidation, not deployment:** PR #215 corrects false
+**v0.55.48 consolidation, blocked before deployment:** PR #215 corrects false
 profile-revision conflicts by capturing raw persisted revision and normalized
 request view in one snapshot. All six controllers forward the revision.
 Focused units pass 281/281; HTTP proof passes 12/12 per backend; built-runtime
 live proof passes 65 checks. The implementation pre-push InMemory E2E result
-is 2,432 passes with four explicit PostgreSQL-only exclusions. CI-only lock
-regeneration, reviewed exact-tip merge, full authoritative dev pipeline, and
-direct legacy-reference verification are pending. No stored profile workaround,
+is 2,432 passes with four explicit PostgreSQL-only exclusions. CI-only locks
+and the runtime correction merged normally at `99cdeda3`; the reviewed
+serial scheduling follow-up merged at `f96f31b5`. Two full no-skip pipeline
+attempts failed direct Prisma bootstrap hooks. The serial attempt retains
+140 failures across six suites and terminated during the backend matrix.
+Its partial matrix passes 6,035 units per backend and 2,488 InMemory E2E
+tests with four PostgreSQL-only exclusions. Dev remains v0.55.47; valid
+original-reference User and Group creates still reproduce 409 with unchanged
+raw profile revision. Image publication, complete pipeline, and fresh dev
+live/gallery/browser proof remain blocked. No stored profile workaround,
 customer-prod promotion, UI backlog implementation, or visual sign-off is
 authorized in this phase.
 
