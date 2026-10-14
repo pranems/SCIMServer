@@ -167,3 +167,15 @@ cleanup, including conditional-write headers.
 **Design disposition: accepted.** One cohesive live helper follows existing
 section conventions; a new test framework or generic provisioning DSL would
 be unnecessary.
+
+### Release consolidation
+
+| ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
+|---|---|---|---|---|---|
+| EG-I28 | Release documentation | Low | The first v0.55.48 metadata push was blocked by C13: the README version badge still claimed 0.55.47. The freshness formatter restamps current headers but does not rewrite badges or historical evidence. | Update only the live badge; the source-truth content audit now passes all 26 documents. No historical release claims were relabeled. | Run both freshness and content checks for release metadata. The existing pre-push gate caught the mismatch before tests, CI, or deployment; no new gate is needed. |
+
+**Test/gate improvement: accepted.** The existing content audit caught the
+release badge mismatch at the earliest owning pre-push stage.
+**Design disposition: accepted.** Targeted metadata edits preserve historical
+evidence; using the broad local bump script would rewrite history and violate
+CI-only lockfile generation.
