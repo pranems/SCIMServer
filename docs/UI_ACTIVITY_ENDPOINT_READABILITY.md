@@ -51,7 +51,9 @@ does not claim live provisioning or mutate source endpoint resources.
 | Mobile containment | Document width stays inside the viewport; activity and table panels own their horizontal overflow. |
 | Component tests | 25 affected Dashboard/Operations tests passed before the final CSS-only mobile floor adjustment. |
 | Type diagnostics | Raw web type checking still fails on the existing baseline. Compiler-host comparison measured 66 baseline and 66 current diagnostics, zero additions; editor diagnostics for changed files are empty. |
-| Production build and size | Initial correction passed build and every size budget. The normal checkpoint/push gates own final-source static validation; do not treat the earlier build as proof of later source. |
+| Final-source build and size | The normal push hook built the final web source successfully. All final bundle budgets pass; Dashboard is 3.05 kB and Operations is 3.72 kB gzipped. |
+| Normal push gate | Commit `e2758b04` passed the Fast hook and was pushed. API InMemory E2E: 116 suites, 2,429 passed, zero failed, four PostgreSQL-specific skips. Web type checking was baseline-tolerated, not error-free. |
+| Actual documentation render | After restoring matching installed root tooling, four blocks across the changed documents rendered in Chromium under strict security in both light and dark themes. The hook's earlier zero-second PASS had actually skipped this check. |
 
 Each browser case writes a numerical JSON receipt through
 `testInfo.outputPath()` and attaches the resulting file. Receipts are ignored
@@ -70,18 +72,28 @@ across local, container, and dev deployments.
 | UR-05 | Baseline diagnostics / Medium | Raw web type checking failed on unrelated existing errors. | Compare exact diagnostics against HEAD without reverting files; retain failure status and report zero additions, not a clean type check. | Type check / baseline comparison before edits |
 | UR-06 | Evidence retention / Medium | Body-only test attachments did not survive the line reporter as reusable receipts. | Write JSON to the test output path and attach the file; verify all nine physical receipts exist. | Receipt inspection / first test artifact inspection |
 | UR-07 | Responsive layout / Medium | Desktop/narrow GREEN did not detect the mobile label collapsing to 28.44 px. | Add the 390 px lane before completion; retain the width assertion, add a table floor and local scroll ownership. | Mobile browser lane / mobile browser lane |
+| UR-08 | Gate reporting / High | The hook labelled missing root Mermaid tooling PASS in 0.0 seconds although its action skipped rendering. | Confirm the missing module, restore a junction to the matching installed pin without npm/lockfile changes, and execute the real changed-document renderer. Separately harden skip-to-PASS reporting; a summary status alone is not evidence of execution. | Detailed push-receipt inspection / tooling preflight |
+| UR-09 | Renderer discovery / Medium | The real renderer reports a built-in Mermaid version of `0.0.0`, producing an equivalence warning against the pinned `11.15.0`. | Do not install `mermaid@0.0.0` or claim renderer equivalence. Actual Chromium rendering passed; version-discovery diagnosis remains scheduled independently. | Actual render / renderer discovery preflight |
 
-**Provenance / completeness:** This checkpoint is reconciled against the
-available continuation summary, failure artifacts, and current command results.
-The full raw session transcript was not available through
-`VSCODE_TARGET_SESSION_LOG`; full-session RCA reconciliation remains pending.
-Missing test selection and startup readiness were harness issues, not product
-regressions. Commit identifiers remain available through normal constituent
-history after the checkpoint is saved.
+**Provenance / completeness:** Although `VSCODE_TARGET_SESSION_LOG` was unset,
+the session's full `events.jsonl` was available. The reconciliation scanned all
+45,085 raw events, selected the 220 entries containing this continuation's
+identifiers, and ran both error-signal and causal-narration passes. The results
+were reconciled with the continuation summary, failure artifacts, and current
+command results. Signal counts include tool-request echoes and are not issue
+recurrence counts. Missing test selection and startup readiness were verified
+harness issues, not product regressions. Later push/render findings are recorded
+as UR-08/UR-09 above.
 
 **Test/gate improvement applied:** Add mobile geometry checks and retained
 file-backed evidence, rather than weakening bounds or checking CSS properties
 alone.
+
+**Gate follow-up scheduled:** Release-assurance tooling owner, target
+2026-10-14: distinguish an unavailable required Mermaid check from PASS and
+diagnose the built-in `0.0.0` version warning in a separate gate-hardening
+change. Root tooling has been restored for this worktree, so actual rendering
+is no longer skipped here.
 
 **Design/architecture disposition accepted:** Small presentation-only changes
 reuse the existing truncation primitive and percentage columns. No new service,
@@ -89,7 +101,8 @@ dependency edge, endpoint identity model, or speculative abstraction is needed.
 
 ## Remaining release boundaries
 
-Final-source normal hooks, exact-tip CI, deployed browser validation, and
+Final-source normal hooks passed, with the explicit exceptions above.
+Exact-tip CI, deployed browser validation, and
 operator visual verification are still required. Discovery selectors, sticky
 filters, Dashboard inventory density, and custom Entra mappings are separate
 pending outcomes; this correction does not close them.

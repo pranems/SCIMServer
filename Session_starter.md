@@ -7,8 +7,15 @@ separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
 pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor
 with panel-owned scrolling; endpoint labels measure 193/85/68 px and rows
 remain 61 px high. JSON geometry receipts are file-backed and retained.
-See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and seven execution
-issues. No deployed UI or operator approval is claimed. Runtime revision fix
+Commit `e2758b04` is pushed through the normal Fast hook. API InMemory E2E
+passed 2,429 cases with four PostgreSQL-only skips. Final-source web build and
+size budgets pass. A misleading Mermaid hook PASS was actually a tooling
+skip; matching installed root dependencies were restored and all four changed
+document blocks really rendered. Built-in renderer version discovery reports
+`0.0.0`, so renderer equivalence remains unverified, not silently green.
+See `docs/UI_ACTIVITY_ENDPOINT_READABILITY.md` for evidence and nine execution
+issues, reconciled against the full raw session event stream.
+No deployed UI or operator approval is claimed. Runtime revision fix
 release/deployment is separately owned by the consolidation chat for PR #215;
 do not infer that the older pending statements below describe its latest state.
 
