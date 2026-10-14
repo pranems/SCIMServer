@@ -89,6 +89,25 @@ live deployment checks, canonical visual
 baseline review and operator visual signoff are intentionally not performed
 in this implementation lane.
 
+### Normal pre-push evidence
+
+Commit `bc3d3cdd422cf5a1d69e13ac1304430d5ea95c90` was pushed normally and
+remote-tip verified. All 20 Fast-hook gates passed in 743.9 seconds, including
+6,033 API units in 210 suites and 2,429 InMemory E2E cases in 116 suites.
+Four PostgreSQL-only cases were skipped, not silently counted as passes.
+API lint reports zero errors and 515 warnings. The web type gate accepts the
+66 existing diagnostics against its 96-error ratchet; this is not zero-error
+type checking. The full render gate actually rendered 755 Mermaid blocks in
+both themes under strict security. Built-in version discovery remains
+`0.0.0`, so renderer equivalence is still unverified.
+
+Jest also force-exited an E2E worker after all assertions passed. Its message
+suggests incomplete teardown, but the root cause is unproven. No API source
+changed in this branch; this warning is handed to consolidation rather than
+hidden or attributed to a guessed cause. See the
+[exact-tip normal-hook receipt](evidence/UI_INVENTORY_PUSH_20261014.json).
+The evidence-only follow-up does not change any runtime or test source.
+
 ## Execution issues and root causes
 
 | ID | Type / severity | Symptom and mechanism | Resolution and why it works | Detection / earliest detection |
@@ -109,10 +128,12 @@ in this implementation lane.
 | IS-I14 | Evidence correctness / Medium | Initial doc classified all 66 tsc diagnostics as test-only; two were unchanged production diagnostics. | Classify actual file paths and verify diagnostic-bearing files are unchanged. Correct this doc to 64 test plus two production; do not fix unrelated baseline errors. | Consolidation of focused evidence / initial tsc result classification |
 | IS-I15 | Tooling / Low | Raw-event scanner encountered a completion without a result; a subsequent JSON-check invocation omitted its file arguments. Read/search output also needed narrow ranges. | Guard event shapes, pass explicit document paths and inspect bounded output. Seven edited docs contain zero literal JSON fences. A zero count alone is not evidence that any file was inspected. | Evidence tooling / same |
 | IS-I16 | Artifact retention / Medium | A later focused Playwright invocation cleaned earlier geometry receipts with its output directory. | Store receipts in a sibling evidence directory and aggregate 21 real receipts into a committed JSON artifact. Verify preservation with a subsequent focused run. | Final handoff inspection / first multi-invocation evidence run |
+| IS-I17 | Test teardown / Low, unresolved | Normal pre-push E2E passed every assertion but warned that a worker failed to exit gracefully and was force-exited. Root cause was not established. | Retain exact-tip evidence and hand off to the parent consolidation owner for triage in the next authoritative matrix on 2026-10-14. Do not modify unrelated API tests or call the warning a resolved leak. | Normal API E2E hook / same |
 
 Fix SHAs are assigned by the containing logical commits, not fabricated before
 commit creation. IS-I01 through IS-I08 were resolved in `892d0192`; subsequent
-entries belong to this follow-up commit.
+entries through IS-I16 belong to `bc3d3cdd`; IS-I17 is retained by the final
+evidence-only commit and remains unresolved outside the bounded UI scope.
 
 ### Provenance and completeness
 
@@ -127,7 +148,12 @@ RED assertions, baseline diagnostics and scanner self-echoes as additional
 incidents. Regex hit counts are not recurrence counts. Initial remote-session
 discovery warned that the repository could not be resolved; this did not block
 local isolation or implementation, and authenticated Git push is checked
-separately.
+separately. The final result/narration reconciliation extended to all 1,417
+events through `2026-10-14T06:27:24.293Z`, and the available readable
+reasoning/narration-field check extended to all 1,426 events through
+`2026-10-14T06:27:49.094Z`. The only new confirmed issue is IS-I17; expected
+HTTP 400 responses in negative API tests, existing warnings, normal CRLF
+normalization and scan/tool-request echoes are not additional defects.
 
 ## Self-improvement and design disposition
 

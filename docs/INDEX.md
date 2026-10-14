@@ -10,6 +10,7 @@
 | UI follow-up | Read |
 |---|---|
 | Review compact endpoint inventory, persistent Operations filters, Discovery selection and distinct `/Me` intent | [Implementation and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md), [generated geometry evidence](evidence/UI_INVENTORY_SELECTION_20261014.json) |
+| Review exact-tip normal push gates and explicitly retained skips/warnings | [Inventory hook receipt](evidence/UI_INVENTORY_PUSH_20261014.json) |
 
 | If you want to... | Read |
 |---|---|

@@ -15,6 +15,12 @@ intent are verified, not merged away. Tsc retains 66 unchanged baseline errors
 (64 test, two production). First local commit: `892d0192`. No release,
 deployment or operator
 signoff is claimed. See `docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md`.
+Runtime/test checkpoints `892d0192` and `bc3d3cdd` are pushed with tracking.
+The exact-tip normal Fast hook passed all 20 gates: 6,033 API units and 2,429
+InMemory E2E cases, with four PostgreSQL-only skips. All 755 Mermaid blocks
+rendered; renderer-version equivalence remains unverified. E2E worker teardown
+warned about a forced exit after all assertions passed; root cause is unproven
+and belongs to consolidation triage, not an invented UI fix.
 
 | Date | Summary |
 |---|---|
