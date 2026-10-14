@@ -2,6 +2,16 @@
 
 **Last verified:** 2026-10-14
 
+**Gallery coverage expansion:** The isolated custom-mapping worktree is based
+on merged runtime PR #215 at `99cdeda3`. Pure profile/mapping transformation,
+saved-source verification, all-three-auth Group orchestration, report
+truthfulness, and stricter Stage 4.8 acceptance pass their behavioral contracts
+after confirmed RED controls. A read-only real Graph template transformation
+also passed. No expanded live provisioning is claimed: the runtime deployment
+owner still owns the shared validation environment. See
+`docs/ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md`. Earlier 33-check results
+below describe the reduced historical matrix, not this prepared expansion.
+
 **Active consolidation:** v0.55.48 metadata is being prepared on
 `fix/persisted-profile-revision-20261013` in the isolated release worktree.
 PR #215 contains durable runtime and permanent live-test commits

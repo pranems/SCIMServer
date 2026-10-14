@@ -39,6 +39,7 @@ $ErrorActionPreference = 'Stop'
 $Modes = @($Modes | Select-Object -Unique)
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'scim-estates.ps1')
+. (Join-Path $PSScriptRoot 'entra-gallery-mapping.ps1')
 
 $graphRoot = 'https://graph.microsoft.com/beta'
 $ruleName = 'USERGROUP_OUTBOUND_USERGROUP'
@@ -254,7 +255,11 @@ function Set-TestSynchronizationMappings {
     # email on this owned job rather than weakening the target's Entra profile.
     $emailMappings[0].source.expression = '[userPrincipalName]'
     $emailMappings[0].source.name = 'userPrincipalName'
+    $schema = Add-GalleryCustomUserMapping -Schema $schema
     Invoke-Graph -Method PUT -Path $schemaPath -Body $schema | Out-Null
+    $saved = Invoke-Graph -Method GET -Path $schemaPath
+    Assert-GalleryCustomUserMapping -Schema $saved
+    @($saved.synchronizationRules | Where-Object name -eq $ruleName)[0]
 }
 
 function Invoke-ProvisionOnDemand {
@@ -526,6 +531,7 @@ function New-SourceUser {
     [pscustomobject]@{
         User = $user
         AssignmentIds = $assignmentIds
+        Department = 'SCIM Validation'
     }
 }
 
@@ -617,12 +623,10 @@ function New-ScimEndpoint {
         profilePreset = 'entra-id'
     }
     $createdEndpointIds.Add([string]$endpoint.id)
+    $profile = Add-GalleryUserExtensionProfile -Profile $endpoint.profile
+    $profile.settings[$Setting] = 'True'
     Invoke-ScimAdmin -Method PATCH -Path "scim/admin/endpoints/$($endpoint.id)" -Body @{
-        profile = @{
-            settings = @{
-                $Setting = 'True'
-            }
-        }
+        profile = $profile
     } | Out-Null
     $endpoint
 }
@@ -868,14 +872,12 @@ function Invoke-ModeScenario {
             Add-Result $scenario 'WIF connectivity read-back' 'PASS' 'Persisted auth type, target URLs, client ID, and both application identifiers match the owned configuration.'
         }
         $modeStage = 'configure owned synchronization mapping'
-        Set-TestSynchronizationMappings -JobId $job.id
-        $modeStage = 'read synchronization schema'
-        $rule = Get-SynchronizationRule -JobId $job.id
+        $rule = Set-TestSynchronizationMappings -JobId $job.id
         $mappingPairs = @($rule.objectMappings | ForEach-Object { "$($_.sourceObjectName)->$($_.targetObjectName)" })
         if (-not ($mappingPairs -match '^User->') -or -not ($mappingPairs -match '^Group->')) {
             throw "The gallery rule does not contain both User and Group object mappings: $($mappingPairs -join ', ')."
         }
-        Add-Result $scenario 'gallery schema' 'PASS' "Resolved $ruleName with User and Group mappings and a UPN-to-required-email test mapping."
+        Add-Result $scenario 'gallery schema' 'PASS' "Resolved $ruleName with User/Group mappings, required work email, and verified custom costCode mapping."
 
         $modeStage = 'create and assign source user'
         $userFixture = New-SourceUser -ModeSlug $context.Slug -Suffix 'primary'
@@ -896,17 +898,28 @@ function Invoke-ModeScenario {
             Pause-SynchronizationJob -JobId $job.id
         }
         Add-Result $scenario 'create user' 'PASS' 'Entra provisionOnDemand created the mapped SCIM User.'
+        if ($scimUser.schemas -notcontains $script:galleryExtensionUrn -or
+            $scimUser.($script:galleryExtensionUrn).costCode -cne $userFixture.Department) {
+            throw 'Entra User create did not export the exact reviewed custom costCode value.'
+        }
+        Add-Result $scenario 'create custom extension' 'PASS' 'The created User includes the registered extension and exact source department value.'
 
         $updatedDisplayName = "SCIM E2E Updated $Mode $runId"
+        $updatedDepartment = 'SCIM Validation Updated'
         Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{
             displayName = $updatedDisplayName
-            department = 'SCIM Validation Updated'
+            department = $updatedDepartment
             jobTitle = 'Senior E2E Engineer'
         } | Out-Null
         Invoke-ExpectedProvision -JobId $job.id -RuleId $rule.id -ObjectId $userFixture.User.id -ObjectType User -Operation 'update user' | Out-Null
         $scimUser = Wait-ScimResource -ResourceType Users -Attribute userName -Value $upn -Headers $context.VerificationHeaders `
-            -Predicate { param($resource) $resource.displayName -eq $updatedDisplayName } -Expectation 'updated displayName is visible'
+            -Predicate {
+                param($resource)
+                $resource.displayName -eq $updatedDisplayName -and
+                $resource.($script:galleryExtensionUrn).costCode -ceq $updatedDepartment
+            } -Expectation 'updated displayName and exact custom costCode are visible'
         Add-Result $scenario 'update user' 'PASS' 'Entra provisionOnDemand updated core and enterprise-mapped source attributes.'
+        Add-Result $scenario 'update custom extension' 'PASS' 'The updated source department replaced the persisted custom costCode value.'
 
         Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{ accountEnabled = $false } | Out-Null
         Wait-GraphUserAccountEnabled -UserId $userFixture.User.id -Expected $false
@@ -914,58 +927,52 @@ function Invoke-ModeScenario {
             -UserName $upn -Headers $context.VerificationHeaders -Expected $false -Operation 'disable user'
         Add-Result $scenario 'disable user' 'PASS' 'Entra account disable propagated to SCIM active=false.'
 
-        if ($Mode -eq 'SecretToken') {
-            Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{ accountEnabled = $true } | Out-Null
-            Wait-GraphUserAccountEnabled -UserId $userFixture.User.id -Expected $true
-            $scimUser = Invoke-UserAccountStateProvision -JobId $job.id -RuleId $rule.id -ObjectId $userFixture.User.id `
-                -UserName $upn -Headers $context.VerificationHeaders -Expected $true -Operation 'reenable user'
+        Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{ accountEnabled = $true } | Out-Null
+        Wait-GraphUserAccountEnabled -UserId $userFixture.User.id -Expected $true
+        $scimUser = Invoke-UserAccountStateProvision -JobId $job.id -RuleId $rule.id -ObjectId $userFixture.User.id `
+            -UserName $upn -Headers $context.VerificationHeaders -Expected $true -Operation 'reenable user'
+        Add-Result $scenario 'reenable user' 'PASS' 'The connector restored active=true before membership and deprovision checks.'
 
-            $groupFixture = New-SourceGroup -ModeSlug $context.Slug
-            $groupName = [string]$groupFixture.Group.displayName
-            Invoke-ExpectedProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'create group' | Out-Null
-            $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
-                -Predicate { param($resource) $null -ne $resource } -Expectation 'resource exists'
-            Add-Result $scenario 'create group' 'PASS' 'Entra provisionOnDemand created the mapped SCIM Group.'
-
-            Invoke-Graph -Method POST -Path "groups/$($groupFixture.Group.id)/members/`$ref" -Body @{
-                '@odata.id' = "$graphRoot/directoryObjects/$($userFixture.User.id)"
-            } | Out-Null
-            Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $true
-            $addMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'add group member'
-            $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
-                -Predicate { param($resource) @($resource.members.value) -contains $scimUser.id } -Expectation 'member contains the provisioned user'
-            if ($addMembershipPath -eq 'scheduled-sync-fallback') {
-                Pause-SynchronizationJob -JobId $job.id
-            }
-            Add-Result $scenario 'add group member' 'PASS' "Entra membership addition propagated to the SCIM Group via $addMembershipPath."
-
-            Invoke-Graph -Method DELETE -Path "groups/$($groupFixture.Group.id)/members/$($userFixture.User.id)/`$ref" | Out-Null
-            Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $false
-            $removeMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'remove group member'
-            $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
-                -Predicate { param($resource) $null -ne $resource -and -not (@($resource.members.value) -contains $scimUser.id) } `
-                -Expectation 'member no longer contains the provisioned user'
-            if ($removeMembershipPath -eq 'scheduled-sync-fallback') {
-                Pause-SynchronizationJob -JobId $job.id
-            }
-            Add-Result $scenario 'remove group member' 'PASS' "Entra membership removal propagated to the SCIM Group via $removeMembershipPath."
-
-            $updatedGroupName = "$groupName Updated"
-            Invoke-Graph -Method PATCH -Path "groups/$($groupFixture.Group.id)" -Body @{ displayName = $updatedGroupName } | Out-Null
-            Invoke-ExpectedProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'update group' | Out-Null
-            Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $updatedGroupName -Headers $context.VerificationHeaders `
-                -Predicate { param($resource) $null -ne $resource } -Expectation 'updated group name is visible' | Out-Null
-            $groupName = $updatedGroupName
-            Add-Result $scenario 'update group' 'PASS' 'Entra provisionOnDemand updated the SCIM Group displayName.'
+        $groupFixture = New-SourceGroup -ModeSlug $context.Slug
+        $groupName = [string]$groupFixture.Group.displayName
+        $createGroupPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'create group'
+        $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
+            -Predicate { param($resource) $null -ne $resource } -Expectation 'resource exists'
+        if ($createGroupPath -eq 'scheduled-sync-fallback') {
+            Pause-SynchronizationJob -JobId $job.id
         }
-        else {
-            Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{ accountEnabled = $true } | Out-Null
-            Wait-GraphUserAccountEnabled -UserId $userFixture.User.id -Expected $true
-            $scimUser = Invoke-UserAccountStateProvision -JobId $job.id -RuleId $rule.id -ObjectId $userFixture.User.id `
-                -UserName $upn -Headers $context.VerificationHeaders -Expected $true -Operation 'reenable user'
-            Add-Result $scenario 'reenable user' 'PASS' 'The connector restored active=true before the independent deprovision check.'
-            Add-Result $scenario 'group and membership matrix' 'UNSUPPORTED' 'The full Group CRUD and membership matrix runs once through SecretToken; repeating identical mappings for every auth transport is intentionally excluded.'
+        Add-Result $scenario 'create group' 'PASS' "Entra created the mapped SCIM Group via $createGroupPath."
+
+        Invoke-Graph -Method POST -Path "groups/$($groupFixture.Group.id)/members/`$ref" -Body @{
+            '@odata.id' = "$graphRoot/directoryObjects/$($userFixture.User.id)"
+        } | Out-Null
+        Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $true
+        $addMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'add group member'
+        $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
+            -Predicate { param($resource) @($resource.members.value) -contains $scimUser.id } -Expectation 'member contains the provisioned user'
+        if ($addMembershipPath -eq 'scheduled-sync-fallback') {
+            Pause-SynchronizationJob -JobId $job.id
         }
+        Add-Result $scenario 'add group member' 'PASS' "Entra membership addition propagated to the SCIM Group via $addMembershipPath."
+
+        Invoke-Graph -Method DELETE -Path "groups/$($groupFixture.Group.id)/members/$($userFixture.User.id)/`$ref" | Out-Null
+        Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $false
+        $removeMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'remove group member'
+        $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
+            -Predicate { param($resource) $null -ne $resource -and -not (@($resource.members.value) -contains $scimUser.id) } `
+            -Expectation 'member no longer contains the provisioned user'
+        if ($removeMembershipPath -eq 'scheduled-sync-fallback') {
+            Pause-SynchronizationJob -JobId $job.id
+        }
+        Add-Result $scenario 'remove group member' 'PASS' "Entra membership removal propagated to the SCIM Group via $removeMembershipPath."
+
+        $updatedGroupName = "$groupName Updated"
+        Invoke-Graph -Method PATCH -Path "groups/$($groupFixture.Group.id)" -Body @{ displayName = $updatedGroupName } | Out-Null
+        Invoke-ExpectedProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'update group' | Out-Null
+        Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $updatedGroupName -Headers $context.VerificationHeaders `
+            -Predicate { param($resource) $null -ne $resource } -Expectation 'updated group name is visible' | Out-Null
+        $groupName = $updatedGroupName
+        Add-Result $scenario 'update group' 'PASS' 'Entra provisionOnDemand updated the SCIM Group displayName.'
 
         foreach ($assignmentId in $userFixture.AssignmentIds) {
             Invoke-Graph -Method DELETE -Path "users/$($userFixture.User.id)/appRoleAssignments/$assignmentId" | Out-Null
@@ -1138,6 +1145,27 @@ function Write-Reports {
         else { 'SKIPPED' }
         [pscustomobject]@{ mode = $mode; status = $status }
     }
+    $missingExtensionChecks = @(
+        foreach ($mode in $Modes) {
+            foreach ($check in @('create custom extension', 'update custom extension')) {
+                $outcomes = @($results | Where-Object {
+                    $_.scenario -eq "auth:$mode" -and $_.check -eq $check
+                })
+                if ($outcomes.Count -ne 1 -or $outcomes[0].status -ne 'PASS') {
+                    "$mode/$check"
+                }
+            }
+        }
+    )
+    $extensionDisposition = if ($PlanOnly) {
+        'NOT_RUN: plan-only intake does not provision the reviewed custom mapping.'
+    }
+    elseif ($missingExtensionChecks.Count -eq 0) {
+        'PASS: the reviewed department-to-costCode mapping was verified on create and update in every requested auth mode.'
+    }
+    else {
+        'FAIL: the reviewed custom mapping did not complete create and update verification in every requested auth mode.'
+    }
     $report = [pscustomobject]@{
         schemaVersion = '1.0.0'
         runId = $runId
@@ -1152,7 +1180,7 @@ function Write-Reports {
         cleanup = @($cleanupResults)
         secretKeys = @($secretKeys | Sort-Object)
         secretsPersisted = $false
-        customExtensionDisposition = 'UNSUPPORTED by the stock isvonboarding mapping; custom SCIM extension transport requires an explicitly reviewed synchronization-schema mapping and is not silently counted as covered.'
+        customExtensionDisposition = $extensionDisposition
     }
     $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'result.json') -Encoding utf8
 
@@ -1177,7 +1205,7 @@ function Write-Reports {
         $lines.Add("| $($item.scenario) | $($item.check) | $($item.status) | $detail |")
     }
     $lines.Add('')
-    $lines.Add('Custom extension disposition: UNSUPPORTED by the stock gallery mapping. It requires a separately reviewed synchronization-schema mapping.')
+    $lines.Add("Custom extension disposition: $extensionDisposition")
     $lines | Set-Content -LiteralPath (Join-Path $OutputDirectory 'summary.md') -Encoding utf8
     $script:report = $report
 }
@@ -1269,7 +1297,6 @@ try {
         foreach ($mode in $Modes) {
             Invoke-ModeScenario -Mode $mode
         }
-        Add-Result 'coverage' 'custom SCIM extensions' 'UNSUPPORTED' 'The stock isvonboarding schema maps core User, enterprise User, and Group. A custom extension requires an explicit synchronization-schema change and separate review.'
     }
 }
 catch {

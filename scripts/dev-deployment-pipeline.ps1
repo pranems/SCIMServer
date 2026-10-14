@@ -910,7 +910,9 @@ if (-not $SkipDeploy) {
                     if ($modeEvidence.Count -ne 1 -or $modeEvidence[0].status -ne 'PASS') {
                         throw "Entra gallery mode $requiredMode is missing, duplicated, or not PASS."
                     }
-                    foreach ($check in @('create user', 'update user', 'disable user', 'deprovision user', 'mode outcome')) {
+                    foreach ($check in @('create user', 'update user', 'disable user', 'reenable user', 'deprovision user',
+                        'create custom extension', 'update custom extension', 'create group', 'update group',
+                        'add group member', 'remove group member', 'deprovision group', 'mode outcome')) {
                         $outcome = @($galleryEvidence.results | Where-Object {
                             $_.scenario -eq "auth:$requiredMode" -and $_.check -eq $check
                         })
@@ -919,7 +921,8 @@ if (-not $SkipDeploy) {
                         }
                     }
                 }
-                if (@($galleryEvidence.results | Where-Object status -in @('FAIL', 'BLOCKED', 'SKIPPED')).Count -ne 0 -or
+                if ($galleryEvidence.customExtensionDisposition -notlike 'PASS:*' -or
+                    @($galleryEvidence.results | Where-Object status -in @('FAIL', 'BLOCKED', 'SKIPPED', 'UNSUPPORTED')).Count -ne 0 -or
                     @($galleryEvidence.cleanup).Count -eq 0 -or
                     @($galleryEvidence.cleanup | Where-Object { -not $_.removed }).Count -ne 0) {
                     throw 'Entra gallery evidence contains failed checks, skips, or unverified cleanup.'

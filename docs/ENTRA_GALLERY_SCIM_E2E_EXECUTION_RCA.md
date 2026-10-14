@@ -6,6 +6,40 @@
 
 This ledger records issues found while building and running the owned Microsoft Entra gallery provisioning gate against the registry-resolved SCIMServer dev estate. Entries are written when the failing check is understood and the corrective check turns green. The measured disposition includes final evidence counts and exact-cleanup outcomes.
 
+## Custom-mapping continuation checkpoint
+
+The following entries describe local contract fixes and the read-only real
+template probe, not a completed live provisioning run. The earlier EG-I
+dashboard and its live counts remain historical evidence.
+
+| ID | Type / severity | Symptom and root cause | Fix and why it works | Prevention | Detection / earliest gate |
+|---|---|---|---|---|---|
+| GM-I01 | Coverage / High | OAuth and WIF mode orchestration omitted Group CRUD/membership by a deliberate SecretToken-only branch. Broad matrix language could hide that reduction. | Remove the branch and execute the same owned Group flow in every mode. Existing scoped on-demand/scheduled provisioning and exact cleanup are reused. | Three behavioral mode controls require all Group outcomes and custom create/update; OAuth/WIF controls were RED before correction. | Mode contract / mode contract |
+| GM-I02 | Evidence acceptance / High | Stage 4.8 accepted reports missing custom/membership outcomes, containing UNSUPPORTED, or declaring custom coverage failed. It only required core User results. | Require exact per-mode User, Group, membership and custom outcomes, reject unsupported checks and unsuccessful custom disposition. Four adversarial acceptance controls turned RED then GREEN. | Behavioral execution of the actual Stage 4.8 scriptblock, not source-word checks. | Pipeline contract / pipeline contract |
+| GM-I03 | Report correctness / High | A total of six custom rows all attributed to SecretToken could falsely claim three-mode custom coverage. | Require exactly one create and update result for each requested scenario; duplicate-mode evidence now reports FAIL. | Four real report-projection cases: valid, missing, duplicated, and plan-only NOT_RUN. Duplicate evidence was RED before the fix. | Report contract / report contract |
+| GM-I04 | Tooling lookup / Low | An initial search expected a separate gallery acceptance script, but acceptance is inline in the dev pipeline. | Follow the actual Stage 4.8 invocation and reuse its existing AST-based contract harness. No speculative helper or second validator was added. | Search the known orchestrator before inventing a split-file location. | Repository lookup / repository lookup |
+| GM-I05 | Worktree tooling / Low | The fresh worktree lacked root Mermaid, web Playwright, and API TypeScript dependencies. | A required-tooling preflight failed explicitly; restore junctions to matching installed dependencies without installs or lockfile edits. The new diagram then rendered under strict security in both themes and the existing Prisma generator created the ignored client. | Probe required tooling before trusting a render-gate summary. The known built-in `0.0.0` version warning remains with the separate gate-hardening owner. | Tooling preflight / tooling preflight |
+
+The reviewed helper also refuses an absent target department template or
+duplicate custom registration and checks the saved source expression. A
+read-only real Graph template probe confirmed the measured directory/object
+names and department source metadata; no directory object or endpoint was
+created. Planned missing-helper and missing-verifier RED runs were intentional
+TDD controls, not product incidents.
+
+**Self-improvement applied:** Negative controls cover the implementation's
+mode decisions and serialized evidence, closing the gap between code that
+exists and outcomes that a required gate actually proves.
+
+**Design disposition accepted:** Pure mapping/profile work is extracted into
+a small helper shared by preparation and read-back. Remote calls and owned
+cleanup remain with the existing orchestrator. No policy language or new
+dependency is introduced.
+
+Full raw transcript reconciliation for this continuation will be completed
+with its final live evidence; the current entries are captured at confirmed
+contract GREEN while their exact failures remain available.
+
 **Provenance:** reconciled against the detailed pre-compaction execution
 checkpoint supplied to this continuation and every command, failure, diagnosis,
 and rerun in the current continuation. `VSCODE_TARGET_SESSION_LOG` was not

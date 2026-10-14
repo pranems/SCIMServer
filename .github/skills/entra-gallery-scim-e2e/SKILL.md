@@ -15,7 +15,7 @@ Use this skill when validating the real Microsoft Entra provisioning service aga
 4. Create source Users, Groups, app assignments, synchronization jobs, SCIM endpoints, and one federated identity credential with a unique run ID. The credential is added to the reviewed dev WIF resource application, never to a production application in another estate.
 5. Remove every owned object by exact ID in `finally`, then verify no new job or endpoint remains.
 6. Never print or persist bearer tokens, OAuth client secrets, WIF values, Graph tokens, or user passwords.
-7. Treat a required mode reported as `BLOCKED`, `UNSUPPORTED`, or `SKIPPED` as a failed gate. Capability exclusions such as custom extension mappings remain explicit in the report.
+7. Treat `BLOCKED`, `UNSUPPORTED`, or `SKIPPED` as a failed required gate. Every mode must prove Group/membership and the reviewed custom mapping; arbitrary mappings remain outside the finite coverage claim.
 8. Do not promote or change production as part of this skill.
 
 ## Run sequence
@@ -41,8 +41,12 @@ WIF application identifiers use `PATCH synchronization/connectivityParameters`,
 not `PUT synchronization/secrets`. The gate writes the complete WIF connectivity
 configuration and verifies every saved field before provisioning. The corrected
 complete gallery matrix passed 33 checks with zero failures in 672 seconds.
-All three auth modes passed and all 13 cleanup entries succeeded. Group
-repetition under OAuth/WIF and custom mappings remain explicit exclusions.
+All three auth modes passed and all 13 cleanup entries succeeded in that
+earlier reduced matrix. The prepared expansion now requires Group CRUD and
+membership under every mode plus the reviewed department-to-custom-costCode
+mapping. Its local behavioral controls pass; its real expanded provisioning
+run remains pending. See
+[custom mapping evidence](../../../docs/ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md).
 Each mode deletes its job before another mode can configure the principal.
 Do not treat a static
 contract or the independent protocol proof as a replacement for this live flow.

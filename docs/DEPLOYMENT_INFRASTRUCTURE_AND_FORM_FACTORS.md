@@ -9,6 +9,13 @@
 
 ## Entra gallery validation gate
 
+**Prepared coverage expansion:** Stage 4.8 now requires Group CRUD/membership
+and reviewed custom extension create/update outcomes in every authentication
+mode, as well as reenable. Unsupported checks and contradictory custom
+disposition fail acceptance. The expanded mutation matrix is not yet live
+verified; see [its evidence boundary](ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md).
+The 33-check measurement below describes the earlier reduced matrix.
+
 The dev deployment orchestrator now runs Stage 4.8 after exact intended
 revision readiness and the live SCIM suite. It invokes the complete default
 matrix in [entra-gallery-scim-e2e.ps1](../scripts/entra-gallery-scim-e2e.ps1),
