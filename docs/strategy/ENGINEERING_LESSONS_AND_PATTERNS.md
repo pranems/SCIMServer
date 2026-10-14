@@ -16,6 +16,17 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Missing required evidence must not become a passed diagnostic skip
+
+A new worktree's missing Mermaid tooling was reported as PASS because both
+the hook wrapper and render command returned zero without rendering. Required
+commands must fail closed on missing prerequisites, while diagnostic commands
+must label unknown evidence honestly. Execute negative controls through the
+real registered action and summary, not a source-text assertion. Bundled
+version discovery must identify the owning library: a profiling placeholder
+or React version is not a Mermaid pin. See
+[the gate hardening evidence and RCA](MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
 ### Revision identity belongs to persisted state, not a normalized view
 
 When compatibility normalization renames or removes legacy settings,

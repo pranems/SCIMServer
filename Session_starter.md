@@ -2,6 +2,15 @@
 
 **Last verified:** 2026-10-14
 
+**Separate gate hardening:** `fix/mermaid-required-gate-20261014` fails the
+required render command on missing tooling and removes the pre-push passed
+skip. Behavioral controls cover CLI exits, actual registered-action invocation,
+FAIL/PASS summaries, and identified versus placeholder bundle versions. The
+current discovered editor Mermaid is 11.17.0; the gate pin remains 11.15.0,
+so editor equivalence is not verified. No runtime/UI/package/deployment changes
+belong to this branch. See
+[gate evidence and RCA](docs/strategy/MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
 **Active consolidation:** v0.55.48 metadata is being prepared on
 `fix/persisted-profile-revision-20261013` in the isolated release worktree.
 PR #215 contains durable runtime and permanent live-test commits

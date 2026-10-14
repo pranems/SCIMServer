@@ -21,6 +21,18 @@ matrix passed 33 checks across three authentication modes with all 13 cleanup
 entries successful. Wiring validation does not imply that the complete
 deployment orchestrator was rerun.
 
+## Required documentation render gate
+
+The pre-push render gate must actually run Chromium with strict Mermaid
+configuration in both light and dark themes. Missing Playwright or the root
+Mermaid bundle now blocks the push rather than reporting a passed skip.
+Behavioral CLI and registered-action controls run before rendering in the
+normal hook. Renderer discovery treats placeholder/unattributed versions as
+unknown, never as npm pins. The observed editor bundle identifies Mermaid
+11.17.0 while the gate remains pinned at 11.15.0; editor equivalence is not
+verified and no dependency changes or deployment are included. See
+[required-gate evidence and RCA](strategy/MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
 ## 0. Provenance and how to reproduce every fact
 
 Nothing in this document is inferred from memory. Every Azure value was read from the live control plane or the live data plane on the capture date; every repo value was read from the file cited.

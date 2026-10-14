@@ -24,7 +24,7 @@ import { join, dirname } from 'node:path';
 
 const HOME = process.env.USERPROFILE || process.env.HOME || '';
 
-/** Pull a `version:"x.y.z"` literal out of a bundled webview script. */
+/** Read Mermaid's info-diagram version, not another bundled library's version. */
 function versionFromBundle(files) {
   for (const f of files) {
     if (!existsSync(f)) continue;
@@ -34,8 +34,8 @@ function versionFromBundle(files) {
     } catch {
       continue;
     }
-    const m = content.match(/version:"(\d+\.\d+\.\d+)"/);
-    if (m) return m[1];
+    const m = content.match(/\bDEFAULT_INFO_DB\s*=\s*\{\s*version:\s*["'](\d+\.\d+\.\d+)["']/);
+    if (m && m[1] !== '0.0.0') return m[1];
   }
   return null;
 }

@@ -110,14 +110,22 @@ try {
   gateVersion = JSON.parse(readFileSync(join(ROOT, 'node_modules', 'mermaid', 'package.json'), 'utf8')).version;
 } catch {
   add(
-    'WARN',
+    'BLOCKER',
     'Gate mermaid not installed',
-    'node_modules/mermaid is absent at the repo root, so the render gate silently SKIPS.',
-    'Run `npm install` at the repo root.',
+    'node_modules/mermaid is absent at the repo root, so the required render gate fails.',
+    'Restore matching root dependencies under the repository supply-chain policy.',
   );
 }
 
 const extVersion = authoritative?.version ?? null;
+if (authoritative && !extVersion) {
+  add(
+    'WARN',
+    'Authoritative renderer Mermaid version is unknown',
+    `${authoritative.id} has no identified non-placeholder Mermaid version. Editor equivalence is unverified.`,
+    'Inspect the renderer bundle before changing any package pin. Unknown versions are not actionable npm pins.',
+  );
+}
 if (gateVersion && extVersion) {
   if (gateVersion === extVersion) {
     add('OK', 'Mermaid version', `gate and the authoritative renderer (${authoritative.id}) both on ${gateVersion}`, null);

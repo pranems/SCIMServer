@@ -337,6 +337,10 @@ Everything else under `docs/` is internal design and phase notes, deliberately n
 
 ## Testing & Validation
 
+- [Required Mermaid gate hardening](strategy/MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md):
+  behavioral RED/GREEN controls, fail-closed prerequisites, version identity,
+  execution RCA, and unresolved editor equivalence.
+
 | Document | Description |
 |----------|-------------|
 | [SCIM_VALIDATOR_RESULTS_32_LEXMARK_ANALYSIS.md](SCIM_VALIDATOR_RESULTS_32_LEXMARK_ANALYSIS.md) | SCIM Validator #32 - Lexmark schema analysis |
