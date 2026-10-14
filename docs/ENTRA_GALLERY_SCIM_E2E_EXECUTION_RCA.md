@@ -35,6 +35,10 @@ The normal push of `0a884263` passed its full Fast hook, including 2,432
 InMemory E2E tests; four PostgreSQL-only tests were excluded, and a Jest
 worker-exit warning remains a teardown limitation rather than an assertion
 failure.
+The separate empty-matrix correction `e4f1cfa9` is also pushed in draft
+PR #218. Its normal Fast hook passed every gate in 612.9 seconds, including
+actual Mermaid rendering in 95.6 seconds and the same 116 InMemory E2E suites
+with 2,432 passed and four PostgreSQL-only exclusions. The warning remains.
 
 **Self-improvement applied:** Negative controls cover the implementation's
 mode decisions and serialized evidence, closing the gap between code that
@@ -45,11 +49,19 @@ a small helper shared by preparation and read-back. Remote calls and owned
 cleanup remain with the existing orchestrator. No policy language or new
 dependency is introduced.
 
-Full raw transcript reconciliation for this continuation will be completed
-with its final live evidence; the current entries are captured at confirmed
-contract GREEN while their exact failures remain available.
+**Continuation provenance, contract checkpoint:** The full raw `events.jsonl`
+stream for session `dabf857d-5a2f-4840-bcf0-145452fd5834` was scanned through
+45,782 events. The custom-mapping continuation starts at event 45,253.
+Reconciliation used both failure/signal and causal-narration passes, correlated
+tool starts with results, and reviewed all continuation tool-result signals,
+not only path-matched calls. The scoped pass identified 86 calls. Source
+listings, patch text, search echoes and deliberate RED controls were not
+counted as new incidents. Missing tooling, renderer-version warnings, the
+internal exception-type test failure, and the worker-exit warning map to the
+entries or explicit limitations above. There was no expanded live run to
+reconcile; this checkpoint is not a final live-validation completeness claim.
 
-**Provenance:** reconciled against the detailed pre-compaction execution
+**Historical EG-I provenance:** reconciled against the detailed pre-compaction execution
 checkpoint supplied to this continuation and every command, failure, diagnosis,
 and rerun in the current continuation. `VSCODE_TARGET_SESSION_LOG` was not
 available, so the original pre-compaction JSONL transcript could not be

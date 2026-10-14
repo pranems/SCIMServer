@@ -93,7 +93,10 @@ normal Fast hook passed all required static, documentation, unit and InMemory
 E2E gates. That E2E run passed 2,432 tests with four PostgreSQL-only exclusions.
 The exclusions are not PostgreSQL validation, and Jest's worker-exit warning
 is not evidence of clean teardown. Neither the hook nor the contracts replace
-the pending real expanded provisioning matrix.
+the pending real expanded provisioning matrix. The separate empty-matrix
+correction `e4f1cfa9` is also pushed, and draft PR #218 preserves both logical
+commits. Its normal Fast hook passed every gate in 612.9 seconds, including
+actual Mermaid rendering in 95.6 seconds and the same 116 InMemory E2E suites.
 
 Run the existing contracts together:
 
