@@ -98,6 +98,7 @@ Do not install or downgrade to `0.0.0`.
 | MG-I3 | Environment / Low | Fresh-worktree API/web builds lacked tsc/vite; render lacked Playwright. | After measured failures, restore existing installed dependencies with identical dependency entries. Root uses a junction; API/web use private copies so generation cannot mutate owned worktrees. | Focused prerequisite checks / same | Compare dependency entries before reuse; no registry fetch, package or lockfile edits. |
 | MG-I4 | Test isolation / Low | Child doctor rediscovered the host instead of the scratch renderer; Windows restored ProgramFiles despite an explicit child environment override. | Feed the real scratch discovery result into the doctor's imported discovery seam in the scratch fixture; production discovery is unchanged. | Focused diagnostic control / same | Test output against identified fixture data; do not assume child environment overrides isolate system-known paths. |
 | MG-I5 | Evidence wording / Medium | Successful focused render ended with "matches the VS Code extension" despite identified version drift. | Report strict/two-theme configuration separately from unverified editor equivalence. | Positive browser receipt / summary output contract | A behavioral negative control rejects the equivalence claim in the render summary. |
+| MG-I6 | Fresh-worktree prerequisite / Low | First normal Validate push stopped at API build because the generated Prisma client was absent. Standalone generation then required DATABASE_URL while loading config. | Generate only the private worktree client with an unused loopback URL; generation succeeded without a database connection or shared mutation. | Normal hook build / prerequisite setup | Restore generated artifacts as well as dependencies before a fresh-worktree push. Gate-order redesign is outside this bounded change. |
 
 Dependency manifests matched the consolidation worktree. API/web lockfile
 dependency entries matched exactly; only release-level lock metadata differed.
@@ -111,7 +112,7 @@ RED/GREEN receipts are actual subprocess outputs from this bounded session.
 The available full `events.jsonl` session log was scanned at consolidation
 using failure-signal and diagnosis-phrase passes, including tool outputs and
 narration rather than compacted recollection. Diagnosed issues map to MG-I1
-through MG-I5. The missing-tool failures are
+through MG-I6. The missing-tool failures are
 intentional RED/prerequisite evidence, not unresolved runtime defects. The
 first discovery fixture format control already passed before the fix; it is
 not counted as a reproduced defect. Commit identities and final hook evidence
