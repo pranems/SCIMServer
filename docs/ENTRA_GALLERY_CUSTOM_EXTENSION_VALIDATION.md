@@ -87,8 +87,11 @@ empty requested matrix into a custom-mapping PASS.
 | Real expanded gallery provisioning and cleanup | Pending shared-estate handoff |
 | New documentation diagram | Rendered in Chromium under strict security in both themes; the separate built-in version-discovery warning is not represented as renderer equivalence. |
 
-The focused checkpoint passes 70 gallery contract checks and 41 deployment
-pipeline contract checks. The first pushed implementation is `0a884263`; its
+The post-master integration checkpoint passes 70 gallery contract checks and
+42 deployment pipeline contract checks. Reviewed master `f96f31b5` adds the
+serial-Prisma scheduling guard without weakening gallery acceptance. Both
+infrastructure explanations are retained and the infrastructure audit passes.
+The first pushed implementation is `0a884263`; its
 normal Fast hook passed all required static, documentation, unit and InMemory
 E2E gates. That E2E run passed 2,432 tests with four PostgreSQL-only exclusions.
 The exclusions are not PostgreSQL validation, and Jest's worker-exit warning

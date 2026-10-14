@@ -14,7 +14,8 @@ below describe the reduced historical matrix, not this prepared expansion.
 Checkpoint `0a884263` is pushed. Its normal Fast hook passed, including 2,432
 InMemory E2E tests with four PostgreSQL-only exclusions. The next focused
 checkpoint rejects empty auth selections and vacuous coverage claims; all 70
-gallery and 41 pipeline contracts pass. A read-only actual dev preset passed
+gallery and 42 pipeline contracts pass after integration of reviewed master
+`f96f31b5` and its serial-Prisma guard. A read-only actual dev preset passed
 the built runtime profile validator with the reviewed extension.
 
 **Runtime release checkpoint:** PR #215 merged normally at `99cdeda3` with

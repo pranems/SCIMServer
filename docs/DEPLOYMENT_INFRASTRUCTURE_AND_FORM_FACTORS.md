@@ -7,6 +7,17 @@
 
 ---
 
+## Prisma validation scheduling
+
+The direct Stage 2.2 Prisma E2E invocation now requests `--runInBand`,
+matching the existing serial Prisma lane in `test-all-modes.ps1`.
+The first v0.55.48 full attempt used four workers and failed 29 suites with
+application-bootstrap timeouts and dependent assertions. Serial execution
+changes scheduling, not selected tests, assertions, timeout limits, or backend.
+The deployment contract now prevents the direct gate from silently returning
+to a different concurrency policy. A fresh complete pipeline is still required;
+the scheduling contract alone is not backend or deployment proof.
+
 ## Entra gallery validation gate
 
 **Prepared coverage expansion:** Stage 4.8 now requires Group CRUD/membership

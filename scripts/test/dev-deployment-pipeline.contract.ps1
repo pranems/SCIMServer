@@ -35,6 +35,8 @@ Invoke-Assert -Description 'pipeline script parses without errors' -Condition ($
 $content = Get-Content -LiteralPath $pipeline -Raw
 $fullValidationContent = Get-Content -LiteralPath $fullValidationPipeline -Raw
 $verifyDeploymentContent = Get-Content -LiteralPath $verifyDeployment -Raw
+Invoke-Assert -Description 'the direct Prisma E2E gate uses the same serial execution as the backend matrix' `
+    -Condition ($content.Contains("Invoke-Gate '2.2' 'API E2E jest (1,217 baseline, prisma)' { npm run test:e2e -- --runInBand }"))
 Invoke-Assert -Description 'Stage 4.8 executes the full Entra gallery gate without mode or retention overrides' `
     -Condition ($content.Contains("Invoke-Gate '4.8' 'Entra gallery provisioning vs dev'") -and
         $content.Contains('scripts/entra-gallery-scim-e2e.ps1 -OutputDirectory $galleryOutputDirectory') -and

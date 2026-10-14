@@ -21,6 +21,7 @@ dashboard and its live counts remain historical evidence.
 | GM-I05 | Worktree tooling / Low | The fresh worktree lacked root Mermaid, web Playwright, and API TypeScript dependencies. | A required-tooling preflight failed explicitly; restore junctions to matching installed dependencies without installs or lockfile edits. The new diagram then rendered under strict security in both themes and the existing Prisma generator created the ignored client. | Probe required tooling before trusting a render-gate summary. The known built-in `0.0.0` version warning remains with the separate gate-hardening owner. | Tooling preflight / tooling preflight |
 | GM-I06 | Input / evidence correctness / High | An explicit empty Modes array passed binding, and the zero-iteration report predicate declared custom coverage PASS. The pipeline separately rejected absent semantic outcomes, but standalone execution could still be misleading. | Require a nonempty parameter and a positive requested-mode count before custom PASS. Both behavioral controls were RED and then GREEN; the default still selects three modes. | Execute the actual parameter AST and report function with empty input; never infer coverage from an empty universal predicate. | Binding/report contract / binding/report contract |
 | GM-I07 | Test harness / Low | The first GREEN rerun failed while resolving the internal PowerShell validation exception type in a catch predicate. | Match the public ErrorRecord identifier `ParameterArgumentValidationError` instead. The contract now distinguishes expected argument validation without depending on an inaccessible exception class. | Use public error identifiers for shell contract assertions; default-binding positive control remains GREEN. | Focused contract / focused contract |
+| GM-I08 | Git integration / Low | Gallery acceptance and the reviewed serial-Prisma correction both inserted infrastructure notes under the same heading, producing a documentation merge conflict. | Preserve both explanations under distinct Prisma scheduling and gallery headings. The source and contract changes merged automatically; all 70 gallery and 42 pipeline contracts and the infrastructure audit pass. | Verify both behavioral contracts after integration; never resolve a shared context document by discarding one side. | Normal merge / normal merge |
 
 The reviewed helper also refuses an absent target department template or
 duplicate custom registration and checks the saved source expression. A
@@ -243,3 +244,48 @@ with zero changed package versions and byte-equivalent dependency-entry maps
 (684 API, 395 web). Public-registry and SHA-512 checks pass. The read-only
 consolidation review found no significant issues. Merge and dev proof remain
 pending; these results do not imply deployment.
+
+### First authoritative v0.55.48 attempt
+
+PR #215 merged normally at `99cdeda35861049b05908f5b507e404b3318e33d`
+with final-tip CI green. The full pipeline was invoked without skip flags.
+Stages 0 and 1 passed, including 73-endpoint before-state capture. Stage 2.1
+passed; Stage 2.2 failed with 2,178 passes, 310 failures, and four skips
+across 118 suites (89 passed, 29 failed). Bootstrap-hook timeouts account
+for early cascades such as undefined `getHttpServer`; this is not 310
+independent runtime diagnoses. The direct gate used four workers while the
+existing backend matrix deliberately runs Prisma E2E serially.
+
+The attempt was stopped before publication or deployment rather than risk
+letting later work obscure the failed validation. Its exact owned PostgreSQL
+container `25b2f446d092` was removed after verifying owner and run labels.
+The shared `scimserver-combined-validation-postgres-20261009` remains running.
+No dev image or profile was changed.
+
+**EG-I30, validation scheduling, Medium:** the owning direct Prisma gate did
+not use the matrix's existing serial scheduling. Align the command with
+`--runInBand`; its new contract assertion is confirmed RED then GREEN.
+Actual full serial execution and complete pipeline recovery remain pending,
+so worker contention is a hypothesis supported by scheduling drift and
+bootstrap timeouts, not a verified sole cause. Detection was Stage 2.2;
+the command-consistency contract is the earliest structural check.
+Both earliest bootstrap-failed suites then pass serially on a fresh exact
+owned PostgreSQL container: 47/47 tests across two suites in 93.8 seconds.
+That container was removed by exact ID after its owner label was checked.
+This focused recovery supports the scheduling correction but does not replace
+the complete serial suite or full deployment matrix.
+
+**Reference proof preparation:** the generic live helper's minimal User body
+omits `displayName`, which this original dev profile publishes as required.
+That setup returned 400 before reaching the revision guard. An explicit
+profile-conforming fixture now confirms User and Group POST both return 409
+on deployed v0.55.47, while a read-only database transaction confirms the
+original raw legacy setting and unchanged revision. The gallery reference
+connector's BaseAddress names customer production; it is not a deployment
+target. Select the existing dev copy explicitly and resolve dev from the
+estate registry. No connector or profile rewrite is permitted.
+
+**Test/gate improvement: applied.** The direct Prisma scheduling contract
+detects drift from the established backend matrix. Full recovery is pending.
+**Design disposition: accepted.** Reuse existing serial execution rather than
+adding a runner, changing timeouts, removing assertions, or redesigning gates.
