@@ -11,8 +11,8 @@
 
     Secret values stay in memory and are never written to the JSON or Markdown
     reports. The gate refuses production targets, a gallery service principal
-    with pre-existing jobs, and any WIF target that is not already present on
-    the resolved dev estate.
+    with pre-existing jobs, and any WIF reference that is not already present
+    on the resolved dev estate. WIF provisions into an owned isolated endpoint.
 
 .PARAMETER Modes
     Authentication modes to exercise. Defaults to all required modes.
@@ -49,6 +49,7 @@ $createdEndpointIds = [System.Collections.Generic.List[string]]::new()
 $createdJobIds = [System.Collections.Generic.List[string]]::new()
 $createdUserIds = [System.Collections.Generic.List[string]]::new()
 $createdGroupIds = [System.Collections.Generic.List[string]]::new()
+$createdFederatedCredentials = [System.Collections.Generic.List[object]]::new()
 $cleanupResults = [System.Collections.Generic.List[object]]::new()
 $secretKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $originalAzureConfigDir = $env:AZURE_CONFIG_DIR
@@ -643,8 +644,15 @@ function New-ModeContext {
         }
         $referenceSecretResponse = Invoke-Graph -Method GET -Path "servicePrincipals/$($referenceSp.id)/synchronization/secrets"
         $referenceSecrets = @($referenceSecretResponse.value | Where-Object { $null -ne $_ })
-        if (-not $WifEntraApplicationIdentifier) {
-            throw 'WIF requires WifEntraApplicationIdentifier or ENTRA_WIF_APPLICATION_ID; the value is an Entra resource application ID, not a secret.'
+        $connectivityResponse = Invoke-Graph -Method GET -Path "servicePrincipals/$($referenceSp.id)/synchronization/connectivityParameters"
+        $connectivity = @($connectivityResponse.value | Where-Object { $null -ne $_ })
+        $resourceAppId = [string]($connectivity | Where-Object key -eq 'entraApplicationIdentifier').value
+        $referenceObjectId = [string]($connectivity | Where-Object key -eq 'entraApplicationObjectIdentifier').value
+        if (-not $resourceAppId -or $referenceObjectId -ne $referenceSp.id) {
+            throw 'WIF reference must contain a resource application ID and its own service-principal object ID.'
+        }
+        if ($WifEntraApplicationIdentifier -and $WifEntraApplicationIdentifier -ne $resourceAppId) {
+            throw 'The explicit WIF application ID does not match the reviewed reference connectivity parameters.'
         }
         $authenticationType = $referenceSecrets | Where-Object key -eq 'AuthenticationType'
         if ($authenticationType.value -ne 'WorkloadIdentityClientAuthentication') {
@@ -658,12 +666,35 @@ function New-ModeContext {
         if ($sourceBaseUri.AbsolutePath -notmatch '^/scim/(?:v2/)?endpoints/([0-9a-fA-F-]{36})/?$') {
             throw 'WIF reference BaseAddress does not identify one SCIMServer endpoint.'
         }
-        $endpointId = $Matches[1].ToLowerInvariant()
-        $wifEndpoint = Invoke-ScimAdmin -Method GET -Path "scim/admin/endpoints/$endpointId"
+        $referenceEndpointId = $Matches[1].ToLowerInvariant()
+        $wifEndpoint = Invoke-ScimAdmin -Method GET -Path "scim/admin/endpoints/$referenceEndpointId"
         if ($wifEndpoint.profile.settings.WifCredentialsEnabled -notin @($true, 'True')) {
             throw 'Dev WIF target endpoint does not have WifCredentialsEnabled.'
         }
-        $targetBase = "$baseUrl$($sourceBaseUri.AbsolutePath.TrimEnd('/'))"
+        $filter = [uri]::EscapeDataString("appId eq '$resourceAppId'")
+        $spResponse = Invoke-Graph -Method GET -Path "servicePrincipals?`$filter=$filter&`$select=id"
+        $resourceSps = @($spResponse.value | Where-Object { $null -ne $_ })
+        if ($resourceSps.Count -ne 1) {
+            throw 'Expected exactly one WIF resource service principal in the dev tenant.'
+        }
+        $endpoint = New-ScimEndpoint -ModeSlug $modeSlug -Setting 'WifCredentialsEnabled'
+        $endpointId = [string]$endpoint.id
+        $targetBase = "$baseUrl/scim/endpoints/$endpointId"
+        Invoke-ScimAdmin -Method POST -Path "scim/admin/endpoints/$endpointId/credentials" -Body @{
+            credentialType = 'wif'
+            label = "Entra gallery E2E $runId"
+            wif = @{
+                assertionProfile = 'jwt-bearer'
+                expectedIssuer = "https://login.microsoftonline.com/$($estate.Tenant.tenantId)/v2.0"
+                expectedSubject = [string]$resourceSps[0].id
+                expectedAudience = $resourceAppId
+                jwksUri = "https://login.microsoftonline.com/$($estate.Tenant.tenantId)/discovery/v2.0/keys"
+                allowedTenantId = [string]$estate.Tenant.tenantId
+                scope = 'scim.read scim.write'
+                issuedTokenTtlSec = 3600
+                targetClientId = "entra-gallery-e2e-$runId"
+            }
+        } | Out-Null
 
         $pairs = @(
             foreach ($pair in $referenceSecrets) {
@@ -674,21 +705,37 @@ function New-ModeContext {
             elseif ($pair.key -eq 'Oauth2TokenExchangeUri') {
                 $value = "$baseUrl/scim/endpoints/$endpointId/oauth/token"
             }
-            elseif ($pair.key -eq 'EntraApplicationIdentifier') {
-                $value = $WifEntraApplicationIdentifier
-            }
             @{
                 key = [string]$pair.key
                 value = $value
             }
             }
         )
-        if (-not ($pairs | Where-Object key -eq 'EntraApplicationIdentifier')) {
-            $pairs += @{
-                key = 'EntraApplicationIdentifier'
-                value = $WifEntraApplicationIdentifier
-            }
+        $filter = [uri]::EscapeDataString("appId eq '$resourceAppId'")
+        $appResponse = Invoke-Graph -Method GET -Path "applications?`$filter=$filter&`$select=id"
+        $apps = @($appResponse.value | Where-Object { $null -ne $_ })
+        if ($apps.Count -ne 1) {
+            throw 'Expected exactly one reviewed WIF resource application in the dev tenant.'
         }
+        $applicationId = [string]$apps[0].id
+        $ficResponse = Invoke-Graph -Method GET -Path "applications/$applicationId/federatedIdentityCredentials"
+        $referenceFics = @($ficResponse.value | Where-Object {
+            $_.subject.EndsWith("/$referenceObjectId", [StringComparison]::Ordinal) -and
+            $_.issuer.TrimEnd('/') -eq "https://login.microsoftonline.com/$($estate.Tenant.tenantId)/v2.0" -and
+            $_.audiences -contains 'api://AzureADTokenExchange'
+        })
+        if ($referenceFics.Count -ne 1) {
+            throw 'Expected one tenant-bound federated credential for the reviewed reference service principal.'
+        }
+        $referenceFic = $referenceFics[0]
+        $subject = $referenceFic.subject.Substring(0, $referenceFic.subject.Length - $referenceObjectId.Length) + $gallerySp.id
+        $fic = Invoke-Graph -Method POST -Path "applications/$applicationId/federatedIdentityCredentials" -Body @{
+            name = "entra-gallery-e2e-$runId"
+            issuer = $referenceFic.issuer
+            subject = $subject
+            audiences = @('api://AzureADTokenExchange')
+        }
+        $createdFederatedCredentials.Add([pscustomobject]@{ ApplicationId = $applicationId; Id = [string]$fic.id })
 
         return [pscustomobject]@{
             Mode = $Mode
@@ -696,8 +743,16 @@ function New-ModeContext {
             TargetBase = $targetBase
             VerificationHeaders = $adminHeaders
             Secrets = @($pairs)
+            ConnectivityParameters = @(
+                @{ key = 'entraApplicationIdentifier'; value = $resourceAppId }
+                @{ key = 'entraApplicationObjectIdentifier'; value = [string]$gallerySp.id }
+                @{ key = 'authenticationType'; value = 'WorkloadIdentityClientAuthentication' }
+                @{ key = 'baseAddress'; value = $targetBase }
+                @{ key = 'oauth2TokenExchangeUri'; value = "$baseUrl/scim/endpoints/$endpointId/oauth/token" }
+                @{ key = 'oauth2ClientId'; value = "entra-gallery-e2e-$runId" }
+            )
             EndpointId = $endpointId
-            OwnsEndpoint = $false
+            OwnsEndpoint = $true
         }
     }
 
@@ -781,6 +836,33 @@ function Invoke-ModeScenario {
         $job = New-SynchronizationJob
         $modeStage = 'configure synchronization secrets'
         Set-SynchronizationSecrets -Pairs $context.Secrets
+        if ($Mode -eq 'WorkloadIdentity') {
+            $modeStage = 'configure WIF connectivity parameters'
+            Invoke-Graph -Method PATCH -Path "servicePrincipals/$($gallerySp.id)/synchronization/connectivityParameters" -Body @{
+                value = $context.ConnectivityParameters
+            } | Out-Null
+            $configurationConverged = $false
+            foreach ($attempt in 1..12) {
+                $configured = Invoke-Graph -Method GET -Path "servicePrincipals/$($gallerySp.id)/synchronization/connectivityParameters"
+                $mismatches = @(
+                    foreach ($expected in $context.ConnectivityParameters) {
+                        $actual = @($configured.value | Where-Object key -eq $expected.key)
+                        if ($actual.Count -ne 1 -or $actual[0].value -ne $expected.value) {
+                            $expected.key
+                        }
+                    }
+                )
+                if ($mismatches.Count -eq 0) {
+                    $configurationConverged = $true
+                    break
+                }
+                Start-Sleep -Seconds 5
+            }
+            if (-not $configurationConverged) {
+                throw "WIF connectivity read-back did not converge for: $($mismatches -join ', ')."
+            }
+            Add-Result $scenario 'WIF connectivity read-back' 'PASS' 'Persisted auth type, target URLs, client ID, and both application identifiers match the owned configuration.'
+        }
         $modeStage = 'configure owned synchronization mapping'
         Set-TestSynchronizationMappings -JobId $job.id
         $modeStage = 'read synchronization schema'
@@ -909,19 +991,7 @@ function Invoke-ModeScenario {
     }
     catch {
         $detail = "$modeStage`: $(Get-SafeExceptionDetail $_)"
-        if (
-            $Mode -eq 'WorkloadIdentity' -and
-            $modeStage -eq 'configure synchronization secrets' -and
-            $detail -match 'RequestParameterInvalid'
-        ) {
-            Add-Result $scenario 'mode outcome' 'BLOCKED' (
-                'Microsoft Graph rejected the required EntraApplicationIdentifier connector field. ' +
-                'The same connector quarantines for the missing field when it is omitted.'
-            )
-        }
-        else {
-            Add-Result $scenario 'mode outcome' 'FAIL' $detail
-        }
+        Add-Result $scenario 'mode outcome' 'FAIL' $detail
     }
 }
 
@@ -976,6 +1046,20 @@ function Remove-OwnedArtifacts {
         }
         catch {
             Add-CleanupResult -Kind 'sourceGroup' -Id $groupId -Removed $false -Detail $_.Exception.Message
+        }
+    }
+    foreach ($credential in $createdFederatedCredentials) {
+        try {
+            $path = "applications/$($credential.ApplicationId)/federatedIdentityCredentials"
+            Invoke-Graph -Method DELETE -Path "$path/$($credential.Id)" | Out-Null
+            $remaining = Invoke-Graph -Method GET -Path $path
+            if (@($remaining.value | Where-Object id -eq $credential.Id).Count -ne 0) {
+                throw 'Federated credential removal did not converge.'
+            }
+            Add-CleanupResult -Kind 'federatedCredential' -Id $credential.Id -Removed $true -Detail 'Deleted and verified by exact owned ID.'
+        }
+        catch {
+            Add-CleanupResult -Kind 'federatedCredential' -Id $credential.Id -Removed $false -Detail $_.Exception.Message
         }
     }
     foreach ($userId in @($createdUserIds)) {

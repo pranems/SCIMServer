@@ -114,9 +114,16 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $skillPath))
         $gate -match "deprovision group'.*Wait-ScimResource" -or
         ($gate -match 'groupDeprovisionPath' -and $gate -match "Expectation 'group is absent'")
     )
-    Assert-Contract 'gate reports the measured WIF configuration blocker explicitly' (
-        $gate -match 'EntraApplicationIdentifier connector field' -and
-        $gate -match 'RequestParameterInvalid'
+    Assert-Contract 'WIF identifiers use connectivityParameters, never the secrets collection' (
+        $gate.Contains('synchronization/connectivityParameters') -and
+        $gate.Contains("key = 'entraApplicationIdentifier'") -and
+        $gate.Contains("key = 'entraApplicationObjectIdentifier'") -and
+        $gate -cnotmatch "key = 'EntraApplicationIdentifier'"
+    )
+    Assert-Contract 'gallery WIF creates and verifies exact owned federated-credential cleanup' (
+        $gate.Contains('createdFederatedCredentials') -and
+        $gate.Contains('federatedIdentityCredentials') -and
+        $gate.Contains('Federated credential removal did not converge')
     )
     Assert-Contract 'skill invokes the executable gate instead of duplicating it' (
         $skill.Contains('scripts\entra-gallery-scim-e2e.ps1')

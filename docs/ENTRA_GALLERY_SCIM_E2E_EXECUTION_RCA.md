@@ -1,6 +1,6 @@
 # Entra Gallery to SCIMServer E2E - Execution Issues and RCA
 
-> **Status:** Active execution ledger - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
+> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.47`
 
 ## Purpose and scope
 
@@ -41,7 +41,7 @@ final runs.
 |---|---|---|
 | Secret token | PASS | User create, update, disable, re-enable, and deprovision; Group create, update, membership add/remove, and deprovision. |
 | OAuth client credentials | PASS | User create, update, disable, re-enable, and deprovision. Group and membership repetition is explicitly unsupported because the same gallery mapping matrix is already covered through secret token. |
-| Workload identity | BLOCKED | The Graph configuration boundary rejects the required hidden connector field. The independent real-Entra WIF proof remains a separate protocol-level claim. |
+| Workload identity | PASS, focused run: 11 checks | Corrected connectivity configuration, real gallery assertion acquisition, User create, update, disable, re-enable, deprovision, and exact owned cleanup. The combined matrix is still pending. |
 | Custom SCIM extensions | UNSUPPORTED | The stock `isvonboarding` schema covers core User, enterprise User, and Group. Arbitrary custom extension transport requires a reviewed synchronization-schema mapping. |
 
 The independent reusable WIF proof passed 50 checks with zero failures against
@@ -54,5 +54,24 @@ Entra application were each removed by exact ID.
 - **Test/gate:** applied. The gate parses the on-demand provisioning steps, rejects false success without an Export step, waits for Graph assignment convergence, and verifies exact cleanup.
 - **Design/architecture:** accepted. One script owns Graph, SCIM, reporting, and cleanup because these operations form one transaction-like test harness. Splitting providers before a second caller exists would add cleanup and secret-lifetime risk without reducing coupling.
 - **Security:** applied. The accidental dev credential disclosure was invalidated immediately, and future diagnostics are limited to allowlisted projections.
-- **WIF investigation:** accepted as a measured external blocker. No production connector was changed, the rejected shared-application hypothesis was removed from the harness, and a required blocked result cannot be mistaken for coverage.
+- **WIF investigation:** applied. The earlier external-blocker conclusion was incorrect. The harness used the wrong Graph collection and omitted the service-principal object identifier. Corrected configuration and an owned federated credential now pass the real gallery User lifecycle.
 - **Temporary identity setup:** applied. The successful one-off setup was converted into `wif-e2e-temporary-app.ps1`, so the safe identity lifecycle and cleanup are executable and reviewable.
+
+## WIF correction on 2026-10-14
+
+The EG-I09 explanation above is historical and superseded by the measured
+correction below. The missing field was not proof of an unsupported service.
+
+| ID | Type | Severity | Symptom and mechanism | Resolution and verification | Prevention and detection stage |
+|---|---|---|---|---|---|
+| EG-I16 | Harness configuration | High | WIF identifiers were submitted to the secrets collection. The working reference exposes them through connectivity parameters with camel-case enum keys, including its own service-principal object ID. | Read the reference connectivity parameters, write both identifiers with PATCH, and add a uniquely owned federated credential for the test gallery principal. Final focused gallery run: 11 PASS, zero FAIL, all cleanup entries removed. | RED-first contract rejects the old secrets-key form. Real gallery User lifecycle verifies the actual connector, not just the independent protocol. The earliest configuration read could have found this before the previous blocker diagnosis. |
+| EG-I17 | Configuration convergence | High | The first corrected run retained an earlier bearer-auth target alongside the new identifiers and timed out with 401. A successful write did not prove the complete persisted configuration. The exact underlying persistence/cache interleaving is not established. | Write the complete WIF connectivity set together and poll read-back equality before fixtures. The subsequent run minted an accepted WIF token and reached SCIM POST. | Fail before provisioning when any saved field differs. This catches the mismatch at configuration rather than after a long export timeout. |
+| EG-I18 | Existing endpoint runtime | High, unresolved | The reference endpoint accepted WIF minting but its User POST returned 409: endpoint profile changed during the resource write. No profile mutation was made to that endpoint by this run. The revision mismatch mechanism remains under investigation. | The harness now creates an isolated `entra-id` endpoint and owned WIF trust instead of provisioning into the reference endpoint. That isolated gallery lifecycle passes. This is isolation, not a fix for the reference endpoint's 409. | Keep an explicit follow-up for the existing endpoint. Do not report the isolated success as proof that existing-profile writes are healthy. |
+| EG-I19 | Editing / test precision | Low | A cleanup loop was initially inserted between try and catch, and a case-insensitive contract rejected the correct camel-case enum key. | Parser gate identified the syntax error before mutation; the loop was moved outside the try/catch. A case-sensitive negative check distinguishes the two key forms. | Existing parser gate plus focused contract passed before each live retry. |
+
+The final focused run used an owned endpoint, trust, source User, job, and
+federated credential. Their cleanup reports are all successful. The reference
+job and its original federated credential were not edited. No production
+promotion occurred. Design disposition: **accepted**, reuse the existing
+endpoint helper and keep the configuration/write-readback lifecycle cohesive;
+no speculative provider framework was introduced.
