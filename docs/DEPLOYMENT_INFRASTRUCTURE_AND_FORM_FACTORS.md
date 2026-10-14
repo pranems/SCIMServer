@@ -9,8 +9,13 @@
 
 ## Entra gallery validation gate
 
-The direct Stage 2.2 Prisma E2E invocation now requests `--runInBand`,
-matching the existing serial Prisma lane in `test-all-modes.ps1`.
+The direct Stage 2.2 Prisma E2E invocation and the Prisma lane in
+`test-all-modes.ps1` now request `--runInBand --silent`. Quiet mode suppresses
+application console chatter, not test assertions, test-failure stacks, or the
+structured results reporter. A deliberately injected exception still appears
+with exit 1. The complete isolated diagnostic passes 118 suites and 2,492
+tests with zero skips in 1,417.31 seconds. Both command contracts were
+confirmed RED before the change and GREEN afterwards.
 The first v0.55.48 full attempt used four workers and failed 29 suites with
 application-bootstrap timeouts and dependent assertions. Serial execution
 changes scheduling, not selected tests, assertions, timeout limits, or backend.
@@ -23,6 +28,13 @@ by this phase; dev remains v0.55.47. Both exact owned PostgreSQL containers
 were removed, and the shared validation container was preserved. See the
 [execution ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) for the blocker
 and partial evidence. No production promotion was attempted.
+The later isolated diagnostic does not establish a sole timeout cause:
+it also runs without a competing heavy validation and explicitly selects
+Prisma, enabling all four PostgreSQL-only tests. Measured StatsModule startup
+peaks at 8,705 ms; a fresh 600-empty-endpoint control takes 2,713 ms there.
+The authoritative merged-master pipeline remains outstanding. The parent
+holds a bounded gallery lease; it must return that lease before runtime
+deployment or live browser/integrity work resumes.
 
 The dev deployment orchestrator now runs Stage 4.8 after exact intended
 revision readiness and the live SCIM suite. It invokes the complete default

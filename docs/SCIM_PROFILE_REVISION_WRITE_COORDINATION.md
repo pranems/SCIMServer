@@ -6,6 +6,15 @@
 
 ## Problem
 
+**Recovery evidence, not deployed proof:** The later isolated serial Prisma
+diagnostic passes all 118 suites and 2,492 tests with zero skips in
+1,417.31 seconds. Both pipeline owners now use the exercised quiet-console
+configuration. Failure stacks and exit 1 remain visible in a negative control;
+test assertions, reporters, and timeouts are unchanged. The earlier timeout's
+sole cause remains unproven, and a complete authoritative merged-master
+deployment run is still required. The parent holds the shared gallery lease
+until explicit return; local recovery does not authorize live mutation.
+
 A resource request resolves an endpoint profile before it validates the
 candidate. Previously, the profile could change after that validation and
 before repository mutation. The late write could then return success even

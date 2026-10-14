@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Validation pipeline
 
+- Align both Prisma E2E owners on serial quiet-console execution. Quiet mode
+  suppresses application console chatter, not test assertions, suite summaries,
+  failure stacks, or the structured results reporter. Contracts were RED for
+  both missing switches and GREEN after the two command changes. An injected
+  causal exception remains visible and exits 1.
+- Retain the second pipeline's 2,348-pass/140-fail/four-skip Prisma receipt.
+  A later isolated diagnostic with explicit Prisma selection passes all
+  2,492 tests across 118 suites with zero skips in 1,417.31 seconds.
+  No tests or timeout limits changed. This diagnostic does not establish
+  the earlier timeout's sole cause or replace authoritative deployment proof.
 - Enable seeded profile-shape coverage in the authoritative dev Playwright
   lane, parse its JSON result, and fail the gate on any skipped case. Restore
   the dev-only shape and mutation flags after the dev run, and explicitly clear
