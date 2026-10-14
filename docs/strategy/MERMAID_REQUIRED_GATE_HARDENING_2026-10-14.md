@@ -150,3 +150,50 @@ dependency is justified for these bounded responsibilities.
 Remaining release checks: review and exact-tip CI, parent sequencing, and
 separate resolution of genuine editor-version drift. No merge or deployment
 is authorized by this change.
+
+## Authorized root-tooling alignment continuation
+
+The operator authorized this tightly coupled follow-up after the original
+checkpoint `a9f376af`. Root Mermaid is now targeted exactly at 11.17.0.
+API/web dependency manifests and lockfiles remain out of scope. Root lockfile
+generation runs only in the existing CI workflow, extended with a `root`
+selector. `both` preserves API/web semantics; artifacts contain only the
+selected lockfiles and publication-age evidence.
+
+The fresh behavioral controls were RED for missing root workspace support and
+the absent root-aware validator. GREEN controls cover selected CLI paths,
+public URLs, missing/weak/unknown integrity rejection, scoped/nested identities,
+unchanged-package exclusion, missing-map failure and the exact seven-day
+boundary. CI now fails on unknown/young changed packages rather than merely
+printing a warning.
+
+Read-only corporate-proxy metadata reports Mermaid 11.17.0 publication at
+`2026-08-19T09:20:08Z`, already more than 55 days old. The operator's earlier
+receipt used `2026-08-19T15:20:08Z`; both are beyond quarantine, but this
+continuation retains the actual returned timestamp rather than silently
+normalizing the six-hour discrepancy. `min-release-age=undefined` is not
+evidence that proxy quarantine is absent. No npm settings are changed.
+
+### MG-I8: root provenance was not covered by the existing checker
+
+- **Type/severity:** supply-chain gate gap / High.
+- **Symptom/root cause:** root verification rejects all 155 historical
+  dependency entries because they carry internal feed URLs. The existing
+  checker inspects only API/web, so prior gate-green did not cover root.
+- **Resolution:** CI npm regeneration, not local lockfile edits or synthesized
+  integrity hashes. Validate the complete selected root lock before upload.
+- **Detection/earliest:** new focused root CLI verification / root-inclusive
+  provenance check.
+- **Prevention:** root CLI contamination controls and workflow-selected
+  validation; no artifact is published if any entry fails.
+
+Final CI artifact provenance, complete changed-package ages, measured
+transitive diff and real aligned strict/two-theme rendering are pending.
+Manifest alignment alone is not a render-equivalence claim.
+
+The age-set control also reproduced an omission in version-only comparison:
+same-version provenance rewrites were absent from the age report. Changed-entry
+comparison now includes those entries. This is **MG-I9**, test correctness /
+Medium, caught by focused RED before CI; prevention is the provenance-only
+behavioral control. The workflow uses a seven-day `--before` resolution cutoff
+and independently rejects young/unknown timestamps before publishing artifacts.
