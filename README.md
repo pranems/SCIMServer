@@ -14,7 +14,7 @@ schema before applying a targeted compatibility setting.
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![Tests](https://img.shields.io/badge/tests-9%2C830%20pass-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-10%2C058%20pass-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---

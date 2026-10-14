@@ -118,6 +118,21 @@ dependency edge, endpoint identity model, or speculative abstraction is needed.
   30-second timeout. No forbidden-pattern assertion failed. All earlier gates
   passed, including actual strict light/dark Mermaid rendering in 223.1 seconds.
   E2E and later Validate gates did not execute, so this is not a green push.
+- The second owning Validate push at `d5024d0f` passes all 23 gates in
+  995.6 seconds. API: 210 unit suites / 6,035 passes; InMemory E2E: 116
+  suites / 2,432 passes / four PostgreSQL-only exclusions; web: 119 suites /
+  1,591 passes. Actual strict light/dark Mermaid rendering took 105.0 seconds.
+  Raw web tsc still reports 66 errors, tolerated by the hook's 96 ceiling.
+- Fresh post-runtime-merge local Chromium passes nine cases in 32.0 seconds.
+  All nine physical geometry JSON receipts are retained; Operations visible
+  labels remain 193/85/68 px for 1,710 px content, row height 61 px, and document
+  widths equal the 1440/900/390 px viewports. Both isolated servers passed
+  health/authentication preflight and were stopped by exact owned session IDs.
+- CI-only lock regeneration run `38524477274` succeeds at `d5024d0f`.
+  Reviewed artifacts change only both release-root versions to 0.55.49.
+  The 684 API and 395 web dependency entries compare identically; public npm
+  hosts and SHA-512 integrity are verified. No dependency reinstall, local
+  lock regeneration, or quarantine-policy exception is needed.
 
 | ID | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest detection |
 |---|---|---|---|---|
@@ -125,7 +140,7 @@ dependency edge, endpoint identity model, or speculative abstraction is needed.
 | UR-11 | Harness timing / Medium | One sequential source scan exceeded 30 seconds under the full unit run. The failure is a time budget, not a forbidden-pattern match; the exact source passes all six checks in 2.039 seconds when run alone. The underlying host I/O contention mechanism is not proven. | Focused retry confirms unchanged assertions with the unchanged timeout. Retry the owning normal push instead of increasing timeouts or bypassing the gate. Full-hook convergence remains required. | Owning unit hook / owning unit hook |
 
 UR-11 prevention disposition: accepted for this bounded release with retained
-failure and focused retry receipts. Do not overlap discretionary local browser
+failure and focused/full-hook retry receipts. Do not overlap discretionary local browser
 processes with the retry. Broader host I/O diagnosis and gate redesign would be
 speculative and outside this presentation-only rollback unit.
 Receipts are `test-results/ui-readability-release-prepush-1.log`,
@@ -134,11 +149,15 @@ Receipts are `test-results/ui-readability-release-prepush-1.log`,
 These consolidation entries are reconciled against every tool result in this
 fresh consolidation conversation; the earlier 45,085-event implementation
 reconciliation remains historical, not a claim about this conversation.
+Successful receipts are `test-results/ui-readability-release-prepush-2.log`,
+`test-results/ui-readability-postmerge-playwright.log`,
+`test-results/playwright-output/*/*bounds.json`, and
+`test-results/ui-readability-ci-lock-workflow.log`.
 
 Normal merge `c90602dd` incorporates runtime master `99cdeda3` and retains
 both original UI commits. The only conflict was current session ownership
 context; both runtime and UI handoffs were retained with their actual states.
-CI-only API/web release locks and post-merge targeted checks are pending.
+CI-only API/web release locks and post-merge targeted checks are complete.
 Runtime #215's pipeline and legacy-reference proof remain separately owned.
 Shared dev/live/directory mutation requires explicit runtime handoff and
 coordination with the parent's bounded gallery validation lease. No original

@@ -14,8 +14,13 @@
 UI-01/UI-02 align six Dashboard activity tracks and bound Operations endpoint
 identity with a 480 px table floor and Card-owned mobile scrolling. Nine real
 Chromium geometry/identity/navigation cases passed at 1440/900/390 px before
-consolidation. Fresh post-merge focused proof, CI-only locks, reviewed exact-tip
-CI, and authoritative merged-image validation remain pending. No deployed UI,
+consolidation. Fresh post-merge local Chromium passes 9/9 in 32.0 seconds;
+affected Vitest passes 25/25. The owning Validate push passes all 23 gates:
+6,035 API units, 2,432 InMemory E2E passes / four PostgreSQL-only skips, and
+1,591 web tests. CI-only lock run `38524477274` changes release roots only,
+preserving all 1,079 dependency entries and public npm/SHA-512 provenance.
+Bounded read-only PR review found no significant issues. Reviewed exact-tip
+CI and authoritative merged-image validation remain pending. No deployed UI,
 operator visual approval, or production promotion is claimed. Runtime #215's
 pipeline and legacy proof are separately owned; shared mutations require
 explicit handoff and coordination with the parent's gallery validation lease.

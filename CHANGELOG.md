@@ -33,11 +33,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   61.25 px high. Pre-consolidation affected Vitest proof passes 25 tests.
   Raw web type diagnostics were 66 baseline / 66 current, zero added, not
   a clean raw type check.
-- Prior release consolidation counts are 6,035 API units, 2,432 InMemory
-  E2E passes with four PostgreSQL-only exclusions, and 1,591 web tests.
-  UI consolidation counts, CI-only lock receipts, exact-tip CI, and all
-  merged-image form-factor evidence remain pending; no fresh counts are
-  inferred from prior release results.
+- The owning consolidation Validate push passes all 23 gates in 995.6
+  seconds: 210 API unit suites / 6,035 tests, 116 InMemory E2E suites /
+  2,432 passes with four PostgreSQL-only exclusions, and 119 web suites /
+  1,591 tests. Counts are unchanged from v0.55.48 at these layers; the
+  readability spec adds nine browser outcome cases, not unit tests.
+- Fresh post-runtime-merge local Chromium passes all nine cases in 32.0
+  seconds, retaining nine JSON geometry receipts. These deterministic display
+  fixtures do not claim live provisioning or merged-image validation.
+- CI-only lock regeneration run `38524477274` changes only the API/web
+  release-root versions. All 1,079 dependency entries remain identical with
+  public npm hosts and SHA-512 integrity. No local lock regeneration occurs.
+- The first owning push was correctly blocked by one 30-second source-scan
+  timeout. Unchanged focused retry passes 6/6 in 2.039 seconds; the subsequent
+  full owning push passes without changing assertions or timeouts. Exact-tip
+  CI and merged-image form-factor proof remain pending.
 - Test/gate improvement is applied through mobile geometry and file-backed
   receipts, not presence-only or CSS-property assertions. Design disposition:
   accepted; presentation-only changes reuse existing primitives without new

@@ -20,7 +20,13 @@ No deployed UI or operator approval is claimed.
 
 **Active consolidation:** v0.55.49 metadata is being prepared for PR #216.
 Normal merge `c90602dd` preserves UI commits `e2758b04` and `a5c1c603`.
-CI-only API/web lock regeneration and reviewed exact-tip CI remain pending.
+CI-only API/web lock run `38524477274` changes release roots only; all 1,079
+dependency entries remain identical with public npm/SHA-512 provenance.
+Owning Validate push at `d5024d0f` passes 23/23 gates: 6,035 API units,
+2,432 InMemory E2E passes / four PostgreSQL-only skips, and 1,591 web tests.
+Fresh post-merge local Chromium passes 9/9 in 32.0 seconds with retained
+geometry receipts. First-push source-scan timeout converged on unchanged
+focused and full-hook retries. Reviewed exact-tip CI remains pending.
 PR #215 merged normally at `99cdeda3` for
 v0.55.48, preserving its runtime and permanent live-test commits. Its full
 merged-master dev pipeline and legacy-reference proof remain owned by the
