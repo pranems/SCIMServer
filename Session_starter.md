@@ -68,18 +68,20 @@ order, Dashboard duplication, Operations purpose, and `/Me` purpose are
 recorded with real-browser acceptance criteria. No item is currently proven
 to be a v0.55.47 data, authorization, routing, or API-contract defect.
 
-The reusable Entra gallery provisioning gate is implemented in
-`scripts/entra-gallery-scim-e2e.ps1` with its repository skill and static
-contract. Measured dev results are SecretToken 14 PASS / 0 FAIL, OAuth client
-credentials 10 PASS / 0 FAIL, plan-only 3 PASS / 0 FAIL, and the independent
-temporary-application WIF protocol proof 50 PASS / 0 FAIL with a final 37 ms
-warm mint median against a 150 ms budget. The real gallery WorkloadIdentity mode is
-explicitly BLOCKED because Microsoft Graph beta rejects the required hidden
-`EntraApplicationIdentifier` connector field; omitting it causes the
-provisioning job to quarantine for that exact field. The gate is therefore not
-wired into the authoritative deployment pipeline yet: running only the two
-green modes would create a false-complete release signal. No production
-connector, canary, or customer-production deployment was changed.
+The earlier gallery WIF blocker is resolved, not an external limitation.
+PR #214 is merged with exact-tip CI green, preserving its three constituent
+commits. The complete real gallery matrix passes 33 checks across SecretToken,
+OAuth, and WIF with zero failures/skips and 13/13 cleanup successes. Stage 4.8
+now enforces that evidence in the dev pipeline. Custom extension mapping is
+still unproven; the complete orchestrator has not been rerun.
+
+The separate legacy-profile false-409 correction is implemented locally:
+clone raw JSON, preserve its persisted revision, and atomically pair it with
+the normalized request view across all six SCIM controller surfaces. Focused
+units pass 281/281; HTTP CRUD and genuine-edit rejection pass 12/12 in each
+backend. A normalized-hash negative control reproduces all three PostgreSQL
+legacy-create 409s. Runtime release consolidation, live verification, and
+deployment remain pending. No customer data was edited as a workaround.
 
 ### Active Execution Reference
 

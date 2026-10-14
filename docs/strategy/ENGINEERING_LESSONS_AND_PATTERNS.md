@@ -16,6 +16,19 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Revision identity belongs to persisted state, not a normalized view
+
+When compatibility normalization renames or removes legacy settings,
+hashing the runtime view and comparing it with raw storage creates a false
+concurrency conflict. Capture the persisted revision before normalization,
+clone rather than mutate storage JSON, and deliver revision and runtime
+profile from one snapshot. Do not independently re-resolve them or ignore
+legacy keys in the mutation guard. Tests must seed actual legacy storage,
+not only normalized admin input, and must still reject genuine concurrent
+edits. Three raw-legacy HTTP negative controls now catch this failure.
+See [revision coordination evidence](../SCIM_PROFILE_REVISION_WRITE_COORDINATION.md)
+and EG-I23 in [the gallery execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
 ### Shared remote configuration requires a verified per-scenario boundary
 
 The Entra gallery harness passed focused auth runs but its first combined

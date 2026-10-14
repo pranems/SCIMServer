@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { PrismaEndpointLifecycleRepository } from '../../../infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository';
+import { endpointProfileRevision } from '../../../domain/repositories/profile-revision';
 
 // Force Prisma backend for unit tests - these tests mock PrismaService,
 // not the in-memory cache. The inmemory path uses a different code flow.
@@ -475,6 +476,28 @@ describe('EndpointService', () => {
         OAuthClientCredentialsAuthEnabled: false,
       }));
       expect(result.profile?.settings).not.toHaveProperty('PerEndpointCredentialsEnabled');
+    });
+
+    it('keeps the persisted legacy profile unchanged while normalizing its cached runtime view', async () => {
+      const persisted = {
+        ...mockEndpoint,
+        profile: {
+          ...mockEndpoint.profile,
+          settings: { PerEndpointCredentialsEnabled: 'True', SoftDeleteEnabled: 'True' },
+        },
+      };
+      const persistedRevision = endpointProfileRevision(persisted.profile);
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(persisted);
+
+      const result = await service.getEndpoint(persisted.id);
+
+      expect(result.profile?.settings).not.toHaveProperty('PerEndpointCredentialsEnabled');
+      expect(result.profile?.settings).toHaveProperty('UserSoftDeleteEnabled', 'True');
+      expect(endpointProfileRevision(persisted.profile)).toBe(persistedRevision);
+      const snapshot = await service.getEndpointForRequest(persisted.id);
+      expect(snapshot.profileRevision).toBe(persistedRevision);
+      expect(endpointProfileRevision(snapshot.endpoint.profile)).not.toBe(persistedRevision);
+      expect(snapshot.endpoint).not.toHaveProperty('profileRevision');
     });
 
     it('should replace an invalid dedicated value from a valid retired credential umbrella', async () => {

@@ -1,6 +1,6 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
+> **Status:** User-facing reference - **Last verified:** 2026-10-14 - **Product version:** `0.55.47`
 
 > **Version:** 0.55.47 - **Updated:** 2026-10-12
 > **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
@@ -12,6 +12,13 @@
 ---
 
 ## Table of Contents
+
+**Local legacy-profile correction, not deployed:** SCIM controllers capture
+the persisted profile revision and normalized runtime profile together. A
+legacy setting renamed during reading must not produce HTTP 409 by itself.
+A genuine concurrent profile edit still returns `PROFILE_REVISION_CHANGED`
+without publishing a resource mutation. No public response field or route
+is added. See [coordination and measured regression evidence](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
 
 **Local P7a update, not yet merged/deployed:** no routes were added.
 Admin profile writes reject malformed declarations before saving. User,

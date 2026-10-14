@@ -62,6 +62,9 @@ describe('EndpointScimBulkController', () => {
 
   const mockEndpointService = {
     getEndpoint: jest.fn(),
+    async getEndpointForRequest(endpointId: string): Promise<{ endpoint: unknown; profileRevision: string }> {
+      return { endpoint: await this.getEndpoint(endpointId), profileRevision: 'persisted-profile-revision' };
+    },
   };
 
   const mockEndpointContext = {
@@ -128,6 +131,9 @@ describe('EndpointScimBulkController', () => {
       const result = await controller.processBulk('ep-1', validDto, mockRequest);
       expect(mockBulkProcessor.process).toHaveBeenCalled();
       expect(result.Operations).toHaveLength(1);
+      expect(mockEndpointContext.setContext).toHaveBeenCalledWith(expect.objectContaining({
+        profileRevision: 'persisted-profile-revision',
+      }));
     });
 
     it('should proceed when BulkOperationsEnabled is true (boolean)', async () => {

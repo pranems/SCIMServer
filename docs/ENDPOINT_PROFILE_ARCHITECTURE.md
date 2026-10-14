@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
+> **Status:** User-facing reference - **Last verified:** 2026-10-14 - **Product version:** `0.55.47`
 
 > **Updated:** 2026-10-12
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -216,8 +216,11 @@ to lowercase so equivalent uppercase route values preserve the same snapshot.
 ## Profile Revision and Write Coordination
 
 Resource writes are validated against a request-scoped endpoint profile
-snapshot. The service derives a canonical SHA-256 revision from that snapshot
-and forwards it to the repository mutation boundary. PostgreSQL mutations and
+snapshot. The service captures a canonical SHA-256 revision of the persisted
+profile before normalizing a cloned runtime view, and returns both from one
+cache snapshot. Controllers explicitly forward that persisted revision to
+the repository mutation boundary. This avoids false conflicts when a legacy
+setting is renamed or removed only in the runtime view. PostgreSQL mutations and
 profile updates acquire the same transaction-scoped advisory lock; InMemory
 repositories compare against the synchronously published current revision.
 If the profile changed after validation, the mutation is rejected with HTTP

@@ -121,3 +121,26 @@ This gives a concrete mismatch path even with no concurrent profile edit.
 No database row was changed. A targeted regression and runtime fix remain
 pending on a separate coherent change; the connector gate does not suppress
 the 409 or weaken the revision check.
+
+## Legacy-profile correction, 2026-10-14
+
+The previously pending runtime correction is now implemented and locally
+verified on its own branch. It is not deployed. PR #214 is merged through
+normal merge commit `df012da94b4800f95d3db14d357a7afc5a439288`, preserving
+all three connector and pipeline commits with exact-tip CI green.
+
+| ID | Type | Severity | Symptom and root cause | Fix and why it works | Prevention and escape analysis |
+|---|---|---|---|---|---|
+| EG-I23 | Runtime / persisted versus normalized identity | High | Accepted gallery WIF was followed by User HTTP 409 without a concurrent edit. Request context hashed a normalized profile while the repository hashed raw persisted legacy settings. Reading also mutated the supplied storage object. | Clone before normalization; capture the raw revision and return it atomically with the normalized endpoint snapshot; forward it through all six SCIM controller surfaces. Repository comparison remains unchanged. | Unit RED confirms source mutation; 281 focused units pass. Raw legacy User/Group/Device HTTP CRUD and nine actual-edit rejections pass 12/12 in PostgreSQL; normalized CRUD and the same races pass 12/12 in memory. A normalized-hash negative control fails all three legacy cases with 409. Escaped to gallery export; earliest possible detection was a raw persisted-profile unit/HTTP fixture. |
+| EG-I24 | Regression fixture correctness | Medium | First HTTP run produced 12 failures from one setup HTTP 400. The new fixture tried to submit a retired setting through the public admin API, which intentionally rejects it. | Keep valid public endpoint creation, then inject legacy JSON only into the exact owned PostgreSQL fixture. InMemory test names explicitly describe normalized rather than raw persisted profiles. | Whole suite is green on both backends. Setup failures are classified once with dependent failures as cascades; never weaken public validation to seed old data. Caught at first HTTP fixture creation, the earliest applicable gate. |
+| EG-I25 | Editing tool friction | Low | One multi-file patch was rejected before any file changed because an empty extra hunk marker preceded the next file header. | Remove the empty hunk and apply the complete patch successfully. | Parser refusal prevented a partial edit; inspect patch grammar before submitting. Caught at edit-time, no escape. |
+
+The complete PostgreSQL rerun after the negative control has zero failures
+and zero skips. No dev database row was modified as a workaround. The local
+test database is isolated from development and customer data.
+
+**Test/gate improvement: applied.** Raw legacy storage fixtures and a
+negative control prove the new assertions detect the original failure.
+**Design/architecture disposition: applied.** One explicit snapshot method
+keeps profile and revision coherent without a second asynchronous read,
+public metadata, a new repository abstraction, or weaker concurrency checks.
