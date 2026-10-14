@@ -144,3 +144,26 @@ negative control prove the new assertions detect the original failure.
 **Design/architecture disposition: applied.** One explicit snapshot method
 keeps profile and revision coherent without a second asynchronous read,
 public metadata, a new repository abstraction, or weaker concurrency checks.
+
+### Built-runtime live gate
+
+The runtime correction is saved in logical commit `46bca59a`. The reusable
+`9z-DP` live section runs before cleanup, validates actual CRUD values and
+published response keys, and preserves endpoint profiles. It passes 24/24
+against each owned InMemory and PostgreSQL built API. A raw-legacy fixture
+on the isolated PostgreSQL database passes 17/17 further live checks,
+including unchanged raw profile revision. All owned endpoints and resources
+are removed. These are **65 focused live checks**, not the complete live
+matrix, a Docker application result, or a deployed dev result.
+
+| ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
+|---|---|---|---|---|---|
+| EG-I26 | Live contract fixture | Medium | The first allowlisted live run failed one endpoint-key check per backend because its manually transcribed key set omitted documented `_links` hypermedia. Resource CRUD and cleanup passed. | Match the existing response serializer's documented keys, including `_links`; report unexpected key names explicitly. The corrected full smoke passes 48/48, followed by 17/17 raw-legacy checks. | Allowlist checks must use the published contract, not assume every underscore-prefixed key is internal. Caught at first built live contract run, no API change needed. |
+| EG-I27 | Local process readiness | Low | An immediate probe of the detached API returned connection refused while the application was still initializing. | Verify its running process, wait for readiness, and confirm `/scim/health` before executing live checks. Both owned runtimes respond with `ok`; no application failure occurred. | Startup confirmation and readiness are separate claims. The deployment orchestrator already owns bounded readiness; ad-hoc probes must honor it too. Caught before any live fixture was created. |
+
+**Test/gate improvement: applied.** The permanent live section checks
+outcome values, published-key allowlists, profile preservation, and exact
+cleanup, including conditional-write headers.
+**Design disposition: accepted.** One cohesive live helper follows existing
+section conventions; a new test framework or generic provisioning DSL would
+be unnecessary.

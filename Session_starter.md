@@ -82,6 +82,11 @@ units pass 281/281; HTTP CRUD and genuine-edit rejection pass 12/12 in each
 backend. A normalized-hash negative control reproduces all three PostgreSQL
 legacy-create 409s. Runtime release consolidation, live verification, and
 deployment remain pending. No customer data was edited as a workaround.
+Logical runtime commit `46bca59a` is saved. Permanent live section `9z-DP`
+now passes 24/24 per local built backend; an isolated raw-legacy fixture
+passes 17/17 more checks with unchanged persisted revision and exact cleanup.
+These 65 focused checks do not imply Docker application, current-dev,
+complete-pipeline, or renewed browser validation.
 
 ### Active Execution Reference
 

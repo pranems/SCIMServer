@@ -141,6 +141,16 @@ cases in that negative-control run are not missing final matrix evidence.
 This evidence is local, not a deployed reference-endpoint or complete
 deployment-pipeline result.
 
+The permanent `9z-DP` section in `scripts/live-test.ps1` now exercises User,
+Group, and Device CRUD with response-key allowlists and exact cleanup.
+Its first built-runtime smoke passes **24/24 per backend**. A separate
+raw-legacy endpoint in the isolated PostgreSQL database passes **17/17**
+User/Group live checks, including equality of the raw persisted revision
+before and after writes. The helper accepts `ExistingEndpointId` for an
+explicit reference-endpoint proof without changing that endpoint's profile;
+it owns and removes only its temporary resources. It has not yet been
+run against the deployed dev reference endpoint.
+
 This change does not alter client resource ETag policy, profile merge policy,
 schema declarations, endpoint defaults, database schema, release metadata, or
 live data. It does not make a multi-operation Bulk request globally atomic;
