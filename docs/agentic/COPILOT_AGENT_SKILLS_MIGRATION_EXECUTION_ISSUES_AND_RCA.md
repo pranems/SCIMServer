@@ -12,7 +12,7 @@ The migration converted every active prompt workflow from latest master into a
 project Agent Skill, moved durable memory beside its owning skill, and rewired
 the gate and deployment automation to use skill paths and slash invocations.
 
-The review found sixteen execution issues. Two were high severity because they
+The review found seventeen execution issues. Two were high severity because they
 could have produced a false-successful migration: stale generated content from
 another branch and an RFC audit whose instructions were trapped inside a code
 fence. Both now have structural prevention in
@@ -58,6 +58,7 @@ the completed state is green.
 | CSM-14 | Operator guidance | Medium | Current tenant and agentic plans still instructed operators to maintain prompt files or prompt lifecycle rules. | The first stale-reference sweep emphasized paths and missed active prose without an explicit path. | Named the deployment skills in tenant cutover and migrated the current agentic lifecycle, diagrams, examples, and memory model to Agent Skills. | Operators no longer receive instructions that create an unloaded customization or skip a migrated skill. | Contract locks the two high-risk active statements; documentation gates validate the updated diagrams and links. | Final code review / documentation sweep |
 | CSM-15 | Git / validation orchestration | Low | One final validation command saw a transient worktree `index.lock`. | Two parallel validation calls both ran `git add -A`; index writes are not independent and cannot safely run concurrently. | Let the successful writer exit, confirmed the lock was absent, then staged and reran the index contract sequentially. | The final evidence comes from one completed index write followed by one read-only contract run. | Never place two index-writing Git commands in the same parallel tool batch. Parallelize only read-only checks after staging once. | Final validation / final validation |
 | CSM-16 | Clean-worktree code generation | Low | The first push was blocked because `tsc` was absent; after `npm ci`, the API build still lacked its generated Prisma client, and generation initially required `DATABASE_URL`. | A fresh worktree has neither ignored dependencies nor ignored generated Prisma output. `npm ci` restores packages but does not generate the client because the Prisma config resolves its environment first. | Ran `npm ci` in `api/`, supplied a local placeholder PostgreSQL URL only to `prisma:generate`, generated the client, and reran the API build green. | The hook now has both the compiler and generated types it expects, without changing tracked source, manifests, or lockfiles. | In a fresh worktree, restore root, web, and API dependencies, then run `prisma:generate` with a non-secret local placeholder URL before the first pre-push run. | First pre-push gate / first pre-push gate |
+| CSM-17 | Documentation coupling | Low | The second push passed seven gates but the deployment-document audit blocked because `dev-deployment-pipeline.ps1` is an infrastructure-coupled path. | Even reviewer-label-only changes to that script require a same-change review of the canonical infrastructure document. | Updated the document capture date/version and Section 15 with the measured no-runtime-change classification; re-reviewed the drift register. | The canonical document now states what changed and explicitly records that deployment, publication, estate, and promotion behavior did not. | Run `audit-deployment-doc.ps1` whenever any mechanically classified infrastructure path changes, even when behavior is unchanged. | Pre-push infrastructure audit / pre-push infrastructure audit |
 
 ## Detection-stage escape analysis
 
@@ -79,6 +80,7 @@ the completed state is green.
 | CSM-14 | Active prose lifecycle sweep | Final code review | 1 phase | Current operator statements are now contract assertions. |
 | CSM-15 | First index write in validation batch | First index write in validation batch | 0 | Final staging and index validation were rerun sequentially. |
 | CSM-16 | First pre-push API build | First pre-push API build | 0 | Dependencies and generated types were restored before retry. |
+| CSM-17 | Pre-push deployment-doc audit | Pre-push deployment-doc audit | 0 | Canonical document updated and focused audit rerun green. |
 
 ## Provenance and completeness
 
@@ -93,7 +95,7 @@ The reconciliation used these signal groups:
 - failures and errors: contract RED output, PowerShell parsing failures,
   missing `jsdom`, skipped Playwright rendering, renderer drift, and a
   transient Git index lock, missing `tsc`, missing Prisma types, and missing
-  generation-time `DATABASE_URL`;
+  generation-time `DATABASE_URL`, plus infrastructure-document coupling;
 - diagnosis phrases: stale source, broken relative link, no-op edit, nested
   fence, compatibility alias, invalid YAML, wrong self-update target, selected
   Git tree, and missing workflow;
