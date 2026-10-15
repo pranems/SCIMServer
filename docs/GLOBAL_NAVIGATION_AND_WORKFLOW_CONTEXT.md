@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-10-12 - **Product version:** `0.55.49`
+> **Status:** Implemented locally - **Last verified:** 2026-10-15 - **Product version:** `0.55.49`
 
 ## Purpose
 
@@ -46,10 +46,24 @@ One endpoint control shape is not correct everywhere. The UI uses one identity m
 | Choose an action target | Shared endpoint context selector | Display name, stable name, Active/Inactive state; inactive targets disabled |
 | Filter an aggregate | Compact combobox with an All endpoints option | Display name, stable name, Active/Inactive state |
 | Show provenance | Compact linked label or badge | Display name with full identity available on the link |
-| Compare contracts | Side-by-side endpoint cards | Display name, stable name, Active/Inactive state |
+| Compare contracts | Searchable context selectors with redundant selected markers | Display name, stable name, copyable ID, profile summary, Active/Inactive state |
 | Work inside endpoint route | No redundant selector | Endpoint context comes from the route and detail header |
 
 This prevents opaque UUID prefixes from being the primary identity while preserving IDs in API calls, links, copy surfaces, and diagnostics.
+
+The local inventory follow-up reuses the context selector rather than
+introducing a second selection system. Discovery allows inactive endpoints
+for read-only inspection; action-target workflows still disable them. Its
+default and visual tab order is Schemas, ResourceTypes, ServiceProviderConfig.
+Endpoint list filters remain `q` URL state and sit outside the panel that
+owns result scrolling. Dashboard shows at most five entries in existing
+inventory order, then links to the complete Endpoints workspace.
+Operations Users and Groups reuse the same accessible panel: filters remain
+outside the 420 px results scroll owner, and Back/Forward restores URL filters
+and exact rows. An exact Active/Inactive inventory query means that status,
+not a substring match. The shared selector still rejects inactive action
+targets in Manual Provision while permitting read-only Discovery inspection.
+See [measured evidence and implementation boundaries](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
 
 The local readability follow-up bounds Operations provenance links inside
 their table columns and retains full identity in the title. At mobile widths,

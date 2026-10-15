@@ -163,6 +163,11 @@ function defaultHookReturn<T>(data: T | undefined = undefined): {
   return { data, isLoading: false, isError: false, error: null };
 }
 
+function pickEndpoint(role: 'primary' | 'secondary', id: string): void {
+  fireEvent.click(screen.getByRole('combobox', { name: `Search ${role} endpoint` }));
+  fireEvent.click(screen.getByTestId(`discovery-${role}-selector-option-${id}`));
+}
+
 describe('DiscoveryExplorerPage (Phase L5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -208,12 +213,13 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
 
   // ─── 2. Endpoint scope picker ──────────────────────────────────────
 
-  it('renders the primary endpoint picker with one option per endpoint', () => {
+  it('opens the compact primary selector with one option per endpoint', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
     const picker = screen.getByTestId('discovery-primary-picker');
     expect(picker).toBeInTheDocument();
-    expect(screen.getByTestId('discovery-primary-option-ep-1')).toBeInTheDocument();
-    expect(screen.getByTestId('discovery-primary-option-ep-2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Search primary endpoint' }));
+    expect(screen.getByTestId('discovery-primary-selector-option-ep-1')).toBeInTheDocument();
+    expect(screen.getByTestId('discovery-primary-selector-option-ep-2')).toBeInTheDocument();
   });
 
   it('renders an empty state when no endpoints exist', () => {
@@ -233,7 +239,7 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
 
   it('Schemas tab in single-endpoint mode shows the picked endpoint`s schemas list', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     fireEvent.click(screen.getByTestId('discovery-tab-schemas'));
     expect(screen.getByTestId('discovery-schemas-single')).toBeInTheDocument();
     // Renders one schema row with the URN visible.
@@ -244,7 +250,7 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
 
   it('ResourceTypes tab in single-endpoint mode renders one row per resource type', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     fireEvent.click(screen.getByTestId('discovery-tab-resourceTypes'));
     expect(screen.getByTestId('discovery-resourcetype-row-User')).toBeInTheDocument();
     expect(screen.getByTestId('discovery-resourcetype-row-Group')).toBeInTheDocument();
@@ -253,7 +259,7 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
   // ─── Phase P1 - CopyableField on schema URNs ───────────────────────
   it('Phase P1 - schema row exposes CopyableField for the URN', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     fireEvent.click(screen.getByTestId('discovery-tab-schemas'));
     expect(
       screen.getByTestId('discovery-schema-urn-urn:ietf:params:scim:schemas:core:2.0:User-copy-button'),
@@ -262,7 +268,7 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
 
   it('Phase P1 - resource type row exposes CopyableField for the schema URN', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     fireEvent.click(screen.getByTestId('discovery-tab-resourceTypes'));
     expect(
       screen.getByTestId('discovery-resourcetype-schema-User-copy-button'),
@@ -271,7 +277,7 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
 
   it('ServiceProviderConfig tab in single-endpoint mode shows the SPC capability rows', () => {
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     // Default tab is SPC; click anyway to be explicit.
     fireEvent.click(screen.getByTestId('discovery-tab-serviceProviderConfig'));
     expect(screen.getByTestId('discovery-spc-row-patch')).toBeInTheDocument();
@@ -290,9 +296,9 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
     });
 
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     fireEvent.click(screen.getByTestId('discovery-toggle-compare'));
-    fireEvent.click(screen.getByTestId('discovery-secondary-option-ep-2'));
+    pickEndpoint('secondary', 'ep-2');
     fireEvent.click(screen.getByTestId('discovery-tab-schemas'));
 
     expect(screen.getByTestId('discovery-schemas-diff')).toBeInTheDocument();
@@ -310,9 +316,9 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
     });
 
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     fireEvent.click(screen.getByTestId('discovery-toggle-compare'));
-    fireEvent.click(screen.getByTestId('discovery-secondary-option-ep-2'));
+    pickEndpoint('secondary', 'ep-2');
     fireEvent.click(screen.getByTestId('discovery-tab-schemas'));
 
     // mutability changed readWrite -> immutable (tighten).
@@ -336,7 +342,8 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
 
   it('Copy as JSON button writes the SPC JSON to clipboard when on the SPC tab', async () => {
     renderWithProviders(<DiscoveryExplorerPage />);
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
+    fireEvent.click(screen.getByTestId('discovery-tab-serviceProviderConfig'));
     const btn = screen.getByTestId('discovery-copy-json');
     fireEvent.click(btn);
     // navigator.clipboard.writeText was called with the JSON-stringified payload.
@@ -353,18 +360,18 @@ describe('DiscoveryExplorerPage (Phase L5)', () => {
     const btnPre = screen.getByTestId('discovery-open-in-workbench');
     expect(btnPre).toBeDisabled();
     // Pick endpoint -> button enables.
-    fireEvent.click(screen.getByTestId('discovery-primary-option-ep-1'));
+    pickEndpoint('primary', 'ep-1');
     const btn = screen.getByTestId('discovery-open-in-workbench');
     expect(btn).not.toBeDisabled();
     mockNavigate.mockClear();
     fireEvent.click(btn);
-    // Default tab is ServiceProviderConfig -> path uses that surface.
+    // Default tab is Schemas.
     expect(mockNavigate).toHaveBeenCalledTimes(1);
     const navArg = mockNavigate.mock.calls[0][0] as { to: string; search?: { prefill?: string } };
     expect(navArg.to).toBe('/workbench');
     const prefillRaw = decodeURIComponent(navArg.search?.prefill ?? '');
     const parsed = JSON.parse(prefillRaw);
     expect(parsed.method).toBe('GET');
-    expect(parsed.path).toBe('/scim/endpoints/ep-1/ServiceProviderConfig');
+    expect(parsed.path).toBe('/scim/endpoints/ep-1/Schemas');
   });
 });

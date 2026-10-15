@@ -83,6 +83,30 @@ sign-off remain separate parent work. No production promotion is authorized.
 | 2026-10-14 | Migrated all latest-master Copilot prompt workflows and their durable memories into 36 validated project Agent Skills; rewired mandatory gates and pre-push enforcement to use skills. Self-improvement applied through a negative customization contract. Design disposition: accepted - existing workflows need shared capabilities, not separate custom agents; only workflows over 500 lines use progressive reference loading. |
 | 2026-10-14 | Merged v0.55.48 correction and CI-only release locks; retained two failed pipeline receipts and a complete 2,492-test isolated Prisma diagnostic. Authoritative deployment proof remains outstanding. |
 
+**Isolated inventory checkpoint:** `fix/ui-inventory-selection-20261014`
+owns UI-03 through UI-10 only. All eight have verified local dispositions;
+49 distinct Chromium cases pass across focused runs at 1440/900/390 px,
+including parent readability and affected navigation regressions. Separate
+focused unit runs pass 63 and 38 tests with two overlapping selector tests.
+Web build and size budgets pass. Dashboard is capped at five entries;
+Endpoints owns a searchable scrollable table; Discovery reuses the searchable
+context selector and defaults to Schemas. Operations shares persistent
+filters/results ownership; its current-resource intent and `/Me` OAuth-subject
+intent are verified, not merged away. Tsc retains 66 unchanged baseline errors
+(64 test, two production). First local commit: `892d0192`. No release,
+deployment or operator
+signoff is claimed. See `docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md`.
+Runtime/test checkpoints `892d0192` and `bc3d3cdd` are pushed with tracking.
+The exact-tip normal Fast hook passed all 20 gates: 6,033 API units and 2,429
+InMemory E2E cases, with four PostgreSQL-only skips. All 755 Mermaid blocks
+rendered; renderer-version equivalence remains unverified. E2E worker teardown
+warned about a forced exit after all assertions passed; root cause is unproven
+and belongs to consolidation triage, not an invented UI fix.
+
+| Date | Summary |
+|---|---|
+| 2026-10-14 | Isolated UI-03 through UI-10 implementation completed locally; finite measured browser evidence, exact status matching, durable geometry receipts, full raw-event RCA reconciliation and explicit design disposition recorded. PR/release/deployment and operator approval remain separate. |
+
 **UI readability checkpoint:** UI-01/UI-02 are implemented locally in the
 separate `fix/ui-readability-20261014` worktree. Nine measured Chromium cases
 pass at 1440, 900, and 390 px. Mobile Operations now keeps a 480 px table floor

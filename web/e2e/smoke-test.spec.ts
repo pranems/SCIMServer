@@ -326,7 +326,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
       const card = page.getByTestId(`endpoint-card-${endpointId}`);
       await expect(card).toBeVisible({ timeout: 30_000 });
       await screenshot(page, '30-before-card-click');
-      await card.click();
+      await card.getByRole('button').click();
       await expect(page).toHaveURL(new RegExp(`/endpoints/${endpointId}`));
       await screenshot(page, '31-endpoint-detail-from-card');
 

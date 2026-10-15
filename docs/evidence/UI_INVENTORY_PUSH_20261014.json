@@ -1,0 +1,175 @@
+{
+  "observedAt": "2026-10-14T06:27:27.089Z",
+  "validatedCommit": "bc3d3cdd422cf5a1d69e13ac1304430d5ea95c90",
+  "mode": "Fast",
+  "normalHook": true,
+  "gates": [
+    {
+      "name": "api: tsc build",
+      "status": "PASS",
+      "seconds": 42.8,
+      "exitCode": 0
+    },
+    {
+      "name": "api: eslint",
+      "status": "PASS",
+      "seconds": 86.9,
+      "exitCode": 0
+    },
+    {
+      "name": "web: tsc --noEmit",
+      "status": "PASS",
+      "seconds": 54.2,
+      "exitCode": 0
+    },
+    {
+      "name": "web: vite production build",
+      "status": "PASS",
+      "seconds": 14.2,
+      "exitCode": 0
+    },
+    {
+      "name": "docker: production source included",
+      "status": "PASS",
+      "seconds": 1.7,
+      "exitCode": 0
+    },
+    {
+      "name": "docs: mermaid diagrams render",
+      "status": "PASS",
+      "seconds": 104.2,
+      "exitCode": 0
+    },
+    {
+      "name": "infra: base images on LTS",
+      "status": "PASS",
+      "seconds": 1.5,
+      "exitCode": 0
+    },
+    {
+      "name": "infra: deployment doc current",
+      "status": "PASS",
+      "seconds": 1.9,
+      "exitCode": 0
+    },
+    {
+      "name": "docs: user-facing docs current",
+      "status": "PASS",
+      "seconds": 2.2,
+      "exitCode": 0
+    },
+    {
+      "name": "docs: doc claims match source",
+      "status": "PASS",
+      "seconds": 0.5,
+      "exitCode": 0
+    },
+    {
+      "name": "supply chain: lockfile provenance",
+      "status": "PASS",
+      "seconds": 0.2,
+      "exitCode": 0
+    },
+    {
+      "name": "docs: patterns pie matches catalog",
+      "status": "PASS",
+      "seconds": 0.2,
+      "exitCode": 0
+    },
+    {
+      "name": "deploy: revision retention selector",
+      "status": "PASS",
+      "seconds": 0.9,
+      "exitCode": 0
+    },
+    {
+      "name": "deploy: workflow run selector",
+      "status": "PASS",
+      "seconds": 1,
+      "exitCode": 0
+    },
+    {
+      "name": "test matrix: orchestrator contract",
+      "status": "PASS",
+      "seconds": 3.2,
+      "exitCode": 0
+    },
+    {
+      "name": "deploy: browser evidence contract",
+      "status": "PASS",
+      "seconds": 1,
+      "exitCode": 0
+    },
+    {
+      "name": "discovery: OpenText ISV-6 verifier contract",
+      "status": "PASS",
+      "seconds": 0.8,
+      "exitCode": 0
+    },
+    {
+      "name": "docs: RFC corpus current + intact",
+      "status": "PASS",
+      "seconds": 1.7,
+      "exitCode": 0
+    },
+    {
+      "name": "api: unit tests (jest)",
+      "status": "PASS",
+      "seconds": 70.2,
+      "exitCode": 0
+    },
+    {
+      "name": "api: e2e tests (inmemory, maxWorkers=2)",
+      "status": "PASS",
+      "seconds": 354.5,
+      "exitCode": 0
+    }
+  ],
+  "apiUnit": {
+    "suitesPassed": 210,
+    "testsPassed": 6033
+  },
+  "apiInMemoryE2E": {
+    "suitesPassed": 116,
+    "testsPassed": 2429,
+    "postgresOnlySkipped": 4
+  },
+  "webTypeDiagnostics": {
+    "total": 66,
+    "unchangedTestFiles": 64,
+    "unchangedProductionFiles": 2,
+    "hookBaseline": 96
+  },
+  "apiLint": {
+    "errors": 0,
+    "warnings": 515
+  },
+  "mermaid": {
+    "blocksRendered": 755,
+    "themes": [
+      "default",
+      "dark"
+    ],
+    "securityLevel": "strict",
+    "pinnedVersion": "11.15.0",
+    "builtInVersionDiscovery": "0.0.0",
+    "rendererEquivalenceVerified": false
+  },
+  "warnings": [
+    "API E2E worker force-exited after passing; root cause unproven and outside bounded UI implementation scope"
+  ],
+  "rawEventReconciliation": {
+    "path": "events.jsonl",
+    "session": "2e6e7d76-3fb6-499e-8b54-3c7f962e5577",
+    "eventsReviewed": 1417,
+    "through": "2026-10-14T06:27:24.293Z",
+    "method": "Full result signal and assistant narration passes; source-read, expected-negative-test, baseline and scanner echoes excluded; regex candidates are not incident counts"
+  },
+  "exclusions": [
+    "No Docker/PostgreSQL runtime matrix",
+    "No deployed live HTTP or deployed Playwright",
+    "No canonical visual baseline regeneration or approval",
+    "No operator visual approval",
+    "No release, deployment, shared Entra change or PR consolidation"
+  ]
+}

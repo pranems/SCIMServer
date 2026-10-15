@@ -7,6 +7,11 @@
 
 ### Start here
 
+| UI follow-up | Read |
+|---|---|
+| Review compact endpoint inventory, persistent Operations filters, Discovery selection and distinct `/Me` intent | [Implementation and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md), [generated geometry evidence](evidence/UI_INVENTORY_SELECTION_20261014.json) |
+| Review exact-tip normal push gates and explicitly retained skips/warnings | [Inventory hook receipt](evidence/UI_INVENTORY_PUSH_20261014.json) |
+
 | If you want to... | Read |
 |---|---|
 | Understand shared-schema uniqueness admission and runtime binding precedence without changing default externalId duplicates | [Binding-qualified integration](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29), [receipt](evidence/scim-binding-uniqueness-integration-20260929.json) |

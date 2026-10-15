@@ -63,7 +63,7 @@ import { EmptyState, LoadingSkeleton, CopyableField, CopyJsonButton } from '../c
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
-import { EndpointOptionIdentity } from '../components/endpoints/EndpointContextSelector';
+import { EndpointContextSelector } from '../components/endpoints/EndpointContextSelector';
 import type { DiscoverySearch } from '../routes/search-schemas';
 import {
   compareSchemas,
@@ -72,7 +72,6 @@ import {
   type CharacteristicKey,
   type AttributeDiffRow,
 } from '../utils/discovery-diff';
-import { clickableProps } from '../utils/interactive';
 
 type DiscoveryTabKey = 'serviceProviderConfig' | 'resourceTypes' | 'schemas';
 
@@ -97,23 +96,6 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-  },
-  pickerGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '8px',
-  },
-  pickerCard: {
-    padding: '10px',
-    cursor: 'pointer',
-    border: `1px solid transparent`,
-    ':hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-    },
-  },
-  pickerCardSelected: {
-    border: `1px solid ${tokens.colorBrandStroke1}`,
-    boxShadow: tokens.shadow4Brand,
   },
   toolbar: {
     display: 'flex',
@@ -207,7 +189,7 @@ export const DiscoveryExplorerPage: React.FC = () => {
   const primaryId = search.primaryId ?? '';
   const compareEnabled = search.compare ?? false;
   const secondaryId = search.secondaryId ?? '';
-  const activeTab = search.tab ?? 'serviceProviderConfig';
+  const activeTab = search.tab ?? 'schemas';
   const updateSearch = (patch: Partial<DiscoverySearch>): void => {
     void navigate({
       to: '/discovery',
@@ -306,25 +288,13 @@ export const DiscoveryExplorerPage: React.FC = () => {
         {endpoints.isLoading ? (
           <LoadingSkeleton count={2} height="40px" />
         ) : (
-          <div className={classes.pickerGrid}>
-            {endpointList.map((ep) => {
-              const selected = ep.id === primaryId;
-              return (
-                <Card
-                  key={ep.id}
-                  className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                  {...clickableProps(
-                    () => updateSearch({ primaryId: ep.id }),
-                    `Select ${ep.displayName ?? ep.name} as primary endpoint`,
-                  )}
-                  aria-pressed={selected}
-                  data-testid={`discovery-primary-option-${ep.id}`}
-                >
-                  <EndpointOptionIdentity endpoint={ep} />
-                </Card>
-              );
-            })}
-          </div>
+          <EndpointContextSelector endpoints={endpointList} value={primaryId}
+            label="Search primary endpoint" selectedRole="primary" allowInactive
+            data-testid="discovery-primary-selector"
+            onChange={id => updateSearch({
+              primaryId: id,
+              secondaryId: id === secondaryId ? undefined : secondaryId || undefined,
+            })} />
         )}
 
         <div style={{ marginTop: '12px' }}>
@@ -347,47 +317,31 @@ export const DiscoveryExplorerPage: React.FC = () => {
       {compareEnabled && (
         <Card data-testid="discovery-secondary-picker">
           <Subtitle2>Secondary endpoint (for diff)</Subtitle2>
-          <div className={classes.pickerGrid}>
-            {endpointList
-              .filter((ep) => ep.id !== primaryId)
-              .map((ep) => {
-                const selected = ep.id === secondaryId;
-                return (
-                  <Card
-                    key={ep.id}
-                    className={`${classes.pickerCard} ${selected ? classes.pickerCardSelected : ''}`}
-                    {...clickableProps(
-                      () => updateSearch({ secondaryId: ep.id }),
-                      `Select ${ep.displayName ?? ep.name} as secondary endpoint`,
-                    )}
-                    aria-pressed={selected}
-                    data-testid={`discovery-secondary-option-${ep.id}`}
-                  >
-                    <EndpointOptionIdentity endpoint={ep} />
-                  </Card>
-                );
-              })}
-          </div>
+          <EndpointContextSelector endpoints={endpointList.filter(ep => ep.id !== primaryId)}
+            value={secondaryId} label="Search secondary endpoint" selectedRole="secondary" allowInactive
+            data-testid="discovery-secondary-selector"
+            onChange={id => updateSearch({ secondaryId: id })} />
         </Card>
       )}
 
       {/* Sub-tabs */}
       <TabList
+        style={{ flexWrap: 'wrap' }}
         selectedValue={activeTab}
         onTabSelect={(_e, d) => updateSearch({ tab: d.value as DiscoveryTabKey })}
         data-testid="discovery-subtabs"
       >
+        <Tab value="schemas" data-testid="discovery-tab-schemas">
+          {TAB_LABEL.schemas}
+        </Tab>
+        <Tab value="resourceTypes" data-testid="discovery-tab-resourceTypes">
+          {TAB_LABEL.resourceTypes}
+        </Tab>
         <Tab
           value="serviceProviderConfig"
           data-testid="discovery-tab-serviceProviderConfig"
         >
           {TAB_LABEL.serviceProviderConfig}
-        </Tab>
-        <Tab value="resourceTypes" data-testid="discovery-tab-resourceTypes">
-          {TAB_LABEL.resourceTypes}
-        </Tab>
-        <Tab value="schemas" data-testid="discovery-tab-schemas">
-          {TAB_LABEL.schemas}
         </Tab>
       </TabList>
 

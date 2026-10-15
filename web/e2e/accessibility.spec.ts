@@ -78,9 +78,9 @@ test.describe('Accessibility - Tab Navigation', () => {
     await page.goto('/endpoints');
     await page.waitForTimeout(3000);
 
-    const grid = page.getByTestId('endpoints-grid');
+    const grid = page.getByTestId('endpoints-table');
     if (await grid.isVisible().catch(() => false)) {
-      const firstCard = grid.locator('[data-testid^="endpoint-"]').first();
+      const firstCard = grid.locator('tbody tr').first();
       if (await firstCard.isVisible().catch(() => false)) {
         const testId = await firstCard.getAttribute('data-testid');
         const epId = testId?.replace('endpoint-', '');

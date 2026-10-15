@@ -1,0 +1,346 @@
+{
+  "generatedAt": "2026-10-14T06:10:05.659Z",
+  "scope": "Local synthetic-data Chromium geometry; not deployed or operator approved",
+  "branch": "fix/ui-inventory-selection-20261014",
+  "base": "a5c1c603",
+  "specification": "web/e2e/endpoint-inventory-selection.spec.ts",
+  "specificationSha256": "3908faa38fa2cd67f9455b12b31ed6d3a9ce95b8db399c21ae9f52def974a03b",
+  "finalFixtureCasesPassed": 33,
+  "distinctBrowserCasesAcrossFocusedRuns": 49,
+  "preservedAfterSubsequentFocusedRun": true,
+  "receipts": [
+    {
+      "name": "Dashboard-bounds-0-endpoint-summary-at-1440-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 318,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "name": "Dashboard-bounds-0-endpoint-summary-at-390-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 370,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "name": "Dashboard-bounds-0-endpoint-summary-at-900-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 334,
+        "page": 900,
+        "viewport": 900
+      }
+    },
+    {
+      "name": "Dashboard-bounds-1-endpoint-summary-at-1440-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 184,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "name": "Dashboard-bounds-1-endpoint-summary-at-390-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 216,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "name": "Dashboard-bounds-1-endpoint-summary-at-900-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 200,
+        "page": 900,
+        "viewport": 900
+      }
+    },
+    {
+      "name": "Dashboard-bounds-80-endpoint-summary-at-1440-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 504,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "name": "Dashboard-bounds-80-endpoint-summary-at-390-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 536,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "name": "Dashboard-bounds-80-endpoint-summary-at-900-dashboard-summary-bounds.json",
+      "measurement": {
+        "height": 520,
+        "page": 900,
+        "viewport": 900
+      }
+    },
+    {
+      "name": "Discovery-selection-contract-order-and-history-are-unambiguous-at-1440-discovery-selection-bounds.json",
+      "measurement": {
+        "height": 208,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "name": "Discovery-selection-contract-order-and-history-are-unambiguous-at-390-discovery-selection-bounds.json",
+      "measurement": {
+        "height": 208,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "name": "Discovery-selection-contract-order-and-history-are-unambiguous-at-900-discovery-selection-bounds.json",
+      "measurement": {
+        "height": 208,
+        "page": 900,
+        "viewport": 900
+      }
+    },
+    {
+      "name": "Operations-groups-filters-retain-owned-scrolling-and-purpose-at-1440-operations-groups-scroll-bounds.json",
+      "measurement": {
+        "height": 420,
+        "scrollTop": 2667,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "name": "Operations-groups-filters-retain-owned-scrolling-and-purpose-at-390-operations-groups-scroll-bounds.json",
+      "measurement": {
+        "height": 420,
+        "scrollTop": 2667,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "name": "Operations-groups-filters-retain-owned-scrolling-and-purpose-at-900-operations-groups-scroll-bounds.json",
+      "measurement": {
+        "height": 420,
+        "scrollTop": 2667,
+        "page": 900,
+        "viewport": 900
+      }
+    },
+    {
+      "name": "Operations-users-filters-retain-owned-scrolling-and-purpose-at-1440-operations-users-scroll-bounds.json",
+      "measurement": {
+        "height": 420,
+        "scrollTop": 2667,
+        "page": 1440,
+        "viewport": 1440
+      }
+    },
+    {
+      "name": "Operations-users-filters-retain-owned-scrolling-and-purpose-at-390-operations-users-scroll-bounds.json",
+      "measurement": {
+        "height": 420,
+        "scrollTop": 2667,
+        "page": 390,
+        "viewport": 390
+      }
+    },
+    {
+      "name": "Operations-users-filters-retain-owned-scrolling-and-purpose-at-900-operations-users-scroll-bounds.json",
+      "measurement": {
+        "height": 420,
+        "scrollTop": 2667,
+        "page": 900,
+        "viewport": 900
+      }
+    },
+    {
+      "name": "compact-inventory-preserves-filters-geometry-and-navigation-at-1440-inventory-bounds.json",
+      "measurement": {
+        "table": {
+          "x": 266,
+          "y": 162,
+          "width": 1149,
+          "height": 117,
+          "top": 162,
+          "right": 1415,
+          "bottom": 279,
+          "left": 266
+        },
+        "headers": [
+          {
+            "x": 266,
+            "y": 162,
+            "width": 448.375,
+            "height": 40.5,
+            "top": 162,
+            "right": 714.375,
+            "bottom": 202.5,
+            "left": 266
+          },
+          {
+            "x": 714.375,
+            "y": 162,
+            "width": 287.25,
+            "height": 40.5,
+            "top": 162,
+            "right": 1001.625,
+            "bottom": 202.5,
+            "left": 714.375
+          },
+          {
+            "x": 1001.625,
+            "y": 162,
+            "width": 233.53125,
+            "height": 40.5,
+            "top": 162,
+            "right": 1235.15625,
+            "bottom": 202.5,
+            "left": 1001.625
+          },
+          {
+            "x": 1235.15625,
+            "y": 162,
+            "width": 179.84375,
+            "height": 40.5,
+            "top": 162,
+            "right": 1415,
+            "bottom": 202.5,
+            "left": 1235.15625
+          }
+        ],
+        "page": 1440,
+        "viewport": 1440,
+        "client": 1149,
+        "scroll": 1149
+      }
+    },
+    {
+      "name": "compact-inventory-preserves-filters-geometry-and-navigation-at-390-inventory-bounds.json",
+      "measurement": {
+        "table": {
+          "x": 74,
+          "y": 238,
+          "width": 640,
+          "height": 117,
+          "top": 238,
+          "right": 714,
+          "bottom": 355,
+          "left": 74
+        },
+        "headers": [
+          {
+            "x": 74,
+            "y": 238,
+            "width": 245.328125,
+            "height": 40.5,
+            "top": 238,
+            "right": 319.328125,
+            "bottom": 278.5,
+            "left": 74
+          },
+          {
+            "x": 319.328125,
+            "y": 238,
+            "width": 160,
+            "height": 40.5,
+            "top": 238,
+            "right": 479.328125,
+            "bottom": 278.5,
+            "left": 319.328125
+          },
+          {
+            "x": 479.328125,
+            "y": 238,
+            "width": 131.546875,
+            "height": 40.5,
+            "top": 238,
+            "right": 610.875,
+            "bottom": 278.5,
+            "left": 479.328125
+          },
+          {
+            "x": 610.875,
+            "y": 238,
+            "width": 103.125,
+            "height": 40.5,
+            "top": 238,
+            "right": 714,
+            "bottom": 278.5,
+            "left": 610.875
+          }
+        ],
+        "page": 390,
+        "viewport": 390,
+        "client": 291,
+        "scroll": 640
+      }
+    },
+    {
+      "name": "compact-inventory-preserves-filters-geometry-and-navigation-at-900-inventory-bounds.json",
+      "measurement": {
+        "table": {
+          "x": 266,
+          "y": 162,
+          "width": 640,
+          "height": 117,
+          "top": 162,
+          "right": 906,
+          "bottom": 279,
+          "left": 266
+        },
+        "headers": [
+          {
+            "x": 266,
+            "y": 162,
+            "width": 245.328125,
+            "height": 40.5,
+            "top": 162,
+            "right": 511.328125,
+            "bottom": 202.5,
+            "left": 266
+          },
+          {
+            "x": 511.328125,
+            "y": 162,
+            "width": 160,
+            "height": 40.5,
+            "top": 162,
+            "right": 671.328125,
+            "bottom": 202.5,
+            "left": 511.328125
+          },
+          {
+            "x": 671.328125,
+            "y": 162,
+            "width": 131.546875,
+            "height": 40.5,
+            "top": 162,
+            "right": 802.875,
+            "bottom": 202.5,
+            "left": 671.328125
+          },
+          {
+            "x": 802.875,
+            "y": 162,
+            "width": 103.125,
+            "height": 40.5,
+            "top": 162,
+            "right": 906,
+            "bottom": 202.5,
+            "left": 802.875
+          }
+        ],
+        "page": 900,
+        "viewport": 900,
+        "client": 609,
+        "scroll": 640
+      }
+    }
+  ]
+}

@@ -16,6 +16,26 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Evidence must outlive the runner that cleans its output
+
+A later focused Playwright invocation deletes the previous output directory.
+Geometry receipts stored there can disappear even though both test runs pass.
+Keep reusable measurements in a sibling evidence directory, verify that a
+subsequent focused invocation preserves them, and commit a generated aggregate
+when the handoff must travel with the branch. Test screenshots can remain
+scratch artifacts. This prevents a truthful measured result from becoming
+an unsupported claim after another validation run.
+See IS-I16 in [the inventory execution ledger](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+
+### Status keywords are semantics, not arbitrary substrings
+
+An inventory query for `Active` also finds `Inactive` under plain substring
+matching. Normalize exact status keywords before generic identity search,
+and assert the complete matching set in both helper units and browser filters.
+Reuse the matcher across inventory and selector consumers so the meaning
+does not drift. See IS-I09 in
+[the inventory execution ledger](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+
 ### Missing required evidence must not become a passed diagnostic skip
 
 A new worktree's missing Mermaid tooling was reported as PASS because both

@@ -9,6 +9,20 @@
 
 ## Active Delivery Process
 
+**Isolated unreleased UI continuation:** `fix/ui-inventory-selection-20261014`
+now includes current master and owns only UI-03 through UI-10. Checkpoint
+`892d0192` implements compact inventory, bounded Dashboard, and shared
+Discovery selectors. The follow-up completes shared Operations filter-scroll
+ownership and exact status matching, retaining distinct current-resource and
+OAuth-subject workflows. Forty-nine distinct local browser cases pass across
+focused runs; unit runs pass 63 and 38 tests with two overlapping selector
+tests. Whole-web tsc retains 64 unchanged test diagnostics and two unchanged
+production diagnostics. Geometry receipts are committed as a generated
+aggregate. See
+[implementation, RCA and handoff](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+No new version, deployment, shared Entra mutation, or operator visual approval
+is claimed by this continuation.
+
 **v0.55.49 UI consolidation, not deployment:** PR #216 preserves UI commits
 `e2758b04` and `a5c1c603` through normal runtime-master merge `c90602dd`.
 UI-01/UI-02 align six Dashboard activity tracks and bound Operations endpoint

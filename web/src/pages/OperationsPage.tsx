@@ -62,6 +62,7 @@ import {
 import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { FilteredResultsPanel } from '../components/primitives/FilteredResultsPanel';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 import type { OperationsSearch } from '../routes/search-schemas';
@@ -127,11 +128,6 @@ const useStyles = makeStyles({
     // grid reads as a single-column list. Fixed layout makes the <th>
     // widths below authoritative and lets the inner TruncatedText clip.
     tableLayout: 'fixed',
-  },
-  tableCard: {
-    padding: 0,
-    minWidth: 0,
-    overflowX: 'auto',
   },
   rowHeader: {
     textAlign: 'left',
@@ -362,7 +358,7 @@ const UsersSection: React.FC<{
   };
 
   return (
-    <div>
+    <FilteredResultsPanel label="Current users" data-testid="operations-users-results" toolbar={
       <div className={classes.toolbar}>
         <div className={classes.toolbarGrow}>
           <SearchBox
@@ -388,6 +384,7 @@ const UsersSection: React.FC<{
           Download CSV
         </Button>
       </div>
+    }>
 
       {isLoading && <LoadingSkeleton count={8} height="36px" />}
       {error != null && <ScimErrorMessage error={error} />}
@@ -404,7 +401,7 @@ const UsersSection: React.FC<{
         />
       )}
       {!isLoading && !error && rows.length > 0 && (
-        <Card className={classes.tableCard}>
+        <>
           <table className={classes.rowTable}>
             <thead>
               <tr>
@@ -484,9 +481,9 @@ const UsersSection: React.FC<{
               </div>
             </div>
           )}
-        </Card>
+        </>
       )}
-    </div>
+    </FilteredResultsPanel>
   );
 };
 
@@ -532,7 +529,7 @@ const GroupsSection: React.FC<{
   };
 
   return (
-    <div>
+    <FilteredResultsPanel label="Current groups" data-testid="operations-groups-results" toolbar={
       <div className={classes.toolbar}>
         <div className={classes.toolbarGrow}>
           <SearchBox
@@ -552,6 +549,7 @@ const GroupsSection: React.FC<{
           Download CSV
         </Button>
       </div>
+    }>
 
       {isLoading && <LoadingSkeleton count={8} height="36px" />}
       {error != null && <ScimErrorMessage error={error} />}
@@ -568,7 +566,7 @@ const GroupsSection: React.FC<{
         />
       )}
       {!isLoading && !error && rows.length > 0 && (
-        <Card className={classes.tableCard}>
+        <>
           <table className={classes.rowTable}>
             <thead>
               <tr>
@@ -646,9 +644,9 @@ const GroupsSection: React.FC<{
               </div>
             </div>
           )}
-        </Card>
+        </>
       )}
-    </div>
+    </FilteredResultsPanel>
   );
 };
 
