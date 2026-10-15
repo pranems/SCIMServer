@@ -30,6 +30,17 @@ coverage replay with `--maxWorkers=2` passed all 1,595 tests and existing
 coverage floors; it does not prove a sole timeout cause or a completed
 deployment. See the [execution ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
 
+The subsequent isolated Stage 4.1 command,
+`pwsh -NoProfile -File scripts\full-validation-pipeline.ps1 -SkipLocal`,
+exited 0: no-cache/refreshed-base Docker build in 145 seconds and 1,729 live
+assertions passed in 177.1 seconds on `0.55.49`. The approved corporate
+registry was supplied through process-local `NPM_REGISTRY`. Project
+`scimserver-validation-16751f991fa4` had its containers, network and volume
+removed; label-scoped absence was verified. This is local Docker evidence,
+not publication, local-node evidence or an Azure update. A depth-10 JSON
+diagnostic warning remains explicit; the parsed summary and 1,729 test
+entries agree with the console result.
+
 ## Prisma validation scheduling
 
 The direct Stage 2.2 Prisma E2E invocation and the Prisma lane in

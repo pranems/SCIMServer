@@ -18,8 +18,21 @@ zero skips; InMemory passed 2,488 with four expected exclusions. The original
 matrix failed one web coverage test and remains a failed receipt. The owner
 stopped the process on Stage 4 entry before publication/deployment. A later
 read-only ARM/version check confirmed dev remains `0.55.47` on revision
-`scimserver-dev--ve4192b0e`. Expanded gallery, Docker/live/browser and
+`scimserver-dev--ve4192b0e`. Expanded gallery, local-node/dev live, browser and
 legacy-reference proof are still incomplete.
+
+The tooling-only normal Validate push at `6d8b0b40` passed all 27 gates in
+1,140.5 seconds: 6,043 API units, 2,432 hook-selected InMemory E2E passes with
+four native-only exclusions, 1,595 web tests, and 758 Mermaid diagrams
+rendered in both strict themes. The hook's selected E2E receipt is distinct
+from the complete backend matrix above.
+
+The subsequent isolated Stage 4.1 command
+`pwsh -NoProfile -File scripts\full-validation-pipeline.ps1 -SkipLocal`
+exited 0. The no-cache/refreshed-base Docker build took 145 seconds; 1,729
+live assertions passed in 177.1 seconds on `0.55.49`. The exact owned project
+was removed and label-scoped absence of containers, volumes and networks
+was verified. No image publication or Azure update occurred.
 
 | ID | Type / severity | Symptom and root cause | Resolution and why it works | Prevention | Detection / earliest gate |
 |---|---|---|---|---|---|
@@ -28,6 +41,8 @@ legacy-reference proof are still incomplete.
 | GM-I11 | Identity / Low | A PR write used the globally selected enterprise-managed GitHub account and returned Unauthorized. | Use the existing owner credential only in process-local `GH_TOKEN` and verify `gh api user`. PR update, ready transition and normal merge succeeded without changing the shared global account or logging the token. | Check process-local write identity before GitHub mutations. | PR update / identity preflight |
 | GM-I12 | Evidence correctness / Medium | The direct Prisma lane cleared the backend variable; runtime selected Prisma, but four native-only test predicates require an explicit backend value and skipped. | Keep its 2,488-pass/four-skip result explicit. The matrix's explicit Prisma lane executed all 2,492 tests with zero skips, closing this run's native coverage gap without relabeling the direct result. | Treat selected runtime backend and native-test admission as separate facts; use the explicit matrix receipt. | Receipt reconciliation / backend environment preflight |
 | GM-I13 | Test harness / Low | The first new positive control assigned an if-expression result to the results list; PowerShell unwrapped its singleton and `+=` failed. | Wrap the complete expression in `@(...)` so the harness retains an array. The corrected baseline run then completed with the seven expected behavioral RED assertions; GREEN passed after the production guard. | Keep collection shape explicit in behavioral harness fixtures. | Focused contract / focused contract |
+| GM-I14 | Environment prerequisite / Low | The first recovery tracking push passed 24 gates but Prisma generation failed loading configuration because the fresh shell lacked `DATABASE_URL`. The command does not connect, but `env('DATABASE_URL')` throws before generation. | Set a process-local nonconnecting placeholder and confirm `npx --no-install prisma generate` exits 0. The normal Validate retry then passed all 27 gates in 826.5 seconds. No source, dependency or lockfile repair was needed. | Check nonconnecting configuration prerequisites before an expensive hook; retain the failed receipt and never bypass the hook. | Validate generation / code-generation preflight |
+| GM-I15 | Evidence limitation / Low | The successful Docker live runner warned that depth-10 JSON serialization truncates deeply nested diagnostics. This is not an assertion failure, but the artifact must not be called lossless. | Retain the console log and parse the receipt: version `0.55.49`, 1,729 passed, zero failed, and 1,729 test entries agree. Accepted diagnostic limitation for this safety PR; no serializer change or lossless payload claim. | Check parsed counters/list agreement and disclose the warning. Inspect nested diagnostic serialization before relying on that payload for detailed replay. | Receipt writer / serializer contract |
 
 **Self-improvement applied:** A recorded failure now prevents downstream
 mutation at the shared execution boundary, not only at the final tally.
@@ -39,14 +54,22 @@ successful replay.
 guard the existing post-deploy block. No new orchestration framework, provider,
 dependency, runtime version or speculative abstraction is justified.
 
-**Provenance / completeness limitation:** Entries above were reconciled
-against retained recovery status, the pipeline/coverage logs, explicit
-backend receipts, GitHub results and this continuation's contract output.
-Expected RED assertions, JSDOM unsupported-window warnings, and read-only
-latency probes are not new product defects. The deleted original transcript
-is unavailable, and the complete raw current-session transcript has not been
-located; this is not a claim of full-transcript reconciliation or completed
-execution-ledger closure.
+**Provenance / completeness checkpoint:** After the first tooling commit,
+the current continuation's complete available `events.jsonl` was located
+and scanned through event 1,583, including 226 tool completions. The pass
+correlated starts/results, searched error signals, separately searched causal
+narration, included actual evidence-log reads, and reconciled the retained
+pipeline/coverage logs, backend receipts, GitHub results and contract output.
+The repeated code-generation matches describe one GM-I14 incident; repeated
+coverage matches describe one GM-I10 incident. Expected RED assertions,
+source/search echoes, JSDOM unsupported-window warnings, optional absent
+knowledge-graph tooling, baseline TypeScript diagnostics and read-only latency
+probes were verified and dismissed as new product incidents. The scan also
+retains the singleton-array harness failure rather than counting only the
+expected RED assertions; the later Docker completion adds GM-I15 with
+independent receipt-counter verification. The deleted original project3 transcript remains
+unavailable. This is a current-continuation checkpoint, not original-session
+restoration or completed deployment/ledger closure.
 
 ## Custom-mapping continuation checkpoint
 

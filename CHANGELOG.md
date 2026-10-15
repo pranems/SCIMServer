@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zero skips, and 2,488 InMemory passes with four native-only exclusions.
 - No runtime/API/UI behavior, package version, dependency, lockfile or
   deployment changes. Dev remains `0.55.47`; source remains `0.55.49`.
-  Live gallery, browser and legacy-reference proof are still pending.
+  Subsequent isolated Docker build/live validation passes 1,729 assertions
+  with verified exact project cleanup. Dev live/gallery, browser and
+  legacy-reference proof are still pending.
 
 ### Standup evidence completeness
 
