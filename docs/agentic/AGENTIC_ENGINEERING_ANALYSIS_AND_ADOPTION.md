@@ -2,8 +2,9 @@
 
 > **Status:** Analysis (review-only; no code change in this document)
 > **Version:** 1.0 - **Date:** 2026-06-24
+> **Last verified:** 2026-10-14
 > **Lens:** The Agentic Engineering Playbook (Kun Chen L8 workflow + AGENTS.md standard + GitHub Spec Kit + Anthropic Claude Code best practices), compiled at `../../../agentic-engineering-playbook/`
-> **Source of truth for current practice:** [.github/copilot-instructions.md](../../.github/copilot-instructions.md), [.github/prompts/](../../.github/prompts/), [scripts/](../../scripts/), [Session_starter.md](../../Session_starter.md), [docs/CONTEXT_INSTRUCTIONS.md](../CONTEXT_INSTRUCTIONS.md)
+> **Source of truth for current practice:** [.github/copilot-instructions.md](../../.github/copilot-instructions.md), [.github/skills/](../../.github/skills/), [scripts/](../../scripts/), [Session_starter.md](../../Session_starter.md), [docs/CONTEXT_INSTRUCTIONS.md](../CONTEXT_INSTRUCTIONS.md)
 > **Companion:** [strategy/SELF_AUDIT_2026-05-16.md](../strategy/SELF_AUDIT_2026-05-16.md), [strategy/SECURITY_INTAKE_2026-05-17.md](../strategy/SECURITY_INTAKE_2026-05-17.md)
 
 ---
@@ -16,7 +17,7 @@
 - [4. SCIMServer Scorecard](#4-scimserver-scorecard)
 - [5. What SCIMServer Does Exceptionally Well](#5-what-scimserver-does-exceptionally-well)
   - [5.1 Staged quality gates as a binding contract](#51-staged-quality-gates-as-a-binding-contract)
-  - [5.2 Self-improving prompts with persistent memory](#52-self-improving-prompts-with-persistent-memory)
+  - [5.2 Self-improving skills with persistent memory](#52-self-improving-skills-with-persistent-memory)
   - [5.3 The meta-audit layer (Stage X)](#53-the-meta-audit-layer-stage-x)
   - [5.4 Incident-to-gate discipline](#54-incident-to-gate-discipline)
   - [5.5 Cross-backend and multi-mode parity](#55-cross-backend-and-multi-mode-parity)
@@ -43,11 +44,11 @@
 
 ## 1. Executive Summary
 
-SCIMServer is, by the maturity model in the Agentic Engineering Playbook, a **Level 4+ ("manager-of-agents") operation** and in several dimensions it operates **beyond** what the playbook documents. Its 33-file prompt library, six-stage-plus-meta quality-gate contract, persistent prompt-memory files, and the formal "incident becomes a gate" discipline are a reference-grade instantiation of the playbook's hardest pillars (validation and self-improvement).
+SCIMServer is, by the maturity model in the Agentic Engineering Playbook, a **Level 4+ ("manager-of-agents") operation** and in several dimensions it operates **beyond** what the playbook documents. Its 36 Agent Skills, six-stage-plus-meta quality-gate contract, referenced persistent memory, and the formal "incident becomes a gate" discipline are a reference-grade instantiation of the playbook's hardest pillars (validation and self-improvement).
 
 This document is a **two-way analysis**:
 
-1. **What SCIMServer does so well that it should feed the playbook.** Five patterns here are stronger than anything currently in the playbook and are folded back into it (see [Section 9](#9-what-flows-back-to-the-playbook)): the staged-gate contract, the self-improving-prompt-with-memory pattern, the Stage X meta-audit cadence, the incident-to-gate loop, and cross-backend/multi-mode parity testing.
+1. **What SCIMServer does so well that it should feed the playbook.** Five patterns here are stronger than anything currently in the playbook and are folded back into it (see [Section 9](#9-what-flows-back-to-the-playbook)): the staged-gate contract, the self-improving-Agent-Skill-with-memory pattern, the Stage X meta-audit cadence, the incident-to-gate loop, and cross-backend/multi-mode parity testing.
 
 2. **What the playbook can bring to SCIMServer.** Despite its depth on *validation* and *self-improvement*, SCIMServer under-invests in *throughput* mechanics. The seven gaps in [Section 6](#6-gaps-and-opportunities) - led by the absence of a vendor-neutral `AGENTS.md`, the lack of a parallel-worktree fleet, and no overnight-loop orchestration for measurable-metric work - are where the largest remaining productivity gains sit.
 
@@ -57,7 +58,7 @@ The single highest-leverage, lowest-risk change is **G1: add a vendor-neutral `A
 flowchart LR
     subgraph SS["SCIMServer strengths"]
         A["Staged gate contract"]
-        B["Self-improving prompts + memory"]
+        B["Self-improving Agent Skills + memory"]
         C["Stage X meta-audit"]
         D["Incident -> gate loop"]
         E["Cross-backend + multi-mode parity"]
@@ -81,9 +82,9 @@ flowchart LR
 
 **Out of scope.** SCIM protocol correctness, product features, and deployment topology, except where they illustrate an agentic-workflow point.
 
-**Method.** Direct inspection of the prompt library, the orchestration scripts, the CI workflows, the session-continuity files, and the two strategy-audit outputs, scored against the playbook's nine pillars and five-level maturity model. Evidence is cited by file. No code or configuration was changed to produce this analysis.
+**Method.** Direct inspection of the Agent Skill library, the orchestration scripts, the CI workflows, the session-continuity files, and the two strategy-audit outputs, scored against the playbook's nine pillars and five-level maturity model. Evidence is cited by file. No code or configuration was changed to produce this analysis.
 
-**Evidence base (as of v0.53.0).** 33 prompt files under [.github/prompts/](../../.github/prompts/); a two-file persistent memory store under [.github/prompts/.memory/](../../.github/prompts/.memory/); ~50 PowerShell orchestration scripts under [scripts/](../../scripts/); 5 CI workflows under [.github/workflows/](../../.github/workflows/); the staged-gate contract in [.github/copilot-instructions.md](../../.github/copilot-instructions.md); and roughly 7,300 automated checks across six layers (API unit, API E2E, web vitest, Playwright, live SCIM, PowerShell) per [INDEX.md](../INDEX.md).
+**Evidence base (refreshed 2026-10-14).** 36 project Agent Skills under [.github/skills/](../../.github/skills/), including workflow-local persistent memory resources; ~50 PowerShell orchestration scripts under [scripts/](../../scripts/); 5 CI workflows under [.github/workflows/](../../.github/workflows/); the staged-gate contract in [.github/copilot-instructions.md](../../.github/copilot-instructions.md); and roughly 7,300 automated checks across six layers (API unit, API E2E, web vitest, Playwright, live SCIM, PowerShell) per [INDEX.md](../INDEX.md).
 
 ---
 
@@ -121,13 +122,13 @@ Scored 0-5 against each pillar, with the single most important piece of evidence
 |---|---|---|---|
 | **P1** Frictionless env | 2 | Rich scripts, but no multiplexer/voice/remote-control practice documented; terminal history shows heavy manual `az`/`git` work | Under-invested |
 | **P2** Durable memory | 4 | [copilot-instructions.md](../../.github/copilot-instructions.md) + [CONTEXT_INSTRUCTIONS.md](../CONTEXT_INSTRUCTIONS.md) + [Session_starter.md](../../Session_starter.md) are deep and disciplined - but **Copilot-only**, no `AGENTS.md` | Strong but vendor-locked |
-| **P3** Plan before code | 5 | [promptChainArchitecture.prompt.md](../../.github/prompts/promptChainArchitecture.prompt.md) 12-stage methodology; RFC-style design docs precede code | Reference-grade |
-| **P4** Delegation discipline | 4 | Outcome-oriented prompts; TDD red-first; escalate-to-human is codified | Strong |
-| **P5** Validation + review | 5 | Six-stage gate contract; 7,300+ checks; multi-mode live tests - **with one gap:** review is in-session ([codeReviewSelfAudit](../../.github/prompts/codeReviewSelfAudit.prompt.md) is "suggestions not blocks"), not fresh-context adversarial | Reference-grade, one gap |
+| **P3** Plan before code | 5 | [`promptchainarchitecture`](../../.github/skills/promptchainarchitecture/SKILL.md) 12-stage methodology; RFC-style design docs precede code | Reference-grade |
+| **P4** Delegation discipline | 4 | Outcome-oriented Agent Skills; TDD red-first; escalate-to-human is codified | Strong |
+| **P5** Validation + review | 5 | Six-stage gate contract; 7,300+ checks; multi-mode live tests - **with one gap:** review is in-session ([codeReviewSelfAudit](../../.github/skills/codereviewselfaudit/SKILL.md) is "suggestions not blocks"), not fresh-context adversarial | Reference-grade, one gap |
 | **P6** Parallelism | 2 | Aware of worktrees (sibling `SCIMServer-az-tenant`); no pool, no fleet, largely sequential phase execution | Under-invested |
 | **P7** Long-running orchestration | 3 | [run-all-gates.ps1](../../scripts/run-all-gates.ps1) orchestrates gates, but no overnight metric-improvement loop | Partial |
 | **P8** Tool ergonomics | 3 | Uses raw `gh`/`az`; CodeQL + Trivy in CI; no agent-ergonomic (AXI/TOON) tool layer | Partial |
-| **P9** Self-improvement | 5 | [selfImprovingTask](../../.github/prompts/selfImprovingTask.prompt.md) + [.memory/](../../.github/prompts/.memory/) + [gateStrategySelfAudit](../../.github/prompts/gateStrategySelfAudit.prompt.md) + [securityBestPracticesIntake](../../.github/prompts/securityBestPracticesIntake.prompt.md) with 4 trigger types | Beyond the playbook |
+| **P9** Self-improvement | 5 | [`selfimprovingtask`](../../.github/skills/selfimprovingtask/SKILL.md) + [its memory](../../.github/skills/selfimprovingtask/references/memory.md) + [`gatestrategyselfaudit`](../../.github/skills/gatestrategyselfaudit/SKILL.md) + [`securitybestpracticesintake`](../../.github/skills/securitybestpracticesintake/SKILL.md) with 4 trigger types | Beyond the playbook |
 
 ```mermaid
 quadrantChart
@@ -176,33 +177,33 @@ flowchart TD
 
 Why it is exemplary: it turns the playbook's P5 ("require evidence, gate the stop") into an auditable, non-bypassable sequence. The phrase the repo enforces - aggregated claims like "all tests passed" are insufficient; only a per-gate row counts - is the discipline most teams lack.
 
-### 5.2 Self-improving prompts with persistent memory
+### 5.2 Self-improving skills with persistent memory
 
-Two prompts - [promptChainArchitecture](../../.github/prompts/promptChainArchitecture.prompt.md) and [selfImprovingTask](../../.github/prompts/selfImprovingTask.prompt.md) - implement a closed learning loop that the playbook only gestures at. Each run:
+Two skills - [`promptchainarchitecture`](../../.github/skills/promptchainarchitecture/SKILL.md) and [`selfimprovingtask`](../../.github/skills/selfimprovingtask/SKILL.md) - implement a closed learning loop that the playbook only gestures at. Each run:
 
-1. **Step 0: loads** a memory file ([.memory/selfImprovingTask.memory.md](../../.github/prompts/.memory/selfImprovingTask.memory.md)) and treats its `Lessons Learned` / `Anti-Patterns Hit` / `Heuristics That Worked` sections as **binding constraints**.
+1. **Step 0: loads** a [workflow-local memory file](../../.github/skills/selfimprovingtask/references/memory.md) and treats its `Lessons Learned` / `Anti-Patterns Hit` / `Heuristics That Worked` sections as **binding constraints**.
 2. **Executes** with explicit bias-removal phrases ("if I started from scratch with no prior context, what would I do differently?") and a self-evaluation rubric scored 1-5 per dimension.
 3. **Step N: writes back** a run-log entry, and **promotes any pattern observed twice** from the run log into the top-level sections.
 
 ```mermaid
 flowchart LR
-    M[(".memory/*.md\npersistent")] -->|"Step 0: load as constraints"| RUN["execute task\n+ bias check\n+ self-eval rubric"]
+    M[("references/memory.md\npersistent")] -->|"Step 0: load as constraints"| RUN["execute task\n+ bias check\n+ self-eval rubric"]
     RUN -->|"Step N: append run log"| M
     RUN -->|"pattern seen twice"| PROMOTE["promote to\nLessons / Heuristics"]
     PROMOTE --> M
-    M -->|"contract evolves"| PROMPT["prompt file\n(user-approved edits)"]
+    M -->|"contract evolves"| SKILL["skill file\n(user-approved edits)"]
 ```
 
 This is the operationalization of "write corrections into memory so they never recur" (playbook R5) taken to a higher form: the memory is a separate, versioned artifact with an explicit promotion rule, not a growing instruction blob.
 
 ### 5.3 The meta-audit layer (Stage X)
 
-Above the per-commit gates sits a layer that audits **the gate strategy itself**. [gateStrategySelfAudit](../../.github/prompts/gateStrategySelfAudit.prompt.md) (internal drift) and [securityBestPracticesIntake](../../.github/prompts/securityBestPracticesIntake.prompt.md) (external landscape) run on four triggers - release cut, monthly calendar, on-demand, and incident-driven - and produce dated reports under [docs/strategy/](../strategy/). They carry hard constraints that most "self-improvement" hand-waving lacks:
+Above the per-commit gates sits a layer that audits **the gate strategy itself**. [gateStrategySelfAudit](../../.github/skills/gatestrategyselfaudit/SKILL.md) (internal drift) and [securityBestPracticesIntake](../../.github/skills/securitybestpracticesintake/SKILL.md) (external landscape) run on four triggers - release cut, monthly calendar, on-demand, and incident-driven - and produce dated reports under [docs/strategy/](../strategy/). They carry hard constraints that most "self-improvement" hand-waving lacks:
 
 - Every external claim **requires a URL citation** (no URL means "speculative - verify before action").
 - Every finding carries a **confidence level** and an **owner action**.
-- A **new prompt requires >= 2 escape-pattern matches**; a single escape goes into an existing prompt.
-- **Retiring a prompt requires 30+ days of no-fire evidence**; ratcheting a baseline requires a measured snapshot.
+- A **new skill requires >= 2 escape-pattern matches**; a single escape goes into an existing skill.
+- **Retiring a skill requires 30+ days of no-fire evidence**; ratcheting a baseline requires a measured snapshot.
 
 The first two runs already paid off: the security intake caught four backlog items as already-active (removing false-negative noise) and one node-version drift, per [SECURITY_INTAKE_2026-05-17.md](../strategy/SECURITY_INTAKE_2026-05-17.md).
 
@@ -212,9 +213,9 @@ Every bug that escaped to dev or prod produced a **named standing rule plus a ne
 
 | Incident | Root cause | The gate it created |
 |---|---|---|
-| Finding-B (May 2026) | InMemory endpoint-create missing the duplicate-name guard Prisma had | Stage 2.5 [crossBackendParityAudit](../../.github/prompts/crossBackendParityAudit.prompt.md) |
+| Finding-B (May 2026) | InMemory endpoint-create missing the duplicate-name guard Prisma had | Stage 2.5 [crossBackendParityAudit](../../.github/skills/crossbackendparityaudit/SKILL.md) |
 | Group.displayName uniqueness flip | Hard-coded characteristic assertion | Schema-Characteristic Test Rule + helper |
-| Finding-C (121-fail false signal) | Stale Playwright specs for deleted UI | Stage 5.2 [playwrightSpecHygieneAudit](../../.github/prompts/playwrightSpecHygieneAudit.prompt.md) |
+| Finding-C (121-fail false signal) | Stale Playwright specs for deleted UI | Stage 5.2 [playwrightSpecHygieneAudit](../../.github/skills/playwrightspechygieneaudit/SKILL.md) |
 | 48-PNG screenshot scandal | No screenshot retention rule | Deny-by-default `.gitignore` allowlist + [audit-screenshots.ps1](../../scripts/audit-screenshots.ps1) |
 | Finding-D (CSS applied, layout not achieved) | Asserting CSS props, not measured bounds | Visual-layout assertion rules R1-R9 |
 
@@ -224,7 +225,7 @@ The lesson is structural: the repo never fixes a bug without asking "why did no 
 
 Two parity disciplines stand out as broadly transferable:
 
-- **Cross-backend parity.** The codebase runs identically on an InMemory backend and a Prisma/PostgreSQL backend. Any change touching an `isInMemoryBackend` branch must pass [crossBackendParityAudit](../../.github/prompts/crossBackendParityAudit.prompt.md) and the 6-mode [test-all-modes.ps1](../../scripts/test-all-modes.ps1) orchestrator.
+- **Cross-backend parity.** The codebase runs identically on an InMemory backend and a Prisma/PostgreSQL backend. Any change touching an `isInMemoryBackend` branch must pass [crossBackendParityAudit](../../.github/skills/crossbackendparityaudit/SKILL.md) and the 6-mode [test-all-modes.ps1](../../scripts/test-all-modes.ps1) orchestrator.
 - **Multi-mode live parity.** [live-test.ps1](../../scripts/live-test.ps1) runs the same 1,000+ SCIM assertions on the wire against local node, Docker compose, and Azure dev. A failure on one mode that passes on another is treated as a parity bug to fix at the source, never suppressed.
 
 This is the strongest available answer to the playbook's "force end-to-end evidence" (P5): the same contract, proven on every deployment form factor.
@@ -233,12 +234,12 @@ This is the strongest available answer to the playbook's "force end-to-end evide
 
 Two crisp, exportable testing rules:
 
-- **Response key allowlist.** API responses are asserted with `expect(ALLOWED_KEYS).toContain(key)`, never `toHaveProperty`. Internal fields prefixed with `_` must never appear. This catches undocumented-field leakage that property-presence checks miss. Enforced at [apiContractVerification](../../.github/prompts/apiContractVerification.prompt.md).
+- **Response key allowlist.** API responses are asserted with `expect(ALLOWED_KEYS).toContain(key)`, never `toHaveProperty`. Internal fields prefixed with `_` must never appear. This catches undocumented-field leakage that property-presence checks miss. Enforced at [apiContractVerification](../../.github/skills/apicontractverification/SKILL.md).
 - **Effective-value testing (Schema-Characteristic Test Rule).** Tests against published schema characteristics check presence first and substitute the RFC 7643 §2.2 default when a characteristic is absent, rather than hard-coding an expected value. The general pattern - *assert against the effective value, not a hard-coded one* - applies to any spec-driven contract.
 
 ### 5.7 Doc-as-context and three-layer session continuity
 
-A principle stated plainly in [promptChainArchitecture](../../.github/prompts/promptChainArchitecture.prompt.md): **"the document IS the persistent context; the conversation is not."** Each stage synthesizes a <= 200-word context block and updates a working draft, so the durable artifact carries forward, not the chat history. This is a sharper version of the playbook's P3 ("make the plan an artifact, not a chat").
+A principle stated plainly in [promptChainArchitecture](../../.github/skills/promptchainarchitecture/SKILL.md): **"the document IS the persistent context; the conversation is not."** Each stage synthesizes a <= 200-word context block and updates a working draft, so the durable artifact carries forward, not the chat history. This is a sharper version of the playbook's P3 ("make the plan an artifact, not a chat").
 
 Continuity is layered:
 
@@ -246,13 +247,13 @@ Continuity is layered:
 |---|---|---|
 | Project state | [Session_starter.md](../../Session_starter.md) | Update log, test counts, version, current phase |
 | Domain constraints | [CONTEXT_INSTRUCTIONS.md](../CONTEXT_INSTRUCTIONS.md) | RFC gotchas, parity rules, the gate contract |
-| Session lifecycle | [session-startup](../../.github/prompts/session-startup.prompt.md) + [sessionWrapUp](../../.github/prompts/sessionWrapUp.prompt.md) | Auto-load context in; persist achievements out |
+| Session lifecycle | [session-startup](../../.github/skills/session-startup/SKILL.md) + [sessionWrapUp](../../.github/skills/sessionwrapup/SKILL.md) | Auto-load context in; persist achievements out |
 
 ### 5.8 Other notable strengths
 
-- **Three-variant phase execution** (MVP / standard / enterprise) is a rigor dial the playbook lacks: [runPhaseWorkflowMvp](../../.github/prompts/runPhaseWorkflowMvp.prompt.md), [runPhaseWorkflow](../../.github/prompts/runPhaseWorkflow.prompt.md), [runPhaseWorkflowEnterprise](../../.github/prompts/runPhaseWorkflowEnterprise.prompt.md).
+- **Three-variant phase execution** (MVP / standard / enterprise) is a rigor dial the playbook lacks: [runPhaseWorkflowMvp](../../.github/skills/runphaseworkflowmvp/SKILL.md), [runPhaseWorkflow](../../.github/skills/runphaseworkflow/SKILL.md), [runPhaseWorkflowEnterprise](../../.github/skills/runphaseworkflowenterprise/SKILL.md).
 - **TDD red-first even for one-line fixes** (Stage 0) - the discipline that would have caught Finding-B at the unit level.
-- **Endpoint-config-flag 10-cell completeness audit** ([endpointConfigFlagAudit](../../.github/prompts/endpointConfigFlagAudit.prompt.md)) - every flag must have registry + default + validator + enforcement + tests-per-layer + doc + UI control + UI test.
+- **Endpoint-config-flag 10-cell completeness audit** ([endpointConfigFlagAudit](../../.github/skills/endpointconfigflagaudit/SKILL.md)) - every flag must have registry + default + validator + enforcement + tests-per-layer + doc + UI control + UI test.
 - **Deny-by-default artifact hygiene** - the screenshot `.gitignore` allowlist that makes the wrong outcome structurally impossible, not merely discouraged.
 
 ---
@@ -265,7 +266,11 @@ Seven gaps, ordered by leverage. Each names the playbook pillar it closes, the c
 
 **Pillar:** P2, P8 (agent-agnostic). **Effort:** very low. **Impact:** high.
 
-SCIMServer's rule investment is enormous but lives only in [copilot-instructions.md](../../.github/copilot-instructions.md) and the `.prompt.md` format, both GitHub Copilot conventions. There is **no `AGENTS.md` or `CLAUDE.md`**, so Claude Code, Codex, Cursor, Amp, Gemini CLI, and OpenCode cannot read any of it. This violates the playbook's agent-agnostic principle (R17): the repo cannot switch to whichever model is currently best without abandoning its own rules.
+SCIMServer's 36 workflows now use portable Agent Skills, closing the former
+prompt-file portability gap. The always-on rule investment still lives in
+[copilot-instructions.md](../../.github/copilot-instructions.md), however.
+There is **no `AGENTS.md` or `CLAUDE.md`**, so agents that do not consume that
+Copilot instruction file still miss the standing rules.
 
 **Change.** Add a thin `AGENTS.md` at the repo root that states the non-negotiables (em-dash ban, TDD red-first, the six-stage gate names, the commit checklist) and points to the canonical detail. Symlink `CLAUDE.md` to it. Keep `copilot-instructions.md` as the Copilot-specific entry that also points at `AGENTS.md` so there is one source of truth. Ready-to-paste content is in [Appendix B](#12-appendix-b-ready-to-paste-agentsmd-for-scimserver).
 
@@ -273,9 +278,9 @@ SCIMServer's rule investment is enormous but lives only in [copilot-instructions
 
 **Pillar:** P6. **Effort:** low to medium. **Impact:** very high (throughput).
 
-The repo executes largely **one phase at a time**, yet it has many *independent* streams of work: the K/L/M/N UI phases, the 33 audit prompts, and the documentation sweeps rarely conflict. It is aware of worktrees (the sibling `SCIMServer-az-tenant` checkout) but has no pool and no fleet pattern, so independent work serializes on a single working directory.
+The repo executes largely **one phase at a time**, yet it has many *independent* streams of work: the K/L/M/N UI phases, the 36 Agent Skills, and the documentation sweeps rarely conflict. It is aware of worktrees (the sibling `SCIMServer-az-tenant` checkout) but has no pool and no fleet pattern, so independent work serializes on a single working directory.
 
-**Change.** Adopt a worktree pool so each parallel agent gets a ready, dependency-warm, isolated checkout. The playbook ships a dependency-free helper ([parallel-agents.ps1](../../../agentic-engineering-playbook/scripts/parallel-agents.ps1)); [treehouse](https://github.com/kunchenguid/treehouse) is the richer option. Run independent audit prompts and independent UI phases concurrently, each in its own worktree, each ending at the same gate.
+**Change.** Adopt a worktree pool so each parallel agent gets a ready, dependency-warm, isolated checkout. The playbook ships a dependency-free helper ([parallel-agents.ps1](../../../agentic-engineering-playbook/scripts/parallel-agents.ps1)); [treehouse](https://github.com/kunchenguid/treehouse) is the richer option. Run independent audit skills and independent UI phases concurrently, each in its own worktree, each ending at the same gate.
 
 ### G3. Overnight orchestration for measurable metrics
 
@@ -294,7 +299,7 @@ SCIMServer carries several **measurable-metric backlogs that are ideal overnight
 
 **Pillar:** P5 (the one P5 gap). **Effort:** medium. **Impact:** high.
 
-The repo's code review ([codeReviewSelfAudit](../../.github/prompts/codeReviewSelfAudit.prompt.md)) runs **in the same session** that wrote the code and is explicitly "suggestions, not blocks." The playbook's strongest validation rule (R9) is that a reviewer must run in a **fresh context** so it is not biased by the reasoning that produced the change. Finding-B and Finding-C are exactly the class a fresh-context adversarial reviewer catches.
+The repo's code review ([codeReviewSelfAudit](../../.github/skills/codereviewselfaudit/SKILL.md)) runs **in the same session** that wrote the code and is explicitly "suggestions, not blocks." The playbook's strongest validation rule (R9) is that a reviewer must run in a **fresh context** so it is not biased by the reasoning that produced the change. Finding-B and Finding-C are exactly the class a fresh-context adversarial reviewer catches.
 
 **Change.** Add a blocking, fresh-context review step before push: either adopt a [no-mistakes](https://github.com/kunchenguid/no-mistakes)-style local git proxy (push to a gate that reviews in a disposable worktree, then forwards on green), or a lighter Writer/Reviewer split where a second agent session sees only the diff and the plan. This complements, not replaces, the staged gates.
 
@@ -310,7 +315,7 @@ The 12-stage architecture methodology produces excellent **markdown** design doc
 
 **Pillar:** P8. **Effort:** low. **Impact:** medium (token cost).
 
-The workflow leans on raw `gh` and `az`. The heavy GitHub operations (PR creation, CI babysitting in the deployment prompts) are a measured cost/accuracy win for an agent-native interface: benchmarks show `gh-axi` at 100% success / ~$0.05 vs GitHub MCP at 87% / ~$0.15.
+The workflow leans on raw `gh` and `az`. The heavy GitHub operations (PR creation, CI babysitting in the deployment skills) are a measured cost/accuracy win for an agent-native interface: benchmarks show `gh-axi` at 100% success / ~$0.05 vs GitHub MCP at 87% / ~$0.15.
 
 **Change.** Add `gh-axi` for GitHub operations and consider the TOON output format for the verbose live-test reporting. Reserve MCP for genuinely rich, stateful integrations.
 
@@ -389,14 +394,14 @@ flowchart LR
 
 1. `npm install -g gh-axi` on the operator machine and CI runner.
 2. Add to `AGENTS.md`: "Use `gh-axi` for GitHub operations (PRs, issues, workflow runs); fall back to `gh` if unavailable."
-3. Spot-check one deployment-prompt flow that babysits CI; compare turn count and cost.
+3. Spot-check one deployment-skill flow that babysits CI; compare turn count and cost.
 4. **Reversible:** remove the AGENTS.md line; `gh` remains.
 
 ### 8.4 G2 - Parallel worktree fleet (Wave 2)
 
 1. Copy [parallel-agents.ps1](../../../agentic-engineering-playbook/scripts/parallel-agents.ps1) into `scripts/` (or install `treehouse`).
 2. Write a short `docs/PARALLEL_AGENT_WORKFLOW.md`: how to start a task in a worktree, the naming convention (`agent/<slug>`), and the rule that each worktree runs its own gate before its PR.
-3. Pilot: run two independent audit prompts (for example `auditAndUpdateDocs` and `dependencyCveSweep`) in two worktrees at once.
+3. Pilot: run two independent audit skills (for example `auditandupdatedocs` and `dependencycvesweep`) in two worktrees at once.
 4. Add a pre-push reminder that each worktree must pass [pre-push-checks.ps1](../../scripts/pre-push-checks.ps1) independently.
 5. **Reversible:** worktrees are disposable; `git worktree remove` cleans up.
 
@@ -415,7 +420,7 @@ flowchart TD
 
 1. Choose the mechanism: a [no-mistakes](https://github.com/kunchenguid/no-mistakes)-style local proxy, or a scripted Writer/Reviewer split using a second agent session.
 2. Encode the reviewer prompt from the playbook ([no-mistakes.yaml](../../../agentic-engineering-playbook/templates/no-mistakes.yaml)): review the diff on its own terms against the plan, force E2E evidence, classify each finding SAFE-FIX vs ESCALATE.
-3. Insert it as Stage 3c.0 (before the in-session [codeReviewSelfAudit](../../.github/prompts/codeReviewSelfAudit.prompt.md)) so the fresh-context pass happens first.
+3. Insert it as Stage 3c.0 (before the in-session [codeReviewSelfAudit](../../.github/skills/codereviewselfaudit/SKILL.md)) so the fresh-context pass happens first.
 4. Trigger its adoption on the next escaped-bug incident, per the repo's own incident-to-gate discipline.
 5. **Reversible:** it is an added gate; remove the stage to revert.
 
@@ -433,7 +438,7 @@ Five SCIMServer patterns are stronger than the current playbook and have been fo
 | # | SCIMServer pattern | Playbook home |
 |---|---|---|
 | C1 | **Staged-gate contract** (numbered stages, no skip without a logged choice, per-gate PASS/FAIL/SKIPPED row) | New worked example under P5; a concrete instantiation of "gate the stop" |
-| C2 | **Self-improving prompt with a separate `.memory` file** (Step 0 load as constraints, write-back, promote-on-second-occurrence) | Elevates P9 from "write corrections into memory" to a versioned, promotable memory artifact |
+| C2 | **Self-improving Agent Skill with a separate memory resource** (Step 0 load as constraints, write-back, promote-on-second-occurrence) | Elevates P9 from "write corrections into memory" to a versioned, promotable memory artifact |
 | C3 | **Stage X meta-audit cadence** (4 triggers; URL-citation + confidence + owner constraints; 2-escape rule for new gates; 30-day retirement) | New subsection of P9 / "Keeping this current" |
 | C4 | **Incident-to-gate worked loop** (every escaped bug yields a named rule + a gate in the same change) | Strengthens R19 with real examples |
 | C5 | **Cross-backend + multi-mode live parity** and **response-key-allowlist** testing | New optional advanced rules in the ruleset |
@@ -481,12 +486,12 @@ Every Wave-1 change is reversible by deleting one or two files or one instructio
 | P1 | Rich scripts | No multiplexer/voice/remote practice | G7 |
 | P2 | copilot-instructions + CONTEXT + Session_starter | No AGENTS.md | G1 |
 | P3 | promptChainArchitecture 12-stage; RFC design docs | Markdown-only plans for UI | G5 |
-| P4 | Outcome prompts; TDD red-first | - | maintain |
+| P4 | Outcome skills; TDD red-first | - | maintain |
 | P5 | 6-stage contract; 7,300+ checks; multi-mode live | In-session review only | G4 |
 | P6 | worktree-aware | No pool/fleet | G2 |
 | P7 | run-all-gates orchestrator | No metric-improvement loop | G3 |
 | P8 | CodeQL + Trivy | Raw gh/az; no AXI/TOON | G6 |
-| P9 | selfImprovingTask + .memory + Stage X | - | maintain + export (C1-C5) |
+| P9 | selfimprovingtask + referenced memory + Stage X | - | maintain + export (C1-C5) |
 
 ---
 
@@ -543,7 +548,7 @@ Attach evidence to the PR.
 ## Quality gates (the contract)
 Six stages plus a meta stage. Do not skip a stage without a logged choice. Full
 definition: .github/copilot-instructions.md (Mandatory Quality Gates) and
-.github/prompts/devDeploymentPipeline.prompt.md.
+.github/skills/devdeploymentpipeline/SKILL.md.
 
 ## Cross-harness notes
 - GitHub Copilot reads .github/copilot-instructions.md (superset of this file).
@@ -557,8 +562,8 @@ definition: .github/copilot-instructions.md (Mandatory Quality Gates) and
 
 **SCIMServer artifacts**
 - [.github/copilot-instructions.md](../../.github/copilot-instructions.md) - the staged-gate contract and standing rules
-- [.github/prompts/](../../.github/prompts/) - 33 structured prompts (plan, audit, deploy, meta)
-- [.github/prompts/.memory/](../../.github/prompts/.memory/) - persistent prompt-memory store
+- [.github/skills/](../../.github/skills/) - 36 structured Agent Skills (plan, audit, deploy, meta)
+- [selfimprovingtask memory](../../.github/skills/selfimprovingtask/references/memory.md) and [promptchainarchitecture memory](../../.github/skills/promptchainarchitecture/references/memory.md) - workflow-local persistent memory
 - [scripts/run-all-gates.ps1](../../scripts/run-all-gates.ps1), [scripts/test-all-modes.ps1](../../scripts/test-all-modes.ps1), [scripts/live-test.ps1](../../scripts/live-test.ps1), [scripts/dev-deployment-pipeline.ps1](../../scripts/dev-deployment-pipeline.ps1)
 - [docs/strategy/SELF_AUDIT_2026-05-16.md](../strategy/SELF_AUDIT_2026-05-16.md), [docs/strategy/SECURITY_INTAKE_2026-05-17.md](../strategy/SECURITY_INTAKE_2026-05-17.md)
 

@@ -190,9 +190,9 @@ Current automatically or frequently supplied context is large:
 | `CHANGELOG.md` | 891,623 | 5,664 | 112,892 words |
 | `README.md` | 56,539 | 1,509 | 6,536 words |
 | `docs/CONTEXT_INSTRUCTIONS.md` | 30,493 | 452 | 3,336 words |
-| 34 `.github/prompts/*.prompt.md` files | 394,889 | 7,126 | 34 files |
+| `.github/prompts/` | 0 | 0 | migrated to Agent Skills |
 | `.github/instructions/` | 0 | 0 | no path-specific files |
-| `.github/skills/` | 0 | 0 | no repository skills |
+| 36 `.github/skills/` workflows | 552,878 | 7,558 | 42 files including references |
 | `.github/agents/` | 0 | 0 | no repository agents |
 
 GitHub documents that repository-wide custom instructions are added to applicable requests. Copilot CLI combines applicable instruction files, while path-specific files are included only when their `applyTo` pattern matches. Therefore, the global 17,811-word file is the first context architecture to change.
@@ -206,7 +206,7 @@ Current orchestration footprint:
 | Script | Lines | Main ownership |
 |---|---:|---|
 | `scripts/pre-push-checks.ps1` | 404 | Push-time static and API validation |
-| `scripts/run-all-gates.ps1` | 680 | Stage 0-6 gate walker and prompt registry |
+| `scripts/run-all-gates.ps1` | 680 | Stage 0-6 gate walker and skill registry |
 | `scripts/dev-deployment-pipeline.ps1` | 845 | Local validation, build, publish, deploy, live, Playwright |
 | `scripts/test-all-modes.ps1` | 238 | API backend matrix and web tests |
 | `scripts/live-test.ps1` | 16,026 | Wire-level integration contract |

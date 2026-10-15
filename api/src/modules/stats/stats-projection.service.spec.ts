@@ -22,47 +22,7 @@ import { GENERIC_RESOURCE_REPOSITORY } from '../../domain/repositories/repositor
 import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
 import type { IGenericResourceRepository } from '../../domain/repositories/generic-resource.repository.interface';
-import type { UserRecord } from '../../domain/models/user.model';
-import type { GroupWithMembers } from '../../domain/models/group.model';
 import type { GenericResourceRecord } from '../../domain/models/generic-resource.model';
-
-// ---- Helpers: mock record factories --------------------------------------
-
-function makeUser(overrides: Partial<UserRecord> = {}): UserRecord {
-  return {
-    id: 'internal-1',
-    endpointId: 'ep-1',
-    scimId: 'scim-u-1',
-    externalId: null,
-    userName: 'alice',
-    displayName: 'Alice',
-    active: true,
-    rawPayload: '{}',
-    version: 1,
-    meta: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  };
-}
-
-function makeGroup(overrides: Partial<GroupWithMembers> = {}): GroupWithMembers {
-  return {
-    id: 'internal-g-1',
-    endpointId: 'ep-1',
-    scimId: 'scim-g-1',
-    externalId: null,
-    displayName: 'Engineering',
-    active: true,
-    rawPayload: '{}',
-    version: 1,
-    meta: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    members: [],
-    ...overrides,
-  };
-}
 
 function makeGenericResource(
   overrides: Partial<GenericResourceRecord> = {},
@@ -100,9 +60,13 @@ describe('StatsProjectionService', () => {
   let userRepo: jest.Mocked<IUserRepository>;
   let groupRepo: jest.Mocked<IGroupRepository>;
   let genericRepo: jest.Mocked<IGenericResourceRepository>;
+  let userCountByEndpoint: jest.Mock;
+  let groupCountByEndpoint: jest.Mock;
 
   beforeEach(async () => {
+    userCountByEndpoint = jest.fn().mockResolvedValue([]);
     userRepo = {
+      countByEndpoint: userCountByEndpoint,
       findAll: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       findByScimId: jest.fn(),
@@ -112,7 +76,9 @@ describe('StatsProjectionService', () => {
       findByScimIds: jest.fn(),
     } as any;
 
+    groupCountByEndpoint = jest.fn().mockResolvedValue([]);
     groupRepo = {
+      countByEndpoint: groupCountByEndpoint,
       findAllWithMembers: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       findByScimId: jest.fn(),
@@ -167,15 +133,51 @@ describe('StatsProjectionService', () => {
       expect(global.totalGenericResources).toBe(0);
     });
 
+    it('should seed all endpoints from one aggregate read per resource type', async () => {
+      mockEndpointService.listEndpoints.mockResolvedValue({
+        totalResults: 2,
+        endpoints: [
+          { id: 'ep-1', name: 'ep1' },
+          { id: 'ep-2', name: 'ep2' },
+        ],
+      });
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 3, active: 2 },
+        { endpointId: 'ep-2', total: 4, active: 1 },
+      ]);
+      groupCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 2, active: 2 },
+      ]);
+
+      await service.onModuleInit();
+
+      expect(userCountByEndpoint).toHaveBeenCalledTimes(1);
+      expect(groupCountByEndpoint).toHaveBeenCalledTimes(1);
+      expect(userRepo.findAll).not.toHaveBeenCalled();
+      expect(groupRepo.findAllWithMembers).not.toHaveBeenCalled();
+      expect(service.getEndpointStats('ep-1')).toEqual({
+        userCount: 3,
+        activeUserCount: 2,
+        groupCount: 2,
+        activeGroupCount: 2,
+        genericResourceCount: 0,
+      });
+      expect(service.getEndpointStats('ep-2')).toEqual({
+        userCount: 4,
+        activeUserCount: 1,
+        groupCount: 0,
+        activeGroupCount: 0,
+        genericResourceCount: 0,
+      });
+    });
+
     it('should seed user counts from repository for each endpoint', async () => {
       mockEndpointService.listEndpoints.mockResolvedValue({
         totalResults: 1,
         endpoints: [{ id: 'ep-1', name: 'test-ep' }],
       });
-      userRepo.findAll.mockResolvedValue([
-        makeUser({ active: true }),
-        makeUser({ id: 'i2', scimId: 'u2', active: true }),
-        makeUser({ id: 'i3', scimId: 'u3', active: false }),
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 3, active: 2 },
       ]);
 
       await service.onModuleInit();
@@ -190,9 +192,8 @@ describe('StatsProjectionService', () => {
         totalResults: 1,
         endpoints: [{ id: 'ep-1', name: 'test-ep' }],
       });
-      groupRepo.findAllWithMembers.mockResolvedValue([
-        makeGroup({ active: true }),
-        makeGroup({ id: 'g2', scimId: 'g2', active: false }),
+      groupCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 2, active: 1 },
       ]);
 
       await service.onModuleInit();
@@ -210,9 +211,10 @@ describe('StatsProjectionService', () => {
           { id: 'ep-2', name: 'ep2' },
         ],
       });
-      userRepo.findAll
-        .mockResolvedValueOnce([makeUser()])           // ep-1: 1 user
-        .mockResolvedValueOnce([makeUser(), makeUser()]); // ep-2: 2 users
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+        { endpointId: 'ep-2', total: 2, active: 2 },
+      ]);
 
       await service.onModuleInit();
 
@@ -234,9 +236,8 @@ describe('StatsProjectionService', () => {
         totalResults: 1,
         endpoints: [{ id: 'ep-1', name: 'test-ep' }],
       });
-      userRepo.findAll.mockResolvedValue([
-        makeUser({ active: true }),
-        makeUser({ id: 'i2', scimId: 'u2', active: false }),
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 2, active: 1 },
       ]);
       await service.onModuleInit();
     });
@@ -304,8 +305,8 @@ describe('StatsProjectionService', () => {
         totalResults: 1,
         endpoints: [{ id: 'ep-1', name: 'test-ep' }],
       });
-      groupRepo.findAllWithMembers.mockResolvedValue([
-        makeGroup({ active: true }),
+      groupCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
       ]);
       await service.onModuleInit();
     });
@@ -425,12 +426,13 @@ describe('StatsProjectionService', () => {
           { id: 'ep-2', name: 'ep2' },
         ],
       });
-      userRepo.findAll
-        .mockResolvedValueOnce([makeUser()])
-        .mockResolvedValueOnce([makeUser(), makeUser()]);
-      groupRepo.findAllWithMembers
-        .mockResolvedValueOnce([makeGroup()])
-        .mockResolvedValueOnce([]);
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+        { endpointId: 'ep-2', total: 2, active: 2 },
+      ]);
+      groupCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+      ]);
 
       await service.onModuleInit();
 
@@ -573,10 +575,8 @@ describe('StatsProjectionService', () => {
       expect(service.getEndpointStats('ep-1').userCount).toBe(0);
 
       // Meanwhile DB has 3 users (simulating drift)
-      userRepo.findAll.mockResolvedValue([
-        makeUser(),
-        makeUser({ id: 'i2', scimId: 'u2' }),
-        makeUser({ id: 'i3', scimId: 'u3', active: false }),
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 3, active: 2 },
       ]);
 
       await service.reconcile();
@@ -584,6 +584,23 @@ describe('StatsProjectionService', () => {
       const stats = service.getEndpointStats('ep-1');
       expect(stats.userCount).toBe(3);
       expect(stats.activeUserCount).toBe(2);
+    });
+
+    it('should reset counts when a successful aggregate has no resources for an endpoint', async () => {
+      mockEndpointService.listEndpoints.mockResolvedValue({
+        totalResults: 1,
+        endpoints: [{ id: 'ep-1', name: 'ep1' }],
+      });
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 2, active: 1 },
+      ]);
+      await service.onModuleInit();
+
+      userCountByEndpoint.mockResolvedValue([]);
+      await service.reconcile();
+
+      expect(service.getEndpointStats('ep-1').userCount).toBe(0);
+      expect(service.getEndpointStats('ep-1').activeUserCount).toBe(0);
     });
 
     it('should handle endpoint added between init and reconcile', async () => {
@@ -596,7 +613,9 @@ describe('StatsProjectionService', () => {
         totalResults: 1,
         endpoints: [{ id: 'ep-new', name: 'new-ep' }],
       });
-      userRepo.findAll.mockResolvedValue([makeUser({ endpointId: 'ep-new' })]);
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-new', total: 1, active: 1 },
+      ]);
 
       await service.reconcile();
 
@@ -609,7 +628,9 @@ describe('StatsProjectionService', () => {
         totalResults: 1,
         endpoints: [{ id: 'ep-1', name: 'ep1' }],
       });
-      userRepo.findAll.mockResolvedValue([makeUser()]);
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+      ]);
       await service.onModuleInit();
       expect(service.getEndpointStats('ep-1').userCount).toBe(1);
 
@@ -640,9 +661,9 @@ describe('StatsProjectionService', () => {
           { id: 'ep-2', name: 'ep2' },
         ],
       });
-      userRepo.findAll
-        .mockResolvedValueOnce([makeUser()])
-        .mockResolvedValueOnce([]);
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+      ]);
       await service.onModuleInit();
 
       const all = service.getAllEndpointStats();
@@ -684,24 +705,27 @@ describe('StatsProjectionService', () => {
       expect(service.getEndpointStats('ep-1').userCount).toBe(1);
     });
 
-    it('should skip failing endpoint and seed remaining on per-endpoint error', async () => {
+    it('should preserve existing user counts when user aggregation fails', async () => {
       mockEndpointService.listEndpoints.mockResolvedValue({
-        totalResults: 2,
-        endpoints: [
-          { id: 'ep-good', name: 'good' },
-          { id: 'ep-bad', name: 'bad' },
-        ],
+        totalResults: 1,
+        endpoints: [{ id: 'ep-1', name: 'ep1' }],
       });
-      userRepo.findAll
-        .mockResolvedValueOnce([makeUser({ endpointId: 'ep-good' })]) // ep-good succeeds
-        .mockRejectedValueOnce(new Error('query failed')); // ep-bad fails
-
+      userCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+      ]);
+      groupCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 1, active: 1 },
+      ]);
       await service.onModuleInit();
 
-      // ep-good was seeded successfully
-      expect(service.getEndpointStats('ep-good').userCount).toBe(1);
-      // ep-bad was skipped - returns zeroed
-      expect(service.getEndpointStats('ep-bad').userCount).toBe(0);
+      userCountByEndpoint.mockRejectedValue(new Error('query failed'));
+      groupCountByEndpoint.mockResolvedValue([
+        { endpointId: 'ep-1', total: 2, active: 1 },
+      ]);
+      await service.reconcile();
+
+      expect(service.getEndpointStats('ep-1').userCount).toBe(1);
+      expect(service.getEndpointStats('ep-1').groupCount).toBe(2);
     });
 
     it('should preserve genericResourceCount across reconciliation', async () => {

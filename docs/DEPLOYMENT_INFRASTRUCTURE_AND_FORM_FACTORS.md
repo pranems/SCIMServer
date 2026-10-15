@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-10 - **Repo version at capture:** `api/package.json` = `0.55.41`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-14 - **Repo version at capture:** `api/package.json` = `0.55.49`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -8,6 +8,33 @@
 ---
 
 ## Entra gallery validation gate
+
+The direct Stage 2.2 Prisma E2E invocation and the Prisma lane in
+`test-all-modes.ps1` now request `--runInBand --silent`. Quiet mode suppresses
+application console chatter, not test assertions, test-failure stacks, or the
+structured results reporter. A deliberately injected exception still appears
+with exit 1. The complete isolated diagnostic passes 118 suites and 2,492
+tests with zero skips in 1,417.31 seconds. Both command contracts were
+confirmed RED before the change and GREEN afterwards.
+The first v0.55.48 full attempt used four workers and failed 29 suites with
+application-bootstrap timeouts and dependent assertions. Serial execution
+changes scheduling, not selected tests, assertions, timeout limits, or backend.
+The deployment contract now prevents the direct gate from silently returning
+to a different concurrency policy. A fresh complete pipeline is still required;
+the scheduling contract alone is not backend or deployment proof.
+The serial recovery attempt still fails six bootstrap suites and terminates
+during the backend matrix. v0.55.48 is merged but not published or deployed
+by this phase; dev remains v0.55.47. Both exact owned PostgreSQL containers
+were removed, and the shared validation container was preserved. See the
+[execution ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) for the blocker
+and partial evidence. No production promotion was attempted.
+The later isolated diagnostic does not establish a sole timeout cause:
+it also runs without a competing heavy validation and explicitly selects
+Prisma, enabling all four PostgreSQL-only tests. Measured StatsModule startup
+peaks at 8,705 ms; a fresh 600-empty-endpoint control takes 2,713 ms there.
+The authoritative merged-master pipeline remains outstanding. The parent
+holds a bounded gallery lease; it must return that lease before runtime
+deployment or live browser/integrity work resumes.
 
 The dev deployment orchestrator now runs Stage 4.8 after exact intended
 revision readiness and the live SCIM suite. It invokes the complete default
@@ -1023,6 +1050,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-10-14 | Migrated the Stage 3 reviewer-gate registrations in [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) from deleted prompt-file terminology to committed Agent Skill slash invocations. This is an orchestration-label and operator-guidance change only: executable deployment stages, image publication, estate resolution, Azure operations, and promotion behavior are unchanged. Re-reviewed the Section 10 drift register with no topology or live-estate fact change. |
 | 2026-10-10 | Raised the bounded per-process database pool from 5 to 10 after measuring the dev estate's 50-connection server ceiling, one-replica limit, and two-revision retention. Added the explicit 20-connection worst-case application budget and 30-connection headroom. |
 | 2026-10-09 | **Local Docker validation is isolated from existing Compose estates and its exit status is authoritative.** The normal form factor keeps ports 8080/5432 and its established container names by default. The full validation runner now assigns a process-specific project, unique container names and available loopback host ports through explicit Compose variables. It uses `127.0.0.1` for the live-test target, invokes child scripts with named hashtable splatting, checks their exit codes, and exits nonzero when either live lane fails. This closes a merged-master pipeline failure where another worktree legitimately owned both standard ports, followed by a positional-argument binding failure that the wrapper incorrectly returned as success. The gate no longer asks the operator to stop unrelated services, risks validating the wrong database, or hides a red live contract behind exit code 0. |
 | 2026-09-30 | **Release validation now proves database ownership, artifact provenance, semantic-tag immutability, and exact revision readiness.** Stage 2 no longer reuses whichever process/container publishes host port 5432 and never removes a fixed-name container; it owns a labeled tmpfs PostgreSQL instance on a random loopback port and performs exact-ID guarded cleanup. Local Compose validation adds `--pull`, because `--no-cache` still reused a May Node/Alpine base while CI used the current base. Local images use non-shipping `local-<sha>` tags. GHCR is the one authoritative builder; the semantic tag must equal the `sha-<runtime-source-commit>` digest, ACR version and `latest` are imports by that digest, and dev deploys the digest rather than a mutable tag. Existing semantic tags are reused rather than rebuilt, and a merged runtime-input change without a version bump blocks publication. Dev readiness is no longer a same-version echo: the exact revision must be latest, ready, Healthy, replicated, at 100% traffic, and pass two consecutive authenticated probes before live tests begin. |

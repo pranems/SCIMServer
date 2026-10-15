@@ -34,6 +34,29 @@ same-version provenance rewrites. The accepted root correction uses npm with
 a temporary version seed, restores the real manifest, and validates every
 changed entry before artifact upload; no integrity hashes are synthesized.
 
+### Lifecycle projections must aggregate where the data lives
+
+A complete Prisma E2E run exposed an application-startup query shape that
+focused suites could not reproduce. `StatsProjectionService` listed every
+endpoint and materialized every User, every Group and every Group membership
+solely to seed four counters. The E2E database retains fixtures until global
+teardown, so every later application bootstrap repeated more work until six
+hooks crossed the unchanged 30-second limit.
+
+Counting now occurs at the repository boundary: one grouped User query and one
+grouped Group query for PostgreSQL, and one map scan per type for InMemory.
+The full retained-fixture run moved from 112/118 suites and 2,348/2,492 tests
+passing in 42m 27.265s to 118/118 and 2,492/2,492 in 17m 49.315s. A permanent
+query-shape test forbids full-list methods during projection seeding.
+
+Sparse aggregate semantics matter. When a successful grouped query omits an
+endpoint, zero is authoritative. Previous counters may be preserved only when
+the aggregate itself rejects. Keep separate tests for those outcomes. For
+lifecycle and reconciliation code, a focused fresh-database pass is not enough:
+the acceptance check must retain realistic accumulated state across repeated
+bootstraps. See RC-I102 and RC-I103 in the
+[correctness execution ledger](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
 ### Revision identity belongs to persisted state, not a normalized view
 
 When compatibility normalization renames or removes legacy settings,
