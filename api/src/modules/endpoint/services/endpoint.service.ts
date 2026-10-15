@@ -20,7 +20,7 @@ import type { IUserRepository } from '../../../domain/repositories/user.reposito
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
 import { USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointLifecycleRepository } from '../../../domain/repositories/endpoint-lifecycle.repository.interface';
-import { endpointProfileRevision } from '../../../domain/repositories/profile-revision';
+import { endpointProfileRevision, type ProfileRevision } from '../../../domain/repositories/profile-revision';
 import { withEndpointProfileLock } from '../../../infrastructure/repositories/prisma/prisma-profile-revision';
 import {
   SCIM_EVENTS,
@@ -139,6 +139,7 @@ interface CachedEndpoint {
   displayName?: string;
   description?: string;
   profile?: EndpointProfile;
+  profileRevision: ProfileRevision;
   active: boolean;
   scimBasePath: string;
   createdAt: Date;
@@ -252,7 +253,7 @@ export class EndpointService implements OnModuleInit {
     this.cacheById.set(ep.id, ep);
     this.cacheByName.set(ep.name.toLowerCase(), ep);
     this.cacheFingerprints.set(ep.id, this.endpointFingerprint(ep));
-    this.lifecycle.recordProfileRevision?.(ep.id, endpointProfileRevision(ep.profile));
+    this.lifecycle.recordProfileRevision?.(ep.id, ep.profileRevision);
   }
 
   private cacheDelete(ep: CachedEndpoint): void {
@@ -487,6 +488,7 @@ export class EndpointService implements OnModuleInit {
         displayName: dto.displayName ?? dto.name,
         description: dto.description ?? undefined,
         profile: resolvedProfile,
+        profileRevision: endpointProfileRevision(resolvedProfile),
         active: true,
         scimBasePath: `/scim/endpoints/${id}`,
         createdAt: now,
@@ -551,6 +553,11 @@ export class EndpointService implements OnModuleInit {
 
   async getEndpoint(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
     return this.toResponse(await this.resolveEndpoint(endpointId), view);
+  }
+
+  async getEndpointForRequest(endpointId: string): Promise<{ endpoint: EndpointResponse; profileRevision: ProfileRevision }> {
+    const snapshot = await this.resolveEndpoint(endpointId);
+    return { endpoint: this.toFullResponse(snapshot), profileRevision: snapshot.profileRevision };
   }
 
   async getEndpointWithETag(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<{ endpoint: EndpointResponse; etag: string }> {
@@ -660,6 +667,7 @@ export class EndpointService implements OnModuleInit {
         displayName: dto.displayName !== undefined ? (dto.displayName ?? current.name) : current.displayName,
         description: dto.description !== undefined ? (dto.description ?? undefined) : current.description,
         profile: newProfile,
+        profileRevision: endpointProfileRevision(newProfile),
         active: dto.active !== undefined ? dto.active : current.active,
         updatedAt: new Date(),
       };
@@ -1122,7 +1130,8 @@ export class EndpointService implements OnModuleInit {
   }
 
   private toCached(endpoint: Endpoint): CachedEndpoint {
-    const profile = endpoint.profile as Record<string, any> | null;
+    const profileRevision = endpointProfileRevision(endpoint.profile);
+    const profile = structuredClone(endpoint.profile) as Record<string, any> | null;
     const typedProfile = profile as EndpointProfile | undefined;
 
     // Strip any serialized _schemaCaches artifact from DB (plain object, not Map).
@@ -1140,6 +1149,7 @@ export class EndpointService implements OnModuleInit {
       displayName: endpoint.displayName || endpoint.name,
       description: endpoint.description ?? undefined,
       profile: typedProfile,
+      profileRevision,
       active: endpoint.active,
       scimBasePath: `/scim/endpoints/${endpoint.id}`,
       createdAt: endpoint.createdAt,

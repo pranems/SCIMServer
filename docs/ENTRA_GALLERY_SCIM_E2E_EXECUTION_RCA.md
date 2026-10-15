@@ -1,6 +1,6 @@
 # Entra Gallery to SCIMServer E2E - Execution Issues and RCA
 
-> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.47`
+> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.48`
 
 ## Purpose and scope
 
@@ -121,3 +121,170 @@ This gives a concrete mismatch path even with no concurrent profile edit.
 No database row was changed. A targeted regression and runtime fix remain
 pending on a separate coherent change; the connector gate does not suppress
 the 409 or weaken the revision check.
+
+## Legacy-profile correction, 2026-10-14
+
+The previously pending runtime correction is now implemented and locally
+verified on its own branch. It is not deployed. PR #214 is merged through
+normal merge commit `df012da94b4800f95d3db14d357a7afc5a439288`, preserving
+all three connector and pipeline commits with exact-tip CI green.
+
+| ID | Type | Severity | Symptom and root cause | Fix and why it works | Prevention and escape analysis |
+|---|---|---|---|---|---|
+| EG-I23 | Runtime / persisted versus normalized identity | High | Accepted gallery WIF was followed by User HTTP 409 without a concurrent edit. Request context hashed a normalized profile while the repository hashed raw persisted legacy settings. Reading also mutated the supplied storage object. | Clone before normalization; capture the raw revision and return it atomically with the normalized endpoint snapshot; forward it through all six SCIM controller surfaces. Repository comparison remains unchanged. | Unit RED confirms source mutation; 281 focused units pass. Raw legacy User/Group/Device HTTP CRUD and nine actual-edit rejections pass 12/12 in PostgreSQL; normalized CRUD and the same races pass 12/12 in memory. A normalized-hash negative control fails all three legacy cases with 409. Escaped to gallery export; earliest possible detection was a raw persisted-profile unit/HTTP fixture. |
+| EG-I24 | Regression fixture correctness | Medium | First HTTP run produced 12 failures from one setup HTTP 400. The new fixture tried to submit a retired setting through the public admin API, which intentionally rejects it. | Keep valid public endpoint creation, then inject legacy JSON only into the exact owned PostgreSQL fixture. InMemory test names explicitly describe normalized rather than raw persisted profiles. | Whole suite is green on both backends. Setup failures are classified once with dependent failures as cascades; never weaken public validation to seed old data. Caught at first HTTP fixture creation, the earliest applicable gate. |
+| EG-I25 | Editing tool friction | Low | One multi-file patch was rejected before any file changed because an empty extra hunk marker preceded the next file header. | Remove the empty hunk and apply the complete patch successfully. | Parser refusal prevented a partial edit; inspect patch grammar before submitting. Caught at edit-time, no escape. |
+
+The complete PostgreSQL rerun after the negative control has zero failures
+and zero skips. No dev database row was modified as a workaround. The local
+test database is isolated from development and customer data.
+
+**Test/gate improvement: applied.** Raw legacy storage fixtures and a
+negative control prove the new assertions detect the original failure.
+**Design/architecture disposition: applied.** One explicit snapshot method
+keeps profile and revision coherent without a second asynchronous read,
+public metadata, a new repository abstraction, or weaker concurrency checks.
+
+### Built-runtime live gate
+
+The runtime correction is saved in logical commit `46bca59a`. The reusable
+`9z-DP` live section runs before cleanup, validates actual CRUD values and
+published response keys, and preserves endpoint profiles. It passes 24/24
+against each owned InMemory and PostgreSQL built API. A raw-legacy fixture
+on the isolated PostgreSQL database passes 17/17 further live checks,
+including unchanged raw profile revision. All owned endpoints and resources
+are removed. These are **65 focused live checks**, not the complete live
+matrix, a Docker application result, or a deployed dev result.
+
+| ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
+|---|---|---|---|---|---|
+| EG-I26 | Live contract fixture | Medium | The first allowlisted live run failed one endpoint-key check per backend because its manually transcribed key set omitted documented `_links` hypermedia. Resource CRUD and cleanup passed. | Match the existing response serializer's documented keys, including `_links`; report unexpected key names explicitly. The corrected full smoke passes 48/48, followed by 17/17 raw-legacy checks. | Allowlist checks must use the published contract, not assume every underscore-prefixed key is internal. Caught at first built live contract run, no API change needed. |
+| EG-I27 | Local process readiness | Low | An immediate probe of the detached API returned connection refused while the application was still initializing. | Verify its running process, wait for readiness, and confirm `/scim/health` before executing live checks. Both owned runtimes respond with `ok`; no application failure occurred. | Startup confirmation and readiness are separate claims. The deployment orchestrator already owns bounded readiness; ad-hoc probes must honor it too. Caught before any live fixture was created. |
+
+**Test/gate improvement: applied.** The permanent live section checks
+outcome values, published-key allowlists, profile preservation, and exact
+cleanup, including conditional-write headers.
+**Design disposition: accepted.** One cohesive live helper follows existing
+section conventions; a new test framework or generic provisioning DSL would
+be unnecessary.
+
+### Release consolidation
+
+| ID | Type | Severity | Symptom and root cause | Fix and verification | Prevention / detection |
+|---|---|---|---|---|---|
+| EG-I28 | Release documentation | Low | The first v0.55.48 metadata push was blocked by C13: the README version badge still claimed 0.55.47. The freshness formatter restamps current headers but does not rewrite badges or historical evidence. | Update only the live badge; the source-truth content audit now passes all 26 documents. No historical release claims were relabeled. | Run both freshness and content checks for release metadata. The existing pre-push gate caught the mismatch before tests, CI, or deployment; no new gate is needed. |
+| EG-I29 | Consolidation environment | Low | Validate-mode push passed static, unit, and InMemory E2E gates, then Prisma generation failed because `DATABASE_URL` was absent in the fresh shell. Prisma's `env()` throws before a nullish fallback can run. | Supply a non-secret local datasource URL to generation and the hook process; targeted Prisma generation passes without connecting to or changing a database. | Establish Validate-mode environment before its owning run. Detection was at Prisma generation; a targeted prerequisite check could have caught it before the preceding suites. No production-code workaround is needed. |
+
+**Test/gate improvement: accepted.** The existing content audit caught the
+release badge mismatch at the earliest owning pre-push stage.
+**Design disposition: accepted.** Targeted metadata edits preserve historical
+evidence; using the broad local bump script would rewrite history and violate
+CI-only lockfile generation.
+
+The corrected configured Validate-mode push passes all 23 gates: 6,035
+API units, 2,432 InMemory E2E passes with four PostgreSQL-only exclusions,
+and 1,591 web tests. CI run `38503638725` regenerated both release locks
+with zero changed package versions and byte-equivalent dependency-entry maps
+(684 API, 395 web). Public-registry and SHA-512 checks pass. The read-only
+consolidation review found no significant issues. Merge and dev proof remain
+pending; these results do not imply deployment.
+
+### First authoritative v0.55.48 attempt
+
+PR #215 merged normally at `99cdeda35861049b05908f5b507e404b3318e33d`
+with final-tip CI green. The full pipeline was invoked without skip flags.
+Stages 0 and 1 passed, including 73-endpoint before-state capture. Stage 2.1
+passed; Stage 2.2 failed with 2,178 passes, 310 failures, and four skips
+across 118 suites (89 passed, 29 failed). Bootstrap-hook timeouts account
+for early cascades such as undefined `getHttpServer`; this is not 310
+independent runtime diagnoses. The direct gate used four workers while the
+existing backend matrix deliberately runs Prisma E2E serially.
+
+The attempt was stopped before publication or deployment rather than risk
+letting later work obscure the failed validation. Its exact owned PostgreSQL
+container `25b2f446d092` was removed after verifying owner and run labels.
+The shared `scimserver-combined-validation-postgres-20261009` remains running.
+No dev image or profile was changed.
+
+**EG-I30, validation scheduling, Medium:** the owning direct Prisma gate did
+not use the matrix's existing serial scheduling. Align the command with
+`--runInBand`; its new contract assertion is confirmed RED then GREEN.
+Actual full serial execution and complete pipeline recovery remain pending,
+so worker contention is a hypothesis supported by scheduling drift and
+bootstrap timeouts, not a verified sole cause. Detection was Stage 2.2;
+the command-consistency contract is the earliest structural check.
+Both earliest bootstrap-failed suites then pass serially on a fresh exact
+owned PostgreSQL container: 47/47 tests across two suites in 93.8 seconds.
+That container was removed by exact ID after its owner label was checked.
+This focused recovery supports the scheduling correction but does not replace
+the complete serial suite or full deployment matrix.
+
+**Reference proof preparation:** the generic live helper's minimal User body
+omits `displayName`, which this original dev profile publishes as required.
+That setup returned 400 before reaching the revision guard. An explicit
+profile-conforming fixture now confirms User and Group POST both return 409
+on deployed v0.55.47, while a read-only database transaction confirms the
+original raw legacy setting and unchanged revision. The gallery reference
+connector's BaseAddress names customer production; it is not a deployment
+target. Select the existing dev copy explicitly and resolve dev from the
+estate registry. No connector or profile rewrite is permitted.
+
+**Test/gate improvement: applied.** The direct Prisma scheduling contract
+detects drift from the established backend matrix. Full recovery is pending.
+**Design disposition: accepted.** Reuse existing serial execution rather than
+adding a runner, changing timeouts, removing assertions, or redesigning gates.
+
+### Serial recovery attempt and bounded handoff
+
+PR #217 merged normally at `f96f31b506a7a77b8d84b62420d5475cc1f66280`
+after exact-tip CI passed. The second complete pipeline invocation used no
+skip flags and no promotion flags. Stages 0/1 and API units passed. The direct
+serial Prisma E2E gate still failed: 112 suites passed, six failed; 2,348
+tests passed, 140 failed, and four skipped. Web units and coverage passed.
+The six-mode matrix then confirmed 6,035 API units per backend and 2,488
+InMemory E2E passes with four PostgreSQL-only exclusions before the process
+terminated with exit -1 during the Prisma matrix lane.
+
+| ID | Type | Severity | Symptom / root cause status | Disposition and evidence | Prevention / next action |
+|---|---|---|---|---|---|
+| EG-I31 | Reference-fixture correctness and target boundary | Medium | The minimal generic helper omits required User `displayName` for the original reference and returned 400 before revision validation. The reference connector's BaseAddress names customer production, not the dev copy. | Select the exact existing dev endpoint through registry-resolved dev and supply the published required attribute in the temporary User fixture. Valid User and Group POSTs both reproduce 409 on v0.55.47; read-only raw revision is unchanged and no fixture was created. | A generic existing-endpoint fixture is not automatically valid for every profile. Read published required attributes before claiming a reference regression. Never use a reference connector URL as deployment authorization. Caught during pre-deploy proof preparation. |
+| EG-I32 | Complete-suite bootstrap failure | High | Serial execution exposed six 30-second before-hook failures because stats initialization loaded every User, Group and Group membership for every endpoint during each application bootstrap. Global E2E teardown retained all earlier fixtures, so the work grew cumulatively. | Replace per-endpoint full reads with one grouped User count and one grouped Group count. The complete owned PostgreSQL 17.11 run passes 118/118 suites and 2,492/2,492 tests with zero skips in 17m 49.315s, down 58.02% from the retained 42m 27.265s failed receipt. | Applied: query-shape and sparse-zero RED/GREEN controls plus the unchanged full retained-fixture run. Review, merge and authoritative merged-master deployment proof remain required. |
+| EG-I33 | Pipeline process termination | High | The second process exited -1 during the six-mode matrix without producing its final orchestrator report. The termination mechanism is unconfirmed; neither memory pressure nor an execution limit is claimed as fact. | Persist a per-gate interrupted report and partial mode receipts. Remove exact owned container `454de5c82ae6` after owner/run verification; confirm the shared validation container remains running. Dev still reports 0.55.47. | Preserve raw test artifacts rather than reconstructing success from a partial log. Diagnose the process termination and retain bounded per-gate output on the next attempt. Owner: delivery assistant; target: 2026-10-14, before publication. |
+| EG-I34 | Read-only tooling friction | Low | Several guessed line ranges or result locations did not exist; one fresh Azure lookup temporarily reported the dev app missing despite correct tenant context. | Use actual file ranges and the reporter's repository-level artifact path. A subsequent same-tenant ARM lookup returned the expected dev app, and the raw read-only probe completed. No source workaround or estate reassignment occurred. | Treat lookup absence as a failed prerequisite, not permission to choose another estate. Verify the exact registry tenant and retry the bounded read before mutation. |
+| EG-I35 | Diagnostic completeness and recovery boundary | High | Six selected suites pass 140/140, but that cannot prove full-suite recovery. One diagnostic was interrupted after 63 passing suite receipts. Measured StatsModule time grew with accumulated fixtures; neither a memory leak nor endpoint count alone is established as the timeout cause. | A complete local-only run with serial scheduling, quiet console, explicit Prisma selection, heap measurements, and per-module timings passes 118/118 suites and 2,492/2,492 tests with zero skips in 1,417.31 seconds. Exact result: `e2e-2026-10-14_09-22-14-677Z-prisma-49108.json`. Peak StatsModule startup is 8,705 ms; a fresh 600-empty-endpoint control takes 2,713 ms in that module and passes 14/14. All exact owned databases are removed. | Retain the original first causal beforeAll timeout at `test-gaps-audit-5.e2e-spec.ts:47` separately from dependent `getHttpServer` errors. Never call a partial diagnostic a complete GREEN. This full diagnostic is recovery evidence, not authoritative deployment proof or proof of a sole cause. |
+| EG-I36 | Console-output overhead containment | Medium | Both Prisma owners previously captured successful application console output while retaining every test's structured evidence. Quiet execution is the fully exercised recovery configuration; the individual contribution of logging versus reduced competing load is not isolated. | Add `--silent` to the direct Prisma command and the existing serial Prisma matrix command only. Both source contracts fail before these changes and pass after them. A deliberately injected causal exception remains visible under quiet mode and exits 1. No assertion, timeout, test selection, reporter, or runtime implementation is changed. | Keep complete test counts and causal failure stacks as acceptance checks, not console volume. Owning pipeline validation remains required. Design disposition: accepted; reuse Jest's supported switch rather than add a runner abstraction or redesign the gate. |
+
+**Local recovery and lease boundary:** The known-red deployment attempt is
+stopped. The parent has the bounded shared dev/gallery lease for one actual
+SecretToken mapping smoke and the expanded three-auth matrix. Runtime work
+is local-only until explicit lease return; no deployment, shared Entra
+mutation, or live browser/integrity check is authorized by this receipt.
+Session messaging reached its 50-message limit, so the latest direct lease
+notification could not be delivered; the boundary is also persisted under
+`test-results/runtime-gallery-lease-release.json` and stated in the chat.
+The receipt branch incorporates separately merged master/UI history through
+a normal merge, without editing UI implementation or downgrading v0.55.49.
+
+The original reference endpoint remains
+`aa69213c-1ba8-4feb-a507-a6e2fe90d6bd`. Its raw revision is unchanged at
+`247d138b0a91c7192472a240d09b18e08e95f8f2987ce22df849877811b01580`;
+`PerEndpointCredentialsEnabled` remains present in storage. The before-release
+reference report contains two expected 409 failures and one raw-preservation
+pass, not a GREEN correction receipt. A 100-sample warmed Schemas baseline
+on v0.55.47 measures p50/p95/p99 at 62.66/217.29/288.17 ms.
+No after-release measurement exists.
+
+**Provenance update:** reconciled against this continuation's commands,
+failure artifacts, hook summaries, CI workflows, and explicit user handoff.
+The full debug JSONL transcript remains unavailable
+(`VSCODE_TARGET_SESSION_LOG` is unset), so a full-transcript scan is not
+claimed. Verified non-issues include unchanged dependency-entry maps, unchanged
+original raw profile, untouched production targets, normal merge history,
+and survival of the shared PostgreSQL container.
+
+**Test/gate improvement: applied and scheduled.** The serial scheduling
+contract is applied; complete bootstrap and process-termination diagnosis are
+scheduled above and remain release blockers. No failed gate was waived.
+**Design disposition: accepted.** The runtime snapshot fix remains cohesive.
+Do not bundle a speculative gate-runner redesign, custom mapping feature, or
+UI backlog into its recovery.

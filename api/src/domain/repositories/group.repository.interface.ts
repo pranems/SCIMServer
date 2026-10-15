@@ -11,6 +11,7 @@
 import type { ExpectedVersion } from './write-precondition';
 import type { UniquenessPolicy } from './uniqueness-policy';
 import type { ProfileRevision } from './profile-revision';
+import type { EndpointResourceCounts } from './endpoint-resource-counts';
 import type {
   GroupRecord,
   GroupWithMembers,
@@ -41,6 +42,9 @@ export interface IGroupRepository {
     dbFilter?: Record<string, unknown>,
     orderBy?: { field: string; direction: 'asc' | 'desc'; caseExact?: boolean },
   ): Promise<GroupWithMembers[]>;
+
+  /** Count total and active groups across all endpoints in one repository read. */
+  countByEndpoint(): Promise<EndpointResourceCounts[]>;
 
   /** Update a group by its internal storage ID. */
   update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<GroupRecord>;

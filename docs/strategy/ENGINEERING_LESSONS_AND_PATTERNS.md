@@ -36,6 +36,60 @@ Reuse the matcher across inventory and selector consumers so the meaning
 does not drift. See IS-I09 in
 [the inventory execution ledger](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
 
+### Missing required evidence must not become a passed diagnostic skip
+
+A new worktree's missing Mermaid tooling was reported as PASS because both
+the hook wrapper and render command returned zero without rendering. Required
+commands must fail closed on missing prerequisites, while diagnostic commands
+must label unknown evidence honestly. Execute negative controls through the
+real registered action and summary, not a source-text assertion. Bundled
+version discovery must identify the owning library: a profiling placeholder
+or React version is not a Mermaid pin. See
+[the gate hardening evidence and RCA](MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
+The root documentation-tooling lock must participate in the same provenance
+gate as API/web. CI-only cleanup must preserve version choices rather than
+silently upgrading unrelated packages, and publication-age reports must include
+same-version provenance rewrites. The accepted root correction uses npm with
+a temporary version seed, restores the real manifest, and validates every
+changed entry before artifact upload; no integrity hashes are synthesized.
+
+### Lifecycle projections must aggregate where the data lives
+
+A complete Prisma E2E run exposed an application-startup query shape that
+focused suites could not reproduce. `StatsProjectionService` listed every
+endpoint and materialized every User, every Group and every Group membership
+solely to seed four counters. The E2E database retains fixtures until global
+teardown, so every later application bootstrap repeated more work until six
+hooks crossed the unchanged 30-second limit.
+
+Counting now occurs at the repository boundary: one grouped User query and one
+grouped Group query for PostgreSQL, and one map scan per type for InMemory.
+The full retained-fixture run moved from 112/118 suites and 2,348/2,492 tests
+passing in 42m 27.265s to 118/118 and 2,492/2,492 in 17m 49.315s. A permanent
+query-shape test forbids full-list methods during projection seeding.
+
+Sparse aggregate semantics matter. When a successful grouped query omits an
+endpoint, zero is authoritative. Previous counters may be preserved only when
+the aggregate itself rejects. Keep separate tests for those outcomes. For
+lifecycle and reconciliation code, a focused fresh-database pass is not enough:
+the acceptance check must retain realistic accumulated state across repeated
+bootstraps. See RC-I102 and RC-I103 in the
+[correctness execution ledger](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
+### Revision identity belongs to persisted state, not a normalized view
+
+When compatibility normalization renames or removes legacy settings,
+hashing the runtime view and comparing it with raw storage creates a false
+concurrency conflict. Capture the persisted revision before normalization,
+clone rather than mutate storage JSON, and deliver revision and runtime
+profile from one snapshot. Do not independently re-resolve them or ignore
+legacy keys in the mutation guard. Tests must seed actual legacy storage,
+not only normalized admin input, and must still reject genuine concurrent
+edits. Three raw-legacy HTTP negative controls now catch this failure.
+See [revision coordination evidence](../SCIM_PROFILE_REVISION_WRITE_COORDINATION.md)
+and EG-I23 in [the gallery execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
 ### Shared remote configuration requires a verified per-scenario boundary
 
 The Entra gallery harness passed focused auth runs but its first combined

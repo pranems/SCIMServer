@@ -29,6 +29,7 @@ import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
 import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 import { assertUnique, uniquenessPayload, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
+import type { EndpointResourceCounts } from '../../../domain/repositories/endpoint-resource-counts';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
@@ -120,6 +121,23 @@ export class InMemoryGroupRepository implements IGroupRepository {
       ...g,
       members: this.getMembersForGroup(g.id),
     }));
+  }
+
+  async countByEndpoint(): Promise<EndpointResourceCounts[]> {
+    const counts = new Map<string, EndpointResourceCounts>();
+    for (const group of this.groups.values()) {
+      const current = counts.get(group.endpointId) ?? {
+        endpointId: group.endpointId,
+        total: 0,
+        active: 0,
+      };
+      current.total++;
+      if (group.active) {
+        current.active++;
+      }
+      counts.set(group.endpointId, current);
+    }
+    return [...counts.values()];
   }
 
   async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {

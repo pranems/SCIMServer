@@ -15,7 +15,7 @@
  *   M4: Profile validation: loosening required attributes
  *   M6: logLevel per-endpoint override (smoke test)
  *
- * @see .github/prompts/addMissingTests.prompt.md
+ * @see .github/skills/addmissingtests/SKILL.md
  */
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';

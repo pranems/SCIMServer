@@ -9,8 +9,8 @@
 
 .DESCRIPTION
     This script is the runnable implementation of
-    [.github/prompts/devDeploymentPipeline.prompt.md](../.github/prompts/devDeploymentPipeline.prompt.md).
-    The prompt codifies the WHY + WHAT. This script codifies the HOW.
+    [.github/skills/devdeploymentpipeline/SKILL.md](../.github/skills/devdeploymentpipeline/SKILL.md).
+    The skill codifies the WHY + WHAT. This script codifies the HOW.
 
     Why this exists: the v0.52.3 prod-prep run (2026-05-29) missed
     Playwright entirely, skipped test-all-modes.ps1, skipped the web
@@ -470,7 +470,7 @@ if (-not $DryRun) {
 try {
     if ($postgresReady) {
         Invoke-Gate '2.1' 'API unit jest (3,816 baseline)' { Remove-Item Env:\PERSISTENCE_BACKEND -ErrorAction SilentlyContinue; npm test } 'api' | Out-Null
-        Invoke-Gate '2.2' 'API E2E jest (1,217 baseline, prisma)' { npm run test:e2e } 'api' | Out-Null
+        Invoke-Gate '2.2' 'API E2E jest (1,217 baseline, prisma)' { npm run test:e2e -- --runInBand --silent } 'api' | Out-Null
         Invoke-Gate '2.3' 'Web vitest (1,006 baseline)' { npm test } 'web' | Out-Null
         Invoke-Gate '2.4' 'Web vitest coverage (lines:78 / branches:70 / functions:65 / statements:75 ratchet)' { npm run test:coverage } 'web' | Out-Null
         Invoke-Gate '2.6' 'test-all-modes.ps1 (6-mode matrix)' { pwsh -NoProfile -File scripts/test-all-modes.ps1 } | Out-Null
@@ -517,7 +517,7 @@ finally {
 # that genuinely need an LLM reviewer stay PENDING. Recording an executable
 # check as PENDING is indistinguishable from having no check at all.
 # =============================================================================
-Write-Stage 3 'Audits (executable gates run; reviewer prompts recorded)'
+Write-Stage 3 'Audits (executable gates run; reviewer skills recorded)'
 
 Invoke-Gate '3b.3' 'endpointConfigFlagAudit (registry vs Settings UI, both directions)' {
     # Two gates, deliberately separate. Conformance asks "does the UI offer a key
@@ -543,19 +543,19 @@ Invoke-Gate '3b.5' 'dependencyCveSweep (production deps + .trivyignore freshness
     } finally { Pop-Location }
 } | Out-Null
 
-$auditPrompts = @(
-    @{ Stage = '3a.1'; Gate = 'addMissingTests prompt' },
-    @{ Stage = '3a.2'; Gate = 'apiContractVerification prompt' },
-    @{ Stage = '3a.3'; Gate = 'error-handling-verification prompt' },
-    @{ Stage = '3b.1'; Gate = 'logging-verification prompt' },
-    @{ Stage = '3b.2'; Gate = 'auditAgainstRFC prompt' },
-    @{ Stage = '3b.4'; Gate = 'securityAudit prompt' },
-    @{ Stage = '3b.6'; Gate = 'performanceBenchmark prompt' },
-    @{ Stage = '3c.1'; Gate = 'codeReviewSelfAudit prompt' },
-    @{ Stage = '3c.2'; Gate = 'auditAndUpdateDocs prompt (narrative half; the mechanical half is 1.11-1.13)' }
+$auditSkills = @(
+    @{ Stage = '3a.1'; Gate = 'addmissingtests skill' },
+    @{ Stage = '3a.2'; Gate = 'apicontractverification skill' },
+    @{ Stage = '3a.3'; Gate = 'error-handling-verification skill' },
+    @{ Stage = '3b.1'; Gate = 'logging-verification skill' },
+    @{ Stage = '3b.2'; Gate = 'auditagainstrfc skill' },
+    @{ Stage = '3b.4'; Gate = 'securityaudit skill' },
+    @{ Stage = '3b.6'; Gate = 'performancebenchmark skill' },
+    @{ Stage = '3c.1'; Gate = 'codereviewselfaudit skill' },
+    @{ Stage = '3c.2'; Gate = 'auditandupdatedocs skill (narrative half; the mechanical half is 1.11-1.13)' }
 )
-foreach ($p in $auditPrompts) {
-    Add-Result -Stage $p.Stage -Gate $p.Gate -Status 'PENDING' -Detail 'reviewer-judgement gate; invoke via Copilot Chat with #prompt:<name> and record the outcome here'
+foreach ($skill in $auditSkills) {
+    Add-Result -Stage $skill.Stage -Gate $skill.Gate -Status 'PENDING' -Detail "reviewer-judgement gate; invoke /$($skill.Gate.Split(' ')[0]) in Copilot Chat and record the outcome here"
 }
 
 if ($SkipDeploy) {
@@ -1061,7 +1061,7 @@ if (-not $SkipDeploy) {
 if ($AutoCanary -and -not $SkipDeploy) {
     Write-Stage '6.5' 'Auto-canary to parallel prod (proudbush)'
 
-    # Interim gate tally (PENDING operator-prompt gates do not block the canary).
+    # Interim gate tally (PENDING operator-skill gates do not block the canary).
     $interimFail = ($script:results | Where-Object { $_.Status -eq 'FAIL' }).Count
     $interimSkip = ($script:results | Where-Object { $_.Status -eq 'SKIPPED' }).Count
     $freezeFile = Join-Path $repoRoot 'scripts/.deploy-freeze'
@@ -1144,7 +1144,7 @@ Write-Host "================================================================" -F
 Write-Host "  PASS:    $passCount" -ForegroundColor Green
 Write-Host "  FAIL:    $failCount" -ForegroundColor $(if ($failCount -gt 0) { 'Red' } else { 'DarkGray' })
 Write-Host "  SKIPPED: $skipCount" -ForegroundColor DarkGray
-Write-Host "  PENDING: $pendCount (operator prompt gates)" -ForegroundColor Yellow
+Write-Host "  PENDING: $pendCount (operator skill gates)" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Report: $reportPath" -ForegroundColor Cyan
 Write-Host ""
@@ -1174,7 +1174,7 @@ $reportLines += ""
 $reportLines += "- PASS: $passCount"
 $reportLines += "- FAIL: $failCount"
 $reportLines += "- SKIPPED: $skipCount"
-$reportLines += "- PENDING (operator prompts): $pendCount"
+$reportLines += "- PENDING (operator skills): $pendCount"
 $reportLines += ""
 if ($failCount -eq 0 -and -not $SkipDeploy) {
     $reportLines += "## Next step"

@@ -19,6 +19,7 @@ import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage'
 describe('ScimMeController', () => {
   let controller: ScimMeController;
   let usersService: Record<string, jest.Mock>;
+  let endpointContext: EndpointContextStorage;
 
   const mockEndpoint = {
     id: 'ep-1',
@@ -70,6 +71,7 @@ describe('ScimMeController', () => {
 
     const mockEndpointService = {
       getEndpoint: jest.fn().mockResolvedValue(mockEndpoint),
+      getEndpointForRequest: jest.fn().mockResolvedValue({ endpoint: mockEndpoint, profileRevision: 'persisted-profile-revision' }),
     };
 
     const mockEndpointContext = {
@@ -90,6 +92,7 @@ describe('ScimMeController', () => {
     }).compile();
 
     controller = module.get<ScimMeController>(ScimMeController);
+    endpointContext = module.get<EndpointContextStorage>(EndpointContextStorage);
   });
 
   // ─── Helper: setup identity resolution mock ─────────────────────
@@ -112,6 +115,9 @@ describe('ScimMeController', () => {
       usersService.getUserForEndpoint.mockResolvedValue(mockUserResource);
 
       const result = await controller.getMe('ep-1', buildReq());
+      expect(endpointContext.setContext).toHaveBeenCalledWith(expect.objectContaining({
+        profileRevision: 'persisted-profile-revision',
+      }));
 
       expect(usersService.listUsersForEndpoint).toHaveBeenCalledWith(
         expect.objectContaining({ filter: 'userName eq "alice"' }),
@@ -298,7 +304,7 @@ describe('ScimMeController', () => {
         providers: [
           {
             provide: EndpointService,
-            useValue: { getEndpoint: jest.fn().mockResolvedValue({ ...mockEndpoint, active: false }) },
+            useValue: { getEndpointForRequest: jest.fn().mockResolvedValue({ endpoint: { ...mockEndpoint, active: false }, profileRevision: 'persisted-profile-revision' }) },
           },
           { provide: EndpointContextStorage, useValue: { setContext: jest.fn() } },
           { provide: EndpointScimUsersService, useValue: usersService },

@@ -64,6 +64,9 @@ describe('EndpointScimDiscoveryController', () => {
 
   const mockEndpointService = {
     getEndpoint: jest.fn(),
+    async getEndpointForRequest(endpointId: string): Promise<{ endpoint: unknown; profileRevision: string }> {
+      return { endpoint: await this.getEndpoint(endpointId), profileRevision: 'persisted-profile-revision' };
+    },
   };
 
   const mockEndpointContext = {
@@ -140,6 +143,7 @@ describe('EndpointScimDiscoveryController', () => {
         expect.objectContaining({
           endpointId: 'endpoint-1',
           baseUrl: expect.stringContaining('endpoint-1'),
+          profileRevision: 'persisted-profile-revision',
         })
       );
     });

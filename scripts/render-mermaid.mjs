@@ -13,7 +13,7 @@
  *   node scripts/render-mermaid.mjs            # docs/ + root *.md
  *   node scripts/render-mermaid.mjs <file...>  # specific files
  *
- * Exits non-zero when any block fails to render.
+ * Exits non-zero when required tooling is absent or any block fails to render.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, extname, relative } from 'node:path';
@@ -31,15 +31,15 @@ try {
   try {
     ({ chromium } = require(join(ROOT, 'web', 'node_modules', '@playwright', 'test')));
   } catch {
-    console.error('SKIP: playwright not found under web/node_modules. Run `npm ci` in web/.');
-    process.exit(0);
+    console.error('FAIL: required playwright not found under web/node_modules. Restore matching web dependencies.');
+    process.exit(1);
   }
 }
 
 const MERMAID_UMD = join(ROOT, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js');
 if (!existsSync(MERMAID_UMD)) {
-  console.error('SKIP: mermaid not installed. Run `npm install` at the repo root.');
-  process.exit(0);
+  console.error('FAIL: required mermaid bundle not installed. Restore matching root dependencies.');
+  process.exit(1);
 }
 
 /**
@@ -72,7 +72,13 @@ function checkVersionDrift() {
   }
 
   const auth = authoritativeRenderer(renderers);
-  if (!auth || !auth.version) return ours;
+  if (!auth || !auth.version) {
+    console.warn(
+      `WARNING: authoritative renderer Mermaid version is unknown; editor equivalence is unverified.\n` +
+        `  Gate uses mermaid ${ours}. Inspect the renderer bundle before changing any package pin.`,
+    );
+    return ours;
+  }
   if (auth.version !== ours) {
     console.warn(
       `\nWARNING: Mermaid VERSION DRIFT.\n` +
@@ -217,7 +223,7 @@ for (const { label, config } of RENDER_CONFIGS) {
 
 await browser.close();
 
-console.log(`Mermaid blocks rendered: ${blocks.length} (x${RENDER_CONFIGS.length} themes, securityLevel=strict - matches the VS Code extension)`);
+console.log(`Mermaid blocks rendered: ${blocks.length} (x${RENDER_CONFIGS.length} themes, securityLevel=strict; editor equivalence requires separate verification)`);
 if (failures.length === 0) {
   console.log('All Mermaid diagrams render cleanly in a real browser.');
   process.exit(0);

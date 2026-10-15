@@ -91,7 +91,7 @@ export class EndpointScimGenericController {
     resourceTypePath: string,
     req: Request,
   ): Promise<{ baseUrl: string; config: EndpointConfig; resourceType: ScimResourceType }> {
-    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    const { endpoint, profileRevision } = await this.endpointService.getEndpointForRequest(endpointId);
 
     if (!endpoint.active) {
       throw new ForbiddenException(
@@ -102,7 +102,7 @@ export class EndpointScimGenericController {
     const profile = endpoint.profile;
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, profileRevision, config });
 
     // Derive custom resource type availability from profile.resourceTypes (D9)
     const rt = resolveResourceType(profile, { endpointPath: `/${resourceTypePath}` }).resourceType;

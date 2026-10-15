@@ -83,7 +83,7 @@ export class EndpointScimGroupsController {
     req: Request,
     opts?: { relaxableList?: boolean }
   ): Promise<{ baseUrl: string; config: EndpointConfig; profile: EndpointProfile | undefined; resourceTypeUnsupported?: boolean; endpointName?: string }> {
-    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    const { endpoint, profileRevision } = await this.endpointService.getEndpointForRequest(endpointId);
 
     if (!endpoint.active) {
       throw new ForbiddenException(`Endpoint "${endpoint.name}" is inactive. SCIM operations are not allowed.`);
@@ -101,7 +101,7 @@ export class EndpointScimGroupsController {
       // to a 200 empty ListResponse + warning; item reads + writes still 404.
       const enforce = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ENFORCE_RESOURCE_TYPES);
       if (opts?.relaxableList && !enforce) {
-        this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
+        this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, profileRevision, config });
         return { baseUrl, config, profile, resourceTypeUnsupported: true, endpointName: endpoint.name };
       }
       throw createScimError({
@@ -112,7 +112,7 @@ export class EndpointScimGroupsController {
       });
     }
 
-    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, config });
+    this.endpointContext.setContext({ endpointId, endpointName: endpoint.displayName ?? endpoint.name, baseUrl, profile, profileRevision, config });
 
     return { baseUrl, config, profile };
   }

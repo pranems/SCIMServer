@@ -6,9 +6,9 @@
     Walks Stage 0 -> Stage 6 in order (Stage X is meta and is NOT walked
     per-commit) and surfaces every gate the strategy requires. For
     shell-runnable gates the orchestrator executes them and captures
-    PASS / FAIL / SKIPPED / PARTIAL. For AI prompt gates (.github/prompts/)
-    the orchestrator prints the prompt file path + suggested invocation
-    and (unless -NoPrompt) pauses for the operator to acknowledge
+    PASS / FAIL / SKIPPED / PARTIAL. For AI skill gates (.github/skills/)
+    the orchestrator prints the skill file path + suggested invocation
+    and (unless -NoSkillAcknowledgement) pauses for the operator to acknowledge
     pass / fail / skip.
 
     Authoritative gate strategy:
@@ -21,14 +21,14 @@
     strategy. A one-command walker is the leverage that drops that gap
     to near zero. Mitigation against the "smoke-screen" risk: the
     orchestrator pauses on every finding and requires explicit
-    acknowledgment (unless -NoPrompt). Operator discipline is still
+    acknowledgment (unless -NoSkillAcknowledgement). Operator discipline is still
     required; this script is the scaffold, not the substitute.
 
     Architecture:
       - Stage registry table (`$STAGES`): one entry per stage with the
         gates it owns. Each gate is either a `Shell` (deterministic
-        command + pass/fail signal) or a `Prompt` (operator-driven AI
-        prompt; printed for invocation; ack required).
+        command + pass/fail signal) or a `Skill` (operator-driven AI
+        skill; printed for invocation; ack required).
       - Auto-skip-no-op: certain gates declare a `When` predicate that
         consults `git diff --name-only` against HEAD. If the predicate
         returns $false the gate is recorded SKIPPED with reason.
@@ -37,11 +37,12 @@
         section per stage, one table row per gate, status + duration +
         notes column.
 
-.PARAMETER SkipPrompts
-    Run only shell-runnable gates. AI prompt gates are recorded as
-    SKIPPED with status note "skipped by -SkipPrompts". Use this for
+.PARAMETER SkipSkills
+    Run only shell-runnable gates. AI skill gates are recorded as
+    SKIPPED with status note "skipped by -SkipSkills". Use this for
     a fast pre-push sanity check (~20 min); use the full walk before
-    feature / release commits.
+    feature / release commits. The legacy -SkipPrompts name remains
+    available as a compatibility alias.
 
 .PARAMETER Stage
     Run only the named stage (0..6). All other stages are skipped.
@@ -52,13 +53,14 @@
 
 .PARAMETER DryRun
     Print every gate the orchestrator would run + its predicate result,
-    but do not execute any command and do not pause for prompt acks.
+    but do not execute any command and do not pause for skill acknowledgements.
     Useful for previewing the per-stage plan before a large run.
 
-.PARAMETER NoPrompt
-    Do not pause for operator acknowledgment on prompt gates. Each
-    prompt gate is recorded with status PROMPT_NOT_ACKNOWLEDGED so the
+.PARAMETER NoSkillAcknowledgement
+    Do not pause for operator acknowledgment on skill gates. Each
+    skill gate is recorded with status SKILL_NOT_ACKNOWLEDGED so the
     report makes the gap visible. Use only for CI / unattended runs.
+    The legacy -NoPrompt name remains available as a compatibility alias.
 
 .PARAMETER ReportDir
     Override the directory the structured report is written to.
@@ -66,10 +68,10 @@
 
 .EXAMPLE
     .\scripts\run-all-gates.ps1
-    Full walk of Stage 0 -> Stage 6 with operator pause on prompt gates.
+    Full walk of Stage 0 -> Stage 6 with operator pause on skill gates.
 
 .EXAMPLE
-    .\scripts\run-all-gates.ps1 -SkipPrompts -Stage 1
+    .\scripts\run-all-gates.ps1 -SkipSkills -Stage 1
     Run only Stage 1 - Local Static, only shell-runnable gates.
 
 .EXAMPLE
@@ -78,9 +80,9 @@
     running anything (use to preview what a full run would do).
 
 .EXAMPLE
-    .\scripts\run-all-gates.ps1 -NoPrompt -SkipPrompts
-    Unattended shell-only mode for CI; prompt gates surface as
-    PROMPT_NOT_ACKNOWLEDGED in the report.
+    .\scripts\run-all-gates.ps1 -NoSkillAcknowledgement -SkipSkills
+    Unattended shell-only mode for CI; skill gates surface as
+    SKILL_NOT_ACKNOWLEDGED in the report.
 
 .NOTES
     Exit codes:
@@ -91,10 +93,12 @@
 
 [CmdletBinding()]
 param(
-    [switch]$SkipPrompts,
+    [Alias('SkipPrompts')]
+    [switch]$SkipSkills,
     [int]$Stage = -1,
     [switch]$DryRun,
-    [switch]$NoPrompt,
+    [Alias('NoPrompt')]
+    [switch]$NoSkillAcknowledgement,
     [string]$ReportDir = ''
 )
 
@@ -160,10 +164,10 @@ function Test-PathTouched {
 # ---------------------------------------------------------------
 # Stage + gate registry. Each gate has:
 #   Name        - human-readable label (printed + report row)
-#   Kind        - 'Shell' (orchestrator runs Command) or 'Prompt'
-#                 (orchestrator prints PromptPath and waits for ack)
+#   Kind        - 'Shell' (orchestrator runs Command) or 'Skill'
+#                 (orchestrator prints SkillPath and waits for ack)
 #   Command     - PowerShell expression to run (Shell only)
-#   PromptPath  - path under .github/prompts/ (Prompt only)
+#   SkillPath   - path under .github/skills/ (Skill only)
 #   WorkDir     - cwd to use (Shell only; defaults to repo root)
 #   When        - optional scriptblock returning $true if the gate
 #                 applies; if $false the gate is SKIPPED auto-no-op
@@ -174,16 +178,16 @@ $STAGES = [ordered]@{
     'Stage 0 - TDD' = @(
         @{
             Name = 'TDD discipline (RED -> GREEN -> REFACTOR sequence verified)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/selfImprovingTask.prompt.md'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/selfimprovingtask/SKILL.md'
         }
     )
 
     'Stage 1 - Local Static' = @(
         @{
-            Name = 'lintAndStaticAnalysis prompt (orchestrator for Stage 1)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/lintAndStaticAnalysis.prompt.md'
+            Name = 'lintAndStaticAnalysis skill (orchestrator for Stage 1)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/lintandstaticanalysis/SKILL.md'
         }
         @{
             Name = 'API tsc build (cd api; npm run build)'
@@ -222,16 +226,16 @@ $STAGES = [ordered]@{
             WorkDir = 'web'
         }
         @{
-            Name = 'bundleBudgetAudit prompt (new lazy routes have size-limit entries)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/bundleBudgetAudit.prompt.md'
+            Name = 'bundleBudgetAudit skill (new lazy routes have size-limit entries)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/bundlebudgetaudit/SKILL.md'
             When = { Test-PathTouched 'web[\\/]src[\\/]routes[\\/]' }
             Reason = 'no web/src/routes/ files touched'
         }
         @{
-            Name = 'prismaMigrationAudit prompt (schema + migrations + repos in lockstep)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/prismaMigrationAudit.prompt.md'
+            Name = 'prismaMigrationAudit skill (schema + migrations + repos in lockstep)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/prismamigrationaudit/SKILL.md'
             When = { Test-PathTouched 'api[\\/]prisma[\\/]' }
             Reason = 'no api/prisma/ files touched'
         }
@@ -263,9 +267,9 @@ $STAGES = [ordered]@{
             WorkDir = 'web'
         }
         @{
-            Name = 'crossBackendParityAudit prompt (isInMemoryBackend parity)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/crossBackendParityAudit.prompt.md'
+            Name = 'crossBackendParityAudit skill (isInMemoryBackend parity)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/crossbackendparityaudit/SKILL.md'
             When = {
                 # Cheap proxy: if any api/src file changed AND that file
                 # contains an isInMemoryBackend branch, the audit applies.
@@ -289,77 +293,77 @@ $STAGES = [ordered]@{
 
     'Stage 3a - Test-Completeness' = @(
         @{
-            Name = 'addMissingTests prompt (unit + E2E + live gap-fill)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/addMissingTests.prompt.md'
+            Name = 'addMissingTests skill (unit + E2E + live gap-fill)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/addmissingtests/SKILL.md'
         }
         @{
-            Name = 'apiContractVerification prompt (key-allowlist + no leaked _ fields)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/apiContractVerification.prompt.md'
+            Name = 'apiContractVerification skill (key-allowlist + no leaked _ fields)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/apicontractverification/SKILL.md'
         }
         @{
-            Name = 'error-handling-verification prompt (HTTP + scimType + smart-error envelope)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/error-handling-verification.prompt.md'
+            Name = 'error-handling-verification skill (HTTP + scimType + smart-error envelope)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/error-handling-verification/SKILL.md'
         }
     )
 
     'Stage 3b - Cross-Cutting' = @(
         @{
-            Name = 'logging-verification prompt (level + category + PII redaction + requestId)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/logging-verification.prompt.md'
+            Name = 'logging-verification skill (level + category + PII redaction + requestId)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/logging-verification/SKILL.md'
         }
         @{
-            Name = 'auditAgainstRFC prompt (RFC 7643 + RFC 7644 compliance)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/auditAgainstRFC.prompt.md'
+            Name = 'auditAgainstRFC skill (RFC 7643 + RFC 7644 compliance)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/auditagainstrfc/SKILL.md'
         }
         @{
-            Name = 'endpointConfigFlagAudit prompt (10-cell completeness for flag changes)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/endpointConfigFlagAudit.prompt.md'
+            Name = 'endpointConfigFlagAudit skill (10-cell completeness for flag changes)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/endpointconfigflagaudit/SKILL.md'
         }
         @{
-            Name = 'securityAudit prompt (auth + secrets + input validation + OWASP Top 10)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/securityAudit.prompt.md'
+            Name = 'securityAudit skill (auth + secrets + input validation + OWASP Top 10)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/securityaudit/SKILL.md'
         }
         @{
-            Name = 'dependencyCveSweep prompt (Critical/High blocks; Moderate tracked)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/dependencyCveSweep.prompt.md'
+            Name = 'dependencyCveSweep skill (Critical/High blocks; Moderate tracked)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/dependencycvesweep/SKILL.md'
             When = {
                 (Test-PathTouched 'package\.json$') -or (Test-PathTouched 'package-lock\.json$')
             }
             Reason = 'no package.json or package-lock.json changes'
         }
         @{
-            Name = 'performanceBenchmark prompt (p50/p95/p99 + N+1 detection)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/performanceBenchmark.prompt.md'
+            Name = 'performanceBenchmark skill (p50/p95/p99 + N+1 detection)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/performancebenchmark/SKILL.md'
         }
     )
 
     'Stage 3c - Code Hygiene' = @(
         @{
-            Name = 'codeReviewSelfAudit prompt (SOLID / DRY / readability on CHANGED files)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/codeReviewSelfAudit.prompt.md'
+            Name = 'codeReviewSelfAudit skill (SOLID / DRY / readability on CHANGED files)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/codereviewselfaudit/SKILL.md'
         }
         @{
-            Name = 'auditAndUpdateDocs prompt (INDEX + Session_starter + CONTEXT + CHANGELOG + README sweep)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/auditAndUpdateDocs.prompt.md'
+            Name = 'auditAndUpdateDocs skill (INDEX + Session_starter + CONTEXT + CHANGELOG + README sweep)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/auditandupdatedocs/SKILL.md'
         }
     )
 
     'Stage 4 - Pipeline + Deploy' = @(
         @{
-            Name = 'fullValidationPipeline prompt (end-to-end local + Docker)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/fullValidationPipeline.prompt.md'
+            Name = 'fullValidationPipeline skill (end-to-end local + Docker)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/fullvalidationpipeline/SKILL.md'
         }
         @{
             Name = 'full-validation-pipeline.ps1 (local build + Docker compose smoke)'
@@ -385,16 +389,16 @@ $STAGES = [ordered]@{
 
     'Stage 5 - UI-Specific' = @(
         @{
-            Name = 'uiTestAndValidation prompt (React/vitest + a11y + visual sanity)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/uiTestAndValidation.prompt.md'
+            Name = 'uiTestAndValidation skill (React/vitest + a11y + visual sanity)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/uitestandvalidation/SKILL.md'
             When = { Test-PathTouched 'web[\\/]' }
             Reason = 'no web/ files touched'
         }
         @{
-            Name = 'playwrightSpecHygieneAudit prompt (delete stale legacy specs)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/playwrightSpecHygieneAudit.prompt.md'
+            Name = 'playwrightSpecHygieneAudit skill (delete stale legacy specs)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/playwrightspechygieneaudit/SKILL.md'
             When = { Test-PathTouched 'web[\\/]e2e[\\/]' -or Test-PathTouched 'web[\\/]src[\\/]' }
             Reason = 'no web/e2e/ or web/src/ files touched'
         }
@@ -411,25 +415,25 @@ $STAGES = [ordered]@{
     'Stage 6 - Commit Hygiene' = @(
         @{
             Name = 'Version bump in api + web (lockfiles regenerated in CI, never on a corp device)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/generateCommitMessage.prompt.md'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/generatecommitmessage/SKILL.md'
             When = { Test-PathTouched 'package\.json$' }
             Reason = 'no package.json changes (no version bump expected)'
         }
         @{
             Name = 'CHANGELOG.md entry with explicit before/after test counts per layer'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/auditAndUpdateDocs.prompt.md'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/auditandupdatedocs/SKILL.md'
         }
         @{
             Name = 'Session_starter.md + docs/CONTEXT_INSTRUCTIONS.md updates'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/auditAndUpdateDocs.prompt.md'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/auditandupdatedocs/SKILL.md'
         }
         @{
-            Name = 'generateCommitMessage prompt (per-sub-phase gate naming)'
-            Kind = 'Prompt'
-            PromptPath = '.github/prompts/generateCommitMessage.prompt.md'
+            Name = 'generateCommitMessage skill (per-sub-phase gate naming)'
+            Kind = 'Skill'
+            SkillPath = '.github/skills/generatecommitmessage/SKILL.md'
         }
     )
 }
@@ -498,60 +502,62 @@ function Invoke-ShellGate {
     }
 }
 
-function Invoke-PromptGate {
+function Invoke-SkillGate {
     param([hashtable]$Gate, [string]$StageName)
-    $promptPath = Join-Path $repoRoot $Gate.PromptPath
+    $skillPath = Join-Path $repoRoot $Gate.SkillPath
+    $skillName = Split-Path -Leaf (Split-Path -Parent $Gate.SkillPath)
     Write-Host ""
     Write-Host "  >>> $($Gate.Name)" -ForegroundColor Magenta
-    Write-Host "      prompt: $($Gate.PromptPath)" -ForegroundColor DarkGray
+    Write-Host "      skill: $($Gate.SkillPath)" -ForegroundColor DarkGray
+    Write-Host "      invoke: /$skillName" -ForegroundColor DarkGray
 
-    if (-not (Test-Path $promptPath)) {
-        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'FAIL' -Note "missing prompt file $($Gate.PromptPath)"
-        Write-Host "      FAIL - prompt file missing" -ForegroundColor Red
+    if (-not (Test-Path $skillPath)) {
+        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'FAIL' -Note "missing skill file $($Gate.SkillPath)"
+        Write-Host "      FAIL - skill file missing" -ForegroundColor Red
         return
     }
 
-    if ($SkipPrompts) {
-        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'SKIPPED' -Note 'skipped by -SkipPrompts'
-        Write-Host "      SKIPPED (-SkipPrompts)" -ForegroundColor Yellow
+    if ($SkipSkills) {
+        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'SKIPPED' -Note 'skipped by -SkipSkills'
+        Write-Host "      SKIPPED (-SkipSkills)" -ForegroundColor Yellow
         return
     }
 
     if ($DryRun) {
-        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'SKIPPED' -Note 'DryRun'
+        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'SKIPPED' -Note 'DryRun'
         return
     }
 
-    if ($NoPrompt) {
+    if ($NoSkillAcknowledgement) {
         # Unattended - surface the gap; do not block.
-        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'PARTIAL' -Note 'PROMPT_NOT_ACKNOWLEDGED (-NoPrompt)'
-        Write-Host "      PARTIAL (PROMPT_NOT_ACKNOWLEDGED)" -ForegroundColor Yellow
+        Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'PARTIAL' -Note 'SKILL_NOT_ACKNOWLEDGED (-NoSkillAcknowledgement)'
+        Write-Host "      PARTIAL (SKILL_NOT_ACKNOWLEDGED)" -ForegroundColor Yellow
         return
     }
 
     # Interactive: pause for ack.
-    Write-Host "      Invoke this prompt in Copilot Chat now, then enter result:" -ForegroundColor Yellow
+    Write-Host "      Invoke this skill in Copilot Chat now, then enter result:" -ForegroundColor Yellow
     Write-Host "        p = PASS   f = FAIL   s = SKIPPED   n = note + PARTIAL" -ForegroundColor Yellow
     $resp = Read-Host -Prompt "      result"
     switch ($resp.ToLower()) {
-        'p' { Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'PASS'; Write-Host "      PASS" -ForegroundColor Green }
+        'p' { Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'PASS'; Write-Host "      PASS" -ForegroundColor Green }
         'f' {
             $note = Read-Host -Prompt "      finding (one-line)"
-            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'FAIL' -Note $note
+            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'FAIL' -Note $note
             Write-Host "      FAIL" -ForegroundColor Red
         }
         's' {
             $note = Read-Host -Prompt "      skip reason"
-            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'SKIPPED' -Note $note
+            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'SKIPPED' -Note $note
             Write-Host "      SKIPPED" -ForegroundColor Yellow
         }
         'n' {
             $note = Read-Host -Prompt "      partial-finding note"
-            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'PARTIAL' -Note $note
+            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'PARTIAL' -Note $note
             Write-Host "      PARTIAL" -ForegroundColor Yellow
         }
         default {
-            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Prompt' -Status 'PARTIAL' -Note "unrecognized response '$resp'"
+            Add-Result -Stage $StageName -GateName $Gate.Name -Kind 'Skill' -Status 'PARTIAL' -Note "unrecognized response '$resp'"
             Write-Host "      PARTIAL (unrecognized response)" -ForegroundColor Yellow
         }
     }
@@ -575,7 +581,7 @@ function Invoke-Gate {
         Invoke-ShellGate -Gate $Gate -StageName $StageName
     }
     else {
-        Invoke-PromptGate -Gate $Gate -StageName $StageName
+        Invoke-SkillGate -Gate $Gate -StageName $StageName
     }
 }
 
@@ -605,7 +611,7 @@ $header = @"
     .github/copilot-instructions.md (Mandatory Quality Gates)
   Run:        $(($startTimestamp).ToString('yyyy-MM-dd HH:mm:ss'))
   Changed files (current scope): $($script:changedFiles.Count)
-  Mode:       SkipPrompts=$SkipPrompts  Stage=$Stage  DryRun=$DryRun  NoPrompt=$NoPrompt
+  Mode:       SkipSkills=$SkipSkills  Stage=$Stage  DryRun=$DryRun  NoSkillAcknowledgement=$NoSkillAcknowledgement
 ============================================================
 "@
 Write-Host $header -ForegroundColor White
@@ -643,7 +649,7 @@ $reportFile = Join-Path $ReportDir ("run-all-gates-{0}.md" -f $startTimestamp.To
 $report = @()
 $report += "# run-all-gates report - $($startTimestamp.ToString('yyyy-MM-dd HH:mm:ss'))"
 $report += ""
-$report += "**Mode:** SkipPrompts=$SkipPrompts | Stage=$Stage | DryRun=$DryRun | NoPrompt=$NoPrompt"
+$report += "**Mode:** SkipSkills=$SkipSkills | Stage=$Stage | DryRun=$DryRun | NoSkillAcknowledgement=$NoSkillAcknowledgement"
 $report += "**Changed files in scope:** $($script:changedFiles.Count)"
 $report += ""
 $report += "## Summary"

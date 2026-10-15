@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
+> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.49`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -10,11 +10,11 @@ For actual supported shapes and integration limits, see
 Keep strict validation enabled for Entra; diagnose the request and effective
 schema before applying a targeted compatibility setting.
 
-[![Version](https://img.shields.io/badge/version-0.55.47-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.49-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![Tests](https://img.shields.io/badge/tests-9%2C830%20pass-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-10%2C058%20pass-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---

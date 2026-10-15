@@ -10,15 +10,22 @@
 // Run before staging any lockfile change. The same two checks run in
 // .github/workflows/regen-lockfile.yml so the CI path cannot drift from this one.
 import { readFileSync, existsSync } from 'node:fs';
+import { verifyLockfile } from './lockfile-regeneration.mjs';
 
 let bad = 0;
-for (const f of ['api/package-lock.json', 'web/package-lock.json']) {
+for (const f of ['package-lock.json', 'api/package-lock.json', 'web/package-lock.json']) {
   if (!existsSync(f)) continue;
   const t = readFileSync(f, 'utf8');
   const hosts = [...new Set([...t.matchAll(/"resolved": "https?:\/\/([^/"]+)/g)].map((m) => m[1]))];
   const weak = (t.match(/"integrity": "sha(1|256|384)-/g) || []).length;
   const sha512 = (t.match(/"integrity": "sha512-/g) || []).length;
-  const clean = hosts.length === 1 && hosts[0] === 'registry.npmjs.org' && weak === 0;
+  let clean = true;
+  try {
+    verifyLockfile(JSON.parse(t));
+  } catch (error) {
+    clean = false;
+    console.error(`  ${f}: ${error.message}`);
+  }
   if (!clean) bad++;
   console.log(f);
   console.log('  hosts      :', hosts.join(', '));

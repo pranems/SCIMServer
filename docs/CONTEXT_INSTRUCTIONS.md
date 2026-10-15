@@ -1,28 +1,74 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.47
-> **Last Updated**: October 14, 2026
-> **Last verified:** 2026-10-14
+> **Version**: 0.55.49
+> **Last Updated**: October 15, 2026
+> **Last verified:** 2026-10-15
 
 ---
 
 ## Active Delivery Process
 
 **Isolated unreleased UI continuation:** `fix/ui-inventory-selection-20261014`
-is based on `a5c1c603` and owns only UI-03 through UI-10. First local checkpoint
-`892d0192` implements compact inventory, bounded Dashboard and shared Discovery
-selectors. The follow-up completes shared Operations filter-scroll ownership
-and exact status matching, retaining distinct current-resource and OAuth-subject
-workflows. Forty-nine distinct local browser cases pass across focused runs;
-unit runs pass 63 and 38 tests with two overlapping selector tests. Whole-web
-tsc retains 64 unchanged test diagnostics and two unchanged production
-diagnostics. Geometry receipts are committed as a generated aggregate.
-See [implementation, RCA and handoff](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
-Do not edit the original dirty analysis checkout or the parent readability/
-release worktrees. Parent owns PR/consolidation; runtime PR #215 is separately
-owned. No new version, deployment, shared Entra mutation or operator visual
-approval is claimed by this continuation.
+now includes current master and owns only UI-03 through UI-10. Checkpoint
+`892d0192` implements compact inventory, bounded Dashboard, and shared
+Discovery selectors. The follow-up completes shared Operations filter-scroll
+ownership and exact status matching, retaining distinct current-resource and
+OAuth-subject workflows. Forty-nine distinct local browser cases pass across
+focused runs; unit runs pass 63 and 38 tests with two overlapping selector
+tests. Whole-web tsc retains 64 unchanged test diagnostics and two unchanged
+production diagnostics. Geometry receipts are committed as a generated
+aggregate. See
+[implementation, RCA and handoff](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+No new version, deployment, shared Entra mutation, or operator visual approval
+is claimed by this continuation.
+
+**v0.55.49 UI consolidation, not deployment:** PR #216 preserves UI commits
+`e2758b04` and `a5c1c603` through normal runtime-master merge `c90602dd`.
+UI-01/UI-02 align six Dashboard activity tracks and bound Operations endpoint
+identity with a 480 px table floor and Card-owned mobile scrolling. Nine real
+Chromium geometry/identity/navigation cases passed at 1440/900/390 px before
+consolidation. Fresh post-merge local Chromium passes 9/9 in 32.0 seconds;
+affected Vitest passes 25/25. The owning Validate push passes all 23 gates:
+6,035 API units, 2,432 InMemory E2E passes / four PostgreSQL-only skips, and
+1,591 web tests. CI-only lock run `38524477274` changes release roots only,
+preserving all 1,079 dependency entries and public npm/SHA-512 provenance.
+Bounded read-only PR review found no significant issues. Reviewed exact-tip
+CI completed before normal merge `4a4719cc`; authoritative merged-image
+validation remains pending. No deployed UI,
+operator visual approval, or production promotion is claimed. Runtime #215's
+pipeline and legacy proof are separately owned; shared mutations require
+explicit handoff and coordination with the parent's gallery validation lease.
+UI-03 through UI-10 and Mermaid gate hardening remain separately owned.
+
+**v0.55.48 runtime merged, deployment separately owned:** PR #215 merged
+normally at `99cdeda3` and corrects false
+profile-revision conflicts by capturing raw persisted revision and normalized
+request view in one snapshot. All six controllers forward the revision.
+Focused units pass 281/281; HTTP proof passes 12/12 per backend; built-runtime
+live proof passes 65 checks. The implementation pre-push InMemory E2E result
+is 2,432 passes with four explicit PostgreSQL-only exclusions. CI-only locks
+and the runtime correction merged normally at `99cdeda3`; the reviewed
+serial scheduling follow-up merged at `f96f31b5`. Two full no-skip pipeline
+attempts failed direct Prisma bootstrap hooks. The confirmed root cause was
+production stats seeding that loaded every User, Group and Group membership
+for every endpoint during each application bootstrap. E2E fixtures persist
+until global teardown, so the work grew cumulatively across suites.
+
+The branch repair adds endpoint-level aggregate counts to both repository
+backends. PostgreSQL issues one grouped query per resource type; InMemory
+scans each map once. Focused tests pass 177/177 and the API build passes.
+A fresh owned PostgreSQL 17.11 run passes all 118 suites and 2,492 tests with
+zero skips in 17m 49.315s under the unchanged 30-second hook limit. This is
+58.02% below the retained failed run's 42m 27.265s. Exact cleanup removed the
+loopback-only container and marker without touching shared containers. The
+repair still requires review, merge and authoritative merged-master execution.
+Dev remains v0.55.47; image publication and fresh dev proof remain blocked.
+The parent holds the bounded mapping-smoke and three-auth gallery lease;
+runtime must explicitly reacquire before live work.
+No stored profile workaround,
+customer-prod promotion, UI backlog implementation, or visual sign-off is
+authorized in this phase.
 
 **v0.55.47 deployed evidence:** runtime merge
 `e4192b0e6115d3e272958183a7fc4a140967ef97` is healthy on dev as revision

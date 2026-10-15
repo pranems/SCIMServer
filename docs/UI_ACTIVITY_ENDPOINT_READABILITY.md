@@ -1,7 +1,7 @@
 # Activity and endpoint identity readability
 
-**Status:** Implemented locally, deployment pending
-**Last verified:** 2026-10-13
+**Status:** v0.55.49 consolidation in progress, deployment pending
+**Last verified:** 2026-10-14
 
 ## Executive summary
 
@@ -91,15 +91,77 @@ alone.
 
 **Gate follow-up scheduled:** Release-assurance tooling owner, target
 2026-10-14: distinguish an unavailable required Mermaid check from PASS and
-diagnose the built-in `0.0.0` version warning in a separate gate-hardening
+finish renderer-version discovery in a separate gate-hardening
 change. Root tooling has been restored for this worktree, so actual rendering
-is no longer skipped here.
+is no longer skipped here. The independent owner has since identified the
+built-in version as 11.17.0 against root 11.15.0. Actual strict light/dark
+rendering passed, but renderer equivalence remains unverified; no tooling
+installation or gate edits are included in this release.
 
 **Design/architecture disposition accepted:** Small presentation-only changes
 reuse the existing truncation primitive and percentage columns. No new service,
 dependency edge, endpoint identity model, or speculative abstraction is needed.
 
 ## Remaining release boundaries
+
+### Consolidation checks and issue receipts
+
+- Post-runtime-merge affected Vitest: 2 suites / 25 passed in 231.41 seconds.
+  The editor test tool found no registered tests in this separate worktree;
+  the existing Vitest CLI supplied the actual result. Changed production and
+  browser-spec editor diagnostics are empty.
+- Bounded read-only PR diff review found no significant correctness issues.
+  The reviewer accepted the design and the outcome-level browser assertions;
+  it did not claim to execute tests or review unrelated runtime work.
+- The first release Validate push was correctly blocked: 6,034 API unit
+  tests passed and one asynchronous source-scan test exceeded its unchanged
+  30-second timeout. No forbidden-pattern assertion failed. All earlier gates
+  passed, including actual strict light/dark Mermaid rendering in 223.1 seconds.
+  E2E and later Validate gates did not execute, so this is not a green push.
+- The second owning Validate push at `d5024d0f` passes all 23 gates in
+  995.6 seconds. API: 210 unit suites / 6,035 passes; InMemory E2E: 116
+  suites / 2,432 passes / four PostgreSQL-only exclusions; web: 119 suites /
+  1,591 passes. Actual strict light/dark Mermaid rendering took 105.0 seconds.
+  Raw web tsc still reports 66 errors, tolerated by the hook's 96 ceiling.
+- Fresh post-runtime-merge local Chromium passes nine cases in 32.0 seconds.
+  All nine physical geometry JSON receipts are retained; Operations visible
+  labels remain 193/85/68 px for 1,710 px content, row height 61 px, and document
+  widths equal the 1440/900/390 px viewports. Both isolated servers passed
+  health/authentication preflight and were stopped by exact owned session IDs.
+- CI-only lock regeneration run `38524477274` succeeds at `d5024d0f`.
+  Reviewed artifacts change only both release-root versions to 0.55.49.
+  The 684 API and 395 web dependency entries compare identically; public npm
+  hosts and SHA-512 integrity are verified. No dependency reinstall, local
+  lock regeneration, or quarantine-policy exception is needed.
+
+| ID | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest detection |
+|---|---|---|---|---|
+| UR-10 | Tool registration / Low | Editor runner reported no tests for the isolated worktree's two existing Vitest files. | Use the existing workspace Vitest CLI, which executed 25/25; no new test framework or dependency installation. | Targeted test discovery / targeted test discovery |
+| UR-11 | Harness timing / Medium | One sequential source scan exceeded 30 seconds under the full unit run. The failure is a time budget, not a forbidden-pattern match; the exact source passes all six checks in 2.039 seconds when run alone. The underlying host I/O contention mechanism is not proven. | Focused retry confirms unchanged assertions with the unchanged timeout. Retry the owning normal push instead of increasing timeouts or bypassing the gate. Full-hook convergence remains required. | Owning unit hook / owning unit hook |
+
+UR-11 prevention disposition: accepted for this bounded release with retained
+failure and focused/full-hook retry receipts. Do not overlap discretionary local browser
+processes with the retry. Broader host I/O diagnosis and gate redesign would be
+speculative and outside this presentation-only rollback unit.
+Receipts are `test-results/ui-readability-release-prepush-1.log`,
+`test-results/ui-readability-postmerge-vitest.log`, and
+`test-results/ui-readability-source-scan-retry.log` in the assigned worktree.
+These consolidation entries are reconciled against every tool result in this
+fresh consolidation conversation; the earlier 45,085-event implementation
+reconciliation remains historical, not a claim about this conversation.
+Successful receipts are `test-results/ui-readability-release-prepush-2.log`,
+`test-results/ui-readability-postmerge-playwright.log`,
+`test-results/playwright-output/*/*bounds.json`, and
+`test-results/ui-readability-ci-lock-workflow.log`.
+
+Normal merge `c90602dd` incorporates runtime master `99cdeda3` and retains
+both original UI commits. The only conflict was current session ownership
+context; both runtime and UI handoffs were retained with their actual states.
+CI-only API/web release locks and post-merge targeted checks are complete.
+Runtime #215's pipeline and legacy-reference proof remain separately owned.
+Shared dev/live/directory mutation requires explicit runtime handoff and
+coordination with the parent's bounded gallery validation lease. No original
+analysis checkout, other owned worktree, or shared database is modified.
 
 Final-source normal hooks passed, with the explicit exceptions above.
 Exact-tip CI, deployed browser validation, and

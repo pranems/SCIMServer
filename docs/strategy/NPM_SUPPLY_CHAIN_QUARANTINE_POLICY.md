@@ -9,6 +9,23 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-14 root documentation tooling continuation
+
+The existing lockfile-regeneration workflow now accepts `root` as well as
+`api`, `web`, and `both` (API/web only). Root Mermaid 11.17.0 is older than
+seven days and is available through the corporate proxy; a client
+`min-release-age` of `undefined` does not establish absence of proxy quarantine.
+The local read-only receipt reports publication `2026-08-19T09:20:08Z`.
+
+Root lockfiles are generated only by npm in CI, not locally. Every selected
+lockfile is checked for public `registry.npmjs.org` URLs and sha512 integrity.
+Every changed entry, including same-version provenance changes, requires a
+known publication timestamp and age at least seven days before artifact upload.
+The job selects versions with a seven-day `--before` cutoff and independently
+checks their actual timestamps. Missing baseline maps and missing metadata fail
+closed; selected lockfiles and a machine-readable age report are retained.
+See [the root tooling evidence and RCA](MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
 Everything here is either **quoted from the notification** or **measured on this machine on 2026-07-30**. Nothing is inferred from the linked documentation, for a reason worth stating plainly:
 
 | Source | Status |
