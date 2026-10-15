@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fail-closed deployment prerequisites
+
+- Block Stage 4-6 gate commands after a recorded earlier failure. Guard
+  post-deployment state/pruning separately and refuse pruning after failed
+  integrity. Preserve independent local diagnostics, explicit blocked reasons,
+  the complete report and final nonzero failure status.
+- Grow pipeline contracts from 43 to 54 passing assertions. Seven behavioral
+  RED assertions preceded the correction. Controls execute the actual runner
+  and post-deployment blocks without external mutation.
+- Preserve the merged `078e741b` pipeline's failed matrix receipt. A separate
+  bounded-worker full coverage replay passed 120 files and 1,595 tests with
+  unchanged assertions, timeout and coverage floors. Retained backend receipts
+  contain 6,043 units per backend, 2,492 explicit PostgreSQL E2E passes with
+  zero skips, and 2,488 InMemory passes with four native-only exclusions.
+- No runtime/API/UI behavior, package version, dependency, lockfile or
+  deployment changes. Dev remains `0.55.47`; source remains `0.55.49`.
+  Subsequent isolated Docker build/live validation passes 1,729 assertions
+  with verified exact project cleanup. Dev live/gallery, browser and
+  legacy-reference proof are still pending.
+
 ### Standup evidence completeness
 
 - Preserve useful local standup improvements in the shared explicit-only skill:

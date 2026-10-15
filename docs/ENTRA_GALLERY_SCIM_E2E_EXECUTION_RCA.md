@@ -1,10 +1,76 @@
 # Entra Gallery to SCIMServer E2E - Execution Issues and RCA
 
-> **Status:** Active execution ledger - **Last verified:** 2026-10-14 - **Product version:** `0.55.48`
+> **Status:** Active execution ledger - **Last verified:** 2026-10-15 - **Product version:** `0.55.49`
 
 ## Purpose and scope
 
 This ledger records issues found while building and running the owned Microsoft Entra gallery provisioning gate against the registry-resolved SCIMServer dev estate. Entries are written when the failing check is understood and the corrective check turns green. The measured disposition includes final evidence counts and exact-cleanup outcomes.
+
+## Reconstructed consolidation and blocked deployment
+
+PR #218 merged normally at `078e741b`. The original deleted project3
+conversation was not restored. This continuation uses preserved recovery
+artifacts, current Git/GitHub state, and new measured receipts.
+
+The full default pipeline ran without skip flags. Both backend unit lanes
+passed 6,043 tests each. Explicit PostgreSQL E2E passed all 2,492 tests with
+zero skips; InMemory passed 2,488 with four expected exclusions. The original
+matrix failed one web coverage test and remains a failed receipt. The owner
+stopped the process on Stage 4 entry before publication/deployment. A later
+read-only ARM/version check confirmed dev remains `0.55.47` on revision
+`scimserver-dev--ve4192b0e`. Expanded gallery, local-node/dev live, browser and
+legacy-reference proof are still incomplete.
+
+The tooling-only normal Validate push at `6d8b0b40` passed all 27 gates in
+1,140.5 seconds: 6,043 API units, 2,432 hook-selected InMemory E2E passes with
+four native-only exclusions, 1,595 web tests, and 758 Mermaid diagrams
+rendered in both strict themes. The hook's selected E2E receipt is distinct
+from the complete backend matrix above.
+
+The subsequent isolated Stage 4.1 command
+`pwsh -NoProfile -File scripts\full-validation-pipeline.ps1 -SkipLocal`
+exited 0. The no-cache/refreshed-base Docker build took 145 seconds; 1,729
+live assertions passed in 177.1 seconds on `0.55.49`. The exact owned project
+was removed and label-scoped absence of containers, volumes and networks
+was verified. No image publication or Azure update occurred.
+
+| ID | Type / severity | Symptom and root cause | Resolution and why it works | Prevention | Detection / earliest gate |
+|---|---|---|---|---|---|
+| GM-I09 | Gate correctness / High | A failed matrix returned false, but callers discarded the value and no common mutation-admission check prevented Stage 4 entry. | Add an earlier-FAIL barrier inside the existing gate runner for Stages 4-6, plus guards around post-deploy state/pruning and after integrity failure. Seven behavioral assertions were RED before implementation; all 54 pipeline assertions now pass. Blocked commands do not execute, original failures remain, and reporting is preserved. | Execute the actual function and post-deploy AST blocks for failed test, audit, build, publication, deployment and live predecessors, with executable positive controls. | Manual Stage 4 observation / focused pipeline contract before the run |
+| GM-I10 | Test execution / Medium | The buffer-cap banner test rendered 5,000 Fluent rows and exceeded its existing 20-second limit in the matrix coverage lane. Direct coverage and the noncoverage lane passed. The precise scheduling contribution is unproven. | Replay the complete failed coverage lane with `npm run test:coverage -- --maxWorkers=2`: exit 0, 120 files, 1,595 tests, 1,057.01 seconds. Lines 85.64%, branches 75.41%, functions 75.42%, statements 82.89% meet unchanged floors. Retain the original failure; no test, timeout, threshold or source fixture was changed. | Preserve distinct run identities and failed receipts. A replay supports a scheduling hypothesis, not an assertion that the original matrix passed or the fixture is permanently repaired. | Matrix coverage / direct coverage under the same scheduling conditions |
+| GM-I11 | Identity / Low | A PR write used the globally selected enterprise-managed GitHub account and returned Unauthorized. | Use the existing owner credential only in process-local `GH_TOKEN` and verify `gh api user`. PR update, ready transition and normal merge succeeded without changing the shared global account or logging the token. | Check process-local write identity before GitHub mutations. | PR update / identity preflight |
+| GM-I12 | Evidence correctness / Medium | The direct Prisma lane cleared the backend variable; runtime selected Prisma, but four native-only test predicates require an explicit backend value and skipped. | Keep its 2,488-pass/four-skip result explicit. The matrix's explicit Prisma lane executed all 2,492 tests with zero skips, closing this run's native coverage gap without relabeling the direct result. | Treat selected runtime backend and native-test admission as separate facts; use the explicit matrix receipt. | Receipt reconciliation / backend environment preflight |
+| GM-I13 | Test harness / Low | The first new positive control assigned an if-expression result to the results list; PowerShell unwrapped its singleton and `+=` failed. | Wrap the complete expression in `@(...)` so the harness retains an array. The corrected baseline run then completed with the seven expected behavioral RED assertions; GREEN passed after the production guard. | Keep collection shape explicit in behavioral harness fixtures. | Focused contract / focused contract |
+| GM-I14 | Environment prerequisite / Low | The first recovery tracking push passed 24 gates but Prisma generation failed loading configuration because the fresh shell lacked `DATABASE_URL`. The command does not connect, but `env('DATABASE_URL')` throws before generation. | Set a process-local nonconnecting placeholder and confirm `npx --no-install prisma generate` exits 0. The normal Validate retry then passed all 27 gates in 826.5 seconds. No source, dependency or lockfile repair was needed. | Check nonconnecting configuration prerequisites before an expensive hook; retain the failed receipt and never bypass the hook. | Validate generation / code-generation preflight |
+| GM-I15 | Evidence limitation / Low | The successful Docker live runner warned that depth-10 JSON serialization truncates deeply nested diagnostics. This is not an assertion failure, but the artifact must not be called lossless. | Retain the console log and parse the receipt: version `0.55.49`, 1,729 passed, zero failed, and 1,729 test entries agree. Accepted diagnostic limitation for this safety PR; no serializer change or lossless payload claim. | Check parsed counters/list agreement and disclose the warning. Inspect nested diagnostic serialization before relying on that payload for detailed replay. | Receipt writer / serializer contract |
+| GM-I16 | Validation tooling / Low | A comment-only equivalence probe compared Git LF output with Windows CRLF working-tree text. PowerShell includes the newline in `LineContinuation.Text`, producing a false mismatch despite equal token counts. | Normalize CRLF/LF only in continuation-token text; preserve every token kind and all other text. All 5,098 executable token kinds/texts then agree. The comment clarification distinguishes optional mirror absence from mandatory validation failure without changing code. | Separate transport line endings from semantic-token changes; never ignore token kinds or normalize string-literal contents. | Focused parser comparison / line-ending-aware comparison |
+
+**Self-improvement applied:** A recorded failure now prevents downstream
+mutation at the shared execution boundary, not only at the final tally.
+Post-deployment pruning has its own admission check because it is not called
+through `Invoke-Gate`. Original failed receipts are never overwritten by a
+successful replay.
+
+**Design disposition accepted:** Extend the existing cohesive gate runner and
+guard the existing post-deploy block. No new orchestration framework, provider,
+dependency, runtime version or speculative abstraction is justified.
+
+**Provenance / completeness checkpoint:** After the first tooling commit,
+the current continuation's complete available `events.jsonl` was located
+and scanned through event 1,583, including 226 tool completions. The pass
+correlated starts/results, searched error signals, separately searched causal
+narration, included actual evidence-log reads, and reconciled the retained
+pipeline/coverage logs, backend receipts, GitHub results and contract output.
+The repeated code-generation matches describe one GM-I14 incident; repeated
+coverage matches describe one GM-I10 incident. Expected RED assertions,
+source/search echoes, JSDOM unsupported-window warnings, optional absent
+knowledge-graph tooling, baseline TypeScript diagnostics and read-only latency
+probes were verified and dismissed as new product incidents. The scan also
+retains the singleton-array harness failure rather than counting only the
+expected RED assertions; the later Docker completion adds GM-I15 with
+independent receipt-counter verification. The deleted original project3 transcript remains
+unavailable. This is a current-continuation checkpoint, not original-session
+restoration or completed deployment/ledger closure.
 
 ## Custom-mapping continuation checkpoint
 

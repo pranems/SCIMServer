@@ -2,6 +2,33 @@
 
 **Last verified:** 2026-10-15
 
+**Current reconstructed consolidation checkpoint:** PR #218 merged normally
+at `078e741b`. The original deleted project3 transcript was not restored.
+Exclusive dev/gallery ownership and the full default dev pipeline were
+authorized. The pipeline passed both unit backends (6,043 tests each) and
+explicit PostgreSQL E2E (2,492 tests, zero skips), but its six-mode matrix
+failed one web coverage timeout. It entered Stage 4 despite that failure and
+was stopped before publication/deployment. A separate complete coverage replay
+with two workers passed all 1,595 tests and unchanged coverage floors; the
+original matrix remains FAIL. Read-only ARM/version confirms dev still
+`0.55.47`. A tooling-only follow-up blocks Stage 4-6 commands and pruning
+after failed prerequisites, with 54 passing contracts after seven expected
+RED assertions. No runtime version bump, canary or customer-prod change.
+The normal tooling Validate push passed all 27 gates in 1,140.5 seconds.
+Subsequent isolated no-cache Docker validation passed 1,729 live assertions
+on `0.55.49`; its exact project containers, network and volume were removed
+and absence verified. A deep-diagnostic JSON serialization warning remains
+explicit, while parsed counters and all 1,729 test entries agree.
+Expanded gallery, local-node/dev live, browser, legacy-reference and operator
+visual proof remain pending. See the [current RCA](docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
+| Date | Summary |
+|---|---|
+| 2026-10-15 | Normal gallery merge `078e741b`; pipeline stopped before deployment after failed coverage and fail-open discovery. Separate replay passes 1,595 tests; fail-closed tooling contracts grow from 43 to 54. Protected tooling push passes 27 gates; isolated Docker passes 1,729 live assertions with exact cleanup. Current continuation transcript reconciled; original deleted transcript remains unavailable. |
+
+The gallery/runtime paragraphs immediately below retain predecessor
+checkpoints, not the current ownership or draft/merge state.
+
 **Gallery coverage expansion:** The isolated custom-mapping worktree is based
 on merged runtime PR #215 at `99cdeda3`. Pure profile/mapping transformation,
 saved-source verification, all-three-auth Group orchestration, report

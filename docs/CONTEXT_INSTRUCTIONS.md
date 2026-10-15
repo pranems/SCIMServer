@@ -9,6 +9,25 @@
 
 ## Active Delivery Process
 
+**Current merged validation checkpoint:** PR #218 merged normally at
+`078e741b`; the reconstructed gallery continuation has exclusive dev/gallery
+ownership. Full default validation was stopped before deployment after one
+matrix coverage timeout and discovery that earlier FAIL did not block
+Stage 4. Explicit PostgreSQL E2E passed 2,492/2,492 with zero skips; both unit
+backends passed 6,043 each. A separate full coverage replay with two workers
+passed 1,595 tests and unchanged coverage floors, without replacing the
+original failed matrix receipt. A tooling-only correction now blocks
+Stage 4-6 gate commands and post-deploy pruning after failed prerequisites;
+54 pipeline assertions pass after expected RED controls. Source remains
+`0.55.49`, dev remains `0.55.47`. The normal tooling Validate push passed
+all 27 gates. Subsequent isolated Docker validation passed 1,729 live
+assertions on `0.55.49` with exact project cleanup and verified absence.
+Local-node/dev live, browser/gallery and legacy-reference proof remain
+incomplete. No canary or customer-production promotion is
+authorized. See the [execution ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+The separate continuation descriptions below retain historical ownership
+and evidence boundaries; they are not current draft/merge status.
+
 **Isolated unreleased UI continuation:** `fix/ui-inventory-selection-20261014`
 now includes current master and owns only UI-03 through UI-10. Checkpoint
 `892d0192` implements compact inventory, bounded Dashboard, and shared
