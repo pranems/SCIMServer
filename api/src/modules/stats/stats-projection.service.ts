@@ -23,6 +23,7 @@ import { GENERIC_RESOURCE_REPOSITORY } from '../../domain/repositories/repositor
 import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
 import type { IGenericResourceRepository } from '../../domain/repositories/generic-resource.repository.interface';
+import type { EndpointResourceCounts } from '../../domain/repositories/endpoint-resource-counts';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 
 import {
@@ -213,36 +214,47 @@ export class StatsProjectionService implements OnModuleInit {
       }
     }
 
-    // Seed/re-seed each active endpoint (isolated per-endpoint error handling)
-    let seededCount = 0;
-    for (const ep of endpoints) {
-      try {
-        const users = await this.userRepo.findAll(ep.id);
-        const groups = await this.groupRepo.findAllWithMembers(ep.id);
+    const [userResult, groupResult] = await Promise.allSettled([
+      this.userRepo.countByEndpoint(),
+      this.groupRepo.countByEndpoint(),
+    ]);
+    const userCounts = userResult.status === 'fulfilled'
+      ? new Map(userResult.value.map((count) => [count.endpointId, count]))
+      : null;
+    const groupCounts = groupResult.status === 'fulfilled'
+      ? new Map(groupResult.value.map((count) => [count.endpointId, count]))
+      : null;
 
-        const c: EndpointCounters = {
-          userCount: users.length,
-          activeUserCount: users.filter((u) => u.active).length,
-          groupCount: groups.length,
-          activeGroupCount: groups.filter((g) => g.active).length,
-          genericResourceCount: 0, // Generic resources not seeded from DB - event-driven only; reconcile preserves existing count
-        };
-
-        // Preserve existing genericResourceCount if already tracked (event-driven)
-        const existing = this.counters.get(ep.id);
-        if (existing) {
-          c.genericResourceCount = existing.genericResourceCount;
-        }
-
-        this.counters.set(ep.id, c);
-        seededCount++;
-      } catch (error) {
-        this.logger.warn(`Failed to seed stats for endpoint ${ep.id}: ${(error as Error).message}`);
-        // Skip this endpoint; keep existing counters if any, retry on next reconcile
-      }
+    if (userResult.status === 'rejected') {
+      this.logger.warn(`Failed to seed user stats: ${(userResult.reason as Error).message}`);
+    }
+    if (groupResult.status === 'rejected') {
+      this.logger.warn(`Failed to seed group stats: ${(groupResult.reason as Error).message}`);
     }
 
-    this.logger.debug(`Stats seeded: ${seededCount}/${endpoints.length} endpoints`);
+    for (const ep of endpoints) {
+      const existing = this.counters.get(ep.id);
+      const users = userCounts?.get(ep.id);
+      const groups = groupCounts?.get(ep.id);
+      this.counters.set(ep.id, {
+        userCount: this.countOrExisting(users, existing?.userCount, 'total', userCounts === null),
+        activeUserCount: this.countOrExisting(users, existing?.activeUserCount, 'active', userCounts === null),
+        groupCount: this.countOrExisting(groups, existing?.groupCount, 'total', groupCounts === null),
+        activeGroupCount: this.countOrExisting(groups, existing?.activeGroupCount, 'active', groupCounts === null),
+        genericResourceCount: existing?.genericResourceCount ?? 0,
+      });
+    }
+
+    this.logger.debug(`Stats seeded: ${endpoints.length} endpoints`);
+  }
+
+  private countOrExisting(
+    counts: EndpointResourceCounts | undefined,
+    existing: number | undefined,
+    key: 'total' | 'active',
+    aggregationFailed: boolean,
+  ): number {
+    return aggregationFailed ? existing ?? 0 : counts?.[key] ?? 0;
   }
 
   /** Get or create counters for an endpoint (lazy init on event). */

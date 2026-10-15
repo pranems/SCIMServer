@@ -7,14 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Standup evidence completeness
+
+- Preserve useful local standup improvements in the shared explicit-only skill:
+  bounded sibling-clone discovery, deduplicated commit evidence, per-initiative
+  acceptance states, exact-commit red/green reconciliation, and redacted
+  incident/non-commit history. Keep reporting read-only and retain all six
+  report sections, CSV shape, and the copy-paste block.
+- Add four customization-contract assertions, confirmed RED before updating
+  the skill and GREEN afterwards. No product runtime, version, or deployment
+  changes are included; existing product test counts are unchanged.
+
+### Copilot Agent Skill migration
+
+- Convert all 34 workspace prompt files on latest master into explicit-only
+  project Agent Skills and migrate the separate SyncFabric authentication
+  workflow into the same portable structure. Preserve the existing Entra
+  gallery skill for 36 project skills total.
+- Move workflow memory beside its owning skill, split the two generated
+  workflows over 500 lines into progressively loaded references, and update
+  relative links and self-update targets for their new locations.
+- Make the mandatory gate walker and dev deployment pipeline register
+  `SkillPath` entries and slash-invoked skills instead of deleted prompt
+  files. Keep `-SkipPrompts` and `-NoPrompt` as compatibility aliases.
+- Add a pre-push customization contract that validates skill discovery
+  metadata, explicit-only behavior, relative resources, legacy-reference
+  removal, split-workflow self-update targets, selected Git-tree state, and
+  gate-walker integration.
+- Record migration issues, root causes, escape analysis, and prevention in the
+  Agent Skills migration execution ledger.
+
 ### Validation pipeline
 
+- Align both Prisma E2E owners on serial quiet-console execution. Quiet mode
+  suppresses application console chatter, not test assertions, suite summaries,
+  failure stacks, or the structured results reporter. Contracts were RED for
+  both missing switches and GREEN after the two command changes. An injected
+  causal exception remains visible and exits 1.
+- Fix the cumulative Prisma bootstrap timeout in `StatsProjectionService`.
+  Startup and reconciliation previously listed every endpoint, then loaded
+  every User and every Group plus membership for each endpoint solely to count
+  them. E2E data persists until global teardown, so repeated application
+  bootstrap became progressively slower as fixtures accumulated.
+- Add repository-level endpoint aggregates for both persistence backends.
+  PostgreSQL now uses one grouped count query per resource type; InMemory scans
+  each resource map once. Successful sparse results treat a missing endpoint
+  row as authoritative zero, while a rejected aggregate preserves the prior
+  counter until the next reconciliation.
+- Permanent RED/GREEN controls forbid full-resource reads during stats seeding
+  and cover the sparse-zero distinction. Five focused suites pass 177 tests,
+  and the API build passes. The complete owned PostgreSQL 17.11 run passes all
+  118 suites and 2,492 tests with zero skips in 17m 49.315s. The retained failed
+  receipt was 112 suites and 2,348 tests passing, 140 failures, four skips, and
+  42m 27.265s. No assertion, suite, migration, or 30-second hook limit changed.
+- The first normal push was correctly blocked because the fresh worktree had
+  no Vite binary. After confirming byte-identical web manifests and locks, an
+  ignored dependency junction reused the matching installed tree without an
+  install or lock rewrite. The unchanged retry passes all 22 Fast gates in
+  356.5 seconds, including 6,043 API units and 2,432 InMemory E2E passes with
+  four PostgreSQL-only exclusions.
 - Enable seeded profile-shape coverage in the authoritative dev Playwright
   lane, parse its JSON result, and fail the gate on any skipped case. Restore
   the dev-only shape and mutation flags after the dev run, and explicitly clear
   inherited values in promotion verification so canary runs cannot mutate data
   or require dev-only fixtures. Deployment-pipeline contract tests prevent
   these guarantees from being silently removed.
+
+## [0.55.49] - 2026-10-14
+
+### Activity and endpoint readability
+
+- Reserve six aligned Dashboard activity fields, including `Server-wide`
+  for requests without an endpoint. Reuse shared `TruncatedText` for long
+  paths and names while preserving endpoint navigation and full identity.
+- Bound Operations User/Group endpoint links inside percentage-based columns.
+  A 480 px table floor and Card-owned horizontal scrolling keep mobile
+  labels readable without widening the document.
+- Preserve constituent commits `e2758b04` and `a5c1c603`; normal merge
+  `c90602dd` incorporates runtime v0.55.48 without rewriting history.
+- Implementation browser proof is nine Chromium cases at 1440/900/390 px;
+  measured labels are 193/85/68 px for 1,710 px content and rows remain
+  61.25 px high. Pre-consolidation affected Vitest proof passes 25 tests.
+  Raw web type diagnostics were 66 baseline / 66 current, zero added, not
+  a clean raw type check.
+- The owning consolidation Validate push passes all 23 gates in 995.6
+  seconds: 210 API unit suites / 6,035 tests, 116 InMemory E2E suites /
+  2,432 passes with four PostgreSQL-only exclusions, and 119 web suites /
+  1,591 tests. Counts are unchanged from v0.55.48 at these layers; the
+  readability spec adds nine browser outcome cases, not unit tests.
+- Fresh post-runtime-merge local Chromium passes all nine cases in 32.0
+  seconds, retaining nine JSON geometry receipts. These deterministic display
+  fixtures do not claim live provisioning or merged-image validation.
+- CI-only lock regeneration run `38524477274` changes only the API/web
+  release-root versions. All 1,079 dependency entries remain identical with
+  public npm hosts and SHA-512 integrity. No local lock regeneration occurs.
+- The first owning push was correctly blocked by one 30-second source-scan
+  timeout. Unchanged focused retry passes 6/6 in 2.039 seconds; the subsequent
+  full owning push passes without changing assertions or timeouts. Exact-tip
+  CI and merged-image form-factor proof remain pending.
+- Test/gate improvement is applied through mobile geometry and file-backed
+  receipts, not presence-only or CSS-property assertions. Design disposition:
+  accepted; presentation-only changes reuse existing primitives without new
+  dependency edges or speculative abstractions.
+- Deployment waits for explicit runtime-owner handoff and parent gallery
+  lease coordination. No operator visual sign-off or production promotion
+  is claimed. See [the implementation evidence](docs/UI_ACTIVITY_ENDPOINT_READABILITY.md).
 
 ## [0.55.48] - 2026-10-14
 
@@ -53,10 +150,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions; all 1,079 dependency entries retain their graph and public
   npm/SHA-512 provenance. Read-only consolidation review found no significant
   issues.
-- Release preparation is pending exact-tip
-  reviewed merge, immutable-image publication, full dev pipeline, and direct
-  legacy-reference proof. No production promotion or operator visual sign-off
-  is claimed.
+- PR #215 merged normally at `99cdeda3` with exact-tip CI green.
+  PR #217 aligns direct Prisma E2E with the existing serial backend matrix
+  and merged normally at `f96f31b5`, also exact-tip green. The scheduling
+  contract went RED then GREEN; two earliest failed suites pass 47/47
+  serial tests on fresh owned PostgreSQL.
+- Deployment is blocked, not validated. Both full no-skip pipeline attempts
+  fail direct Prisma bootstrap hooks. The second serial run reports 2,348
+  passes, 140 failures, and four skips across 118 suites, then its process
+  terminates during the backend matrix. Confirmed partial matrix: 6,035 units
+  per backend and 2,488 InMemory E2E passes with four PostgreSQL-only
+  exclusions. Web units and coverage passed in that attempt.
+- Dev remains v0.55.47. Profile-conforming User and Group creates on the
+  explicitly selected original reference still return 409, with its raw
+  legacy setting and persisted revision unchanged. No immutable release image
+  publication, fresh dev gallery/browser result, production promotion, or
+  operator visual sign-off is claimed.
 
 ## [0.55.47] - 2026-10-12
 
@@ -4963,7 +5072,7 @@ No runtime cost - just hands the singleton to loaders.
 **Web UI Test Infrastructure (NEW):**
 - Vitest + @testing-library/react: 16 test files, 152 component tests
 - Playwright E2E: 6 spec files, 86 live browser tests against running server
-- Self-improving audit prompt: `.github/prompts/uiTestAndValidation.prompt.md`
+- Self-improving audit prompt: `.github/skills/uitestandvalidation/SKILL.md`
 - New documentation: `docs/WEB_UI_FLOWS_AND_BEHAVIORS.md` (20 sections, 7 Mermaid diagrams)
 
 **API E2E Gap Closure:**

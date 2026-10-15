@@ -19,7 +19,6 @@ import {
   makeStyles,
   tokens,
   Card,
-  CardHeader,
   Text,
   Badge,
   Button,
@@ -41,7 +40,7 @@ import {
 import { useDashboard, useActivitySummary } from '../api/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { DashboardResponse, DashboardEndpoint } from '@scim/types/dashboard.types';
-import { EmptyState, KpiChart, LoadingSkeleton } from '../components/primitives';
+import { EmptyState, KpiChart, LoadingSkeleton, TruncatedText } from '../components/primitives';
 import { AuthMethodChip } from '../components/primitives/AuthMethodChip';
 
 const useStyles = makeStyles({
@@ -82,29 +81,26 @@ const useStyles = makeStyles({
     gap: '12px',
   },
   endpointGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-    gap: '16px',
+    display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0,
   },
   endpointCard: {
-    padding: '16px',
-    cursor: 'pointer',
-    ':hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-    },
+    padding: '8px', minWidth: 0, gap: '4px',
   },
   endpointStats: {
     display: 'flex',
     gap: '16px',
-    marginTop: '8px',
+    marginTop: '0',
   },
   activityList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
+    overflowX: 'auto',
   },
   activityItem: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '64px minmax(60px, 2fr) minmax(80px, 1fr) 48px minmax(90px, 1fr) 64px',
+    minWidth: '590px',
     alignItems: 'center',
     gap: '12px',
     padding: '8px 12px',
@@ -117,6 +113,17 @@ const useStyles = makeStyles({
     fontFamily: 'monospace',
     minWidth: '56px',
     textAlign: 'center' as const,
+  },
+  activityEndpoint: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    minWidth: 0,
+  },
+  activityEndpointName: {
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   errorItem: {
     color: tokens.colorPaletteRedForeground1,
@@ -284,10 +291,14 @@ export const DashboardPage: React.FC = () => {
       <ActivityAnalyticsSection />
 
       {/* Endpoint Cards */}
-      <div className={classes.section}>
-        <Subtitle1>Endpoints</Subtitle1>
+      <div className={classes.section} data-testid="dashboard-endpoint-summary">
+        <Subtitle1>Endpoint summary</Subtitle1>
+        <Caption1>Showing up to five endpoints in inventory order. Browse all endpoints to search and manage the complete inventory.</Caption1>
+        <Button data-testid="dashboard-all-endpoints" onClick={() => navigate({ to: '/endpoints' })}>
+          Browse all {data.stats.totalEndpoints} endpoints
+        </Button>
         <div className={classes.endpointGrid} data-testid="endpoint-grid">
-          {data.endpoints.map((ep) => (
+          {data.endpoints.slice(0, 5).map((ep) => (
             <EndpointCard key={ep.id} endpoint={ep} />
           ))}
           {data.endpoints.length === 0 && (
@@ -335,14 +346,18 @@ export const DashboardPage: React.FC = () => {
                 >
                   {activity.method}
                 </Badge>
-                <Caption1 style={{ fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {activity.path}
-                </Caption1>
-                {activity.endpointId && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
-                    <Caption1 style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activity.endpointName ?? activity.endpointId}>
-                      {activity.endpointName ?? '(endpoint)'}
-                    </Caption1>
+                <TruncatedText
+                  text={activity.path}
+                  monospace
+                  data-testid={`dashboard-activity-path-${activity.id}`}
+                />
+                <span className={classes.activityEndpoint}>
+                  <TruncatedText
+                    text={activity.endpointId ? activity.endpointName ?? activity.endpointId : 'Server-wide'}
+                    className={classes.activityEndpointName}
+                    data-testid={`dashboard-activity-endpoint-${activity.id}`}
+                  />
+                  {activity.endpointId && (
                     <Tooltip content="Open this endpoint" relationship="label" positioning="above">
                       <Button
                         appearance="subtle"
@@ -354,10 +369,11 @@ export const DashboardPage: React.FC = () => {
                         }}
                         aria-label={`Open endpoint ${activity.endpointName ?? activity.endpointId}`}
                         data-testid={`dashboard-activity-endpoint-open-${activity.id}`}
+                        style={{ flexShrink: 0 }}
                       />
                     </Tooltip>
-                  </span>
-                )}
+                  )}
+                </span>
                 <Badge
                   appearance="outline"
                   color={activity.statusCode >= 400 ? 'danger' : 'success'}
@@ -513,21 +529,17 @@ const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
     <Card
       className={classes.endpointCard}
       data-testid={`endpoint-card-${endpoint.id}`}
-      onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: endpoint.id } })}
     >
-      <CardHeader
-        header={
-          <Text weight="semibold">{endpoint.displayName ?? endpoint.name}</Text>
-        }
-        description={
-          <Caption1>{endpoint.name}</Caption1>
-        }
-        action={
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0 }}>
+        <Button appearance="subtle" style={{ minWidth: 0, flex: 1 }}
+          title={`${endpoint.displayName ?? endpoint.name} (${endpoint.name})`}
+          onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: endpoint.id } })}>
+          <TruncatedText maxWidth="100%" text={endpoint.displayName ?? endpoint.name} />
+        </Button>
           <Badge appearance="filled" color={endpoint.active ? 'success' : 'warning'}>
             {endpoint.active ? 'Active' : 'Inactive'}
           </Badge>
-        }
-      />
+      </div>
       <div className={classes.endpointStats}>
         <Body1>{endpoint.users.total} users</Body1>
         <Body1>{endpoint.groups.total} groups</Body1>

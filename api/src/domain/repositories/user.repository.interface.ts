@@ -11,6 +11,7 @@
 import type { ExpectedVersion } from './write-precondition';
 import type { UniquenessPolicy } from './uniqueness-policy';
 import type { ProfileRevision } from './profile-revision';
+import type { EndpointResourceCounts } from './endpoint-resource-counts';
 import type {
   UserRecord,
   UserCreateInput,
@@ -38,6 +39,9 @@ export interface IUserRepository {
     dbFilter?: Record<string, unknown>,
     orderBy?: { field: string; direction: 'asc' | 'desc'; caseExact?: boolean },
   ): Promise<UserRecord[]>;
+
+  /** Count total and active users across all endpoints in one repository read. */
+  countByEndpoint(): Promise<EndpointResourceCounts[]>;
 
   /** Update a user by its internal storage ID. */
   update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness?: UniquenessPolicy, profileRevision?: ProfileRevision): Promise<UserRecord>;

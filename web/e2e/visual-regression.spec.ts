@@ -137,7 +137,7 @@ const DASHBOARD_LIVE_SELECTORS = [
 const ENDPOINTS_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
   '[data-testid="endpoints-page"] > div:first-child',
-  '[data-testid="endpoints-grid"]',
+  '[data-testid="endpoints-table"]',
 ];
 
 const SETTINGS_LIVE_SELECTORS = [

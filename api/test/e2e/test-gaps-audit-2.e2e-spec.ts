@@ -13,7 +13,7 @@
  * 8. readOnly field in PATCH → 400 (StrictSchema ON, IgnoreReadOnly OFF)
  * 9. Invalid ?attributes= value → gracefully handled
  *
- * @see .github/prompts/addMissingTests.prompt.md
+ * @see .github/skills/addmissingtests/SKILL.md
  */
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';

@@ -223,6 +223,24 @@ describe('InMemoryGroupRepository', () => {
     });
   });
 
+  describe('countByEndpoint', () => {
+    it('counts total and active groups without traversing members', async () => {
+      await repo.create(makeGroupInput({ scimId: 'g1', displayName: 'one', active: true }));
+      await repo.create(makeGroupInput({ scimId: 'g2', displayName: 'two', active: false }));
+      await repo.create(makeGroupInput({
+        endpointId: otherEndpointId,
+        scimId: 'g3',
+        displayName: 'three',
+        active: true,
+      }), [makeMemberInput()]);
+
+      await expect(repo.countByEndpoint()).resolves.toEqual([
+        { endpointId, total: 2, active: 1 },
+        { endpointId: otherEndpointId, total: 1, active: 1 },
+      ]);
+    });
+  });
+
   // ─── update ────────────────────────────────────────────────────────
 
   describe('update', () => {

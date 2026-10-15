@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.48`
+> **Status:** User-facing reference - **Last verified:** 2026-10-15 - **Product version:** `0.55.49`
 
-> **Status:** Active | **Last Updated:** 2026-10-12 | **Version:** 0.55.48
+> **Status:** Active | **Last Updated:** 2026-10-12 | **Version:** 0.55.49
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -16,6 +16,27 @@
 ---
 
 ## Table of Contents
+
+**Local, unreleased readability follow-up:** Recent Activity reserves stable
+fields and explicitly labels server-wide requests. Operations endpoint labels
+truncate within their columns, retain full identity on hover, and use locally
+scrollable tables on mobile. Nine responsive Chromium cases cover these
+outcomes. See [validation and release boundaries](UI_ACTIVITY_ENDPOINT_READABILITY.md).
+The screenshots below still describe their recorded deployment, not this
+unreleased correction.
+
+**Local, unreleased inventory follow-up:** Dashboard now caps its endpoint
+summary at five entries and links to the full inventory. Endpoints uses a
+compact searchable table with filters outside its results scroll region.
+Discovery uses searchable endpoint selectors and the contract-first order
+Schemas, ResourceTypes, ServiceProviderConfig. The selected identities remain
+copyable, visibly marked and URL-owned. See
+[finite responsive evidence and release exclusions](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+Operations Users and Groups now reuse that persistent filter/results pattern:
+the toolbar stays outside the bounded results scroll owner while filters
+remain in URL state. Exact `Active` inventory searches exclude inactive
+endpoints. Operations and OAuth-subject `/Me` remain distinct workflows; their
+existing explanations and navigation are browser-verified, not removed.
 
 1. [Overview](#1-overview)
 2. [Accessing the UI](#2-accessing-the-ui)
@@ -108,8 +129,8 @@ After authentication the app shell renders: a brand bar, a collapsible sidebar w
 
 | Link | Route | Purpose |
 |------|-------|---------|
-| Dashboard | `/` | KPIs, request volume, activity analytics, endpoint grid |
-| Endpoints | `/endpoints` | Endpoint card grid, create, drill into detail |
+| Dashboard | `/` | KPIs, request volume, activity analytics, bounded endpoint summary |
+| Endpoints | `/endpoints` | Searchable endpoint inventory, create, drill into detail |
 | Manual Provision | `/manual-provision` | Choose an endpoint first, then create any ResourceType declared by its profile |
 | Self-service /Me | `/me` | Resolve and manage the SCIM User represented by a per-endpoint OAuth token |
 | Discovery | `/discovery` | Read-only RFC 7644 §4-§5 discovery, side-by-side diff |
@@ -143,7 +164,7 @@ The sidebar collapses to an icon rail via the chevron at its bottom, persisting 
 > and a gate keeps it that way: adding a setting to the registry without giving it a control now
 > fails the build.
 
-The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Groups, Status). Below: a 24-hour request-volume sparkline, an **Activity analytics** block (Operations 24h / 7d, User ops 30d, Group ops 30d) with a Users-vs-Groups split bar, and a grid of endpoint summary cards.
+The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Groups, Status). Below: a 24-hour request-volume sparkline, an **Activity analytics** block (Operations 24h / 7d, User ops 30d, Group ops 30d) with a Users-vs-Groups split bar, and a bounded endpoint summary. The local follow-up shows at most five entries in existing inventory order, resource counts, and **Browse all endpoints**. It does not claim favorite or recent ranking.
 
 ![Dashboard](screenshots/prod-01-dashboard.png)
 
@@ -152,13 +173,19 @@ The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Gr
 | KPI cards | `GET /scim/admin/dashboard` |
 | Request volume | `GET /scim/admin/dashboard` (hourly buckets) |
 | Activity analytics | `GET /scim/admin/activity/summary` |
-| Endpoint grid | `GET /scim/admin/endpoints` |
+| Endpoint summary | `GET /scim/admin/dashboard` |
 
 ---
 
 ## 6. Endpoints
 
-A searchable card grid of every endpoint. The header shows the total count and a **Create endpoint** button; each card shows the display name, slug, an Active/Inactive badge, and the copyable `/scim/endpoints/{id}` base path.
+The local follow-up is a searchable table of every endpoint. The header shows
+the total count and **Create endpoint**; rows expose display name, copyable ID,
+profile schema names, Active/Inactive status and the copyable base path.
+The existing `q` URL filter searches name, ID, published profile summary and
+status, and survives Back/Forward. The filter stays outside the 420 px results
+scroll region. On mobile the table scrolls inside that region, not the page.
+The recorded deployment screenshot below still shows the former card grid.
 
 ![Endpoints](screenshots/prod-02-endpoints.png)
 

@@ -8,7 +8,7 @@
     This script performs a COMPREHENSIVE find-and-replace of the old version string
     across EVERY text file in the repo (not just .md), covering:
       - Markdown docs, README, DEPLOYMENT, Session_starter, CHANGELOG
-      - .github/prompts/*.prompt.md  (Copilot prompt files)
+      - .github/skills/*/SKILL.md  (Copilot Agent Skills)
       - .github/copilot-instructions.md
       - JSON files: OpenAPI spec, version-latest badge, etc.
       - PowerShell scripts (.ps1) - deploy, live-test, setup, etc.

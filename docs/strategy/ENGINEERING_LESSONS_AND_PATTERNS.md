@@ -16,6 +16,67 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Evidence must outlive the runner that cleans its output
+
+A later focused Playwright invocation deletes the previous output directory.
+Geometry receipts stored there can disappear even though both test runs pass.
+Keep reusable measurements in a sibling evidence directory, verify that a
+subsequent focused invocation preserves them, and commit a generated aggregate
+when the handoff must travel with the branch. Test screenshots can remain
+scratch artifacts. This prevents a truthful measured result from becoming
+an unsupported claim after another validation run.
+See IS-I16 in [the inventory execution ledger](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+
+### Status keywords are semantics, not arbitrary substrings
+
+An inventory query for `Active` also finds `Inactive` under plain substring
+matching. Normalize exact status keywords before generic identity search,
+and assert the complete matching set in both helper units and browser filters.
+Reuse the matcher across inventory and selector consumers so the meaning
+does not drift. See IS-I09 in
+[the inventory execution ledger](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+
+### Missing required evidence must not become a passed diagnostic skip
+
+A new worktree's missing Mermaid tooling was reported as PASS because both
+the hook wrapper and render command returned zero without rendering. Required
+commands must fail closed on missing prerequisites, while diagnostic commands
+must label unknown evidence honestly. Execute negative controls through the
+real registered action and summary, not a source-text assertion. Bundled
+version discovery must identify the owning library: a profiling placeholder
+or React version is not a Mermaid pin. See
+[the gate hardening evidence and RCA](MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
+The root documentation-tooling lock must participate in the same provenance
+gate as API/web. CI-only cleanup must preserve version choices rather than
+silently upgrading unrelated packages, and publication-age reports must include
+same-version provenance rewrites. The accepted root correction uses npm with
+a temporary version seed, restores the real manifest, and validates every
+changed entry before artifact upload; no integrity hashes are synthesized.
+
+### Lifecycle projections must aggregate where the data lives
+
+A complete Prisma E2E run exposed an application-startup query shape that
+focused suites could not reproduce. `StatsProjectionService` listed every
+endpoint and materialized every User, every Group and every Group membership
+solely to seed four counters. The E2E database retains fixtures until global
+teardown, so every later application bootstrap repeated more work until six
+hooks crossed the unchanged 30-second limit.
+
+Counting now occurs at the repository boundary: one grouped User query and one
+grouped Group query for PostgreSQL, and one map scan per type for InMemory.
+The full retained-fixture run moved from 112/118 suites and 2,348/2,492 tests
+passing in 42m 27.265s to 118/118 and 2,492/2,492 in 17m 49.315s. A permanent
+query-shape test forbids full-list methods during projection seeding.
+
+Sparse aggregate semantics matter. When a successful grouped query omits an
+endpoint, zero is authoritative. Previous counters may be preserved only when
+the aggregate itself rejects. Keep separate tests for those outcomes. For
+lifecycle and reconciliation code, a focused fresh-database pass is not enough:
+the acceptance check must retain realistic accumulated state across repeated
+bootstraps. See RC-I102 and RC-I103 in the
+[correctness execution ledger](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md).
+
 ### Revision identity belongs to persisted state, not a normalized view
 
 When compatibility normalization renames or removes legacy settings,

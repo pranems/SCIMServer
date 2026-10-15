@@ -23,6 +23,8 @@ import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-p
 import { withUniqueWrite } from './prisma-uniqueness';
 import { wrapEndpointCreateError } from './endpoint-create-error';
 import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
+import type { EndpointResourceCounts } from '../../../domain/repositories/endpoint-resource-counts';
+import { collectEndpointResourceCounts } from './prisma-resource-counts';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
@@ -105,6 +107,19 @@ export class PrismaUserRepository implements IUserRepository {
       return resources.map((r) => toUserRecord(r as unknown as Record<string, unknown>));
     } catch (error) {
       throw wrapPrismaError(error, `User findAll(${endpointId})`);
+    }
+  }
+
+  async countByEndpoint(): Promise<EndpointResourceCounts[]> {
+    try {
+      const rows = await this.prisma.scimResource.groupBy({
+        by: ['endpointId', 'active'],
+        where: { resourceType: 'User' },
+        _count: { _all: true },
+      });
+      return collectEndpointResourceCounts(rows);
+    } catch (error) {
+      throw wrapPrismaError(error, 'User countByEndpoint');
     }
   }
 

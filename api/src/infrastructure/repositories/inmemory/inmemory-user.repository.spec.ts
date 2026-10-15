@@ -201,6 +201,24 @@ describe('InMemoryUserRepository', () => {
     });
   });
 
+  describe('countByEndpoint', () => {
+    it('counts total and active users independently for each endpoint', async () => {
+      await repo.create(makeInput({ scimId: 'u1', userName: 'one', active: true }));
+      await repo.create(makeInput({ scimId: 'u2', userName: 'two', active: false }));
+      await repo.create(makeInput({
+        endpointId: otherEndpointId,
+        scimId: 'u3',
+        userName: 'three',
+        active: true,
+      }));
+
+      await expect(repo.countByEndpoint()).resolves.toEqual([
+        { endpointId, total: 2, active: 1 },
+        { endpointId: otherEndpointId, total: 1, active: 1 },
+      ]);
+    });
+  });
+
   // ─── update ────────────────────────────────────────────────────────
 
   describe('update', () => {

@@ -160,7 +160,7 @@ export const operationsSearchSchema = z.object({
 export type OperationsSearch = z.infer<typeof operationsSearchSchema>;
 
 /** Discovery endpoint selection, comparison mode, and active sub-tab. */
-export const DISCOVERY_TAB_VALUES = ['serviceProviderConfig', 'resourceTypes', 'schemas'] as const;
+export const DISCOVERY_TAB_VALUES = ['schemas', 'resourceTypes', 'serviceProviderConfig'] as const;
 export const discoverySearchSchema = z.object({
   primaryId: z.preprocess(emptyToUndef, z.string().optional()),
   compare: z.preprocess(
@@ -168,7 +168,7 @@ export const discoverySearchSchema = z.object({
     explicitBoolean.optional(),
   ),
   secondaryId: z.preprocess(emptyToUndef, z.string().optional()),
-  tab: z.preprocess(emptyToUndef, z.enum(DISCOVERY_TAB_VALUES).default('serviceProviderConfig')),
+  tab: z.preprocess(emptyToUndef, z.enum(DISCOVERY_TAB_VALUES).default('schemas')),
 });
 export type DiscoverySearch = z.infer<typeof discoverySearchSchema>;
 

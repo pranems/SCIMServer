@@ -1,21 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Badge,
+  Button,
   Caption1,
   Combobox,
   Field,
   Option,
-  Text,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { Checkmark16Regular } from '@fluentui/react-icons';
+import { CopyableField, TruncatedText } from '../primitives';
+import { endpointProfileLabel, matchesEndpoint, type EndpointInventoryIdentity } from './endpoint-inventory';
 
-export interface EndpointContextOption {
-  id: string;
-  name: string;
-  displayName?: string;
-  active: boolean;
-}
+export type EndpointContextOption = EndpointInventoryIdentity;
 
 export interface EndpointContextSelectorProps {
   endpoints: EndpointContextOption[];
@@ -25,6 +23,8 @@ export interface EndpointContextSelectorProps {
   purpose?: string;
   placeholder?: string;
   disabled?: boolean;
+  allowInactive?: boolean;
+  selectedRole?: 'primary' | 'secondary';
   'data-testid'?: string;
 }
 
@@ -49,10 +49,14 @@ const useStyles = makeStyles({
   },
   selected: {
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: 'column',
     gap: '8px',
     minHeight: '24px',
     minWidth: 0,
+    padding: '12px',
+    border: `2px solid ${tokens.colorBrandStroke1}`,
+    backgroundColor: tokens.colorBrandBackground2,
+    borderRadius: tokens.borderRadiusMedium,
   },
   selectedIdentity: {
     display: 'flex',
@@ -71,10 +75,9 @@ export const EndpointOptionIdentity: React.FC<{ endpoint: EndpointContextOption 
   const displayName = endpoint.displayName ?? endpoint.name;
   return (
     <div className={classes.option}>
-      <Text weight="semibold">{displayName}</Text>
-      <span className={classes.optionMeta}>
-        {endpoint.name} - {endpoint.active ? 'Active' : 'Inactive'}
-      </span>
+      <TruncatedText maxWidth="100%" text={displayName} />
+      <TruncatedText className={classes.optionMeta} maxWidth="100%"
+        text={`${endpoint.name} - ${endpoint.id} - ${endpoint.active ? 'Active' : 'Inactive'} - ${endpointProfileLabel(endpoint)}`} />
     </div>
   );
 };
@@ -87,10 +90,15 @@ export const EndpointContextSelector: React.FC<EndpointContextSelectorProps> = (
   purpose,
   placeholder = 'Select an endpoint',
   disabled = false,
+  allowInactive = false,
+  selectedRole,
   'data-testid': testId = 'endpoint-context-selector',
 }) => {
   const classes = useStyles();
   const selected = endpoints.find((endpoint) => endpoint.id === value);
+  const [query, setQuery] = useState<string>();
+  const [open, setOpen] = useState(false);
+  const filtered = endpoints.filter(endpoint => matchesEndpoint(endpoint, query ?? ''));
 
   return (
     <div className={classes.root} data-testid={testId}>
@@ -98,39 +106,65 @@ export const EndpointContextSelector: React.FC<EndpointContextSelectorProps> = (
         <Combobox
           aria-label={label}
           placeholder={endpoints.length === 0 ? 'No endpoints available' : placeholder}
-          value={selected ? (selected.displayName ?? selected.name) : ''}
+          value={query ?? (selected ? (selected.displayName ?? selected.name) : '')}
+          open={open}
+          onOpenChange={(_, data) => {
+            setOpen(data.open);
+            if (!data.open) setQuery(undefined);
+          }}
+          onChange={event => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setQuery('')}
+          style={{ width: '100%', minWidth: 0 }}
+          listbox={{ style: { maxHeight: '280px', overflowY: 'auto', maxWidth: 'calc(100vw - 32px)' } }}
           selectedOptions={value ? [value] : []}
           onOptionSelect={(_, data) => {
-            if (data.optionValue) onChange(data.optionValue);
+            if (data.optionValue) {
+              onChange(data.optionValue);
+              setQuery(undefined);
+              setOpen(false);
+            }
           }}
           disabled={disabled || endpoints.length === 0}
         >
-          {endpoints.map((endpoint) => {
+          {filtered.map((endpoint) => {
             const displayName = endpoint.displayName ?? endpoint.name;
             return (
               <Option
                 key={endpoint.id}
                 value={endpoint.id}
                 text={displayName}
-                disabled={!endpoint.active}
+                disabled={!allowInactive && !endpoint.active}
                 data-testid={`${testId}-option-${endpoint.id}`}
               >
                 <EndpointOptionIdentity endpoint={endpoint} />
               </Option>
             );
           })}
+          {filtered.length === 0 && <Option disabled text="No matching endpoints">No matching endpoints</Option>}
         </Combobox>
       </Field>
       {purpose && <Caption1 className={classes.purpose}>{purpose}</Caption1>}
       {selected && (
-        <div className={classes.selected} data-testid="endpoint-context-selected">
+        <div className={classes.selected} data-testid={selectedRole ? `${testId}-selected` : 'endpoint-context-selected'}>
+          {selectedRole && (
+            <Button appearance="transparent" size="small" icon={<Checkmark16Regular />} aria-pressed="true"
+              aria-label={`Selected ${selectedRole} endpoint: ${selected.displayName ?? selected.name}`}
+              onClick={() => onChange(selected.id)}>
+              {selectedRole === 'primary' ? 'Primary selected' : 'Secondary selected'}
+            </Button>
+          )}
           <Badge appearance="tint" color={selected.active ? 'success' : 'danger'}>
             {selected.active ? 'Active' : 'Inactive'}
           </Badge>
           <div className={classes.selectedIdentity}>
-            <Text weight="semibold">{selected.displayName ?? selected.name}</Text>
-            <Caption1 className={classes.optionMeta}>{selected.name}</Caption1>
+            <CopyableField value={selected.displayName ?? selected.name} truncate maxWidth="100%" />
           </div>
+          <CopyableField value={selected.id} monospace truncate maxWidth="100%" />
+          <CopyableField value={selected.name} truncate maxWidth="100%" />
+          <CopyableField value={endpointProfileLabel(selected)} truncate maxWidth="100%" />
         </div>
       )}
     </div>

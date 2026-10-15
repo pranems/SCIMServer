@@ -5,8 +5,8 @@ $helperPath = Join-Path $repoRoot 'scripts/github-workflow-run.ps1'
 $pipelinePath = Join-Path $repoRoot 'scripts/dev-deployment-pipeline.ps1'
 $workflowPath = Join-Path $repoRoot '.github/workflows/publish-ghcr.yml'
 $publishInstructionPaths = @(
-    (Join-Path $repoRoot '.github/prompts/deployAndPromote.prompt.md'),
-    (Join-Path $repoRoot '.github/prompts/devDeploymentPipeline.prompt.md'),
+    (Join-Path $repoRoot '.github/skills/deployandpromote/SKILL.md'),
+    (Join-Path $repoRoot '.github/skills/devdeploymentpipeline/SKILL.md'),
     (Join-Path $repoRoot 'docs/TENANT_09_MIGRATION_PLAN.md')
 )
 $promotePath = Join-Path $repoRoot 'scripts/promote-to-prod.ps1'

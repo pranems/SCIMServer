@@ -62,6 +62,7 @@ import {
 import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
+import { FilteredResultsPanel } from '../components/primitives/FilteredResultsPanel';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 import type { OperationsSearch } from '../routes/search-schemas';
@@ -116,6 +117,7 @@ const useStyles = makeStyles({
   },
   rowTable: {
     width: '100%',
+    minWidth: '480px',
     borderCollapse: 'collapse',
     fontSize: tokens.fontSizeBase300,
     // R5 (copilot-instructions.md): a table whose cells truncate MUST use
@@ -356,7 +358,7 @@ const UsersSection: React.FC<{
   };
 
   return (
-    <div>
+    <FilteredResultsPanel label="Current users" data-testid="operations-users-results" toolbar={
       <div className={classes.toolbar}>
         <div className={classes.toolbarGrow}>
           <SearchBox
@@ -382,6 +384,7 @@ const UsersSection: React.FC<{
           Download CSV
         </Button>
       </div>
+    }>
 
       {isLoading && <LoadingSkeleton count={8} height="36px" />}
       {error != null && <ScimErrorMessage error={error} />}
@@ -398,7 +401,7 @@ const UsersSection: React.FC<{
         />
       )}
       {!isLoading && !error && rows.length > 0 && (
-        <Card style={{ padding: 0 }}>
+        <>
           <table className={classes.rowTable}>
             <thead>
               <tr>
@@ -478,9 +481,9 @@ const UsersSection: React.FC<{
               </div>
             </div>
           )}
-        </Card>
+        </>
       )}
-    </div>
+    </FilteredResultsPanel>
   );
 };
 
@@ -526,7 +529,7 @@ const GroupsSection: React.FC<{
   };
 
   return (
-    <div>
+    <FilteredResultsPanel label="Current groups" data-testid="operations-groups-results" toolbar={
       <div className={classes.toolbar}>
         <div className={classes.toolbarGrow}>
           <SearchBox
@@ -546,6 +549,7 @@ const GroupsSection: React.FC<{
           Download CSV
         </Button>
       </div>
+    }>
 
       {isLoading && <LoadingSkeleton count={8} height="36px" />}
       {error != null && <ScimErrorMessage error={error} />}
@@ -562,7 +566,7 @@ const GroupsSection: React.FC<{
         />
       )}
       {!isLoading && !error && rows.length > 0 && (
-        <Card style={{ padding: 0 }}>
+        <>
           <table className={classes.rowTable}>
             <thead>
               <tr>
@@ -640,9 +644,9 @@ const GroupsSection: React.FC<{
               </div>
             </div>
           )}
-        </Card>
+        </>
       )}
-    </div>
+    </FilteredResultsPanel>
   );
 };
 
@@ -678,10 +682,13 @@ const EndpointBadgeLink: React.FC<{
       onClick={handleClick}
       data-testid={testId}
       title={`${identity?.label ?? endpointId} (${identity?.name ?? endpointId}, ${endpointId})`}
-      style={{ textDecoration: 'none' }}
+      style={{ textDecoration: 'none', display: 'block', maxWidth: '100%' }}
     >
-      <Badge appearance="outline" size="small">
-        {identity?.label ?? endpointId.slice(0, 8)}
+      <Badge appearance="outline" size="small" style={{ maxWidth: '100%', minWidth: 0 }}>
+        <TruncatedText
+          text={identity?.label ?? endpointId.slice(0, 8)}
+          data-testid={`${testId}-label`}
+        />
       </Badge>
     </a>
   );

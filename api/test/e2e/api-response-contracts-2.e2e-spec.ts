@@ -10,7 +10,7 @@
  *   - Endpoint log responses (P1, P4)
  *   - /Me endpoint contract (M1)
  *
- * @see .github/prompts/apiContractVerification.prompt.md
+ * @see .github/skills/apicontractverification/SKILL.md
  */
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';

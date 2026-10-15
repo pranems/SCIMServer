@@ -54,7 +54,8 @@ async function openDiscovery(page: Page): Promise<void> {
   // The discovery surfaces only render once a PRIMARY endpoint is picked (the
   // picker does NOT auto-select). Select OUR endpoint by id so no other spec's
   // lifecycle can affect this one.
-  const option = page.getByTestId(`discovery-primary-option-${fixtureEndpointId}`);
+  await page.getByTestId('discovery-primary-selector').getByRole('combobox').fill(fixtureEndpointId!);
+  const option = page.getByTestId(`discovery-primary-selector-option-${fixtureEndpointId}`);
   await expect(option, 'the fixture endpoint must appear in the discovery picker').toBeVisible({
     timeout: 30_000,
   });
