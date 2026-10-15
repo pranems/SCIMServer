@@ -27,6 +27,7 @@ import { assertWritePrecondition, type ExpectedVersion } from '../../../domain/r
 import { InMemoryEndpointWriteGuard } from './inmemory-endpoint-write-guard';
 import { prepareMapRemoval, type EndpointDeletionStep } from './endpoint-deletion-step';
 import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
+import type { EndpointResourceCounts } from '../../../domain/repositories/endpoint-resource-counts';
 
 @Injectable()
 export class InMemoryUserRepository implements IUserRepository {
@@ -100,6 +101,23 @@ export class InMemoryUserRepository implements IUserRepository {
     });
 
     return results.map((u) => ({ ...u }));
+  }
+
+  async countByEndpoint(): Promise<EndpointResourceCounts[]> {
+    const counts = new Map<string, EndpointResourceCounts>();
+    for (const user of this.users.values()) {
+      const current = counts.get(user.endpointId) ?? {
+        endpointId: user.endpointId,
+        total: 0,
+        active: 0,
+      };
+      current.total++;
+      if (user.active) {
+        current.active++;
+      }
+      counts.set(user.endpointId, current);
+    }
+    return [...counts.values()];
   }
 
   async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<UserRecord> {

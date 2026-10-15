@@ -44,11 +44,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failure stacks, or the structured results reporter. Contracts were RED for
   both missing switches and GREEN after the two command changes. An injected
   causal exception remains visible and exits 1.
-- Retain the second pipeline's 2,348-pass/140-fail/four-skip Prisma receipt.
-  A later isolated diagnostic with explicit Prisma selection passes all
-  2,492 tests across 118 suites with zero skips in 1,417.31 seconds.
-  No tests or timeout limits changed. This diagnostic does not establish
-  the earlier timeout's sole cause or replace authoritative deployment proof.
+- Fix the cumulative Prisma bootstrap timeout in `StatsProjectionService`.
+  Startup and reconciliation previously listed every endpoint, then loaded
+  every User and every Group plus membership for each endpoint solely to count
+  them. E2E data persists until global teardown, so repeated application
+  bootstrap became progressively slower as fixtures accumulated.
+- Add repository-level endpoint aggregates for both persistence backends.
+  PostgreSQL now uses one grouped count query per resource type; InMemory scans
+  each resource map once. Successful sparse results treat a missing endpoint
+  row as authoritative zero, while a rejected aggregate preserves the prior
+  counter until the next reconciliation.
+- Permanent RED/GREEN controls forbid full-resource reads during stats seeding
+  and cover the sparse-zero distinction. Five focused suites pass 177 tests,
+  and the API build passes. The complete owned PostgreSQL 17.11 run passes all
+  118 suites and 2,492 tests with zero skips in 17m 49.315s. The retained failed
+  receipt was 112 suites and 2,348 tests passing, 140 failures, four skips, and
+  42m 27.265s. No assertion, suite, migration, or 30-second hook limit changed.
+- The first normal push was correctly blocked because the fresh worktree had
+  no Vite binary. After confirming byte-identical web manifests and locks, an
+  ignored dependency junction reused the matching installed tree without an
+  install or lock rewrite. The unchanged retry passes all 22 Fast gates in
+  356.5 seconds, including 6,043 API units and 2,432 InMemory E2E passes with
+  four PostgreSQL-only exclusions.
 - Enable seeded profile-shape coverage in the authoritative dev Playwright
   lane, parse its JSON result, and fail the gate on any skipped case. Restore
   the dev-only shape and mutation flags after the dev run, and explicitly clear

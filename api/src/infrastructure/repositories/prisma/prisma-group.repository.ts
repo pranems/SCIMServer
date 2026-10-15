@@ -25,6 +25,8 @@ import { isValidUuid } from './uuid-guard';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
 import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
+import type { EndpointResourceCounts } from '../../../domain/repositories/endpoint-resource-counts';
+import { collectEndpointResourceCounts } from './prisma-resource-counts';
 
 /** Maps a ScimResource row (with JSONB payload) to the GroupRecord domain type. */
 function toGroupRecord(resource: Record<string, unknown>): GroupRecord {
@@ -154,6 +156,19 @@ export class PrismaGroupRepository implements IGroupRepository {
       return resources.map((r) => toGroupWithMembers(r as unknown as Record<string, unknown>));
     } catch (error) {
       throw wrapPrismaError(error, `Group findAllWithMembers(${endpointId})`);
+    }
+  }
+
+  async countByEndpoint(): Promise<EndpointResourceCounts[]> {
+    try {
+      const rows = await this.prisma.scimResource.groupBy({
+        by: ['endpointId', 'active'],
+        where: { resourceType: 'Group' },
+        _count: { _all: true },
+      });
+      return collectEndpointResourceCounts(rows);
+    } catch (error) {
+      throw wrapPrismaError(error, 'Group countByEndpoint');
     }
   }
 
