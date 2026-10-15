@@ -143,7 +143,10 @@ reporter duration is 17m 49.315s, a 58.02% reduction from the retained failed
 receipt. The task-owned container, database marker and loopback binding were
 removed after exact identity verification; no shared container was touched.
 Five focused repository/projection suites pass 177 tests, and the API build
-passes.
+passes. The subsequent normal push passes all 22 Fast gates in 356.5 seconds:
+6,043 API units, 2,432 InMemory E2E passes with four PostgreSQL-only
+exclusions, both builds, lint, type-checking and all registered static
+contracts.
 
 The original dev reference was explicitly selected, using its enabled bearer
 method and profile-conforming User and Group fixtures. Both POSTs reproduce

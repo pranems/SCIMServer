@@ -60,6 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   118 suites and 2,492 tests with zero skips in 17m 49.315s. The retained failed
   receipt was 112 suites and 2,348 tests passing, 140 failures, four skips, and
   42m 27.265s. No assertion, suite, migration, or 30-second hook limit changed.
+- The first normal push was correctly blocked because the fresh worktree had
+  no Vite binary. After confirming byte-identical web manifests and locks, an
+  ignored dependency junction reused the matching installed tree without an
+  install or lock rewrite. The unchanged retry passes all 22 Fast gates in
+  356.5 seconds, including 6,043 API units and 2,432 InMemory E2E passes with
+  four PostgreSQL-only exclusions.
 - Enable seeded profile-shape coverage in the authoritative dev Playwright
   lane, parse its JSON result, and fail the gate on any skipped case. Restore
   the dev-only shape and mutation flags after the dev run, and explicitly clear
