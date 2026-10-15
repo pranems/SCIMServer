@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Standup evidence completeness
+
+- Preserve useful local standup improvements in the shared explicit-only skill:
+  bounded sibling-clone discovery, deduplicated commit evidence, per-initiative
+  acceptance states, exact-commit red/green reconciliation, and redacted
+  incident/non-commit history. Keep reporting read-only and retain all six
+  report sections, CSV shape, and the copy-paste block.
+- Add four customization-contract assertions, confirmed RED before updating
+  the skill and GREEN afterwards. No product runtime, version, or deployment
+  changes are included; existing product test counts are unchanged.
+
 ### Copilot Agent Skill migration
 
 - Convert all 34 workspace prompt files on latest master into explicit-only

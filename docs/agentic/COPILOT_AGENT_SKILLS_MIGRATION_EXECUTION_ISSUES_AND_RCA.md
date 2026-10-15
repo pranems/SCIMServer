@@ -166,3 +166,34 @@ Verified and dismissed as non-issues:
   workflows over 500 lines use progressive reference loading. Creating custom
   agents for workflows that need no restricted capability would add
   speculative abstraction with no second implementation.
+
+## Standup guidance follow-up - 2026-10-14
+
+Cleanup of the original worktree identified one generated skill with useful
+unmerged additions: `standupstatus`. Its sibling-clone, incident-history, and
+acceptance-reconciliation guidance was preserved locally rather than discarded.
+This follow-up promotes those capabilities on a branch from merged master,
+without changing the original source or its unrelated staged documentation.
+
+The shared skill retains explicit-only invocation and its six-section output,
+CSV contract, and copy-paste block. Discovery is bounded to matching project
+repositories. Parallel work gets branch-specific acceptance evidence, and
+incidents are reported from existing investigation records rather than turning
+a status report into a debugging task. Session-history guidance uses the
+available tool's documented schema rather than assuming a personal skill or
+identical cloud/local columns.
+
+| Issue | Type / severity | Symptom and root cause | Resolution and why it works | Prevention and escape analysis |
+|---|---|---|---|---|
+| ST-01 | Test correctness / Low | The first GREEN attempt still rejected sibling discovery because a literal assertion did not tolerate a Markdown line wrap between `immediate` and `repository`. | Match whitespace with `\s+` at that boundary; the requirement is unchanged and the check now accepts equivalent wrapping. | Four new requirements failed before the skill update; all pass after it. Detected and fixed in the same focused gate, escape delta zero. These are instruction-presence guards, not proof that every future report is complete. |
+| ST-02 | Shared environment / Low | The active GitHub account had read-only access and branch-protection lookup returned 404. | Use the already authenticated repository owner through a process-scoped token; verify permission and protection without changing global account selection. | Do not infer absent protection from 404. Check repository permission first. Detected at governance lookup, the earliest applicable gate, escape delta zero. |
+
+This follow-up was reconciled against the local source comparison and current
+tool results, including the exact four expected RED assertions and the
+subsequent GREEN output. No raw transcript path was available; no full-transcript
+reconciliation is claimed.
+
+**Test/gate disposition: applied.** Four committed-tree assertions prevent
+silent loss of the promoted guidance. **Design/architecture disposition:
+accepted.** The workflow remains one cohesive read-only reporting skill;
+adding a separate clone-inventory execution framework would be speculative.

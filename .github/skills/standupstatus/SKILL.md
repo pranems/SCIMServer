@@ -35,6 +35,56 @@ $worktrees = git worktree list --porcelain | Where-Object { $_ -like 'worktree *
 foreach ($p in $worktrees) { "=== $p ==="; git -C $p status --short --branch }
 ```
 
+### 1.1a Sibling clones and parallel branches
+
+`git worktree list` does not discover separate clones. Search only the immediate
+repository parent for directories named `SCIMServer*`, including Git worktrees
+whose `.git` is a file. Keep only candidates with the same repository identity:
+compare the exact origin owner/repository after normalizing SSH versus HTTPS,
+the optional `.git` suffix, and case. Do not use a loose substring match, scan
+unrelated directories, or change a candidate's branch, files, or index.
+
+For every matching candidate and its linked worktrees, record path, branch,
+full HEAD, dirty state, upstream, ahead/behind counts against its fetched
+`origin/master`, and commits in the requested range. Deduplicate paths already
+visited through the worktree inventory. Fetch refs without pruning or resetting
+local work; if fetch, upstream resolution, or ancestry lookup fails, record the
+failure and mark the corresponding evidence unverified, never zero or clean.
+
+Deduplicate by full commit SHA before computing cross-clone totals. Do not add
+mainline test totals to a parallel branch's feature claims. A clean clone,
+`integrate/*` branch name, or version bump does not prove reviewed delivery.
+Report each parallel initiative with its evidence:
+
+| State | Required evidence |
+|---|---|
+| Merged and deployed | PR merge identity plus current live estate proof |
+| Merged, not deployed | Merge identity and unverified or lagging estates |
+| Parallel branch, validation known | Clone/branch/HEAD, dirty state, passing and failing gates, PR state |
+| Parallel branch, validation incomplete | Same identity and explicitly missing or failed acceptance gates |
+| Uncommitted work | Changed paths, separate from committed delivery totals |
+
+For a substantial parallel initiative, inspect its session handoff, canonical
+plan/issue ledger, latest validation receipts, and matching PR/deployment
+closeout even when mainline already contains an earlier related merge. For
+example, a SCIM correctness consolidation may contain further PATCH path,
+schema/profile, query/search, persistence/race, or retained-entry work. Include
+only surfaces supported by evidence, not a checklist of assumed features.
+
+### 1.1b Reconcile red/green evidence by exact commit
+
+For every relevant saved failure, record its timestamp, tested full HEAD,
+command/test scope, backend, and environment. Search later receipts and
+PR/merge closeouts for a complete rerun on the same or a descendant commit.
+A later exact-tip full pass supersedes the older failure as current status only
+when it covers the failed scope in the applicable backend/environment; retain
+the earlier failure as historical root-cause evidence. A focused pass does not supersede a broad backend suite.
+
+If commit identity, ancestry, scope, or environment cannot be established, mark
+acceptance unverified. Separate source-tested, built-artifact-tested, merged, and deployed
+outcomes. Neither a prose completion claim nor a green unrelated suite replaces
+the missing acceptance evidence.
+
 Quantify the range:
 
 ```powershell
@@ -45,16 +95,32 @@ git log "$base..origin/master" --pretty=format:"=== %h %s" --name-only   # map c
 
 ### 1.2 Work that produced no commit
 
-Commits are not the whole record. Use the **chronicle** skill (`copilot_sessionStoreSql`)
-to find investigative work, reviews, incidents and RCA that never became a commit:
+Commits are not the whole record. Use the available session-history query tool
+(for example `session_store_sql`) to find investigations, reviews, incidents,
+and root-cause analysis that never became a commit. Start with time-bounded
+session metadata for the requested range, then inspect turns only for relevant
+session IDs. Use the tool's documented cloud or local schema and a result limit;
+do not assume both stores expose the same columns.
 
-```sql
-SELECT id, repository, branch, substr(summary,1,180) AS summary, updated_at, agent_name
-FROM sessions WHERE updated_at >= '<RANGE_START>' ORDER BY updated_at DESC
-```
+Cross-repository sessions count when the work was ours (for example a pull
+request review in another repository). Also inspect candidates whose
+repository or branch metadata is blank when their summaries, turns, or file
+references identify this project. State which store supplied evidence. If a
+relevant store is unavailable or bounded results are incomplete, mark activity
+coverage partial rather than claiming no non-commit work occurred.
 
-Drill into `turns` for the sessions that matter. Cross-repository sessions count when
-the work was ours (for example a pull request review in another repository).
+For reported production or canary incidents, recover the original symptom,
+affected operation/resource family, reproduced cause, fix location, validation,
+and deployment state from the incident's existing evidence. Search by symptom
+as well as project terms, such as PATCH, filter, boolean, custom extension,
+schemaExtensions, User/Group, `.search`, Prisma, and InMemory when relevant.
+For PATCH/filter incidents, distinguish boolean predicates such as
+`primary eq true` from quoted-string predicates on complex extension attributes,
+and a missed nested mutation from a persisted literal path key. Consult the
+recorded parser/validator/mutation findings; do not start a new debugging or implementation exercise.
+If the investigation did not establish a cause or affected surface, say so.
+Redact resource identifiers, tenant data, request bodies, personally identifiable
+information (PII), and credential values from the report.
 
 ### 1.3 Merged is not deployed
 
@@ -108,6 +174,10 @@ shortlog. For each theme give the outcome and, where it exists, the measurement
 ("7 ms versus 2,866 ms" beats "improved performance").
 
 Lead with the release list and the deployed-versus-merged line.
+Give significant parallel work its own theme, labeled unmerged/unreleased until proven otherwise.
+For incidents, state what the user observed, what was reproduced, what changed,
+and whether the correction is on a parallel branch, in a reviewed PR, merged,
+or live. Do not reduce a production regression to its eventual commit title.
 
 ### 2) 30-second spoken script
 
@@ -128,6 +198,9 @@ the headline outcome, name the single most valuable finding, close with the them
 
 Columns: `# | Work item | Status | Acceptance outcome`. Cover delivered **and** open
 items so the list doubles as a backlog snapshot.
+Represent a large parallel initiative as a parent item with coherent child work items
+for distinct behavioral outcomes. Give each child its own validation and
+merge/deployment state. One green sub-branch does not complete the parent.
 
 ### 5) Consolidated work items (CSV, import ready)
 
@@ -168,13 +241,20 @@ operator actually pastes into the standup channel, so it must stand alone.
 
 1. **Verify, never recall.** Every number traces to a command run in this session.
 2. **Merged is not deployed.** State both. An estate behind is a Risk.
-3. **No pull request is not no work.** Direct-to-master delivery is normal here; say
-   "no pull request" rather than omitting the item.
+3. **No pull request is not no work.** Report investigations, uncommitted work,
+   and historical direct-to-master delivery honestly; say "no pull request"
+   rather than omitting the item. This does not authorize bypassing current PR policy.
 4. **Include the invisible work.** Reviews, incidents, RCA and environment triage
    belong in the report even with zero commits.
 5. **Include every worktree**, plus dirty files and local-ahead commits.
-6. **Never use an em-dash** anywhere in the output. Use a single hyphen.
-7. **Report contradictions.** If a ledger, doc or register disagrees with the code,
+6. **Include sibling clones.** Bound discovery to matching project repositories;
+   deduplicate paths and full commit SHAs, not just commit subjects.
+7. **Implementation is not acceptance.** Show branch-specific evidence and missing
+   gates; distinguish source, built artifact, merge, and deployment outcomes.
+8. **Reconcile old failures.** Record the original red and the superseding full
+   green, or explain why the evidence is still incomplete.
+9. **Never use an em-dash** anywhere in the output. Use a single hyphen.
+10. **Report contradictions.** If a ledger, doc or register disagrees with the code,
    that gap is a finding.
-8. **Measurements beat adjectives.** Prefer a number with its before and after.
-9. If a check cannot run, say so and mark the item unverified. Do not guess.
+11. **Measurements beat adjectives.** Prefer a number with its before and after.
+12. If a check cannot run, say so and mark the item unverified. Do not guess.
