@@ -217,14 +217,18 @@ Invoke-Assert -Description 'default validation project identity remains unique a
     function Get-Content { param($LiteralPath, [switch]$Raw) $state.Evidence | ConvertTo-Json -Depth 10 }
     $originalExit = $global:LASTEXITCODE
     try {
-        foreach ($case in @('valid', 'child failure', 'wrong version', 'missing mode', 'missing outcome', 'failed cleanup', 'skipped check')) {
+        foreach ($case in @('valid', 'child failure', 'wrong version', 'missing mode', 'missing outcome', 'failed cleanup',
+            'skipped check', 'missing custom outcome', 'missing membership outcome', 'unsupported check', 'failed custom disposition')) {
             $state.Exit = 0
             $state.Evidence = @{
                 serverVersion = $version
+                customExtensionDisposition = 'PASS: reviewed mapping proved'
                 modes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity') | ForEach-Object { @{ mode = $_; status = 'PASS' } }
                 results = @(
                     foreach ($mode in @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')) {
-                        foreach ($check in @('create user', 'update user', 'disable user', 'deprovision user', 'mode outcome')) {
+                        foreach ($check in @('create user', 'update user', 'disable user', 'reenable user', 'deprovision user',
+                            'create custom extension', 'update custom extension', 'create group', 'update group',
+                            'add group member', 'remove group member', 'deprovision group', 'mode outcome')) {
                             @{ scenario = "auth:$mode"; check = $check; status = 'PASS' }
                         }
                     }
@@ -238,6 +242,18 @@ Invoke-Assert -Description 'default validation project identity remains unique a
                 'missing outcome' { $state.Evidence.results = @() }
                 'failed cleanup' { $state.Evidence.cleanup[0].removed = $false }
                 'skipped check' { $state.Evidence.results += @{ status = 'SKIPPED' } }
+                'missing custom outcome' {
+                    $state.Evidence.results = @($state.Evidence.results | Where-Object {
+                        $_.scenario -ne 'auth:OAuthClientCredentials' -or $_.check -ne 'update custom extension'
+                    })
+                }
+                'missing membership outcome' {
+                    $state.Evidence.results = @($state.Evidence.results | Where-Object {
+                        $_.scenario -ne 'auth:WorkloadIdentity' -or $_.check -ne 'remove group member'
+                    })
+                }
+                'unsupported check' { $state.Evidence.results += @{ status = 'UNSUPPORTED' } }
+                'failed custom disposition' { $state.Evidence.customExtensionDisposition = 'FAIL: mapping not proved' }
             }
             $passed = $true
             try { & $gateBody } catch { $passed = $false }

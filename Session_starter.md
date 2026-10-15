@@ -2,6 +2,32 @@
 
 **Last verified:** 2026-10-15
 
+**Gallery coverage expansion:** The isolated custom-mapping worktree is based
+on merged runtime PR #215 at `99cdeda3`. Pure profile/mapping transformation,
+saved-source verification, all-three-auth Group orchestration, report
+truthfulness, and stricter Stage 4.8 acceptance pass their behavioral contracts
+after confirmed RED controls. A read-only real Graph template transformation
+also passed. No expanded live provisioning is claimed: the runtime deployment
+owner still owns the shared validation environment. See
+`docs/ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md`. Earlier 33-check results
+below describe the reduced historical matrix, not this prepared expansion.
+Checkpoint `0a884263` is pushed. Its normal Fast hook passed, including 2,432
+InMemory E2E tests with four PostgreSQL-only exclusions. The next focused
+checkpoint rejects empty auth selections and vacuous coverage claims; all 70
+gallery and 42 pipeline contracts pass after integration of reviewed master
+`f96f31b5` and its serial-Prisma guard. A read-only actual dev preset passed
+the built runtime profile validator with the reviewed extension.
+
+**Runtime release checkpoint:** PR #215 merged normally at `99cdeda3` with
+v0.55.48 metadata and preserved runtime/live-test history. Its full
+merged-master dev pipeline and existing legacy-reference verification still
+belong to the runtime continuation; no final receipt is available here.
+Prior-release browser and gallery receipts are
+not substitutes for this release's deployment matrix. The original dirty
+analysis worktree and the shared PostgreSQL container must remain untouched.
+No customer-prod promotion is authorized. Custom gallery mappings, UI
+readability, and operator visual sign-off remain separate parent work.
+
 **Separate gate hardening:** `fix/mermaid-required-gate-20261014` fails the
 required render command on missing tooling and removes the pre-push passed
 skip. Behavioral controls cover CLI exits, actual registered-action invocation,
@@ -142,7 +168,7 @@ and coordination with the parent's separate gallery validation lease.
 The original dirty analysis worktree and other owned worktrees remain untouched.
 No customer-prod promotion or operator visual sign-off is authorized.
 
-**WIF follow-up:** The gallery configuration blocker was a harness defect:
+**Historical WIF checkpoint:** The gallery configuration blocker was a harness defect:
 application identifiers belong in Graph `connectivityParameters`, not
 `secrets`. The corrected focused gallery flow passes 11 checks with zero
 failures, using a fresh owned endpoint and an exact-cleaned federated

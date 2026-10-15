@@ -7,7 +7,7 @@
 
 ---
 
-## Entra gallery validation gate
+## Prisma validation scheduling
 
 The direct Stage 2.2 Prisma E2E invocation and the Prisma lane in
 `test-all-modes.ps1` now request `--runInBand --silent`. Quiet mode suppresses
@@ -35,6 +35,15 @@ peaks at 8,705 ms; a fresh 600-empty-endpoint control takes 2,713 ms there.
 The authoritative merged-master pipeline remains outstanding. The parent
 holds a bounded gallery lease; it must return that lease before runtime
 deployment or live browser/integrity work resumes.
+
+## Entra gallery validation gate
+
+**Prepared coverage expansion:** Stage 4.8 now requires Group CRUD/membership
+and reviewed custom extension create/update outcomes in every authentication
+mode, as well as reenable. Unsupported checks and contradictory custom
+disposition fail acceptance. The expanded mutation matrix is not yet live
+verified; see [its evidence boundary](ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md).
+The 33-check measurement below describes the earlier reduced matrix.
 
 The dev deployment orchestrator now runs Stage 4.8 after exact intended
 revision readiness and the live SCIM suite. It invokes the complete default

@@ -5,6 +5,7 @@ $gatePath = Join-Path $repoRoot 'scripts\entra-gallery-scim-e2e.ps1'
 $wifWrapperPath = Join-Path $repoRoot 'scripts\wif-e2e-temporary-app.ps1'
 $skillPath = Join-Path $repoRoot '.github\skills\entra-gallery-scim-e2e\SKILL.md'
 $failures = @()
+$mappingHelperPath = Join-Path $repoRoot 'scripts\entra-gallery-mapping.ps1'
 
 function Assert-Contract {
     param(
@@ -22,6 +23,105 @@ function Assert-Contract {
 }
 
 Write-Host 'Entra gallery provisioning to SCIMServer E2E contract'
+
+Assert-Contract 'reviewed custom-mapping helper exists' (Test-Path -LiteralPath $mappingHelperPath)
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($gatePath, [ref]$null, [ref]$null)
+    $binding = [scriptblock]::Create("[CmdletBinding()]`n$($ast.ParamBlock.Extent.Text)`n`$Modes.Count")
+    $refused = $false
+    try { & $binding -Modes @() | Out-Null }
+    catch { $refused = $_.FullyQualifiedErrorId -like 'ParameterArgumentValidationError*' }
+    Assert-Contract 'behavior: empty auth selection is rejected before any remote action' $refused
+    Assert-Contract 'behavior: default auth selection retains all three transports' ((& $binding) -eq 3)
+}
+if (Test-Path -LiteralPath $mappingHelperPath) {
+    & {
+        . $mappingHelperPath
+        $enterprise = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+        $extension = 'urn:scimserver:validation:gallery:2.0:User'
+        $profile = @{
+            schemas = @(@{ id = 'urn:ietf:params:scim:schemas:core:2.0:User'; attributes = 'all' })
+            resourceTypes = @(@{
+                name = 'User'
+                schemaExtensions = @(@{ schema = $enterprise; required = $false })
+            })
+            settings = @{ preserved = $true }
+        }
+        $profileBefore = $profile | ConvertTo-Json -Depth 30 -Compress
+        $extended = Add-GalleryUserExtensionProfile -Profile $profile
+        Assert-Contract 'behavior: endpoint registers the same mapped attribute without losing profile state' (
+            $extended.schemas.Count -eq 2 -and
+            $extended.schemas[1].id -eq $extension -and
+            $extended.schemas[1].attributes[0].name -eq 'costCode' -and
+            $extended.resourceTypes[0].schemaExtensions.Count -eq 2 -and
+            $extended.settings.preserved -eq $true -and
+            ($profile | ConvertTo-Json -Depth 30 -Compress) -eq $profileBefore
+        )
+        $schema = @{
+            directories = @(@{
+                name = 'target'
+                objects = @(@{
+                    name = 'ScimUser'
+                    attributes = @(@{
+                        name = "${enterprise}:department"
+                        type = 'String'
+                        anchor = $false
+                        required = $false
+                    })
+                })
+            })
+            synchronizationRules = @(@{
+                name = 'USERGROUP_OUTBOUND_USERGROUP'
+                targetDirectoryName = 'target'
+                objectMappings = @(@{
+                    sourceObjectName = 'User'
+                    targetObjectName = 'ScimUser'
+                    attributeMappings = @(@{
+                        targetAttributeName = "${enterprise}:department"
+                        source = @{ name = 'department'; expression = '[department]' }
+                        flowType = 'Always'
+                    })
+                }, @{
+                    sourceObjectName = 'Group'
+                    targetObjectName = 'ScimGroup'
+                    attributeMappings = @()
+                })
+            })
+        }
+        $before = $schema | ConvertTo-Json -Depth 30 -Compress
+        $mapped = Add-GalleryCustomUserMapping -Schema $schema
+        $mapping = $mapped.synchronizationRules[0].objectMappings[0]
+        $attributes = $mapped.directories[0].objects[0].attributes
+        Assert-Contract 'behavior: mapping registers the exact custom target and source expression' (
+            $attributes.Count -eq 2 -and $attributes[1].name -eq "${extension}:costCode" -and
+            $attributes[1].type -eq 'String' -and
+            $mapping.attributeMappings.Count -eq 2 -and
+            $mapping.attributeMappings[1].targetAttributeName -eq "${extension}:costCode" -and
+            $mapping.attributeMappings[1].source.expression -eq '[department]'
+        )
+        Assert-Contract 'behavior: mapping preserves source schema and unrelated Group mappings' (
+            ($schema | ConvertTo-Json -Depth 30 -Compress) -eq $before -and
+            $mapped.synchronizationRules[0].objectMappings[1].targetObjectName -eq 'ScimGroup'
+        )
+        Assert-GalleryCustomUserMapping -Schema $mapped
+        $mapped.synchronizationRules[0].objectMappings[0].attributeMappings[1].source.expression = '[jobTitle]'
+        $refused = $false
+        try { Assert-GalleryCustomUserMapping -Schema $mapped }
+        catch { $refused = $_.Exception.Message -like '*read-back*' }
+        Assert-Contract 'behavior: a wrong saved source expression fails read-back' $refused
+        $mapped = Add-GalleryCustomUserMapping -Schema $schema
+        $refused = $false
+        try { Add-GalleryCustomUserMapping -Schema $mapped | Out-Null }
+        catch { $refused = $_.Exception.Message -like '*already registered*' }
+        Assert-Contract 'behavior: duplicate target registration is rejected' $refused
+
+        $schema.directories[0].objects[0].attributes = @()
+        $refused = $false
+        try { Add-GalleryCustomUserMapping -Schema $schema | Out-Null }
+        catch { $refused = $_.Exception.Message -like '*department attribute*' }
+        Assert-Contract 'behavior: absent reviewed target template cannot fabricate a mapping' $refused
+    }
+}
 
 Assert-Contract 'executable gate exists in SCIMServer' (Test-Path -LiteralPath $gatePath)
 Assert-Contract 'temporary-app WIF proof wrapper exists in SCIMServer' (Test-Path -LiteralPath $wifWrapperPath)
@@ -219,6 +319,161 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     Assert-Contract 'behavior: unconfirmed deletion throws and retains ownership for final cleanup' (
         $failed -and -not $state.Cleanup -and $createdJobIds.Contains('owned-job')
     )
+}
+
+& {
+    . $mappingHelperPath
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($gatePath, [ref]$null, [ref]$null)
+    $definition = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-ModeScenario'
+    }, $true)
+    . ([scriptblock]::Create($definition.Extent.Text))
+    $gallerySp = @{ id = 'owned-principal' }
+    $runId = 'contract'
+    $graphRoot = 'https://graph.invalid'
+    $ruleName = 'USERGROUP_OUTBOUND_USERGROUP'
+    $KeepArtifacts = $false
+    $state = @{}
+    function Add-Result {
+        param($Scenario, $Check, $Status, $Detail)
+        $state.Checks.Add("$Status/$Check")
+    }
+    function New-ModeContext {
+        param($Mode)
+        @{ Slug = $Mode; TargetBase = 'https://scim.invalid'; VerificationHeaders = @{};
+            Secrets = @(); ConnectivityParameters = @(@{ key = 'authenticationType'; value = 'wif' }) }
+    }
+    function New-SynchronizationJob { @{ id = 'owned-job' } }
+    function Set-SynchronizationSecrets { param($Pairs) }
+    function Set-TestSynchronizationMappings { param($JobId) Get-SynchronizationRule -JobId $JobId }
+    function Get-SynchronizationRule {
+        param($JobId)
+        @{ id = 'rule'; objectMappings = @(
+            @{ sourceObjectName = 'User'; targetObjectName = 'User' },
+            @{ sourceObjectName = 'Group'; targetObjectName = 'Group' }
+        ) }
+    }
+    function New-SourceUser {
+        param($ModeSlug, $Suffix)
+        @{ User = @{ id = 'source-user'; userPrincipalName = 'owned@example.invalid' };
+            Department = 'SCIM Validation'; AssignmentIds = @('assignment') }
+    }
+    function New-SourceGroup {
+        param($ModeSlug)
+        @{ Group = @{ id = 'source-group'; displayName = 'Owned Group' }; AssignmentIds = @('assignment') }
+    }
+    function Invoke-ExpectedProvision {
+        param($JobId, $RuleId, $ObjectId, $ObjectType, $Operation)
+        @{ Result = 'Success' }
+    }
+    function Invoke-ScopedChangeProvision {
+        param($JobId, $RuleId, $ObjectId, $ObjectType, $Operation)
+        'provisionOnDemand'
+    }
+    function Invoke-Graph {
+        param($Method, $Path, $Body)
+        if ($Path -like '*connectivityParameters') {
+            return @{ value = @(@{ key = 'authenticationType'; value = 'wif' }) }
+        }
+        if ($Method -eq 'PATCH' -and $Body.Contains('displayName')) { $state.Name = $Body.displayName }
+        if ($Method -eq 'PATCH' -and $Body.Contains('department')) { $state.Department = $Body.department }
+        if ($Path -like 'groups/*/members*') { $state.HasMember = $Method -eq 'POST' }
+        if ($Method -eq 'DELETE' -and $Path -like 'groups/*/appRoleAssignments/*') { $state.GroupGone = $true }
+        if ($Method -eq 'DELETE' -and $Path -like 'users/*/appRoleAssignments/*') { $state.UserGone = $true }
+    }
+    function Wait-GraphUserAccountEnabled { param($UserId, $Expected) }
+    function Wait-GraphGroupMembership { param($GroupId, $MemberId, $Present) }
+    function Invoke-UserAccountStateProvision {
+        param($JobId, $RuleId, $ObjectId, $UserName, $Headers, $Expected, $Operation)
+        @{ id = 'scim-user'; active = $Expected }
+    }
+    function Wait-ScimResource {
+        param($ResourceType, $Attribute, $Value, $Headers, $Predicate, $Expectation)
+        $resource = if ($ResourceType -eq 'Users') {
+            @{ id = 'scim-user'; displayName = $state.Name; active = -not $state.UserGone;
+                schemas = @($script:galleryExtensionUrn);
+                $script:galleryExtensionUrn = @{ costCode = $state.Department } }
+        }
+        elseif (-not $state.GroupGone) {
+            @{ id = 'scim-group'; displayName = $Value;
+                members = if ($state.HasMember) { @(@{ value = 'scim-user' }) } else { @() } }
+        }
+        if (-not (& $Predicate $resource)) { throw "Behavioral fixture failed predicate: $Expectation" }
+        $resource
+    }
+    function Get-SafeExceptionDetail { param($ErrorRecord) $ErrorRecord.Exception.Message }
+    function Remove-OwnedSynchronizationJob { param($JobId) $state.Teardown = $true }
+
+    foreach ($mode in @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')) {
+        $state = @{
+            Checks = [System.Collections.Generic.List[string]]::new()
+            Department = 'SCIM Validation'
+            HasMember = $false; GroupGone = $false; UserGone = $false; Teardown = $false
+        }
+        Invoke-ModeScenario -Mode $mode
+        $missing = @(@('create group', 'update group', 'add group member', 'remove group member', 'deprovision group') |
+            Where-Object { "PASS/$_" -notin $state.Checks })
+        Assert-Contract "behavior: $mode executes Group CRUD and both membership outcomes" (
+            $missing.Count -eq 0
+        )
+        Assert-Contract "behavior: $mode verifies custom create/update and releases its job" (
+            'PASS/create custom extension' -in $state.Checks -and
+            'PASS/update custom extension' -in $state.Checks -and
+            'PASS/mode outcome' -in $state.Checks -and $state.Teardown
+        )
+    }
+}
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($gatePath, [ref]$null, [ref]$null)
+    $definition = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Write-Reports'
+    }, $true)
+    . ([scriptblock]::Create($definition.Extent.Text))
+    $Modes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')
+    $runId = 'report-contract'
+    $startedAt = [DateTimeOffset]::UtcNow
+    $tenantDomain = 'example.invalid'
+    $GalleryServicePrincipalName = 'contract-fixture'
+    $script:serverVersion = 'contract-only'
+    $cleanupResults = @(@{ removed = $true })
+    $secretKeys = [System.Collections.Generic.HashSet[string]]::new()
+    $OutputDirectory = Join-Path $repoRoot "test-results\gallery-report-contract\$([guid]::NewGuid())"
+    try {
+        foreach ($case in @('valid', 'missing', 'duplicates', 'plan', 'empty modes')) {
+            $Modes = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')
+            $PlanOnly = $case -eq 'plan'
+            $results = @(
+                foreach ($mode in $Modes) {
+                    foreach ($check in @('create custom extension', 'update custom extension')) {
+                        @{ scenario = "auth:$mode"; check = $check; status = 'PASS' }
+                    }
+                }
+            )
+            if ($case -eq 'missing') { $results = @($results | Select-Object -First 5) }
+            if ($case -eq 'duplicates') {
+                $results | ForEach-Object { $_.scenario = 'auth:SecretToken' }
+            }
+            if ($case -eq 'empty modes') { $Modes = @() }
+            Write-Reports
+            $saved = Get-Content -LiteralPath (Join-Path $OutputDirectory 'result.json') -Raw | ConvertFrom-Json
+            $expected = if ($case -eq 'valid') { 'PASS:*' } elseif ($case -eq 'plan') { 'NOT_RUN:*' } else { 'FAIL:*' }
+            Assert-Contract "behavior: custom report disposition is truthful for $case evidence" (
+                $saved.customExtensionDisposition -like $expected
+            )
+        }
+    }
+    finally {
+        foreach ($name in @('result.json', 'summary.md')) {
+            $path = Join-Path $OutputDirectory $name
+            if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
+        }
+        if (Test-Path -LiteralPath $OutputDirectory) { Remove-Item -LiteralPath $OutputDirectory }
+    }
 }
 
 if ($failures.Count -gt 0) {

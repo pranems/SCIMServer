@@ -56,6 +56,7 @@
 | Review the operator-observed UI readability issues and next-release acceptance criteria | [UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md](UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md) |
 | Review measured activity alignment and endpoint-label corrections, mobile coverage, and remaining release gates | [UI_ACTIVITY_ENDPOINT_READABILITY.md](UI_ACTIVITY_ENDPOINT_READABILITY.md) |
 | Follow the measured Entra gallery provisioning gate issues, fixes, and prevention checks | [ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) |
+| Review the bounded custom extension mapping and complete three-auth Group/membership validation | [ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md](ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md) |
 | Inspect and edit effective WIF/JWKS runtime egress values | [EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md](EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md) |
 | Run ready-to-use server, admin, endpoint, and profile-aware SCIM requests | [WORKBENCH_REQUEST_EXAMPLES.md](WORKBENCH_REQUEST_EXAMPLES.md) |
 | Understand what every endpoint setting does | [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |

@@ -6,7 +6,63 @@
 
 This ledger records issues found while building and running the owned Microsoft Entra gallery provisioning gate against the registry-resolved SCIMServer dev estate. Entries are written when the failing check is understood and the corrective check turns green. The measured disposition includes final evidence counts and exact-cleanup outcomes.
 
-**Provenance:** reconciled against the detailed pre-compaction execution
+## Custom-mapping continuation checkpoint
+
+The following entries describe local contract fixes and the read-only real
+template probe, not a completed live provisioning run. The earlier EG-I
+dashboard and its live counts remain historical evidence.
+
+| ID | Type / severity | Symptom and root cause | Fix and why it works | Prevention | Detection / earliest gate |
+|---|---|---|---|---|---|
+| GM-I01 | Coverage / High | OAuth and WIF mode orchestration omitted Group CRUD/membership by a deliberate SecretToken-only branch. Broad matrix language could hide that reduction. | Remove the branch and execute the same owned Group flow in every mode. Existing scoped on-demand/scheduled provisioning and exact cleanup are reused. | Three behavioral mode controls require all Group outcomes and custom create/update; OAuth/WIF controls were RED before correction. | Mode contract / mode contract |
+| GM-I02 | Evidence acceptance / High | Stage 4.8 accepted reports missing custom/membership outcomes, containing UNSUPPORTED, or declaring custom coverage failed. It only required core User results. | Require exact per-mode User, Group, membership and custom outcomes, reject unsupported checks and unsuccessful custom disposition. Four adversarial acceptance controls turned RED then GREEN. | Behavioral execution of the actual Stage 4.8 scriptblock, not source-word checks. | Pipeline contract / pipeline contract |
+| GM-I03 | Report correctness / High | A total of six custom rows all attributed to SecretToken could falsely claim three-mode custom coverage. | Require exactly one create and update result for each requested scenario; duplicate-mode evidence now reports FAIL. | Real report-projection cases cover valid, missing, duplicated, empty-matrix, and plan-only NOT_RUN evidence. Duplicate evidence was RED before the fix. | Report contract / report contract |
+| GM-I04 | Tooling lookup / Low | An initial search expected a separate gallery acceptance script, but acceptance is inline in the dev pipeline. | Follow the actual Stage 4.8 invocation and reuse its existing AST-based contract harness. No speculative helper or second validator was added. | Search the known orchestrator before inventing a split-file location. | Repository lookup / repository lookup |
+| GM-I05 | Worktree tooling / Low | The fresh worktree lacked root Mermaid, web Playwright, and API TypeScript dependencies. | A required-tooling preflight failed explicitly; restore junctions to matching installed dependencies without installs or lockfile edits. The new diagram then rendered under strict security in both themes and the existing Prisma generator created the ignored client. | Probe required tooling before trusting a render-gate summary. The known built-in `0.0.0` version warning remains with the separate gate-hardening owner. | Tooling preflight / tooling preflight |
+| GM-I06 | Input / evidence correctness / High | An explicit empty Modes array passed binding, and the zero-iteration report predicate declared custom coverage PASS. The pipeline separately rejected absent semantic outcomes, but standalone execution could still be misleading. | Require a nonempty parameter and a positive requested-mode count before custom PASS. Both behavioral controls were RED and then GREEN; the default still selects three modes. | Execute the actual parameter AST and report function with empty input; never infer coverage from an empty universal predicate. | Binding/report contract / binding/report contract |
+| GM-I07 | Test harness / Low | The first GREEN rerun failed while resolving the internal PowerShell validation exception type in a catch predicate. | Match the public ErrorRecord identifier `ParameterArgumentValidationError` instead. The contract now distinguishes expected argument validation without depending on an inaccessible exception class. | Use public error identifiers for shell contract assertions; default-binding positive control remains GREEN. | Focused contract / focused contract |
+| GM-I08 | Git integration / Low | Gallery acceptance and the reviewed serial-Prisma correction both inserted infrastructure notes under the same heading, producing a documentation merge conflict. | Preserve both explanations under distinct Prisma scheduling and gallery headings. The source and contract changes merged automatically; all 70 gallery and 42 pipeline contracts and the infrastructure audit pass. | Verify both behavioral contracts after integration; never resolve a shared context document by discarding one side. | Normal merge / normal merge |
+
+The reviewed helper also refuses an absent target department template or
+duplicate custom registration and checks the saved source expression. A
+read-only real Graph template probe confirmed the measured directory/object
+names and department source metadata; no directory object or endpoint was
+created. Planned missing-helper and missing-verifier RED runs were intentional
+TDD controls, not product incidents.
+The actual dev `entra-id` preset also passed the built runtime's
+`validateAndExpandProfile` after the extension was added, with no live endpoint
+mutation. At this checkpoint, 70 gallery and 41 pipeline contract checks pass.
+The normal push of `0a884263` passed its full Fast hook, including 2,432
+InMemory E2E tests; four PostgreSQL-only tests were excluded, and a Jest
+worker-exit warning remains a teardown limitation rather than an assertion
+failure.
+The separate empty-matrix correction `e4f1cfa9` is also pushed in draft
+PR #218. Its normal Fast hook passed every gate in 612.9 seconds, including
+actual Mermaid rendering in 95.6 seconds and the same 116 InMemory E2E suites
+with 2,432 passed and four PostgreSQL-only exclusions. The warning remains.
+
+**Self-improvement applied:** Negative controls cover the implementation's
+mode decisions and serialized evidence, closing the gap between code that
+exists and outcomes that a required gate actually proves.
+
+**Design disposition accepted:** Pure mapping/profile work is extracted into
+a small helper shared by preparation and read-back. Remote calls and owned
+cleanup remain with the existing orchestrator. No policy language or new
+dependency is introduced.
+
+**Continuation provenance, contract checkpoint:** The full raw `events.jsonl`
+stream for session `dabf857d-5a2f-4840-bcf0-145452fd5834` was scanned through
+45,782 events. The custom-mapping continuation starts at event 45,253.
+Reconciliation used both failure/signal and causal-narration passes, correlated
+tool starts with results, and reviewed all continuation tool-result signals,
+not only path-matched calls. The scoped pass identified 86 calls. Source
+listings, patch text, search echoes and deliberate RED controls were not
+counted as new incidents. Missing tooling, renderer-version warnings, the
+internal exception-type test failure, and the worker-exit warning map to the
+entries or explicit limitations above. There was no expanded live run to
+reconcile; this checkpoint is not a final live-validation completeness claim.
+
+**Historical EG-I provenance:** reconciled against the detailed pre-compaction execution
 checkpoint supplied to this continuation and every command, failure, diagnosis,
 and rerun in the current continuation. `VSCODE_TARGET_SESSION_LOG` was not
 available, so the original pre-compaction JSONL transcript could not be

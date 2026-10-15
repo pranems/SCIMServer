@@ -317,6 +317,19 @@ The most dangerous class: a gate that is GREEN but proves nothing. Every pattern
 | **PA-13** | Aggregate counts need item-level diagnostic evidence | The final dev browser rerun retained `247 passed / 5 skipped`, but `.last-run.json` stored no skipped tests or annotations, making the aggregate impossible to audit later | A pass count proves completion, not why exclusions were intentional. Keep a human reporter plus a structured reporter containing every test outcome and annotation | Dev deployment writes timestamped Playwright JSON beside its Markdown report; a pre-push contract locks the reporter and environment cleanup | SCIM correctness RC-I17 |
 | **PA-14** | A disposable database must prove ownership, not availability | The deployment pipeline reused whichever container published host port 5432 and could remove a fixed-name container before starting its own prerequisite | A reachable port or familiar name proves only availability. Create a unique run-labeled container, bind it to a Docker-assigned loopback port, keep data in tmpfs, pass its exact URL to the gates, and verify labels before exact-ID cleanup | Dev deployment pipeline contract plus the Disposable Database Ownership Rule | SCIM correctness RC-I22 |
 
+**PA-12 extension, 2026-10-14:** A matrix also needs a nonempty requested set
+and exact evidence identity. An empty auth selection made a zero-iteration
+custom-mapping predicate report PASS; six repeated SecretToken rows could
+also impersonate three independent transports. Reject empty selections before
+remote work, then require exactly one successful result for every requested
+mode/outcome pair. Test empty, missing, duplicated, unsupported and failed
+evidence against the actual report and acceptance functions. These controls
+now run in the
+[gallery contract](../../scripts/test/entra-gallery-scim-e2e.contract.ps1)
+and [pipeline contract](../../scripts/test/dev-deployment-pipeline.contract.ps1);
+the [execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) records the
+confirmed RED/GREEN controls and their live-validation boundary.
+
 ### Category B - Cross-environment and deployment drift
 
 Values that differ silently across local / Docker / Azure.
