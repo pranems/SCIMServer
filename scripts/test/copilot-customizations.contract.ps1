@@ -210,6 +210,35 @@ foreach ($skillName in $requiredSkills) {
     }
 }
 
+$standupWorkflow = Get-TreeFileContent '.github/skills/standupstatus/SKILL.md'
+Invoke-Assert -Description 'standup inventories bounded sibling clones and deduplicates full commit SHAs' `
+    -Condition (
+        $standupWorkflow -match '### 1\.1a Sibling clones and parallel branches' -and
+        $standupWorkflow -match 'immediate\s+repository parent' -and
+        $standupWorkflow -match 'same repository identity' -and
+        $standupWorkflow -match 'Deduplicate by full commit SHA'
+    )
+Invoke-Assert -Description 'standup reconciles failures with complete exact-commit evidence' `
+    -Condition (
+        $standupWorkflow -match '### 1\.1b Reconcile red/green evidence by exact commit' -and
+        $standupWorkflow -match 'same or a descendant commit' -and
+        $standupWorkflow -match 'focused pass does not supersede a broad backend suite' -and
+        $standupWorkflow -match 'source-tested, built-artifact-tested, merged, and deployed'
+    )
+Invoke-Assert -Description 'standup includes incident provenance and partial session coverage without PII' `
+    -Condition (
+        $standupWorkflow -match 'repository or branch metadata is blank' -and
+        $standupWorkflow -match 'coverage partial' -and
+        $standupWorkflow -match 'original symptom' -and
+        $standupWorkflow -match 'Redact resource identifiers'
+    )
+Invoke-Assert -Description 'standup reports parallel initiative acceptance without launching a new investigation' `
+    -Condition (
+        $standupWorkflow -match 'parent item with coherent child work items' -and
+        $standupWorkflow -match 'unmerged/unreleased until proven otherwise' -and
+        $standupWorkflow -match 'do not start a new debugging or implementation exercise'
+    )
+
 $addMissingWorkflow = Get-TreeFileContent '.github/skills/addmissingtests/references/workflow.md'
 Invoke-Assert -Description 'addmissingtests self-updates its executable workflow resource' `
     -Condition (

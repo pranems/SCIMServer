@@ -19,7 +19,7 @@ pipeline use `SkillPath` and slash-command terminology, with `-SkipPrompts` and
 legacy prompt files, stale automation references, invalid skill frontmatter,
 broken relative resources, and prompt-based gate registration.
 
-**Migration consolidation:** PR #222 is open for review. A fresh workspace chat
+**Migration consolidation:** PR #222 merged normally at `e16d1b28`. A fresh workspace chat
 exposes the existing Entra project skill and successfully loads the project
 `session-startup`, `standupstatus`, and SyncFabric skills through actual user
 slash commands. Explicit-only skills are intentionally absent from the model
@@ -27,7 +27,9 @@ skill-tool inventory; that absence is not a discovery failure. The personal
 SyncFabric duplicate is unchanged and did not override project slash resolution.
 All four focused contracts, seven changed-script parse checks, documentation
 freshness/source checks, and whitespace checks pass. Exact-tip CI and review
-remain required before merge. No version bump or deployment is part of this PR.
+passed on final feature tip `205b305c`; detached merged-master customization
+verification and post-merge CodeQL also passed. No version bump or deployment
+was part of this PR.
 Independent resource review found one contradictory SyncFabric write boundary;
 a narrow owning-skill exception and permanent RED/GREEN contract address it
 (CSM-20). Hosted Copilot review returned a billing configuration error, not an
@@ -61,6 +63,7 @@ sign-off remain separate parent work. No production promotion is authorized.
 
 | Date | Summary |
 |---|---|
+| 2026-10-14 | Promoted useful local standup guidance on a latest-master-based branch: bounded sibling discovery, exact-commit acceptance reconciliation, incident/session evidence and parallel initiative reporting. The original dirty worktree and its unique local skill are preserved. Self-improvement: four permanent customization assertions confirmed RED before the skill update and GREEN afterwards. Design disposition: accepted - cohesive read-only reporting guidance, no new execution framework or runtime change. |
 | 2026-10-14 | Opened Agent Skills migration PR #222 and proved fresh-chat user slash dispatch for three explicit-only project skills. Recorded the model-inventory distinction and full Copilot reviewer bot identity in CSM-18/19. Self-improvement: applied through the actual harness acceptance procedure. Design disposition: accepted - no new abstraction or runtime responsibility. |
 | 2026-10-14 | Migrated all latest-master Copilot prompt workflows and their durable memories into 36 validated project Agent Skills; rewired mandatory gates and pre-push enforcement to use skills. Self-improvement applied through a negative customization contract. Design disposition: accepted - existing workflows need shared capabilities, not separate custom agents; only workflows over 500 lines use progressive reference loading. |
 | 2026-10-14 | Merged v0.55.48 correction and CI-only release locks; retained two failed pipeline receipts and a complete 2,492-test isolated Prisma diagnostic. Authoritative deployment proof remains outstanding. |
