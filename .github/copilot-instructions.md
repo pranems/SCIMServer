@@ -665,6 +665,14 @@ Stage 3 is split into three sub-stages by the SCOPE of what each skill audits. R
 3b.5. **`dependencycvesweep` skill** - NPM-audit / CVE scan against api/ + web/ with Critical/High severity blocking commits. Companion to `securityaudit` but triggered by `package.json`/`package-lock.json` changes AND on a weekly schedule. Both skills must be green for Stage 3b to pass.
 3b.6. **`performancebenchmark` skill** - p50/p95/p99 latency, DB query count per request, memory headroom, no N+1 patterns. Compare against the prior commit's baseline; regression > 10% requires explicit justification in the commit message.
 
+**Lifecycle aggregate rule (RC-I102).** Startup and reconciliation code that
+needs counts or summaries MUST aggregate in the persistence layer. It MUST NOT
+loop through tenants/endpoints and materialize full resources or relationships
+solely to count them. Add a query-shape unit that forbids the full-list path and
+run a retained-fixture bootstrap gate that can expose cumulative growth. For a
+successful sparse aggregate, a missing key means zero; preserve a previous
+value only when the aggregate query rejects.
+
 #### Stage 3c - Code Hygiene + Documentation Sweep (after all impl + tests are GREEN)
 3c.1. **`codereviewselfaudit` skill** - SOLID / DRY / readability / complexity audit of CHANGED files only. Suggestions, not blocks. Catches god-class growth, helper-bloat, and naming drift that the RFC/security/performance skills do not see. Reference: the May 2026 Design Deep Analysis found 5 SOLID violations (SchemaValidator god class 1,467 lines, service-helpers 1,230 lines, etc.) - this skill is the standing engine for catching the next one.
 3c.2. **`auditandupdatedocs` skill** - Sweep `docs/INDEX.md`, `Session_starter.md`, `docs/CONTEXT_INSTRUCTIONS.md`, `CHANGELOG.md`, `README.md`, plus every feature doc that references test counts / version / commit SHA / behavior the change touches. Use sub-agent for thoroughness on large changes.

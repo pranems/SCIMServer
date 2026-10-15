@@ -2,8 +2,8 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.49
-> **Last Updated**: October 14, 2026
-> **Last verified:** 2026-10-14
+> **Last Updated**: October 15, 2026
+> **Last verified:** 2026-10-15
 
 ---
 
@@ -36,18 +36,22 @@ live proof passes 65 checks. The implementation pre-push InMemory E2E result
 is 2,432 passes with four explicit PostgreSQL-only exclusions. CI-only locks
 and the runtime correction merged normally at `99cdeda3`; the reviewed
 serial scheduling follow-up merged at `f96f31b5`. Two full no-skip pipeline
-attempts failed direct Prisma bootstrap hooks. The serial attempt retains
-140 failures across six suites and terminated during the backend matrix.
-Its partial matrix passes 6,035 units per backend and 2,488 InMemory E2E
-tests with four PostgreSQL-only exclusions. Dev remains v0.55.47; valid
-original-reference User and Group creates still reproduce 409 with unchanged
-raw profile revision. Image publication, complete pipeline, and fresh dev
-live/gallery/browser proof remain blocked. A later isolated serial Prisma
-diagnostic passes all 118 suites and 2,492 tests with zero skips in
-1,417.31 seconds, with quiet console output and explicit Prisma selection.
-It does not establish the previous timeout's sole cause or replace the
-authoritative pipeline. The parent holds the bounded mapping-smoke and
-three-auth gallery lease; runtime must explicitly reacquire before live work.
+attempts failed direct Prisma bootstrap hooks. The confirmed root cause was
+production stats seeding that loaded every User, Group and Group membership
+for every endpoint during each application bootstrap. E2E fixtures persist
+until global teardown, so the work grew cumulatively across suites.
+
+The branch repair adds endpoint-level aggregate counts to both repository
+backends. PostgreSQL issues one grouped query per resource type; InMemory
+scans each map once. Focused tests pass 177/177 and the API build passes.
+A fresh owned PostgreSQL 17.11 run passes all 118 suites and 2,492 tests with
+zero skips in 17m 49.315s under the unchanged 30-second hook limit. This is
+58.02% below the retained failed run's 42m 27.265s. Exact cleanup removed the
+loopback-only container and marker without touching shared containers. The
+repair still requires review, merge and authoritative merged-master execution.
+Dev remains v0.55.47; image publication and fresh dev proof remain blocked.
+The parent holds the bounded mapping-smoke and three-auth gallery lease;
+runtime must explicitly reacquire before live work.
 No stored profile workaround,
 customer-prod promotion, UI backlog implementation, or visual sign-off is
 authorized in this phase.

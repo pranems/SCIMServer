@@ -1,6 +1,6 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-14
+**Last verified:** 2026-10-15
 
 **Active consolidation - blocked before deployment:** v0.55.48 runtime,
 metadata, and CI-generated locks merged normally through PR #215 at
@@ -35,22 +35,24 @@ a narrow owning-skill exception and permanent RED/GREEN contract address it
 (CSM-20). Hosted Copilot review returned a billing configuration error, not an
 approval. No repository-required approval or CI protection may be bypassed.
 
-Both full no-skip pipeline attempts failed the direct Prisma E2E gate.
-The second serial run improves to 112/118 suites and 2,348 passes but retains
-140 bootstrap-timeout cascade failures and four skips. Its process then
-terminated with exit -1 during the six-mode matrix. The confirmed partial
-matrix passes 6,035 units in each backend and 2,488 InMemory E2E tests with
-four PostgreSQL-only exclusions. Web units and coverage passed earlier in
-the second attempt. This is not a complete or green pipeline.
+The two earlier no-skip attempts failed direct Prisma E2E bootstrap. The second
+serial run retained 112/118 suites, 2,348 passes, 140 failures and four skips
+in 42m 27.265s before its process later terminated in the six-mode matrix.
+The root cause is now established: `StatsProjectionService.onModuleInit()`
+listed every endpoint and materialized every User, every Group and every Group
+membership solely to seed counters. The E2E database retains fixtures until
+global teardown, so every new application bootstrap did more work.
 
-An isolated, instrumented serial Prisma diagnostic subsequently passes all
-118 suites and 2,492 tests with zero skips in 1,417.31 seconds. It uses quiet
-console output and an explicit Prisma backend. Its measured StatsModule
-startup peaks at 8,705 ms across accumulated fixtures. This is standalone
-recovery evidence, not proof of the earlier timeout's sole cause or a green
-deployment pipeline. All diagnostic databases were removed by exact owned ID.
-The parent holds a bounded dev/gallery lease for its mapping smoke and
-three-auth matrix; runtime must obtain explicit return before live work.
+The branch repair replaces the per-endpoint full reads with one grouped User
+count and one grouped Group count. InMemory parity uses one pass per resource
+map. Two permanent RED/GREEN controls lock both the query shape and the
+successful-sparse-result rule. Five focused suites pass 177 tests and the API
+build passes. A fresh owned PostgreSQL 17.11 run with the unchanged 30-second
+hook limit passes all 118 suites and 2,492 tests with zero skips in
+17m 49.315s, 58.02% below the retained failed duration. The loopback-only
+container and database marker were removed by exact identity; no shared
+container was touched. This is complete branch-level blocker proof, not a
+merged-master pipeline, image publication or deployment claim.
 
 Dev still serves v0.55.47. Valid fixtures on the original dev reference
 `aa69213c-1ba8-4feb-a507-a6e2fe90d6bd` reproduce User and Group POST 409s,
@@ -63,6 +65,7 @@ sign-off remain separate parent work. No production promotion is authorized.
 
 | Date | Summary |
 |---|---|
+| 2026-10-15 | Repaired the cumulative Prisma bootstrap blocker at its production source. Stats projection now uses two aggregate repository reads instead of per-endpoint full User/Group/member materialization. Focused proof is 177/177; owned PostgreSQL 17.11 proof is 118/118 suites and 2,492/2,492 tests with zero skips in 17m 49.315s. Self-improvement applied through query-shape, sparse-zero and lifecycle-aggregation rules. Design disposition: accepted - extend the existing repository ports for two real backends rather than introduce a speculative statistics persistence layer. |
 | 2026-10-14 | Promoted useful local standup guidance on a latest-master-based branch: bounded sibling discovery, exact-commit acceptance reconciliation, incident/session evidence and parallel initiative reporting. The original dirty worktree and its unique local skill are preserved. Self-improvement: four permanent customization assertions confirmed RED before the skill update and GREEN afterwards. Design disposition: accepted - cohesive read-only reporting guidance, no new execution framework or runtime change. |
 | 2026-10-14 | Opened Agent Skills migration PR #222 and proved fresh-chat user slash dispatch for three explicit-only project skills. Recorded the model-inventory distinction and full Copilot reviewer bot identity in CSM-18/19. Self-improvement: applied through the actual harness acceptance procedure. Design disposition: accepted - no new abstraction or runtime responsibility. |
 | 2026-10-14 | Migrated all latest-master Copilot prompt workflows and their durable memories into 36 validated project Agent Skills; rewired mandatory gates and pre-push enforcement to use skills. Self-improvement applied through a negative customization contract. Design disposition: accepted - existing workflows need shared capabilities, not separate custom agents; only workflows over 500 lines use progressive reference loading. |

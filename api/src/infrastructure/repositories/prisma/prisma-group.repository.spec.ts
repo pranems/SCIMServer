@@ -18,6 +18,7 @@ function createMockPrismaService(): PrismaService {
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
@@ -375,6 +376,25 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
 
       await expect(repo.findAllWithMembers('ep-1'))
         .rejects.toMatchObject({ code: 'CONNECTION' });
+    });
+  });
+
+  describe('countByEndpoint', () => {
+    it('aggregates total and active groups without loading group members', async () => {
+      (prisma.scimResource.groupBy as jest.Mock).mockResolvedValue([
+        { endpointId: 'ep-1', active: true, _count: { _all: 3 } },
+        { endpointId: 'ep-1', active: false, _count: { _all: 2 } },
+      ]);
+
+      await expect(repo.countByEndpoint()).resolves.toEqual([
+        { endpointId: 'ep-1', total: 5, active: 3 },
+      ]);
+      expect(prisma.scimResource.groupBy).toHaveBeenCalledWith({
+        by: ['endpointId', 'active'],
+        where: { resourceType: 'Group' },
+        _count: { _all: true },
+      });
+      expect(prisma.scimResource.findMany).not.toHaveBeenCalled();
     });
   });
 
