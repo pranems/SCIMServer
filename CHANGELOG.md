@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### UI date-time consistency and endpoint identity (0.55.50)
+
+- Prepare the product patch from `0.55.49` to `0.55.50`. API/web manifests
+  and matching locks are updated. Locks came from successful CI run
+  `38817415869`; structural comparison proves only root version fields
+  changed, with dependency/provenance contents unchanged.
+  The root tooling package is not a product version and remains unchanged.
+- Use complete UTC date, time, milliseconds and timezone across absolute
+  timestamp displays. Preserve original copied instants, raw JSON, domain
+  date-only values, exports and duration semantics. Missing and invalid
+  timestamps remain distinguishable; ambiguous expiry values cannot appear
+  as valid credentials.
+- Replace the persistent Operations endpoint outline with a plain linked
+  name and independent canonical copy/new-tab actions. Keep modifier-click
+  navigation, percentage columns, persisted resizing and local mobile
+  scrolling. Fix button-only copy-wrapper shrinkage and activation-key
+  propagation in the shared primitive rather than page-specific workarounds.
+- Focused units: seven suites pass 148 cases, and the corrected source-policy
+  replay passes three cases. The initial combined receipt retains its one
+  policy-path failure. Real 4,999/5,000-entry cap boundaries pass without
+  mounting unrelated thousands of rows or relaxing timeouts.
+- All 33 focused browser cases pass in 7.0 minutes, including three viewport
+  widths, copy via click/Space/Enter, endpoint navigation, glyph bounds,
+  explicit invalid expiry and inline request authentication timestamps.
+- Protected Validate push: all 27 gates pass in 823 seconds at `3032b5df`.
+  API units remain 6,043 across 210 suites. Selected InMemory E2E remains
+  2,432 passes across 116 suites with four native-only exclusions.
+  Web unit cases grow from the retained 1,595/120-file receipt to
+  1,624 across 123 files. All production bundle budgets pass; Operations
+  is 3.83 kB gzipped. All 759 diagrams render in both strict themes, with
+  the separately recorded editor-version warning.
+- Reviewed merge, current coverage/backend matrix, immutable dev
+  delivery, full deployment browser tests, gallery/reference proof and operator visual acceptance remain
+  pending. No deployment or production-readiness claim is made.
+- See [implementation, evidence and execution RCA](docs/UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+
 ### Fail-closed deployment prerequisites
 
 - Block Stage 4-6 gate commands after a recorded earlier failure. Guard

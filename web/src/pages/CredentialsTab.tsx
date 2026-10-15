@@ -17,6 +17,8 @@
  * surfaces as a friendly explanation banner with link to settings.
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
+import { formatDateTime } from '../utils/date-time';
 import {
   makeStyles,
   tokens,
@@ -586,7 +588,7 @@ const WifTrustDetails: React.FC<{
         </Badge>
         <Caption1>
           {verified
-            ? `Last verified ${new Date(trust.lastVerifiedAt as string).toLocaleString()}`
+            ? <>Last verified <DateTimeField value={trust.lastVerifiedAt} /></>
             : 'Never verified - run Verify to confirm the issuer + JWKS are reachable.'}
         </Caption1>
       </div>
@@ -661,10 +663,11 @@ function httpsUrlError(value: string): string | undefined {
  */
 function validityDescriptor(expiresAt?: string | null): { text: string; level: 'ok' | 'warning' | 'error' } {
   if (!expiresAt) return { text: 'No expiry - valid until revoked', level: 'ok' };
-  const exp = new Date(expiresAt).getTime();
-  if (Number.isNaN(exp)) return { text: 'No expiry - valid until revoked', level: 'ok' };
+  const formatted = formatDateTime(expiresAt);
+  if (!formatted.iso) return { text: `Invalid expiry: ${expiresAt}`, level: 'error' };
+  const exp = new Date(formatted.iso).getTime();
   const now = Date.now();
-  const when = new Date(expiresAt).toLocaleDateString();
+  const when = formatted.text;
   if (exp <= now) return { text: `Expired ${when}`, level: 'error' };
   const days = Math.floor((exp - now) / (1000 * 60 * 60 * 24));
   return {
@@ -2437,7 +2440,7 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
                     </Caption1>
                   )}
                   <div className={classes.cardSummary} data-testid={`credential-summary-${cred.id}`}>
-                    <Caption1>Created {new Date(cred.createdAt).toLocaleString()}</Caption1>
+                    <Caption1>Created <DateTimeField value={cred.createdAt} /></Caption1>
                     <Badge appearance="filled" color={cred.active ? 'success' : 'subtle'}>
                       {cred.active ? 'Active' : 'Inactive'}
                     </Badge>

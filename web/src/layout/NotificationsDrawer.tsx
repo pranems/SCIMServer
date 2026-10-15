@@ -21,6 +21,7 @@
  * @see web/src/layout/NotificationsButton.tsx (the Bell trigger)
  */
 import React, { useEffect } from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   OverlayDrawer,
   makeStyles,
@@ -250,7 +251,7 @@ export const NotificationsDrawer: React.FC = () => {
                   {entry.endpointId && (
                     <Caption1 className={classes.monoChip}>endpoint: {entry.endpointId}</Caption1>
                   )}
-                  <Caption1>{relativeTime(entry.timestamp)}</Caption1>
+                  <Caption1><DateTimeField value={entry.timestamp} /> ({relativeTime(entry.timestamp)})</Caption1>
                 </div>
                 {entry.message && <Caption1>{entry.message}</Caption1>}
               </div>

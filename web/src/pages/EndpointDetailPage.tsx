@@ -21,6 +21,7 @@
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   tokens,
@@ -298,7 +299,7 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
             data-testid="endpoint-scim-base-path"
           />
         </span>
-        <Caption1>Created: {new Date(endpoint.createdAt).toLocaleDateString()}</Caption1>
+        <Caption1>Created: <DateTimeField value={endpoint.createdAt} /></Caption1>
       </div>
 
       {/* Tab bar - selectedValue comes from URL */}

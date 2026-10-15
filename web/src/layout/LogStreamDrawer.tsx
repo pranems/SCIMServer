@@ -21,6 +21,7 @@
  * @see docs/PHASE_K4_LIVE_LOG_STREAM_VIEWER.md
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   Badge,
   Button,
@@ -89,7 +90,7 @@ const useStyles = makeStyles({
   },
   row: {
     display: 'grid',
-    gridTemplateColumns: '60px 56px 90px 1fr',
+    gridTemplateColumns: '132px 56px 90px minmax(0, 1fr)',
     gap: '8px',
     padding: '2px 12px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
@@ -122,13 +123,6 @@ const LEVEL_COLORS: Record<string, string> = {
 
 function levelColor(level: string): string {
   return LEVEL_COLORS[level] ?? tokens.colorNeutralForeground2;
-}
-
-function timeOnly(iso: string): string {
-  // Show hh:mm:ss.SSS - the operator already knows the date.
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso.slice(11, 23);
-  return date.toISOString().slice(11, 23);
 }
 
 export const LogStreamDrawer: React.FC = () => {
@@ -273,7 +267,7 @@ const LogRow: React.FC<LogRowProps> = ({ entry, testIndex }) => {
   const classes = useStyles();
   return (
     <div className={classes.row} data-testid={`log-stream-row-${testIndex}`}>
-      <Text size={100}>{timeOnly(entry.timestamp)}</Text>
+      <Text size={100}><DateTimeField value={entry.timestamp} /></Text>
       <Text size={100} weight="semibold" style={{ color: levelColor(entry.level) }}>
         {entry.level}
       </Text>

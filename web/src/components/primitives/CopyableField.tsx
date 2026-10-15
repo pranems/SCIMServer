@@ -33,6 +33,9 @@ const useStyles = makeStyles({
     minWidth: 0,
     flex: '1 1 auto',
   },
+  buttonOnlyRoot: {
+    flexShrink: 0,
+  },
   monospace: {
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '12px',
@@ -110,7 +113,7 @@ export const CopyableField: React.FC<CopyableFieldProps> = ({
     );
 
   return (
-    <span className={mergeClasses(classes.root, className)} data-testid={testId}>
+    <span className={mergeClasses(classes.root, buttonOnly ? classes.buttonOnlyRoot : undefined, className)} data-testid={testId}>
       {!buttonOnly && (
         <span className={mergeClasses(classes.value, monospace ? classes.monospace : undefined)}>
           {truncate ? (
@@ -127,6 +130,9 @@ export const CopyableField: React.FC<CopyableFieldProps> = ({
           size="small"
           className={classes.button}
           onClick={onClick}
+          onKeyDown={event => {
+            if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+          }}
           data-testid={buttonTestId}
           aria-label={ariaLabel ?? `Copy ${value}`}
         />

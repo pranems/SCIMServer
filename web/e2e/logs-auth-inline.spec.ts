@@ -109,6 +109,10 @@ test.describe('Logs auth integration (U11 + U12)', () => {
     // The inline auth section renders the matched decision + the failed check.
     await expect(page.getByTestId('log-detail-auth-section')).toBeVisible();
     await expect(page.getByTestId('log-detail-auth-section-record')).toBeVisible();
+    await expect(page.getByTestId('log-detail-auth-section-record').locator('time'))
+      .toHaveText('2026-07-21 12:00:00.000 UTC');
+    await expect(page.getByTestId('log-detail-auth-section-record').locator('time'))
+      .toHaveAttribute('datetime', '2026-07-21T12:00:00.000Z');
     const failed = page.getByTestId('auth-decision-check-audience_match');
     await expect(failed).toContainText('api://expected');
     await expect(failed).toContainText('api://actual');

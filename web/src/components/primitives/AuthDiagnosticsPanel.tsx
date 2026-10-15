@@ -16,6 +16,7 @@
  * fields). Uses the R9 copy primitives (CopyableJsonBlock, CopyableField).
  */
 import * as React from 'react';
+import { DateTimeField } from './DateTimeField';
 import {
   makeStyles,
   tokens,
@@ -293,7 +294,7 @@ export const AuthDecisionForRequest: React.FC<{
             {record.reasonCode && <Caption1 className={classes.mono}>{record.reasonCode}</Caption1>}
             {record.recordedAt && (
               <Caption1 className={classes.hint}>
-                {new Date(record.recordedAt).toLocaleTimeString()}
+                <DateTimeField value={record.recordedAt} />
               </Caption1>
             )}
           </div>
@@ -369,18 +370,23 @@ export const AuthDiagnosticsPanel: React.FC<AuthDiagnosticsPanelProps> = ({
         <Accordion multiple collapsible openItems={openItems} data-testid={`${testId}-list`}>
           {records.map((record) => (
             <AccordionItem value={record.id} key={record.id}>
-              <AccordionHeader data-testid={`auth-decision-row-${record.id}`}>
-                <div className={classes.rowHeader}>
-                  {outcomeBadge(record)}
-                  <Text className={classes.mono}>{record.method}</Text>
-                  {record.reasonCode && (
-                    <Caption1 className={classes.mono}>{record.reasonCode}</Caption1>
-                  )}
-                  <Caption1 className={classes.hint}>
-                    {new Date(record.recordedAt).toLocaleTimeString()}
-                  </Caption1>
-                </div>
-              </AccordionHeader>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <AccordionHeader
+                  data-testid={`auth-decision-row-${record.id}`}
+                  style={{ flex: '1 1 160px', minWidth: 0 }}
+                >
+                  <div className={classes.rowHeader}>
+                    {outcomeBadge(record)}
+                    <Text className={classes.mono}>{record.method}</Text>
+                    {record.reasonCode && (
+                      <Caption1 className={classes.mono}>{record.reasonCode}</Caption1>
+                    )}
+                  </div>
+                </AccordionHeader>
+                <Caption1 className={classes.hint}>
+                  <DateTimeField value={record.recordedAt} data-testid={`auth-decision-timestamp-${record.id}`} />
+                </Caption1>
+              </div>
               <AccordionPanel>
                 <DecisionDetail record={record} endpointId={endpointId} />
               </AccordionPanel>

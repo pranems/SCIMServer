@@ -226,11 +226,12 @@ describe('OverviewTab', () => {
     expect(screen.getByText('POST')).toBeInTheDocument();
     expect(screen.getByText('201')).toBeInTheDocument();
     // X5 - the auth-method chip renders on the row (accept via WIF), and the
-    // row is a clickable button that opens the request in the Logs view.
+    // The request action and timestamp copy are independent native buttons.
     const chip = screen.getByTestId('overview-activity-auth-l1');
     expect(chip.textContent).toContain('auth ok');
     expect(chip.textContent).toContain('WIF');
-    expect(screen.getByTestId('overview-activity-row-l1').getAttribute('role')).toBe('button');
+    expect(screen.getByTestId('overview-activity-open-l1')).toHaveAttribute('type', 'button');
+    expect(screen.getByTestId('overview-activity-row-l1').querySelector('button button')).toBeNull();
   });
 
   it('shows an EmptyState in the Recent Activity slot when none exist', () => {

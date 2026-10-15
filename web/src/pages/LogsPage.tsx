@@ -18,6 +18,7 @@
  * @see docs/PHASE_D5_GLOBAL_LOGS_ENHANCEMENT.md
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   mergeClasses,
@@ -461,7 +462,7 @@ export const LogsPage: React.FC<{ routeSince?: string }> = ({ routeSince }) => {
                 </td>
                 <td className={classes.td}>
                   <Caption1>
-                    {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
+                    <DateTimeField value={log.createdAt} />
                   </Caption1>
                 </td>
               </tr>

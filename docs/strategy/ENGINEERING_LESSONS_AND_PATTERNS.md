@@ -16,6 +16,17 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### New inline actions invalidate the old text-width budget
+
+A previously bounded endpoint name can collapse when copy/open actions are
+added. Visibility alone also misses a shrinking wrapper whose child button
+overlaps another action. Budget the whole identity group at every supported
+viewport, keep canonical button-only wrappers nonshrinking, and assert actual
+clipboard contents, new-tab destinations and minimum name width. Exercise
+Enter/Space inside clickable rows to prove copy does not trigger navigation.
+See DT-I01 through DT-I04 and DT-I07 in
+[the date-time and endpoint-identity ledger](../UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+
 ### A final failure tally is not a mutation barrier
 
 Recording FAIL and returning false does not stop deployment when callers

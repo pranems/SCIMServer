@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.49`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.50`
 
-> **Version:** 0.55.49 - **Updated:** 2026-09-30
+> **Version:** 0.55.50 - **Updated:** 2026-09-30
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -55,6 +55,7 @@
 | Use global Back/Forward and understand Operations, Logs, `/Me`, Manual Provision, and endpoint context | [GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md](GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md) |
 | Review the operator-observed UI readability issues and next-release acceptance criteria | [UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md](UI_VISUAL_REVIEW_BACKLOG_2026-10-12.md) |
 | Review measured activity alignment and endpoint-label corrections, mobile coverage, and remaining release gates | [UI_ACTIVITY_ENDPOINT_READABILITY.md](UI_ACTIVITY_ENDPOINT_READABILITY.md) |
+| Follow complete UTC timestamp presentation and plain endpoint name/copy/open behavior, including measured regression controls | [UI_DATE_TIME_IDENTITY_CONSISTENCY.md](UI_DATE_TIME_IDENTITY_CONSISTENCY.md) |
 | Follow the measured Entra gallery provisioning gate issues, fixes, and prevention checks | [ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) |
 | Review the bounded custom extension mapping and complete three-auth Group/membership validation | [ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md](ENTRA_GALLERY_CUSTOM_EXTENSION_VALIDATION.md) |
 | Inspect and edit effective WIF/JWKS runtime egress values | [EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md](EFFECTIVE_WIF_JWKS_EGRESS_POLICY.md) |

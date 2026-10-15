@@ -9,6 +9,7 @@
  * Phase G2: empty state migrated from plain Text to EmptyState.
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   mergeClasses,
@@ -248,9 +249,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
               </td>
               <td className={classes.td}>
                 <Caption1>
-                  {group.meta?.created
-                    ? new Date(group.meta.created).toLocaleDateString()
-                    : '-'}
+                  <DateTimeField value={group.meta?.created} />
                 </Caption1>
               </td>
             </tr>
