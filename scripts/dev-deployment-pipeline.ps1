@@ -208,6 +208,14 @@ function Invoke-Gate {
         Add-Result -Stage $Stage -Gate $Gate -Status 'PENDING' -Detail 'dry-run'
         return $true
     }
+    if ($Stage -match '^[4-6](?:\.|$)') {
+        $failedPrerequisites = @($script:results | Where-Object { $_.Status -eq 'FAIL' })
+        if ($failedPrerequisites.Count -gt 0) {
+            Add-Result -Stage $Stage -Gate $Gate -Status 'SKIPPED' `
+                -Detail "blocked by $($failedPrerequisites.Count) earlier failed gate(s)"
+            return $false
+        }
+    }
     $start = Get-Date
     Push-Location $WorkDir
     try {
@@ -1002,7 +1010,7 @@ if (-not $SkipDeploy -and -not $SkipPlaywright) {
 # =============================================================================
 # Stage 6 - Post-deploy state diff + report
 # =============================================================================
-if (-not $SkipDeploy) {
+if (-not $SkipDeploy -and @($script:results | Where-Object { $_.Status -eq 'FAIL' }).Count -eq 0) {
     Write-Stage 6 'Post-deploy state diff'
 
     $afterPath = Join-Path $ReportDir "dev-after-$gitSha-$ImageTag.json"
@@ -1044,7 +1052,7 @@ if (-not $SkipDeploy) {
     #
     # Retention comes from scripts/scim-estates.json per estate, not from a
     # literal here, so this stage cannot drift away from promote-to-prod.ps1.
-    if (-not $DryRun) {
+    if (-not $DryRun -and @($script:results | Where-Object { $_.Status -eq 'FAIL' }).Count -eq 0) {
         try {
             $devKeep = Get-ScimEstateRevisionKeep -AppName $DevAppName -ResourceGroup $DevResourceGroup
             & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep $devKeep
@@ -1052,7 +1060,12 @@ if (-not $SkipDeploy) {
         } catch {
             Add-Result -Stage '6.2' -Gate 'Revision hygiene' -Status 'FAIL' -Detail $_.Exception.Message
         }
+    } elseif (-not $DryRun) {
+        Add-Result -Stage '6.2' -Gate 'Revision hygiene' -Status 'SKIPPED' -Detail 'blocked by failed data integrity check'
     }
+} elseif (-not $SkipDeploy) {
+    Add-Result -Stage '6.1' -Gate 'Data integrity check' -Status 'SKIPPED' -Detail 'blocked by earlier failed gate(s)'
+    Add-Result -Stage '6.2' -Gate 'Revision hygiene' -Status 'SKIPPED' -Detail 'blocked by earlier failed gate(s)'
 }
 
 # =============================================================================

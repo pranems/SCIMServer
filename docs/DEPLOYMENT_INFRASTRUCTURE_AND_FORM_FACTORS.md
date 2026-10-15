@@ -1,11 +1,34 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-14 - **Repo version at capture:** `api/package.json` = `0.55.49`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-15 - **Repo version at capture:** `api/package.json` = `0.55.49`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
 
 ---
+
+## Failed prerequisites block deployment commands
+
+The default merged-master pipeline at `078e741b` recorded a failed web
+coverage matrix lane but entered Stage 4. The owner stopped it before
+publication or deployment. A read-only ARM and version check confirmed that
+dev still serves `0.55.47`, revision `scimserver-dev--ve4192b0e`.
+
+`Invoke-Gate` now refuses to execute Stage 4-6 commands after an earlier
+recorded FAIL, records an explicit SKIPPED reason, and returns false.
+Independent local test gates can still collect diagnostic evidence. The
+post-deployment integrity/pruning block also checks earlier failures, and
+pruning checks integrity again before acting. Report generation and the
+nonzero final failure status remain in place. This is a tooling-only change,
+not a runtime release or permission to deploy an unmerged branch.
+
+The pipeline contract grows from 43 to 54 passing assertions, with seven
+expected RED assertions observed before the guard was implemented. Controls
+execute the actual gate function and post-deployment block without external
+mutation. The original six-mode run remains FAIL. A separate full web
+coverage replay with `--maxWorkers=2` passed all 1,595 tests and existing
+coverage floors; it does not prove a sole timeout cause or a completed
+deployment. See the [execution ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
 
 ## Prisma validation scheduling
 

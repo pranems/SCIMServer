@@ -198,6 +198,95 @@ Invoke-Assert -Description 'default validation project identity remains unique a
 
 & {
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $definition = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-Gate'
+    }, $true)
+    . ([scriptblock]::Create($definition.Extent.Text))
+    $originalResults = $script:results
+    $originalExit = $global:LASTEXITCODE
+    $DryRun = $false
+    $state = @{ Executed = $false }
+    function Add-Result {
+        param($Stage, $Gate, $Status, $Detail, $DurationSec)
+        $script:results += [pscustomobject]@{ Stage = $Stage; Gate = $Gate; Status = $Status }
+    }
+    try {
+        foreach ($case in @(
+            @{ Earlier = '2.6'; Next = '4.1' },
+            @{ Earlier = '3b.5'; Next = '4.3' },
+            @{ Earlier = '4.1'; Next = '4.2a' },
+            @{ Earlier = '4.3'; Next = '4.5' },
+            @{ Earlier = '4.6'; Next = '4.8' },
+            @{ Earlier = '4.7'; Next = '5.3' }
+        )) {
+            $script:results = @([pscustomobject]@{ Stage = $case.Earlier; Status = 'FAIL' })
+            $state.Executed = $false
+            $allowed = Invoke-Gate -Stage $case.Next -Gate 'contract mutation' -Command {
+                $state.Executed = $true
+                $global:LASTEXITCODE = 0
+            }
+            Invoke-Assert "failed $($case.Earlier) blocks $($case.Next) before command execution" (
+                -not $allowed -and -not $state.Executed -and
+                $script:results[-1].Status -eq 'SKIPPED' -and $script:results[0].Status -eq 'FAIL'
+            )
+        }
+        foreach ($stage in @('2.3', '4.1')) {
+            $script:results = @(if ($stage -eq '2.3') {
+                @([pscustomobject]@{ Stage = '2.2'; Status = 'FAIL' })
+            } else { @([pscustomobject]@{ Stage = '2.6'; Status = 'PASS' }) })
+            $state.Executed = $false
+            $allowed = Invoke-Gate -Stage $stage -Gate 'contract positive control' -Command {
+                $state.Executed = $true
+                $global:LASTEXITCODE = 0
+            }
+            Invoke-Assert "positive control preserves executable $stage evidence" (
+                $allowed -and $state.Executed -and $script:results[-1].Status -eq 'PASS'
+            )
+        }
+        $postDeploy = @($ast.EndBlock.Statements | Where-Object {
+            $_ -is [System.Management.Automation.Language.IfStatementAst] -and
+            $_.Extent.Text.Contains("'prune-revisions.ps1'")
+        })
+        Invoke-Assert 'post-deploy state and pruning block is available for behavioral control' ($postDeploy.Count -eq 1)
+        if ($postDeploy.Count -eq 1) {
+            $script:results = @([pscustomobject]@{ Stage = '2.6'; Status = 'FAIL' })
+            $state.Executed = $false
+            $SkipDeploy = $false
+            $ReportDir = $env:TEMP
+            function Write-Stage { param($num, $title) }
+            function Invoke-RestMethod { $state.Executed = $true; throw 'Contract refuses remote calls.' }
+            function Get-ScimEstateRevisionKeep { $state.Executed = $true; return 2 }
+            function Invoke-ContractPrune { $state.Executed = $true }
+            function Join-Path {
+                param($Path, $ChildPath)
+                if ($ChildPath -eq 'prune-revisions.ps1') { return 'Invoke-ContractPrune' }
+                Microsoft.PowerShell.Management\Join-Path $Path $ChildPath
+            }
+            & ([scriptblock]::Create($postDeploy[0].Extent.Text))
+            Invoke-Assert 'failed prerequisites prevent post-deploy state capture and pruning' (-not $state.Executed)
+            $pruning = @($postDeploy[0].FindAll({
+                param($node)
+                $node -is [System.Management.Automation.Language.IfStatementAst] -and
+                $node.Extent.Text.Contains('Get-ScimEstateRevisionKeep')
+            }, $true) | Sort-Object { $_.Extent.Text.Length })[0]
+            $script:results = @([pscustomobject]@{ Stage = '6.1'; Status = 'FAIL' })
+            $state.Executed = $false
+            & ([scriptblock]::Create($pruning.Extent.Text))
+            Invoke-Assert 'failed data integrity prevents pruning within the post-deploy stage' (
+                -not $state.Executed -and $script:results[-1].Status -eq 'SKIPPED'
+            )
+        }
+    }
+    finally {
+        $script:results = $originalResults
+        $global:LASTEXITCODE = $originalExit
+    }
+}
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
     $command = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.CommandAst] -and

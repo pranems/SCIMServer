@@ -16,6 +16,19 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### A final failure tally is not a mutation barrier
+
+Recording FAIL and returning false does not stop deployment when callers
+discard the return value. The shared gate runner must reject downstream
+mutation commands before executing them, retain the original failure, and
+record an explicit blocked result. Operations outside that runner, such as
+revision pruning, need the same admission rule; an integrity failure must
+also prevent pruning later in the same stage. Execute adversarial controls
+against the actual function and stage blocks, with positive controls for
+normal execution and independent diagnostic tests. A successful replay is a
+separate receipt, never a rewrite of the failed run.
+See GM-I09 in [the gallery execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
 ### Evidence must outlive the runner that cleans its output
 
 A later focused Playwright invocation deletes the previous output directory.

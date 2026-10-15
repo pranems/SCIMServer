@@ -2,6 +2,24 @@
 
 **Last verified:** 2026-10-15
 
+**Current reconstructed consolidation checkpoint:** PR #218 merged normally
+at `078e741b`. The original deleted project3 transcript was not restored.
+Exclusive dev/gallery ownership and the full default dev pipeline were
+authorized. The pipeline passed both unit backends (6,043 tests each) and
+explicit PostgreSQL E2E (2,492 tests, zero skips), but its six-mode matrix
+failed one web coverage timeout. It entered Stage 4 despite that failure and
+was stopped before publication/deployment. A separate complete coverage replay
+with two workers passed all 1,595 tests and unchanged coverage floors; the
+original matrix remains FAIL. Read-only ARM/version confirms dev still
+`0.55.47`. A tooling-only follow-up blocks Stage 4-6 commands and pruning
+after failed prerequisites, with 54 passing contracts after seven expected
+RED assertions. No runtime version bump, canary or customer-prod change.
+Expanded gallery, Docker/live/browser, legacy-reference and operator visual
+proof remain pending. See the [current RCA](docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
+The gallery/runtime paragraphs immediately below retain predecessor
+checkpoints, not the current ownership or draft/merge state.
+
 **Gallery coverage expansion:** The isolated custom-mapping worktree is based
 on merged runtime PR #215 at `99cdeda3`. Pure profile/mapping transformation,
 saved-source verification, all-three-auth Group orchestration, report
