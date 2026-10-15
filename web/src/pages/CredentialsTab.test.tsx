@@ -929,6 +929,18 @@ describe('CredentialsTab', () => {
     };
   }
 
+  it.each(['not-a-date', '2030-11-21', '2030-11-21T22:23:24'])(
+    'V1: rejects invalid or ambiguous expiry %s instead of showing valid-until',
+    expiresAt => {
+      mockUseEndpointOverview.mockReturnValue({
+        data: bearerOverview({ expiresAt }), isLoading: false, error: null,
+      });
+      renderWithProviders(<CredentialsTab endpointId="ep-1" />);
+      expect(screen.getByTestId('credential-validity-bc-1'))
+        .toHaveTextContent(`Invalid expiry: ${expiresAt}`);
+    },
+  );
+
   it('V1: a credential row shows its remaining-validity line', () => {
     const soon = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
     mockUseEndpointOverview.mockReturnValue({ data: bearerOverview({ expiresAt: soon }), isLoading: false, error: null });

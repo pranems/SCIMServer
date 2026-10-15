@@ -40,12 +40,12 @@ async function seedDisplayFixtures(page: Page): Promise<void> {
   }));
   await page.route('**/scim/admin/database/users?*', route => route.fulfill({
     json: { users: [{ id: 'readability-user', userName: 'readability@example.invalid',
-      active: true, endpointId, createdAt: '2026-10-14T00:00:00Z' }],
+      active: true, endpointId, createdAt: '2026-10-14T23:59:58.123Z' }],
     pagination: { page: 1, limit: 50, total: 1, pages: 1 } },
   }));
   await page.route('**/scim/admin/database/groups?*', route => route.fulfill({
     json: { groups: [{ id: 'readability-group', displayName: 'Readability group',
-      memberCount: 1, endpointId, createdAt: '2026-10-14T00:00:00Z' }],
+      memberCount: 1, endpointId, createdAt: '2026-10-15T04:05:06.789Z' }],
     pagination: { page: 1, limit: 50, total: 1, pages: 1 } },
   }));
 }
@@ -107,6 +107,38 @@ for (const width of [1440, 900, 390]) {
       await expect(link).toBeVisible();
       await expect(link).toHaveAttribute('title', `${endpointName} (readability, ${endpointId})`);
       await expect(link).toContainText(endpointName);
+      await expect(link.locator('.fui-Badge')).toHaveCount(0);
+      const identityId = await link.getAttribute('data-testid');
+      const copy = page.getByTestId(`${identityId}-identity-copy-button`);
+      await expect(copy).toBeVisible();
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      await copy.click();
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(endpointName);
+      await page.evaluate(() => navigator.clipboard.writeText('before-keyboard-copy'));
+      await copy.press('Space');
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(endpointName);
+      const created = page.getByTestId(`operations-${kind}-row-readability-${kind}`).locator('time');
+      await expect(created).toHaveText(section === 'users'
+        ? '2026-10-14 23:59:58.123 UTC' : '2026-10-15 04:05:06.789 UTC');
+      await created.scrollIntoViewIfNeeded();
+      const timestampBounds = await created.evaluate(element => {
+        const range = document.createRange();
+        range.selectNodeContents(element.firstElementChild!.firstElementChild!);
+        return { cell: element.closest('td')!.getBoundingClientRect().toJSON(),
+          text: Array.from(range.getClientRects(), rect => rect.toJSON()) };
+      });
+      expect(timestampBounds.text.length).toBeGreaterThan(0);
+      for (const rect of timestampBounds.text) {
+        expect(rect.left).toBeGreaterThanOrEqual(timestampBounds.cell.left - 1);
+        expect(rect.right).toBeLessThanOrEqual(timestampBounds.cell.right + 1);
+        expect(rect.top).toBeGreaterThanOrEqual(timestampBounds.cell.top - 1);
+        expect(rect.bottom).toBeLessThanOrEqual(timestampBounds.cell.bottom + 1);
+      }
+      const popupPromise = page.waitForEvent('popup');
+      await page.getByTestId(`${identityId}-open`).click();
+      const popup = await popupPromise;
+      await expect(popup).toHaveURL(new RegExp(`/endpoints/${endpointId}/${section}`));
+      await popup.close();
       const bounds = await link.evaluate(element => {
         const cell = element.closest('td')!;
         const table = element.closest('table')!;

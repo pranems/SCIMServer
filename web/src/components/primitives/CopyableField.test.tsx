@@ -46,6 +46,28 @@ describe('CopyableField primitive', () => {
     expect(screen.getByTestId('f4-copy-button')).toBeInTheDocument();
   });
 
+  it.each(['Enter', ' '])('keeps copy activation %s out of a containing clickable row', key => {
+    const parentKeyDown = vi.fn();
+    renderWithFluent(
+      <div onKeyDown={parentKeyDown}>
+        <CopyableField value="timestamp" data-testid="nested-copy" />
+      </div>,
+    );
+    fireEvent.keyDown(screen.getByTestId('nested-copy-copy-button'), { key });
+    expect(parentKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('preserves propagation for non-activation keys', () => {
+    const parentKeyDown = vi.fn();
+    renderWithFluent(
+      <div onKeyDown={parentKeyDown}>
+        <CopyableField value="timestamp" data-testid="arrow-copy" />
+      </div>,
+    );
+    fireEvent.keyDown(screen.getByTestId('arrow-copy-copy-button'), { key: 'ArrowRight' });
+    expect(parentKeyDown).toHaveBeenCalledOnce();
+  });
+
   it('truncate=true composes TruncatedText for long values', () => {
     const long = 'urn:ietf:params:scim:schemas:extension:proviam:2.0:Employee';
     renderWithFluent(

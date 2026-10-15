@@ -49,6 +49,7 @@ import {
   People24Regular,
   Group24Regular,
   Pulse24Regular,
+  Open16Regular,
 } from '@fluentui/react-icons';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
@@ -59,7 +60,7 @@ import {
   type DatabaseUserRow,
   type DatabaseGroupRow,
 } from '../api/queries';
-import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText } from '../components/primitives';
+import { EmptyState, LoadingSkeleton, CopyableField, TruncatedText, DateTimeField } from '../components/primitives';
 import { ColumnResizeHandle } from '../components/primitives/ColumnResizeHandle';
 import { useResizableColumns } from '../hooks/useResizableColumns';
 import { FilteredResultsPanel } from '../components/primitives/FilteredResultsPanel';
@@ -70,18 +71,6 @@ import type { OperationsSearch } from '../routes/search-schemas';
 type OperationsTabKey = 'users' | 'groups' | 'statistics';
 
 const PAGE_SIZE = 50;
-
-/**
- * Format an ISO timestamp as a short local date for the `created`
- * column. The full value is preserved in the CSV export; the table cell
- * only needs a scannable date (the raw ISO string forced the column wide
- * and clipped awkwardly under the R5 overflow:hidden cell).
- */
-function formatCreated(iso: string | null | undefined): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
-}
 
 const useStyles = makeStyles({
   page: {
@@ -117,7 +106,7 @@ const useStyles = makeStyles({
   },
   rowTable: {
     width: '100%',
-    minWidth: '480px',
+    minWidth: '640px',
     borderCollapse: 'collapse',
     fontSize: tokens.fontSizeBase300,
     // R5 (copilot-instructions.md): a table whose cells truncate MUST use
@@ -439,7 +428,7 @@ const UsersSection: React.FC<{
                   </td>
                   <td className={classes.rowCell}>
                     {u.endpointId ? (
-                      <EndpointBadgeLink
+                      <EndpointIdentityLink
                         endpointId={u.endpointId}
                         identity={endpointIdentityById.get(u.endpointId)}
                         section="users"
@@ -450,7 +439,7 @@ const UsersSection: React.FC<{
                     )}
                   </td>
                   <td className={classes.rowCell}>
-                    <Caption1>{formatCreated(u.createdAt)}</Caption1>
+                    <Caption1><DateTimeField value={u.createdAt} /></Caption1>
                   </td>
                 </tr>
               ))}
@@ -602,7 +591,7 @@ const GroupsSection: React.FC<{
                   </td>
                   <td className={classes.rowCell}>
                     {g.endpointId ? (
-                      <EndpointBadgeLink
+                      <EndpointIdentityLink
                         endpointId={g.endpointId}
                         identity={endpointIdentityById.get(g.endpointId)}
                         section="groups"
@@ -613,7 +602,7 @@ const GroupsSection: React.FC<{
                     )}
                   </td>
                   <td className={classes.rowCell}>
-                    <Caption1>{formatCreated(g.createdAt)}</Caption1>
+                    <Caption1><DateTimeField value={g.createdAt} /></Caption1>
                   </td>
                 </tr>
               ))}
@@ -650,16 +639,16 @@ const GroupsSection: React.FC<{
   );
 };
 
-// ─── EndpointBadgeLink ───────────────────────────────────────────────
+// ─── EndpointIdentityLink ────────────────────────────────────────────
 //
-// Plain-anchor implementation of "click this badge to jump to the
+// Plain-anchor implementation of "click this name to jump to the
 // per-endpoint Users/Groups tab pre-filtered". Uses useNavigate()
 // to drive SPA navigation on click; preserves href for keyboard /
 // right-click / middle-click semantics. Plain anchor instead of
 // TanStack Router's <Link> so the page can be unit-tested without
 // requiring the full nested route tree mounted in the test router.
 
-const EndpointBadgeLink: React.FC<{
+const EndpointIdentityLink: React.FC<{
   endpointId: string;
   identity?: { label: string; name: string };
   section: 'users' | 'groups';
@@ -667,6 +656,7 @@ const EndpointBadgeLink: React.FC<{
 }> = ({ endpointId, identity, section, testId }) => {
   const navigate = useNavigate();
   const href = `/endpoints/${endpointId}/${section}`;
+  const label = identity?.label ?? endpointId;
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>): void => {
     // Honour modifier keys + middle/right click (let the browser
     // handle them).
@@ -677,20 +667,36 @@ const EndpointBadgeLink: React.FC<{
     navigate({ to: href });
   };
   return (
-    <a
-      href={href}
-      onClick={handleClick}
-      data-testid={testId}
-      title={`${identity?.label ?? endpointId} (${identity?.name ?? endpointId}, ${endpointId})`}
-      style={{ textDecoration: 'none', display: 'block', maxWidth: '100%' }}
-    >
-      <Badge appearance="outline" size="small" style={{ maxWidth: '100%', minWidth: 0 }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, maxWidth: '100%' }}>
+      <a
+        href={href}
+        onClick={handleClick}
+        data-testid={testId}
+        title={`${label} (${identity?.name ?? endpointId}, ${endpointId})`}
+        style={{ textDecoration: 'none', display: 'block', flex: '1 1 auto', minWidth: 0 }}
+      >
         <TruncatedText
           text={identity?.label ?? endpointId.slice(0, 8)}
           data-testid={`${testId}-label`}
         />
-      </Badge>
-    </a>
+      </a>
+      <CopyableField
+        value={label}
+        buttonOnly
+        ariaLabel="Copy endpoint name"
+        data-testid={`${testId}-identity`}
+      />
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${label} in a new tab`}
+        data-testid={`${testId}-open`}
+        style={{ display: 'inline-flex', flexShrink: 0 }}
+      >
+        <Open16Regular />
+      </a>
+    </span>
   );
 };
 

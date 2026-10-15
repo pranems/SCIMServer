@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### UI date-time consistency and endpoint identity (0.55.50 preparation)
+
+- Prepare the product patch from `0.55.49` to `0.55.50`. API/web manifests
+  are updated; matching lockfiles must come from the existing CI workflow.
+  The root tooling package is not a product version and remains unchanged.
+- Use complete UTC date, time, milliseconds and timezone across absolute
+  timestamp displays. Preserve original copied instants, raw JSON, domain
+  date-only values, exports and duration semantics. Missing and invalid
+  timestamps remain distinguishable; ambiguous expiry values cannot appear
+  as valid credentials.
+- Replace the persistent Operations endpoint outline with a plain linked
+  name and independent canonical copy/new-tab actions. Keep modifier-click
+  navigation, percentage columns, persisted resizing and local mobile
+  scrolling. Fix button-only copy-wrapper shrinkage and activation-key
+  propagation in the shared primitive rather than page-specific workarounds.
+- Focused units: seven suites pass 148 cases, and the corrected source-policy
+  replay passes three cases. The initial combined receipt retains its one
+  policy-path failure. Real 4,999/5,000-entry cap boundaries pass without
+  mounting unrelated thousands of rows or relaxing timeouts.
+- All 33 focused browser cases pass in 7.0 minutes, including three viewport
+  widths, copy via click/Space/Enter, endpoint navigation, glyph bounds,
+  explicit invalid expiry and inline request authentication timestamps.
+- Static consolidation, full hook-owned counts, immutable dev
+  delivery, gallery/reference proof and operator visual acceptance remain
+  pending. No deployment or production-readiness claim is made.
+- See [implementation, evidence and execution RCA](docs/UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+
 ### Fail-closed deployment prerequisites
 
 - Block Stage 4-6 gate commands after a recorded earlier failure. Guard

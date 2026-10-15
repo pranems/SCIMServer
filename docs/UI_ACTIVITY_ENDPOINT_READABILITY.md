@@ -1,7 +1,7 @@
 # Activity and endpoint identity readability
 
-**Status:** v0.55.49 consolidation in progress, deployment pending
-**Last verified:** 2026-10-14
+**Status:** Historical v0.55.49 evidence; v0.55.50 follow-up linked below, deployment pending
+**Last verified:** 2026-10-15
 
 ## Executive summary
 
@@ -13,6 +13,14 @@ This document describes local source and browser evidence, not a change already
 deployed to dev or approved for production.
 
 ## Root causes and correction
+
+**Superseding source follow-up:** The earlier evidence below bounded the
+outlined badge but did not remove it. The operator's follow-up now replaces
+that badge with plain name/copy/open actions and uses complete UTC timestamps.
+The added actions required a 640 px table floor after the 480 px layout left
+only 28 px for the mobile endpoint name. Current validation belongs in
+[the date-time and endpoint-identity ledger](UI_DATE_TIME_IDENTITY_CONSISTENCY.md);
+the older dimensions below remain historical measurements.
 
 | Surface | Observed cause | Correction |
 |---|---|---|

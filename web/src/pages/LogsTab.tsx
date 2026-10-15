@@ -11,6 +11,7 @@
  * with a contextual "Reset filter" CTA when a filter is active.
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   mergeClasses,
@@ -335,7 +336,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
               </td>
               <td className={classes.td}>
                 <Caption1>
-                  {log.createdAt ? new Date(log.createdAt).toLocaleTimeString() : '-'}
+                  <DateTimeField value={log.createdAt} />
                 </Caption1>
               </td>
             </tr>

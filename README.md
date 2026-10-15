@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.49`
+> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.50`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 

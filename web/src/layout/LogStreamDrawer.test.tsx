@@ -134,22 +134,22 @@ describe('LogStreamDrawer', () => {
     expect(screen.getByTestId(/^log-stream-row-/)).toHaveTextContent(/pool exhausted/);
   });
 
-  it(
-    'shows a banner when the buffer is at its max-entries cap (operator hint that older entries dropped)',
-    () => {
-      useUIStore.setState({ logStreamDrawerOpen: true });
-      const big = Array.from({ length: 5000 }, (_, i): LogStreamEntry => ({
-        timestamp: `t${i}`, level: 'INFO', category: 'x', message: `m${i}`,
+  it.each([[4999, false], [5000, true]] as const)(
+    'reports the unfiltered buffer cap at %i entries while rendering only matching rows',
+    (length, atCap) => {
+      useUIStore.setState({ logStreamDrawerOpen: true, logStreamSearch: 'last-entry' });
+      const big = Array.from({ length }, (_, i): LogStreamEntry => ({
+        timestamp: '2026-10-15T04:05:06.789Z', level: 'INFO', category: 'x',
+        message: i === length - 1 ? 'last-entry' : `m${i}`,
       }));
       useLogStreamMock.mockReturnValue({
         entries: big, connectionState: 'open', paused: false, setPaused: setPausedSpy, clear: clearSpy,
       });
       renderWithFluent(<LogStreamDrawer />);
-      expect(screen.getByTestId('log-stream-cap-banner')).toBeInTheDocument();
+      expect(screen.getAllByTestId(/^log-stream-row-/)).toHaveLength(1);
+      expect(screen.getByTestId('log-stream-row-0')).toHaveTextContent('last-entry');
+      if (atCap) expect(screen.getByTestId('log-stream-cap-banner')).toBeInTheDocument();
+      else expect(screen.queryByTestId('log-stream-cap-banner')).not.toBeInTheDocument();
     },
-    // Render of 5000 rows is intentionally heavy - bump the per-test
-    // timeout above the global vitest default so this test does not
-    // flake under shared-suite contention.
-    20_000,
   );
 });

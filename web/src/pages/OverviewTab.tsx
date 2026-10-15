@@ -24,6 +24,7 @@
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md S7.1
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   tokens,
@@ -99,6 +100,14 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2,
   },
   activityPath: {
+    minWidth: 0,
+    border: 0,
+    backgroundColor: 'transparent',
+    padding: 0,
+    fontFamily: 'inherit',
+    fontSize: 'inherit',
+    textAlign: 'left',
+    cursor: 'pointer',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -273,27 +282,24 @@ function statusBadgeColor(status: number): 'success' | 'informative' | 'warning'
 
 const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate, onOpen }) => {
   const classes = useStyles();
-  // Format timestamp as HH:MM:SS local. Recent activity is by definition
-  // recent so the date is implicit; saving column space.
-  const time = (() => {
-    try {
-      return new Date(entry.timestamp).toLocaleTimeString();
-    } catch {
-      return entry.timestamp;
-    }
-  })();
   return (
     <div
       className={`${classes.activityRow} ${alternate ? classes.activityRowAlt : ''} ${onOpen ? classes.activityRowClickable : ''}`}
       data-testid={`overview-activity-row-${entry.id}`}
       onClick={onOpen}
-      role={onOpen ? 'button' : undefined}
-      tabIndex={onOpen ? 0 : undefined}
-      onKeyDown={onOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } } : undefined}
       title={onOpen ? 'Open this request in the Logs view' : undefined}
     >
-      <Caption1 className={classes.activityMeta}>{time}</Caption1>
-      <span className={classes.activityPath} title={entry.path}>{entry.path}</span>
+      <Caption1 className={classes.activityMeta}><DateTimeField value={entry.timestamp} /></Caption1>
+      <button
+        type="button"
+        className={classes.activityPath}
+        title={entry.path}
+        aria-label="Open this request in the Logs view"
+        data-testid={`overview-activity-open-${entry.id}`}
+        onClick={event => { event.stopPropagation(); onOpen?.(); }}
+      >
+        {entry.path}
+      </button>
       <Badge appearance="outline">{entry.method}</Badge>
       <Badge appearance="filled" color={statusBadgeColor(entry.statusCode)}>
         {entry.statusCode}

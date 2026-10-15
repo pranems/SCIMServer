@@ -32,6 +32,7 @@
  * @see docs/PHASE_M1_SCIM_WORKBENCH.md - original M1 design
  */
 import React, { useMemo, useState } from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   tokens,
@@ -1056,7 +1057,7 @@ export const WorkbenchPage: React.FC = () => {
                   data-testid={`workbench-history-row-${entry.id}`}
                 >
                   <td className={classes.historyCell}>
-                    <Caption1>{new Date(entry.timestamp).toLocaleTimeString()}</Caption1>
+                    <Caption1><DateTimeField value={entry.timestamp} /></Caption1>
                   </td>
                   <td className={classes.historyCell}>
                     <Text weight="semibold" style={{ fontFamily: tokens.fontFamilyMonospace }}>

@@ -3,14 +3,14 @@
  *
  * Asserts:
  *   1. Page renders with 3 sub-tabs (All Users | All Groups | Statistics)
- *   2. All Users tab renders one row per user with endpoint Badge
- *   3. All Groups tab renders one row per group with endpoint Badge
+ *   2. All Users tab renders one row per user with endpoint identity
+ *   3. All Groups tab renders one row per group with endpoint identity
  *   4. Statistics tab renders 4 KPI tiles + 24h count
  *   5. Search box drives the query string and resets to page 1 on change
  *   6. Active filter (Switch) drives the query string when toggled
  *   7. Empty-state shows when no rows exist
  *   8. Download CSV button on Users tab triggers triggerCsvDownload
- *   9. Endpoint Badge link points to the per-endpoint Users tab
+ *   9. Endpoint name links to the per-endpoint Users tab
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -100,7 +100,7 @@ function defaultHookReturn<T>(data: T | undefined = undefined): {
   return { data, isLoading: false, isError: false, error: null };
 }
 
-// Stub useNavigate so the EndpointBadgeLink anchor handler doesn't
+// Stub useNavigate so the EndpointIdentityLink anchor handler doesn't
 // require a real router context in unit tests.
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
@@ -152,6 +152,24 @@ describe('OperationsPage (Phase L6)', () => {
   });
 
   // ─── 1. Sub-tabs render ────────────────────────────────────────────
+
+  it('shows complete UTC date and time in both resource tables', () => {
+    renderWithProviders(<OperationsPage />);
+    expect(screen.getByText('2026-05-01 10:00:00.000 UTC')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('operations-tab-groups'));
+    expect(screen.getByText('2026-05-01 09:00:00.000 UTC')).toBeInTheDocument();
+  });
+
+  it('uses plain linked endpoint identity with independent copy and open actions', () => {
+    renderWithProviders(<OperationsPage />);
+    const link = screen.getByTestId('operations-user-row-u1-endpoint-ep-1');
+    expect(link).toHaveTextContent('Production');
+    expect(link.querySelector('.fui-Badge')).toBeNull();
+    expect(screen.getByTestId('operations-user-row-u1-endpoint-ep-1-identity-copy-button')).toBeInTheDocument();
+    expect(screen.getByTestId('operations-user-row-u1-endpoint-ep-1-open')).toHaveAttribute(
+      'href', '/endpoints/ep-1/users',
+    );
+  });
 
   it('renders the page with 3 sub-tabs (All Users | All Groups | Statistics)', () => {
     renderWithProviders(<OperationsPage />);

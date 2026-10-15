@@ -1,8 +1,8 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.49`
+> **Status:** Living reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.50`
 >
-> **Everything here was measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
+> **The captured protocol examples below were measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
 > **Reference endpoint.** All screenshots and traces come from the dev endpoint **`PRTest-Auth-Methods-ISV-1`** (`e8edd907-0dfb-415d-b834-abf0d20eb0e0`), which has **all four authentication methods enabled at once**, **six federated trusts**, and **real Microsoft Entra applications provisioning into it**. At capture time it held 767 request-log rows and 50 recorded auth decisions across `shared_secret`, `bearer_jwt` and `wif`.
 >
@@ -11,6 +11,15 @@
 > **Companions:** [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) - every endpoint setting. [UI_GUIDE.md](UI_GUIDE.md) - screen tour. [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - route reference.
 
 ---
+
+**Source-only UI follow-up for 0.55.50:** Connection health, credential creation
+and expiry, trust verification, and authentication decisions now show complete
+UTC date/time rather than a partial date or clock. Timestamp copy preserves the
+original instant. Missing expiry still means no expiry; malformed or
+timezone-free expiry is explicitly invalid and cannot be labelled valid.
+These presentation changes do not change token validation or server contracts.
+See [local evidence and release boundaries](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+The historical wire captures and screenshots above have not been recaptured.
 
 ## Contents
 

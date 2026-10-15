@@ -15,6 +15,7 @@
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3 + S10 G1/G2
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   mergeClasses,
@@ -333,9 +334,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
               </td>
               <td className={classes.td}>
                 <Caption1>
-                  {user.meta?.created
-                    ? new Date(user.meta.created).toLocaleDateString()
-                    : '-'}
+                  <DateTimeField value={user.meta?.created} />
                 </Caption1>
               </td>
             </tr>

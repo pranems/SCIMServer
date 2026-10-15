@@ -18,6 +18,7 @@
  * passes `oneTimeSecret` for the create moment.
  */
 import * as React from 'react';
+import { DateTimeField } from './DateTimeField';
 import { useState } from 'react';
 import {
   makeStyles,
@@ -280,7 +281,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           </Badge>
           <Caption1>
             {method.authHealth.lastReasonCode ? `${method.authHealth.lastReasonCode} - ` : ''}
-            {new Date(method.authHealth.lastAttemptAt).toLocaleString()}
+            <DateTimeField value={method.authHealth.lastAttemptAt} />
             {method.authHealth.lastCorrelationId ? ` (req ${method.authHealth.lastCorrelationId})` : ''}
           </Caption1>
         </div>

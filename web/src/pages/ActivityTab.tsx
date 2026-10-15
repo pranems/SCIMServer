@@ -15,6 +15,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md S5.2 (route table)
  */
 import React from 'react';
+import { DateTimeField } from '../components/primitives/DateTimeField';
 import {
   makeStyles,
   tokens,
@@ -118,15 +119,6 @@ function severityColor(s: ActivitySeverity | string): 'success' | 'informative' 
     case 'warning': return 'warning';
     case 'error': return 'danger';
     default: return 'subtle';
-  }
-}
-
-function formatTime(ts: string | Date): string {
-  try {
-    const d = typeof ts === 'string' ? new Date(ts) : ts;
-    return d.toLocaleTimeString();
-  } catch {
-    return String(ts);
   }
 }
 
@@ -322,7 +314,7 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ entry, alternate }) => {
       className={`${classes.row} ${alternate ? classes.rowAlt : ''}`}
       data-testid={`activity-row-${entry.id}`}
     >
-      <Caption1 className={classes.meta}>{formatTime(entry.timestamp)}</Caption1>
+      <Caption1 className={classes.meta}><DateTimeField value={entry.timestamp} /></Caption1>
       <Badge appearance="outline">{entry.type}</Badge>
       <Badge appearance="filled" color={severityColor(entry.severity)}>
         {entry.severity}

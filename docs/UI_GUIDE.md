@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-15 - **Product version:** `0.55.49`
+> **Status:** User-facing reference - **Last verified:** 2026-10-15 - **Product version:** `0.55.50`
 
-> **Status:** Active | **Last Updated:** 2026-10-12 | **Version:** 0.55.49
+> **Status:** Active | **Last Updated:** 2026-10-15 | **Version:** 0.55.50
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -16,6 +16,14 @@
 ---
 
 ## Table of Contents
+
+**Local, unreleased date-time follow-up:** Absolute timestamps display both
+date and time, including milliseconds and an explicit UTC timezone. Copying
+retains the source instant. Operations endpoint names are plain links with
+separate copy and new-tab actions, not outlined badges. Invalid or
+timezone-free expiry values display an error instead of a validity claim.
+See [implementation and current evidence](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+The version header describes source metadata, not proof of deployment.
 
 **Local, unreleased readability follow-up:** Recent Activity reserves stable
 fields and explicitly labels server-wide requests. Operations endpoint labels

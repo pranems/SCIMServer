@@ -1,6 +1,6 @@
 # UI Visual Review Backlog - 2026-10-12
 
-> **Status:** Next-release backlog - **Last verified:** 2026-10-12 - **Product version:** `0.55.47`
+> **Status:** Historical review with current source dispositions - **Last verified:** 2026-10-15 - **Product version:** `0.55.50`
 
 ## Executive summary
 
@@ -13,7 +13,7 @@ measured Chromium cases at 1440, 900, and 390 px, including real clipping,
 stable fields, readable mobile columns, and navigation. See
 [readability evidence and RCA](UI_ACTIVITY_ENDPOINT_READABILITY.md).
 These two items are not yet deployed or operator-approved. UI-03 through UI-10
-are owned by the isolated inventory branch. All eight have explicit local
+have since merged to master. All eight have explicit source
 dispositions: compact inventory and selectors, a bounded Dashboard summary,
 shared Endpoints/Operations filter-scroll ownership, contract-first tab order,
 and verified retention of distinct Operations and OAuth-subject `/Me` workflows.
@@ -22,6 +22,17 @@ runs, including nine parent readability regressions. This is not a claim of
 every possible combination, deployed validation or operator approval. See
 [inventory implementation and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
 The original current-release dispositions below are preserved.
+
+## Current remaining consolidation
+
+| Item | Verified source state | Remaining claim |
+|---|---|---|
+| UI-01 through UI-10 | Readability, inventory, selection and workflow dispositions are merged | Current dev browser evidence and operator acceptance |
+| Plain Operations endpoint identity | Local 0.55.50 follow-up removes the outline and adds independent copy/open actions | Final consolidation, reviewed merge and dev acceptance |
+| Complete date/time everywhere absolute instants are shown | Local shared UTC formatter/field across 14 surfaces | Final consolidation, reviewed merge and dev acceptance |
+| Universal sorting and advanced large-inventory scalability | Separate presentation backlog, not silently included in this patch | Bounded future design and measurable acceptance |
+
+See [the current date-time implementation and RCA](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
 
 ## Current surface intent
 

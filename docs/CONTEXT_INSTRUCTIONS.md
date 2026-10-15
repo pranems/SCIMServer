@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.49
+> **Version**: 0.55.50
 > **Last Updated**: October 15, 2026
 > **Last verified:** 2026-10-15
 
@@ -9,7 +9,18 @@
 
 ## Active Delivery Process
 
-**Current merged validation checkpoint:** PR #218 merged normally at
+**Active UI follow-up:** Safety PR #225 merged normally at `e71cec967`.
+The assigned worktree owns `fix/ui-date-time-identity-20261015`, implementing
+shared complete UTC date/time display and plain Operations endpoint
+name/copy/open actions. All 33 focused browser cases pass, including 1440,
+900 and 390 px journeys after the 640 px table-floor correction. Seven unit
+suites pass 148 cases plus three source-policy cases on replay. The earlier
+exact HEAD type comparison remains 66 versus 66 diagnostics, zero additions.
+Source manifests now say 0.55.50; CI lockfiles, final static consolidation,
+dev deployment and operator acceptance remain pending. See
+[implementation, evidence and RCA](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+
+**Gallery validation evidence before the UI follow-up:** PR #218 merged normally at
 `078e741b`; the reconstructed gallery continuation has exclusive dev/gallery
 ownership. Full default validation was stopped before deployment after one
 matrix coverage timeout and discovery that earlier FAIL did not block

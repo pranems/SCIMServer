@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-10-15 - **Product version:** `0.55.49`
+> **Status:** Implemented locally - **Last verified:** 2026-10-15 - **Product version:** `0.55.50`
 
 ## Purpose
 
@@ -16,6 +16,13 @@ The admin UI now exposes one global Back/Forward pair and uses endpoint identity
 | Endpoint detail | What can I inspect or change inside this endpoint? | Owned by the route, so no extra picker |
 
 ## Global Back and Forward
+
+The 0.55.50 source follow-up keeps timestamp copy actions independent from
+request navigation. Enter or Space on copy must copy without opening the
+containing row. Overview has a separate request button, and authentication
+accordion timestamps sit beside rather than inside their header button.
+Absolute timestamps show complete UTC date and time across tables, cards and
+drawers. See [date-time and action regression evidence](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
 
 Back and Forward live in the application header, so they remain available on pages, endpoint panels, tabs, subtabs, filters, drawers, and other URL-owned workflow state.
 
@@ -45,7 +52,7 @@ One endpoint control shape is not correct everywhere. The UI uses one identity m
 | --- | --- | --- |
 | Choose an action target | Shared endpoint context selector | Display name, stable name, Active/Inactive state; inactive targets disabled |
 | Filter an aggregate | Compact combobox with an All endpoints option | Display name, stable name, Active/Inactive state |
-| Show provenance | Compact linked label or badge | Display name with full identity available on the link |
+| Show provenance | Compact linked label; Operations adds independent copy/open actions | Display name with full identity available on the link |
 | Compare contracts | Searchable context selectors with redundant selected markers | Display name, stable name, copyable ID, profile summary, Active/Inactive state |
 | Work inside endpoint route | No redundant selector | Endpoint context comes from the route and detail header |
 

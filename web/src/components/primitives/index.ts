@@ -29,6 +29,7 @@ export type { TruncatedTextProps } from './TruncatedText';
 
 export { CopyableField } from './CopyableField';
 export type { CopyableFieldProps } from './CopyableField';
+export { DateTimeField } from './DateTimeField';
 
 export { CopyJsonButton } from './CopyJsonButton';
 export type { CopyJsonButtonProps } from './CopyJsonButton';
