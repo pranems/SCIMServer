@@ -105,6 +105,7 @@ are rejected before they can be forwarded.
 | DT-I11 | Documentation / Low | The freshness coupling gate identified two missing consumer-document updates after the timestamp changes. Updating only the new feature doc and UI tour was insufficient. | Update authentication validity/diagnostic guidance and navigation/copy behavior in their existing user-facing guides. All 26 freshness checks pass; the existing coupling gate already catches this class. | Focused freshness gate / same gate |
 | DT-I12 | Compiler tooling / Low | A standalone TypeScript 6 browser-spec command failed with TS5112 because explicit files and a nearby project config require a deliberate choice. | Use `--ignoreConfig` with explicit target/module/lib/types flags for that separate check. All three changed browser specs compile with exit zero; the normal project config still receives its own baseline comparison. | Standalone type check / same check |
 | DT-I13 | Environment drift / Medium | Strict rendering passed, but the installed built-in Mermaid renderer is 11.17.0 while the pinned gate is 11.15.0. Content rendering cannot establish editor equivalence under that mismatch. | Scheduled, not silently resolved: repository maintainer to align tooling through a separate quarantined CI-lockfile change by 2026-10-16. No root dependency regeneration on the corporate host and no claim of editor-version parity. | Renderer warning / renderer-version audit |
+| DT-I14 | Release metadata / Low | The first protected Validate push stopped after 11 passing static gates because the README version badge still said 0.55.49. The freshness fixer updates headers, not image badge URLs; the independent content gate caught the difference. | Update the badge to 0.55.50 and run the content check before retrying the unchanged normal hook. Version-bump preflight must include both freshness and content checks. Preserve the failed 223.9-second receipt; no full-unit claim belongs to that stopped run. | Protected content gate / focused content preflight |
 
 The original coverage failure in the 5,000-row log-cap fixture is retained in
 the gallery continuation evidence. This change keeps real 4,999/5,000-entry
@@ -133,6 +134,7 @@ checkpoint must still be appended when their fixes are confirmed.
 2. Prepare the next patch version and obtain API/web lockfiles from the
    existing CI regeneration workflow, not the corporate host.
 3. Update release and user-facing documentation with measured evidence.
+   Run both freshness and content audits: header fixing does not update badges.
 4. Push through normal hooks, obtain exact-tip checks/review, and merge normally.
 5. Complete dev-only pipeline and independent live, gallery, reference-profile,
    browser, performance, and integrity evidence against the exact deployed image.
