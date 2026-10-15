@@ -16,6 +16,24 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Missing required evidence must not become a passed diagnostic skip
+
+A new worktree's missing Mermaid tooling was reported as PASS because both
+the hook wrapper and render command returned zero without rendering. Required
+commands must fail closed on missing prerequisites, while diagnostic commands
+must label unknown evidence honestly. Execute negative controls through the
+real registered action and summary, not a source-text assertion. Bundled
+version discovery must identify the owning library: a profiling placeholder
+or React version is not a Mermaid pin. See
+[the gate hardening evidence and RCA](MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
+The root documentation-tooling lock must participate in the same provenance
+gate as API/web. CI-only cleanup must preserve version choices rather than
+silently upgrading unrelated packages, and publication-age reports must include
+same-version provenance rewrites. The accepted root correction uses npm with
+a temporary version seed, restores the real manifest, and validates every
+changed entry before artifact upload; no integrity hashes are synthesized.
+
 ### Lifecycle projections must aggregate where the data lives
 
 A complete Prisma E2E run exposed an application-startup query shape that

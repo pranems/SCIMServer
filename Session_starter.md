@@ -2,6 +2,17 @@
 
 **Last verified:** 2026-10-15
 
+**Separate gate hardening:** `fix/mermaid-required-gate-20261014` fails the
+required render command on missing tooling and removes the pre-push passed
+skip. Behavioral controls cover CLI exits, actual registered-action invocation,
+FAIL/PASS summaries, and identified versus placeholder bundle versions. The
+discovered editor Mermaid and root gate are now aligned at 11.17.0 through a
+separately authorized, CI-generated root-only lockfile. Real strict/light/dark
+rendering and the actual info SVG confirm installed 11.17.0; active-editor
+preview behavior still requires its own verification. No API/web dependency,
+runtime/UI or deployment changes belong to this branch. See
+[gate evidence and RCA](docs/strategy/MERMAID_REQUIRED_GATE_HARDENING_2026-10-14.md).
+
 **Active consolidation - blocked before deployment:** v0.55.48 runtime,
 metadata, and CI-generated locks merged normally through PR #215 at
 `99cdeda35861049b05908f5b507e404b3318e33d`. Exact-tip CI and all 23

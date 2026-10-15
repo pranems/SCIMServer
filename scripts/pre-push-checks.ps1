@@ -199,14 +199,23 @@ Invoke-Gate -Name 'docker: production source included' -WorkingDir $repoRoot -Ac
 # a render failure is what the operator actually sees as a blank/error box. The
 # gate deliberately pins the same Mermaid version the VS Code extension bundles
 # (see the version-drift guard inside the script) - running a different version
-# is how two broken diagrams stayed green on 2026-07-27. Skips (does not fail)
-# when the tooling deps are absent, so a fresh clone is not blocked.
-Invoke-Gate -Name 'docs: mermaid diagrams render' -WorkingDir $repoRoot -Action {
-    if (-not (Test-Path (Join-Path $repoRoot 'node_modules/mermaid'))) {
-        Write-Host "Skipped (run 'npm install' at the repo root to enable this gate)" -ForegroundColor Yellow
-        $global:LASTEXITCODE = 0
-        return
+# is how two broken diagrams stayed green on 2026-07-27. Required tooling must
+# be restored before pushing; missing tooling is a failure, not a passed skip.
+Invoke-Gate -Name 'docs: mermaid gate negative controls' -WorkingDir $repoRoot -Action {
+    node scripts/test-mermaid-gates.mjs 2>&1 | Out-Host
+    if ($LASTEXITCODE -eq 0) {
+        pwsh -NoProfile -File scripts/test/mermaid-pre-push.contract.ps1 2>&1 | Out-Host
     }
+}
+
+Invoke-Gate -Name 'supply chain: lockfile regeneration controls' -WorkingDir $repoRoot -Action {
+    node scripts/test-lockfile-regeneration.mjs 2>&1 | Out-Host
+    if ($LASTEXITCODE -eq 0) {
+        node scripts/test-root-lock-provenance.mjs 2>&1 | Out-Host
+    }
+}
+
+Invoke-Gate -Name 'docs: mermaid diagrams render' -WorkingDir $repoRoot -Action {
     node scripts/render-mermaid.mjs 2>&1 | Out-Host
 }
 
