@@ -585,12 +585,9 @@ if (-not $SkipDeploy) {
 
     # 4.2 - Mirror the LOCAL image into ACR.
     #
-    # This is now an OPTIONAL convenience mirror, not the deploy path. Since
-    # 2026-07-29 the deployable artifact is imported from GHCR (gate 4.5), so a
-    # local Docker failure must not fail the run or - worse - leave the deploy
-    # pointing at a tag that was never pushed. If the local build did not produce
-    # an image, skip with a reason rather than reporting a FAIL for a step that
-    # no longer gates anything.
+    # The local mirror is optional; GHCR supplies the deployable artifact.
+    # A missing mirror is a skipped convenience step, not another build failure.
+    # Required Docker validation failures still block the downstream chain.
     $composeImageId = docker compose images -q api 2>$null | Select-Object -First 1
     $localImagePresent = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($composeImageId)
     $localImageId = if ($localImagePresent) {
@@ -773,7 +770,8 @@ if (-not $SkipDeploy) {
     # the deploy still ran - pointing dev at a tag that had never been pushed and
     # leaving a Failed revision behind. Importing the artifact CI already
     # published is both more robust AND more correct: dev runs exactly the bits
-    # GHCR serves, so local Docker is no longer on the deployment critical path.
+    # GHCR serves. The local image is not the deployment artifact, but required
+    # local validation gates must still pass before publication or deployment.
     $acrName = $RegistryAcr.Split('.')[0]
     if ($releaseArtifactReady) {
         $releaseArtifactReady = Invoke-Gate '4.5' "Import ${RegistryGhcr}:$version -> ACR version + latest" {

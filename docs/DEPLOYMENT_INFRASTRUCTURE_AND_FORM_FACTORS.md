@@ -21,6 +21,9 @@ post-deployment integrity/pruning block also checks earlier failures, and
 pruning checks integrity again before acting. Report generation and the
 nonzero final failure status remain in place. This is a tooling-only change,
 not a runtime release or permission to deploy an unmerged branch.
+An absent optional local-image mirror remains a skipped convenience step;
+it does not excuse a failed required Docker validation gate. Inline artifact
+guidance distinguishes these cases from the CI-built shipping image.
 
 The pipeline contract grows from 43 to 54 passing assertions, with seven
 expected RED assertions observed before the guard was implemented. Controls
