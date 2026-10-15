@@ -9,10 +9,14 @@ Operations endpoint name/copy/open actions. Shared UTC rendering is wired
 through 14 surfaces. All 33 final focused browser cases pass, including 1440,
 900 and 390 px journeys, real copy/open and inline authentication timestamps.
 The mobile width assertion passes after a 640 px table-floor correction.
-Seven related unit suites pass 148 cases and the policy replay passes three.
-Exact HEAD type comparison retained 66 existing diagnostics with zero additions
-before final consolidation. Source manifests now say 0.55.50; CI-generated
-lockfiles, hook-owned full checks, protected delivery and dev closure remain pending.
+Protected Validate push passes all 27 gates in 823 seconds at `3032b5df`:
+6,043 API units, 2,432 selected InMemory E2E passes/four native-only exclusions,
+and 1,624 web tests across 123 files. Exact type comparison is 66/66, zero
+additions. Source manifests and CI-generated locks now say 0.55.50; CI run
+`38817415869` preserved every dependency/provenance entry. Draft PR #226 owns
+final lock/evidence push, exact-tip review and normal merge. Dev closure and
+operator acceptance remain pending. Mermaid editor 11.17.0/gate 11.15.0
+alignment is a separate scheduled tooling follow-up.
 No deployment is claimed. See [current implementation and RCA](docs/UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
 
 **Gallery consolidation evidence retained:** PR #218 merged normally
@@ -37,7 +41,7 @@ visual proof remain pending. See the [current RCA](docs/ENTRA_GALLERY_SCIM_E2E_E
 
 | Date | Summary |
 |---|---|
-| 2026-10-15 | Safety PR #225 merged normally at `e71cec967`. Separate date-time/endpoint-identity UI follow-up started; focused RED controls and desktop action checks are recorded. Responsive consolidation and next patch metadata remain in progress. |
+| 2026-10-15 | Safety PR #225 merged at `e71cec967`. UI 0.55.50 source passes 33 responsive browser cases and all 27 Validate gates, including 1,624 web tests. Draft PR #226 and verified CI-only locks await final protected consolidation/merge and dev delivery. |
 | 2026-10-15 | Normal gallery merge `078e741b`; pipeline stopped before deployment after failed coverage and fail-open discovery. Separate replay passes 1,595 tests; fail-closed tooling contracts grow from 43 to 54. Protected tooling push passes 27 gates; isolated Docker passes 1,729 live assertions with exact cleanup. Current continuation transcript reconciled; original deleted transcript remains unavailable. |
 
 The gallery/runtime paragraphs immediately below retain predecessor

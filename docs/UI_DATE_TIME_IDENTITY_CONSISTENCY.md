@@ -82,12 +82,21 @@ indicators are not removed.
 | Final compiler checks | Exact HEAD comparison remains 66/66 with zero new diagnostics; all three changed browser specs compile cleanly | Main project is not zero-error; browser file-targeted TypeScript 6 invocation uses `--ignoreConfig` |
 | Documentation and layout | Freshness passes all 26 documents; table-layout audit passes all 106 TSX files; new diagram renders in both strict themes | Mermaid gate uses 11.15.0 while current built-in editor uses 11.17.0; editor equivalence is not claimed |
 | Second protected Validate attempt | 24 gates pass, including 6,043 API units and 2,432 selected InMemory E2E cases; four native-only cases skipped | Attempt remains failed: Prisma codegen required process-local DATABASE_URL before full web suite admission |
+| Successful protected Validate push | All 27 gates pass in 823 seconds at 3032b5df; 6,043 API units, 2,432 selected InMemory E2E passes/four native-only exclusions, 1,624 web tests across 123 files | Independent current coverage/backend/deployment evidence still belongs to dev closure |
+| Bundle budgets and source character policy | All budgets pass against hook-built output; Operations 3.83 kB gzipped; zero added-line em-dash characters | No second build or unrelated budget change |
+| CI lock regeneration | Run 38817415869 succeeds at exact 3032b5df; both 0.55.50 locks differ only in root version fields and retain public-registry SHA512 provenance | Root tooling manifest/lock and dependency versions remain unchanged |
 | Cross-surface browser suite | Initial interrupted failure retained as an artifact | Not a passing release receipt |
 
 Browser fixtures pass real health/authentication preflight, then intercept
 display data. They do not prove live gallery provisioning. Secret-reveal POSTs
 are fulfilled locally with fixture-only values; unexpected non-GET requests
 are rejected before they can be forwarded.
+
+The final geometry receipts measure both Users and Groups endpoint-name links
+at 152.61 px in a 1440 px viewport, and 60.17 px in both 900 and 390 px
+viewports. Their tables are 1101/640/640 px respectively. Narrow tables scroll
+locally; they do not widen the document. These are measured results, not
+inferences from CSS properties.
 
 ## Execution issues and root causes
 
@@ -108,6 +117,7 @@ are rejected before they can be forwarded.
 | DT-I13 | Environment drift / Medium | Strict rendering passed, but the installed built-in Mermaid renderer is 11.17.0 while the pinned gate is 11.15.0. Content rendering cannot establish editor equivalence under that mismatch. | Scheduled, not silently resolved: repository maintainer to align tooling through a separate quarantined CI-lockfile change by 2026-10-16. No root dependency regeneration on the corporate host and no claim of editor-version parity. | Renderer warning / renderer-version audit |
 | DT-I14 | Release metadata / Low | The first protected Validate push stopped after 11 passing static gates because the README version badge still said 0.55.49. The freshness fixer updates headers, not image badge URLs; the independent content gate caught the difference. | Update the badge to 0.55.50 and run the content check before retrying the unchanged normal hook. Version-bump preflight must include both freshness and content checks. Preserve the failed 223.9-second receipt; no full-unit claim belongs to that stopped run. | Protected content gate / focused content preflight |
 | DT-I15 | Environment / Medium | The next protected attempt passed 24 gates but Prisma config evaluation failed because DATABASE_URL was absent. A prior shell's environment was not inherited; `env()` throws before its apparent fallback can apply. Full web tests were not admitted. | Explicitly set a non-live loopback port-1 codegen URL in each Validate process. Focused generation now succeeds with Prisma 7.8.0; it performs no connection, migration or live mutation. Retain the failed 454.2-second receipt. Validate preflight must establish codegen environment before costly test admission, not rely on a prior shell. | Protected codegen gate / focused codegen preflight |
+| DT-I16 | Patch tooling / Low | A later documentation hunk used an assumed sentence instead of its exact current text. The multi-file patch reported partial application after changing the changelog. | Preserve that successful edit, inspect only the failed section and apply only failed/unattempted hunks. The corrected patch succeeds without duplicate entries or rollback. Treat a multi-file patch failure as potentially partial, not atomic. | Patch result / exact-context preflight |
 
 The original coverage failure in the 5,000-row log-cap fixture is retained in
 the gallery continuation evidence. This change keeps real 4,999/5,000-entry
@@ -132,16 +142,16 @@ checkpoint must still be appended when their fixes are confirmed.
 
 ## Remaining delivery and backlog boundaries
 
-1. Complete responsive browser and related unit/static validation.
-2. Prepare the next patch version and obtain API/web lockfiles from the
-   existing CI regeneration workflow, not the corporate host.
-3. Update release and user-facing documentation with measured evidence.
-   Run both freshness and content audits: header fixing does not update badges.
-4. Push through normal hooks, obtain exact-tip checks/review, and merge normally.
-5. Complete dev-only pipeline and independent live, gallery, reference-profile,
+1. Commit/push the verified CI locks and final measured documentation normally.
+   The source Validate push already passed; do not manually repeat its unchanged
+   complete web suite before another owner.
+2. Obtain final exact-tip checks/review and merge draft PR #226 normally.
+3. Complete dev-only pipeline and independent live, gallery, reference-profile,
    browser, performance, and integrity evidence against the exact deployed image.
-6. Obtain explicit operator visual acceptance. No canary or customer-prod
+4. Obtain explicit operator visual acceptance. No canary or customer-prod
    promotion is authorized.
+5. Resolve the separately scheduled Mermaid/editor version alignment without
+   mixing an unrelated dependency migration into this UI patch.
 
 Earlier UI-01 through UI-10 have merged source dispositions, not a current dev
 acceptance receipt. Operations and `/Me` are intentionally retained distinct

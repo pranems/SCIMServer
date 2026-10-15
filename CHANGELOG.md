@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### UI date-time consistency and endpoint identity (0.55.50 preparation)
+### UI date-time consistency and endpoint identity (0.55.50)
 
 - Prepare the product patch from `0.55.49` to `0.55.50`. API/web manifests
-  are updated; matching lockfiles must come from the existing CI workflow.
+  and matching locks are updated. Locks came from successful CI run
+  `38817415869`; structural comparison proves only root version fields
+  changed, with dependency/provenance contents unchanged.
   The root tooling package is not a product version and remains unchanged.
 - Use complete UTC date, time, milliseconds and timezone across absolute
   timestamp displays. Preserve original copied instants, raw JSON, domain
@@ -29,8 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All 33 focused browser cases pass in 7.0 minutes, including three viewport
   widths, copy via click/Space/Enter, endpoint navigation, glyph bounds,
   explicit invalid expiry and inline request authentication timestamps.
-- Static consolidation, full hook-owned counts, immutable dev
-  delivery, gallery/reference proof and operator visual acceptance remain
+- Protected Validate push: all 27 gates pass in 823 seconds at `3032b5df`.
+  API units remain 6,043 across 210 suites. Selected InMemory E2E remains
+  2,432 passes across 116 suites with four native-only exclusions.
+  Web unit cases grow from the retained 1,595/120-file receipt to
+  1,624 across 123 files. All production bundle budgets pass; Operations
+  is 3.83 kB gzipped. All 759 diagrams render in both strict themes, with
+  the separately recorded editor-version warning.
+- Reviewed merge, current coverage/backend matrix, immutable dev
+  delivery, full deployment browser tests, gallery/reference proof and operator visual acceptance remain
   pending. No deployment or production-readiness claim is made.
 - See [implementation, evidence and execution RCA](docs/UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
 

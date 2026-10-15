@@ -13,10 +13,12 @@
 The assigned worktree owns `fix/ui-date-time-identity-20261015`, implementing
 shared complete UTC date/time display and plain Operations endpoint
 name/copy/open actions. All 33 focused browser cases pass, including 1440,
-900 and 390 px journeys after the 640 px table-floor correction. Seven unit
-suites pass 148 cases plus three source-policy cases on replay. The earlier
-exact HEAD type comparison remains 66 versus 66 diagnostics, zero additions.
-Source manifests now say 0.55.50; CI lockfiles, final static consolidation,
+900 and 390 px journeys after the 640 px table-floor correction. All 27 protected
+Validate gates pass at `3032b5df`, including 6,043 API units, 2,432 selected
+InMemory E2E passes/four native-only exclusions and 1,624 web cases in 123 files.
+Exact type comparison remains 66/66, zero additions. Both 0.55.50 locks come
+from successful CI run `38817415869`, with only root version fields changed.
+Draft PR #226 awaits final lock/evidence push, exact-tip review and normal merge;
 dev deployment and operator acceptance remain pending. See
 [implementation, evidence and RCA](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
 
