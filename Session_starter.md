@@ -2,7 +2,27 @@
 
 **Last verified:** 2026-10-16
 
-**Active execution:** membership rejection evidence on
+**Current release:** 0.55.54 is deployed to dev and the same-tenant canary
+from merged master `db10b13e`. PR #238 merged after 25 protected gates and
+seven exact-tip CI checks; 6,060 units and 2,460 HTTP/oracle cases PASS.
+The full no-skip pipeline completed exit 0 in 6,349 seconds:
+40 PASS / 0 FAIL / 0 SKIPPED / 9 reviewer PENDING.
+All 324 authoritative dev browser cases pass without skips; all 50 native
+Entra checks and 15 exact-ID cleanups pass across three authentication modes.
+Minimal-schema live section: 66 PASS. Original dev IDs: 74 -> 74;
+canary endpoints: 64 -> 64. Both serve unchanged digest `42613fe0` and keep
+two revisions. Original failed matrices remain historical, not relabeled.
+Operator visual acceptance is still unavailable. Two 18-sample membership
+benchmark batches show variable over-10% deltas; performance remains open,
+owner SCIMServer maintainer, target 2026-10-19. Customer production is not
+authorized or promoted. See
+[current closeout and limits](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
+
+| Date | Summary |
+|---|---|
+| 2026-10-16 | Dev/canary 0.55.54 delivery and actual Entra membership verified; visual acceptance and measured performance follow-up remain open. |
+
+**Historical predeployment execution:** membership rejection evidence on
 `test/minimal-group-error-contract-20261016`, based on reviewed merged
 `72eb4fd0`. Group items A/B merged in PRs #233/#234 after seven exact-tip checks
 each. Their local proof includes both backends, populated/fresh migrations and
@@ -38,7 +58,7 @@ The user authorizes dev and canary through the normal process, not customer
 production. Existing UI visual acceptance is not inferred from new observations.
 See [minimal Group membership resolution](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
-**Current checkpoint:** Item B PR #234 merged at `17031d85`, preserving reviewed
+**Historical 0.55.51 checkpoint (superseded above):** Item B PR #234 merged at `17031d85`, preserving reviewed
 `ac56f5f2`, with 28 Validate gates, 25 final Fast gates and seven exact-tip
 checks PASS. Item A PR #233 merged normally at `47d85cdb`, preserving
 reviewed `cdd8e0fb`, after all 28 Validate gates, 25 final Fast gates and seven

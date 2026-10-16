@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.51`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.54`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -73,7 +73,8 @@ isolated Docker validation and actual ACR local-image handoff passed. Shipping
 stopped before deployment: the gate confused the last runtime-input-changing
 merge `0fd0a87a` with the actual CI publication source `c3ef1f0d`.
 The missing shipping ACR tags were a downstream cascade, not another root
-cause. The original failed matrix remains unchanged; dev remains 0.55.51.
+cause. The original failed matrix remains unchanged; dev remained 0.55.51
+at that historical checkpoint.
 
 An artifact's publication source and its runtime-input revision are distinct
 identities. The resolver searches source SHA tags on reviewed first-parent
@@ -93,6 +94,17 @@ blocks. Four desired assertions failed before the fix; all 68 pipeline
 controls and 22 selector checks now pass. These checks do not turn the failed
 deployment matrix green or prove deployed membership/browser behavior.
 See [UI-H10 through UI-H14](RESPONSIVE_ENDPOINT_INVENTORY.md).
+
+The subsequent full no-skip run from merged `db10b13e` completed exit 0
+in 6,349 seconds with 40 PASS, zero FAIL/SKIPPED and nine reviewer PENDING.
+Dev and the same-tenant canary now serve the existing immutable digest above.
+Dev's serving revision is `scimserver-dev--vdb10b13e`; the canary's is
+`scimserver--green-1016-0927` at 100% after verified blue/green promotion.
+Both retain two active revisions. Read-only ARM verification confirms the
+same digest and traffic state. Customer production was not accessed or promoted.
+The pipeline's commit-tag image header is a run breadcrumb, not proof that
+an image was published from the later release merge.
+See [the exact deployed evidence and acceptance limits](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 
 ## Prisma validation scheduling
 
@@ -526,10 +538,10 @@ Names, regions, and resource groups differ in ways that matter operationally, so
 | Region | East US | East US | Central US |
 | Managed environment | `scimserver-env` (**in RG `scimserver-prod`** - cross-RG) | `scimserver-env` | not enumerable (cross-tenant) |
 | FQDN | `scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `scimserver.purplecliff-91e4026d.eastus.azurecontainerapps.io` | `scimserver-prod.calmsand-7f4fc5dc.centralus.azurecontainerapps.io` |
-| Revision mode | **Multiple** (`scimserver-dev--v0556` at 100 %, 2 active) | **Multiple** (`scimserver--v0556` at 100 %, 2 active) | Multiple |
+| Revision mode | **Multiple** (`scimserver-dev--vdb10b13e` at 100 %, 2 active) | **Multiple** (`scimserver--green-1016-0927` at 100 %, 2 active) | Multiple (not reverified this release) |
 | Revisions retained (`revisionKeep`) | **2** - serving + rollback target | **2** - serving + rollback target | **1** (2026-08-14, cost) - **no rollback target; recovery is roll-forward** |
 | Retention selection | image-aware (2026-09-03, D3) - the second slot goes to a revision running a **different** image | image-aware (2026-09-03, D3) | keep=1: budget spent on the serving revision, selection unchanged |
-| Image reference | `ghcr.io/pranems/scimserver@sha256:435c6dc2...f1d2` (**digest-pinned**) | `ghcr.io/pranems/scimserver@sha256:435c6dc2...f1d2` (**digest-pinned**) | `ghcr.io` per self-report |
+| Image reference | `ghcr.io/pranems/scimserver@sha256:42613fe0...745f9` (**digest-pinned**) | `ghcr.io/pranems/scimserver@sha256:42613fe0...745f9` (**digest-pinned**) | `ghcr.io` per historical self-report, not reverified |
 | Managed identity | SystemAssigned | SystemAssigned | not enumerable |
 | Registry auth | **anonymous GHCR pull** (no `registries[]` entry) | **anonymous GHCR pull** (no `registries[]` entry) | anonymous GHCR pull |
 | Ingress | external, port 8080, transport Auto, `allowInsecure: false` | external, port 8080, transport Auto, `allowInsecure: false` | not enumerable |
@@ -540,7 +552,7 @@ Names, regions, and resource groups differ in ways that matter operationally, so
 | PostgreSQL host | `scimserver-pg-dev-09.postgres.database.azure.com` (**East US 2**) | `scimserver-pg-09.postgres.database.azure.com` (**East US 2**) | `scimserver-prod-pg.postgres.database.azure.com` |
 | PostgreSQL SKU | `Standard_B1ms` Burstable, 32 GB, 7-day backup, geo-redundant off | `Standard_B1ms` Burstable, 32 GB, 7-day backup, geo-redundant off | not enumerable |
 | Database | `scimdb`, PostgreSQL 17 | `scimdb`, PostgreSQL 17 | `scimdb`, PostgreSQL 17 |
-| Running app version | **0.55.13** | **0.55.13** | **0.55.13** |
+| Running app version | **0.55.54** | **0.55.54** | Not reverified; **0.55.20** at the Google investigation |
 | Node.js runtime in container | **v24.19.0** (Active LTS) | **v24.19.0** (Active LTS) | **v24.18.1** (Active LTS) |
 
 **The retiring tenant-08 estates are still live.** The 2026-08-12 migration copied everything to tenant 09 and changed nothing in tenant 08, by explicit instruction. Both old estates keep serving on `proudbush-ae90986e.eastus.azurecontainerapps.io` (`scimserver-dev` and `scimserver`, subscription `5738ea6a-...`, tenant `f08e6aff-...`). Their **ARM control plane expired on 2026-08-11**, so they can no longer be managed, scaled, redeployed or deleted - but the running containers and their PostgreSQL data plane are unaffected and still reachable. They are **not** deployment targets: every pipeline, gate and script now points at `purplecliff-91e4026d`. Treat them as read-only historical estates that will disappear on their own when the subscription is reclaimed.
@@ -1155,6 +1167,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-10-16 | Verified dev/canary 0.55.54 on the same existing digest after the full no-skip db10b13e run: 40 PASS, zero FAIL/SKIPPED, nine reviewer PENDING. Refreshed actual serving revisions and two-revision retention; no customer-production operation or new image publication. |
 | 2026-10-16 | Added physical dependency ownership preflight before executing validation/deployment work, with actual runner refusal and command-sentinel negative controls. No topology, live deployment, publication or promotion behavior changed. |
 | 2026-10-14 | Migrated the Stage 3 reviewer-gate registrations in [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) from deleted prompt-file terminology to committed Agent Skill slash invocations. This is an orchestration-label and operator-guidance change only: executable deployment stages, image publication, estate resolution, Azure operations, and promotion behavior are unchanged. Re-reviewed the Section 10 drift register with no topology or live-estate fact change. |
 | 2026-10-10 | Raised the bounded per-process database pool from 5 to 10 after measuring the dev estate's 50-connection server ceiling, one-replica limit, and two-revision retention. Added the explicit 20-connection worst-case application budget and 30-connection headroom. |

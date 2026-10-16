@@ -1,7 +1,17 @@
 # Group member reference preservation
 
 **Last verified:** 2026-10-16
-**Status:** Item B merged in PR #234 at `17031d85` after seven exact-tip checks. Locally demonstrated on both backends, including populated upgrades and fresh migrations; candidate dev, Entra and canary evidence remains pending deployment.
+**Status:** Item B merged in PR #234 at `17031d85` and is delivered in 0.55.54 to dev and the same-tenant canary. Both backends, populated/fresh migrations, exact deployed reference round trips and native Entra add/remove readbacks pass. Customer production remains unpromoted.
+
+**Release closeout:** The final merged-master run at `db10b13e` completed
+40 PASS / 0 FAIL / 0 SKIPPED / 9 reviewer PENDING in 6,349 seconds.
+All 66 minimal-schema live assertions pass on dev, including exact `$ref`
+values after POST, PUT and PATCH and exact rollback after immutable-reference
+rejection. The native Entra journey passes all three authentication modes
+with actual add/remove readback and 15 exact-ID cleanup successes.
+See [the shared deployed evidence](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#deployed-05554-evidence)
+and [remaining acceptance limits](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
+Historical pending-deployment entries below retain their original meaning.
 
 ## Executive summary
 

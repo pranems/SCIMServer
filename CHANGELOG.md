@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.54 deployed evidence closeout
+
+- PR #238 merged normally at `db10b13e` after 25 protected gates and seven
+  exact-tip checks. The no-skip dev/canary pipeline completes exit 0 in
+  6,349 seconds: 40 PASS, zero FAIL/SKIPPED, nine reviewer PENDING.
+  No runtime, version, lockfile or artifact change in this documentation closeout.
+- Dev: all 324 browser cases PASS with zero skips/flaky cases; registered
+  minimal-schema live checks 66 PASS. Native Entra: 50 checks and 15 exact-ID
+  cleanup successes across shared secret, OAuth client credentials and WIF,
+  with actual Group member addition/removal independently read back.
+  Full inventory remains 6,060 API units / 2,460 HTTP-oracle / 1,624 Web.
+- Same-digest canary green and post-flip verification each pass 1,795 live
+  assertions and 289 browser cases, with 11 explicitly separate mutation-opt-in
+  browser exclusions. They are not the authoritative zero-skip dev receipt.
+  Dev retains 74 endpoint IDs; canary retains 64 endpoints; both keep two revisions.
+- Visual acceptance is unavailable, not inferred. Two network-inclusive
+  18-sample membership batches have inconsistent over-10% deltas; no performance
+  waiver or query/memory proof is claimed. Maintainer follow-up due 2026-10-19.
+  Customer production is untouched. See
+  [the immutable receipts and remaining limits](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
+
 ### Membership rejection evidence
 
 - Strengthen existing minimal-schema membership tests, without production,
@@ -29,8 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all PASS with exact inventory cleanup and owned node shutdown.
 - Focused ESLint PASS. Raw API types retain three unchanged errors, zero in
   the changed file. API units 6,060, Web units 1,624 and browser inventory 324
-  are unchanged. Protected consolidation and new deployed evidence remain
-  pending. See [closeout evidence and RCA](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#rejection-contract-evidence-closeout).
+  are unchanged. Protected consolidation is complete in PR #238 and new
+  dev/canary evidence is recorded above. See
+  [closeout evidence and RCA](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#rejection-contract-evidence-closeout).
 
 ### Immutable release source proof
 
@@ -50,8 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Original full delivery receipt remains 27 PASS / 2 FAIL / 10 SKIPPED /
   9 reviewer PENDING in 3,531 seconds. Its isolated Docker/local ACR handoff
   passed, but shipping provenance and its downstream ACR cascade blocked
-  deployment. Dev remains 0.55.51; candidate dev/Entra/canary and human visual
-  acceptance remain pending. See [source contract](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
+  deployment at that historical checkpoint. The final successful matrix above
+  supersedes its deployment status without relabeling it. Human visual
+  acceptance remains pending. See [source contract](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
   and [execution issues](docs/RESPONSIVE_ENDPOINT_INVENTORY.md).
 - PR #237 merged normally at 72eb4fd0, preserving reviewed 6e0496ca, after
   25 protected Fast gates and seven exact-tip checks. Direct scoped review

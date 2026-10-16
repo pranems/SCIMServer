@@ -9,7 +9,24 @@
 
 ## Active Delivery Process
 
-**Active implementation:** membership rejection-contract evidence on
+**Current delivery:** 0.55.54 is on dev and same-tenant canary from merged
+`db10b13e`. PR #238 merged after 25 protected gates and seven exact-tip
+checks; full inventory is 6,060 units / 2,460 HTTP-oracle / 1,624 Web.
+The full no-skip AutoCanary run completed exit 0 in 6,349 seconds with
+40 PASS / 0 FAIL / 0 SKIPPED / 9 reviewer PENDING.
+Authoritative dev browser evidence: 324 PASS, zero skips or flaky cases.
+Minimal imported-schema live section: 66 PASS. Native Entra: 50 checks
+and 15 exact-ID cleanups PASS in all three authentication modes.
+Dev preserves 74 IDs; canary preserves 64 endpoints. Both serve unchanged
+immutable digest `42613fe0`, with two active revisions each.
+Operator visual acceptance remains unavailable, not inferred.
+Network-inclusive membership timings cross the 10% threshold inconsistently
+across two small batches. Performance, query-count and memory acceptance
+remain open for the maintainer by 2026-10-19. No customer-prod action.
+See [current release evidence and limitations](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
+The older pending/deployment-failure statements below are historical receipts.
+
+**Historical predeployment implementation:** membership rejection-contract evidence on
 `test/minimal-group-error-contract-20261016`, based on merged `72eb4fd0`.
 Group items A/B merged in PRs #233/#234 with exact-tip CI; strict validation
 remains enabled. Current inventory: 6,060 units, 2,460 HTTP/oracle cases,
@@ -46,7 +63,7 @@ The other active session released its cloud window; do not infer operator
 visual acceptance. Customer production is not authorized. See
 [layout contract and RCA](RESPONSIVE_ENDPOINT_INVENTORY.md).
 
-**Latest consolidation:** PR #234 merged at `17031d85`, preserving reviewed
+**Historical consolidation:** PR #234 merged at `17031d85`, preserving reviewed
 `ac56f5f2`, after 28 Validate gates, 25 final Fast gates and seven exact-tip
 checks. PR #233 merged at `47d85cdb`, preserving reviewed
 `cdd8e0fb`, after 28 Validate gates, 25 final Fast gates and seven exact-tip

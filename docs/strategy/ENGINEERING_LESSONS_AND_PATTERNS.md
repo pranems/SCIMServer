@@ -682,3 +682,18 @@ Keep dynamic-data visual masks for stable chrome, but never mistake their
 green snapshots for row-layout evidence. Use unmasked values, left edges,
 vertical centers, available-bottom equality and scroll/client bounds.
 See [the regression evidence and RCA](../RESPONSIVE_ENDPOINT_INVENTORY.md).
+
+## Keep deployment success separate from remaining acceptance claims
+
+2026-10-16: The complete dev/canary run records 40 PASS, zero FAIL/SKIPPED
+and nine reviewer PENDING. Preserve that exact distinction after a successful
+exit. The authoritative dev receipt has 324 browser cases and zero skips;
+the canary verification subset has 289 passes and 11 mutation-opt-in exclusions.
+Never substitute one receipt for the other or infer operator acceptance.
+Two small network-inclusive membership batches also produce inconsistent
+over-10% changes. Keep both observations and the performance gate open rather
+than selecting the better repeat or claiming server/query/memory proof.
+The maintainer owns the larger matched-environment follow-up by 2026-10-19
+in [UI-H17](../RESPONSIVE_ENDPOINT_INVENTORY.md#provenance-and-completeness).
+This is an explicit evidence boundary, not a change to canary authorization
+or a silent redesign of pipeline policy.
