@@ -15,7 +15,9 @@ Group items A/B merged in PRs #233/#234 with exact-tip CI; strict validation
 remains enabled. Current API/Web totals: 6,060 units, 2,447 HTTP, 1,624 Web.
 UI local proof: 36 browser cases, 26 DOM/error-boundary units, four visual
 comparisons, build/size/table audit PASS; raw types unchanged at 66/66.
-Candidate 0.55.54 locks/consolidation/review remain pending. Dev/Entra proof
+Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at c04b06f1;
+CI-only locks from 38891306560 are version-only/provenance-clean.
+Final exact-tip review/CI remain pending. Dev/Entra proof
 and dev/canary deployment are next; the other active session released its
 cloud mutation window. Customer production is not authorized. See
 [layout contract and RCA](RESPONSIVE_ENDPOINT_INVENTORY.md).

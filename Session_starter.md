@@ -9,7 +9,9 @@ each. Their local proof includes both backends, populated/fresh migrations and
 50 live assertions. Current API/Web totals are 6,060/2,447/1,624.
 UI proof: 36 adjacent browser cases, 26 DOM/error-boundary units, four unchanged
 visual comparisons, build/size/layout audit PASS. Exact raw type diagnostics
-remain 66/66. Candidate 0.55.54 consolidation/CI-only locks/review pending.
+remain 66/66. Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at
+c04b06f1. CI-only locks from 38891306560 are version-only and provenance-clean.
+Final exact-tip review/CI remain pending.
 Live dev/Entra and dev/canary delivery remain next, with an explicitly released
 exclusive cloud window from the other active onboarding session.
 The user authorizes dev and canary through the normal process, not customer

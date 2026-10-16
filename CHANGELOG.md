@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.54] - 2026-10-16
+
 ### Responsive endpoint inventory and dashboard
 
 - Size nonempty Endpoints results to the available window height, preserving
@@ -24,9 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjacent DOM/error-boundary units 26 PASS; production build, size limits and
   fixed-table audit PASS. Full raw web diagnostics remain exactly 66/66 at
   base 17031d85, with zero new signatures. API and web unit totals are unchanged
-  until the protected full selector reconfirms them.
-- Candidate 0.55.53 -> 0.55.54; CI-only locks are required before reviewed
-  merge. Dev/canary delivery remains pending.
+  and reconfirmed by the protected full selector: 6,060 API units,
+  2,447 HTTP cases and 1,624 Web units.
+- Candidate 0.55.53 -> 0.55.54; normal tracking Validate passes 28/28 gates
+  in 883.7 seconds at c04b06f1. CI-only locks from workflow 38891306560
+  are structurally version-only with public-registry/sha512 provenance.
+  Reviewed exact-tip CI and dev/canary delivery remain pending.
   See [layout contract, exact measurements and RCA](docs/RESPONSIVE_ENDPOINT_INVENTORY.md).
 
 ### Accepted Group member references

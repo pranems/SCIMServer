@@ -74,6 +74,8 @@ The page itself never horizontally overflows; narrow tables scroll internally.
 | Fixed-table static audit | PASS, no new offenders. |
 | Visual inspection | Agent opened wide and phone inventory/dashboard scratch images and verified columns, left alignment, compact counts and internal scrolling. This is not operator acceptance. |
 | Baseline visual comparisons | Four PASS with the production UI preview and registry-resolved read-only dev API data, explicitly enabling local canonical baseline checks. No diffs or baseline changes. |
+| Protected consolidation | Normal tracking push at c04b06f1: 28/28 Validate gates PASS in 883.7 seconds, including 6,060 API units, 2,447 HTTP cases and 1,624 Web units. |
+| CI-only release locks | Workflow 38891306560 at c04b06f1 succeeds. Imported 0.55.54 locks compare identical after normalizing only root/package version metadata; public registry and sha512 provenance PASS. |
 | Dev and canary | Pending reviewed merged-source deployment. |
 | Operator visual acceptance | Pending an explicit statement about the deployed surfaces. |
 
