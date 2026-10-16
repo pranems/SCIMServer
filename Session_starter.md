@@ -5,7 +5,7 @@
 **Active execution:** item B on `fix/group-member-reference-20261016` from
 reviewed `47d85cdb`. Item A merged in PR #233 with seven exact-tip checks green.
 Item B preserves accepted `$ref` across adapters and both repositories with an
-additive nullable column. Focused 144 units, identical 217 HTTP cases on both
+additive nullable column. Focused 267 units, identical 217 HTTP cases on both
 backends, populated upgrade, 29 fresh migrations and 50 local live assertions
 PASS. Candidate 0.55.53 consolidation/review remain pending.
 Live dev/Entra proof and endpoint/dashboard layout remain subsequent outcomes.

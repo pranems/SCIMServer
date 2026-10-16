@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Add a nullable reference column without rewriting or backfilling old rows.
   Missing references remain absent; strict validation and immutability remain.
 - RED first: three unit and five HTTP assertions expose missing references.
-  Focused units 144 PASS; identical 217 HTTP cases PASS on both backends;
+  Focused units 267 PASS across service/adapter/repositories; identical 217
+  HTTP cases PASS on both backends;
   populated legacy upgrade and all 29 fresh migrations PASS. Compiled local
   live section increases 33 -> 50 assertions, all PASS with owned cleanup.
   Consolidated suite counts, live dev, Entra and canary remain pending.

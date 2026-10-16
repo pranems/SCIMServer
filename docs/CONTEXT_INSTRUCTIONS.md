@@ -12,7 +12,7 @@
 **Active implementation:** Group reference item B on
 `fix/group-member-reference-20261016`, based on reviewed `47d85cdb`.
 Item A merged in PR #233 after seven exact-tip checks. Strict validation
-remains enabled. Item B local proof: 144 units, identical 217 HTTP cases on
+remains enabled. Item B local proof: 267 units, identical 217 HTTP cases on
 each backend, populated upgrade, 29 fresh migrations and 50 live assertions.
 Candidate 0.55.53 review/release remain pending. Live dev/Entra proof and
 endpoint/dashboard layout are subsequent outcomes. Dev/canary are authorized

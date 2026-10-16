@@ -63,7 +63,7 @@ introduced. Customer production migration/promotion is not authorized here.
 | Claim | Observed result |
 |---|---|
 | RED first | Three unit assertions and five HTTP desired-success cases failed because the exact submitted reference was missing. Ten existing minimal-schema cases continued to pass. |
-| Focused units | 144 PASS across Group adapter, InMemory repository and Prisma repository suites. |
+| Focused units | 267 PASS across Group service, adapter, InMemory repository and Prisma repository suites. Initial adapter/repository-only selector passed 144. |
 | HTTP InMemory | 217 PASS across minimal membership, Group parity and PATCH schema contract suites. |
 | HTTP PostgreSQL | Identical 217 PASS against the privately upgraded database. |
 | Fresh migration replay | All 29 migrations PASS in a separate private fresh database. |
@@ -73,7 +73,7 @@ introduced. Customer production migration/promotion is not authorized here.
 | Missing references | A value-only member remains value-only beside a reference-bearing member. |
 | Live-section author smoke | 50 PASS/0 FAIL against an exclusively owned compiled local node; exact endpoint cleanup confirmed. |
 | Build and lint | Production build PASS; focused ESLint zero errors and one unchanged repository-test warning. |
-| Consolidated hooks and CI | Pending; focused proof is not a substitute. |
+| Consolidated hooks and CI | First Validate push blocked at one old service assertion that omitted the new internal null field; 6,058 other cases passed. Corrected and strengthened the service seam, focused 267 PASS. Protected retry and CI pending. |
 | Dev HTTP, Entra and canary | Pending merged-source deployment and explicit exclusive live ownership. |
 | Customer production | No changes authorized. |
 
@@ -81,6 +81,7 @@ Focused commands:
 
 ```powershell
 npm test -- --runInBand --runTestsByPath `
+  src\modules\scim\services\endpoint-scim-groups.service.spec.ts `
   src\domain\patch\group-patch-engine.spec.ts `
   src\infrastructure\repositories\inmemory\inmemory-group.repository.spec.ts `
   src\infrastructure\repositories\prisma\prisma-group.repository.spec.ts
@@ -104,10 +105,13 @@ against all deployment form factors without targeting an existing endpoint.
 | GM-B01 | Test fixture / Low | Initial test draft guessed replaceMembers rather than the repository's existing aggregate update API. The first RED assertion failed earlier, so that later call had not executed. | Use updateGroupWithMembers after inspecting its signature. All 144 unit cases pass. No production workaround was introduced. | GREEN preparation / repository signature lookup |
 | GM-B02 | Local smoke tooling / Low | A guessed root health URL returned 404 because the app applies the SCIM global prefix. The node was responsive, not unhealthy. | Use the canonical /scim/health route already used by verify-deployment. The same node passes all 50 live assertions. | Immediate node probe / canonical route lookup |
 | GM-B03 | Release documentation / Low | Freshness stamps the README header, not its separate badge. The paired content audit caught the old badge before protected push, the same known class as GM-A08. | Align the badge to 0.55.53 and rerun the existing content audit successfully. No gate bypass or new audit is needed. | Paired pre-push content audit / same static check |
+| GM-B04 | Internal contract test / Low | Full unit gate caught an existing exact service-to-repository expectation that omitted the new nullable reference input. The initial focused selector covered adapter/repositories but not that adjacent service seam. | Expect explicit null for missing references and add a reference-bearing parameter case with exact persistence-input/output and public key-allowlist assertions. Expanded focused selector is permanently documented above; 267 cases pass. | Protected full unit gate / focused service seam unit |
 
 Self-improvement disposition: **applied**. Exact accepted reference values are
 checked at adapter, repository and HTTP boundaries. A success status and an
 empty-Group smoke can no longer masquerade as reference round-trip coverage.
+The focused selector now also includes the adjacent service-to-repository seam
+whose input contract changes when a member storage field is introduced.
 
 Design/architecture disposition: **accepted**. One optional field passes through
 existing cohesive responsibilities. There is no second storage mechanism,
@@ -119,7 +123,8 @@ information-loss boundary during its existing database-copy operation.
 
 The full available continuation was reconciled through event 12,771 using the
 existing two-pass error/signal and causal narration scanner, with this execution
-beginning at event 11,599. New candidates were mapped to GM-B01..03; expected
+beginning at event 11,599. New candidates were mapped to GM-B01..03; GM-B04 was
+captured immediately when its focused repair passed. Expected
 reference-loss RED assertions, successful patches quoting errors and search
 echoes were dismissed as additional incidents. Three full-test TypeScript errors
 are unchanged baseline in activity/logging/reporter tests; production build and
