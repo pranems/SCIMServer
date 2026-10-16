@@ -2,25 +2,31 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.50
-> **Last Updated**: October 15, 2026
-> **Last verified:** 2026-10-15
+> **Last Updated**: October 16, 2026
+> **Last verified:** 2026-10-16
 
 ---
 
 ## Active Delivery Process
 
-**Active UI follow-up:** Safety PR #225 merged normally at `e71cec967`.
-The assigned worktree owns `fix/ui-date-time-identity-20261015`, implementing
-shared complete UTC date/time display and plain Operations endpoint
-name/copy/open actions. All 33 focused browser cases pass, including 1440,
-900 and 390 px journeys after the 640 px table-floor correction. All 27 protected
-Validate gates pass at `3032b5df`, including 6,043 API units, 2,432 selected
-InMemory E2E passes/four native-only exclusions and 1,624 web cases in 123 files.
-Exact type comparison remains 66/66, zero additions. Both 0.55.50 locks come
-from successful CI run `38817415869`, with only root version fields changed.
-Draft PR #226 awaits final lock/evidence push, exact-tip review and normal merge;
-dev deployment and operator acceptance remain pending. See
-[implementation, evidence and RCA](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+**Current UI release and validation:** PR #226 merged normally at `096ee65f`
+after seven exact-tip checks. Complete UTC display and plain Operations
+endpoint name/copy/open actions are deployed on dev as `0.55.50`, revision
+`scimserver-dev--v096ee65f`. The full isolated pipeline passed the six-mode
+matrix, coverage, publication and Docker/dev live checks, with 1,729 live
+assertions on each target, but failed gallery WIF User update. Its final
+result is 33 PASS/1 FAIL/6 SKIPPED/9 reviewer PENDING, not green.
+A WIF-only replay failed Group creation after passing User update.
+An instrumented replay then created the Group but failed membership addition,
+with all seven cleanup checks passed. Its skipped native export and fallback
+path are retained. Independent compiled local-node proof passes all 1,729
+assertions; exact server cleanup and listener absence are verified.
+Browser/integrity/pruning and operator visual acceptance remain incomplete.
+The assigned branch `fix/gallery-provisioning-observations-20261016` adds
+tested diagnostic metadata without changing provisioning behavior or timeout.
+No runtime version bump is needed for this tooling-only follow-up.
+See [implementation, evidence and RCA](UI_DATE_TIME_IDENTITY_CONSISTENCY.md)
+and the [gallery ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
 
 **Gallery validation evidence before the UI follow-up:** PR #218 merged normally at
 `078e741b`; the reconstructed gallery continuation has exclusive dev/gallery

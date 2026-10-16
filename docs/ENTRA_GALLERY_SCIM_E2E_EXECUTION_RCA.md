@@ -1,12 +1,84 @@
 # Entra Gallery to SCIMServer E2E - Execution Issues and RCA
 
-> **Status:** Active execution ledger - **Last verified:** 2026-10-15 - **Product version:** `0.55.49`
+> **Status:** Active execution ledger - **Last verified:** 2026-10-16 - **Product version:** `0.55.50`
 
 ## Purpose and scope
 
 This ledger records issues found while building and running the owned Microsoft Entra gallery provisioning gate against the registry-resolved SCIMServer dev estate. Entries are written when the failing check is understood and the corrective check turns green. The measured disposition includes final evidence counts and exact-cleanup outcomes.
 
-## Reconstructed consolidation and blocked deployment
+## Current dev deployment and diagnostic checkpoint
+
+UI PR #226 merged normally at `096ee65f`; the full isolated no-skip pipeline
+deployed its immutable image to dev as `0.55.50`. Backend matrix and web
+coverage passed, along with 1,729 Docker live assertions and 1,729 dev live
+assertions. The final pipeline result is 33 PASS/1 FAIL/6 SKIPPED/9 reviewer
+PENDING. Gallery SecretToken/OAuth passed; WIF User update timed out.
+Browser, integrity and pruning were correctly blocked. No canary or
+customer-production changes occurred.
+
+An unchanged WIF replay passed User update/disable/reenable but timed out on
+Group creation. Exact owned cleanup succeeded in both runs. Original audit
+evidence shows an `active=false` PATCH, not the requested attribute update,
+while directory audit has no source account-disable change at that point.
+The provider mechanism is not established. A second partial run does not
+repair or replace either failed receipt.
+
+| ID | Type / severity | Symptom and root cause | Resolution and why it works | Prevention | Detection / earliest gate |
+|---|---|---|---|---|---|
+| GM-I17 | Diagnostic correctness / Medium | Later failures were labelled "provision source user"; update outcomes and fallback paths were discarded before target polling completed. | Advance actual operation stages and record allowlisted per-response metadata before acceptance checks, including failed responses and successful fallback starts. Five assertion-level RED controls became GREEN without timeout, transport or acceptance changes. This fixes lost/mislabelled evidence, not the unproven provider failure. | Execute real helper/orchestrator/report functions; assert operation, attempt, export status, path, exact keys and secret exclusion. | Live failure diagnosis / focused orchestration/report contracts |
+| GM-I18 | Provider integration / Medium, unresolved | Original WIF User update and replay Group create timed out at different stages. Source and target/provider observations do not establish a common cause. | Retain both failures and verified cleanup; run one instrumented WIF diagnostic with in-flight job/source metadata. No speculative mapping, timeout or transport change. | Require a complete all-mode target-value receipt; never combine partial passes or equate provider success with target correctness. | Live gallery gate / live gallery gate |
+| GM-I19 | Test harness / Low | The first RED report assertion indexed a missing observation array because `@($null)` has one entry. | Guard explicit non-null before count/index checks. The rerun reached all five expected assertion-level failures, then GREEN after the source change. | Missing-field fixtures must fail assertions rather than abort the test harness. | Focused RED / focused RED |
+| GM-I20 | Diagnostic tooling / Low | A read-only `appRoleAssignedTo` projection requested unsupported `createdDateTime` and Graph returned BadRequest. | Remove the unsupported field; exact principal/type/display-name projection succeeded and captured the owned run. No data or provider change. | Keep diagnostic queries to verified required fields and validate remote API errors before interpreting absent data. | In-flight read-only query / query smoke |
+| GM-I21 | Tool output shape / Low | Diagnostic reads produced offloaded output, including byte-oriented HTTP content; two public-documentation parses treated multiple JSON objects as one document and failed. | Decode byte content before interpreting it; parse the individual result object, inspect actual property names, and project bounded metadata or passages. Corrected reads succeeded; full artifacts remained available. | Treat artifacts as data with an explicit shape, not a chat payload. Bound both match count and excerpt length before printing; JSON-lines is not a single JSON document. | Diagnostic output/read / output-shape preflight |
+
+The instrumented run `20261015-190055-3ce748be` completed with 12 PASS/1 FAIL:
+Group creation passed, membership addition timed out, and all seven cleanup
+checks passed. Seven observations were retained. User update exported on
+attempt two after a skipped first response. Group create and membership used
+scheduled fallback, with no native successful Export for either call.
+An in-flight source read confirmed one member and two gallery assignments;
+job metadata reported a successful cycle without quarantine. These do not
+prove that the target received membership.
+Exact-endpoint request metadata contains one native Group POST with HTTP201
+and no Group PATCH, PUT or DELETE in the captured write pages. This supports
+a missing export, not a demonstrated server membership-update rejection.
+
+Independent compiled local-node proof subsequently passed all 1,729 live
+assertions in 87.4 seconds on `0.55.50`. Receipt counters and all 1,729 test
+entries agree. The exact owned server was stopped and listener absence
+verified. The existing depth-10 diagnostic serialization warning remains a
+disclosed limitation, not an assertion failure or a lossless-payload claim.
+
+Official Microsoft references establish that on-demand subjects can include
+[linked members](https://learn.microsoft.com/en-us/graph/api/resources/synchronization-synchronizationlinkedobjects?view=graph-rest-beta)
+and that [start resumes processing](https://learn.microsoft.com/en-us/graph/api/synchronization-synchronizationjob-start?view=graph-rest-beta).
+The latter warns against repeated start calls while running. Missing linked
+subjects and fallback scheduling require separate behavioral validation;
+neither is presented as the established cause of this run.
+
+**Self-improvement applied:** Native response success, successful Export and
+verified target state now remain separate claims in both contracts and
+persisted observations. Raw responses and arbitrary response properties are
+not added to the diagnostic report.
+
+**Design disposition accepted:** A small metadata projector is shared by the
+two existing provisioning helpers. Existing orchestration, transport and
+acceptance responsibilities are preserved; a new tracing framework would be
+speculative. This tooling-only change does not bump the shipped runtime.
+
+**Provenance / completeness checkpoint:** The complete available continuation
+`events.jsonl` was scanned through event 5,810, using separate error/signal
+and causal-narration passes. Earlier UI/gallery scan receipts cover the
+previous checkpoint at 4,086. All 56 later candidates were classified:
+ownership maps to DT-I17; gallery failures to GM-I18; report assertion setup
+to GM-I19; unsupported projection to GM-I20; output/JSON parsing to GM-I21.
+Historical compiler/identity excerpts, search/patch echoes, deliberate RED
+assertions and the already-disclosed serialization warning were verified
+non-new issues. The bounded scan receipt remains in session artifacts.
+Later CI/live events require an appended checkpoint; overall dev acceptance
+is still pending. This does not restore the deleted project3 transcript.
+
+## Earlier reconstructed consolidation and blocked deployment
 
 PR #218 merged normally at `078e741b`. The original deleted project3
 conversation was not restored. This continuation uses preserved recovery

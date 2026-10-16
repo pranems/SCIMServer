@@ -1,8 +1,8 @@
 # UI Date-Time and Endpoint Identity Consistency
 
-**Last verified:** 2026-10-15
+**Last verified:** 2026-10-16
 
-**Status:** Implementation and focused validation complete; protected release consolidation in progress. Not deployed.
+**Status:** PR #226 merged; 0.55.50 deployed to dev. Full acceptance blocked by gallery provisioning; operator visual acceptance pending.
 
 ## Executive summary
 
@@ -14,8 +14,38 @@ browser-dependent full timestamp.
 
 This change uses one UTC timestamp presentation and removes the persistent
 Operations endpoint outline. All 33 focused browser cases now pass, including
-responsive journeys at 1440, 900 and 390 px. Release metadata, reviewed delivery, dev validation, and operator
-visual acceptance remain separate, unfinished claims.
+responsive journeys at 1440, 900 and 390 px. PR #226 merged normally at
+`096ee65f` after seven successful exact-tip checks. Its immutable image
+`sha256:b48c668d4d3045599cff3233fbd2d4ceab291526361e29770d7f5060278ef49e`
+is deployed on dev as `0.55.50`.
+
+The full isolated pipeline passed the backend matrix, web coverage and
+Docker/dev live checks (1,729 assertions each), then failed Entra gallery WIF
+User update. An unchanged WIF replay passed that update and failed Group
+creation. Neither establishes a UI regression or a SCIM update defect.
+The original run remains failed: 33 PASS, 1 FAIL, 6 SKIPPED, 9 reviewer PENDING.
+Dev browser, integrity, revision pruning and operator acceptance remain
+unverified. See the [gallery diagnostic ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
+## Validation ownership correction: DT-I17
+
+The first post-merge run discovered that root, API and web `node_modules`
+were junctions into another worktree. Code generation and caches could write
+outside this continuation's ownership, so the exact owned pipeline process
+was stopped. Its interrupted Prisma E2E lane is not a PASS.
+
+Existing dependency trees were copied read-only into private physical
+directories, compared with zero-difference metadata replays, and substituted
+only in the assigned worktree. All three tracked lockfile SHA256 values
+remained unchanged. No install, package change or local lockfile regeneration
+occurred. The isolated rerun then completed its matrix and deployment stages.
+The exact owned temporary PostgreSQL was removed and absence verified.
+
+Detection was the Stage 2 ownership inspection; the earliest appropriate
+gate is a preflight before code generation or caches. A permanent preflight
+with negative controls is scheduled to the repository maintainer for
+2026-10-16 as a separate tooling change. Private dependencies are fixed now;
+the permanent prevention is not claimed complete.
 
 ## Display contract
 

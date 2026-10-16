@@ -1,7 +1,7 @@
 # Entra gallery custom extension and complete transport coverage
 
-**Status:** Contract GREEN; live provisioning matrix pending
-**Last verified:** 2026-10-14
+**Status:** Contract GREEN; SecretToken/OAuth live PASS, complete WIF live proof blocked
+**Last verified:** 2026-10-16
 
 ## Executive summary
 
@@ -13,9 +13,12 @@ successful tests.
 
 Behavioral contracts pass. A read-only request against the actual gallery
 template confirms that the transformation matches its department definition
-and source mapping. The expanded real provisioning matrix has not run yet:
-the runtime deployment continuation currently owns the shared gallery
-principal and estate. No live success is inferred from these local controls.
+and source mapping. The expanded live matrix ran against dev `0.55.50`:
+SecretToken and OAuth completed; WIF timed out on User update. An unchanged
+WIF-only replay passed that update but timed out creating a Group. Both
+verified exact cleanup. Partial replays are not combined into an all-mode
+PASS. The execution owner retains exclusive dev/gallery access while
+collecting operation-specific observations.
 
 ## One bounded mapping
 
@@ -84,10 +87,52 @@ empty requested matrix into a custom-mapping PASS.
 | Missing custom/membership evidence, unsupported result, failed disposition | Four pipeline controls RED before acceptance hardening; GREEN afterwards |
 | Duplicate-mode report evidence | Confirmed RED before per-mode identity checks; GREEN afterwards |
 | Empty authentication selection and vacuous report evidence | Both controls confirmed RED, then GREEN; default remains all three transports |
-| Real expanded gallery provisioning and cleanup | Pending shared-estate handoff |
+| Real expanded gallery provisioning and cleanup | SecretToken/OAuth PASS; WIF incomplete in two distinct failed receipts; exact cleanup verified |
 | New documentation diagram | Rendered in Chromium under strict security in both themes; the separate built-in version-discovery warning is not represented as renderer equivalence. |
 
-The post-master integration checkpoint passes 70 gallery contract checks and
+## Diagnostic report contract
+
+Report schema `1.1.0` adds `provisioningObservations` independently of
+acceptance results. Each actual on-demand response records only the following
+metadata keys:
+
+| Keys | Meaning |
+|---|---|
+| `observedAt`, `operation`, `attempt` | UTC observation time and the requested operation/attempt |
+| `jobId`, `objectId`, `objectType` | Exact owned identities for correlation; a reused job ID alone is not a unique execution identity |
+| `result`, `action`, `stepStatuses`, `hasSuccessfulExport` | Normalized result and step metadata, not raw Graph response bodies or error details |
+| `path` | `provisionOnDemand`, or `scheduled-sync-fallback` after the owned start call succeeds |
+
+An import-only success remains distinct from an Export success. Observations
+survive target-poll failures and never turn them into acceptance. Raw response
+properties, credentials, headers and tokens are not projected. Failure-stage
+labels advance through User updates, account changes, Group operations and
+deprovisioning. Contract fixtures execute the real helpers and orchestrator,
+with a secret sentinel and exact key allowlist.
+The focused command
+`pwsh -NoProfile -File scripts\test\entra-gallery-scim-e2e.contract.ps1`
+passes 78 assertions after the five initial diagnostic RED assertions.
+
+The instrumented WIF run `20261015-190055-3ce748be` passed 12 checks, including
+Group creation, then failed membership addition after the unchanged
+240-second target wait. Seven cleanup checks passed. User update first
+reported no Export, then exported successfully on attempt two. Group create
+and membership both used scheduled fallback; membership on-demand reported
+`EntrySynchronizationSkip=Skipped`. The in-flight source Group had the
+member, while the provider job reported a successful cycle. Those are not
+proof of target membership.
+
+Microsoft documents explicit
+[linked member subjects](https://learn.microsoft.com/en-us/graph/api/resources/synchronization-synchronizationlinkedobjects?view=graph-rest-beta)
+for on-demand provisioning and says
+[start resumes a paused job](https://learn.microsoft.com/en-us/graph/api/synchronization-synchronizationjob-start?view=graph-rest-beta),
+not that it forces a fresh cycle. It warns against repeatedly starting
+an already-running job. The current helper sends no member links. Whether
+that omission and/or fallback scheduling caused this exact failure remains
+an open validation question, not a proven provider root cause. Do not
+increase timeouts or start running jobs repeatedly to manufacture a PASS.
+
+The earlier post-master integration checkpoint passed 70 gallery contract checks and
 42 deployment pipeline contract checks. Reviewed master `f96f31b5` adds the
 serial-Prisma scheduling guard without weakening gallery acceptance. Both
 infrastructure explanations are retained and the infrastructure audit passes.

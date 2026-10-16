@@ -339,6 +339,7 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     function Add-Result {
         param($Scenario, $Check, $Status, $Detail)
         $state.Checks.Add("$Status/$Check")
+        if ($Status -eq 'FAIL') { $state.FailureDetail = $Detail }
     }
     function New-ModeContext {
         param($Mode)
@@ -391,6 +392,10 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     }
     function Wait-ScimResource {
         param($ResourceType, $Attribute, $Value, $Headers, $Predicate, $Expectation)
+        if ($state.FailGroup -and $ResourceType -eq 'Groups') { throw 'Controlled Group wait failure.' }
+        if ($state.FailUpdate -and $ResourceType -eq 'Users' -and $state.Department -eq 'SCIM Validation Updated') {
+            throw 'Controlled User update wait failure.'
+        }
         $resource = if ($ResourceType -eq 'Users') {
             @{ id = 'scim-user'; displayName = $state.Name; active = -not $state.UserGone;
                 schemas = @($script:galleryExtensionUrn);
@@ -424,6 +429,24 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
             'PASS/mode outcome' -in $state.Checks -and $state.Teardown
         )
     }
+    $state = @{
+        Checks = [System.Collections.Generic.List[string]]::new()
+        Department = 'SCIM Validation'; FailGroup = $true
+    }
+    Invoke-ModeScenario -Mode WorkloadIdentity
+    Assert-Contract 'behavior: Group timeout identifies the actual failing provisioning stage' (
+        $state.FailureDetail -like 'provision source group:*Controlled Group wait failure*' -and
+        $state.Teardown
+    )
+    $state = @{
+        Checks = [System.Collections.Generic.List[string]]::new()
+        Department = 'SCIM Validation'; FailUpdate = $true
+    }
+    Invoke-ModeScenario -Mode WorkloadIdentity
+    Assert-Contract 'behavior: User update timeout identifies the update stage and still releases its job' (
+        $state.FailureDetail -like 'update source user:*Controlled User update wait failure*' -and
+        $state.Teardown
+    )
 }
 
 & {
@@ -441,6 +464,7 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     $GalleryServicePrincipalName = 'contract-fixture'
     $script:serverVersion = 'contract-only'
     $cleanupResults = @(@{ removed = $true })
+    $provisioningObservations = @(@{ operation = 'update user'; action = 'Update' })
     $secretKeys = [System.Collections.Generic.HashSet[string]]::new()
     $OutputDirectory = Join-Path $repoRoot "test-results\gallery-report-contract\$([guid]::NewGuid())"
     try {
@@ -465,6 +489,14 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
             Assert-Contract "behavior: custom report disposition is truthful for $case evidence" (
                 $saved.customExtensionDisposition -like $expected
             )
+            if ($case -eq 'valid') {
+                Assert-Contract 'behavior: report persists provisioning observations independently of acceptance results' (
+                    $null -ne $saved.provisioningObservations -and
+                    @($saved.provisioningObservations).Count -eq 1 -and
+                    $saved.schemaVersion -eq '1.1.0' -and
+                    $saved.provisioningObservations[0].operation -eq 'update user'
+                )
+            }
         }
     }
     finally {
@@ -474,6 +506,92 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         }
         if (Test-Path -LiteralPath $OutputDirectory) { Remove-Item -LiteralPath $OutputDirectory }
     }
+}
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($gatePath, [ref]$null, [ref]$null)
+    foreach ($name in @('Get-ProvisionOutcome', 'Invoke-ProvisionOnDemand', 'Add-ProvisionObservation', 'Invoke-ExpectedProvision', 'Invoke-ScopedChangeProvision')) {
+        $definition = $ast.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+        }, $true)
+        . ([scriptblock]::Create($definition.Extent.Text))
+    }
+    $gallerySp = @{ id = 'owned-principal' }
+    $state = @{ Responses = [System.Collections.Generic.Queue[object]]::new(); Starts = 0 }
+    $provisioningObservations = [System.Collections.Generic.List[object]]::new()
+    function Start-Sleep { param($Seconds) }
+    function Invoke-Graph {
+        param($Method, $Path, $Body)
+        if ($Method -eq 'POST' -and $Path.EndsWith('/provisionOnDemand')) {
+            return $state.Responses.Dequeue()
+        }
+        if ($Method -eq 'POST' -and $Path.EndsWith('/start')) {
+            $state.Starts++
+            return
+        }
+        throw "Unexpected contract Graph call: $Method $Path"
+    }
+    $importOnly = @{
+        key = '{"result":"Success"}'
+        value = '{"action":"Skip","provisioningSteps":[{"name":"EntryImport","type":"Import","status":"Success"}]}'
+    }
+    $export = @{
+        key = '{"result":"Success"}'
+        value = '{"action":"Update","secret":"must-not-persist","provisioningSteps":[{"name":"EntryExportUpdate","type":"Export","status":"Success"}]}'
+    }
+    $state.Responses.Enqueue($importOnly)
+    $state.Responses.Enqueue($export)
+    $outcome = Invoke-ExpectedProvision -JobId owned-job -RuleId rule -ObjectId owned-user -ObjectType User -Operation 'update user'
+    Assert-Contract 'behavior: every real provisioning retry records its own operation, attempt and export outcome' (
+        $outcome.HasSuccessfulExport -and $provisioningObservations.Count -eq 2 -and
+        $provisioningObservations[0].operation -eq 'update user' -and
+        $provisioningObservations[0].attempt -eq 1 -and
+        -not $provisioningObservations[0].hasSuccessfulExport -and
+        $provisioningObservations[1].attempt -eq 2 -and
+        $provisioningObservations[1].action -eq 'Update' -and
+        $provisioningObservations[1].objectId -eq 'owned-user'
+    )
+    $state.Responses.Enqueue($importOnly)
+    $path = Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group -Operation 'create group'
+    Assert-Contract 'behavior: scheduled fallback retains the observed Group outcome without claiming an export' (
+        $path -eq 'scheduled-sync-fallback' -and $state.Starts -eq 1 -and
+        $provisioningObservations.Count -eq 3 -and
+        $provisioningObservations[2].path -eq 'scheduled-sync-fallback' -and
+        $provisioningObservations[2].objectType -eq 'Group' -and
+        -not $provisioningObservations[2].hasSuccessfulExport
+    )
+    Assert-Contract 'behavior: provisioning observations contain metadata only, not raw response secrets' (
+        $provisioningObservations.Count -gt 0 -and
+        ($provisioningObservations | ConvertTo-Json -Depth 8) -notlike '*must-not-persist*' -and
+        $provisioningObservations[0].observedAt -match '^\d{4}-\d{2}-\d{2}T.*Z$'
+    )
+    $allowedKeys = @(
+        'observedAt', 'operation', 'jobId', 'objectId', 'objectType', 'attempt',
+        'result', 'action', 'stepStatuses', 'hasSuccessfulExport', 'path'
+    )
+    Assert-Contract 'behavior: every observation has exactly the documented metadata keys' (
+        @($provisioningObservations | Where-Object {
+            @($_.PSObject.Properties.Name).Count -ne $allowedKeys.Count -or
+            @($_.PSObject.Properties.Name | Where-Object { $_ -notin $allowedKeys }).Count -gt 0
+        }).Count -eq 0 -and
+        $provisioningObservations[1].stepStatuses -eq 'EntryExportUpdate=Success'
+    )
+    $state.Responses.Enqueue(@{
+        key = '{"result":"Failure","details":{"errorCode":"ControlledFailure"}}'
+        value = '{"action":"Update","provisioningSteps":[{"name":"EntryExportUpdate","type":"Export","status":"Failure"}]}'
+    })
+    $failure = $null
+    try {
+        Invoke-ExpectedProvision -JobId owned-job -RuleId rule -ObjectId owned-user -ObjectType User -Operation 'failed update' | Out-Null
+    }
+    catch { $failure = $_.Exception.Message }
+    Assert-Contract 'behavior: a failed export remains a thrown failure with its observation retained' (
+        $failure -like '*failed update provisionOnDemand failed:*ControlledFailure*' -and
+        $provisioningObservations.Count -eq 4 -and
+        $provisioningObservations[3].result -eq 'Failure' -and
+        -not $provisioningObservations[3].hasSuccessfulExport
+    )
 }
 
 if ($failures.Count -gt 0) {
