@@ -314,6 +314,38 @@ function Get-RemoteImageDigest {
     return $match.Groups[1].Value
 }
 
+function Resolve-ReleaseSourceImage {
+    param(
+        [Parameter(Mandatory)] [string]$Registry,
+        [Parameter(Mandatory)] [string]$ExpectedDigest,
+        [Parameter(Mandatory)] [string]$RuntimeSourceCommit,
+        [Parameter(Mandatory)] [string]$HeadSha,
+        [Parameter(Mandatory)] [string[]]$RuntimeInputPaths
+    )
+
+    $commits = @(git rev-list --first-parent "${RuntimeSourceCommit}..${HeadSha}")
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not enumerate reviewed release source history.'
+    }
+    foreach ($commit in @($commits) + @($RuntimeSourceCommit)) {
+        if ($commit -notmatch '^[0-9a-f]{40}$') {
+            throw "Invalid release source commit '$commit'."
+        }
+        $sourceShaDigest = Get-RemoteImageDigest -Reference "${Registry}:sha-$commit"
+        if ($sourceShaDigest -ne $ExpectedDigest) { continue }
+        git merge-base --is-ancestor $commit $HeadSha
+        if ($LASTEXITCODE -ne 0) {
+            throw "Image source '$commit' is not an ancestor of the reviewed release."
+        }
+        git diff --quiet $commit $HeadSha -- $RuntimeInputPaths
+        if ($LASTEXITCODE -ne 0) {
+            throw "Runtime image inputs differ or could not be verified for source '$commit'."
+        }
+        return [pscustomobject]@{ Commit = $commit; Digest = $sourceShaDigest }
+    }
+    throw "No runtime-equivalent merged source SHA tag matches semantic digest '$ExpectedDigest'."
+}
+
 # =============================================================================
 # Stage 0 - Pre-flight + state capture
 # =============================================================================
@@ -731,28 +763,26 @@ if (-not $SkipDeploy) {
         }
     }
 
-    $sourceShaDigest = Get-RemoteImageDigest -Reference "${RegistryGhcr}:sha-$runtimeSourceCommit"
     $existingVersionDigest = Get-RemoteImageDigest -Reference "${RegistryGhcr}:$version"
     $script:verifiedGhcrDigest = $null
+    $script:verifiedSourceCommit = $null
     if ($releaseArtifactReady) {
         $releaseArtifactReady = Invoke-Gate '4.3c' 'Semantic tag matches runtime source SHA digest' {
-            if (-not $sourceShaDigest) {
-                throw "Missing source SHA tag ${RegistryGhcr}:sha-$runtimeSourceCommit."
-            }
             if (-not $existingVersionDigest) {
                 throw "Missing semantic tag ${RegistryGhcr}:$version."
             }
-            if ($existingVersionDigest -ne $sourceShaDigest) {
-                throw "Semantic tag digest $existingVersionDigest does not match runtime source SHA digest $sourceShaDigest."
-            }
-            $script:verifiedGhcrDigest = $sourceShaDigest
-            Write-Host "    runtime source $($runtimeSourceCommit.Substring(0,8)) -> $sourceShaDigest" -ForegroundColor DarkGray
+            $source = Resolve-ReleaseSourceImage -Registry $RegistryGhcr -ExpectedDigest $existingVersionDigest `
+                -RuntimeSourceCommit $runtimeSourceCommit -HeadSha $script:expectedHeadSha -RuntimeInputPaths $runtimeInputPaths
+            $script:verifiedGhcrDigest = $source.Digest
+            $script:verifiedSourceCommit = $source.Commit
+            Write-Host "    verified source $($source.Commit.Substring(0,8)) -> $($source.Digest)" -ForegroundColor DarkGray
         }
     } else {
         Add-Result -Stage '4.3c' -Gate 'Semantic tag matches runtime source SHA digest' -Status 'SKIPPED' `
             -Detail 'release artifact is not ready'
     }
     $verifiedGhcrDigest = $script:verifiedGhcrDigest
+    $publishedSourceCommit = $script:verifiedSourceCommit
 
     # 4.4 - Verify anonymous GHCR pull
     if ($releaseArtifactReady) {
@@ -764,11 +794,11 @@ if (-not $SkipDeploy) {
         if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:$version" }
         docker pull "${RegistryGhcr}:latest"
         if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:latest" }
-        docker pull "${RegistryGhcr}:sha-$runtimeSourceCommit"
-        if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:sha-$runtimeSourceCommit" }
+        docker pull "${RegistryGhcr}:sha-$publishedSourceCommit"
+        if ($LASTEXITCODE -ne 0) { throw "Could not pull ${RegistryGhcr}:sha-$publishedSourceCommit" }
         $versionDigest = ((docker image inspect "${RegistryGhcr}:$version" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
         $latestDigest = ((docker image inspect "${RegistryGhcr}:latest" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
-        $sourceDigest = ((docker image inspect "${RegistryGhcr}:sha-$runtimeSourceCommit" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
+        $sourceDigest = ((docker image inspect "${RegistryGhcr}:sha-$publishedSourceCommit" --format '{{index .RepoDigests 0}}').Trim() -split '@')[-1]
         if (
             $versionDigest -ne $verifiedGhcrDigest -or
             $latestDigest -ne $verifiedGhcrDigest -or

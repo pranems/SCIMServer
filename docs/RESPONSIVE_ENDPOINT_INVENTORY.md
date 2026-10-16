@@ -1,7 +1,7 @@
 # Responsive endpoint inventory and compact dashboard
 
 **Last verified:** 2026-10-16
-**Status:** UI merged with exact-tip CI. Isolated image handoff review, dev/canary and operator visual acceptance pending.
+**Status:** UI and isolated image handoff merged with exact-tip CI. Full delivery stopped before deployment on source provenance. The separate tooling correction is locally GREEN; protected review, dev/canary and operator visual acceptance remain pending.
 
 ## Executive summary
 
@@ -76,7 +76,7 @@ The page itself never horizontally overflows; narrow tables scroll internally.
 | Baseline visual comparisons | Four PASS with the production UI preview and registry-resolved read-only dev API data, explicitly enabling local canonical baseline checks. No diffs or baseline changes. |
 | Protected consolidation | Normal tracking push at c04b06f1: 28/28 Validate gates PASS in 883.7 seconds, including 6,060 API units, 2,447 HTTP cases and 1,624 Web units. |
 | CI-only release locks | Workflow 38891306560 at c04b06f1 succeeds. Imported 0.55.54 locks compare identical after normalizing only root/package version metadata; public registry and sha512 provenance PASS. |
-| Dev and canary | Pending reviewed merged-source deployment. |
+| Dev and canary | Full run from c3ef1f0d: 27 PASS, 2 FAIL, 10 SKIPPED, 9 reviewer PENDING in 3,531 seconds. No deployment. Provenance failure and downstream ACR cascade are retained, not relabeled. |
 | Operator visual acceptance | Pending an explicit statement about the deployed surfaces. |
 
 Commands:
@@ -110,18 +110,40 @@ directory. No screenshot baseline has been regenerated at this checkpoint.
 | UI-H05 | PowerShell tooling / Low | A review command interpolated a variable immediately followed by a colon, so the shell rejected scope-like syntax before any GitHub action. | Delimit the variable as `${head}` before punctuation. Retried review and all seven exact-tip CI checks succeeded; no failed command is counted as an executed review. | Shell parser / shell parser |
 | UI-H06 | Delivery integration / Medium | Preflight found the isolated validation child cleans up its containers and has a private project environment, while the parent queried containers in the default project. Two behavioral controls reproduced the missing project/image handoff. | Parent assigns and passes a unique project, then mirrors its surviving image by validated immutable ID. All 58 contract checks PASS, including missing/malformed identity rejection. Cleanup/isolation and canary policy remain unchanged. | Pre-deployment inspection plus behavioral RED / parent-child integration contract |
 | UI-H07 | Coupled gate expectation / Low | The first protected tooling push at 9c5317da stopped because the workflow-selector contract still required the removed default-project lookup string. | Replace that stale requirement with explicit project handoff, forbid the old lookup and execute the existing 58 behavioral controls from the registered selector gate. All 22 selector checks plus 58 pipeline checks PASS; no hook bypass. | Protected push / selector contract |
+| UI-H08 | Performance harness contract / Low | Benchmark admission expected a version in health, which publishes status/uptime/timestamp instead. It stopped before fixture creation. | Use the version-bearing administrative endpoint. The version-pinned 0.55.51 baseline completes with 18 post-warmup samples per operation. Keep deployment identity separate from health. | Benchmark admission / prior API-contract inspection |
+| UI-H09 | Cleanup assertion contract / Low | After owned endpoint DELETE, the benchmark expected a raw inventory array, not the actual endpoints envelope. It correctly withheld a success receipt. | Assert the documented envelope and absence of the exact owned ID before writing results. Final baseline cleanup readback passes; no permissive fallback. | Post-DELETE readback / prior API-contract inspection |
+| UI-H10 | Artifact provenance / Medium | CI published from tooling merge c3ef1f0d, but the gate required the nonexistent source tag for the last runtime merge 0fd0a87a. Shipping ACR failure was its cascade. | Resolve a matching source SHA on reviewed first-parent history, then require ancestry and identical declared runtime inputs. Four expected RED assertions become GREEN; all 68 pipeline and 22 selector checks pass. Actual public OCI proof resolves the existing immutable digest without rebuilding or retagging. Permanent controls reject missing source, unmerged history, runtime drift, Git failure and digest drift. | Full delivery source gate / behavioral fresh-publication and reuse contract |
+| UI-H11 | Registry metadata permissions / Low | GitHub package-version metadata returned HTTP 403 because read:packages is unavailable; the image has no revision label. | Use existing public OCI source-tag digests and reviewed Git equivalence instead. Real read-only proof succeeds. No privilege elevation, account switch or fabricated label/tag. | Read-only provenance investigation / registry contract and permission inspection |
+| UI-H12 | Test authoring / Low | An ambiguous patch anchor placed the new Docker mock inside a Git switch clause, producing a parser error before tests ran. | Move the mock to its own function boundary using complete surrounding context. The actual selector and all 68 behavioral cases pass. Anchor edits on complete unique boundaries; parser rejection remains a failed admission, never test evidence. | Focused contract parser / focused contract parser |
+| UI-H13 | Diagnostic AST extraction / Low | SafeGetValue rejected an array-expression wrapper when extracting declared runtime paths for the read-only proof. | Extract its 12 literal string nodes without executing dynamic expressions. Real source/digest proof passes; no production-code workaround. | Read-only proof admission / AST shape inspection |
+| UI-H14 | Evidence lookup / Low | A bounded review lookup assumed a helper path that did not exist. | Locate the existing HTTP contract helpers before constructing the follow-up assertion plan. The retained review identifies actual exported shape/key helpers and exact diagnostic expectations; no duplicate helper or production change. | Review source lookup / file discovery |
 
 UI PR #235 merged normally at `0fd0a87a`, preserving reviewed `8827402b`
 after seven exact-tip checks. The delivery handoff correction is a separate
 tooling rollback unit; it does not change runtime inputs or require another
-product-version bump. Full Docker/ACR, dev/Entra and canary outcomes remain
-pending. UI-H05 was captured immediately in the persistent continuation issue
+product-version bump. Handoff PR #236 merged at `c3ef1f0d` after 25 protected
+push gates and seven exact-tip checks. Full local/backend/Docker and local ACR
+mirror gates passed, but the failed shipping source proof prevented dev/Entra
+and canary execution. UI-H05 was captured immediately in the persistent continuation issue
 receipt and is consolidated here; UI-H06 is recorded at its confirmed GREEN.
 Delivery design disposition: **accepted**. One small Docker identity-boundary
 helper and the existing child/mirror blocks keep their cohesive roles; no
 artifact framework, cleanup retention, new deployment policy or speculative
 strategy is introduced. Test/gate self-improvement: **applied** through the
 behavioral handoff and missing/malformed identity controls.
+
+Provenance correction disposition: **applied** for permanent test/gate
+coverage and **accepted** for design/architecture. A small pipeline-local
+resolver reuses the digest reader and Git's ancestry/tree contracts. It does
+not add a publication framework, permission dependency, mutable source alias
+or new runtime responsibility. The anonymous pull consumes the resolved
+identity instead of reintroducing the incorrect anchor assumption.
+
+The retained old-runtime benchmark is not candidate membership proof.
+Candidate performance comparison, complete negative-response contracts,
+deployed privacy observations and actual Entra add/remove remain explicit
+follow-up evidence. Nine manual audit rows cannot be marked PASS merely
+because local suites passed. No customer-production promotion is authorized.
 
 Self-improvement disposition: **applied**. Permanent browser checks exercise
 both short and tall windows, measure the entire height chain and assert exact
@@ -139,10 +161,14 @@ navigation/error-boundary and complete browser validation, not only page tests.
 
 ### Provenance and completeness
 
-The full available reconstructed continuation was scanned through event 13,460,
-from execution start event 11,599, using error/signal and causal narration
-passes. The 43 candidates were reconciled to the Group and UI issue tables.
+The full available reconstructed continuation was scanned through event 15,306,
+from execution start event 11,599, using expanded error/signal and causal
+narration passes. The 95 candidates were reconciled to the Group and UI issue
+tables, including publication failure, registry permission, benchmark and
+local diagnostic/parser failures. The scan artifact remains session-local.
 Expected RED assertions, intentionally rejected requests, patches/searches
-quoting earlier failures and existing type diagnostics are not new incidents.
+quoting earlier failures, scanner echoes, repeated missing-search-tool output,
+historical browser-host admission errors and existing type diagnostics are
+not new incidents.
 The skipped visual admission and successful explicit retry remain distinct
 receipts. The deleted original session is not available or claimed as restored.

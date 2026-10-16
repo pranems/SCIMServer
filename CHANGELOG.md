@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Immutable release source proof
+
+- Distinguish actual CI publication source from the last runtime-input commit.
+  Match the semantic digest against reviewed first-parent source tags, verify
+  ancestry and exact declared runtime-input equality, then use that verified
+  source for anonymous pulls. Preserve all digest-pinned import/deploy checks.
+- Four desired RED assertions exposed fresh/tooling-only publication and
+  invalid-source acceptance. Ten new cases grow pipeline controls 58 -> 68;
+  all 68 plus 22 workflow-selector checks PASS, including actual anonymous
+  pull-block digest checks. Existing API/Web totals remain 6,060/2,447/1,624;
+  this tooling-only change adds no runtime tests, version or lock changes.
+- Read-only public OCI proof retains the existing 0.55.54 digest
+  `sha256:42613fe093bcb770c8eec849f2ac8840afa1b0ca85a1b8baf98efa33665745f9`,
+  published from merged c3ef1f0d. No rebuild, false source alias, package-scope
+  elevation or customer-production change.
+- Original full delivery receipt remains 27 PASS / 2 FAIL / 10 SKIPPED /
+  9 reviewer PENDING in 3,531 seconds. Its isolated Docker/local ACR handoff
+  passed, but shipping provenance and its downstream ACR cascade blocked
+  deployment. Dev remains 0.55.51; candidate dev/Entra/canary and human visual
+  acceptance remain pending. See [source contract](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
+  and [execution issues](docs/RESPONSIVE_ENDPOINT_INVENTORY.md).
+
 ## [0.55.54] - 2026-10-16
 
 ### Delivery tooling follow-through
@@ -22,8 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assertion requiring the former default-project lookup. Its existing gate
   now forbids that lookup and executes the 58 behavioral controls. All 22
   selector checks plus 58 pipeline checks PASS; no bypass.
-- Protected consolidation and actual merged-master Docker/dev/canary proof
-  for this tooling correction remain pending.
+- PR #236 merged at c3ef1f0d after 25 protected gates and seven exact-tip
+  checks. Actual merged-master Docker/local ACR handoff passed; dev/canary
+  remain blocked on the separate shipping provenance correction above.
 
 ### Responsive endpoint inventory and dashboard
 
@@ -47,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Candidate 0.55.53 -> 0.55.54; normal tracking Validate passes 28/28 gates
   in 883.7 seconds at c04b06f1. CI-only locks from workflow 38891306560
   are structurally version-only with public-registry/sha512 provenance.
-  Reviewed exact-tip CI and dev/canary delivery remain pending.
+  PR #235 merged at 0fd0a87a after seven exact-tip checks. Dev/canary delivery
+  and operator visual acceptance remain pending.
   See [layout contract, exact measurements and RCA](docs/RESPONSIVE_ENDPOINT_INVENTORY.md).
 
 ### Accepted Group member references

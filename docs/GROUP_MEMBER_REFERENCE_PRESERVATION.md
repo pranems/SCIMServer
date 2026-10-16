@@ -1,7 +1,7 @@
 # Group member reference preservation
 
 **Last verified:** 2026-10-16
-**Status:** Item B locally demonstrated on both backends; review, dev, Entra and canary evidence pending.
+**Status:** Item B merged in PR #234 at `17031d85` after seven exact-tip checks. Locally demonstrated on both backends, including populated upgrades and fresh migrations; candidate dev, Entra and canary evidence remains pending deployment.
 
 ## Executive summary
 

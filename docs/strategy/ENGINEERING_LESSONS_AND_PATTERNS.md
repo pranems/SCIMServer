@@ -642,6 +642,22 @@ Do not weaken cleanup or the zero-skip canary policy to conceal the mismatch.
 See [the infrastructure contract](../DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
 and [UI-H06](../RESPONSIVE_ENDPOINT_INVENTORY.md).
 
+## Separate publication source from runtime-input identity
+
+2026-10-16: An immutable semantic artifact can be correctly built from a
+reviewed tooling-only merge after the last runtime-input merge. Requiring
+those two commits to be identical rejects a legitimate fresh publication;
+using only current HEAD would then reject later unchanged-runtime reuse.
+Find a digest-matching source tag on reviewed first-parent history, prove
+ancestry and identical declared runtime inputs, and carry that verified
+source into every downstream pull. Reject missing proof and Git errors.
+Do not repair provenance by fabricating an older source tag or rebuilding an
+already published semantic version. Permanent behavioral controls must cover
+both fresh publication and later reuse, plus source/runtime/digest drift.
+The [infrastructure contract](../DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
+and [UI-H10](../RESPONSIVE_ENDPOINT_INVENTORY.md) retain the failed full-run
+receipt separately from successful local and read-only artifact proof.
+
 ## Verify the complete height chain, independently of content masks
 
 2026-10-16: A percentage-height page did not become bounded when its result

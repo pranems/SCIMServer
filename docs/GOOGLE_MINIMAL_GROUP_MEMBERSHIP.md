@@ -1,7 +1,7 @@
 # Minimal imported Group membership correctness
 
 **Last verified:** 2026-10-16
-**Status:** Item A implemented and demonstrated locally on both persistence backends. Not yet reviewed, released or demonstrated on live dev/Entra.
+**Status:** Item A merged in PR #233 at `47d85cdb` after seven exact-tip checks. Locally demonstrated on both persistence backends; candidate live dev/Entra evidence remains pending deployment.
 
 ## Executive summary
 

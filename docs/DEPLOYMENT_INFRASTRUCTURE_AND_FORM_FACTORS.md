@@ -65,6 +65,35 @@ The existing pre-push workflow-selector gate invokes these 58 behavioral
 controls and rejects a return to default-project container lookup; its 22
 selector assertions also PASS.
 
+## Immutable release source provenance
+
+The 0.55.54 full run from merged master `c3ef1f0d` completed with 27 PASS,
+2 FAIL, 10 SKIPPED and 9 reviewer PENDING results in 3,531 seconds. The
+isolated Docker validation and actual ACR local-image handoff passed. Shipping
+stopped before deployment: the gate confused the last runtime-input-changing
+merge `0fd0a87a` with the actual CI publication source `c3ef1f0d`.
+The missing shipping ACR tags were a downstream cascade, not another root
+cause. The original failed matrix remains unchanged; dev remains 0.55.51.
+
+An artifact's publication source and its runtime-input revision are distinct
+identities. The resolver searches source SHA tags on reviewed first-parent
+history from the authorized release head through its runtime-input anchor.
+A tag must match the semantic artifact digest, its source must be an ancestor
+of that head, and every declared runtime input must compare identical.
+Missing proof, Git failure, unmerged source and runtime drift fail explicitly.
+The anonymous pull gate uses the verified publication source and still checks
+semantic/latest/source digest equality. ACR import and deployment remain
+digest-pinned. No new account, registry permission, tag alias or rebuild is
+needed.
+
+Read-only proof resolved the existing 0.55.54 artifact to `c3ef1f0d` and
+`sha256:42613fe093bcb770c8eec849f2ac8840afa1b0ca85a1b8baf98efa33665745f9`.
+Ten added behavioral cases execute the actual provenance and anonymous-pull
+blocks. Four desired assertions failed before the fix; all 68 pipeline
+controls and 22 selector checks now pass. These checks do not turn the failed
+deployment matrix green or prove deployed membership/browser behavior.
+See [UI-H10 through UI-H14](RESPONSIVE_ENDPOINT_INVENTORY.md).
+
 ## Prisma validation scheduling
 
 The direct Stage 2.2 Prisma E2E invocation and the Prisma lane in
