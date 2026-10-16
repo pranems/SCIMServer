@@ -2,9 +2,21 @@
 
 **Last verified:** 2026-10-16
 
-**Status:** PR #226 merged; 0.55.50 deployed to dev. Native gallery follow-up passes 50/50; latency, dev browser/integrity and operator acceptance remain open.
+**Status:** Requested UI shipped in 0.55.50 and retained in current dev 0.55.51. Latency and follow-up browser/integrity proof pass; visual-test consolidation, reviewer gates, reference proof, pruning and operator acceptance remain open.
 
 ## Executive summary
+
+Current 2026-10-16 checkpoint: PR #229 merged at `c1a466ec` and dev now runs
+0.55.51. Matching HTTP measurements close the endpoint-list regression:
+p95 240.97 ms versus immediate 430.93 ms and original 265.52 ms baselines.
+Both relative checks pass. Three inspected inventory/navigation/history
+baselines needed a test-only follow-up, not another runtime change.
+Browser coverage passes all 321 distinct cases across a 310-pass invocation
+and an exact 11-case opt-in replay. Original 74 endpoint IDs and the deployed
+digest are unchanged. These are separate follow-up receipts; the 0.55.51
+full pipeline remains failed at 34 PASS/1 FAIL/5 SKIPPED/9 reviewer PENDING.
+See [visual follow-up and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16).
+The paragraphs below retain the earlier 0.55.50 execution history.
 
 The earlier Operations readability fix bounded long endpoint names but retained
 the outlined badge. It did not implement the operator's requested plain name,

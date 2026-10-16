@@ -1,12 +1,39 @@
 # Endpoint Profile Revision and Resource Write Coordination
 
-> **Status:** Prisma bootstrap repair proven locally; merged deployment blocked
-> **Last verified:** 2026-10-15
-> **Product version:** `0.55.49`
+> **Status:** Deployed to dev; original legacy reference CRUD proof passes
+> **Last verified:** 2026-10-16
+> **Product version:** `0.55.51`
+
+## Current deployed proof, 2026-10-16
+
+The same original reference endpoint that returned false 409s for both User
+and Group POST on 0.55.47 now passes **19/19 checks** on dev 0.55.51.
+User and Group POST, PUT, PATCH, independent GET and DELETE pass, including
+response-key allowlists. The fixture supplies the published required User
+`displayName`; the endpoint profile is not weakened or rewritten.
+
+Read-only PostgreSQL checks show the raw profile revision remains
+`247d138b0a91c7192472a240d09b18e08e95f8f2987ce22df849877811b01580`,
+matching both the original before-deployment receipt and the new before/after
+reads. The retired persisted setting remains present. Original persisted
+counts remain one User and zero Groups, and **zero owned fixture rows**
+remain in the database after cleanup.
+
+The runtime is merged `c1a466ec`, revision `scimserver-dev--vc1a466ec`,
+with the immutable digest recorded in the
+[portable acceptance receipt](evidence/DEV_05551_ACCEPTANCE_20261016.json).
+This closes the original reference-profile proof, not every release gate:
+the historical full pipeline still has its failed receipt, browser closure
+uses two explicit receipts, and operator visual approval remains unavailable.
+No canary or customer-production action occurred.
+
+The sections below preserve earlier local and blocked checkpoints as
+history. Their former deployment blockers are superseded by this dated
+proof; they must not be mistaken for the current release status.
 
 ## Problem
 
-**Complete branch proof, not deployed proof:** The cumulative timeout root
+**Historical complete branch proof, before deployed proof:** The cumulative timeout root
 cause is production stats seeding that materialized every User, every Group and
 every Group membership for every endpoint during each application bootstrap.
 Because E2E fixtures persist until global teardown, later suites paid for all

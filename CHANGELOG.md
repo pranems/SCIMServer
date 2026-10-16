@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Endpoint-list derived-work correction (runtime, not yet deployed)
+### Inventory visual acceptance follow-up (tests only)
+
+- Intended visual change because the merged inventory/navigation/history UI
+  is now being reflected in three inspected Windows Chromium baselines.
+  The Dashboard button border and Endpoints filter remain visible; only
+  live-count foreground text is suppressed during screenshots.
+- Assert counts against the actual delivered upstream response and table
+  row counts. A new actual-matcher mutation control uses zero pixel tolerance;
+  ordinary scenes retain their 0.002 tolerance. Focused comparison: 4/4.
+- Browser suite grows 320 -> 321 cases. Follow-up runs: 310 PASS/11 explicit
+  opt-in SKIP/0 FAIL, then exactly those 11 PASS with canonical dev flags.
+  Exact case-key comparison proves 321 distinct passes across two receipts,
+  not one zero-skip full pipeline. API unit/E2E, Web vitest and live counts
+  are unchanged by this test-only change; no new runtime version is needed.
+- Original 74 endpoint IDs, count and deployed 0.55.51 digest are verified
+  unchanged after the browser runs. Subsequent original-reference proof
+  passes 19/19 with the original raw profile revision and zero fixture rows
+  remaining. Nine direct change-scoped review dispositions and safe dev
+  revision pruning are recorded in the
+  [portable acceptance receipt](docs/evidence/DEV_05551_ACCEPTANCE_20261016.json).
+  Protected consolidation and explicit operator visual approval remain open.
+- Actual read-only PostgreSQL tracing shows one SELECT per endpoint-list
+  service call. Three identical-workload process pairs reduce peak memory
+  and p95 while retained heap is effectively unchanged. Cloud working set
+  has 711.62 MiB headroom; its 33.08% rise is not a controlled comparison
+  because the two windows served 84 versus 29,405 requests. No concurrent
+  load-capacity claim or new runtime version follows.
+- Capture stylesheet API mismatch, below-tolerance false greens, response
+  navigation race and explicit opt-in replay in the
+  [inventory execution ledger](docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md).
+
+### Endpoint-list derived-work correction (0.55.51, deployed to dev)
 
 - Compare authoritative persisted endpoint fingerprints before cloning and
   canonicalizing profiles. Preserve database reads, same-timestamp edit
@@ -16,14 +47,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cases, 191 cases across seven related unit suites, 37 selected InMemory
   HTTP cases across three suites, and the API TypeScript build all pass.
   The same 37 HTTP cases also pass on a private PostgreSQL 17 database.
-  Its exact container/volume cleanup is verified. Full counts remain pending.
+  Its exact container/volume cleanup is verified.
 - Identical local warmed 74-row/six-profile benchmark: 2,220 -> 0 clones
   and canonical hashes; CPU p95 43.6404 -> 13.3925 ms. This does not prove
-  deployed latency recovery. The original live +60.45% failure stays open.
+  deployed latency recovery. Separate matching deployed HTTP measurements
+  now pass: endpoint-list p95 430.93 -> 240.97 ms (-44.08%) against the
+  immediate baseline, and 265.52 -> 240.97 ms (-9.25%) against the original.
+  Both executable 10% relative-limit checks pass.
 - Prepare runtime patch 0.55.51. Both version locks come from successful CI
   run `38843457859`; structural comparison proves only root version fields
   changed. Dependency contents, public URLs and sha512 integrity are unchanged.
-  Dev remains 0.55.50; no deployment change has been made.
+  PR #229 merged at `c1a466ec` after seven exact-final-tip checks.
+  Dev runs 0.55.51 on `scimserver-dev--vc1a466ec`, digest
+  `sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
+  The fresh no-skip pipeline remains failed at its three stale visual
+  baselines: 34 PASS/1 FAIL/5 SKIPPED/9 reviewer PENDING.
 - Normal protected tracking push at `848412c4`: all 24 Fast gates PASS in
   465.5 seconds. API units increase 6,043 -> 6,048 across 210 suites;
   selected InMemory E2E remains 2,432 across 116 suites with four native-only

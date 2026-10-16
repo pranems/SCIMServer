@@ -5,6 +5,27 @@
 **Tracker:** [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](UI_REDESIGN_REMAINING_GAPS_PLAN.md) S11.3
 **Branch:** `feat/ui`
 
+## Current follow-up, 2026-10-16
+
+The header and original rollout below are historical. Dev 0.55.51 follow-up
+refreshes exactly three inspected Windows Chromium baselines for already
+merged inventory/navigation/history changes. Platform-specific baseline
+filenames remain authoritative; a Windows capture is not Linux evidence.
+
+Live inventory values are checked against their real delivered API response
+before screenshot-only CSS suppresses the counter text. The stylesheet is
+passed using `toHaveScreenshot()`'s `stylePath` option, not the `style`
+option accepted by the different `page.screenshot()` API. Borders, dimensions
+and the search field remain visible.
+
+The new counter-mutation control exercises the actual matcher with zero pixel
+tolerance. Unstyled pixels must change while stabilized pixels must not.
+Normal scenes retain their existing 0.002 tolerance. Refresh only reviewed
+real scenes with `--update-snapshots=all` when necessary; never refresh the
+counter-mutating control. All three regenerated images were inspected.
+Focused final comparison passes 4/4. See the
+[inventory follow-up and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16).
+
 ## 1. Goal
 
 Phase H3 closes the **plan §5.2** gap: the redesigned UI shipped without

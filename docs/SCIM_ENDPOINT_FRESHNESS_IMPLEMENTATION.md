@@ -135,14 +135,36 @@ all 24 Fast gates in 465.5 seconds, including 6,048 API units across 210
 suites and 2,432 selected InMemory E2E cases across 116 suites. Four
 native-only exclusions remain explicit. Version 0.55.51 locks were generated
 by successful CI run `38843457859`; structural comparison proves that only
-root version metadata changed. Complete release gates, final-tip CI and
-deployment remain pending.
+root version metadata changed. Final metadata commit `cf5998e1` passed all
+24 protected gates and seven exact-tip CI checks. PR #229 merged normally
+at `c1a466ec`; dev now runs 0.55.51 on revision
+`scimserver-dev--vc1a466ec`, digest
+`sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
+
+The fresh no-skip pipeline completed backend, Docker, live, publication,
+dev deployment and native gallery proof, then failed three stale browser
+baselines: 34 PASS, 1 FAIL, 5 SKIPPED, 9 reviewer PENDING. Integrity and
+pruning remained blocked. This failed receipt has not been relabelled.
+
+An identical read-only GET benchmark after deployment passes the executable
+10% relative limit against both saved baselines:
+
+| Endpoint-list HTTP p95 | Before | Dev 0.55.51 | Change |
+|---|---:|---:|---:|
+| Immediate 0.55.50 baseline | 430.93 ms | 240.97 ms | -44.08% |
+| Original pre-UI baseline | 265.52 ms | 240.97 ms | -9.25% |
+
+Each route has 20 sequential requests with two warmups discarded. These are
+client-observed, network-inclusive GET measurements, not server CPU, database
+query-count, memory or load-test claims. All four sampled routes improve
+against the immediate baseline. The latency regression is closed separately
+from browser, integrity, reviewer and operator acceptance.
 
 ### 4.2 Execution issues and prevention
 
 | ID | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest gate |
 |---|---|---|---|---|
-| EC-I01 | Performance / High | An unchanged row incurred a deep clone and sorted canonical hash before cache admission. The cache avoided hydration but not expensive conversion. | Compare raw persisted fingerprints first, then convert only changed rows. Four RED cases now pass and the representative workload records zero repeat clones/revisions. Commit pending. | Live latency comparison / a warmed service work-count regression could have caught this before deployment. |
+| EC-I01 | Performance / High | An unchanged row incurred a deep clone and sorted canonical hash before cache admission. The cache avoided hydration but not expensive conversion. | Compare raw persisted fingerprints first, then convert only changed rows. Four RED cases now pass and the representative workload records zero repeat clones/revisions. Source `848412c4`, merged in #229 at `c1a466ec`; deployed HTTP p95 recovery passes both relative comparisons. | Live latency comparison / a warmed service work-count regression could have caught this before deployment. |
 | EC-I02 | Test correctness / Low | Initial new tests counted setup repository calls and expected a disabled setting in `activeSettings`, which intentionally omits disabled values. | Clear query mocks after arrangement and inspect the full profile for the disabled value. Reconfirmed four intended RED failures before production edits; the snapshot case now passes without changing runtime semantics. | Focused RED / focused RED; no escape. |
 | EC-I03 | Tooling / Low | The editor test runner discovered no tests in the separately owned worktree. | Run the existing Jest command from that worktree with explicit test paths. No dependency installation or alternate-checkout access. | Test discovery / test discovery; no escape. |
 | EC-I04 | Documentation / Low | The version-freshness update touched a guide containing seven pre-existing single-line JSON envelopes. All parsed, but they violated the readability rule. | Pretty-printed those seven examples; all 174 literal JSON blocks in changed documentation parse, with no single-line envelopes remaining. No payload values changed. | Pre-commit documentation check / the same check; no escape. |
