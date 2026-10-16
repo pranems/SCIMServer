@@ -629,6 +629,19 @@ including a reference-bearing member beside a legacy value-only member.
 An additive nullable column preserves old records without inventing information.
 Migration upgrade proof and fresh replay are distinct claims. See
 [implementation and evidence](../GROUP_MEMBER_REFERENCE_PRESERVATION.md).
+## Carry artifact identity across isolated child cleanup
+
+2026-10-16: Isolation is incomplete when a child owns a unique Compose project
+but its parent later queries the default project's containers. Environment
+changes do not propagate from child processes, and containers can be correctly
+removed while their image remains. Let the parent assign the unique project
+identity, pass it explicitly, and inspect the surviving image's immutable ID.
+Behavioral contracts must execute both sides of the handoff after simulated
+container cleanup, with missing and malformed identity negative controls.
+Do not weaken cleanup or the zero-skip canary policy to conceal the mismatch.
+See [the infrastructure contract](../DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
+and [UI-H06](../RESPONSIVE_ENDPOINT_INVENTORY.md).
+
 ## Verify the complete height chain, independently of content masks
 
 2026-10-16: A percentage-height page did not become bounded when its result

@@ -272,6 +272,21 @@ function Test-PrereqOrExit {
     }
 }
 
+function Get-ValidatedLocalImageId {
+    param([Parameter(Mandatory)] [string]$ProjectName)
+
+    $imageReference = "${ProjectName}-api"
+    [string]$imageId = docker image inspect $imageReference --format '{{.Id}}' 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($imageId)) {
+        throw "Validated image '$imageReference' is unavailable after isolated cleanup."
+    }
+    $imageId = $imageId.Trim()
+    if ($imageId -notmatch '^sha256:[0-9a-f]{64}$') {
+        throw "Validated image '$imageReference' has an invalid image ID."
+    }
+    return $imageId
+}
+
 function Assert-OwnedPostgresContainer {
     param(
         [Parameter(Mandatory)] [string]$ContainerId,
@@ -585,27 +600,25 @@ if ($SkipDeploy) {
 if (-not $SkipDeploy) {
     Write-Stage 4 'Build, publish, deploy'
 
+    $validationProjectName = "scimserver-validation-$([guid]::NewGuid().ToString('N').Substring(0, 12))"
+    $dockerValidationPassed = $false
     if (-not $SkipDocker) {
-        Invoke-Gate '4.1' 'Docker compose build + live tests' { pwsh -NoProfile -File scripts/full-validation-pipeline.ps1 -SkipLocal } | Out-Null
+        $dockerValidationPassed = Invoke-Gate '4.1' 'Docker compose build + live tests' {
+            pwsh -NoProfile -File scripts/full-validation-pipeline.ps1 -SkipLocal -DockerProjectName $validationProjectName
+        }
     } else {
         Add-Result -Stage '4.1' -Gate 'Docker compose build + live tests' -Status 'SKIPPED' -Detail '-SkipDocker'
     }
 
     # 4.2 - Mirror the LOCAL image into ACR.
     #
-    # The local mirror is optional; GHCR supplies the deployable artifact.
-    # A missing mirror is a skipped convenience step, not another build failure.
-    # Required Docker validation failures still block the downstream chain.
-    $composeImageId = docker compose images -q api 2>$null | Select-Object -First 1
-    $localImagePresent = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($composeImageId)
-    $localImageId = if ($localImagePresent) {
-        (docker image inspect $composeImageId --format '{{.Id}}' 2>$null).Trim()
-    } else { $null     }
-    $localImagePresent = $localImagePresent -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($localImageId)
-    if ($localImagePresent) {
+    # Containers are already cleaned up; the run-owned image tag survives.
+    # GHCR still supplies the independently built deployable artifact.
+    if ($dockerValidationPassed) {
         Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') } | Out-Null
         $localMirrorTag = "local-$ImageTag"
         Invoke-Gate '4.2b' "Mirror local image -> $RegistryAcr/scimserver:$localMirrorTag" {
+            $localImageId = Get-ValidatedLocalImageId -ProjectName $validationProjectName
             $target = "$RegistryAcr/scimserver:$localMirrorTag"
             docker tag $localImageId $target
             if ($LASTEXITCODE -ne 0) { throw "docker tag failed for image $localImageId -> $target" }

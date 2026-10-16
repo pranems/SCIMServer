@@ -44,6 +44,27 @@ not publication, local-node evidence or an Azure update. A depth-10 JSON
 diagnostic warning remains explicit; the parsed summary and 1,729 test
 entries agree with the console result.
 
+## Isolated Docker image handoff
+
+The parent deployment pipeline assigns the unique Compose project identity
+and passes it to local validation. After the child removes its containers,
+network and volume, the parent inspects that exact project's surviving
+`<project>-api` image tag and mirrors its immutable SHA-256 image ID under the
+existing non-shipping `local-<commit>` tag. It never queries the default
+project's containers or assumes child-process environment changes propagate
+back. Missing or malformed image identity after successful validation fails
+the mirror gate explicitly. CI-built GHCR publication/import remains the only
+shipping artifact path.
+
+Behavioral controls execute the actual child/mirror script blocks with no
+remaining containers: the exact project and image must reach the mirror,
+and missing/malformed identities must be rejected. Two RED assertions exposed
+the former integration mismatch; all 58 pipeline contract checks now PASS.
+Actual Docker/ACR proof remains part of the full merged-master run.
+The existing pre-push workflow-selector gate invokes these 58 behavioral
+controls and rejects a return to default-project container lookup; its 22
+selector assertions also PASS.
+
 ## Prisma validation scheduling
 
 The direct Stage 2.2 Prisma E2E invocation and the Prisma lane in

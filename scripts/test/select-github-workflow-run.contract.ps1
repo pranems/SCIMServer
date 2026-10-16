@@ -101,8 +101,8 @@ foreach ($required in @(
     }
 }
 foreach ($required in @(
-    'docker compose images -q api',
-    'docker image inspect $composeImageId',
+    '-DockerProjectName $validationProjectName',
+    'Get-ValidatedLocalImageId -ProjectName $validationProjectName',
     'docker tag $localImageId $target',
     'docker image inspect $target',
     'docker tag failed for image',
@@ -114,6 +114,13 @@ foreach ($required in @(
 }
 if ($pipeline.Contains('docker tag scimserver-api')) {
     throw 'Deployment pipeline still treats the Compose container name as an image tag.'
+}
+if ($pipeline.Contains('docker compose images -q api')) {
+    throw 'Deployment pipeline still queries cleaned or unrelated default-project containers for the validated image.'
+}
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'dev-deployment-pipeline.contract.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Deployment pipeline behavioral evidence contract failed.'
 }
 
 foreach ($required in @(
