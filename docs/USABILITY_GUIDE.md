@@ -1,5 +1,16 @@
 # Usability Guide
 
+**Current presentation, 0.55.54:** absolute timestamps use `DateTimeField` with
+full UTC date/time, milliseconds and source-value copying. Keep copy buttons
+separate from enclosing navigation/accordion actions. Operations endpoint
+identity is a plain bounded link, not an outlined badge. Endpoints results
+adapt to available window height; Dashboard endpoint rows are compact and
+left-aligned. Preserve the existing copy primitives and measured wide/narrow
+layout contracts rather than introducing per-page formatting or CSS-only
+presence assertions. See [UI guide](UI_GUIDE.md),
+[release notes](RELEASE_NOTES.md) and
+[layout regression evidence](RESPONSIVE_ENDPOINT_INVENTORY.md).
+
 > **What this is.** How SCIMServer turns raw signals (errors, logs, auth decisions, connection facts) into an operator experience that is *explainable, glanceable, copyable, progressively disclosed, and accessible*. It is the human-facing counterpart to [OBSERVABILITY_TRACEABILITY_AND_DIAGNOSTICS.md](OBSERVABILITY_TRACEABILITY_AND_DIAGNOSTICS.md): that doc produces the signals, this doc makes them usable. Carries the primitive catalog, `data-testid` contracts, before/after examples, Mermaid flows, and a cross-domain comparison against Stripe, Twilio, GitHub, and the browser devtools model.
 
 > **Audience.** Engineers building UI surfaces (which primitive to reach for), and reviewers checking that a new screen meets the usability bar.

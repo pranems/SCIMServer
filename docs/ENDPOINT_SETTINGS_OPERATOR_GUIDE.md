@@ -1,14 +1,19 @@
 # Endpoint Settings - Operator Guide
 
-> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-09-29 - **Product version at capture:** `0.55.33`
-> The historical preset matrix in [Section 3](#3-preset-matrix-measured) and request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) were measured on the live dev estate at the capture version. P7a/P9 notes below describe newer local source and owned backend/live evidence, not a re-capture or deployment.
+> **Status:** Living reference - **Created:** 2026-07-31 - **Last verified:** 2026-10-16 - **Product version at capture:** `0.55.33`
+> The historical preset matrix in [Section 3](#3-preset-matrix-measured) and request/response bodies in [Section 6](#6-changing-a-setting-over-the-api) retain their capture version. Current correctness notes describe behavior included since 0.55.36 and the later 0.55.54 release; they do not restamp the old captures.
 > **Companion docs:** [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (flag registry internals), [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) (the five auth methods), [UI_GUIDE.md](UI_GUIDE.md) (screen-by-screen tour).
 
 ---
 
 ## 1. What this document is
 
-**C0 local source update, not deployed:** profile creation and profile edits
+See [release notes](RELEASE_NOTES.md) for current deployment and compatibility
+limits. Minimal value-only Group members no longer require a schema expansion
+or disabling strict mode. Actual undeclared input still fails; accepted
+member references persist without changing membership policy flags.
+
+**C0 behavior, included since 0.55.36:** profile creation and profile edits
 now reject unsupported uniqueness promises through the same capability
 compiler used by resource writes. This does not depend on
 StrictSchemaValidation. Shared core/extension schemas use binding-local common
@@ -17,7 +22,7 @@ Omitted optional schemaExtensions lists become empty; explicit malformed lists
 are rejected. Existing live preset captures below are unchanged. See
 [the combined-source proof](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
 
-**Local source update (P7a), not a deployment:** malformed schema declarations
+**P7a behavior, included since 0.55.36:** malformed schema declarations
 are rejected independently of `StrictSchemaValidation`. Strict mode gates
 resource type/format/cardinality checks; required fields, required extension
 bindings and immutable rules still apply with it off. Canonical values are

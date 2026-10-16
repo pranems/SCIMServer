@@ -1,9 +1,9 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-14 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> **Version:** 0.55.54 - **Updated:** 2026-10-12
-> **P5 search/error contract reviewed locally:** 2026-09-28; release consolidation pending.
+> **Version:** 0.55.54 - **Updated:** 2026-10-16
+> **Current release:** [Release notes, upgrade steps and validation limits](RELEASE_NOTES.md). Earlier isolated P1-P9 receipts remain historical; the correctness consolidation is included in the deployed release.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
 >
@@ -13,14 +13,14 @@
 
 ## Table of Contents
 
-**Local legacy-profile correction, not deployed:** SCIM controllers capture
+**Legacy-profile correction, included since 0.55.48:** SCIM controllers capture
 the persisted profile revision and normalized runtime profile together. A
 legacy setting renamed during reading must not produce HTTP 409 by itself.
 A genuine concurrent profile edit still returns `PROFILE_REVISION_CHANGED`
 without publishing a resource mutation. No public response field or route
 is added. See [coordination and measured regression evidence](SCIM_PROFILE_REVISION_WRITE_COORDINATION.md).
 
-**Local P7a update, not yet merged/deployed:** no routes were added.
+**P7a behavior, included since 0.55.36:** no routes were added.
 Admin profile writes reject malformed declarations before saving. User,
 Group and custom-resource POST/PUT ignore readOnly input; PUT preserves
 omitted non-required immutable values and rejects explicit immutable changes.
@@ -28,7 +28,7 @@ Required extension bindings apply in both strict modes. Supplied
 `returned:request` values appear in POST/PUT responses unless explicit
 projection excludes them. See [contracts and evidence](SCIM_P7A_PROFILE_VALIDATION.md).
 
-**Local P7b PATCH update, not deployed:** whole registered extension URNs
+**P7b PATCH behavior, included since 0.55.36:** whole registered extension URNs
 (including numeric-version suffixes) and no-path namespace objects share
 strict attribute validation. Invalid later operations save nothing and
 report their zero-based index. Required bindings and required/immutable
@@ -107,7 +107,7 @@ All requests (except public routes) are evaluated against 3 tiers in order:
 | `If-Match` | Conditional | `W/"{version}"` or `*` | ETag for PUT/PATCH/DELETE. Required if `RequireIfMatch: true` |
 | `If-None-Match` | Optional | `W/"{version}"` | Conditional GET - returns 304 if match |
 
-**Conditional resource writes (P3, locally validated; release integration pending):**
+**Conditional resource writes (P3, included since 0.55.36):**
 User, Group and custom-resource PUT/PATCH/DELETE enforce a numeric If-Match
 at persistence, not only at the initial read. A concurrent modification returns
 412 without changing fields, members or version. Wildcard `*` means existence,
@@ -173,7 +173,11 @@ Authorization: Bearer changeme-scim
     "arch": "x64",
     "pid": 1,
     "uptime": 3600,
-    "memory": { "rss": 67108864, "heapUsed": 33554432, "heapTotal": 50331648 }
+    "memory": {
+      "rss": 67108864,
+      "heapUsed": 33554432,
+      "heapTotal": 50331648
+    }
   },
   "auth": {
     "sharedSecret": "configured",
@@ -612,12 +616,31 @@ Authorization: Bearer changeme-scim
 {
   "totalResults": 6,
   "presets": [
-    { "name": "entra-id", "description": "Entra ID provisioning...", "default": true },
-    { "name": "entra-id-minimal", "description": "Entra ID minimal..." },
-    { "name": "rfc-standard", "description": "Full RFC 7643..." },
-    { "name": "minimal", "description": "Bare minimum..." },
-    { "name": "user-only", "description": "User provisioning only..." },
-    { "name": "user-only-with-custom-ext", "description": "User-only with custom extension..." }
+    {
+      "name": "entra-id",
+      "description": "Entra ID provisioning...",
+      "default": true
+    },
+    {
+      "name": "entra-id-minimal",
+      "description": "Entra ID minimal..."
+    },
+    {
+      "name": "rfc-standard",
+      "description": "Full RFC 7643..."
+    },
+    {
+      "name": "minimal",
+      "description": "Bare minimum..."
+    },
+    {
+      "name": "user-only",
+      "description": "User provisioning only..."
+    },
+    {
+      "name": "user-only-with-custom-ext",
+      "description": "User-only with custom extension..."
+    }
   ]
 }
 ```
@@ -749,9 +772,21 @@ Authorization: Bearer changeme-scim
 {
   "generatedAt": "2026-09-03T02:41:07.912Z",
   "total": 75,
-  "legacy": { "total": 0, "active": 0, "inactive": 0 },
-  "keyed": { "total": 59, "active": 51, "inactive": 8 },
-  "secretless": { "total": 16, "active": 16, "inactive": 0 },
+  "legacy": {
+    "total": 0,
+    "active": 0,
+    "inactive": 0
+  },
+  "keyed": {
+    "total": 59,
+    "active": 51,
+    "inactive": 8
+  },
+  "secretless": {
+    "total": 16,
+    "active": 16,
+    "inactive": 0
+  },
   "byAlgo": {
     "bcrypt": 16,
     "hmac-sha256-v1": 59
@@ -820,7 +855,9 @@ Content-Type: application/scim+json
     "expectedAudience": "api://scim-app",
     "jwksUri": "https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys",
     "allowedTenantId": "<tenant>",
-    "requiredRoles": ["Scim.Provision"],
+    "requiredRoles": [
+      "Scim.Provision"
+    ],
     "roleEnforcement": "off"
   }
 }
@@ -1534,8 +1571,15 @@ Authorization: Bearer changeme-scim
       "resourceId": "f47ac10b-..."
     }
   ],
-  "pagination": { "page": 1, "limit": 20, "total": 150 },
-  "filters": { "type": "user", "severity": "info" }
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 150
+  },
+  "filters": {
+    "type": "user",
+    "severity": "info"
+  }
 }
 ```
 
@@ -1554,9 +1598,20 @@ Authorization: Bearer changeme-scim
 ```json
 {
   "summary": {
-    "last24Hours": { "creates": 10, "updates": 25, "deletes": 2 },
-    "lastWeek": { "creates": 50, "updates": 200, "deletes": 15 },
-    "operations": { "user": 180, "group": 85 }
+    "last24Hours": {
+      "creates": 10,
+      "updates": 25,
+      "deletes": 2
+    },
+    "lastWeek": {
+      "creates": 50,
+      "updates": 200,
+      "deletes": 15
+    },
+    "operations": {
+      "user": 180,
+      "group": 85
+    }
   }
 }
 ```
@@ -1633,15 +1688,21 @@ Host: localhost:8080
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+  ],
   "totalResults": 3,
   "Resources": [
     {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Schema"],
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:Schema"
+      ],
       "id": "urn:ietf:params:scim:schemas:core:2.0:User",
       "name": "User",
       "description": "User Account",
-      "attributes": [ "..." ],
+      "attributes": [
+        "..."
+      ],
       "meta": {
         "resourceType": "Schema",
         "location": "/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:User"
@@ -1673,11 +1734,15 @@ Host: localhost:8080
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+  ],
   "totalResults": 2,
   "Resources": [
     {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
+      ],
       "id": "User",
       "name": "User",
       "endpoint": "/Users",
@@ -1714,14 +1779,31 @@ Host: localhost:8080
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"
+  ],
   "documentationUri": "https://github.com/your-org/SCIMServer",
-  "patch": { "supported": true },
-  "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
-  "filter": { "supported": true, "maxResults": 200 },
-  "changePassword": { "supported": false },
-  "sort": { "supported": true },
-  "etag": { "supported": true },
+  "patch": {
+    "supported": true
+  },
+  "bulk": {
+    "supported": true,
+    "maxOperations": 1000,
+    "maxPayloadSize": 1048576
+  },
+  "filter": {
+    "supported": true,
+    "maxResults": 200
+  },
+  "changePassword": {
+    "supported": false
+  },
+  "sort": {
+    "supported": true
+  },
+  "etag": {
+    "supported": true
+  },
   "authenticationSchemes": [
     {
       "type": "oauthbearertoken",
@@ -1825,10 +1907,17 @@ Content-Type: application/scim+json
   ],
   "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "userName": "jane.doe@example.com",
-  "name": { "givenName": "Jane", "familyName": "Doe" },
+  "name": {
+    "givenName": "Jane",
+    "familyName": "Doe"
+  },
   "displayName": "Jane Doe",
   "emails": [
-    { "value": "jane.doe@example.com", "type": "work", "primary": true }
+    {
+      "value": "jane.doe@example.com",
+      "type": "work",
+      "primary": true
+    }
   ],
   "active": true,
   "externalId": null,
@@ -2043,11 +2132,22 @@ Returns same ListResponse as GET with filter.
 
 ## SCIM Groups
 
+**Imported schemas and member references:** keep `StrictSchemaValidation`
+enabled. A schema declaring only `members.value` and `members.$ref` accepts
+value-only members; internally absent optional properties do not introduce
+unknown sub-attributes. Genuinely supplied undeclared fields still fail.
+Accepted `$ref` strings survive POST, PUT, PATCH and readback exactly, subject
+to the effective mutability and response-projection rules. References are not
+dereferenced; the internal storage field `reference` is not a response key.
+Rejected operations retain the prior persisted state. See
+[minimal-schema contracts](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md) and
+[reference migration/rollback](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
+
 ### POST /scim/endpoints/:endpointId/Groups
 
 Create a group.
 
-**Aggregate persistence (P4, locally validated; release integration pending):**
+**Aggregate persistence (P4, included since 0.55.36):**
 the Group and initial members are saved together. A member lookup or storage
 failure leaves no partial Group, so a corrected request can be retried.
 PUT/PATCH failures preserve scalar fields, payload, version and members;
@@ -2132,14 +2232,20 @@ Modify group. Common patterns:
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
   "Operations": [
     {
       "op": "add",
       "path": "members",
       "value": [
-        { "value": "new-user-id-1" },
-        { "value": "new-user-id-2" }
+        {
+          "value": "new-user-id-1"
+        },
+        {
+          "value": "new-user-id-2"
+        }
       ]
     }
   ]
@@ -2222,12 +2328,30 @@ Content-Type: application/scim+json
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkResponse"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+  ],
   "Operations": [
-    { "method": "POST", "bulkId": "user1", "status": "201", "location": ".../Users/new-id-..." },
-    { "method": "PUT", "status": "200", "location": ".../Users/f47ac10b-..." },
-    { "method": "PATCH", "status": "200", "location": ".../Groups/g1234567-..." },
-    { "method": "DELETE", "status": "204" }
+    {
+      "method": "POST",
+      "bulkId": "user1",
+      "status": "201",
+      "location": ".../Users/new-id-..."
+    },
+    {
+      "method": "PUT",
+      "status": "200",
+      "location": ".../Users/f47ac10b-..."
+    },
+    {
+      "method": "PATCH",
+      "status": "200",
+      "location": ".../Groups/g1234567-..."
+    },
+    {
+      "method": "DELETE",
+      "status": "204"
+    }
   ]
 }
 ```
@@ -2248,7 +2372,7 @@ Content-Type: application/scim+json
 
 Server-side search via POST body (RFC 7644 S3.4.3). Useful when filter expressions exceed URL length limits.
 
-**P5 local implementation, pending release consolidation:** Users, Groups and
+**P5 behavior, included since 0.55.36:** Users, Groups and
 registered custom resources accept JSON arrays for `attributes` and
 `excludedAttributes`. Comma-separated JSON strings remain an explicit
 compatibility form; GET URL parameters remain comma-separated strings.
@@ -2469,14 +2593,23 @@ RFC 8414 authorization-server metadata for one endpoint, so a client can discove
   "issuer": "https://<host>/scim/endpoints/<endpointId>",
   "token_endpoint": "https://<host>/scim/endpoints/<endpointId>/oauth/token",
   "jwks_uri": "https://<host>/scim/oauth/jwks",
-  "grant_types_supported": ["client_credentials"],
+  "grant_types_supported": [
+    "client_credentials"
+  ],
   "token_endpoint_auth_methods_supported": [
     "client_secret_basic",
     "client_secret_post",
     "private_key_jwt"
   ],
-  "scopes_supported": ["scim.read", "scim.write", "scim.manage"],
-  "token_endpoint_auth_signing_alg_values_supported": ["RS256", "ES256"],
+  "scopes_supported": [
+    "scim.read",
+    "scim.write",
+    "scim.manage"
+  ],
+  "token_endpoint_auth_signing_alg_values_supported": [
+    "RS256",
+    "ES256"
+  ],
   "x_scimserver_wif_profiles": [
     {
       "name": "syncfabric-rfc7523",

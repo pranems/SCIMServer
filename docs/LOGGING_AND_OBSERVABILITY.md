@@ -1,13 +1,20 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+
+**Current UI presentation:** absolute timestamps in Logs, Activity, Operations
+and live/detail drawers include full UTC date/time and milliseconds. Copy
+retains the original value; relative ages/durations remain relative. This does
+not change the console's deliberately shortened pretty-log timestamp format
+described below. Endpoint identity remains separate from copy/open actions.
+See [release notes](RELEASE_NOTES.md) and [the UI guide](UI_GUIDE.md).
 
 Global and endpoint Logs share filters for URL, HTTP method, status, time range,
 errors-only, minimum duration, and request ID. Custom ResourceType URLs remain
 visible in both surfaces. Endpoint Logs fixes endpoint scope; global Logs adds
 an endpoint selector.
 
-> **Version:** 4.2 - **Source-verified against:** v0.55.6 - **Updated:** 2026-07-31  
+> **Historical logging-stack source pass:** guide revision 4.2, v0.55.6, 2026-07-31
 > Route and module structure re-verified against v0.55.6 on 2026-07-31; the full line-by-line pass dates from v0.53.0.  
 > Every statement in this document references the actual source file and line - nothing is assumed.
 
@@ -714,7 +721,12 @@ Authorization: Bearer changeme-scim
       "type": "group",
       "severity": "info",
       "groupIdentifier": "Engineering",
-      "addedMembers": [{ "id": "usr-1", "name": "jsmith" }],
+      "addedMembers": [
+        {
+          "id": "usr-1",
+          "name": "jsmith"
+        }
+      ],
       "removedMembers": []
     },
     {
@@ -735,8 +747,17 @@ Authorization: Bearer changeme-scim
     "pages": 170
   },
   "filters": {
-    "types": ["user", "group", "system"],
-    "severities": ["info", "success", "warning", "error"]
+    "types": [
+      "user",
+      "group",
+      "system"
+    ],
+    "severities": [
+      "info",
+      "success",
+      "warning",
+      "error"
+    ]
   }
 }
 ```
@@ -862,8 +883,14 @@ Every config change is logged at INFO level with before/after values:
   "message": "Log configuration updated",
   "data": {
     "changes": {
-      "globalLevel": { "from": 2, "to": 1 },
-      "format": { "from": "pretty", "to": "json" }
+      "globalLevel": {
+        "from": 2,
+        "to": 1
+      },
+      "format": {
+        "from": "pretty",
+        "to": "json"
+      }
     }
   }
 }

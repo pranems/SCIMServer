@@ -19,7 +19,8 @@ Minimal imported-schema live section: 66 PASS. Native Entra: 50 checks
 and 15 exact-ID cleanups PASS in all three authentication modes.
 Dev preserves 74 IDs; canary preserves 64 endpoints. Both serve unchanged
 immutable digest `42613fe0`, with two active revisions each.
-Operator visual acceptance remains unavailable, not inferred.
+Provisional positive visual feedback was received on 2026-10-16; its target
+and version were not confirmed. It is not customer-production approval.
 Matched membership assurance now includes 2,000 samples/version/operation
 at 0.5 CPU and a separate 2-CPU quota-sensitivity diagnostic. The first
 profile retains over-10% tail increases; they are not relabeled green.
@@ -27,12 +28,23 @@ In the second, all candidate p50/p95/p99 values decrease, query totals are
 identical, CPU decreases 4.27% and peak memory remains below 1 GiB.
 The dev/canary disposition is explicitly bounded by small-quota tail risk,
 not an unconditional production latency guarantee or a deployment quota change.
-Private runtime checks verify 66 membership outcomes and 200 persisted log
+Private runtime checks verify 66 registered membership-section assertions
+(including 16 embedded oracle self-checks) and 200 persisted log
 rows/seven errors, including correlation, duration and actual credential
 redaction. Official RFC text confirms relative references and ordered,
 atomic PATCH. No runtime/version/artifact change or customer-prod action.
 See [current release evidence and limitations](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 The older pending/deployment-failure statements below are historical receipts.
+
+**Current user documentation:** [Release notes](RELEASE_NOTES.md) provides
+curated operator changes, upgrade/rollback and known limits, alongside the
+engineering changelog. Updated task guides remove stale not-deployed labels
+without restamping screenshots or wire captures. Package versions are coupled
+to release-note updates through the existing freshness manifest.
+Full HTTP matrix: 2,516 InMemory passes plus four exclusions / 2,520 PostgreSQL;
+protected selection: 2,460 plus four. A zero-skip outer pipeline does not prove
+the separate full compiled-node live lane: the nested Docker invocation uses
+`-SkipLocal`. No runtime/version/deployment change in this documentation work.
 
 **Historical predeployment implementation:** membership rejection-contract evidence on
 `test/minimal-group-error-contract-20261016`, based on merged `72eb4fd0`.
