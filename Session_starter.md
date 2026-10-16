@@ -2,8 +2,10 @@
 
 **Last verified:** 2026-10-16
 
-**Current checkpoint:** PR #230 merged normally at `5bf94f93` after all
-seven final-tip checks and the normal protected push.
+**Current checkpoint:** PR #231 merged normally at `8887584c`, preserving
+reviewed source `b0c64705`, after all 25 protected push gates and seven
+exact-tip checks. Merged-master CodeQL `38863401990` also passes.
+Earlier visual consolidation PR #230 merged at `5bf94f93`.
 Dev remains on the unchanged 0.55.51 runtime `c1a466ec` on
 `scimserver-dev--vc1a466ec`, digest
 `sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
@@ -43,16 +45,25 @@ the windows served 84 versus 29,405 requests.
 Dev pruning passes: four -> two active revisions, unchanged serving image
 at 100%, and the prior 0.55.50 revision retained for rollback.
 
-The active separate tooling branch is
+The merged separate tooling branch was
 `fix/dependency-ownership-preflight-20261016`. Its shared guard protects five
 validation entry points; 31 ownership assertions and related orchestrator
 contracts pass after meaningful RED. Real subprocess negative controls
 confirm no npm/Node/Docker/Azure/Git work starts through linked dependencies.
-The tooling change still needs protected consolidation.
+Its normal protected push passed all 25 gates in 633.7 seconds; all four
+exact-head workflows succeeded. No runtime-affecting source has changed
+since deployed `c1a466ec`.
 
-Remaining: explicit operator visual acceptance and the active tooling
-consolidation. Mermaid editor/gate alignment remains separate. No further runtime
-bump applies to this test-only follow-up. No canary/customer-prod work.
+Mermaid alignment is also closed: reviewed manifest/CI lock already pinned
+11.17.0, but the installed private copy was stale at 11.15.0. After explicit
+`npm ls` and doctor failures, an exact existing-lock root restore preserved
+the manifest and all three locks byte-for-byte. The doctor now confirms
+11.17.0 editor/gate parity; all 763 diagrams render in both strict themes.
+No new dependency selection or local lock regeneration was needed.
+
+Remaining: actual operator visual acceptance only. No approval was received
+or inferred. No further runtime bump applies to this tooling/documentation
+follow-up. No canary/customer-prod work.
 See [inventory visual follow-up and RCA](docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
 and [portable dev acceptance](docs/evidence/DEV_05551_ACCEPTANCE_20261016.json).
 
@@ -127,6 +138,7 @@ No canary or customer-production change. See the
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | PR #231 normally merged at `8887584c`: 31 ownership assertions, all 25 protected gates, seven exact-tip checks/four workflows and merged-master CodeQL PASS. Mermaid existing-lock restore closes local 11.15.0/11.17.0 drift; doctor and 763 two-theme renders PASS without changing manifests or locks. Only explicit operator visual approval remains blocked. |
 | 2026-10-16 | PR #230 merged at `5bf94f93`; no runtime drift or redeployment. Separate dependency-ownership tooling now passes 31 negative/positive assertions and related runner contracts; protected consolidation remains. Operator visual approval is still blocked; Mermaid alignment remains separate. |
 | 2026-10-16 | Original legacy reference passes 19/19 with its unchanged 0.55.47 raw revision and zero fixture rows left. Nine direct change-scoped review dispositions, actual one-SELECT tracing and three controlled memory/latency pairs are recorded. Dev pruning keeps serving plus rollback only. Protected visual consolidation and operator acceptance remain open; tooling follow-ups stay separate. |
 | 2026-10-16 | PR #229 merged at `c1a466ec`; dev 0.55.51 deployed. Both endpoint-list latency comparisons pass. Three inspected visual baselines corrected, zero-tolerance actual-matcher control passes, and 321 distinct browser cases pass across 310 + 11 receipts. Original 74 endpoint IDs and exact deployed digest verified unchanged. Protected visual-test consolidation, reviewer gates, reference proof, pruning and operator acceptance remain open. |

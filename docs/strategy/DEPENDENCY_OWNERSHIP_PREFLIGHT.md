@@ -80,6 +80,30 @@ continues testing the intended missing-database and explicit opt-out behavior.
 No full product matrix or deployment is needed to prove this preflight.
 The normal protected push owns its applicable existing product checks.
 
+### Verified delivery and local dependency alignment
+
+PR #231 merged normally at `8887584c`, preserving reviewed `b0c64705`.
+All 25 protected Fast gates passed in 633.7 seconds, including 6,048 API
+units and 2,432 selected InMemory E2E cases. Seven exact-tip checks across
+four workflow runs passed; merged-master CodeQL `38863401990` also passed.
+No runtime-affecting source differs from deployed 0.55.51 `c1a466ec`.
+
+The separate Mermaid task was reconciled rather than blindly implemented:
+source `f70a96a1` already aligned the manifest and CI lock to 11.17.0.
+The private installed copy was still 11.15.0. `npm ls mermaid --depth=0`
+failed with `ELSPROBLEMS`; the existing doctor independently failed with
+editor/gate version drift. After all six physical-path checks passed,
+`npm ci --ignore-scripts --no-audit --no-fund` restored only the existing
+root lock through the existing corporate proxy. No fresh version was
+selected, and no lock was generated locally. The manifest and all three
+lock hashes remained identical.
+
+The doctor then confirmed one built-in renderer and 11.17.0 parity.
+All 763 diagrams rendered under strict light and dark Chromium themes.
+The original protected push's older installed-renderer result is not
+substituted for this separate authoritative-version proof.
+See the [portable tooling closeout](../evidence/TOOLING_CLOSEOUT_20261016.json).
+
 ## Execution issues and root causes
 
 | ID | Type / severity | Symptom and root cause | Fix and why it works | Detection / earliest detection |
@@ -88,24 +112,31 @@ The normal protected push owns its applicable existing product checks.
 | DO-I02 | Invalid-input handling / Medium | A nonexistent repository root was accepted as six absent paths. Missing dependencies and a missing checkout were conflated. | Require the root to exist; only dependency/project absence retains the runner's existing availability checks. The adversarial root case changes RED to GREEN. | Added adversarial test / same focused contract |
 | DO-I03 | Documentation / Low | A draft handoff introduced an unsupported independent-claim count and a duplicated empty heading. | Replace the count with the verified normal-push fact and remove the empty heading before committing. Evidence counts must come from receipts, not an incidental prose edit. | Focused pre-commit review / same documentation edit |
 | DO-I04 | Test oracle / Medium | Parent-link non-mutation checks initially inspected a marker in the shared dependency directory rather than each linked project's actual target. That could miss a changed parent target. | Assert a marker in each exact target; both parent fixtures first fail RED, then initialize their own markers and pass. Unrelated surviving content is no longer accepted as target-preservation proof. | Focused assertion review / target-specific negative control before first GREEN |
+| DO-I05 | Inspection tooling / Low | A read-only lock inspection used `ConvertFrom-Json` without `-AsHashtable`; npm's empty root-package key cannot be represented by the default object conversion. | Use `-AsHashtable` and inspect the empty root key explicitly. No dependency operation started before the corrected inspection. | First inspection / same command |
+| DO-I06 | Invocation tooling / Low | The first manual restore command omitted the guard's mandatory `RepositoryRoot` argument and stopped immediately. | Supply the explicit owned checkout root before restoring. Mandatory binding prevented any dependency mutation, as intended. | Parameter binding / before the first mutation |
+| DO-I07 | Environment drift / Medium | A private installed Mermaid copy was 11.15.0 even though the reviewed manifest/CI lock and built-in editor were already 11.17.0. Physical ownership alone does not establish version provenance. | Existing `npm ls` and doctor failures justified restoring the exact existing root lock; unchanged manifest/lock hashes, a clean doctor and 763 strict two-theme renders prove the correction without another source upgrade. | Follow-up environment reconciliation / dependency/doctor inspection before editor-equivalence claims |
 
 The original shared-dependency incident is DT-I17 in the
 [UI date/time ledger](../UI_DATE_TIME_IDENTITY_CONSISTENCY.md#validation-ownership-correction-dt-i17).
 This guard makes its prevention executable rather than repeating a warning.
 Source/payload integrity and corporate package quarantine remain independent
-requirements; no dependency, manifest or lockfile changed here.
+requirements; no dependency declaration, manifest or lockfile changed here.
+The local installed root tree was restored from its existing reviewed lock.
 
 ### Provenance and completeness
 
-The full available continuation log was reconciled through event 10,866,
+The full available continuation log was reconciled through event 11,137,
 retaining earlier reconciliations. Separate failure-signal and causal-narration
-passes yielded 68 cumulative candidates, 19 after the prior checkpoint.
+passes yielded 83 cumulative candidates, including 15 after event 10,866.
 The initial 14 expected RED assertions are not a production incident;
 the unexpected AST false failures and adversarial invalid-root failure map
-to DO-I01/02. DO-I03 was corrected in the draft. Historical failures,
-successful patch text, status updates and scanner echoes were verified and
-dismissed as new incidents. This does not claim access to the deleted
-original conversation.
+to DO-I01/02. DO-I03 was corrected in the draft. The later exact-target RED
+maps to DO-I04; inspection, mandatory-argument and stale-install failures map
+to DO-I05/06/07. Historical failures, successful patch text, status updates,
+an optional absent transcript environment variable and scanner echoes were
+verified and dismissed as new incidents. Later successful CI and normal
+merge events do not introduce an additional failure. This does not claim
+access to the deleted original conversation.
 
 Self-improvement disposition: **applied**, through actual link fixtures,
 runner subprocess refusal and mutation sentinels.
