@@ -1,6 +1,12 @@
 # SCIM PATCH Operations - Complete Behavior Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.51`
+**Minimal imported Group schemas:** candidate members are validated before the
+Group adapter projects them into storage fields. Strict mode rejects actual
+undeclared fields rather than silently dropping them. Internally materialized
+undefined optional fields are absent, not invalid wire attributes. See
+[minimal Group membership proof and limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.52`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 

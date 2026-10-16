@@ -1,13 +1,22 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.51
+> **Version**: 0.55.52
 > **Last Updated**: October 16, 2026
 > **Last verified:** 2026-10-16
 
 ---
 
 ## Active Delivery Process
+
+**Active implementation:** minimal imported Group membership item A on
+`fix/google-optional-members-20261016`, based on reviewed `0a0966a8`.
+Strict validation remains enabled. Focused 169 units, 212 identical InMemory
+and PostgreSQL HTTP cases, and API build PASS. Review/release/live dev and
+Entra proof remain pending. `$ref` persistence and endpoint/dashboard layout
+are separate subsequent outcomes. Dev/canary are authorized through the
+existing process; customer prod is not. See
+[resolution and RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
 **Latest consolidation:** PR #231 merged normally at `8887584c`, preserving
 `b0c64705`, after 25 protected push gates and seven exact-tip checks.

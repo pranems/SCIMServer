@@ -23,8 +23,8 @@ export class GroupPatchEngine {
     }, {
       ...config, caseExactPaths: exact,
       normalize: (candidate, operation) => {
-        candidate.members = this.ensureUniqueMembers(((candidate.members ?? []) as unknown[]).map(m => this.toMemberDto(m)));
         config.normalize?.(candidate, operation);
+        candidate.members = this.ensureUniqueMembers(((candidate.members ?? []) as unknown[]).map(m => this.toMemberDto(m)));
       },
     }, {
       normalizeOperation: input => {
