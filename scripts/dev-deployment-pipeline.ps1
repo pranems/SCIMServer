@@ -138,6 +138,14 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $DryRun) {
+    try {
+        & (Join-Path $PSScriptRoot 'assert-dependency-ownership.ps1') -RepositoryRoot $repoRoot
+    } catch {
+        Write-Error $_ -ErrorAction Continue
+        exit 2
+    }
+}
 Set-Location $repoRoot
 . (Join-Path $PSScriptRoot 'github-workflow-run.ps1')
 . (Join-Path $PSScriptRoot 'scim-estates.ps1')

@@ -36,6 +36,7 @@ param(
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDir
+& (Join-Path $scriptDir 'assert-dependency-ownership.ps1') -RepositoryRoot $repoRoot
 $apiDir = Join-Path $repoRoot "api"
 $liveTestScript = Join-Path $scriptDir "live-test.ps1"
 

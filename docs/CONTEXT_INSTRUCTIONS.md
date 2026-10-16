@@ -9,14 +9,15 @@
 
 ## Active Delivery Process
 
-**Latest consolidation:** PR #229 merged normally at `c1a466ec` after seven
-exact-final-tip checks. Dev runs 0.55.51, revision
+**Latest consolidation:** PR #230 merged normally at `5bf94f93` after seven
+exact-final-tip checks; its merged-master CodeQL also passes. Dev remains
+on unchanged runtime `c1a466ec`, version 0.55.51, revision
 `scimserver-dev--vc1a466ec`, digest
 `sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
 The no-skip pipeline remains failed: 34 PASS/1 FAIL/5 SKIPPED/9 reviewer
 PENDING. Three stale browser baselines blocked integrity/pruning.
 
-The assigned branch `test/inventory-visual-baselines-20261016` refreshes
+The merged branch `test/inventory-visual-baselines-20261016` refreshes
 only those inspected intended inventory/navigation/history images, with
 real-response count assertions and an actual-matcher count-mutation control
 at zero pixel tolerance. Browser follow-up passes 310 cases, explicitly
@@ -40,9 +41,15 @@ of 33.08% is not workload-comparable: 84 versus 29,405 requests; current
 headroom is 711.62 MiB. Dev pruning keeps two active revisions, unchanged
 100% serving `c1a466ec` plus `096ee65f` rollback.
 
-Remaining: visual-test protected consolidation/CI/PR and operator
-visual approval. Dependency ownership preflight and Mermaid editor/gate
-alignment are separate tooling changes. No runtime bump is needed for
+Active separate tooling: `fix/dependency-ownership-preflight-20261016`
+implements physical dependency ownership checks across five validation
+entry points. Its 31 assertions include real subprocess refusals and
+external-command sentinels. Related runner contracts pass; protected
+consolidation remains. See the
+[ownership guide](strategy/DEPENDENCY_OWNERSHIP_PREFLIGHT.md).
+
+Remaining: operator visual approval, ownership-tooling consolidation and
+the separate Mermaid editor/gate alignment. No runtime bump is needed for
 this test-only follow-up. No canary or customer production was changed.
 See [inventory visual proof and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
 and [portable dev acceptance](evidence/DEV_05551_ACCEPTANCE_20261016.json).

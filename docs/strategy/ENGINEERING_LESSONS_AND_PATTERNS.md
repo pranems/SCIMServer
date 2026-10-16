@@ -51,6 +51,17 @@ and their limitations in the
 See IS-I27/28 in
 [the inventory RCA](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md#execution-issues-and-root-causes).
 
+### Validate physical dependency ownership before generated-file work
+
+A worktree label does not isolate a junction-backed dependency tree.
+Check physical checkout/project/dependency roots before npm, Prisma or build
+commands. Refuse unsafe links without modifying their targets; distinguish
+missing dependencies from a missing checkout. Test the actual runner's
+nonzero exit and absence of mutation commands, not just a guard's presence
+in its source. The
+[shared preflight and negative controls](DEPENDENCY_OWNERSHIP_PREFLIGHT.md)
+now enforce the DT-I17 ownership lesson in all five canonical runners.
+
 ### Cache admission must precede expensive derived work
 
 An authoritative database read can remain mandatory while its hydrated
