@@ -12,14 +12,20 @@ Entra checks and 15 exact-ID cleanups pass across three authentication modes.
 Minimal-schema live section: 66 PASS. Original dev IDs: 74 -> 74;
 canary endpoints: 64 -> 64. Both serve unchanged digest `42613fe0` and keep
 two revisions. Original failed matrices remain historical, not relabeled.
-Operator visual acceptance is still unavailable. Two 18-sample membership
-benchmark batches show variable over-10% deltas; performance remains open,
-owner SCIMServer maintainer, target 2026-10-19. Customer production is not
-authorized or promoted. See
+Operator visual acceptance is still unavailable. The larger matched membership
+comparison is complete: 2,000 samples/version/operation retain the 0.5-CPU
+tail increases. A separate 2-CPU diagnostic removes substantial throttling and
+all candidate p50/p95/p99 increases; both profiles have equal query totals.
+The scoped dev/canary performance disposition explicitly retains the
+small-quota tail risk, rather than claiming that its thresholds passed.
+Private changed-path logging checks pass for 200 rows and seven errors,
+including actual credential redaction. No production code, quota, version or
+deployed artifact changed. Customer production is not authorized or promoted. See
 [current closeout and limits](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | Completed matched performance/resource and private logging assurance; retained quota-sensitive tail limits, official RFC verification and measurement-oracle RCA. Operator visual acceptance is still required. |
 | 2026-10-16 | Dev/canary 0.55.54 delivery and actual Entra membership verified; visual acceptance and measured performance follow-up remain open. |
 
 **Historical predeployment execution:** membership rejection evidence on

@@ -20,9 +20,17 @@ and 15 exact-ID cleanups PASS in all three authentication modes.
 Dev preserves 74 IDs; canary preserves 64 endpoints. Both serve unchanged
 immutable digest `42613fe0`, with two active revisions each.
 Operator visual acceptance remains unavailable, not inferred.
-Network-inclusive membership timings cross the 10% threshold inconsistently
-across two small batches. Performance, query-count and memory acceptance
-remain open for the maintainer by 2026-10-19. No customer-prod action.
+Matched membership assurance now includes 2,000 samples/version/operation
+at 0.5 CPU and a separate 2-CPU quota-sensitivity diagnostic. The first
+profile retains over-10% tail increases; they are not relabeled green.
+In the second, all candidate p50/p95/p99 values decrease, query totals are
+identical, CPU decreases 4.27% and peak memory remains below 1 GiB.
+The dev/canary disposition is explicitly bounded by small-quota tail risk,
+not an unconditional production latency guarantee or a deployment quota change.
+Private runtime checks verify 66 membership outcomes and 200 persisted log
+rows/seven errors, including correlation, duration and actual credential
+redaction. Official RFC text confirms relative references and ordered,
+atomic PATCH. No runtime/version/artifact change or customer-prod action.
 See [current release evidence and limitations](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 The older pending/deployment-failure statements below are historical receipts.
 
