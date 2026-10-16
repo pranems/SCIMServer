@@ -629,3 +629,14 @@ including a reference-bearing member beside a legacy value-only member.
 An additive nullable column preserves old records without inventing information.
 Migration upgrade proof and fresh replay are distinct claims. See
 [implementation and evidence](../GROUP_MEMBER_REFERENCE_PRESERVATION.md).
+## Verify the complete height chain, independently of content masks
+
+2026-10-16: A percentage-height page did not become bounded when its result
+cap was removed, because auto-height route error/transition wrappers broke
+height propagation. New browser diagnostics measured every ancestor and
+exposed a 6,202-pixel result region. Propagating available height through both
+wrappers restored exact short/tall viewport deltas and internal scrolling.
+Keep dynamic-data visual masks for stable chrome, but never mistake their
+green snapshots for row-layout evidence. Use unmasked values, left edges,
+vertical centers, available-bottom equality and scroll/client bounds.
+See [the regression evidence and RCA](../RESPONSIVE_ENDPOINT_INVENTORY.md).

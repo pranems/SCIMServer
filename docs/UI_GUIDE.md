@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-15 - **Product version:** `0.55.53`
+> **Status:** User-facing reference - **Last verified:** 2026-10-15 - **Product version:** `0.55.54`
 
-> **Status:** Active | **Last Updated:** 2026-10-15 | **Version:** 0.55.53
+> **Status:** Active | **Last Updated:** 2026-10-15 | **Version:** 0.55.54
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -501,3 +501,14 @@ The twelve `prod-auth-*` images belong to [AUTHENTICATION_GUIDE.md](AUTHENTICATI
 ---
 
 > Maintained as a Tier-1 user-facing guide. When the UI changes, refresh the affected screenshots from a live deployment and update the corresponding section.
+## Responsive endpoint inventory and summaries
+
+Nonempty Endpoints results fill the available window height; rows and narrow
+columns scroll inside the results region while filters stay visible. Endpoint
+names are left-aligned in the existing column. Dashboard endpoint summaries
+show identity, status and counts on one desktop row, with a compact two-line
+phone fallback. Copy/navigation controls and zero-result actions are unchanged.
+See [the measured layout contract](RESPONSIVE_ENDPOINT_INVENTORY.md).
+Curated screenshots retain their own recorded capture provenance until the
+reviewed change is deployed and those affected surfaces are deliberately
+recaptured. Local scratch images are not promoted as deployed UI evidence.

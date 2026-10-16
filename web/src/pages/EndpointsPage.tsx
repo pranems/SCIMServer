@@ -43,6 +43,8 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '16px',
     maxWidth: '1400px',
+    height: '100%',
+    minHeight: '320px',
   },
   header: {
     display: 'flex',
@@ -63,6 +65,9 @@ const useStyles = makeStyles({
   },
   identity: {
     display: 'flex', flexDirection: 'column', minWidth: 0, gap: '4px',
+  },
+  endpointName: {
+    justifyContent: 'flex-start', textAlign: 'left', minWidth: 0,
   },
   center: {
     display: 'flex',
@@ -134,7 +139,7 @@ export const EndpointsPage: React.FC = () => {
           </Button>
       </div>
 
-      <FilteredResultsPanel label="Endpoint inventory" data-testid="endpoints-results" toolbar={
+      <FilteredResultsPanel label="Endpoint inventory" fillHeight={filtered.length > 0} data-testid="endpoints-results" toolbar={
         <>
           <SearchBox
             aria-label="Filter endpoints by name, ID, profile or status"
@@ -158,7 +163,7 @@ export const EndpointsPage: React.FC = () => {
           <tr key={ep.id} data-testid={`endpoint-${ep.id}`}>
             <td>
               <div className={classes.identity}>
-                <Button appearance="subtle" data-testid={`endpoint-${ep.id}-open`}
+                <Button appearance="subtle" className={classes.endpointName} data-testid={`endpoint-${ep.id}-open`}
                   title={`${ep.displayName ?? ep.name} (${ep.name})`}
                   onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: ep.id } })}>
                   <TruncatedText data-testid={`endpoint-${ep.id}-label`} maxWidth="100%" text={ep.displayName ?? ep.name} />

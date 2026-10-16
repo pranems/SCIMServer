@@ -37,12 +37,14 @@ import { makeStyles, mergeClasses } from '@fluentui/react-components';
 import { ErrorBoundary } from '../components/primitives/ErrorBoundary';
 
 const useStyles = makeStyles({
+  root: { height: '100%' },
   // Apply a short opacity fade on every pathname change. The opacity
   // animation is intentionally cheap (no transform / no layout) so it
   // stays under one frame on low-end hardware. `prefers-reduced-motion`
   // is honored via a media query so accessibility users see an instant
   // swap with no fade.
   fade: {
+    height: '100%',
     animationName: {
       from: { opacity: 0 },
       to: { opacity: 1 },
@@ -78,7 +80,7 @@ export const RouteBoundary: React.FC<RouteBoundaryProps> = ({ children, ...rest 
   const testId = rest['data-testid'] ?? 'route-boundary';
 
   return (
-    <div data-testid={testId}>
+    <div className={classes.root} data-testid={testId}>
       <ErrorBoundary
         // resetKeys: changes when the URL changes. This makes the
         // boundary auto-recover the next time the user navigates so a

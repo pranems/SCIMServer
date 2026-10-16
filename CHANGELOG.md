@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Responsive endpoint inventory and dashboard
+
+- Size nonempty Endpoints results to the available window height, preserving
+  fixed-width column proportions, internal scrolling, pinned filters and empty
+  states. Propagate available height through the two route wrappers; other
+  result panels retain the existing 420-pixel cap.
+- Left-align names in their existing inventory column and Dashboard summaries.
+  Put desktop name/status/user/group information on compact 48-pixel rows, with
+  a 72-pixel two-line phone fallback.
+- RED first: eight desired-layout failures. Final adjacent browser suite passes
+  36/36 with actual 540/1100-height and 1440/900/390-width measurements, values,
+  navigation and clipping checks. Browser inventory grows 321 -> 324 cases.
+  Existing four visual comparisons PASS without changing baselines.
+  Agent inspected wide/phone images; operator acceptance remains pending.
+- Adjacent DOM/error-boundary units 26 PASS; production build, size limits and
+  fixed-table audit PASS. Full raw web diagnostics remain exactly 66/66 at
+  base 17031d85, with zero new signatures. API and web unit totals are unchanged
+  until the protected full selector reconfirms them.
+- Candidate 0.55.53 -> 0.55.54; CI-only locks are required before reviewed
+  merge. Dev/canary delivery remains pending.
+  See [layout contract, exact measurements and RCA](docs/RESPONSIVE_ENDPOINT_INVENTORY.md).
+
 ### Accepted Group member references
 
 - Preserve exact accepted members.$ref through DTOs, PATCH, both repositories,

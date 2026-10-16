@@ -2,20 +2,23 @@
 
 **Last verified:** 2026-10-16
 
-**Active execution:** item B on `fix/group-member-reference-20261016` from
-reviewed `47d85cdb`. Item A merged in PR #233 with seven exact-tip checks green.
-Item B preserves accepted `$ref` across adapters and both repositories with an
-additive nullable column. Focused 267 units, identical 217 HTTP cases on both
-backends, populated upgrade, 29 fresh migrations and 50 local live assertions
-PASS. Candidate 0.55.53 has 28/28 Validate gates passing: 6,060 API units,
-2,447 HTTP cases and 1,624 Web cases. CI-generated version-only locks imported
-from workflow 38885291269. Final-tip review and CI remain pending.
-Live dev/Entra proof and endpoint/dashboard layout remain subsequent outcomes.
+**Active execution:** responsive UI on
+`fix/endpoint-inventory-responsive-layout-20261016`, based on reviewed
+`17031d85`. Group items A/B merged in PRs #233/#234 after seven exact-tip checks
+each. Their local proof includes both backends, populated/fresh migrations and
+50 live assertions. Current API/Web totals are 6,060/2,447/1,624.
+UI proof: 36 adjacent browser cases, 26 DOM/error-boundary units, four unchanged
+visual comparisons, build/size/layout audit PASS. Exact raw type diagnostics
+remain 66/66. Candidate 0.55.54 consolidation/CI-only locks/review pending.
+Live dev/Entra and dev/canary delivery remain next, with an explicitly released
+exclusive cloud window from the other active onboarding session.
 The user authorizes dev and canary through the normal process, not customer
 production. Existing UI visual acceptance is not inferred from new observations.
 See [minimal Group membership resolution](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
-**Current checkpoint:** Item A PR #233 merged normally at `47d85cdb`, preserving
+**Current checkpoint:** Item B PR #234 merged at `17031d85`, preserving reviewed
+`ac56f5f2`, with 28 Validate gates, 25 final Fast gates and seven exact-tip
+checks PASS. Item A PR #233 merged normally at `47d85cdb`, preserving
 reviewed `cdd8e0fb`, after all 28 Validate gates, 25 final Fast gates and seven
 exact-tip checks. Tooling PR #232 merged at `0a0966a8`.
 Earlier PR #231 merged normally at `8887584c`, preserving
