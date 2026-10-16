@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.53`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.54`
 
-> **Version:** 0.55.53 - **Updated:** 2026-09-30
+> **Version:** 0.55.54 - **Updated:** 2026-09-30
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -451,3 +451,6 @@ These are the definitive source files for key aspects of the system:
 # Group reference preservation
 
 - [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
+## Responsive inventory layout
+
+- [Viewport-height Endpoints and compact Dashboard summaries](RESPONSIVE_ENDPOINT_INVENTORY.md).

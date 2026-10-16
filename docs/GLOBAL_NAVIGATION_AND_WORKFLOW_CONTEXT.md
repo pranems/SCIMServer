@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-10-15 - **Product version:** `0.55.53`
+> **Status:** Implemented locally - **Last verified:** 2026-10-15 - **Product version:** `0.55.54`
 
 ## Purpose
 
@@ -171,3 +171,11 @@ Manual Provision also stacks its form and result cards into one bounded column b
 | Visual | Desktop Operations, Logs, Manual Provision, and `/Me` inspected; narrow Logs inspected after deterministic data readiness |
 
 Canary and customer production are outside this change unless promoted through the normal explicit approval flow.
+## Inventory window sizing
+
+Endpoints use the route shell's available height for their internally scrolling
+inventory, with filters outside that scroll owner and names left-aligned.
+The shared error/transition wrappers propagate height without changing route
+remounting or recovery; long pages keep ordinary outer scrolling. Dashboard
+summary rows are compact and horizontal above phone widths. See
+[layout behavior and measurements](RESPONSIVE_ENDPOINT_INVENTORY.md).

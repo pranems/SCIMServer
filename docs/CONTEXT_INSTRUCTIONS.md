@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.53
+> **Version**: 0.55.54
 > **Last Updated**: October 16, 2026
 > **Last verified:** 2026-10-16
 
@@ -9,19 +9,22 @@
 
 ## Active Delivery Process
 
-**Active implementation:** Group reference item B on
-`fix/group-member-reference-20261016`, based on reviewed `47d85cdb`.
-Item A merged in PR #233 after seven exact-tip checks. Strict validation
-remains enabled. Item B local proof: 267 units, identical 217 HTTP cases on
-each backend, populated upgrade, 29 fresh migrations and 50 live assertions.
-Candidate 0.55.53 protected Validate passes 28/28: 6,060 API units, 2,447 HTTP
-cases and 1,624 Web cases. CI-only locks from 38885291269 are version-only.
-Final-tip review/release remain pending. Live dev/Entra proof and
-endpoint/dashboard layout are subsequent outcomes. Dev/canary are authorized
-through the existing process; customer prod is not. See
-[reference contract and RCA](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
+**Active implementation:** responsive inventory/dashboard on
+`fix/endpoint-inventory-responsive-layout-20261016`, based on `17031d85`.
+Group items A/B merged in PRs #233/#234 with exact-tip CI; strict validation
+remains enabled. Current API/Web totals: 6,060 units, 2,447 HTTP, 1,624 Web.
+UI local proof: 36 browser cases, 26 DOM/error-boundary units, four visual
+comparisons, build/size/table audit PASS; raw types unchanged at 66/66.
+Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at c04b06f1;
+CI-only locks from 38891306560 are version-only/provenance-clean.
+Final exact-tip review/CI remain pending. Dev/Entra proof
+and dev/canary deployment are next; the other active session released its
+cloud mutation window. Customer production is not authorized. See
+[layout contract and RCA](RESPONSIVE_ENDPOINT_INVENTORY.md).
 
-**Latest consolidation:** PR #233 merged at `47d85cdb`, preserving reviewed
+**Latest consolidation:** PR #234 merged at `17031d85`, preserving reviewed
+`ac56f5f2`, after 28 Validate gates, 25 final Fast gates and seven exact-tip
+checks. PR #233 merged at `47d85cdb`, preserving reviewed
 `cdd8e0fb`, after 28 Validate gates, 25 final Fast gates and seven exact-tip
 checks. Earlier tooling PR #232 merged at `0a0966a8`.
 PR #231 merged normally at `8887584c`, preserving

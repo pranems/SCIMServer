@@ -6,7 +6,7 @@ undeclared fields rather than silently dropping them. Internally materialized
 undefined optional fields are absent, not invalid wire attributes. See
 [minimal Group membership proof and limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.53`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.54`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 

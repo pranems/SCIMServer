@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { saveScreenshot } from './fixtures';
 
 const token = process.env.E2E_TOKEN || 'changeme-scim';
 const longName = `Inventory ${'long-provisioning-name-'.repeat(18)}`;
@@ -55,6 +56,58 @@ async function receipt(info: TestInfo, name: string, data: unknown): Promise<voi
 }
 
 for (const width of [1440, 900, 390]) {
+  test(`inventory fills available window height and left-aligns names at ${width}`, async ({ page }, info) => {
+    await fixtures(page);
+    const heights: number[] = [];
+    for (const height of [540, 1100]) {
+      await page.setViewportSize({ width, height });
+      await page.goto('/endpoints');
+      const results = page.getByTestId('endpoints-results');
+      await expect(results.locator('tbody tr')).toHaveCount(80);
+      const geometry = await results.evaluate(element => {
+        const main = document.querySelector('[data-testid="app-content"]')!;
+        const rect = element.getBoundingClientRect();
+        const ancestors = [];
+        for (let parent: Element | null = element; parent; parent = parent.parentElement) {
+          const style = getComputedStyle(parent);
+          ancestors.push({
+            tag: parent.tagName, testId: parent.getAttribute('data-testid'),
+            height: style.height, minHeight: style.minHeight, display: style.display,
+            flex: style.flex, overflow: style.overflow,
+          });
+        }
+        return {
+          top: rect.top, bottom: rect.bottom, height: rect.height,
+          availableBottom: main.getBoundingClientRect().bottom - parseFloat(getComputedStyle(main).paddingBottom),
+          page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
+          scrollHeight: element.scrollHeight, clientHeight: element.clientHeight,
+          ancestors,
+        };
+      });
+      await receipt(info, `inventory-height-${height}`, geometry);
+      expect(geometry.bottom).toBeLessThanOrEqual(height);
+      expect(Math.abs(geometry.bottom - geometry.availableBottom)).toBeLessThanOrEqual(2);
+      expect(geometry.height).toBeGreaterThan(180);
+      expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight);
+      expect(geometry.page).toBeLessThanOrEqual(geometry.viewport + 1);
+      heights.push(geometry.height);
+      await saveScreenshot(page, `inventory-layout-${width}-${height}`);
+      const button = page.getByTestId(`endpoint-${inventory[1].id}-open`);
+      const alignment = await button.evaluate(element => ({
+        text: element.firstElementChild!.getBoundingClientRect().left,
+        content: element.getBoundingClientRect().left
+          + parseFloat(getComputedStyle(element).paddingLeft)
+          + parseFloat(getComputedStyle(element).borderLeftWidth),
+      }));
+      expect(Math.abs(alignment.text - alignment.content)).toBeLessThanOrEqual(2);
+      const filter = page.getByTestId('endpoints-search');
+      const before = await filter.boundingBox();
+      await results.evaluate(element => { element.scrollTop = element.scrollHeight; });
+      expect((await filter.boundingBox())!.y).toBeCloseTo(before!.y, 0);
+    }
+    expect(heights[1] - heights[0]).toBeGreaterThan(500);
+  });
+
   for (const section of ['users', 'groups'] as const) {
     test(`Operations ${section} filters retain owned scrolling and purpose at ${width}`, async ({ page }, info) => {
       await page.setViewportSize({ width, height: 900 });
@@ -255,6 +308,30 @@ for (const width of [1440, 900, 390]) {
       await expect(summary.getByTestId(/endpoint-card-/)).toHaveCount(Math.min(count, 5));
       if (count === 0) await expect(summary).toContainText('No endpoints configured');
       else await expect(summary.getByTestId(`endpoint-card-${inventory[0].id}`)).toContainText('1 users');
+      if (count > 0) {
+        const card = summary.getByTestId(`endpoint-card-${inventory[count > 1 ? 1 : 0].id}`);
+        await expect(card).toContainText(`${count > 1 ? 2 : 1} users`);
+        await expect(card).toContainText('2 groups');
+        const row = await card.evaluate(element => {
+          const button = element.querySelector('button')!;
+          const name = button.getBoundingClientRect();
+          const stats = element.lastElementChild!.getBoundingClientRect();
+          const bounds = element.getBoundingClientRect();
+          return {
+            height: bounds.height, right: bounds.right,
+            statsRight: stats.right,
+            centerDifference: Math.abs((name.top + name.bottom) / 2 - (stats.top + stats.bottom) / 2),
+            nameLeft: button.firstElementChild!.getBoundingClientRect().left,
+            contentLeft: name.left + parseFloat(getComputedStyle(button).paddingLeft)
+              + parseFloat(getComputedStyle(button).borderLeftWidth),
+          };
+        });
+        await receipt(info, 'dashboard-row-bounds', row);
+        expect(row.statsRight).toBeLessThanOrEqual(row.right);
+        expect(row.height).toBeLessThanOrEqual(width === 390 ? 90 : 64);
+        expect(Math.abs(row.nameLeft - row.contentLeft)).toBeLessThanOrEqual(2);
+        if (width !== 390) expect(row.centerDifference).toBeLessThanOrEqual(2);
+      }
       const geometry = await summary.evaluate(e => ({
         height: e.getBoundingClientRect().height,
         page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
@@ -262,6 +339,8 @@ for (const width of [1440, 900, 390]) {
       await receipt(info, 'dashboard-summary-bounds', geometry);
       expect(geometry.height).toBeLessThan(600);
       expect(geometry.page).toBeLessThanOrEqual(geometry.viewport + 1);
+      await summary.scrollIntoViewIfNeeded();
+      if (count === 80) await saveScreenshot(page, `dashboard-summary-layout-${width}`);
       await page.getByTestId('dashboard-all-endpoints').click();
       await expect(page).toHaveURL(/\/endpoints$/);
     });

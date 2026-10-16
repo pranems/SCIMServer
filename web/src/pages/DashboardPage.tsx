@@ -84,7 +84,12 @@ const useStyles = makeStyles({
     display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0,
   },
   endpointCard: {
-    padding: '8px', minWidth: 0, gap: '4px',
+    padding: '8px', minWidth: 0, gap: '16px',
+    display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center',
+    '@media (max-width: 600px)': { gridTemplateColumns: 'minmax(0, 1fr)', gap: '4px' },
+  },
+  endpointName: {
+    minWidth: 0, flex: 1, justifyContent: 'flex-start', textAlign: 'left',
   },
   endpointStats: {
     display: 'flex',
@@ -531,7 +536,7 @@ const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
       data-testid={`endpoint-card-${endpoint.id}`}
     >
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0 }}>
-        <Button appearance="subtle" style={{ minWidth: 0, flex: 1 }}
+        <Button appearance="subtle" className={classes.endpointName}
           title={`${endpoint.displayName ?? endpoint.name} (${endpoint.name})`}
           onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: endpoint.id } })}>
           <TruncatedText maxWidth="100%" text={endpoint.displayName ?? endpoint.name} />
