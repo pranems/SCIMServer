@@ -75,6 +75,8 @@ change or Entra mapping workaround is part of this fix.
 | Rejection atomicity | Rejected policy/undeclared-field operations retain full prior response, including metadata. |
 | Membership matrix | POST deduplication, PUT empty/populated, PATCH add/replace/filtered remove, duplicate/idempotent operations, multi-member and remove-all flag transitions. |
 | Strict negative controls | Real undeclared display/type/unknown fields fail on POST/PUT/PATCH; unit checks also cover empty/null/false/zero. |
+| Protected consolidation | Normal Validate push at 5b5c3dba: all 28 gates PASS in 724.1 seconds. API units 6,056 across 211 suites; InMemory HTTP 2,442 PASS across 117 suites, four pre-existing skipped cases; Web 1,624 PASS across 123 suites. |
+| Release locks | Existing CI-only regen-lockfile workflow 38879494153 succeeded for source 5b5c3dba. Imported API/web locks structurally differ only in the two version fields, now 0.55.52. Public registry and sha512 provenance verified. |
 | Live dev HTTP | Pending authorized live ownership and reviewed deployment. |
 | Entra actual add/remove journey | Pending; requires independent target readback and required Google Group-extension email. |
 | Customer production | No action authorized. Promotion requires separate approval. |
@@ -99,6 +101,19 @@ no shared or live database was used by the truncating test teardown.
 | GM-A06 | Shell tooling / Low | A discovery command piped directly from a foreach statement, which PowerShell rejects; another guessed audit path did not exist. | Collect foreach output before piping and use existing known file paths. Neither failed read changed source or evidence. | Intake commands / same command |
 | GM-A07 | Test type safety / Low | Focused ESLint rejected direct access to Supertest's untyped response body in new tests. | Give the asserted response boundary a concrete Group shape and type endpoint/error envelopes; focused ESLint then passes and the full type check reports no errors in new files. Three unrelated pre-existing type errors remain explicitly recorded, not fixed or hidden. | Focused lint / same authoring step |
 | GM-A08 | Release documentation / Low | The first protected push stopped at doc-content C13: freshness autofix updated the README header but not its separate version badge. | Update the badge to the manifest release candidate and use the existing content audit alongside freshness before retrying. The content gate correctly blocked an inconsistent release claim; no bypass or threshold change is needed. | Protected push static gate / paired freshness and content audits before push |
+| GM-A09 | Read-only tooling / Low | Registry rejected guessed purpose canary; artifact inspection guessed publish-age-report.txt instead of publish-ages.json. | Use declared canary-prod and discover actual artifact names. Registry validation stopped the invalid purpose before cloud mutation; the verified lock import already succeeded and was not rolled back or regenerated locally. | Read-only discovery / same command |
+
+### Provenance and completeness
+
+The full available reconstructed continuation was scanned through event 12,330,
+with this execution beginning at event 11,599. An error/signal pass and a causal
+narration pass identified 20 candidate hits, reconciled against GM-A01..09.
+Expected RED failures, intentionally rejected strict-validation requests,
+successful patch outputs quoting failures, and search echoes are not additional
+incidents. Three unchanged full-test type errors are retained explicitly.
+The deleted original session is unavailable; this is not a claim to have its
+transcript. The machine-readable scan stays in session artifacts as
+`google-member-rca-reconciliation.json`.
 
 Self-improvement disposition: **applied**. Permanent minimal imported-schema
 coverage includes nonempty membership and actual readback, not empty-Group
