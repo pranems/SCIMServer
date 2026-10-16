@@ -17,7 +17,10 @@ UI local proof: 36 browser cases, 26 DOM/error-boundary units, four visual
 comparisons, build/size/table audit PASS; raw types unchanged at 66/66.
 Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at c04b06f1;
 CI-only locks from 38891306560 are version-only/provenance-clean.
-Final exact-tip review/CI remain pending. Dev/Entra proof
+UI PR #235 merged at 0fd0a87a with seven exact-tip checks. A separate
+pre-deployment handoff correction carries the unique Docker project into
+surviving image lookup after cleanup: two RED controls, 58 GREEN checks.
+Tooling review/push remain pending; runtime stays 0.55.54. Dev/Entra proof
 and dev/canary deployment are next; the other active session released its
 cloud mutation window. Customer production is not authorized. See
 [layout contract and RCA](RESPONSIVE_ENDPOINT_INVENTORY.md).

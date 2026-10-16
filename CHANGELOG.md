@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.55.54] - 2026-10-16
 
+### Delivery tooling follow-through
+
+- UI PR #235 merged at 0fd0a87a after seven exact-tip checks. Pre-deployment
+  inspection then exposed a parent/isolated-Docker image handoff mismatch.
+  Two behavioral assertions fail first; all 58 pipeline contract checks pass
+  after carrying the exact unique project through cleanup and looking up the
+  surviving immutable image ID. Missing/malformed image identities fail
+  explicitly. No shared container reuse, cleanup weakening, shipping-image
+  substitution, canary-policy change or runtime/version bump.
+- Protected consolidation and actual merged-master Docker/dev/canary proof
+  for this tooling correction remain pending.
+
 ### Responsive endpoint inventory and dashboard
 
 - Size nonempty Endpoints results to the available window height, preserving

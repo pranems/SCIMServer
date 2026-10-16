@@ -198,6 +198,91 @@ Invoke-Assert -Description 'default validation project identity remains unique a
 
 & {
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $imageHelper = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-ValidatedLocalImageId'
+    }, $true)
+    if ($imageHelper) {
+        . ([scriptblock]::Create($imageHelper.Extent.Text))
+    }
+    $buildGate = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Invoke-Gate' -and
+        $node.CommandElements[1].Value -eq '4.1'
+    }, $true)
+    $mirrorGate = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Invoke-Gate' -and
+        $node.CommandElements[1].Value -eq '4.2b'
+    }, $true)
+    $validationProjectName = 'scimserver-validation-aabbccddeeff'
+    $RegistryAcr = 'registry.example.test'
+    $ImageTag = 'fixture'
+    $localMirrorTag = "local-$ImageTag"
+    $localImageId = $null
+    $expectedImageId = 'sha256:' + ('a' * 64)
+    $state = @{ Project = $null; ImageId = $expectedImageId; Available = $true; Tagged = $null; Pushed = $null }
+    $originalExit = $global:LASTEXITCODE
+    function pwsh {
+        $index = [array]::IndexOf($args, '-DockerProjectName')
+        $state.Project = if ($index -ge 0) { $args[$index + 1] } else { $null }
+        $global:LASTEXITCODE = 0
+    }
+    function docker {
+        $global:LASTEXITCODE = 0
+        switch ($args[0]) {
+            'image' {
+                $reference = [string]$args[2]
+                if ($state.Available -and $state.Project -and
+                    ($reference -eq "$($state.Project)-api" -or $reference -eq $state.Tagged)) {
+                    $state.ImageId
+                } else {
+                    $global:LASTEXITCODE = 1
+                }
+            }
+            'tag' {
+                if ($args[1] -ne $expectedImageId) { $global:LASTEXITCODE = 1 }
+                else { $state.Tagged = $args[2] }
+            }
+            'push' { $state.Pushed = $args[1] }
+            default { throw 'The cleaned validation estate has no containers to query.' }
+        }
+    }
+    try {
+        & ($buildGate.CommandElements[3].ScriptBlock.GetScriptBlock())
+        Invoke-Assert 'the parent passes its exact run-owned project identity to isolated validation' `
+            ($state.Project -eq $validationProjectName)
+        $mirrored = $false
+        try {
+            & ($mirrorGate.CommandElements[3].ScriptBlock.GetScriptBlock())
+            $mirrored = $state.Pushed -eq "$RegistryAcr/scimserver:$localMirrorTag"
+        } catch {
+            Write-Host "  Mirror fixture: $($_.Exception.Message)"
+        }
+        Invoke-Assert 'the surviving validated image is mirrored by immutable ID after container cleanup' $mirrored
+        if ($imageHelper) {
+            foreach ($case in @(
+                @{ Available = $false; ImageId = $expectedImageId; Name = 'missing image' },
+                @{ Available = $true; ImageId = 'not-an-image-id'; Name = 'invalid image identity' }
+            )) {
+                $state.Available = $case.Available
+                $state.ImageId = $case.ImageId
+                $rejected = $false
+                try { Get-ValidatedLocalImageId -ProjectName $validationProjectName | Out-Null }
+                catch { $rejected = $true }
+                Invoke-Assert "validated-image lookup rejects $($case.Name)" $rejected
+            }
+        }
+    } finally {
+        $global:LASTEXITCODE = $originalExit
+    }
+}
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
     $definition = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and

@@ -11,7 +11,11 @@ UI proof: 36 adjacent browser cases, 26 DOM/error-boundary units, four unchanged
 visual comparisons, build/size/layout audit PASS. Exact raw type diagnostics
 remain 66/66. Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at
 c04b06f1. CI-only locks from 38891306560 are version-only and provenance-clean.
-Final exact-tip review/CI remain pending.
+UI PR #235 merged at 0fd0a87a after seven exact-tip checks. Pre-deployment
+inspection found the isolated-child/default-project image lookup mismatch.
+Separate `fix/isolated-validation-image-handoff-20261016` now has two RED-first
+behavioral controls and 58 GREEN contract checks. Review/push remain pending;
+no runtime/version change. See UI-H05/H06 in the layout RCA.
 Live dev/Entra and dev/canary delivery remain next, with an explicitly released
 exclusive cloud window from the other active onboarding session.
 The user authorizes dev and canary through the normal process, not customer

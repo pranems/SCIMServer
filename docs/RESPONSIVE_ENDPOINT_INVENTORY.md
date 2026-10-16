@@ -1,7 +1,7 @@
 # Responsive endpoint inventory and compact dashboard
 
 **Last verified:** 2026-10-16
-**Status:** Local measured browser proof complete. Reviewed delivery, dev/canary and operator visual acceptance pending.
+**Status:** UI merged with exact-tip CI. Isolated image handoff review, dev/canary and operator visual acceptance pending.
 
 ## Executive summary
 
@@ -107,6 +107,20 @@ directory. No screenshot baseline has been regenerated at this checkpoint.
 | UI-H02 | Type baseline / Low | Raw tsc exits 2 with 66 unrelated existing errors, which stopped the chained build/size command. | Compare exact diagnostic signatures with the base through an in-memory compiler host: 66/66, zero regressions. Then run build and size independently, both PASS. Do not change unrelated tests or lower a gate. | Local static validation / explicit baseline comparison |
 | UI-H03 | Startup timing / Low | An immediate health request raced the new local node's startup and got connection refused. | Confirm actual startup output and the canonical health/authenticated proxy response before testing. Both processes were responsive; no dependency reinstall or shared-node substitution. | Immediate startup check / readiness check |
 | UI-H04 | Test admission / Low | The first local visual command selected four cases but the established canonical-dev admission skipped them. | Explicitly enable E2E_VISUAL_BASELINES for the production preview against dev read-only data. The real four comparisons pass. The skipped receipt is not counted as evidence. | Local browser admission / same skip report |
+| UI-H05 | PowerShell tooling / Low | A review command interpolated a variable immediately followed by a colon, so the shell rejected scope-like syntax before any GitHub action. | Delimit the variable as `${head}` before punctuation. Retried review and all seven exact-tip CI checks succeeded; no failed command is counted as an executed review. | Shell parser / shell parser |
+| UI-H06 | Delivery integration / Medium | Preflight found the isolated validation child cleans up its containers and has a private project environment, while the parent queried containers in the default project. Two behavioral controls reproduced the missing project/image handoff. | Parent assigns and passes a unique project, then mirrors its surviving image by validated immutable ID. All 58 contract checks PASS, including missing/malformed identity rejection. Cleanup/isolation and canary policy remain unchanged. | Pre-deployment inspection plus behavioral RED / parent-child integration contract |
+
+UI PR #235 merged normally at `0fd0a87a`, preserving reviewed `8827402b`
+after seven exact-tip checks. The delivery handoff correction is a separate
+tooling rollback unit; it does not change runtime inputs or require another
+product-version bump. Full Docker/ACR, dev/Entra and canary outcomes remain
+pending. UI-H05 was captured immediately in the persistent continuation issue
+receipt and is consolidated here; UI-H06 is recorded at its confirmed GREEN.
+Delivery design disposition: **accepted**. One small Docker identity-boundary
+helper and the existing child/mirror blocks keep their cohesive roles; no
+artifact framework, cleanup retention, new deployment policy or speculative
+strategy is introduced. Test/gate self-improvement: **applied** through the
+behavioral handoff and missing/malformed identity controls.
 
 Self-improvement disposition: **applied**. Permanent browser checks exercise
 both short and tall windows, measure the entire height chain and assert exact
