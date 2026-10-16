@@ -14,7 +14,9 @@
 Item A merged in PR #233 after seven exact-tip checks. Strict validation
 remains enabled. Item B local proof: 267 units, identical 217 HTTP cases on
 each backend, populated upgrade, 29 fresh migrations and 50 live assertions.
-Candidate 0.55.53 review/release remain pending. Live dev/Entra proof and
+Candidate 0.55.53 protected Validate passes 28/28: 6,060 API units, 2,447 HTTP
+cases and 1,624 Web cases. CI-only locks from 38885291269 are version-only.
+Final-tip review/release remain pending. Live dev/Entra proof and
 endpoint/dashboard layout are subsequent outcomes. Dev/canary are authorized
 through the existing process; customer prod is not. See
 [reference contract and RCA](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

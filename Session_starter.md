@@ -7,7 +7,9 @@ reviewed `47d85cdb`. Item A merged in PR #233 with seven exact-tip checks green.
 Item B preserves accepted `$ref` across adapters and both repositories with an
 additive nullable column. Focused 267 units, identical 217 HTTP cases on both
 backends, populated upgrade, 29 fresh migrations and 50 local live assertions
-PASS. Candidate 0.55.53 consolidation/review remain pending.
+PASS. Candidate 0.55.53 has 28/28 Validate gates passing: 6,060 API units,
+2,447 HTTP cases and 1,624 Web cases. CI-generated version-only locks imported
+from workflow 38885291269. Final-tip review and CI remain pending.
 Live dev/Entra proof and endpoint/dashboard layout remain subsequent outcomes.
 The user authorizes dev and canary through the normal process, not customer
 production. Existing UI visual acceptance is not inferred from new observations.

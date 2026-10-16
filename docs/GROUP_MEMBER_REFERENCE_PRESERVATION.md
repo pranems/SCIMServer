@@ -73,7 +73,8 @@ introduced. Customer production migration/promotion is not authorized here.
 | Missing references | A value-only member remains value-only beside a reference-bearing member. |
 | Live-section author smoke | 50 PASS/0 FAIL against an exclusively owned compiled local node; exact endpoint cleanup confirmed. |
 | Build and lint | Production build PASS; focused ESLint zero errors and one unchanged repository-test warning. |
-| Consolidated hooks and CI | First Validate push blocked at one old service assertion that omitted the new internal null field; 6,058 other cases passed. Corrected and strengthened the service seam, focused 267 PASS. Protected retry and CI pending. |
+| Protected consolidation | Normal Validate retry at 59c0d7e8: all 28 gates PASS in 733.3 seconds. API units 6,060 PASS across 211 suites; InMemory HTTP 2,447 PASS across 117 suites, four pre-existing skipped cases; Web 1,624 PASS across 123 suites. |
+| Release locks | CI-only workflow 38885291269 succeeded at 59c0d7e8. Imported API/web locks differ structurally only in the two version fields, now 0.55.53; public registry and sha512 provenance pass. Final-tip CI pending. |
 | Dev HTTP, Entra and canary | Pending merged-source deployment and explicit exclusive live ownership. |
 | Customer production | No changes authorized. |
 
