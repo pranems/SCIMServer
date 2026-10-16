@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Native gallery Group member transport (tooling only)
+
+- Include the affected linked User subject for both Group member addition
+  and removal. Keep ordinary User transport
+  unchanged and reject more than five linked members before Graph calls.
+- Reuse the existing seven-attempt on-demand convergence policy for scoped
+  changes before scheduled fallback. Start only paused/quarantined jobs;
+  never post another start to an Active job. Unknown states fail explicitly.
+  Target predicates and the 240-second wait remain unchanged.
+- Gallery contracts increase from 78 to 92. Seven initial RED assertions
+  preceded linked transport/admission fixes; three later RED assertions
+  require the affected removal subject, and one RED negative control exposed
+  a self-fulfilling target fixture. Source/target state is now independent.
+- Reject mixed linked responses with any failed child export even when the
+  parent reports Success and another child exported successfully. A new
+  actual-helper RED/GREEN contract prevents masking that partial failure.
+- Accept a membership export only when the actual target membership matches.
+  Five RED assertions lock bounded wrong-effect retries and per-mode wiring.
+  Reuse the existing seven attempts/ten-second interval and unchanged final
+  240-second target wait; preserve truthful export observations.
+- Native WIF Group creation and member addition passed on-demand provisioning.
+  Empty-selection removal failed (13 PASS/1 FAIL; seven cleanup checks PASS).
+  Corrected WIF passes 18/18, including native removal on attempt one and
+  both deprovisioning checks; all seven cleanup checks pass. The separate
+  preceding matrix failed 39 PASS/2 FAIL despite successful export metadata.
+  Final-source run `20261015-201005-60d2bd31` passes all 50 checks across all
+  three modes, with all 15 cleanup checks passed and 46 observations retained.
+  All six membership transitions complete natively in one or two attempts.
+  Original failed receipts remain failed. No timeout or assertion relaxation.
+- No shipped runtime, dependency, lockfile or product-version change.
+
 ### Gallery provisioning observations (tooling only)
 
 - Advance failure-stage labels through User updates, account changes,

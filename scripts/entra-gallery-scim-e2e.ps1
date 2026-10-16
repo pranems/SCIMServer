@@ -269,19 +269,29 @@ function Invoke-ProvisionOnDemand {
         [Parameter(Mandatory)] [string]$JobId,
         [Parameter(Mandatory)] [string]$RuleId,
         [Parameter(Mandatory)] [string]$ObjectId,
-        [Parameter(Mandatory)] [ValidateSet('User', 'Group')] [string]$ObjectType
+        [Parameter(Mandatory)] [ValidateSet('User', 'Group')] [string]$ObjectType,
+        [ValidateCount(0, 5)] [string[]]$MemberIds = @()
     )
 
+    if ($ObjectType -ne 'Group' -and $MemberIds.Count -gt 0) {
+        throw 'Linked member IDs are only valid for Group provisioning.'
+    }
+    $subject = @{
+        objectId = $ObjectId
+        objectTypeName = $ObjectType
+    }
+    if ($ObjectType -eq 'Group') {
+        $subject.links = @{
+            members = @($MemberIds | ForEach-Object {
+                @{ objectId = $_; objectTypeName = 'User' }
+            })
+        }
+    }
     Invoke-Graph -Method POST -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$JobId/provisionOnDemand" -Body @{
         parameters = @(
             @{
                 ruleId = $RuleId
-                subjects = @(
-                    @{
-                        objectId = $ObjectId
-                        objectTypeName = $ObjectType
-                    }
-                )
+                subjects = @($subject)
             }
         )
     }
@@ -314,8 +324,8 @@ function Get-ProvisionOutcome {
     $allSteps = @($value.provisioningSteps)
     $stepStatuses = @($allSteps | ForEach-Object { "$($_.name)=$($_.status)" })
     [pscustomobject]@{
-        Result = if ($key.result) { [string]$key.result }
-            elseif ($failedSteps.Count -gt 0) { 'Failure' }
+        Result = if ($failedSteps.Count -gt 0) { 'Failure' }
+            elseif ($key.result) { [string]$key.result }
             elseif (@($allSteps | Where-Object status -eq 'Success').Count -gt 0) { 'Success' }
             else { $keyRaw.Substring(0, [Math]::Min(160, $keyRaw.Length)) }
         ErrorCode = [string]$key.details.errorCode
@@ -364,7 +374,10 @@ function Invoke-ExpectedProvision {
         [Parameter(Mandatory)] [string]$RuleId,
         [Parameter(Mandatory)] [string]$ObjectId,
         [Parameter(Mandatory)] [ValidateSet('User', 'Group')] [string]$ObjectType,
-        [Parameter(Mandatory)] [string]$Operation
+        [Parameter(Mandatory)] [string]$Operation,
+        [ValidateCount(0, 5)] [string[]]$MemberIds = @(),
+        [scriptblock]$ExportPredicate,
+        [switch]$AllowScheduledFallback
     )
 
     $lastOutcome = $null
@@ -372,22 +385,28 @@ function Invoke-ExpectedProvision {
         if ($attempt -gt 1) {
             Start-Sleep -Seconds 10
         }
-        $response = Invoke-ProvisionOnDemand -JobId $JobId -RuleId $RuleId -ObjectId $ObjectId -ObjectType $ObjectType
+        $response = Invoke-ProvisionOnDemand -JobId $JobId -RuleId $RuleId -ObjectId $ObjectId -ObjectType $ObjectType -MemberIds $MemberIds
         $lastOutcome = Get-ProvisionOutcome -Response $response
-        Add-ProvisionObservation -Outcome $lastOutcome -JobId $JobId -ObjectId $ObjectId -ObjectType $ObjectType `
-            -Operation $Operation -Attempt $attempt | Out-Null
+        $observation = Add-ProvisionObservation -Outcome $lastOutcome -JobId $JobId -ObjectId $ObjectId -ObjectType $ObjectType `
+            -Operation $Operation -Attempt $attempt
+        $lastOutcome | Add-Member -NotePropertyMembers @{ Observation = $observation; ExportAccepted = $false }
         if ($lastOutcome.Result -eq 'Failure') {
             $failure = @($lastOutcome.ErrorCode, $lastOutcome.ErrorMessage, $lastOutcome.FailedSteps) |
                 Where-Object { $_ } |
                 ForEach-Object { [string]$_ }
             throw "$Operation provisionOnDemand failed: $($failure -join '; ')"
         }
-        if ($lastOutcome.HasSuccessfulExport) {
+        if ($lastOutcome.HasSuccessfulExport -and
+            ($null -eq $ExportPredicate -or [bool](& $ExportPredicate))) {
+            $lastOutcome.ExportAccepted = $true
             return $lastOutcome
         }
     }
 
-    throw "$Operation provisionOnDemand produced no successful Export step after 7 attempts; result=$($lastOutcome.Result), action=$($lastOutcome.Action), steps=$($lastOutcome.StepStatuses)."
+    if ($AllowScheduledFallback) {
+        return $lastOutcome
+    }
+    throw "$Operation provisionOnDemand produced no accepted Export step after 7 attempts; result=$($lastOutcome.Result), action=$($lastOutcome.Action), steps=$($lastOutcome.StepStatuses)."
 }
 
 function Invoke-ScopedChangeProvision {
@@ -396,22 +415,25 @@ function Invoke-ScopedChangeProvision {
         [Parameter(Mandatory)] [string]$RuleId,
         [Parameter(Mandatory)] [string]$ObjectId,
         [Parameter(Mandatory)] [ValidateSet('User', 'Group')] [string]$ObjectType,
-        [Parameter(Mandatory)] [string]$Operation
+        [Parameter(Mandatory)] [string]$Operation,
+        [ValidateCount(0, 5)] [string[]]$MemberIds = @(),
+        [scriptblock]$ExportPredicate
     )
 
-    $response = Invoke-ProvisionOnDemand -JobId $JobId -RuleId $RuleId -ObjectId $ObjectId -ObjectType $ObjectType
-    $outcome = Get-ProvisionOutcome -Response $response
-    $observation = Add-ProvisionObservation -Outcome $outcome -JobId $JobId -ObjectId $ObjectId -ObjectType $ObjectType `
-        -Operation $Operation -Attempt 1
-    if ($outcome.Result -eq 'Failure') {
-        throw "$Operation provisionOnDemand failed: $($outcome.FailedSteps -join '; ')"
-    }
-    if ($outcome.HasSuccessfulExport) {
+    $outcome = Invoke-ExpectedProvision -JobId $JobId -RuleId $RuleId -ObjectId $ObjectId -ObjectType $ObjectType `
+        -Operation $Operation -MemberIds $MemberIds -ExportPredicate $ExportPredicate -AllowScheduledFallback
+    if ($outcome.ExportAccepted) {
         return 'provisionOnDemand'
     }
 
-    Invoke-Graph -Method POST -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$JobId/start" | Out-Null
-    $observation.path = 'scheduled-sync-fallback'
+    $job = Invoke-Graph -Method GET -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$JobId"
+    if ($job.status.code -in @('Paused', 'Quarantine')) {
+        Invoke-Graph -Method POST -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$JobId/start" | Out-Null
+    }
+    elseif ($job.status.code -ne 'Active') {
+        throw "$Operation cannot use scheduled fallback while the owned job state is '$($job.status.code)'."
+    }
+    $outcome.Observation.path = 'scheduled-sync-fallback'
     'scheduled-sync-fallback'
 }
 
@@ -987,9 +1009,16 @@ function Invoke-ModeScenario {
             '@odata.id' = "$graphRoot/directoryObjects/$($userFixture.User.id)"
         } | Out-Null
         Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $true
-        $addMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'add group member'
+        $addMembershipPredicate = {
+            param($resource)
+            $null -ne $resource -and @($resource.members.value) -contains $scimUser.id
+        }
+        $addMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group `
+            -Operation 'add group member' -MemberIds @($userFixture.User.id) -ExportPredicate {
+                & $addMembershipPredicate (Find-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders)
+            }
         $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
-            -Predicate { param($resource) @($resource.members.value) -contains $scimUser.id } -Expectation 'member contains the provisioned user'
+            -Predicate $addMembershipPredicate -Expectation 'member contains the provisioned user'
         if ($addMembershipPath -eq 'scheduled-sync-fallback') {
             Pause-SynchronizationJob -JobId $job.id
         }
@@ -998,9 +1027,16 @@ function Invoke-ModeScenario {
         $modeStage = 'remove source group member'
         Invoke-Graph -Method DELETE -Path "groups/$($groupFixture.Group.id)/members/$($userFixture.User.id)/`$ref" | Out-Null
         Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $false
-        $removeMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'remove group member'
+        $removeMembershipPredicate = {
+            param($resource)
+            $null -ne $resource -and -not (@($resource.members.value) -contains $scimUser.id)
+        }
+        $removeMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group `
+            -Operation 'remove group member' -MemberIds @($userFixture.User.id) -ExportPredicate {
+                & $removeMembershipPredicate (Find-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders)
+            }
         $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
-            -Predicate { param($resource) $null -ne $resource -and -not (@($resource.members.value) -contains $scimUser.id) } `
+            -Predicate $removeMembershipPredicate `
             -Expectation 'member no longer contains the provisioned user'
         if ($removeMembershipPath -eq 'scheduled-sync-fallback') {
             Pause-SynchronizationJob -JobId $job.id

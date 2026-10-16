@@ -8,6 +8,107 @@ This ledger records issues found while building and running the owned Microsoft 
 
 ## Current dev deployment and diagnostic checkpoint
 
+### Native linked-member correction verified locally
+
+Diagnostic PR #227 merged normally at `f5046202` after 24 protected gates and
+seven successful exact-tip checks. The next source correction addresses the
+native Group subject body and scoped convergence, not the shipped runtime.
+
+**Final-source proof:** run `20261015-201005-60d2bd31` against dev `0.55.50`
+passes **50 PASS/0 FAIL**, with SecretToken, OAuthClientCredentials and
+WorkloadIdentity each PASS. All 15 exact cleanup checks pass, and 46
+normalized observations are retained. All six membership transitions
+complete natively in one or two attempts without scheduled fallback.
+The verified script SHA256 is
+`1E8287DFA7BB4F451E559235F674759D6709027E4B6CF916F48CDDFE15E2C60C`.
+Focused contracts pass 92/92. Three new diagrams render in strict mode under
+both themes; gate/editor version alignment remains a separate known task.
+Protected push, exact-tip CI and normal PR consolidation are still pending.
+
+| ID | Type / severity | Symptom and root cause | Resolution and why it works | Prevention | Detection / earliest gate |
+|---|---|---|---|---|---|
+| GM-I22 | Native API contract / Medium | The Group subject omitted documented `links.members`. Provider audit classified member addition as `RedundantExport` despite a source member and no target membership write. Scoped changes also fell back after one skipped response, unlike the existing bounded User update policy. | Carry explicit selected members and share the existing seven-attempt convergence helper. Native WIF Group create and addition now pass through on-demand provisioning; complete mode/matrix proof remains required. | Seven assertion-level RED results preceded the initial fix. Current contracts also cover the later removal correction below. | Native target failure / wire-shape plus convergence contracts |
+| GM-I23 | Provider admission / Medium | Scheduled fallback posted start without observing the job state, despite the documented restriction against starting an already-running job. | Read the owned job state; start only Paused/Quarantine, reuse Active without another start, and reject unknown states. This respects provider admission without weakening target checks. | Actual-helper negative control proves zero start calls for Active; unknown-state refusal and paused positive control are executable. | Documentation-backed integration diagnosis / provider-state contract |
+| GM-I24 | Test correctness / High | The first linked-member run passed addition but removal timed out: empty `links.members` selected no affected reference. The contract incorrectly called this a desired-state replacement, and its mock target directly mirrored directory state, so 88 GREEN assertions could not detect missing target export. | Three per-mode RED assertions require the affected User for both add/remove. A fourth RED proves the fixture itself was blind; separate target state now advances only through selected transport. All 89 contracts pass. Corrected live WIF passes 18/18, including native removal on attempt one and complete deprovisioning. | Actual-orchestrator omitted-selection negative control must fail the target predicate and complete mode. Promote the third PA-6 escape to R10.6 and the central pattern ledger. | Native target wait / semantic wire review and independent-target negative control; one-stage escape from contracts to live |
+| GM-I25 | Response normalization / Medium | Real linked-member responses contain several child step sequences. A new adversarial response proved that parent `Success` and one successful User export could mask a failed Group member export because the decoder trusted the parent before failed steps. This was found locally, not observed as a production failure. | Give explicit failed steps precedence over parent success. The actual helper now throws immediately and retains `Failure` metadata even when another child exported successfully. One meaningful RED assertion became GREEN; final gallery contracts pass 90/90. | Mixed-child positive/negative evidence is distinct from aggregate success. The permanent actual-helper contract includes both a successful child and a failed linked export. | Focused adversarial contract / focused adversarial contract; zero escape |
+| GM-I26 | Integration convergence / Medium | The complete matrix passed SecretToken but OAuth addition and WIF removal timed out despite native successful exports. The helper stopped retrying on export metadata alone, then polled an unchanged target without triggering another import. Exact OAuth Group audit shows a member removal during the requested addition; the upstream wrong-direction mechanism is unproven. | Use each existing membership predicate to accept an export only after the target has the requested effect. Reuse the same seven attempts/ten-second interval and scheduled admission. Keep raw export observations separate from private acceptance state and retain the existing 240-second target wait. Five assertion-level RED results became 92 GREEN contracts; the final-source matrix passes 50/50 with all 15 cleanup checks passed. | Actual-helper wrong-effect exports must retry; seven wrong effects must fall back without rewriting export facts. All three mode contracts require both target guards. | Complete native matrix / adversarial target-effect contract; one-stage escape from contract to live |
+| GM-I27 | Diagnostic identifier domain / Low | A read-only database detail lookup used the provider's SCIM Group ID and returned HTTP500. The administrative database route looks up the distinct internal `ScimResource.id`, not `scimId`. | Resolve the exact owned Group through its unique run name first. The supported filtered query succeeds and confirms zero persisted members after the OAuth update. Do not treat the failed detail lookup as a membership result. No runtime change is included. | Distinguish source directory ID, public SCIM ID and internal database ID in diagnostics. Set terminating error behavior before projecting API results. | Read-only diagnostic / identifier-domain review |
+
+Run `20261015-194119-a64e4816` is retained as **13 PASS/1 FAIL**.
+Create/add used native on-demand export. Removal produced seven skipped
+nonexports, then scheduled fallback, and the unchanged target predicate
+timed out after 240 seconds. All seven exact cleanup checks passed.
+Corrected run `20261015-195022-dd75d395` selects the removed User reference
+after deleting its source membership. It passes **18 PASS/0 FAIL**, including
+native removal on attempt one, Group update and both deprovisioning checks.
+All seven cleanup checks pass; 13 normalized observations are retained.
+This proves the affected-reference correction, not a claim that an empty
+list removes all target members. A separate complete three-mode run is now
+in progress and remains required for gallery acceptance.
+Its exact input snapshot is retained separately because the final mixed-export
+failure-precedence guard was added after it started. Final-source live
+verification must not silently reuse that older-input receipt.
+
+That matrix, `20261015-195326-1688a987`, completed with **39 PASS/2 FAIL**:
+SecretToken PASS, OAuth member-add FAIL and WIF member-remove FAIL. All 15
+cleanup checks passed. Both failing operations reported successful native
+exports on attempt one, which is not proof of the intended target effect.
+The exact OAuth Group audit records a `members` change from its selected
+User reference to null during addition; the filtered target database view
+confirms zero members. This establishes premature export-only acceptance,
+not the upstream reason for the contradictory delta. The corrected run
+now retries wrong effects under the existing bounded policy.
+
+**Self-improvement applied:** Test the native linked-subject envelope and
+provider admission, not just successful helper return values. The exact
+target membership assertions and 240-second limit remain unchanged.
+
+**Design disposition accepted:** Reuse the existing bounded retry loop with
+an explicit unaccepted-export outcome policy for the already-existing scheduled
+fallback caller. The outcome retains its observation reference for truthful
+path updates. Optional target acceptance has two concrete consumers, member
+addition and removal, and reuses their final predicates. Export facts remain
+unchanged in the allowlisted report. No duplicate retry loop, tracing
+framework or speculative provider strategy was introduced.
+
+### Current correction issue dashboard
+
+These distributions cover GM-I22 through GM-I27 only, not the historical
+issues retained below. Four of six issues are medium severity, one is high
+and one is low. Native/provisioning concerns account for three issues;
+test correctness, response normalization and diagnostic tooling account
+for one each.
+
+```mermaid
+pie title "Current correction issues by type"
+    "Native API and provisioning" : 3
+    "Test correctness" : 1
+    "Response normalization" : 1
+    "Diagnostic tooling" : 1
+```
+
+```mermaid
+pie title "Current correction issues by severity"
+    "High" : 1
+    "Medium" : 4
+    "Low" : 1
+```
+
+The detection-stage distribution below shows why the fixture correction
+matters: three issues reached live target verification, whereas the mixed
+child failure was caught by a focused contract before another live run.
+
+```mermaid
+flowchart LR
+    A["Six current correction issues"]
+    A --> B["Live target checks: 3"]
+    A --> C["Provider documentation review: 1"]
+    A --> D["Focused adversarial contract: 1"]
+    A --> E["Read-only diagnostics: 1"]
+    B --> F["Strengthen transport and target-effect assertions"]
+    D --> F
+```
+
 UI PR #226 merged normally at `096ee65f`; the full isolated no-skip pipeline
 deployed its immutable image to dev as `0.55.50`. Backend matrix and web
 coverage passed, along with 1,729 Docker live assertions and 1,729 dev live
@@ -66,7 +167,19 @@ two existing provisioning helpers. Existing orchestration, transport and
 acceptance responsibilities are preserved; a new tracing framework would be
 speculative. This tooling-only change does not bump the shipped runtime.
 
-**Provenance / completeness checkpoint:** The complete available continuation
+**Current correction completeness checkpoint:** The full available current
+continuation transcript was scanned through event 7,377 with separate
+error/signal and causal-narration passes. All 45 candidates were classified.
+Expected RED outcomes map to GM-I22 through GM-I26; actual native failures
+map to GM-I24/GM-I26; the administrative lookup HTTP500 maps to GM-I27.
+Six large-output incidents were handled through bounded artifact reads;
+one unavailable web-search backend was replaced by direct official
+documentation fetches, extending the GM-I21 tooling lesson. The apparent
+compiler/network/missing-module signals were scanner/code echoes, not new
+failures. Historical receipt reads, patch text and scanner echoes were
+explicitly dismissed. Deleted project3 history was not recovered or claimed.
+
+**Earlier provenance / completeness checkpoint:** The complete available continuation
 `events.jsonl` was scanned through event 5,810, using separate error/signal
 and causal-narration passes. Earlier UI/gallery scan receipts cover the
 previous checkpoint at 4,086. All 56 later candidates were classified:

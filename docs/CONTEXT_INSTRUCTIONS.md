@@ -22,9 +22,35 @@ with all seven cleanup checks passed. Its skipped native export and fallback
 path are retained. Independent compiled local-node proof passes all 1,729
 assertions; exact server cleanup and listener absence are verified.
 Browser/integrity/pruning and operator visual acceptance remain incomplete.
-The assigned branch `fix/gallery-provisioning-observations-20261016` adds
-tested diagnostic metadata without changing provisioning behavior or timeout.
-No runtime version bump is needed for this tooling-only follow-up.
+Diagnostic PR #227 merged normally at `f5046202` after 24 protected gates and
+seven exact-tip checks. The assigned branch
+`fix/gallery-group-member-links-20261016` now passes 92 contracts. It carries
+explicit linked Group subjects, reuses
+the existing bounded convergence loop and avoids starting Active provider
+jobs. Native WIF Group creation/addition passed but empty-selection removal
+failed (13 PASS/1 FAIL, seven cleanup checks PASS). The next run selects the
+affected User for removal too and passes WIF 18/18 with all seven cleanup
+checks passed. Native removal exports on attempt one; both deprovisioning
+checks pass. A separate complete all-mode run is active. Three removal RED assertions and one
+fixture RED control led to independent source/target state and an
+omitted-selection negative control. A further RED/GREEN guard makes failed
+linked child exports override parent Success. The preceding full matrix
+failed 39 PASS/2 FAIL (OAuth add/WIF remove) despite successful export
+metadata, with all 15 cleanup checks passed. Five additional RED assertions
+led to target-aware membership acceptance within the same seven-attempt
+policy. Final-source run `20261015-201005-60d2bd31` now passes 50/50 across
+all three modes with all 15 cleanup checks passed. All six membership
+transitions complete natively in one or two attempts. Protected push,
+exact-tip CI and normal source consolidation remain next. The original failed
+receipts remain failed. No runtime version bump is
+needed for this tooling-only follow-up.
+
+The read-only endpoint-list comparison exceeded its relative limit:
+p95 265.52 -> 426.04 ms (+60.45%). Actual deployed-source comparison found
+new canonical profile hashing/cloning before unchanged-row cache admission.
+An isolated runtime regression test, repair and measured verification remain
+required; neither the candidate mechanism nor other passing routes waive
+this failure.
 See [implementation, evidence and RCA](UI_DATE_TIME_IDENTITY_CONSISTENCY.md)
 and the [gallery ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
 

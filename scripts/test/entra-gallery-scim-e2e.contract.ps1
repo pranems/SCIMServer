@@ -370,7 +370,22 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         @{ Result = 'Success' }
     }
     function Invoke-ScopedChangeProvision {
-        param($JobId, $RuleId, $ObjectId, $ObjectType, $Operation)
+        param($JobId, $RuleId, $ObjectId, $ObjectType, $Operation, $MemberIds, $ExportPredicate)
+        if ($Operation -eq 'add group member') {
+            $state.LinkedAdd = @($MemberIds)
+            if ($MemberIds -contains 'source-user' -and $state.HasMember) {
+                $state.TargetHasMember = $true
+            }
+            $state.AddTargetGuard = $null -ne $ExportPredicate -and [bool](& $ExportPredicate)
+        }
+        if ($Operation -eq 'remove group member') {
+            $state.LinkedRemoveBound = $PSBoundParameters.ContainsKey('MemberIds')
+            $state.LinkedRemove = @($MemberIds)
+            if ($MemberIds -contains 'source-user' -and -not $state.HasMember) {
+                $state.TargetHasMember = $false
+            }
+            $state.RemoveTargetGuard = $null -ne $ExportPredicate -and [bool](& $ExportPredicate)
+        }
         'provisionOnDemand'
     }
     function Invoke-Graph {
@@ -386,6 +401,11 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     }
     function Wait-GraphUserAccountEnabled { param($UserId, $Expected) }
     function Wait-GraphGroupMembership { param($GroupId, $MemberId, $Present) }
+    function Find-ScimResource {
+        param($ResourceType, $Attribute, $Value, $Headers)
+        if ($ResourceType -ne 'Groups') { throw "Unexpected fixture resource type: $ResourceType" }
+        @{ id = 'scim-group'; members = if ($state.TargetHasMember) { @(@{ value = 'scim-user' }) } else { @() } }
+    }
     function Invoke-UserAccountStateProvision {
         param($JobId, $RuleId, $ObjectId, $UserName, $Headers, $Expected, $Operation)
         @{ id = 'scim-user'; active = $Expected }
@@ -403,7 +423,7 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         }
         elseif (-not $state.GroupGone) {
             @{ id = 'scim-group'; displayName = $Value;
-                members = if ($state.HasMember) { @(@{ value = 'scim-user' }) } else { @() } }
+                members = if ($state.TargetHasMember) { @(@{ value = 'scim-user' }) } else { @() } }
         }
         if (-not (& $Predicate $resource)) { throw "Behavioral fixture failed predicate: $Expectation" }
         $resource
@@ -428,7 +448,31 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
             'PASS/update custom extension' -in $state.Checks -and
             'PASS/mode outcome' -in $state.Checks -and $state.Teardown
         )
+        Assert-Contract "behavior: $mode selects the affected User and checks target membership before accepting exports" (
+            $state.LinkedAdd.Count -eq 1 -and $state.LinkedAdd[0] -eq 'source-user' -and
+            $state.LinkedRemoveBound -and $state.LinkedRemove.Count -eq 1 -and
+            $state.LinkedRemove[0] -eq 'source-user' -and
+            $state.AddTargetGuard -and $state.RemoveTargetGuard
+        )
     }
+    $withoutRemovalSelection = $definition.Extent.Text.Replace(
+        "-Operation 'remove group member' -MemberIds @(`$userFixture.User.id)",
+        "-Operation 'remove group member' -MemberIds @()"
+    )
+    . ([scriptblock]::Create($withoutRemovalSelection))
+    $state = @{
+        Checks = [System.Collections.Generic.List[string]]::new()
+        Department = 'SCIM Validation'
+        HasMember = $false; GroupGone = $false; UserGone = $false; Teardown = $false
+    }
+    Invoke-ModeScenario -Mode WorkloadIdentity
+    Assert-Contract 'behavior: omitting the affected removal subject cannot pass target membership or the complete mode' (
+        $withoutRemovalSelection -ne $definition.Extent.Text -and
+        $state.FailureDetail -like 'remove source group member:*member no longer contains the provisioned user*' -and
+        'PASS/remove group member' -notin $state.Checks -and
+        'PASS/mode outcome' -notin $state.Checks -and $state.Teardown
+    )
+    . ([scriptblock]::Create($definition.Extent.Text))
     $state = @{
         Checks = [System.Collections.Generic.List[string]]::new()
         Department = 'SCIM Validation'; FailGroup = $true
@@ -518,13 +562,17 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         . ([scriptblock]::Create($definition.Extent.Text))
     }
     $gallerySp = @{ id = 'owned-principal' }
-    $state = @{ Responses = [System.Collections.Generic.Queue[object]]::new(); Starts = 0 }
+    $state = @{ Responses = [System.Collections.Generic.Queue[object]]::new(); Starts = 0; JobState = 'Paused' }
     $provisioningObservations = [System.Collections.Generic.List[object]]::new()
     function Start-Sleep { param($Seconds) }
     function Invoke-Graph {
         param($Method, $Path, $Body)
         if ($Method -eq 'POST' -and $Path.EndsWith('/provisionOnDemand')) {
+            $state.LastBody = $Body
             return $state.Responses.Dequeue()
+        }
+        if ($Method -eq 'GET' -and $Path.EndsWith('/owned-job')) {
+            return @{ status = @{ code = $state.JobState } }
         }
         if ($Method -eq 'POST' -and $Path.EndsWith('/start')) {
             $state.Starts++
@@ -552,14 +600,19 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         $provisioningObservations[1].action -eq 'Update' -and
         $provisioningObservations[1].objectId -eq 'owned-user'
     )
-    $state.Responses.Enqueue($importOnly)
+    foreach ($attempt in 1..7) { $state.Responses.Enqueue($importOnly) }
     $path = Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group -Operation 'create group'
     Assert-Contract 'behavior: scheduled fallback retains the observed Group outcome without claiming an export' (
         $path -eq 'scheduled-sync-fallback' -and $state.Starts -eq 1 -and
-        $provisioningObservations.Count -eq 3 -and
-        $provisioningObservations[2].path -eq 'scheduled-sync-fallback' -and
+        $provisioningObservations.Count -eq 9 -and
+        $provisioningObservations[8].path -eq 'scheduled-sync-fallback' -and
         $provisioningObservations[2].objectType -eq 'Group' -and
         -not $provisioningObservations[2].hasSuccessfulExport
+    )
+    $subject = $state.LastBody.parameters[0].subjects[0]
+    Assert-Contract 'behavior: Group requests without selected Users carry an empty linked selection' (
+        $null -ne $subject.links -and $null -ne $subject.links.members -and
+        @($subject.links.members).Count -eq 0
     )
     Assert-Contract 'behavior: provisioning observations contain metadata only, not raw response secrets' (
         $provisioningObservations.Count -gt 0 -and
@@ -577,6 +630,7 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
         }).Count -eq 0 -and
         $provisioningObservations[1].stepStatuses -eq 'EntryExportUpdate=Success'
     )
+    $state.Responses.Clear()
     $state.Responses.Enqueue(@{
         key = '{"result":"Failure","details":{"errorCode":"ControlledFailure"}}'
         value = '{"action":"Update","provisioningSteps":[{"name":"EntryExportUpdate","type":"Export","status":"Failure"}]}'
@@ -588,9 +642,114 @@ if (Test-Path -LiteralPath $wifWrapperPath) {
     catch { $failure = $_.Exception.Message }
     Assert-Contract 'behavior: a failed export remains a thrown failure with its observation retained' (
         $failure -like '*failed update provisionOnDemand failed:*ControlledFailure*' -and
-        $provisioningObservations.Count -eq 4 -and
-        $provisioningObservations[3].result -eq 'Failure' -and
-        -not $provisioningObservations[3].hasSuccessfulExport
+        $provisioningObservations[-1].result -eq 'Failure' -and
+        -not $provisioningObservations[-1].hasSuccessfulExport
+    )
+    $state.Responses.Enqueue(@{
+        key = '{"result":"Success"}'
+        value = '[{"action":"Update","provisioningSteps":[{"name":"UserExport","type":"Export","status":"Success"}]},{"action":"Update","provisioningSteps":[{"name":"GroupMemberExport","type":"Export","status":"Failure"}]}]'
+    })
+    $failure = $null
+    try {
+        Invoke-ExpectedProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group `
+            -MemberIds @('owned-user') -Operation 'partial linked export' | Out-Null
+    }
+    catch { $failure = $_.Exception.Message }
+    Assert-Contract 'behavior: a failed linked export overrides parent Success and another successful export' (
+        $failure -like '*partial linked export provisionOnDemand failed:*GroupMemberExport*' -and
+        $provisioningObservations[-1].result -eq 'Failure' -and
+        $provisioningObservations[-1].hasSuccessfulExport
+    )
+    $state.Responses.Clear()
+    foreach ($attempt in 1..3) { $state.Responses.Enqueue($export) }
+    $state.TargetChecks = 0
+    $startsBefore = $state.Starts
+    $path = $null
+    try {
+        $path = Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group `
+            -Operation 'delayed target membership' -MemberIds @('owned-user') -ExportPredicate {
+                $state.TargetChecks++
+                $state.TargetChecks -eq 3
+            }
+    }
+    catch { $state.TargetFailure = $_.Exception.Message }
+    Assert-Contract 'behavior: successful exports with the wrong target effect retry within the existing seven-attempt policy' (
+        $path -eq 'provisionOnDemand' -and $state.TargetChecks -eq 3 -and
+        $state.Starts -eq $startsBefore -and $provisioningObservations[-1].attempt -eq 3
+    )
+    $state.Responses.Clear()
+    foreach ($attempt in 1..7) { $state.Responses.Enqueue($export) }
+    $state.TargetChecks = 0
+    $startsBefore = $state.Starts
+    $path = $null
+    try {
+        $path = Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group `
+            -Operation 'unconfirmed target membership' -MemberIds @('owned-user') -ExportPredicate {
+                $state.TargetChecks++
+                $false
+            }
+    }
+    catch { $state.TargetFailure = $_.Exception.Message }
+    Assert-Contract 'behavior: seven wrong-effect exports fall back without relabelling actual export observations' (
+        $path -eq 'scheduled-sync-fallback' -and $state.TargetChecks -eq 7 -and
+        $state.Starts -eq $startsBefore + 1 -and
+        $provisioningObservations[-1].hasSuccessfulExport -and
+        $provisioningObservations[-1].path -eq 'scheduled-sync-fallback'
+    )
+    $state.Responses.Clear()
+    $state.Responses.Enqueue($importOnly)
+    $state.Responses.Enqueue($export)
+    $startsBefore = $state.Starts
+    $path = Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group -Operation 'delayed membership export'
+    Assert-Contract 'behavior: scoped changes retry a skipped import before falling back to scheduled sync' (
+        $path -eq 'provisionOnDemand' -and $state.Starts -eq $startsBefore -and
+        $provisioningObservations[-1].attempt -eq 2 -and
+        $provisioningObservations[-1].hasSuccessfulExport
+    )
+    $state.Responses.Clear()
+    foreach ($attempt in 1..7) { $state.Responses.Enqueue($importOnly) }
+    $state.JobState = 'Active'
+    $startsBefore = $state.Starts
+    $path = Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group -Operation 'already active fallback'
+    Assert-Contract 'behavior: fallback never posts start to an already-active provider job' (
+        $path -eq 'scheduled-sync-fallback' -and $state.Starts -eq $startsBefore
+    )
+    $state.Responses.Clear()
+    $state.Responses.Enqueue($export)
+    Invoke-ExpectedProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group `
+        -Operation 'linked member export' -MemberIds @('owned-user') | Out-Null
+    $subject = $state.LastBody.parameters[0].subjects[0]
+    Assert-Contract 'behavior: native Group payload carries the exact selected member as a User subject' (
+        $subject.objectId -eq 'owned-group' -and $subject.objectTypeName -eq 'Group' -and
+        $subject.links.members.Count -eq 1 -and
+        $subject.links.members[0].objectId -eq 'owned-user' -and
+        $subject.links.members[0].objectTypeName -eq 'User'
+    )
+    $state.Responses.Enqueue($export)
+    Invoke-ExpectedProvision -JobId owned-job -RuleId rule -ObjectId owned-user -ObjectType User -Operation 'plain user export' | Out-Null
+    Assert-Contract 'behavior: User transport remains free of Group links' (
+        -not $state.LastBody.parameters[0].subjects[0].ContainsKey('links')
+    )
+    $failure = $null
+    try {
+        Invoke-ProvisionOnDemand -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group `
+            -MemberIds @('one', 'two', 'three', 'four', 'five', 'six') | Out-Null
+    }
+    catch { $failure = $_.FullyQualifiedErrorId }
+    Assert-Contract 'behavior: more than five linked members fails parameter validation before Graph' (
+        $failure -like 'ParameterArgumentValidationError*'
+    )
+    $state.JobState = 'NotConfigured'
+    foreach ($attempt in 1..7) { $state.Responses.Enqueue($importOnly) }
+    $startsBefore = $state.Starts
+    $failure = $null
+    try {
+        Invoke-ScopedChangeProvision -JobId owned-job -RuleId rule -ObjectId owned-group -ObjectType Group -Operation 'invalid fallback state' | Out-Null
+    }
+    catch { $failure = $_.Exception.Message }
+    Assert-Contract 'behavior: an unsupported provider state fails explicitly without starting the job' (
+        $failure -like "*cannot use scheduled fallback*NotConfigured*" -and
+        $state.Starts -eq $startsBefore
     )
 }
 
