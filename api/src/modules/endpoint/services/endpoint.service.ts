@@ -230,7 +230,7 @@ export class EndpointService implements OnModuleInit {
 
       for (const ep of endpoints) {
         const cached = this.toCached(ep);
-        this.cacheSet(cached);
+        this.cacheSet(cached, this.endpointFingerprint(ep));
 
         // Restore per-endpoint log levels
         const settings = cached.profile?.settings as Record<string, any> | undefined;
@@ -249,10 +249,11 @@ export class EndpointService implements OnModuleInit {
 
   // ─── Cache helpers ──────────────────────────────────────────────────
 
-  private cacheSet(ep: CachedEndpoint): void {
+  private cacheSet(ep: CachedEndpoint, persistentFingerprint?: string): void {
     this.cacheById.set(ep.id, ep);
     this.cacheByName.set(ep.name.toLowerCase(), ep);
-    this.cacheFingerprints.set(ep.id, this.endpointFingerprint(ep));
+    if (persistentFingerprint === undefined) this.cacheFingerprints.delete(ep.id);
+    else this.cacheFingerprints.set(ep.id, persistentFingerprint);
     this.lifecycle.recordProfileRevision?.(ep.id, ep.profileRevision);
   }
 
@@ -262,21 +263,26 @@ export class EndpointService implements OnModuleInit {
     this.cacheFingerprints.delete(ep.id);
   }
 
-  private endpointFingerprint(ep: CachedEndpoint): string {
-    const { _schemaCaches: _runtimeCaches, ...profile } = ep.profile ?? {};
+  private endpointFingerprint(ep: Endpoint): string {
+    let profile = ep.profile;
+    if (profile !== null && typeof profile === 'object' && !Array.isArray(profile)) {
+      const { _schemaCaches: _runtimeCaches, ...persistedProfile } = profile;
+      profile = persistedProfile;
+    }
     return createHash('sha256')
       .update(JSON.stringify({ ...ep, profile }))
       .digest('hex');
   }
 
   private observePersistentEndpoint(endpoint: Endpoint): CachedEndpoint {
-    const fresh = this.toCached(endpoint);
-    const previous = this.cacheById.get(fresh.id);
-    if (previous && this.cacheFingerprints.get(fresh.id) === this.endpointFingerprint(fresh)) {
+    const fingerprint = this.endpointFingerprint(endpoint);
+    const previous = this.cacheById.get(endpoint.id);
+    if (previous && this.cacheFingerprints.get(endpoint.id) === fingerprint) {
       return previous;
     }
+    const fresh = this.toCached(endpoint);
     if (previous) this.cacheDelete(previous);
-    this.cacheSet(fresh);
+    this.cacheSet(fresh, fingerprint);
     this.syncEndpointLogLevel(fresh.id, fresh.profile?.settings);
     this.syncEndpointFileLogging(fresh.id, fresh.name, fresh.profile?.settings);
     this.profileChangeListener?.(fresh.id, fresh.profile ?? null);
@@ -536,7 +542,7 @@ export class EndpointService implements OnModuleInit {
     }
 
     const cached = this.toCached(endpoint);
-    this.cacheSet(cached);
+    this.cacheSet(cached, this.endpointFingerprint(endpoint));
     this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
     this.syncEndpointFileLogging(endpoint.id, dto.name, resolvedProfile.settings);
     this.profileChangeListener?.(endpoint.id, resolvedProfile);
@@ -753,7 +759,7 @@ export class EndpointService implements OnModuleInit {
     const cached = this.toCached(dbUpdated);
     // Update cache (delete old name entry if name changed)
     if (current && current.name !== cached.name) this.cacheByName.delete(current.name.toLowerCase());
-    this.cacheSet(cached);
+    this.cacheSet(cached, this.endpointFingerprint(dbUpdated));
 
     if (dto.profile?.settings) {
       this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);

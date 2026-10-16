@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Endpoint-list derived-work correction (runtime, not yet deployed)
+
+- Compare authoritative persisted endpoint fingerprints before cloning and
+  canonicalizing profiles. Preserve database reads, same-timestamp edit
+  detection, raw profile revisions, legacy normalization and cache eviction.
+- Four confirmed RED regressions now pass. Focused evidence: 119 service
+  cases, 191 cases across seven related unit suites, 37 selected InMemory
+  HTTP cases across three suites, and the API TypeScript build all pass.
+  The same 37 HTTP cases also pass on a private PostgreSQL 17 database.
+  Its exact container/volume cleanup is verified. Full counts remain pending.
+- Identical local warmed 74-row/six-profile benchmark: 2,220 -> 0 clones
+  and canonical hashes; CPU p95 43.6404 -> 13.3925 ms. This does not prove
+  deployed latency recovery. The original live +60.45% failure stays open.
+- Prepare runtime patch 0.55.51. Both version locks come from successful CI
+  run `38843457859`; structural comparison proves only root version fields
+  changed. Dependency contents, public URLs and sha512 integrity are unchanged.
+  Dev remains 0.55.50; no deployment change has been made.
+- Normal protected tracking push at `848412c4`: all 24 Fast gates PASS in
+  465.5 seconds. API units increase 6,043 -> 6,048 across 210 suites;
+  selected InMemory E2E remains 2,432 across 116 suites with four native-only
+  exclusions. API lint has zero errors and 513 existing warnings. API/web
+  static builds and all diagram renders pass. This is not full deployment
+  or exact-final-tip CI evidence.
+- See [freshness, evidence and execution issues](docs/SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
+
 ### Native gallery Group member transport (tooling only)
 
 - Include the affected linked User subject for both Group member addition

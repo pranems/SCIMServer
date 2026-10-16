@@ -6,6 +6,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { PrismaEndpointLifecycleRepository } from '../../../infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository';
 import { endpointProfileRevision } from '../../../domain/repositories/profile-revision';
+import * as profileRevisions from '../../../domain/repositories/profile-revision';
 
 // Force Prisma backend for unit tests - these tests mock PrismaService,
 // not the in-memory cache. The inmemory path uses a different code flow.
@@ -901,6 +902,8 @@ describe('EndpointService', () => {
   // ─── Endpoint Cache Behavior (Phase 14.1) ──────────────────────────
 
   describe('Endpoint cache', () => {
+    afterEach(() => jest.restoreAllMocks());
+
     const cachedEndpoint = {
       id: '76e3c596-22aa-4527-bd6d-234367d798e7',
       name: 'cached-test',
@@ -1000,6 +1003,95 @@ describe('EndpointService', () => {
       expect(list.totalResults).toBeGreaterThanOrEqual(1);
       expect(list.endpoints.length).toBeGreaterThanOrEqual(1);
       expect(prisma.endpoint.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['warm', 'create', 'update'] as const)(
+      'reuses unchanged persisted profiles after %s without cloning or canonicalizing them again',
+      async (initialization) => {
+        (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+        if (initialization === 'create') {
+          (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+          (prisma.endpoint.create as jest.Mock).mockResolvedValue(cachedEndpoint);
+          await service.createEndpoint({ name: cachedEndpoint.name, profilePreset: 'rfc-standard' });
+        } else {
+          await service.onModuleInit();
+          if (initialization === 'update') {
+            (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+            (prisma.endpoint.update as jest.Mock).mockResolvedValue(cachedEndpoint);
+            await service.updateEndpoint(cachedEndpoint.id, { displayName: cachedEndpoint.displayName });
+          }
+        }
+        (prisma.endpoint.findMany as jest.Mock).mockClear();
+        (prisma.endpoint.findUnique as jest.Mock).mockClear();
+        (prisma.endpoint.findFirst as jest.Mock).mockClear();
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+        (prisma.endpoint.findFirst as jest.Mock).mockResolvedValue(cachedEndpoint);
+        const clone = jest.spyOn(globalThis, 'structuredClone');
+        const revision = jest.spyOn(profileRevisions, 'endpointProfileRevision');
+
+        const list = await service.listEndpoints();
+        const byId = await service.getEndpoint(cachedEndpoint.id);
+        const byName = await service.getEndpointByName(cachedEndpoint.name);
+
+        expect(list.endpoints.map(endpoint => endpoint.id)).toEqual([cachedEndpoint.id]);
+        expect(byId.profile).toEqual(cachedEndpoint.profile);
+        expect(byName.name).toBe(cachedEndpoint.name);
+        expect(prisma.endpoint.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.endpoint.findUnique).toHaveBeenCalledTimes(1);
+        expect(prisma.endpoint.findFirst).toHaveBeenCalledTimes(1);
+        expect(clone).not.toHaveBeenCalled();
+        expect(revision).not.toHaveBeenCalled();
+      },
+    );
+
+    it('detects same-timestamp profile edits without mutating prior request snapshots or persistence', async () => {
+      const persisted = {
+        ...cachedEndpoint,
+        profile: {
+          ...cachedEndpoint.profile,
+          settings: { SoftDeleteEnabled: 'True' },
+        },
+      };
+      const original = structuredClone(persisted);
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(persisted);
+      const before = await service.getEndpointForRequest(persisted.id);
+      const changed = {
+        ...persisted,
+        profile: { ...persisted.profile, settings: { SoftDeleteEnabled: 'False' } },
+      };
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([changed]);
+
+      const list = await service.listEndpoints(undefined, 'full');
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(changed);
+      const after = await service.getEndpointForRequest(persisted.id);
+
+      expect(list.endpoints[0].profile?.settings?.UserSoftDeleteEnabled).toBe('False');
+      expect(before.endpoint.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
+      expect(after.endpoint.profile?.settings?.UserSoftDeleteEnabled).toBe('False');
+      expect(before.profileRevision).toBe(endpointProfileRevision(original.profile));
+      expect(after.profileRevision).toBe(endpointProfileRevision(changed.profile));
+      expect(after.profileRevision).not.toBe(before.profileRevision);
+      expect(changed.updatedAt).toBe(persisted.updatedAt);
+      expect(persisted).toEqual(original);
+      expect(changed.profile.settings).toEqual({ SoftDeleteEnabled: 'False' });
+    });
+
+    it('ignores serialized runtime cache artifacts on unchanged persistent reads', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+      await service.onModuleInit();
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([{
+        ...cachedEndpoint,
+        profile: { ...cachedEndpoint.profile, _schemaCaches: { stale: 'serialized' } },
+      }]);
+      const clone = jest.spyOn(globalThis, 'structuredClone');
+      const revision = jest.spyOn(profileRevisions, 'endpointProfileRevision');
+
+      const list = await service.listEndpoints(undefined, 'full');
+
+      expect(list.endpoints[0].profile).toEqual(cachedEndpoint.profile);
+      expect(list.endpoints[0].profile).not.toHaveProperty('_schemaCaches');
+      expect(clone).not.toHaveBeenCalled();
+      expect(revision).not.toHaveBeenCalled();
     });
 
     it('getEndpoint cache miss should fall back to DB', async () => {
