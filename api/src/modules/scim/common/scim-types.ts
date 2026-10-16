@@ -38,6 +38,7 @@ export interface ScimGroupResource {
   active?: boolean;
   members?: Array<{
     value: string;
+    $ref?: string;
     display?: string;
     type?: string;
   }>;

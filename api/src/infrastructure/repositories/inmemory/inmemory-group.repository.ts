@@ -270,7 +270,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     return members.map((m) => {
       const record: MemberRecord = {
         id: randomUUID(), groupId, userId: m.userId, value: m.value,
-        type: m.type, display: m.display, createdAt: now,
+        type: m.type, display: m.display, reference: m.reference ?? null, createdAt: now,
       };
       if (values.has(record.value)) {
         throw new RepositoryError('CONFLICT', 'Group member value already exists.');

@@ -620,3 +620,12 @@ When a fix is confirmed and it generalizes:
 - Hard rules + gates (where promoted patterns land): [.github/copilot-instructions.md](../../.github/copilot-instructions.md) - see "Execution Issue RCA Ledger", R1-R9, the Mandatory Quality Gates
 - Stage X audits that review this doc: [docs/strategy/SELF_AUDIT_2026-05-16.md](SELF_AUDIT_2026-05-16.md), [docs/strategy/SECURITY_INTAKE_2026-05-17.md](SECURITY_INTAKE_2026-05-17.md)
 - Doc index: [docs/INDEX.md](../INDEX.md)
+# Exact accepted-value preservation at representation boundaries
+
+2026-10-16: Google-shaped Group tests proved that HTTP success did not mean an
+accepted `members.$ref` survived adapter projection or persistence. Guard both
+input-to-record and record-to-response boundaries with exact value assertions,
+including a reference-bearing member beside a legacy value-only member.
+An additive nullable column preserves old records without inventing information.
+Migration upgrade proof and fresh replay are distinct claims. See
+[implementation and evidence](../GROUP_MEMBER_REFERENCE_PRESERVATION.md).

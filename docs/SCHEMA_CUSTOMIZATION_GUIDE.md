@@ -6,7 +6,7 @@ do not count as submitted sub-attributes. Real undeclared fields, including
 null or empty values, remain rejected in strict mode. See
 [minimal membership coverage and current reference-storage limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.52`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.53`
 
 > **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.
@@ -1493,3 +1493,9 @@ sequenceDiagram
 ---
 
 *Last updated: April 28, 2026 - Source-verified against v0.40.0 codebase*
+# Imported Group member references
+
+If the effective schema accepts `members.$ref`, the server preserves its exact
+value across writes and readback. It does not add references to old value-only
+members or relax strict validation. See
+[reference preservation](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

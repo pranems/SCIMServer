@@ -95,6 +95,60 @@ describe('Minimal imported Group membership schema', () => {
     await patch(url, [{ op: 'remove', path: `members[value eq "${users[1]}"]` }]).expect(200);
     await readMembers(url, [users[0]]);
   });
+  it('round-trips an accepted member reference through POST, GET, list and search', async () => {
+    const member = { value: users[0], $ref: `https://scim.example.test/Users/${users[0]}` };
+    const response = await scimPost(app, `${base}/Groups`, token, { ...body(), members: [member] }).expect(201);
+    expect((response.body as GroupResponse).members).toEqual([member]);
+    const url = `${base}/Groups/${(response.body as GroupResponse).id}`;
+    expect((await readMembers(url, [users[0]])).members).toEqual([member]);
+    const list = await scimGet(app, `${base}/Groups`, token).expect(200);
+    expect((list.body as { Resources: GroupResponse[] }).Resources[0].members).toEqual([member]);
+    const search = await scimPost(app, `${base}/Groups/.search`, token, {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest'],
+      attributes: ['members.$ref'],
+    }).expect(200);
+    expect((search.body as { Resources: GroupResponse[] }).Resources[0].members?.[0].$ref).toBe(member.$ref);
+  });
+  for (const populated of [false, true]) {
+    it(`preserves exact references through PUT and ordered PATCH on populated=${populated}`, async () => {
+      const url = await create(populated ? [users[0]] : []);
+      const first = { value: users[1], $ref: `https://scim.example.test/Users/${users[1]}` };
+      const second = { value: users[2], $ref: `https://scim.example.test/Users/${users[2]}?source=import` };
+      await scimPut(app, url, token, { ...body(), members: [first] }).expect(200);
+      expect((await readMembers(url, [users[1]])).members).toEqual([first]);
+      await patch(url, [
+        { op: 'add', path: 'members', value: [second, second] },
+        { op: 'replace', path: 'displayName', value: 'reference-preserved' },
+      ]).expect(200);
+      expect((await readMembers(url, users.slice(1))).members).toEqual([first, second]);
+      await patch(url, [{ op: 'remove', path: `members[value eq "${users[1]}"]` }]).expect(200);
+      expect((await readMembers(url, [users[2]])).members).toEqual([second]);
+      await patch(url, [{ op: 'replace', path: 'members', value: [first] }]).expect(200);
+      expect((await readMembers(url, [users[1]])).members).toEqual([first]);
+    });
+  }
+  it('keeps references when unrelated members are added and does not synthesize missing references', async () => {
+    const url = await create([users[0]]);
+    const member = { value: users[1], $ref: `https://scim.example.test/Users/${users[1]}` };
+    await patch(url, [{ op: 'add', value: { members: [member] } }]).expect(200);
+    expect((await readMembers(url, users.slice(0, 2))).members).toEqual([{ value: users[0] }, member]);
+    await patch(url, [{ op: 'replace', value: { displayName: 'retained-on-no-path' } }]).expect(200);
+    expect((await readMembers(url, users.slice(0, 2))).members).toEqual([{ value: users[0] }, member]);
+  });
+  it('rejects immutable reference replacement with exact unchanged persisted state', async () => {
+    const member = { value: users[0], $ref: `https://scim.example.test/Users/${users[0]}` };
+    const response = await scimPost(app, `${base}/Groups`, token, { ...body(), members: [member] }).expect(201);
+    const url = `${base}/Groups/${(response.body as GroupResponse).id}`;
+    const before = await readMembers(url, [users[0]]);
+    expect(before.members).toEqual([member]);
+    await patch(url, [
+      { op: 'replace', path: 'displayName', value: 'must-rollback' },
+      { op: 'replace', path: `members[value eq "${users[0]}"].$ref`, value: 'https://scim.example.test/Users/changed' },
+    ]).expect(400);
+    expect(await readMembers(url, [users[0]])).toEqual(before);
+    await scimPut(app, url, token, { ...body(), members: [{ ...member, $ref: 'https://scim.example.test/Users/changed' }] }).expect(400);
+    expect(await readMembers(url, [users[0]])).toEqual(before);
+  });
   it('applies multi-member and remove-all policies without partial writes', async () => {
     const url = await create([users[0]]);
     await settings({

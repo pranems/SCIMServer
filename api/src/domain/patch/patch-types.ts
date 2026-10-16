@@ -90,6 +90,7 @@ export interface GroupPatchResult {
 /** A group member DTO (value = SCIM user id) */
 export interface GroupMemberDto {
   value: string;
+  $ref?: string;
   display?: string;
   type?: string;
 }

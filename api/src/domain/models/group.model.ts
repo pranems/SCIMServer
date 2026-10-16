@@ -26,6 +26,7 @@ export interface MemberRecord {
   value: string;
   type: string | null;
   display: string | null;
+  reference?: string | null;
   createdAt: Date;
 }
 
@@ -56,4 +57,5 @@ export interface MemberCreateInput {
   value: string;
   type: string | null;
   display: string | null;
+  reference?: string | null;
 }

@@ -33,6 +33,15 @@ describe('InMemoryGroupRepository', () => {
     repo = new InMemoryGroupRepository();
   });
 
+  it('stores exact optional member references while leaving legacy members without a reference', async () => {
+    const member = { ...makeMemberInput(), reference: 'https://scim.example.test/Users/scim-user-1' };
+    const group = await repo.create(makeGroupInput(), [member]);
+    expect((await repo.findWithMembers(endpointId, 'scim-grp-1'))?.members).toMatchObject([member]);
+    const replacement = { ...makeMemberInput({ value: 'replacement' }), reference: 'https://scim.example.test/Users/replacement' };
+    await repo.updateGroupWithMembers(group.id, {}, [replacement]);
+    expect((await repo.findWithMembers(endpointId, 'scim-grp-1'))?.members).toMatchObject([replacement]);
+  });
+
   // ─── create ────────────────────────────────────────────────────────
 
   describe('create', () => {
