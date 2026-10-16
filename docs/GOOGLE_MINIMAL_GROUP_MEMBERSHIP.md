@@ -1,7 +1,43 @@
 # Minimal imported Group membership correctness
 
 **Last verified:** 2026-10-16
-**Status:** Item A merged in PR #233 at `47d85cdb` after seven exact-tip checks. Locally demonstrated on both persistence backends; candidate live dev/Entra evidence remains pending deployment.
+**Status:** Item A and reference item B are delivered to dev and the same-tenant canary in 0.55.54. Both backends, actual dev HTTP membership and native Entra add/remove readbacks pass. Operator visual acceptance and performance follow-up remain open; customer production is not promoted.
+
+## Deployed 0.55.54 evidence
+
+The final no-skip command was
+`pwsh -NoProfile -File scripts\dev-deployment-pipeline.ps1 -AutoCanary`
+from merged master `db10b13eceb85a4cbf8787e1d2827bec1fb19585`.
+It completed exit 0 in 6,349 seconds with **40 PASS, 0 FAIL, 0 SKIPPED
+and 9 reviewer PENDING**. The nine judgment rows are not implied PASS.
+The immutable matrix is `test-results/dev-deploy-2026-10-16-081024.md`;
+the earlier failed matrix remains separate and unchanged.
+
+| Required outcome | Verified evidence |
+|---|---|
+| Local correctness and both backends | 28 focused cases per backend; 29 fresh migrations and populated legacy upgrade proof |
+| Rejection contracts | PR #238 merged at `db10b13e`, preserving `3b072212`; 25 protected gates and seven exact-tip CI checks PASS |
+| Full protected inventory | 6,060 units and 2,460 HTTP/oracle cases PASS, with four existing exclusions in the InMemory lane |
+| Minimal imported schema on deployed dev | All 66 registered live-section assertions PASS, including exact reference values, real undeclared-attribute rejection and unchanged rejected-operation state |
+| Native Entra membership | 50 checks PASS across shared secret, OAuth client credentials and workload identity; actual member addition/removal independently read back from SCIM |
+| Native fixture cleanup | All 15 exact-ID cleanup entries report `removed: true`; no secret values persisted |
+| Existing dev inventory | 74 endpoints before and after, zero missing IDs |
+| Same-tenant canary | Same immutable digest, verified green soak and public post-flip readbacks; 64 endpoints retained, two active revisions |
+| Customer production | Not accessed or promoted by this delivery; separate approval required |
+
+Native evidence is in
+`test-results/entra-gallery-2026-10-16-081024/summary.md` and its local JSON
+receipt. It proves owned connector journeys, not an inspection or alteration
+of the saved Google production mapping. Existing Google authentication,
+credentials and imported schema were not changed to compensate for the defect.
+
+The accepted artifact remains
+`sha256:42613fe093bcb770c8eec849f2ac8840afa1b0ca85a1b8baf98efa33665745f9`,
+published from `c3ef1f0d`; the later merged release head is not a fabricated
+publication-source tag. See
+[the release closeout and open performance observation](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
+The historical local-only and pending-deployment entries below describe their
+original checkpoints, not the current release status.
 
 ## Executive summary
 

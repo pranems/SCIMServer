@@ -1,7 +1,7 @@
 # Responsive endpoint inventory and compact dashboard
 
 **Last verified:** 2026-10-16
-**Status:** UI, isolated image handoff and source-provenance correction merged with exact-tip CI. The separate membership error-contract closeout is locally GREEN on both backends. Its protected consolidation, full dev/canary delivery and operator visual acceptance remain pending.
+**Status:** Delivered in 0.55.54 to dev and the same-tenant canary from merged `db10b13e`. All 324 authoritative dev browser cases pass with zero skips. Operator visual acceptance remains unavailable; performance observations need follow-up. Customer production is not promoted.
 
 ## Executive summary
 
@@ -13,7 +13,72 @@ fallback on narrow phones.
 
 The Group correctness work remains separate: item A merged in PR #233 at
 `47d85cdb`; reference item B merged in PR #234 at `17031d85`.
-No deployment or customer-production action is part of this local proof.
+The original local proof below is distinct from the deployed evidence that follows.
+
+## Deployed release closeout
+
+The full no-skip `scripts/dev-deployment-pipeline.ps1 -AutoCanary` run
+completed exit 0 in 6,349 seconds from merged master `db10b13e`.
+The original `test-results/dev-deploy-2026-10-16-081024.md` matrix records
+**40 PASS / 0 FAIL / 0 SKIPPED / 9 reviewer PENDING**. Neither this document
+nor the process exit relabels those nine judgment rows as PASS.
+PR #238's test-only closeout merged after 25 protected gates and seven
+exact-tip checks; no new version, lockfile or shipping image was needed.
+
+Dev serves `scimserver-dev--vdb10b13e`; canary serves
+`scimserver--green-1016-0927` at 100% after green soak and public verification.
+Both use the same immutable digest `42613fe0` documented in
+[the Group release evidence](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#deployed-05554-evidence).
+Each retains two active revisions. Dev preserves all 74 endpoint IDs;
+canary preserves its 64 endpoints and the verified per-endpoint inventory.
+No customer-production operation occurred.
+
+The authoritative dev JSON receipt
+`test-results/playwright-dev-2026-10-16-081024.json` records 324 expected,
+zero unexpected, zero skipped and zero flaky cases, including the measured
+layout regressions and mutation-enabled seeded-shape journeys.
+The separate canary green and public checks each pass 1,795 live assertions
+and 289 browser cases; their 11 mutation-opt-in browser exclusions are not
+the authoritative zero-skip dev receipt. Do not combine those scopes or
+describe the canary subset as the complete dev browser suite.
+Native Entra passes 50 checks in all three authentication modes with actual
+member add/remove readback; all 15 exact-ID cleanup entries succeed.
+
+Operator acceptance was requested again against the actually deployed
+0.55.54 surfaces. The question tool returned user unavailable.
+Automated layout measurements are not a substitute for that confirmation.
+The release is deployed and automatically verified, not operator-accepted
+or approved for customer production.
+
+### Open performance observation
+
+The same version-admitted membership harness compared the retained 0.55.51
+baseline with two serial 0.55.54 batches, each containing 18 post-warmup
+samples per operation. Every batch independently read actual added/removed
+members and verified exact owned-endpoint cleanup.
+
+| Operation | First candidate p50 / p95 change | Repeat candidate p50 / p95 change |
+|---|---|---|
+| Add | +24.23% / +28.42% | +5.53% / -26.26% |
+| Populated read | +7.39% / +0.27% | +11.05% / +9.18% |
+| Remove | +22.83% / +56.53% | +8.05% / -1.43% |
+| Empty read | +3.47% / -60.06% | +3.20% / +32.37% |
+
+Retain both observations, not only the better repeat. The initial mutation
+slowdown did not reproduce at the same magnitude, but other repeat metrics
+still exceed the 10% threshold. With 18 samples, both p95 and p99 select the
+batch maximum; network-inclusive timings cannot establish the server cause.
+No performance PASS, approved regression waiver, query-count bound or
+memory-headroom claim is inferred.
+
+Follow-up owner: SCIMServer maintainer. Target: 2026-10-19. Obtain a larger
+matched-environment comparison with request/query and memory evidence before
+closing performance acceptance or claiming customer-production readiness.
+Receipts remain local: `group-membership-perf-baseline.json`,
+`group-membership-perf-candidate.json`,
+`group-membership-perf-candidate-repeat.json` and their comparison under
+`test-results/`. This observation is not a reason to alter schema strictness,
+fabricate a green gate or mutate existing provisioning mappings.
 
 ## Layout contract
 
@@ -169,6 +234,24 @@ speculative abstraction is needed. The shared wrapper change requires adjacent
 navigation/error-boundary and complete browser validation, not only page tests.
 
 ### Provenance and completeness
+
+Post-delivery reconciliation scanned all available continuation events through
+16,381 with 135 candidate signals, followed by the corrected read-only
+verification. New observations and diagnostic friction are recorded below;
+quoted failures, intentional rejections, expected REDs and old-receipt echoes
+were dismissed, not counted as fresh deployment defects.
+
+| ID | Type / severity | Symptom and cause | Resolution and why it works | Detection / prevention |
+|---|---|---|---|---|
+| UI-H17 | Performance evidence / Medium, open | First candidate add/remove latency exceeded the 10% threshold; a serial repeat changed the outliers and still crossed other thresholds. Network-inclusive 18-sample tails cannot identify the server cause. | Not resolved or waived. Both receipts retained; maintainer owns larger matched comparison plus query/memory evidence by 2026-10-19. | Detected post-canary; earliest candidate-runtime measurement was after dev admission and before canary. Stage 3b.6 remained PENDING, not PASS. Do not convert automated deployment success into performance acceptance. |
+| UI-H18 | PowerShell tooling / Low | A read-only verification command piped directly from a foreach statement and failed parsing before any Azure read ran. | Collect loop results in an array, then pipe the array; corrected command verifies actual same-digest traffic and revision counts. | Shell parser caught it before execution; use explicit result collection rather than dense chained statements. |
+| UI-H19 | Receipt interpretation / Low | A diagnostic queried cleanup.status, but this structured receipt exposes cleanup.removed; missing values looked like 15 failures. | Inspect the receipt schema and count explicit removed=true: 15/15. No cleanup rerun or live mutation was needed. | Caught by the conflicting successful journey and schema read; assert the published field and its value, not an invented key. |
+| UI-H20 | Diagnostic output / Low | Combined documentation reads exceeded the output limit; long existing change-log rows amplified the output. | Used the saved output artifact and bounded line/pattern reads without dumping it. | Output offload caught it; batch independent small ranges, not whole combined sections. Related to existing UI-H16, not another product defect. |
+
+Self-improvement disposition: **applied** for receipt scope and explicit pending
+acceptance; performance investigation **scheduled** as UI-H17 with owner/date.
+Design/architecture disposition: **accepted** for this documentation-only
+closeout; no runtime responsibility, dependency or abstraction is added.
 
 The full available reconstructed continuation was scanned through event 15,306,
 from execution start event 11,599, using expanded error/signal and causal
