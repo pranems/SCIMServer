@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Cache admission must precede expensive derived work
+
+An authoritative database read can remain mandatory while its hydrated
+representation is reusable. Compare persisted content before deep cloning,
+normalizing and computing a sorted canonical revision. A cache hit after
+those operations does not save their cost. Seed the same fingerprint on
+startup and writes; never substitute timestamps alone for content checks.
+Test zero repeat conversion work alongside real repository calls, same-time
+edits, raw revisions and old-snapshot isolation. Separate local CPU evidence
+from deployed HTTP latency. See EC-I01 in
+[the endpoint freshness ledger](../SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#42-execution-issues-and-prevention).
+
 ### Replication tests must not manufacture target convergence from source state
 
 A directory membership delete changed the mock target automatically, so the

@@ -2,7 +2,31 @@
 
 **Last verified:** 2026-10-16
 
-**Current checkpoint:** UI PR #226 merged normally at `096ee65f` after seven
+**Current checkpoint:** Gallery PR #228 merged normally at `4d11770c` after
+24/24 protected push gates and seven successful exact-tip checks at
+`97b071b7`. Final native proof remains 50/50 with all 15 cleanup checks passed.
+No runtime bump or deployment applies to that tooling-only merge.
+
+The assigned worktree now owns `fix/endpoint-list-cache-admission-20261016`
+from that merged master. Four assertion-level RED regressions preceded a
+small runtime correction: compare persisted fingerprints before repeating
+canonical revisions and clones. API build, 191 related unit cases and 37
+HTTP cases on each of InMemory and private PostgreSQL pass. The exact owned
+PostgreSQL container and volume were removed, with absence verified.
+Identical local warmed 74-row/six-profile
+benchmark: 2,220 -> 0 clones/revisions; CPU p95 43.6404 -> 13.3925 ms.
+This is not deployed HTTP evidence. Plan 0.55.51 with CI-generated locks at
+consolidation; the original live +60.45% latency failure is still open.
+See [freshness and execution issues](docs/SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
+
+Remaining: complete runtime consolidation and exact-tip CI, fresh dev
+delivery/latency/browser/integrity/reference proof, then explicit operator
+visual acceptance. Dependency ownership preflight and Mermaid version
+alignment remain separate tooling changes. No canary/customer-prod work.
+
+### Previous deployment and retained failed receipts
+
+UI PR #226 merged normally at `096ee65f` after seven
 successful exact-tip checks. Version `0.55.50` is deployed on dev revision
 `scimserver-dev--v096ee65f`, shipping digest
 `sha256:b48c668d4d3045599cff3233fbd2d4ceab291526361e29770d7f5060278ef49e`.
@@ -71,6 +95,7 @@ No canary or customer-production change. See the
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | PR #228 merged at4d11770c with7 exact-tip checks PASS. Separate endpoint-list correction passes4 RED/GREEN regressions,191 focused units,37 InMemory HTTP cases and API build; warmed CPU p95 falls43.6404->13.3925ms, with0 repeat clones/revisions. Runtime version/CI/deployment and live latency closure remain pending. |
 | 2026-10-16 | PR #227 merged at f5046202; native linked-member/target-aware correction passes contracts78->92 and final complete gallery50/50 with15cleanupPASS. Independent target state, partial-failure precedence and target-effect guards close observed false-green gaps. |
 | 2026-10-16 | UI 0.55.50 merged and deployed to dev; complete matrix and both 1,729-assertion live lanes passed. Gallery failure correctly blocked downstream acceptance. Private dependencies fixed ownership without installs or lock changes. Gallery contracts70->78; instrumented WIF failed membership after successful Group creation, with seven cleanup checks passed. |
 

@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-14 - **Product version:** `0.55.50`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.51`
 
 > **Updated:** 2026-10-12
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
@@ -574,9 +574,18 @@ sees the new row. Reads already in progress are not cancelled. This removes the
 previous indefinite cross-process cache staleness without adding a TTL or broker.
 Database failure is surfaced rather than hidden by the cached profile.
 
+The locally validated endpoint-list correction compares persisted content
+before cloning or calculating the canonical profile revision. An unchanged
+row therefore reuses its normalized profile and runtime indexes without
+repeating either operation. Startup and writes seed the same persisted
+fingerprint, while same-timestamp content changes still invalidate it.
+This correction is not yet deployed; its warmed local CPU measurements do
+not close the outstanding deployed HTTP latency regression.
+
 See [P8a evidence and limits](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) for
 two-application HTTP tests, two-process PostgreSQL live checks and the measured
-extra query cost. P8a is not yet deployed. InMemory is still instance-local;
+extra query cost. The freshness boundary is deployed in 0.55.50; the new
+derived-work optimization awaits consolidation. InMemory is still instance-local;
 the historical verification below does not prove replication between processes.
 
 ### Live verification of this section
