@@ -61,6 +61,9 @@ remaining containers: the exact project and image must reach the mirror,
 and missing/malformed identities must be rejected. Two RED assertions exposed
 the former integration mismatch; all 58 pipeline contract checks now PASS.
 Actual Docker/ACR proof remains part of the full merged-master run.
+The existing pre-push workflow-selector gate invokes these 58 behavioral
+controls and rejects a return to default-project container lookup; its 22
+selector assertions also PASS.
 
 ## Prisma validation scheduling
 

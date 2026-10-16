@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surviving immutable image ID. Missing/malformed image identities fail
   explicitly. No shared container reuse, cleanup weakening, shipping-image
   substitution, canary-policy change or runtime/version bump.
+- The first protected tooling push correctly blocked a stale source-string
+  assertion requiring the former default-project lookup. Its existing gate
+  now forbids that lookup and executes the 58 behavioral controls. All 22
+  selector checks plus 58 pipeline checks PASS; no bypass.
 - Protected consolidation and actual merged-master Docker/dev/canary proof
   for this tooling correction remain pending.
 
