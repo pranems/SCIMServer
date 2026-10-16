@@ -41,6 +41,11 @@ function apply(
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('GroupPatchEngine', () => {
+  it('retains the exact accepted reference during member normalization', () => {
+    const member = { value: 'user-3', $ref: 'https://scim.example.test/Users/user-3?source=import' };
+    const result = apply([{ op: 'add', path: 'members', value: [member] }], { members: [] });
+    expect(result.members).toMatchObject([member]);
+  });
   // ── Replace operations ─────────────────────────────────────────────
 
   describe('replace operations', () => {

@@ -88,6 +88,18 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
     repo = new PrismaGroupRepository(prisma);
   });
 
+  it('reconstructs the exact persisted reference and legacy null without a synthetic URL', async () => {
+    const reference = 'https://scim.example.test/Users/user-scim-1?source=import';
+    (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(fakeGroupResource({
+      membersAsGroup: [fakeResourceMember({ reference })],
+    }));
+    expect((await repo.findWithMembers('ep-1', GRP_SCIM_ID))?.members).toMatchObject([{ reference }]);
+    (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(fakeGroupResource({
+      membersAsGroup: [fakeResourceMember({ reference: null })],
+    }));
+    expect((await repo.findWithMembers('ep-1', GRP_SCIM_ID))?.members).toMatchObject([{ reference: null }]);
+  });
+
   // ─── create ──────────────────────────────────────────────────────────
 
   describe('create', () => {

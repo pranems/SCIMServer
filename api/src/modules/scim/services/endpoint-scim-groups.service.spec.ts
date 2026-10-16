@@ -195,12 +195,13 @@ describe('EndpointScimGroupsService', () => {
       );
     });
 
-    it('should create group with members within endpoint', async () => {
+    it.each([undefined, 'https://scim.example.test/Users/scim-user-123'])(
+      'should create group members with exact optional reference %s within endpoint', async (reference) => {
       const createDto: CreateGroupDto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
         displayName: 'Group with Members',
         members: [
-          { value: mockUser.scimId, display: 'Test User' },
+          { value: mockUser.scimId, display: 'Test User', $ref: reference },
         ],
       };
 
@@ -217,6 +218,7 @@ describe('EndpointScimGroupsService', () => {
             value: mockUser.scimId,
             display: 'Test User',
             type: null,
+            reference: reference ?? null,
             createdAt: new Date(),
           },
         ],
@@ -230,8 +232,12 @@ describe('EndpointScimGroupsService', () => {
 
       expect(result.members).toHaveLength(1);
       expect(result.members![0].value).toBe(mockUser.scimId);
+      expect(result.members![0].$ref).toBe(reference);
+      for (const key of Object.keys(result.members![0])) {
+        expect(['value', 'display', 'type', '$ref']).toContain(key);
+      }
       expect(mockGroupRepo.create).toHaveBeenCalledWith(expect.any(Object), [
-        { userId: mockUser.id, value: mockUser.scimId, display: 'Test User', type: null },
+        { userId: mockUser.id, value: mockUser.scimId, display: 'Test User', type: null, reference: reference ?? null },
       ], expect.any(Array));
       expect(mockGroupRepo.addMembers).not.toHaveBeenCalled();
       expect(mockUserRepo.findByScimIds).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Array));

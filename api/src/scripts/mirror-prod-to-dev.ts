@@ -314,6 +314,7 @@ async function mirrorMembers(
             value: m.value,
             type: m.type,
             display: m.display,
+            reference: m.reference,
           },
         });
         stats.members.updated++;
@@ -326,6 +327,7 @@ async function mirrorMembers(
             value: m.value,
             type: m.type,
             display: m.display,
+            reference: m.reference,
             createdAt: m.createdAt,
           },
         }).catch((err: unknown) => {

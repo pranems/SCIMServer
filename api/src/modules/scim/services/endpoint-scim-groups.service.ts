@@ -608,6 +608,7 @@ export class EndpointScimGroupsService {
       externalId: group.externalId ?? undefined,
       members: group.members.map((member) => ({
         value: member.value,
+        $ref: member.reference ?? undefined,
         display: member.display ?? undefined,
         type: member.type ?? undefined,
       })),
@@ -639,6 +640,7 @@ export class EndpointScimGroupsService {
     return dedupedDtos.map((m) => ({
       userId: userMap.get(m.value) ?? null,
       value: m.value,
+      reference: m.$ref ?? null,
       type: m.type ?? null,
       display: m.display ?? null,
     }));
@@ -647,6 +649,7 @@ export class EndpointScimGroupsService {
   private memberRecordsToDtos(members: MemberRecord[]): GroupMemberDto[] {
     return members.map((member) => ({
       value: member.value,
+      $ref: member.reference ?? undefined,
       display: member.display ?? undefined,
       type: member.type ?? undefined
     }));
@@ -698,6 +701,7 @@ export class EndpointScimGroupsService {
       displayName: group.displayName,
       members: group.members.map((member) => ({
         value: member.value,
+        $ref: member.reference ?? undefined,
         display: member.display ?? undefined,
         type: member.type ?? undefined
       })),

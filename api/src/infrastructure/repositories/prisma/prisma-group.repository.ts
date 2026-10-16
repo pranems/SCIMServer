@@ -56,6 +56,7 @@ function toMemberRecord(member: Record<string, unknown>): MemberRecord {
     value: member.value as string,
     type: (member.type as string) ?? null,
     display: (member.display as string) ?? null,
+    reference: (member.reference as string) ?? null,
     createdAt: member.createdAt as Date,
   };
 }
@@ -76,6 +77,7 @@ function toMemberData(groupId: string, members: MemberCreateInput[]): Prisma.Res
     value: m.value,
     type: m.type,
     display: m.display,
+    reference: m.reference ?? null,
     createdAt: new Date(),
   }));
 }

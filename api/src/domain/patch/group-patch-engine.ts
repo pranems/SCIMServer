@@ -106,7 +106,12 @@ export class GroupPatchEngine {
     if (!objectValue(member) || typeof read(member, 'value') !== 'string' || !read(member, 'value')) {
       throw new PatchError(400, 'Member object must include a non-empty string value property.', 'invalidValue');
     }
-    return { value: read(member, 'value') as string, display: read(member, 'display') as string, type: read(member, 'type') as string };
+    return {
+      value: read(member, 'value') as string,
+      $ref: read(member, '$ref') as string | undefined,
+      display: read(member, 'display') as string,
+      type: read(member, 'type') as string,
+    };
   }
   static ensureUniqueMembers(members: GroupMemberDto[]): GroupMemberDto[] {
     return Array.from(new Map(members.map(m => [m.value, m])).values());

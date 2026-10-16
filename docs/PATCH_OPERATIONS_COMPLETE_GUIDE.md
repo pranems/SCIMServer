@@ -6,7 +6,7 @@ undeclared fields rather than silently dropping them. Internally materialized
 undefined optional fields are absent, not invalid wire attributes. See
 [minimal Group membership proof and limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.52`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.53`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
@@ -876,3 +876,9 @@ Defaults summary: `VerbosePatchSupported=false`, `StrictSchemaValidation=true`, 
 - [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) - PATCH validation + immutable enforcement
 - [SCIM_COMPLIANCE.md](SCIM_COMPLIANCE.md) - RFC compliance matrix
 - [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - all routes
+# Accepted member references
+
+Accepted `members.$ref` values survive Group PATCH normalization and persistence
+without URL rewriting. Effective schema mutability still applies; replacing an
+immutable reference is rejected without partial writes. See the
+[reference contract and migration](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

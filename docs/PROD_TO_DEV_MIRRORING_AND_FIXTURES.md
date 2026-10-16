@@ -1,8 +1,8 @@
 # Prod -> Dev mirroring + synthetic shape-coverage fixtures
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.52`
+> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.53`
 
-> **Version:** 0.55.52  -  **Date:** May 6, 2026
+> **Version:** 0.55.53  -  **Date:** May 6, 2026
 > **Scope:** dev-tooling, no API surface change
 > **Affects:** [api/src/scripts/mirror-prod-to-dev.ts](../api/src/scripts/mirror-prod-to-dev.ts), [api/src/scripts/seed-shape-coverage.ts](../api/src/scripts/seed-shape-coverage.ts), [scripts/mirror-prod-to-dev.ps1](../scripts/mirror-prod-to-dev.ps1)
 
@@ -225,3 +225,10 @@ to undo a mirror, the safest path is to recreate the dev PG database via
 - [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) - endpoint isolation model that this script preserves
 - [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - flag catalog used by the shape matrix
 - [G11_PER_ENDPOINT_CREDENTIALS.md](auth/G11_PER_ENDPOINT_CREDENTIALS.md) - the bearer-credential model that `shape-per-endpoint-creds` exercises
+## Accepted member references
+
+The existing database-copy script carries the nullable ResourceMember.reference
+column on both insert and update, so accepted `members.$ref` strings are not
+lost at this boundary. Legacy nulls remain null. Both databases must have the
+additive migration before this version of the script runs. See the
+[contract and compatibility evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

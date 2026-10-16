@@ -2,18 +2,23 @@
 
 **Last verified:** 2026-10-16
 
-**Active execution:** `fix/google-optional-members-20261016` from reviewed
-`0a0966a8`. Queued item A now fixes absent optional member validation without
-disabling strict mode. RED-first tests exposed a related pre-projection unknown
-field escape, also fixed. Focused evidence: 169 units, identical 212 HTTP cases
-on InMemory and isolated fresh PostgreSQL 17, and API build PASS.
-Consolidation/version/review/live dev/Entra proof remain pending. Item B `$ref`
-persistence and endpoint/dashboard layout remain separate pending outcomes.
+**Active execution:** item B on `fix/group-member-reference-20261016` from
+reviewed `47d85cdb`. Item A merged in PR #233 with seven exact-tip checks green.
+Item B preserves accepted `$ref` across adapters and both repositories with an
+additive nullable column. Focused 267 units, identical 217 HTTP cases on both
+backends, populated upgrade, 29 fresh migrations and 50 local live assertions
+PASS. Candidate 0.55.53 has 28/28 Validate gates passing: 6,060 API units,
+2,447 HTTP cases and 1,624 Web cases. CI-generated version-only locks imported
+from workflow 38885291269. Final-tip review and CI remain pending.
+Live dev/Entra proof and endpoint/dashboard layout remain subsequent outcomes.
 The user authorizes dev and canary through the normal process, not customer
 production. Existing UI visual acceptance is not inferred from new observations.
 See [minimal Group membership resolution](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
 
-**Current checkpoint:** PR #231 merged normally at `8887584c`, preserving
+**Current checkpoint:** Item A PR #233 merged normally at `47d85cdb`, preserving
+reviewed `cdd8e0fb`, after all 28 Validate gates, 25 final Fast gates and seven
+exact-tip checks. Tooling PR #232 merged at `0a0966a8`.
+Earlier PR #231 merged normally at `8887584c`, preserving
 reviewed source `b0c64705`, after all 25 protected push gates and seven
 exact-tip checks. Merged-master CodeQL `38863401990` also passes.
 Earlier visual consolidation PR #230 merged at `5bf94f93`.
@@ -1680,3 +1685,14 @@ Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---
 *Condensed: older verbose narrative & future-dated/hallucinated entries removed for clarity.*
+# Current Group reference execution
+
+- 2026-10-16: Item A merged in PR #233 at 47d85cdb with all seven exact-tip checks
+  green. Item B is active separately on fix/group-member-reference-20261016.
+- Exact accepted members.$ref now crosses existing DTO/adapter/repository/response
+  boundaries via a nullable reference column. Focused 144 units and identical
+  217 HTTP cases PASS on both backends; legacy upgrade and 29-migration fresh
+  replay PASS. The compiled local live section passes 50/50.
+- Candidate 0.55.53; CI-only locks, protected consolidation and reviewed merge
+  remain pending. UI height/alignment/compact dashboard is next. Dev, Entra
+  and canary proof are not yet claimed; customer production is not authorized.

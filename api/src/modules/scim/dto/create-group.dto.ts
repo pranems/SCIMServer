@@ -15,6 +15,10 @@ export class GroupMemberDto {
 
   @IsOptional()
   @IsString()
+  $ref?: string;
+
+  @IsOptional()
+  @IsString()
   display?: string;
 
   @IsOptional()

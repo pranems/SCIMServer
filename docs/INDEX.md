@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.52`
+> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.53`
 
-> **Version:** 0.55.52 - **Updated:** 2026-09-30
+> **Version:** 0.55.53 - **Updated:** 2026-09-30
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -448,3 +448,6 @@ These are the definitive source files for key aspects of the system:
 # Current Group membership correction
 
 - [Minimal imported Group membership correctness and execution RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md)
+# Group reference preservation
+
+- [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

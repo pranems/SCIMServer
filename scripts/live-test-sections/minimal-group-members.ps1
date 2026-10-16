@@ -23,6 +23,15 @@ function Invoke-MinimalGroupMembersContract {
         Test-Result -Success ($unexpected.Count -eq 0) -Message "9z-DQ: $Label response key allowlists"
         return $read
     }
+    function Assert-ReferenceReadback([string]$Uri, [object[]]$Members, [string]$Label) {
+        $read = Assert-MemberReadback $Uri @($Members | ForEach-Object value) $Label
+        $matches = $read.members.Count -eq $Members.Count
+        foreach ($member in $Members) {
+            $stored = @($read.members | Where-Object value -eq $member.value)
+            $matches = $matches -and $stored.Count -eq 1 -and $stored[0].'$ref' -ceq $member.'$ref'
+        }
+        Test-Result -Success $matches -Message "9z-DQ: $Label exact persisted member references"
+    }
     try {
         $profile = @{
             schemas = @(
@@ -99,6 +108,47 @@ function Invoke-MinimalGroupMembersContract {
             }
             $null = Assert-MemberReadback $uri @() 'PATCH filtered remove'
         }
+        $first = @{ value = $users[0]; '$ref' = "https://scim.example.test/Users/$($users[0])" }
+        $second = @{ value = $users[1]; '$ref' = "https://scim.example.test/Users/$($users[1])?source=import" }
+        $group = Send-MemberRequest "$collection/Groups" 'POST' @{
+            schemas = @($groupUrn); displayName = "references-$([guid]::NewGuid().ToString('N'))"; members = @($first)
+        }
+        if ([string]::IsNullOrWhiteSpace($group.id)) { throw 'Owned reference Group creation returned no id.' }
+        $uri = "$collection/Groups/$($group.id)"
+        Assert-ReferenceReadback $uri @($first) 'reference POST'
+        $null = Send-MemberRequest $uri 'PUT' @{
+            schemas = @($groupUrn); displayName = $group.displayName; members = @($second)
+        }
+        Assert-ReferenceReadback $uri @($second) 'reference PUT'
+        $null = Send-MemberRequest $uri 'PATCH' @{
+            schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp')
+            Operations = @(@{ op = 'add'; path = 'members'; value = @($first) })
+        }
+        Assert-ReferenceReadback $uri @($second, $first) 'reference PATCH add'
+        $before = Invoke-RestMethod -Uri $uri -Headers $Headers -ErrorAction Stop
+        $invalid = @{
+            schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp')
+            Operations = @(
+                @{ op = 'replace'; path = 'displayName'; value = 'must-rollback' }
+                @{ op = 'replace'; path = "members[value eq `"$($users[0])`"].`$ref"; value = 'https://scim.example.test/Users/changed' }
+            )
+        }
+        $rejected = Invoke-WebRequest -Uri $uri -Method Patch -Headers $Headers -ContentType 'application/scim+json' `
+            -Body ($invalid | ConvertTo-Json -Depth 20) -SkipHttpErrorCheck -ErrorAction Stop
+        Test-Result -Success ($rejected.StatusCode -eq 400) -Message '9z-DQ: immutable reference change rejected'
+        $after = Invoke-RestMethod -Uri $uri -Headers $Headers -ErrorAction Stop
+        Test-Result -Success (($before | ConvertTo-Json -Depth 20 -Compress) -ceq ($after | ConvertTo-Json -Depth 20 -Compress)) `
+            -Message '9z-DQ: rejected reference change preserves complete state'
+        $null = Send-MemberRequest $uri 'PATCH' @{
+            schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp')
+            Operations = @(@{ op = 'remove'; path = "members[value eq `"$($users[1])`"]" })
+        }
+        Assert-ReferenceReadback $uri @($first) 'reference PATCH remove'
+        $null = Send-MemberRequest $uri 'PATCH' @{
+            schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp')
+            Operations = @(@{ op = 'replace'; path = 'members'; value = @($second) })
+        }
+        Assert-ReferenceReadback $uri @($second) 'reference PATCH replace'
     } catch {
         Test-Result -Success $false -Message "9z-DQ: minimal imported Group membership failed: $($_.Exception.Message)"
     } finally {

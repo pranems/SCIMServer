@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Accepted Group member references
+
+- Preserve exact accepted members.$ref through DTOs, PATCH, both repositories,
+  reconstruction, response projection and the existing database-copy script.
+  Add a nullable reference column without rewriting or backfilling old rows.
+  Missing references remain absent; strict validation and immutability remain.
+- RED first: three unit and five HTTP assertions expose missing references.
+  Focused units 267 PASS across service/adapter/repositories; identical 217
+  HTTP cases PASS on both backends;
+  populated legacy upgrade and all 29 fresh migrations PASS. Compiled local
+  live section increases 33 -> 50 assertions, all PASS with owned cleanup.
+  Protected Validate retry passes all 28 gates: API units 6,056 -> 6,060
+  (211 suites), InMemory HTTP 2,442 -> 2,447 (117 suites, four existing skips),
+  and unchanged Web vitest 1,624 (123 suites). Playwright count unchanged.
+  Live dev, Entra and canary remain pending.
+- Runtime candidate 0.55.52 -> 0.55.53; CI-only lock generation is required
+  before merge. CI workflow 38885291269 supplied verified version-only API/web
+  locks with unchanged dependencies and approved provenance. Reference storage
+  is a separate rollback unit from item A.
+  See [reference contract and compatibility](docs/GROUP_MEMBER_REFERENCE_PRESERVATION.md).
+
 ### Minimal imported Group membership
 
 - Keep strict validation enabled while treating internally materialized

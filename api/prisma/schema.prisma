@@ -126,6 +126,7 @@ model ResourceMember {
   value            String
   type             String?
   display          String?
+  reference        String?
   createdAt        DateTime  @default(now()) @db.Timestamptz
 
   group  ScimResource  @relation("GroupMembers", fields: [groupResourceId], references: [id], onDelete: Cascade)

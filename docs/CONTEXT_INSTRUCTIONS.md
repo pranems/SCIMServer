@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.52
+> **Version**: 0.55.53
 > **Last Updated**: October 16, 2026
 > **Last verified:** 2026-10-16
 
@@ -9,16 +9,22 @@
 
 ## Active Delivery Process
 
-**Active implementation:** minimal imported Group membership item A on
-`fix/google-optional-members-20261016`, based on reviewed `0a0966a8`.
-Strict validation remains enabled. Focused 169 units, 212 identical InMemory
-and PostgreSQL HTTP cases, and API build PASS. Review/release/live dev and
-Entra proof remain pending. `$ref` persistence and endpoint/dashboard layout
-are separate subsequent outcomes. Dev/canary are authorized through the
-existing process; customer prod is not. See
-[resolution and RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+**Active implementation:** Group reference item B on
+`fix/group-member-reference-20261016`, based on reviewed `47d85cdb`.
+Item A merged in PR #233 after seven exact-tip checks. Strict validation
+remains enabled. Item B local proof: 267 units, identical 217 HTTP cases on
+each backend, populated upgrade, 29 fresh migrations and 50 live assertions.
+Candidate 0.55.53 protected Validate passes 28/28: 6,060 API units, 2,447 HTTP
+cases and 1,624 Web cases. CI-only locks from 38885291269 are version-only.
+Final-tip review/release remain pending. Live dev/Entra proof and
+endpoint/dashboard layout are subsequent outcomes. Dev/canary are authorized
+through the existing process; customer prod is not. See
+[reference contract and RCA](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
 
-**Latest consolidation:** PR #231 merged normally at `8887584c`, preserving
+**Latest consolidation:** PR #233 merged at `47d85cdb`, preserving reviewed
+`cdd8e0fb`, after 28 Validate gates, 25 final Fast gates and seven exact-tip
+checks. Earlier tooling PR #232 merged at `0a0966a8`.
+PR #231 merged normally at `8887584c`, preserving
 `b0c64705`, after 25 protected push gates and seven exact-tip checks.
 Merged-master CodeQL `38863401990` passes. Earlier visual PR #230 merged
 at `5bf94f93`. Dev remains
@@ -1165,3 +1171,11 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 ---
 
 *This document should be the FIRST thing read at the start of any AI-assisted coding session.*
+# Current Group reference execution
+
+- Item A merged in PR #233 at 47d85cdb after exact-tip CI. Item B is a separate
+  reference-preservation change, candidate 0.55.53, not yet reviewed/deployed.
+- Local proof: 144 units, 217 identical HTTP cases on each backend, unchanged
+  legacy member fields after additive upgrade, all 29 fresh migrations, and
+  50/50 compiled local live assertions. UI layout and dev/canary remain next.
+- [Contract, compatibility and RCA](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
