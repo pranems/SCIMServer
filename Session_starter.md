@@ -12,7 +12,10 @@ Entra checks and 15 exact-ID cleanups pass across three authentication modes.
 Minimal-schema live section: 66 PASS. Original dev IDs: 74 -> 74;
 canary endpoints: 64 -> 64. Both serve unchanged digest `42613fe0` and keep
 two revisions. Original failed matrices remain historical, not relabeled.
-Operator visual acceptance is still unavailable. The larger matched membership
+The user reported a quick visual look seemed alright on 2026-10-16, but the
+reviewed target/version was not confirmed and clarification was unavailable.
+Record this as provisional positive feedback, not customer-production approval.
+The larger matched membership
 comparison is complete: 2,000 samples/version/operation retain the 0.5-CPU
 tail increases. A separate 2-CPU diagnostic removes substantial throttling and
 all candidate p50/p95/p99 increases; both profiles have equal query totals.
@@ -23,8 +26,28 @@ including actual credential redaction. No production code, quota, version or
 deployed artifact changed. Customer production is not authorized or promoted. See
 [current closeout and limits](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 
+**Documentation closeout:** freshness and source-content gates cover 27
+manifest docs; freshness self-tests pass 24/24, and literal JSON examples are
+parsed and pretty-printed. Screenshot hygiene and whitespace checks pass.
+Test/gate improvement: **applied**, using existing version/source coupling and
+an explicit stale-behavior-label check. Design/architecture disposition:
+**accepted**, because curated notes reuse the existing changelog and freshness
+gate without another workflow or a runtime version bump. Authoring friction
+was resolved by matching literal manifest text rather than a serialized view,
+and removing an unnecessary Markdown trailing-space line ending.
+
+**User documentation:** [Release notes](docs/RELEASE_NOTES.md) is the curated
+operator entry point alongside the engineering changelog. Current guides now
+describe shipped Group/reference, profile/PATCH, timestamp, inventory and
+Dashboard behavior without stale local-only labels. Historical captures stay
+historical. Full matrix HTTP counts are 2,516 InMemory plus four exclusions /
+2,520 PostgreSQL; protected HTTP is the narrower 2,460 plus four selection.
+The nested Docker lane uses `-SkipLocal`; no full standalone compiled-node live
+receipt is inferred. Documentation-only delivery needs no runtime version bump.
+
 | Date | Summary |
 |---|---|
+| 2026-10-16 | Reconciled current user guides and curated release notes; version-to-release-note and missing behavior/doc bindings use the existing freshness gate. Provisional visual feedback recorded without an unverified target or promotion approval. |
 | 2026-10-16 | Completed matched performance/resource and private logging assurance; retained quota-sensitive tail limits, official RFC verification and measurement-oracle RCA. Operator visual acceptance is still required. |
 | 2026-10-16 | Dev/canary 0.55.54 delivery and actual Entra membership verified; visual acceptance and measured performance follow-up remain open. |
 

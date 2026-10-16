@@ -1,8 +1,23 @@
 # SCIM and Microsoft Entra compatibility
 
-**Last verified:** 2026-09-29
+**Last verified:** 2026-10-16
 
-**Scope:** historical P9 on P7a/P1 base `8e42f15f54a955fd6b93d58e9471c393329f4d3a`,
+## Current release and native provisioning
+
+The [0.55.54 release notes](RELEASE_NOTES.md) distinguish deployed behavior
+from the historical P9 receipts below. Minimal imported Group schemas accept
+value-only members with strict validation enabled; real undeclared fields
+remain rejected and accepted `$ref` values are preserved. Do not widen
+Entra's valid mapping to compensate for an internal representation defect.
+
+The latest owned native Entra journey passed 50 checks across shared secret,
+OAuth client credentials and workload identity, including actual member
+add/remove readback and 15 successful exact-ID cleanup entries. This is not
+an inspection of the saved customer Google mapping or proof of every
+first-party/sovereign acquisition-mode contract. See
+[minimal membership and native evidence](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
+**Historical scope:** P9 on P7a/P1 base `8e42f15f54a955fd6b93d58e9471c393329f4d3a`,
 plus the explicitly identified integration checkpoint below. Local evidence,
 not a deployed-service certification.
 See the [correctness tracker](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md),

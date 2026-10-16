@@ -1,6 +1,12 @@
 # Global navigation and workflow context
 
-> **Status:** Implemented locally - **Last verified:** 2026-10-15 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+
+See [current release notes](RELEASE_NOTES.md) for deployment and acceptance
+boundaries. Endpoints now uses available window height, Dashboard uses compact
+left-aligned endpoint rows, and Operations keeps plain endpoint links with
+separate copy/open actions. These presentation changes preserve URL-owned
+selection and Back/Forward context; they do not merge the distinct workflows.
 
 ## Purpose
 
@@ -17,7 +23,7 @@ The admin UI now exposes one global Back/Forward pair and uses endpoint identity
 
 ## Global Back and Forward
 
-The 0.55.50 source follow-up keeps timestamp copy actions independent from
+The timestamp behavior included since 0.55.50 keeps copy actions independent from
 request navigation. Enter or Space on copy must copy without opening the
 containing row. Overview has a separate request button, and authentication
 accordion timestamps sit beside rather than inside their header button.

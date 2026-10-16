@@ -1,8 +1,15 @@
 # SCIMServer Deployment Options
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-17 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> Updated: June 2, 2026 · v0.53.0 · Scope: production + local deployment paths
+> Updated: 2026-10-16 - Scope: production + local deployment paths
+
+Before upgrading, read the [release notes and rollback guidance](docs/RELEASE_NOTES.md#upgrade-and-rollback).
+The 0.55.53 member-reference migration is additive, but older binaries can
+discard accepted references during membership writes. Prefer roll-forward;
+an old-binary rollback is not lossless. Dev/canary delivery does not authorize
+customer-production promotion, and a passing Docker lane does not prove a
+separate full compiled-local-node live run.
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 

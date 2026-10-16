@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-15 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> **Status:** Active | **Last Updated:** 2026-10-15 | **Version:** 0.55.54
+> **Status:** Active | **Last Updated:** 2026-10-16 | **Version:** 0.55.54
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -17,23 +17,24 @@
 
 ## Table of Contents
 
-**Local, unreleased date-time follow-up:** Absolute timestamps display both
+**Current behavior, included in 0.55.54:** Absolute timestamps display both
 date and time, including milliseconds and an explicit UTC timezone. Copying
 retains the source instant. Operations endpoint names are plain links with
 separate copy and new-tab actions, not outlined badges. Invalid or
 timezone-free expiry values display an error instead of a validity claim.
 See [implementation and current evidence](UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
-The version header describes source metadata, not proof of deployment.
+See [release status and limits](RELEASE_NOTES.md). Relative ages and durations
+remain relative; the absolute timestamp policy does not change console-log formatting.
 
-**Local, unreleased readability follow-up:** Recent Activity reserves stable
+**Current Activity readability:** Recent Activity reserves stable
 fields and explicitly labels server-wide requests. Operations endpoint labels
 truncate within their columns, retain full identity on hover, and use locally
 scrollable tables on mobile. Nine responsive Chromium cases cover these
 outcomes. See [validation and release boundaries](UI_ACTIVITY_ENDPOINT_READABILITY.md).
-The screenshots below still describe their recorded deployment, not this
-unreleased correction.
+The screenshots below retain their recorded capture provenance; they have
+not been re-shot for this release.
 
-**Local, unreleased inventory follow-up:** Dashboard now caps its endpoint
+**Current inventory behavior:** Dashboard caps its endpoint
 summary at five entries and links to the full inventory. Endpoints uses a
 compact searchable table with filters outside its results scroll region.
 Discovery uses searchable endpoint selectors and the contract-first order
@@ -172,7 +173,7 @@ The sidebar collapses to an icon rail via the chevron at its bottom, persisting 
 > and a gate keeps it that way: adding a setting to the registry without giving it a control now
 > fails the build.
 
-The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Groups, Status). Below: a 24-hour request-volume sparkline, an **Activity analytics** block (Operations 24h / 7d, User ops 30d, Group ops 30d) with a Users-vs-Groups split bar, and a bounded endpoint summary. The local follow-up shows at most five entries in existing inventory order, resource counts, and **Browse all endpoints**. It does not claim favorite or recent ranking.
+The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Groups, Status). Below: a 24-hour request-volume sparkline, an **Activity analytics** block (Operations 24h / 7d, User ops 30d, Group ops 30d) with a Users-vs-Groups split bar, and a bounded endpoint summary. The summary shows at most five entries in existing inventory order, resource counts, and **Browse all endpoints**. In 0.55.54 each entry is a compact horizontal row, with a left-aligned endpoint name and resource information rather than a tall stack of boxes. It does not claim favorite or recent ranking.
 
 ![Dashboard](screenshots/prod-01-dashboard.png)
 
@@ -187,12 +188,14 @@ The landing page. Top row shows four KPI cards (Endpoints, Total Users, Total Gr
 
 ## 6. Endpoints
 
-The local follow-up is a searchable table of every endpoint. The header shows
+The searchable table lists every endpoint. The header shows
 the total count and **Create endpoint**; rows expose display name, copyable ID,
 profile schema names, Active/Inactive status and the copyable base path.
 The existing `q` URL filter searches name, ID, published profile summary and
-status, and survives Back/Forward. The filter stays outside the 420 px results
-scroll region. On mobile the table scrolls inside that region, not the page.
+status, and survives Back/Forward. Names are left-aligned in their existing
+column. The filter stays outside the results scroll region, whose height
+adapts to the available window space with a safe minimum instead of a fixed
+420 px height. On mobile the table scrolls inside that region, not the page.
 The recorded deployment screenshot below still shows the former card grid.
 
 ![Endpoints](screenshots/prod-02-endpoints.png)
@@ -332,6 +335,12 @@ The recovery action uses the shared structured SCIM filter builder to search Use
 
 A read-only view of each endpoint's SCIM discovery surfaces (RFC 7644 §4 + §5): `ServiceProviderConfig`, `ResourceTypes`, and `Schemas`. Pick one endpoint to inspect, or two to compare **side-by-side**. The Schemas diff colors each attribute characteristic green (tighten), red (relax), or grey (unchanged) using the same partial order the API's tighten-only validator enforces.
 
+Selection is compact and searchable; the tabs are ordered **Schemas**,
+**ResourceTypes**, **ServiceProviderConfig**. The current diff is an inspection
+aid, not a complete recursive or symmetric conformance check. Inspect the
+actual published payloads when a nested attribute or secondary-only resource
+type matters.
+
 ![Discovery Explorer](screenshots/prod-03-discovery.png)
 
 | Action | Endpoint |
@@ -345,6 +354,11 @@ A read-only view of each endpoint's SCIM discovery surfaces (RFC 7644 §4 + §5)
 ## 10. Operations
 
 A current-state cross-endpoint inventory of Users and Groups across **every** endpoint on the server. Three tabs: **All Users**, **All Groups**, **Statistics**. Each row shows the resource, its `active` state, the owning endpoint display name, and the created timestamp. An **Active only** toggle and **Download CSV** export operate on the current page; clicking an endpoint label jumps to that endpoint's tab. Use **View request history** to pivot to Logs.
+
+Endpoint names are plain, bounded links with separate copy and new-tab actions,
+not outlined badges. Created timestamps include full UTC date and time.
+Search/filter toolbars stay outside their bounded results scroll owners;
+URL-owned filters survive navigation.
 
 ![Operations](screenshots/prod-04-operations.png)
 

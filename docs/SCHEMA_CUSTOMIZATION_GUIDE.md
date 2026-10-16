@@ -4,13 +4,17 @@
 `members.$ref`. Server-materialized optional keys whose value is `undefined`
 do not count as submitted sub-attributes. Real undeclared fields, including
 null or empty values, remain rejected in strict mode. See
-[minimal membership coverage and current reference-storage limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+[minimal membership coverage](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+Accepted references are preserved exactly on both backends, subject to
+effective mutability and response projection. See
+[reference persistence and migration compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
+and [release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
+> **P7a correctness, included since 0.55.36:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.
-> They are not yet merged or deployed. Omitted RFC defaults remain supported.
+> Original isolated receipts remain historical. Omitted RFC defaults remain supported.
 > The [recursive readOnly follow-up and capability matrix](SCIM_P7_CHARACTERISTIC_STATUS.md)
 > covers nested-complex compatibility mode without changing its flag/default.
 > `global` remains a valid RFC keyword; rejection here is a provider policy.
@@ -25,17 +29,17 @@ null or empty values, remain rejected in strict mode. See
 > used as an extension is preserved; common overrides apply to its core use
 > only, not globally to the shared declaration.
 
-> **Local PUT array correction, 2026-09-29:** [Entry preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
+> **PUT array correction, included since 0.55.36:** [Entry preservation](SCIM_PUT_ENTRY_PRESERVATION.md)
 > pairs retained complex values once each across cores/extensions and nested
 > compatibility arrays. Duplicate value/type and anonymous entries use stable
 > occurrence fallback, not a fabricated identity. Required and immutable
-> failures reject the entire PUT in both strict modes; this is not deployed.
+> failures reject the entire PUT in both strict modes.
 
 > **Version**: 3.2 · **Date**: 2026-09-18 · **Status**: Complete (profile ownership and route structure re-verified against v0.55.24; the full line-by-line schema source pass dates from v0.53.0)
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types
 > **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
 
-### Pending release: PATCH validation uses typed paths
+### Current behavior: PATCH validation uses typed paths
 
 The [P7b integration](SCIM_P7B_PATCH_SCHEMA_CONTRACTS.md) extends this to whole
 namespace objects and numeric-version URNs. With strict validation enabled,

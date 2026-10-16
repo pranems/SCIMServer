@@ -4,11 +4,14 @@
 materialized `undefined` properties as absent, consistently with top-level
 attributes. Actual undeclared values still fail. Do not expand a minimal
 value/$ref member schema or disable strict validation to work around server
-representation. See [implementation and separate reference-storage limit](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+representation. Accepted member references now round-trip without rewriting
+or fetching them. See [minimal-schema validation](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md),
+[reference persistence and compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
+and [release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> **Local P7a update, not deployed:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
+> **P7a behavior, included since 0.55.36:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > adds declaration/type/cardinality checks, required extension enforcement,
 > readonly POST/PUT ignoring, and immutable PUT preservation. `global`
 > uniqueness is rejected as an unsupported provider promise.
@@ -23,7 +26,7 @@ representation. See [implementation and separate reference-storage limit](GOOGLE
 > in another: [common semantics are resolved per binding](SCIM_P7_COMMON_ATTRIBUTE_CONTEXT.md),
 > not inferred solely from a URN prefix or applied to every namespaced homonym.
 
-> **C0 local uniqueness integration, not deployed:** an extension's numeric/MV
+> **C0 uniqueness behavior, included since 0.55.36:** an extension's numeric/MV
 > id/externalId and scalar meta may carry supported server uniqueness even
 > when that same schema is a core elsewhere. Core writes compile the effective
 > RFC common view, extension writes compile the independent declared view,
@@ -75,7 +78,7 @@ String only, not to a namespaced extension externalId integer array or a
 custom-core displayName/active shape. Rejected values leave the stored
 resource and version unchanged.
 
-**PUT retained-state correction, integrated but not deployed:** when an
+**PUT retained-state correction, included since 0.55.36:** when an
 extension contains repeated complex values, preserving readOnly/omitted
 immutable children must not copy one old entry's server data to several
 new entries. The shared [P7 retention contract](SCIM_P7A_PROFILE_VALIDATION.md#integrated-put-preservation-of-repeated-complex-entries)
@@ -83,8 +86,8 @@ consumes prior occurrences once, disambiguates by `type`, and keeps anonymous
 occurrence order. It does not add uniqueness restrictions or change RFC
 defaults.
 
-The [P1 implementation](SCIM_P1_IMPLEMENTATION.md) is locally integrated, not
-deployed. It interprets an extension path such as
+The [P1 implementation](SCIM_P1_IMPLEMENTATION.md), included since 0.55.36,
+interprets an extension path such as
 `urn:contoso:scim:schemas:extension:contacts:2.0:User:contacts[primary eq true].value`
 as a typed selector. A native Boolean, number, or compound predicate is not a
 literal property name. Register the extension and ResourceType binding before
@@ -359,7 +362,7 @@ urn:opentext:scim:schemas:extension:mailbox:2.0:User
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:Schema"
   ],
-  "id":   "urn:opentext:scim:schemas:extension:mailbox:2.0:User",
+  "id": "urn:opentext:scim:schemas:extension:mailbox:2.0:User",
   "name": "Mailbox",
   "description": "OpenText mailbox routing extension for User. Carries the user's full set of mailbox-addressable identifiers as a flat list of typed-prefix strings, wire-compatible with Microsoft Exchange / Entra ID 'proxyAddresses' semantics.",
   "attributes": [
@@ -407,7 +410,7 @@ urn:opentext:scim:schemas:extension:mailbox:2.0:User
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
   ],
-  "id":   "User",
+  "id": "User",
   "name": "User",
   "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
   "endpoint": "/Users",
@@ -450,7 +453,7 @@ Accept:        application/scim+json
     "givenName": "Barbara",
     "familyName": "Jensen"
   },
-  "active":   true,
+  "active": true,
   "urn:opentext:scim:schemas:extension:mailbox:2.0:User": {
     "proxyAddresses": [
       "SMTP:bjensen@example.com",

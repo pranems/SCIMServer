@@ -1,8 +1,8 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> **Version:** 0.55.54 - **Updated:** 2026-09-18
+> **Version:** 0.55.54 - **Updated:** 2026-10-16
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
 > **Source of truth:** [endpoint.controller.ts](../api/src/modules/endpoint/controllers/endpoint.controller.ts) - [built-in-presets.ts](../api/src/modules/scim/endpoint-profile/built-in-presets.ts)
 
@@ -12,9 +12,12 @@ This is the "start here" page. For deeper reference see:
 [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) (complete settings inventory) -
 [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) (every route).
 
+For current user-visible changes, minimal Group schemas, migration/rollback
+and deployment limits, start with [release notes](RELEASE_NOTES.md).
+
 An endpoint profile is portable configuration, not a complete running endpoint export. It includes schemas, ResourceTypes, capability inputs, endpoint settings, and non-secret authentication method declarations. Credentials, secrets, resources, logs, and server policy are configured separately. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
-**P7a local source update, not deployed:** when creating/updating an inline
+**P7a behavior, included since 0.55.36:** when creating/updating an inline
 profile, use Boolean characteristic values, valid SCIM type/mutability/returned
 keywords and arrays of attribute definitions. Omitted RFC defaults remain
 valid. Unsupported `global` uniqueness is rejected before saving. See
@@ -31,7 +34,7 @@ preserves the declaration and applies common semantics only to core usage.
 Admin rejection of conflicting **core-only** declarations is an explicit
 provider choice; RFC precedence itself does not prescribe an admin API.
 
-**C0 local admission update, not deployed:** `uniqueness:server` must be
+**C0 admission behavior, included since 0.55.36:** `uniqueness:server` must be
 supported for the declared type and stored path. Boolean/dateTime/binary and
 whole-complex promises are rejected before endpoint creation or profile
 publication; supported scalar leaves remain available. Shared schemas retain

@@ -42,6 +42,12 @@
       "maxAgeDays": 120
     },
     {
+      "path": "docs/RELEASE_NOTES.md",
+      "title": "User-facing release notes and upgrade guidance",
+      "sources": ["api/package.json", "web/package.json"],
+      "maxAgeDays": 90
+    },
+    {
       "path": "docs/AUTHENTICATION_GUIDE.md",
       "title": "Authentication and Entra ID",
       "sources": [
@@ -75,7 +81,7 @@
     {
       "path": "docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md",
       "title": "Mirroring production data into dev",
-      "sources": ["scripts/replicate-endpoints.ps1"],
+      "sources": ["scripts/replicate-endpoints.ps1", "api/src/scripts/mirror-prod-to-dev.ts"],
       "maxAgeDays": 120
     },
     {
@@ -87,7 +93,13 @@
     {
       "path": "docs/UI_GUIDE.md",
       "title": "Admin UI tour",
-      "sources": ["web/src/pages/", "web/src/routes/"],
+      "sources": [
+        "web/src/pages/",
+        "web/src/routes/",
+        "web/src/components/primitives/DateTimeField.tsx",
+        "web/src/components/primitives/FilteredResultsPanel.tsx",
+        "web/src/utils/date-time.ts"
+      ],
       "maxAgeDays": 90
     },
     {
@@ -104,7 +116,13 @@
     {
       "path": "docs/COMPLETE_API_REFERENCE.md",
       "title": "REST API reference",
-      "sources": ["api/src/modules/scim/controllers/", "api/src/oauth/oauth.controller.ts"],
+      "sources": [
+        "api/src/modules/scim/controllers/",
+        "api/src/oauth/oauth.controller.ts",
+        "api/src/domain/validation/schema-validator.ts",
+        "api/src/modules/scim/services/endpoint-scim-groups.service.ts",
+        "api/src/modules/scim/dto/create-group.dto.ts"
+      ],
       "maxAgeDays": 90
     },
     {
@@ -163,7 +181,11 @@
     {
       "path": "docs/PATCH_OPERATIONS_COMPLETE_GUIDE.md",
       "title": "PATCH behaviour",
-      "sources": ["api/src/domain/patch/", "api/src/modules/scim/utils/scim-patch-path.ts"],
+      "sources": [
+        "api/src/domain/patch/",
+        "api/src/modules/scim/utils/scim-patch-path.ts",
+        "api/src/modules/scim/services/endpoint-scim-groups.service.ts"
+      ],
       "maxAgeDays": 120
     },
     {

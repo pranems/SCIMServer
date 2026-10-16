@@ -2,7 +2,7 @@
 
 > **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
-> **Updated:** 2026-10-12
+> **Updated:** 2026-10-16
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 >
 > **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines the portability boundary, discovery translation, authentication provenance, API/DB ownership, and target UX. This document remains authoritative for current profile expansion and PATCH merge semantics.
@@ -27,7 +27,12 @@
 
 ## Overview
 
-**C0 local uniqueness bridge, not deployed:** structural validation is followed
+For release status, upgrade steps and the member-reference migration, see
+[release notes](RELEASE_NOTES.md). Profile fingerprints avoid repeated
+conversion of unchanged persisted profiles; normalization retains the stored
+revision so only a real concurrent edit produces a revision conflict.
+
+**C0 uniqueness behavior, included since 0.55.36:** structural validation is followed
 by per-ResourceType uniqueness capability compilation. Core-only raw promises
 are checked before common normalization; schemas shared with an extension keep
 their raw declaration, and the effective core view uses RFC common
@@ -37,7 +42,7 @@ them. The view adapter does not alter the stored profile. Omitted optional
 extension lists are normalized on copied ResourceTypes before validation
 consumers iterate them. [Design, RED/GREEN and parity receipt](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29).
 
-**P7a implementation note (local, not deployed):** the existing profile
+**P7a behavior, included since 0.55.36:** the existing profile
 pipeline validates raw declarations before expansion, then expanded
 declarations before tighten-only/structural checks. This prevents malformed
 containers or unknown types from becoming accepted profiles. ResourceType
@@ -635,11 +640,21 @@ Operators use **ShorthandProfileInput** for concise definitions. The auto-expand
       "id": "urn:ietf:params:scim:schemas:core:2.0:User",
       "name": "User",
       "attributes": [
-        { "name": "userName" },
-        { "name": "displayName" },
-        { "name": "emails" },
-        { "name": "active" },
-        { "name": "password" }
+        {
+          "name": "userName"
+        },
+        {
+          "name": "displayName"
+        },
+        {
+          "name": "emails"
+        },
+        {
+          "name": "active"
+        },
+        {
+          "name": "password"
+        }
       ]
     },
     {
@@ -651,8 +666,18 @@ Operators use **ShorthandProfileInput** for concise definitions. The auto-expand
       "id": "urn:example:schemas:custom:2.0:User",
       "name": "CustomExtension",
       "attributes": [
-        { "name": "badgeCode", "type": "string", "mutability": "writeOnly", "returned": "never" },
-        { "name": "internalId", "type": "string", "mutability": "readOnly", "returned": "always" }
+        {
+          "name": "badgeCode",
+          "type": "string",
+          "mutability": "writeOnly",
+          "returned": "never"
+        },
+        {
+          "name": "internalId",
+          "type": "string",
+          "mutability": "readOnly",
+          "returned": "always"
+        }
       ]
     }
   ],
@@ -663,17 +688,34 @@ Operators use **ShorthandProfileInput** for concise definitions. The auto-expand
       "endpoint": "/Users",
       "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
       "schemaExtensions": [
-        { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
-        { "schema": "urn:example:schemas:custom:2.0:User", "required": false }
+        {
+          "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+          "required": false
+        },
+        {
+          "schema": "urn:example:schemas:custom:2.0:User",
+          "required": false
+        }
       ]
     }
   ],
   "serviceProviderConfig": {
-    "patch": { "supported": true },
-    "bulk": { "supported": false },
-    "filter": { "supported": true, "maxResults": 200 },
-    "sort": { "supported": true },
-    "etag": { "supported": true }
+    "patch": {
+      "supported": true
+    },
+    "bulk": {
+      "supported": false
+    },
+    "filter": {
+      "supported": true,
+      "maxResults": 200
+    },
+    "sort": {
+      "supported": true
+    },
+    "etag": {
+      "supported": true
+    }
   },
   "settings": {
     "StrictSchemaValidation": true,

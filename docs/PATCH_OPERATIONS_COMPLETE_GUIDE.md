@@ -5,16 +5,22 @@ Group adapter projects them into storage fields. Strict mode rejects actual
 undeclared fields rather than silently dropping them. Internally materialized
 undefined optional fields are absent, not invalid wire attributes. See
 [minimal Group membership proof and limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+Accepted `members.$ref` values now survive ordered add/replace/remove and
+readback exactly, subject to the effective immutable/returned policy. A
+rejected later operation saves no earlier mutation. See
+[reference persistence and rollback compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
+and [current release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-30 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
 **Audience:** integrators wiring a SCIM client (Microsoft Entra ID, Okta, custom), operators configuring endpoint profiles, and contributors changing PATCH code.
 
 **Status:** living reference. P1 typed paths and P2 shared ordered execution
-were verified on isolated implementation branches with both local persistence
-backends, not deployed. See [P1](SCIM_P1_IMPLEMENTATION.md) and
+were verified on isolated implementation branches with both persistence
+backends and are included in the correctness release since 0.55.36. Their
+original local-only receipts are historical. See [P1](SCIM_P1_IMPLEMENTATION.md) and
 [P2 behavior, compatibility and evidence](SCIM_P2_IMPLEMENTATION.md). This is
 not an all-PATCH or whole-roadmap conformance claim.
 

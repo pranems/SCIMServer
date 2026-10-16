@@ -1,6 +1,14 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+
+**Current operator presentation:** all absolute UI timestamps carry complete
+UTC date/time, milliseconds and timezone; invalid expiry values are explicit,
+not a success-shaped validity claim. Copy controls do not navigate a containing
+request row. Operations uses plain endpoint links and separate copy/open
+actions. These are UI changes, not a console-format or correlation-ID change.
+See [release notes](RELEASE_NOTES.md), [UI tour](UI_GUIDE.md) and
+[navigation contracts](GLOBAL_NAVIGATION_AND_WORKFLOW_CONTEXT.md).
 
 Custom ResourceType operations are first-class Activity entries with
 `resourceType`, `resourceEndpoint`, and `resourceIdentifier`. Create, update,
@@ -343,11 +351,29 @@ The short-TTL admin store keeps recent decisions for 30 minutes (`AUTH_DECISION_
   "endpointId": "d915cf86-414f-47a0-98e0-bcaf45791c9b",
   "correlationId": "a16360c6-db64-4949-ae7c-3bb49084a32e",
   "checks": [
-    { "id": "jwks_signature", "status": "pass", "expected": "RS256", "received": "RS256" },
-    { "id": "issuer_match", "status": "pass", "expected": "https://issuer", "received": "https://issuer" },
-    { "id": "audience_match", "status": "fail", "expected": "api://app", "received": "api://wrong" }
+    {
+      "id": "jwks_signature",
+      "status": "pass",
+      "expected": "RS256",
+      "received": "RS256"
+    },
+    {
+      "id": "issuer_match",
+      "status": "pass",
+      "expected": "https://issuer",
+      "received": "https://issuer"
+    },
+    {
+      "id": "audience_match",
+      "status": "fail",
+      "expected": "api://app",
+      "received": "api://wrong"
+    }
   ],
-  "decodedClaims": { "iss": "https://issuer", "aud": "api://wrong" }
+  "decodedClaims": {
+    "iss": "https://issuer",
+    "aud": "api://wrong"
+  }
 }
 ```
 

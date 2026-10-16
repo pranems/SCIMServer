@@ -1,10 +1,21 @@
 # Prod -> Dev mirroring + synthetic shape-coverage fixtures
 
-> **Status:** User-facing reference - **Last verified:** 2026-07-31 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
 > **Version:** 0.55.54  -  **Date:** May 6, 2026
 > **Scope:** dev-tooling, no API surface change
 > **Affects:** [api/src/scripts/mirror-prod-to-dev.ts](../api/src/scripts/mirror-prod-to-dev.ts), [api/src/scripts/seed-shape-coverage.ts](../api/src/scripts/seed-shape-coverage.ts), [scripts/mirror-prod-to-dev.ps1](../scripts/mirror-prod-to-dev.ps1)
+
+**Member-reference compatibility:** the current database mirror carries nullable
+`ResourceMember.reference` so accepted `members.$ref` values are not silently
+discarded. Verify source, target and tool schema versions before copying an
+older estate; do not assume a new generated database client can query a column
+that an old source does not have. Existing rows need no invented reference.
+Use an explicit schema-compatible copy plan, obtain exclusive fixture ownership
+and verify exact values/IDs after copying. This note does not authorize
+customer access or destructive fixtures. See
+[release upgrade steps](RELEASE_NOTES.md#upgrade-and-rollback) and
+[migration compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
 
 ---
 

@@ -2,10 +2,28 @@
 
 All notable changes to SCIMServer will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### User-facing release and documentation reconciliation
+
+- Add [curated release notes](docs/RELEASE_NOTES.md) with the 0.55.54 operator
+  changes, 0.55.20 upgrade summary, migration/rollback steps and known limits.
+  Link them from README, the documentation index, deployment and affected guides.
+- Correct stale local/not-deployed labels for shipped P1-P9, profile-revision
+  and UI behavior; document available-height results, compact endpoint rows,
+  complete absolute UTC timestamps and exact minimal Group reference contracts.
+- Preserve old screenshots, measured preset tables and wire-capture provenance.
+  Positive provisional visual feedback was received; its target/version was
+  not confirmed, and no customer-production promotion is authorized.
+- Bind package version changes to release notes through the existing freshness
+  manifest; extend missing Group, UI primitive and mirror source/doc bindings.
+- No runtime/version/dependency/lockfile/deployment change. Retained full
+  six-mode inventory is 6,060 units per backend, 2,516 InMemory HTTP passes plus
+  four exclusions, 2,520 PostgreSQL HTTP passes and 1,624 Web passes.
+  The protected HTTP selection remains 2,460 passes plus four exclusions.
 
 ### 0.55.54 matched assurance evidence
 
@@ -24,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   increases 8.18% while retaining 72.07% headroom under the same 1 GiB limit.
   This justifies a bounded dev/canary disposition, not a claim that the
   observed 0.5-CPU tail thresholds passed or that production quotas changed.
-- Each successful private trace executes 66 real membership outcomes and
+- Each successful private trace executes 66 registered membership-section
+  assertions, including 16 embedded error/state oracle self-checks, and
   checks 200 persisted Group log rows, including seven errors, for UUID
   correlation, duration, expected statuses and actual Authorization redaction.
   Generated credentials are absent from the checked stored/console samples;

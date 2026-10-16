@@ -1,8 +1,12 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-12 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
+
+**What's new and how to upgrade:** [User-facing release notes](docs/RELEASE_NOTES.md)
+cover 0.55.54, cumulative changes since 0.55.20, migration/rollback steps and
+known limits. See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
 
 For actual supported shapes and integration limits, see
 [SCIM/Entra compatibility](docs/SCIM_ENTRA_COMPATIBILITY.md) and
@@ -14,7 +18,9 @@ schema before applying a targeted compatibility setting.
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![Tests](https://img.shields.io/badge/tests-10%2C058%20pass-brightgreen)]()
+[![API units](https://img.shields.io/badge/API_units-6%2C060%20pass-brightgreen)](#testing)
+[![PostgreSQL HTTP](https://img.shields.io/badge/PostgreSQL_HTTP-2%2C520%20pass-brightgreen)](#testing)
+[![Web units](https://img.shields.io/badge/Web_units-1%2C624%20pass-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---
@@ -1382,22 +1388,21 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 
 ## Testing
 
-### Test Pyramid
+### Current validation selections
 
-```
-                    +-------------------+
-                    |   112 ISV Tests   |  Lexmark SCIM Validator
-                    +-------------------+
-                 +-------------------------+
-                 |   1,027 Live Tests     |  PowerShell, real HTTP
-                 +-------------------------+
-              +-------------------------------+
-              |   1,217 E2E Tests (63 suites) |  Supertest, in-process
-              +-------------------------------+
-           +-------------------------------------+
-           |   3,816 Unit Tests (103 suites)      |  Jest, mocked deps
-           +-------------------------------------+
-```
+| Layer | 0.55.54 result |
+|---|---|
+| API units, each backend mode | 6,060 PASS, 211 suites |
+| Full HTTP, InMemory | 2,516 PASS, four PostgreSQL-specific exclusions, 119 suites |
+| Full HTTP, PostgreSQL | 2,520 PASS, 119 suites |
+| Default protected CI/pre-push HTTP | 2,460 PASS, four exclusions, 117 suites; two logging suites are included by the full release matrix instead |
+| Web units | 1,624 PASS, 123 files |
+| Docker/dev/canary live checks | 1,795 registered assertions per run, including embedded oracle self-checks |
+| Native Entra provisioning | 50 checks across three auth modes; actual membership readback and 15 successful cleanup entries |
+| Authoritative dev browser | 324 expected passes, zero skipped/unexpected/flaky |
+
+These selections overlap; do not sum repeated runs as unique coverage.
+See [release validation scope and limits](docs/RELEASE_NOTES.md#validation-and-deployment-status).
 
 ### Run Tests
 

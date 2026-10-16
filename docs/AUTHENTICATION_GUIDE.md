@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-09-24 - **Product version:** `0.55.54`
+> **Status:** Living reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
 >
 > **The captured protocol examples below were measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -9,6 +9,15 @@
 > **Reproduce the screenshots:** `pwsh scripts/capture-auth-guide.ps1 -BaseUrl <url> -EndpointId <id> -Apply`
 >
 > **Companions:** [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) - every endpoint setting. [UI_GUIDE.md](UI_GUIDE.md) - screen tour. [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - route reference.
+
+**Current UI and provisioning evidence:** diagnostics, credential and connection
+timestamps use complete UTC date/time; invalid or timezone-free expiry values
+are not presented as valid. Copy actions retain the source value without
+triggering the containing navigation/accordion action. The latest native
+Entra journey passed all three tested auth modes, but does not establish every
+first-party/sovereign acquisition-mode claim. See
+[release scope and limits](RELEASE_NOTES.md). Historical wire captures below
+retain their original endpoint and capture provenance; they were not recaptured.
 
 ---
 
@@ -737,7 +746,9 @@ Every failure carries a diagnostics extension. Verbatim 401 from the reference e
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:Error"
+  ],
   "detail": "Invalid bearer token.",
   "status": "401",
   "scimType": "invalidToken",
