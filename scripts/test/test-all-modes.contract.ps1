@@ -103,6 +103,7 @@ try {
     $npmShimDirectory = Join-Path $sandbox 'bin'
     New-Item -ItemType Directory -Path $sandboxScripts, $sandboxApiModules, $npmShimDirectory | Out-Null
     Copy-Item -LiteralPath $orchestrator -Destination (Join-Path $sandboxScripts 'test-all-modes.ps1')
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts' 'assert-dependency-ownership.ps1') -Destination $sandboxScripts
     @(
         '@echo off'
         'exit /b 0'

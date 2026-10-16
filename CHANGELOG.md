@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Physical dependency ownership preflight (tooling only)
+
+- Refuse linked checkout/project/top-level dependency directories before
+  mutation-capable work in protected push, backend matrix, dev deployment,
+  local/Docker validation and the quality-gate walker. Report absent
+  dependencies explicitly; never install, unlink or modify a linked target.
+- Confirm initial RED, then 31/31 ownership assertions, including real
+  runner subprocess refusals with external-command sentinels. Related
+  matrix, dev-pipeline and walker contracts pass. Add the ownership contract
+  as the first protected gate. Product test counts and version stay unchanged.
+- Record root-cause analysis and the deliberately physical-directory policy
+  in the [implementation guide](docs/strategy/DEPENDENCY_OWNERSHIP_PREFLIGHT.md).
+  No dependency, lockfile, runtime or deployed image changed.
+
 ### Inventory visual acceptance follow-up (tests only)
 
 - Intended visual change because the merged inventory/navigation/history UI

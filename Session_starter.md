@@ -2,8 +2,9 @@
 
 **Last verified:** 2026-10-16
 
-**Current checkpoint:** PR #229 merged normally at `c1a466ec` after all
-seven exact-final-tip checks. Dev runs 0.55.51 on
+**Current checkpoint:** PR #230 merged normally at `5bf94f93` after all
+seven final-tip checks and the normal protected push.
+Dev remains on the unchanged 0.55.51 runtime `c1a466ec` on
 `scimserver-dev--vc1a466ec`, digest
 `sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
 The fresh no-skip pipeline remains failed: 34 PASS, 1 FAIL, 5 SKIPPED and
@@ -19,7 +20,7 @@ API units remain 6,048/210 suites, selected InMemory E2E 2,432/116 suites
 with four native-only exclusions. Native gallery remains 50/50 with
 15 cleanup PASS. Version locks were generated only in CI.
 
-The assigned branch is `test/inventory-visual-baselines-20261016`, based on
+The merged visual branch was `test/inventory-visual-baselines-20261016`, based on
 merged `c1a466ec`. Three inspected intended inventory/navigation/history
 baselines are refreshed. Actual response counts and table row counts are
 asserted before suppressing only live-count foreground pixels; a new
@@ -42,9 +43,15 @@ the windows served 84 versus 29,405 requests.
 Dev pruning passes: four -> two active revisions, unchanged serving image
 at 100%, and the prior 0.55.50 revision retained for rollback.
 
-Remaining: protected visual-test consolidation/CI/PR and explicit
-operator visual acceptance. Dependency ownership preflight and Mermaid
-editor/gate alignment remain separate tooling changes. No further runtime
+The active separate tooling branch is
+`fix/dependency-ownership-preflight-20261016`. Its shared guard protects five
+validation entry points; 31 ownership assertions and related orchestrator
+contracts pass after meaningful RED. Real subprocess negative controls
+confirm no npm/Node/Docker/Azure/Git work starts through linked dependencies.
+The tooling change still needs protected consolidation.
+
+Remaining: explicit operator visual acceptance and the active tooling
+consolidation. Mermaid editor/gate alignment remains separate. No further runtime
 bump applies to this test-only follow-up. No canary/customer-prod work.
 See [inventory visual follow-up and RCA](docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
 and [portable dev acceptance](docs/evidence/DEV_05551_ACCEPTANCE_20261016.json).
@@ -120,6 +127,7 @@ No canary or customer-production change. See the
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | PR #230 merged at `5bf94f93`; no runtime drift or redeployment. Separate dependency-ownership tooling now passes 31 negative/positive assertions and related runner contracts; protected consolidation remains. Operator visual approval is still blocked; Mermaid alignment remains separate. |
 | 2026-10-16 | Original legacy reference passes 19/19 with its unchanged 0.55.47 raw revision and zero fixture rows left. Nine direct change-scoped review dispositions, actual one-SELECT tracing and three controlled memory/latency pairs are recorded. Dev pruning keeps serving plus rollback only. Protected visual consolidation and operator acceptance remain open; tooling follow-ups stay separate. |
 | 2026-10-16 | PR #229 merged at `c1a466ec`; dev 0.55.51 deployed. Both endpoint-list latency comparisons pass. Three inspected visual baselines corrected, zero-tolerance actual-matcher control passes, and 321 distinct browser cases pass across 310 + 11 receipts. Original 74 endpoint IDs and exact deployed digest verified unchanged. Protected visual-test consolidation, reviewer gates, reference proof, pruning and operator acceptance remain open. |
 | 2026-10-16 | PR #228 merged at4d11770c with7 exact-tip checks PASS. Separate endpoint-list correction passes4 RED/GREEN regressions,191 focused units,37 InMemory HTTP cases and API build; warmed CPU p95 falls43.6404->13.3925ms, with0 repeat clones/revisions. Runtime version/CI/deployment and live latency closure remain pending. |

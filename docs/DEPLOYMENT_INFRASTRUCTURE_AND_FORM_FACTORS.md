@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-15 - **Repo version at capture:** `api/package.json` = `0.55.49`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.51`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -784,6 +784,15 @@ Without `-BlueGreen` the script falls back to a legacy auto-flip: update the ima
 
 ### 8.3 The full dev pipeline - `dev-deployment-pipeline.ps1`
 
+Before any executing stage, the shared
+[dependency ownership preflight](strategy/DEPENDENCY_OWNERSHIP_PREFLIGHT.md)
+rejects linked checkout/project/dependency directories without touching their
+targets. The same guard protects pre-push, backend matrix, local/Docker
+validation and the quality-gate walker. Missing dependencies are reported
+explicitly and remain subject to existing prerequisites. A true `-DryRun`
+does not execute the guard or any deployment. This adds no estate, image,
+traffic or retention-policy change.
+
 | Stage | Gate |
 |---|---|
 | 0 | Prereqs (`git npm node docker az gh`, Docker daemon, `az account show`), tag confirmation, dev **before-state** snapshot to `test-results/dev-before-<sha>.json` |
@@ -1096,6 +1105,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-10-16 | Added physical dependency ownership preflight before executing validation/deployment work, with actual runner refusal and command-sentinel negative controls. No topology, live deployment, publication or promotion behavior changed. |
 | 2026-10-14 | Migrated the Stage 3 reviewer-gate registrations in [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) from deleted prompt-file terminology to committed Agent Skill slash invocations. This is an orchestration-label and operator-guidance change only: executable deployment stages, image publication, estate resolution, Azure operations, and promotion behavior are unchanged. Re-reviewed the Section 10 drift register with no topology or live-estate fact change. |
 | 2026-10-10 | Raised the bounded per-process database pool from 5 to 10 after measuring the dev estate's 50-connection server ceiling, one-replica limit, and two-revision retention. Added the explicit 20-connection worst-case application budget and 30-connection headroom. |
 | 2026-10-09 | **Local Docker validation is isolated from existing Compose estates and its exit status is authoritative.** The normal form factor keeps ports 8080/5432 and its established container names by default. The full validation runner now assigns a process-specific project, unique container names and available loopback host ports through explicit Compose variables. It uses `127.0.0.1` for the live-test target, invokes child scripts with named hashtable splatting, checks their exit codes, and exits nonzero when either live lane fails. This closes a merged-master pipeline failure where another worktree legitimately owned both standard ports, followed by a positional-argument binding failure that the wrapper incorrectly returned as success. The gate no longer asks the operator to stop unrelated services, risks validating the wrong database, or hides a red live contract behind exit code 0. |

@@ -84,6 +84,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+& (Join-Path $PSScriptRoot 'assert-dependency-ownership.ps1') -RepositoryRoot $repoRoot
 Set-Location $repoRoot
 
 $results = [System.Collections.Generic.List[object]]::new()
@@ -160,6 +161,10 @@ function Show-Summary {
 # -------------------------------------------------------------------------
 # Fast gates (always run)
 # -------------------------------------------------------------------------
+
+Invoke-Gate -Name 'dependencies: ownership negative controls' -Action {
+    pwsh -NoProfile -File (Join-Path $PSScriptRoot 'test' 'dependency-ownership.contract.ps1')
+}
 
 Invoke-Gate -Name 'api: tsc build' -WorkingDir (Join-Path $repoRoot 'api') -Action {
     npm run build 2>&1 | Out-Host

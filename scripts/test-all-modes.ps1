@@ -65,6 +65,12 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+try {
+    & (Join-Path $PSScriptRoot 'assert-dependency-ownership.ps1') -RepositoryRoot $repoRoot
+} catch {
+    Write-Error $_ -ErrorAction Continue
+    exit 2
+}
 
 # Per-mode result tracking. Each entry is a hashtable with Mode + Passed.
 $results = @()
