@@ -16,6 +16,23 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Replication tests must not manufacture target convergence from source state
+
+A directory membership delete changed the mock target automatically, so the
+scenario passed even when its native provisioning request selected no
+affected member. The real target retained the member through seven skipped
+responses and a 240-second wait. Keep source and target fixture state
+separate; only a transport request selecting the affected reference may
+advance the simulated target. Delete that selection in a negative control
+and require both the target predicate and complete mode to fail.
+
+Provider `links.members` is a selection of references to process, not a
+documented complete desired-state replacement. Verify removal independently
+instead of inferring it from successful addition. This is the third PA-6
+test-double escape and is now enforced by R10.6 and an actual-orchestrator
+negative control. See GM-I24 in
+[the gallery ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
 ### New inline actions invalidate the old text-width budget
 
 A previously bounded endpoint name can collapse when copy/open actions are
@@ -486,7 +503,7 @@ A pattern earns a hard rule after >= 2 escapes OR one high-severity escape. This
 | PA-2 (structural assertion) | 1 (high-sev: false-green) | YES - immediate (high severity) |
 | PA-3 / PA-4 (visual/stale gates) | 2+ (Finding-C, Finding-D) | YES (R1/R2/R3) |
 | PA-5 (viewer-side blindness) | 3 (mermaid invisibility 2026-07-27, and twice on 2026-07-28) | YES - Mermaid Diagram Rule 2 + 9 (R0) + 10 + the doctor and shared renderer-discovery scripts |
-| PA-6 (vacuous RED from a permissive test double) | 2 (both in the 2026-07-30 log-uuid chain: `findUnique`, `createMany`) | convention + negative controls in both specs; promote to a rule on a 3rd sighting |
+| PA-6 (vacuous RED from a permissive test double) | 3 (`findUnique`/`createMany` in the 2026-07-30 log-uuid chain; source-derived target convergence in gallery GM-I24) | YES - R10.6 plus independent-state and omitted-selection negative controls |
 | PA-7 (unasserted stdout / caught-and-logged failures) | 2 (dead fallback + audit-batch loss, both invisible to a 1,368-assertion green run) | convention; candidate live-gate check (count driver-error lines during a live run) |
 | PA-8 (prove a live section against the unfixed build) | 2 (9z-CA 2026-07-30, 9z-CC 2026-07-30) | convention; promote if a decorative section ever ships |
 | PA-10 (aggregate rollback and snapshot consistency) | 1 high-severity Group partial-create escape, plus a deterministic torn-read regression | YES - aggregate integrity rule and stored-state tests |

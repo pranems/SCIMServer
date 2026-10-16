@@ -20,18 +20,48 @@ their owned artifacts. Browser, integrity and pruning remain blocked.
 The failures are not evidence of a timestamp regression or a proven SCIM
 update defect.
 
-The assigned worktree now owns
-`fix/gallery-provisioning-observations-20261016`. Diagnostic-only contracts
+Diagnostic PR #227 merged normally at `f5046202` after 24 protected gates and
+seven exact-tip CI checks. The assigned worktree now owns
+`fix/gallery-group-member-links-20261016`. Diagnostic-only contracts
 first failed on five missing outcomes, then passed after adding per-attempt
 metadata and accurate stages without changing transport, timeouts or target
 assertions. The instrumented WIF run passed Group creation and then failed
 membership addition: 12 PASS/1 FAIL, seven cleanup checks passed. Its native
 membership export was skipped; both Group operations used scheduled fallback.
 Source membership and provider job success did not prove target membership.
+The next correction now passes 92 contracts: explicit native Group member
+links, shared bounded convergence and safe scheduled-start admission.
+Its first WIF run passed native creation/addition but failed removal with an
+empty linked selection (13 PASS/1 FAIL, all seven cleanup checks PASS).
+The corrected run selects the affected User for both addition and removal;
+WIF run `20261015-195022-dd75d395` passes 18/18 with all seven cleanup checks
+passed, including native removal on attempt one and both deprovisioning
+outcomes. A separate complete three-mode run is active. Three per-mode RED assertions preceded
+that correction. One further RED negative control exposed the fixture's
+source-derived target; independent target state now prevents that false green.
+One further RED/GREEN control closes mixed linked-export masking: failed
+child steps override parent Success. The preceding complete matrix
+`20261015-195326-1688a987` failed 39 PASS/2 FAIL (OAuth addition and WIF
+removal) despite successful native exports; all 15 cleanup checks passed.
+The exact OAuth Group audit shows removal during requested addition; the
+upstream mechanism remains unproven. Five more assertion-level RED results
+preceded target-aware acceptance under the existing seven-attempt policy.
+Final-source run `20261015-201005-60d2bd31` passes 50/50 across all three
+modes with all 15 cleanup checks passed and 46 observations. All six
+membership transitions complete natively in one or two attempts. Exact
+source SHA256: `1E8287DFA7BB4F451E559235F674759D6709027E4B6CF916F48CDDFE15E2C60C`.
+Protected push, exact-tip CI and normal tooling PR consolidation are next.
+No timeout increase, target weakening or combined partial PASS.
+The separate endpoint-list latency comparison exceeded the
+relative limit (p95 265.52 -> 426.04 ms). Source tracing found new canonical
+profile hashing/cloning before every unchanged-row cache comparison; that
+runtime mechanism needs an isolated regression test and performance fix,
+not a waiver or an unrelated edit in the gallery branch.
 Independent compiled local-node proof now passes all 1,729 assertions in
 87.4 seconds; the exact server was stopped and port16000 has no listener.
 Receipt counters and 1,729 entries agree; the depth-10 diagnostic warning
-remains disclosed. Remaining tasks: complete all-mode gallery proof, dev browser
+remains disclosed. Native all-mode gallery proof is now complete. Remaining
+tasks: consolidate its source, dev browser
 and integrity checks, legacy reference proof,
 performance comparison and operator visual acceptance. Dependency ownership
 preflight and Mermaid editor/gate alignment remain separate tooling work.
@@ -41,6 +71,7 @@ No canary or customer-production change. See the
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | PR #227 merged at f5046202; native linked-member/target-aware correction passes contracts78->92 and final complete gallery50/50 with15cleanupPASS. Independent target state, partial-failure precedence and target-effect guards close observed false-green gaps. |
 | 2026-10-16 | UI 0.55.50 merged and deployed to dev; complete matrix and both 1,729-assertion live lanes passed. Gallery failure correctly blocked downstream acceptance. Private dependencies fixed ownership without installs or lock changes. Gallery contracts70->78; instrumented WIF failed membership after successful Group creation, with seven cleanup checks passed. |
 
 **Earlier gallery evidence, superseded by the current checkpoint above:** PR #218 merged normally

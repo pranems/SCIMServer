@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-10-16
 
-**Status:** PR #226 merged; 0.55.50 deployed to dev. Full acceptance blocked by gallery provisioning; operator visual acceptance pending.
+**Status:** PR #226 merged; 0.55.50 deployed to dev. Native gallery follow-up passes 50/50; latency, dev browser/integrity and operator acceptance remain open.
 
 ## Executive summary
 
@@ -26,6 +26,15 @@ creation. Neither establishes a UI regression or a SCIM update defect.
 The original run remains failed: 33 PASS, 1 FAIL, 6 SKIPPED, 9 reviewer PENDING.
 Dev browser, integrity, revision pruning and operator acceptance remain
 unverified. See the [gallery diagnostic ledger](ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
+The final-source gallery follow-up now passes all 50 checks across all three
+authentication modes with all 15 cleanup checks passed. This is a separate
+receipt, not a relabelled original pipeline. Endpoint-list p95 still fails
+the relative 10% limit (265.52 -> 426.04 ms, +60.45%); source tracing found
+new per-read profile canonicalization/cloning before cache-hit admission.
+That runtime repair and its measured proof remain a separate coherent
+change. Dev-wide browser/integrity/pruning and operator acceptance are not
+claimed complete by the gallery result.
 
 ## Validation ownership correction: DT-I17
 
