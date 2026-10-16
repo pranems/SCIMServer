@@ -1,6 +1,12 @@
 # Custom Resource Extensions - RFC-Compliant Authoring Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.51`
+**Minimal imported Group members:** strict nested validation treats internally
+materialized `undefined` properties as absent, consistently with top-level
+attributes. Actual undeclared values still fail. Do not expand a minimal
+value/$ref member schema or disable strict validation to work around server
+representation. See [implementation and separate reference-storage limit](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.52`
 
 > **Local P7a update, not deployed:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > adds declaration/type/cardinality checks, required extension enforcement,

@@ -16229,6 +16229,8 @@ Write-Host "`n--- 9z-DO: Durable Endpoint Log Name Complete ---" -ForegroundColo
 Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 . "$PSScriptRoot\live-test-sections\profile-revision.ps1"
 Invoke-ScimProfileRevisionContract -BaseUrl $baseUrl -Headers $headers
+. "$PSScriptRoot\live-test-sections\minimal-group-members.ps1"
+Invoke-MinimalGroupMembersContract -BaseUrl $baseUrl -Headers $headers
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

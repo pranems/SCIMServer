@@ -553,6 +553,7 @@ export class SchemaValidator {
     }
 
     for (const [key, value] of Object.entries(obj)) {
+      if (value === undefined) continue;
       const subDef = subMap.get(key.toLowerCase());
       if (!subDef) {
         if (options.strictMode) {

@@ -1,6 +1,12 @@
 # Schema Customization Guide - Operator Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.51`
+**Minimal member schemas:** a Group may declare only `members.value` and
+`members.$ref`. Server-materialized optional keys whose value is `undefined`
+do not count as submitted sub-attributes. Real undeclared fields, including
+null or empty values, remain rejected in strict mode. See
+[minimal membership coverage and current reference-storage limits](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.52`
 
 > **P7a local correctness update:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.

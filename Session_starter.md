@@ -2,6 +2,17 @@
 
 **Last verified:** 2026-10-16
 
+**Active execution:** `fix/google-optional-members-20261016` from reviewed
+`0a0966a8`. Queued item A now fixes absent optional member validation without
+disabling strict mode. RED-first tests exposed a related pre-projection unknown
+field escape, also fixed. Focused evidence: 169 units, identical 212 HTTP cases
+on InMemory and isolated fresh PostgreSQL 17, and API build PASS.
+Consolidation/version/review/live dev/Entra proof remain pending. Item B `$ref`
+persistence and endpoint/dashboard layout remain separate pending outcomes.
+The user authorizes dev and canary through the normal process, not customer
+production. Existing UI visual acceptance is not inferred from new observations.
+See [minimal Group membership resolution](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
 **Current checkpoint:** PR #231 merged normally at `8887584c`, preserving
 reviewed source `b0c64705`, after all 25 protected push gates and seven
 exact-tip checks. Merged-master CodeQL `38863401990` also passes.

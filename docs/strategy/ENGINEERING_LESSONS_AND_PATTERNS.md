@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Validate before representation projection can erase supplied fields
+
+A Group adapter discarded unknown member fields before strict validation.
+A generic schema with all common fields hid this, while a minimal imported
+value/$ref schema exposed both that escape and DTO-materialized undefined keys.
+Treat only undefined as absent, consistently at root and nested boundaries.
+Validate the complete candidate after readOnly policy but before lossy storage
+projection. Prove rejection atomicity and exact readback with nonempty minimal
+schema fixtures on both backends; empty Group smoke tests cannot prove it.
+The permanent unit/HTTP regressions and local live section are recorded in
+[the membership resolution ledger](../GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
 ### Stabilization must be proved through the actual gate at a discriminating threshold
 
 Two screenshot APIs accepted different stylesheet options. A raw screenshot

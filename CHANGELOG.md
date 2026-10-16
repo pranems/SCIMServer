@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Minimal imported Group membership
+
+- Keep strict validation enabled while treating internally materialized
+  undefined optional member fields as absent, consistently with top-level
+  validation. Validate PATCH candidates before lossy member projection so
+  genuinely supplied undeclared fields remain rejected atomically.
+- Add eight validator regressions and ten HTTP cases with a sanitized minimal
+  value/$ref schema. Focused 169 units and identical 212 InMemory/PostgreSQL
+  HTTP cases pass. API build and 33/33 compiled local live assertions pass.
+  Live dev/Entra and reviewed release are not yet claimed. Runtime release
+  candidate 0.55.51 -> 0.55.52; CI workflow 38879494153 regenerated the locks.
+  Structural comparison proves only root/package version metadata changed;
+  public registry and sha512 provenance pass. No dependency selection changed.
+- Protected Validate consolidation passes all 28 gates: API unit 6,048 ->
+  6,056 (211 suites), InMemory E2E 2,432 -> 2,442 (117 suites, four existing
+  skipped cases), Web vitest unchanged at 1,624 (123 suites). Focused live
+  section adds 33 assertions; full live and Playwright counts are unchanged
+  until the separately authorized merged-source deployment runs.
+- `$ref` storage and endpoint/dashboard layout remain separate outcomes.
+  See [implementation, boundaries and RCA](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).
+
 ### Physical dependency ownership preflight (tooling only)
 
 - Refuse linked checkout/project/top-level dependency directories before
