@@ -9,27 +9,36 @@
 
 ## Active Delivery Process
 
-**Latest consolidation:** Gallery PR #228 merged normally at `4d11770c`
-after 24/24 protected push gates and all seven exact-tip CI checks at
-`97b071b7`. Its tooling-only final native proof is 50/50 with 15 cleanup PASS.
-The assigned branch is now `fix/endpoint-list-cache-admission-20261016`.
-Four assertion-level RED regressions preceded persisted-fingerprint admission
-before profile cloning/canonicalization. API build, 191 focused unit cases and
-37 selected HTTP cases on each of InMemory and private PostgreSQL pass.
-The exact owned database container and anonymous volume were removed.
-A matching warmed 74-row/six-profile
-CPU benchmark reduces 2,220 repeat clones/revisions to zero and p95 from
-43.6404 to 13.3925 ms. This is not live HTTP proof; the +60.45% deployed latency
-failure remains open. Source commit `848412c4` passes all 24 protected Fast
-gates, including 6,048 API units and 2,432 selected InMemory E2E cases.
-Version 0.55.51 locks came from successful CI run `38843457859`, with only
-root version metadata changes and unchanged dependencies/provenance.
-Final-tip consolidation and CI remain pending.
-Full release gates and fresh deployment remain pending. See
-[freshness evidence and RCA](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
+**Latest consolidation:** PR #229 merged normally at `c1a466ec` after seven
+exact-final-tip checks. Dev runs 0.55.51, revision
+`scimserver-dev--vc1a466ec`, digest
+`sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
+The no-skip pipeline remains failed: 34 PASS/1 FAIL/5 SKIPPED/9 reviewer
+PENDING. Three stale browser baselines blocked integrity/pruning.
+
+The assigned branch `test/inventory-visual-baselines-20261016` refreshes
+only those inspected intended inventory/navigation/history images, with
+real-response count assertions and an actual-matcher count-mutation control
+at zero pixel tolerance. Browser follow-up passes 310 cases, explicitly
+skips 11 opt-in cases, then passes exactly those 11 with canonical dev flags.
+An executable case-key comparison proves 321 distinct passes across two
+receipts; it is not a single zero-skip pipeline. Integrity now proves
+74 -> 74 original endpoint IDs, no new IDs, and the exact version/digest.
+Deployed endpoint-list p95 is 240.97 ms, down 44.08% against the immediate
+baseline and 9.25% against the original pre-UI baseline; both relative
+checks pass. API units are 6,048, selected InMemory E2E 2,432 with four
+native-only exclusions, and native gallery 50/50 with 15 cleanup PASS.
+
+Remaining: visual-test protected consolidation/CI/PR, nine reviewer gates,
+legacy reference fixture, registry-policy revision pruning and operator
+visual approval. Dependency ownership preflight and Mermaid editor/gate
+alignment are separate tooling changes. No runtime bump is needed for
+this test-only follow-up. No canary or customer production was changed.
+See [inventory visual proof and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
+and [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
 The retained paragraphs below describe previous receipts, not active runners.
 
-**Current UI release and validation:** PR #226 merged normally at `096ee65f`
+**Historical 0.55.50 UI receipt:** PR #226 merged normally at `096ee65f`
 after seven exact-tip checks. Complete UTC display and plain Operations
 endpoint name/copy/open actions are deployed on dev as `0.55.50`, revision
 `scimserver-dev--v096ee65f`. The full isolated pipeline passed the six-mode

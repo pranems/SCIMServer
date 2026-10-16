@@ -45,6 +45,7 @@
  * @see docs/PHASE_H3_VISUAL_REGRESSION.md
  */
 import { test, expect, type Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
 
 const visualBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:4000';
 const visualHost = new URL(visualBaseUrl).hostname;
@@ -176,7 +177,47 @@ const SNAPSHOT_OPTIONS = {
   // across machines but tight enough to catch real layout shifts. The
   // default is 0.2% pixel-by-pixel diff via SSIM.
   maxDiffPixelRatio: 0.002,
+  stylePath: fileURLToPath(new URL('./visual-regression.css', import.meta.url)),
 };
+
+async function loadInventoryPage(page: Page, path: '/' | '/endpoints'): Promise<unknown> {
+  const dashboard = path === '/';
+  const apiPath = dashboard ? '/scim/admin/dashboard' : '/scim/admin/endpoints';
+  let body: unknown;
+  await page.route(`**${apiPath}`, async route => {
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    body = await response.json();
+    await route.fulfill({ response });
+  });
+  await page.goto(path);
+  await expect(page.getByTestId(dashboard ? 'dashboard-page' : 'endpoints-page'))
+    .toBeVisible({ timeout: 30_000 });
+  return body;
+}
+
+async function expectDashboardInventory(page: Page, body: unknown): Promise<void> {
+  if (typeof body !== 'object' || body === null || !('stats' in body)
+    || typeof body.stats !== 'object' || body.stats === null
+    || !('totalEndpoints' in body.stats) || typeof body.stats.totalEndpoints !== 'number') {
+    throw new Error('Dashboard response omitted its endpoint count.');
+  }
+  const count = body.stats.totalEndpoints;
+  expect(Number.isInteger(count) && count >= 0).toBe(true);
+  await expect(page.getByTestId('dashboard-endpoint-summary')).toContainText('Endpoint summary');
+  await expect(page.getByTestId('dashboard-all-endpoints')).toHaveText(`Browse all ${count} endpoints`);
+}
+
+async function expectEndpointInventory(page: Page, body: unknown): Promise<void> {
+  if (typeof body !== 'object' || body === null || !('endpoints' in body) || !Array.isArray(body.endpoints)) {
+    throw new Error('Endpoint response omitted its inventory rows.');
+  }
+  const count = body.endpoints.length;
+  await expect(page.getByTestId('endpoints-search')).toHaveValue('');
+  await expect(page.getByTestId('endpoints-results-filters').getByRole('status'))
+    .toHaveText(`${count} of ${count} endpoints`);
+  await expect(page.getByTestId('endpoints-table').locator('tbody tr')).toHaveCount(count);
+}
 
 /**
  * Creates a throwaway endpoint for the endpoint-detail snapshots.
@@ -229,10 +270,11 @@ async function deleteSnapshotEndpoint(page: Page, id: string | null): Promise<vo
 test.describe('Phase H3 - Visual regression baselines', () => {
   test('Dashboard (light theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'light'));
-    await page.goto('/');
+    const body = await loadInventoryPage(page, '/');
     await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('Activity analytics', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expectStableAppShell(page);
+    await expectDashboardInventory(page, body);
     await expect(page).toHaveScreenshot('dashboard-light.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
@@ -242,10 +284,11 @@ test.describe('Phase H3 - Visual regression baselines', () => {
 
   test('Dashboard (dark theme)', async ({ page }) => {
     await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'dark'));
-    await page.goto('/');
+    const body = await loadInventoryPage(page, '/');
     await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('Activity analytics', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expectStableAppShell(page);
+    await expectDashboardInventory(page, body);
     await expect(page).toHaveScreenshot('dashboard-dark.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, DASHBOARD_LIVE_SELECTORS),
@@ -254,13 +297,46 @@ test.describe('Phase H3 - Visual regression baselines', () => {
   });
 
   test('Endpoints list', async ({ page }) => {
-    await page.goto('/endpoints');
+    const body = await loadInventoryPage(page, '/endpoints');
     await expect(page.getByTestId('endpoints-page')).toBeVisible({ timeout: 30_000 });
+    await expectStableAppShell(page);
+    await expectEndpointInventory(page, body);
     await expect(page).toHaveScreenshot('endpoints-list.png', {
       ...SNAPSHOT_OPTIONS,
       mask: locatorsFor(page, ENDPOINTS_LIVE_SELECTORS),
       fullPage: true,
     });
+  });
+
+  test('live inventory counts change text without changing stable screenshot pixels', async ({ page }) => {
+    await page.evaluate(() => localStorage.setItem('scim-color-scheme', 'light'));
+    for (const [path, selector, masks, snapshot] of [
+      ['/', '[data-testid="dashboard-all-endpoints"]', DASHBOARD_LIVE_SELECTORS, 'dashboard-light.png'],
+      ['/endpoints', '[data-testid="endpoints-results-filters"] [role="status"]', ENDPOINTS_LIVE_SELECTORS, 'endpoints-list.png'],
+    ] as const) {
+      await page.goto(path);
+      await expectStableAppShell(page);
+      const counter = page.locator(selector);
+      await expect(counter).toContainText('endpoints');
+      const original = await counter.textContent();
+      const options = {
+        animations: 'disabled' as const,
+        caret: 'hide' as const,
+        mask: locatorsFor(page, [...masks]),
+        fullPage: true,
+      };
+      const visibleBefore = await page.screenshot(options);
+      const exactOptions = { ...options, ...SNAPSHOT_OPTIONS, maxDiffPixels: 0, maxDiffPixelRatio: 0 };
+      await expect(page).toHaveScreenshot(snapshot, exactOptions);
+      try {
+        await counter.evaluate(element => { element.textContent = '999999 of 999999 endpoints'; });
+        await expect(counter).toHaveText('999999 of 999999 endpoints');
+        expect(await page.screenshot(options)).not.toEqual(visibleBefore);
+        await expect(page).toHaveScreenshot(snapshot, exactOptions);
+      } finally {
+        await counter.evaluate((element, text) => { element.textContent = text; }, original);
+      }
+    }
   });
 
   test('Logs page (light theme)', async ({ page }) => {

@@ -2,31 +2,41 @@
 
 **Last verified:** 2026-10-16
 
-**Current checkpoint:** Gallery PR #228 merged normally at `4d11770c` after
-24/24 protected push gates and seven successful exact-tip checks at
-`97b071b7`. Final native proof remains 50/50 with all 15 cleanup checks passed.
-No runtime bump or deployment applies to that tooling-only merge.
+**Current checkpoint:** PR #229 merged normally at `c1a466ec` after all
+seven exact-final-tip checks. Dev runs 0.55.51 on
+`scimserver-dev--vc1a466ec`, digest
+`sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
+The fresh no-skip pipeline remains failed: 34 PASS, 1 FAIL, 5 SKIPPED and
+9 reviewer PENDING. Backend/Docker/live/publication/deployment/native
+gallery passed; browser acceptance failed three outdated visual baselines.
+The failed receipt has not been relabelled.
 
-The assigned worktree now owns `fix/endpoint-list-cache-admission-20261016`
-from that merged master. Four assertion-level RED regressions preceded a
-small runtime correction: compare persisted fingerprints before repeating
-canonical revisions and clones. API build, 191 related unit cases and 37
-HTTP cases on each of InMemory and private PostgreSQL pass. The exact owned
-PostgreSQL container and volume were removed, with absence verified.
-Identical local warmed 74-row/six-profile
-benchmark: 2,220 -> 0 clones/revisions; CPU p95 43.6404 -> 13.3925 ms.
-This is not deployed HTTP evidence. Source commit `848412c4` passes all 24
-protected Fast gates in 465.5 seconds: 6,048 API units/210 suites and 2,432
-selected InMemory E2E cases/116 suites, with four native-only exclusions.
-Version 0.55.51 locks came from successful CI run `38843457859`; only root
-version metadata changed. Final-tip consolidation/CI remains pending.
-The original live +60.45% latency failure is still open.
-See [freshness and execution issues](docs/SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
+Deployed endpoint-list p95 now passes both relative comparisons:
+430.93 -> 240.97 ms (-44.08%) against the immediate baseline and
+265.52 -> 240.97 ms (-9.25%) against the original pre-UI baseline.
+These are network-inclusive read-only observations, not load/memory proof.
+API units remain 6,048/210 suites, selected InMemory E2E 2,432/116 suites
+with four native-only exclusions. Native gallery remains 50/50 with
+15 cleanup PASS. Version locks were generated only in CI.
 
-Remaining: complete runtime consolidation and exact-tip CI, fresh dev
-delivery/latency/browser/integrity/reference proof, then explicit operator
-visual acceptance. Dependency ownership preflight and Mermaid version
-alignment remain separate tooling changes. No canary/customer-prod work.
+The assigned branch is `test/inventory-visual-baselines-20261016`, based on
+merged `c1a466ec`. Three inspected intended inventory/navigation/history
+baselines are refreshed. Actual response counts and table row counts are
+asserted before suppressing only live-count foreground pixels; a new
+actual-matcher stability control passes at zero pixel tolerance.
+Browser follow-up: 310 PASS/11 opt-in SKIP/0 FAIL, then exactly those
+11 omitted cases PASS with canonical dev flags. Executable case-key
+comparison proves 321 distinct passing cases across two receipts, not one
+zero-skip pipeline. Read-only integrity proves the original 74 endpoint IDs
+are unchanged, with no new IDs and the exact deployed version/digest intact.
+
+Remaining: protected visual-test consolidation/CI/PR, nine reviewer gates,
+legacy reference fixture, registry-policy dev revision pruning and explicit
+operator visual acceptance. Dependency ownership preflight and Mermaid
+editor/gate alignment remain separate tooling changes. No further runtime
+bump applies to this test-only follow-up. No canary/customer-prod work.
+See [inventory visual follow-up and RCA](docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
+and [deployed freshness/latency proof](docs/SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
 
 ### Previous deployment and retained failed receipts
 
@@ -99,6 +109,7 @@ No canary or customer-production change. See the
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | PR #229 merged at `c1a466ec`; dev 0.55.51 deployed. Both endpoint-list latency comparisons pass. Three inspected visual baselines corrected, zero-tolerance actual-matcher control passes, and 321 distinct browser cases pass across 310 + 11 receipts. Original 74 endpoint IDs and exact deployed digest verified unchanged. Protected visual-test consolidation, reviewer gates, reference proof, pruning and operator acceptance remain open. |
 | 2026-10-16 | PR #228 merged at4d11770c with7 exact-tip checks PASS. Separate endpoint-list correction passes4 RED/GREEN regressions,191 focused units,37 InMemory HTTP cases and API build; warmed CPU p95 falls43.6404->13.3925ms, with0 repeat clones/revisions. Runtime version/CI/deployment and live latency closure remain pending. |
 | 2026-10-16 | PR #227 merged at f5046202; native linked-member/target-aware correction passes contracts78->92 and final complete gallery50/50 with15cleanupPASS. Independent target state, partial-failure precedence and target-effect guards close observed false-green gaps. |
 | 2026-10-16 | UI 0.55.50 merged and deployed to dev; complete matrix and both 1,729-assertion live lanes passed. Gallery failure correctly blocked downstream acceptance. Private dependencies fixed ownership without installs or lock changes. Gallery contracts70->78; instrumented WIF failed membership after successful Group creation, with seven cleanup checks passed. |

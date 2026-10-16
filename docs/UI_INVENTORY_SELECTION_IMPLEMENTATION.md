@@ -1,6 +1,44 @@
 # Compact endpoint inventory and comparison selection
 
-**Last verified:** 2026-10-14
+**Last verified:** 2026-10-16
+
+## Dev visual follow-up, 2026-10-16
+
+Dev 0.55.51 contains the merged inventory, navigation and history changes.
+The original full pipeline remains failed: 34 PASS, 1 FAIL, 5 SKIPPED and
+9 reviewer PENDING. Its browser gate passed 317 cases and failed three
+outdated snapshots. All three diff images and expected/actual pairs were
+inspected before any baseline refresh.
+
+Classification: **intended visual change because the merged
+inventory/navigation/history UI is now being reflected**. The Dashboard's
+endpoint summary, complete-inventory button, `/Me` navigation label, history
+controls and the Endpoints filter/results arrangement are intentional.
+This follow-up changes tests and three Windows Chromium baselines, not the
+deployed runtime or version.
+
+The screenshot stylesheet hides only the foreground of the two live
+inventory counters. It preserves their dimensions, the Dashboard button
+border and the endpoint search field. Before hiding pixels, the tests assert
+the count against the actual upstream response delivered to the browser,
+and assert the Endpoints table row count. No fabricated API fixture or
+live write is involved in those three scenes.
+
+A fourth case changes counter text in the DOM, requires an unstyled
+screenshot to change, then requires the real `toHaveScreenshot()` matcher
+to remain identical at zero pixel tolerance. This is stricter than the
+unchanged 0.002 tolerance of normal scenes. The exact check first failed
+on 378 stale count pixels, then passed after explicit refresh of only the
+three real scenes. The final focused comparison passes 4/4.
+
+The complete browser invocation passes 310, skips 11 opt-in cases and has
+zero failures or flaky cases. A focused replay with the pipeline's
+`E2E_ALLOW_MUTATIONS=1` and `E2E_SHAPE_COVERAGE=1` passes exactly those 11,
+with zero skips. An executable comparison of file/line/title/project keys
+proves all 321 distinct cases are covered across the two receipts. This
+is not a claim of one zero-skip full pipeline. The original 74 endpoint
+IDs are unchanged after both runs; the version and exact deployed image
+digest remain correct. Operator visual approval is not implied.
 
 ## Executive summary
 
@@ -129,6 +167,14 @@ The evidence-only follow-up does not change any runtime or test source.
 | IS-I15 | Tooling / Low | Raw-event scanner encountered a completion without a result; a subsequent JSON-check invocation omitted its file arguments. Read/search output also needed narrow ranges. | Guard event shapes, pass explicit document paths and inspect bounded output. Seven edited docs contain zero literal JSON fences. A zero count alone is not evidence that any file was inspected. | Evidence tooling / same |
 | IS-I16 | Artifact retention / Medium | A later focused Playwright invocation cleaned earlier geometry receipts with its output directory. | Store receipts in a sibling evidence directory and aggregate 21 real receipts into a committed JSON artifact. Verify preservation with a subsequent focused run. | Final handoff inspection / first multi-invocation evidence run |
 | IS-I17 | Test teardown / Low, unresolved | Normal pre-push E2E passed every assertion but warned that a worker failed to exit gracefully and was force-exited. Root cause was not established. | Retain exact-tip evidence and hand off to the parent consolidation owner for triage in the next authoritative matrix on 2026-10-14. Do not modify unrelated API tests or call the warning a resolved leak. | Normal API E2E hook / same |
+| IS-I18 | Baseline drift / Medium | Dev browser acceptance failed three snapshots after merged inventory/navigation/history changes had not been reflected in the baselines. Live endpoint counts also leaked into images. | Inspect every diff and expected/actual pair, classify the intended changes, and refresh only those three scenes. Assert actual response counts before suppressing only count foreground pixels. The focused comparison passes 4/4. | Full dev browser gate / focused affected snapshot comparison before consolidation. |
+| IS-I19 | Browser harness / Medium | Reading a response captured by `waitForResponse()` failed with `Network.getResponseBody: No resource with given identifier found` after navigation destroyed its document. | Fetch the real upstream response inside the route handler, read its JSON before forwarding it unchanged, and then assert the delivered values. The corrected Endpoints scene passes. | Focused refresh / focused scene run; no deployed defect. |
+| IS-I20 | Gate fidelity / High | `style` worked with `page.screenshot()` but was silently ignored when passed through a spread to `toHaveScreenshot()`, whose API requires `stylePath`. A proxy comparison passed while baselines retained live counts. | Use a typed matcher-supported stylesheet path and test the actual matcher before and after counter mutation. Inspect regenerated images as well as runner output. No tolerance increase. | Inspection of refreshed PNGs / an actual-matcher negative control before refresh. |
+| IS-I21 | Test correctness / High | The first actual-matcher control still passed with stale counts because 378 changed pixels were below the normal scene tolerance. A normal green did not prove count suppression. | Give only the stability control zero pixel tolerance. It fails on the stale count and passes after correction, including the mutated-count comparison. Normal scene tolerance stays 0.002. | Adversarial control review / zero-tolerance stability assertion. |
+| IS-I22 | Tooling / Medium | `--update-snapshots` reported passes without rewriting stale count pixels already within scene tolerance. | Use `--update-snapshots=all` on the three inspected real scenes, never on the counter-mutating control. The separate zero-tolerance comparison proves the refreshed images actually changed. | Exact post-refresh comparison / exact post-refresh comparison; no escape. |
+| IS-I23 | Tooling / Low | Direct TypeScript file checking returned TS5112 because an existing tsconfig would otherwise be ignored. | Supply the compiler's explicit `--ignoreConfig` option with the intended ESM/compiler settings. The selected spec compiles without changing project configuration or installing tools. | Focused type check / same. |
+| IS-I24 | Tooling / Low | The transcript scanner printed its complete candidate list and the tool offloaded the 14.2 KB output. | Inspect only targeted candidate fields and bounded ranges in the saved artifact. The scan completed successfully; no validation was repeated to recover presentation output. | Reconciliation output / same. |
+| IS-I25 | Validation configuration / Medium | The manual full browser follow-up omitted two process-local flags set by the canonical pipeline, so 11 opt-in cases skipped despite exit zero. | Inspect every skip; enable both existing dev-only flags and run precisely the 11 omitted cases. They pass without skips. An executable exact case-key comparison proves complete distinct coverage rather than adding unrelated counts. Future manual replays must copy the canonical Stage 5.3 environment and assert zero unexplained skips. The original receipt remains 310 PASS/11 SKIP. | JSON result inspection / environment parity check before a manual replay. |
 
 Fix SHAs are assigned by the containing logical commits, not fabricated before
 commit creation. IS-I01 through IS-I08 were resolved in `892d0192`; subsequent
@@ -136,6 +182,18 @@ entries through IS-I16 belong to `bc3d3cdd`; IS-I17 is retained by the final
 evidence-only commit and remains unresolved outside the bounded UI scope.
 
 ### Provenance and completeness
+
+The 2026-10-16 visual follow-up reconciled the full available continuation
+transcript through event 9,131, retaining the earlier reconciliation through
+8,330. Separate error/signal and causal-narration passes yielded 29
+candidates. Real browser failures map to IS-I18/19, the stylesheet/control
+false greens to IS-I20/21, the ineffective refresh to IS-I22 and TS5112
+to IS-I23. Historical pipeline failures, successful patch text, source reads,
+SQL status updates and earlier scan echoes are not additional incidents.
+The output offload happened after that scan and is recorded as IS-I24.
+The final full-browser result and later consolidation are separate receipts;
+this cutoff does not claim to include future events or the deleted original
+project3 transcript.
 
 The full raw `events.jsonl` for session
 `2e6e7d76-3fb6-499e-8b54-3c7f962e5577` was reconciled, not just the compacted
@@ -156,6 +214,13 @@ HTTP 400 responses in negative API tests, existing warnings, normal CRLF
 normalization and scan/tool-request echoes are not additional defects.
 
 ## Self-improvement and design disposition
+
+Visual follow-up disposition: test/gate improvement **applied** through
+actual-response value assertions and a zero-tolerance actual-matcher
+counter-mutation control. A proxy API or normal scene tolerance is not proof
+of screenshot stabilization. Design disposition **accepted**: one cohesive
+test helper and screenshot-only stylesheet, no new production responsibility,
+dependency or speculative abstraction.
 
 Test/gate improvement **applied**: finite large-inventory geometry, exact
 filter counts, full selected IDs, keyboard navigation and URL-history checks

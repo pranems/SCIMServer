@@ -574,18 +574,20 @@ sees the new row. Reads already in progress are not cancelled. This removes the
 previous indefinite cross-process cache staleness without adding a TTL or broker.
 Database failure is surfaced rather than hidden by the cached profile.
 
-The locally validated endpoint-list correction compares persisted content
+The endpoint-list correction deployed in 0.55.51 compares persisted content
 before cloning or calculating the canonical profile revision. An unchanged
 row therefore reuses its normalized profile and runtime indexes without
 repeating either operation. Startup and writes seed the same persisted
 fingerprint, while same-timestamp content changes still invalidate it.
-This correction is not yet deployed; its warmed local CPU measurements do
-not close the outstanding deployed HTTP latency regression.
+Matching read-only dev HTTP measurements now pass the relative latency
+limit: endpoint-list p95 is 240.97 ms, versus 430.93 ms immediately before
+the repair and 265.52 ms in the original pre-UI baseline. These
+network-inclusive observations are distinct from warmed service CPU proof.
 
 See [P8a evidence and limits](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md) for
 two-application HTTP tests, two-process PostgreSQL live checks and the measured
-extra query cost. The freshness boundary is deployed in 0.55.50; the new
-derived-work optimization awaits consolidation. InMemory is still instance-local;
+extra query cost. The freshness boundary shipped in 0.55.50; the
+derived-work optimization shipped in 0.55.51. InMemory is still instance-local;
 the historical verification below does not prove replication between processes.
 
 ### Live verification of this section

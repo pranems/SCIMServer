@@ -1,0 +1,4 @@
+[data-testid="dashboard-all-endpoints"],
+[data-testid="endpoints-results-filters"] [role="status"] {
+  color: transparent !important;
+}
