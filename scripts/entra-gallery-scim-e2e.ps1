@@ -48,6 +48,7 @@ $runId = '{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().T
 $startedAt = [DateTimeOffset]::UtcNow
 $requiredMode = @('SecretToken', 'OAuthClientCredentials', 'WorkloadIdentity')
 $results = [System.Collections.Generic.List[object]]::new()
+$provisioningObservations = [System.Collections.Generic.List[object]]::new()
 $createdEndpointIds = [System.Collections.Generic.List[string]]::new()
 $createdJobIds = [System.Collections.Generic.List[string]]::new()
 $createdUserIds = [System.Collections.Generic.List[string]]::new()
@@ -330,6 +331,33 @@ function Get-ProvisionOutcome {
     }
 }
 
+function Add-ProvisionObservation {
+    param(
+        [Parameter(Mandatory)] $Outcome,
+        [Parameter(Mandatory)] [string]$JobId,
+        [Parameter(Mandatory)] [string]$ObjectId,
+        [Parameter(Mandatory)] [string]$ObjectType,
+        [Parameter(Mandatory)] [string]$Operation,
+        [Parameter(Mandatory)] [int]$Attempt
+    )
+
+    $observation = [pscustomobject]@{
+        observedAt = [DateTime]::UtcNow.ToString('o')
+        operation = $Operation
+        jobId = $JobId
+        objectId = $ObjectId
+        objectType = $ObjectType
+        attempt = $Attempt
+        result = if ($Outcome.Result -in @('Success', 'Failure')) { $Outcome.Result } else { 'Unrecognized' }
+        action = $Outcome.Action
+        stepStatuses = $Outcome.StepStatuses
+        hasSuccessfulExport = [bool]$Outcome.HasSuccessfulExport
+        path = 'provisionOnDemand'
+    }
+    $provisioningObservations.Add($observation)
+    $observation
+}
+
 function Invoke-ExpectedProvision {
     param(
         [Parameter(Mandatory)] [string]$JobId,
@@ -346,6 +374,8 @@ function Invoke-ExpectedProvision {
         }
         $response = Invoke-ProvisionOnDemand -JobId $JobId -RuleId $RuleId -ObjectId $ObjectId -ObjectType $ObjectType
         $lastOutcome = Get-ProvisionOutcome -Response $response
+        Add-ProvisionObservation -Outcome $lastOutcome -JobId $JobId -ObjectId $ObjectId -ObjectType $ObjectType `
+            -Operation $Operation -Attempt $attempt | Out-Null
         if ($lastOutcome.Result -eq 'Failure') {
             $failure = @($lastOutcome.ErrorCode, $lastOutcome.ErrorMessage, $lastOutcome.FailedSteps) |
                 Where-Object { $_ } |
@@ -371,6 +401,8 @@ function Invoke-ScopedChangeProvision {
 
     $response = Invoke-ProvisionOnDemand -JobId $JobId -RuleId $RuleId -ObjectId $ObjectId -ObjectType $ObjectType
     $outcome = Get-ProvisionOutcome -Response $response
+    $observation = Add-ProvisionObservation -Outcome $outcome -JobId $JobId -ObjectId $ObjectId -ObjectType $ObjectType `
+        -Operation $Operation -Attempt 1
     if ($outcome.Result -eq 'Failure') {
         throw "$Operation provisionOnDemand failed: $($outcome.FailedSteps -join '; ')"
     }
@@ -379,6 +411,7 @@ function Invoke-ScopedChangeProvision {
     }
 
     Invoke-Graph -Method POST -Path "servicePrincipals/$($gallerySp.id)/synchronization/jobs/$JobId/start" | Out-Null
+    $observation.path = 'scheduled-sync-fallback'
     'scheduled-sync-fallback'
 }
 
@@ -905,6 +938,7 @@ function Invoke-ModeScenario {
         }
         Add-Result $scenario 'create custom extension' 'PASS' 'The created User includes the registered extension and exact source department value.'
 
+        $modeStage = 'update source user'
         $updatedDisplayName = "SCIM E2E Updated $Mode $runId"
         $updatedDepartment = 'SCIM Validation Updated'
         Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{
@@ -922,20 +956,24 @@ function Invoke-ModeScenario {
         Add-Result $scenario 'update user' 'PASS' 'Entra provisionOnDemand updated core and enterprise-mapped source attributes.'
         Add-Result $scenario 'update custom extension' 'PASS' 'The updated source department replaced the persisted custom costCode value.'
 
+        $modeStage = 'disable source user'
         Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{ accountEnabled = $false } | Out-Null
         Wait-GraphUserAccountEnabled -UserId $userFixture.User.id -Expected $false
         $scimUser = Invoke-UserAccountStateProvision -JobId $job.id -RuleId $rule.id -ObjectId $userFixture.User.id `
             -UserName $upn -Headers $context.VerificationHeaders -Expected $false -Operation 'disable user'
         Add-Result $scenario 'disable user' 'PASS' 'Entra account disable propagated to SCIM active=false.'
 
+        $modeStage = 'reenable source user'
         Invoke-Graph -Method PATCH -Path "users/$($userFixture.User.id)" -Body @{ accountEnabled = $true } | Out-Null
         Wait-GraphUserAccountEnabled -UserId $userFixture.User.id -Expected $true
         $scimUser = Invoke-UserAccountStateProvision -JobId $job.id -RuleId $rule.id -ObjectId $userFixture.User.id `
             -UserName $upn -Headers $context.VerificationHeaders -Expected $true -Operation 'reenable user'
         Add-Result $scenario 'reenable user' 'PASS' 'The connector restored active=true before membership and deprovision checks.'
 
+        $modeStage = 'create and assign source group'
         $groupFixture = New-SourceGroup -ModeSlug $context.Slug
         $groupName = [string]$groupFixture.Group.displayName
+        $modeStage = 'provision source group'
         $createGroupPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'create group'
         $scimGroup = Wait-ScimResource -ResourceType Groups -Attribute displayName -Value $groupName -Headers $context.VerificationHeaders `
             -Predicate { param($resource) $null -ne $resource } -Expectation 'resource exists'
@@ -944,6 +982,7 @@ function Invoke-ModeScenario {
         }
         Add-Result $scenario 'create group' 'PASS' "Entra created the mapped SCIM Group via $createGroupPath."
 
+        $modeStage = 'add source group member'
         Invoke-Graph -Method POST -Path "groups/$($groupFixture.Group.id)/members/`$ref" -Body @{
             '@odata.id' = "$graphRoot/directoryObjects/$($userFixture.User.id)"
         } | Out-Null
@@ -956,6 +995,7 @@ function Invoke-ModeScenario {
         }
         Add-Result $scenario 'add group member' 'PASS' "Entra membership addition propagated to the SCIM Group via $addMembershipPath."
 
+        $modeStage = 'remove source group member'
         Invoke-Graph -Method DELETE -Path "groups/$($groupFixture.Group.id)/members/$($userFixture.User.id)/`$ref" | Out-Null
         Wait-GraphGroupMembership -GroupId $groupFixture.Group.id -MemberId $userFixture.User.id -Present $false
         $removeMembershipPath = Invoke-ScopedChangeProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'remove group member'
@@ -967,6 +1007,7 @@ function Invoke-ModeScenario {
         }
         Add-Result $scenario 'remove group member' 'PASS' "Entra membership removal propagated to the SCIM Group via $removeMembershipPath."
 
+        $modeStage = 'update source group'
         $updatedGroupName = "$groupName Updated"
         Invoke-Graph -Method PATCH -Path "groups/$($groupFixture.Group.id)" -Body @{ displayName = $updatedGroupName } | Out-Null
         Invoke-ExpectedProvision -JobId $job.id -RuleId $rule.id -ObjectId $groupFixture.Group.id -ObjectType Group -Operation 'update group' | Out-Null
@@ -975,6 +1016,7 @@ function Invoke-ModeScenario {
         $groupName = $updatedGroupName
         Add-Result $scenario 'update group' 'PASS' 'Entra provisionOnDemand updated the SCIM Group displayName.'
 
+        $modeStage = 'deprovision source user'
         foreach ($assignmentId in $userFixture.AssignmentIds) {
             Invoke-Graph -Method DELETE -Path "users/$($userFixture.User.id)/appRoleAssignments/$assignmentId" | Out-Null
         }
@@ -987,6 +1029,7 @@ function Invoke-ModeScenario {
         Add-Result $scenario 'deprovision user' 'PASS' "Removing app assignment caused deletion or standards-compatible soft deactivation via $userDeprovisionPath."
 
         if ($groupFixture) {
+            $modeStage = 'deprovision source group'
             foreach ($assignmentId in $groupFixture.AssignmentIds) {
                 Invoke-Graph -Method DELETE -Path "groups/$($groupFixture.Group.id)/appRoleAssignments/$assignmentId" | Out-Null
             }
@@ -1168,7 +1211,7 @@ function Write-Reports {
         'FAIL: the reviewed custom mapping did not complete create and update verification in every requested auth mode.'
     }
     $report = [pscustomobject]@{
-        schemaVersion = '1.0.0'
+        schemaVersion = '1.1.0'
         runId = $runId
         startedAt = $startedAt.ToString('o')
         completedAt = [DateTimeOffset]::UtcNow.ToString('o')
@@ -1178,6 +1221,7 @@ function Write-Reports {
         galleryServicePrincipalName = $GalleryServicePrincipalName
         modes = @($modeOutcomes)
         results = @($results)
+        provisioningObservations = @($provisioningObservations)
         cleanup = @($cleanupResults)
         secretKeys = @($secretKeys | Sort-Object)
         secretsPersisted = $false

@@ -1,25 +1,49 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-15
+**Last verified:** 2026-10-16
 
-**Active UI follow-up:** Safety PR #225 merged normally at `e71cec967`;
-the assigned worktree now owns `fix/ui-date-time-identity-20261015`.
-The operator requested complete date/time display everywhere and plain
-Operations endpoint name/copy/open actions. Shared UTC rendering is wired
-through 14 surfaces. All 33 final focused browser cases pass, including 1440,
-900 and 390 px journeys, real copy/open and inline authentication timestamps.
-The mobile width assertion passes after a 640 px table-floor correction.
-Protected Validate push passes all 27 gates in 823 seconds at `3032b5df`:
-6,043 API units, 2,432 selected InMemory E2E passes/four native-only exclusions,
-and 1,624 web tests across 123 files. Exact type comparison is 66/66, zero
-additions. Source manifests and CI-generated locks now say 0.55.50; CI run
-`38817415869` preserved every dependency/provenance entry. Draft PR #226 owns
-final lock/evidence push, exact-tip review and normal merge. Dev closure and
-operator acceptance remain pending. Mermaid editor 11.17.0/gate 11.15.0
-alignment is a separate scheduled tooling follow-up.
-No deployment is claimed. See [current implementation and RCA](docs/UI_DATE_TIME_IDENTITY_CONSISTENCY.md).
+**Current checkpoint:** UI PR #226 merged normally at `096ee65f` after seven
+successful exact-tip checks. Version `0.55.50` is deployed on dev revision
+`scimserver-dev--v096ee65f`, shipping digest
+`sha256:b48c668d4d3045599cff3233fbd2d4ceab291526361e29770d7f5060278ef49e`.
+Complete UTC rendering across 14 surfaces and plain Operations endpoint
+name/copy/open actions have 33 focused browser passes, including measured
+1440/900/390 px behavior. These are not current-deployment operator acceptance.
 
-**Gallery consolidation evidence retained:** PR #218 merged normally
+The full isolated no-skip pipeline exited 1 after 5,051 seconds:
+33 PASS, 1 FAIL, 6 SKIPPED and 9 reviewer PENDING. Backend matrix, web
+coverage, Docker/live checks, publication, dev deployment and dev live passed.
+Docker and dev each passed 1,729 live assertions. Gallery SecretToken and
+OAuth completed, but WIF User update failed. A WIF-only replay passed User
+update/disable/reenable and failed Group creation instead. Both cleaned up
+their owned artifacts. Browser, integrity and pruning remain blocked.
+The failures are not evidence of a timestamp regression or a proven SCIM
+update defect.
+
+The assigned worktree now owns
+`fix/gallery-provisioning-observations-20261016`. Diagnostic-only contracts
+first failed on five missing outcomes, then passed after adding per-attempt
+metadata and accurate stages without changing transport, timeouts or target
+assertions. The instrumented WIF run passed Group creation and then failed
+membership addition: 12 PASS/1 FAIL, seven cleanup checks passed. Its native
+membership export was skipped; both Group operations used scheduled fallback.
+Source membership and provider job success did not prove target membership.
+Independent compiled local-node proof now passes all 1,729 assertions in
+87.4 seconds; the exact server was stopped and port16000 has no listener.
+Receipt counters and 1,729 entries agree; the depth-10 diagnostic warning
+remains disclosed. Remaining tasks: complete all-mode gallery proof, dev browser
+and integrity checks, legacy reference proof,
+performance comparison and operator visual acceptance. Dependency ownership
+preflight and Mermaid editor/gate alignment remain separate tooling work.
+No canary or customer-production change. See the
+[UI implementation and RCA](docs/UI_DATE_TIME_IDENTITY_CONSISTENCY.md) and
+[gallery execution ledger](docs/ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md).
+
+| Date | Summary |
+|---|---|
+| 2026-10-16 | UI 0.55.50 merged and deployed to dev; complete matrix and both 1,729-assertion live lanes passed. Gallery failure correctly blocked downstream acceptance. Private dependencies fixed ownership without installs or lock changes. Gallery contracts70->78; instrumented WIF failed membership after successful Group creation, with seven cleanup checks passed. |
+
+**Earlier gallery evidence, superseded by the current checkpoint above:** PR #218 merged normally
 at `078e741b`. The original deleted project3 transcript was not restored.
 Exclusive dev/gallery ownership and the full default dev pipeline were
 authorized. The pipeline passed both unit backends (6,043 tests each) and

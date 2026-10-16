@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gallery provisioning observations (tooling only)
+
+- Advance failure-stage labels through User updates, account changes,
+  Group operations and deprovisioning. Preserve per-attempt, allowlisted
+  provisioning metadata independently of final acceptance results.
+- Report schema moves from `1.0.0` to `1.1.0`; runtime remains `0.55.50`.
+  No transport, timeout, acceptance, dependency or lockfile change.
+- Focused gallery contracts increase from 70 to 78. Five new assertions
+  were confirmed RED before implementation; all 78 now pass, including
+  exact observation keys, raw-secret exclusion and retained failed exports.
+- One instrumented WIF run passed 12 checks, then failed Group membership
+  addition. Seven cleanup checks passed. Group create and membership used
+  scheduled-sync fallback; native membership on-demand export was skipped.
+  Source membership and provider job success did not prove target membership.
+  The original full pipeline and this diagnostic remain failed receipts.
+- The deployed UI release passed the complete backend matrix and 1,729
+  Docker plus 1,729 dev live assertions. Independent compiled local-node
+  proof also passes 1,729 assertions in 87.4 seconds, with all receipt entries
+  agreeing and the exact server/listener cleaned up. The existing deep
+  diagnostic serialization warning is retained, not called lossless.
+  Browser, integrity and operator
+  acceptance remain blocked; no canary or customer-production changes.
+
 ### UI date-time consistency and endpoint identity (0.55.50)
 
 - Prepare the product patch from `0.55.49` to `0.55.50`. API/web manifests
