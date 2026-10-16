@@ -2,9 +2,9 @@
 
 **Last verified:** 2026-10-16
 
-**Active execution:** responsive UI on
-`fix/endpoint-inventory-responsive-layout-20261016`, based on reviewed
-`17031d85`. Group items A/B merged in PRs #233/#234 after seven exact-tip checks
+**Active execution:** immutable source provenance on
+`fix/release-source-provenance-20261016`, based on reviewed merged
+`c3ef1f0d`. Group items A/B merged in PRs #233/#234 after seven exact-tip checks
 each. Their local proof includes both backends, populated/fresh migrations and
 50 live assertions. Current API/Web totals are 6,060/2,447/1,624.
 UI proof: 36 adjacent browser cases, 26 DOM/error-boundary units, four unchanged
@@ -13,11 +13,19 @@ remain 66/66. Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at
 c04b06f1. CI-only locks from 38891306560 are version-only and provenance-clean.
 UI PR #235 merged at 0fd0a87a after seven exact-tip checks. Pre-deployment
 inspection found the isolated-child/default-project image lookup mismatch.
-Separate `fix/isolated-validation-image-handoff-20261016` now has two RED-first
-behavioral controls and 58 GREEN contract checks. Review/push remain pending;
-no runtime/version change. See UI-H05/H06 in the layout RCA.
-Live dev/Entra and dev/canary delivery remain next, with an explicitly released
-exclusive cloud window from the other active onboarding session.
+Handoff PR #236 merged at c3ef1f0d after 25 protected gates and seven exact-tip
+checks. Full no-skip delivery completed in 3,531 seconds: 27 PASS, 2 FAIL,
+10 SKIPPED, 9 reviewer PENDING. Local/backend/Docker and local ACR handoff
+passed. Shipping source provenance failed; missing ACR shipping tags are its
+cascade. No deployment occurred and dev remains 0.55.51.
+Separate provenance correction has four expected RED assertions and 68 GREEN
+pipeline controls plus 22 selector checks. Real public OCI proof resolves
+0.55.54 to publication source c3ef1f0d and retained digest 42613fe0.
+Protected review/merge remains pending; no runtime/version/lock change.
+Retain the failed matrix. Close negative membership response-contract gaps,
+then resume full dev/Entra and guarded canary evidence. Operator visual
+acceptance and candidate performance comparison remain explicit pending
+claims. See UI-H08 through UI-H14 in the layout RCA.
 The user authorizes dev and canary through the normal process, not customer
 production. Existing UI visual acceptance is not inferred from new observations.
 See [minimal Group membership resolution](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md).

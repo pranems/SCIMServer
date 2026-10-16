@@ -9,8 +9,8 @@
 
 ## Active Delivery Process
 
-**Active implementation:** responsive inventory/dashboard on
-`fix/endpoint-inventory-responsive-layout-20261016`, based on `17031d85`.
+**Active implementation:** immutable release source provenance on
+`fix/release-source-provenance-20261016`, based on merged `c3ef1f0d`.
 Group items A/B merged in PRs #233/#234 with exact-tip CI; strict validation
 remains enabled. Current API/Web totals: 6,060 units, 2,447 HTTP, 1,624 Web.
 UI local proof: 36 browser cases, 26 DOM/error-boundary units, four visual
@@ -20,9 +20,19 @@ CI-only locks from 38891306560 are version-only/provenance-clean.
 UI PR #235 merged at 0fd0a87a with seven exact-tip checks. A separate
 pre-deployment handoff correction carries the unique Docker project into
 surviving image lookup after cleanup: two RED controls, 58 GREEN checks.
-Tooling review/push remain pending; runtime stays 0.55.54. Dev/Entra proof
-and dev/canary deployment are next; the other active session released its
-cloud mutation window. Customer production is not authorized. See
+Handoff PR #236 merged at c3ef1f0d with 25 protected gates and seven exact-tip
+checks. Full delivery completed in 3,531 seconds with 27 PASS, 2 FAIL,
+10 SKIPPED and 9 reviewer PENDING. Local/backend/Docker and local ACR handoff
+passed. Shipping provenance confused publication source with the last runtime
+commit; downstream shipping ACR tags failed and deployment was blocked.
+Dev remains 0.55.51. The separate correction has four expected RED assertions,
+68 GREEN pipeline controls and 22 selector checks; actual read-only OCI proof
+retains the immutable 0.55.54 digest 42613fe0/source c3ef1f0d.
+Protected review/merge and complete negative membership error assertions
+remain next, then a new authoritative dev/Entra/canary matrix and candidate
+performance comparison. No version/lock change for tooling or tests.
+The other active session released its cloud window; do not infer operator
+visual acceptance. Customer production is not authorized. See
 [layout contract and RCA](RESPONSIVE_ENDPOINT_INVENTORY.md).
 
 **Latest consolidation:** PR #234 merged at `17031d85`, preserving reviewed

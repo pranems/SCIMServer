@@ -198,6 +198,121 @@ Invoke-Assert -Description 'default validation project identity remains unique a
 
 & {
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $resolver = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Resolve-ReleaseSourceImage'
+    }, $true)
+    if ($resolver) { . ([scriptblock]::Create($resolver.Extent.Text)) }
+    $sourceGate = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Invoke-Gate' -and
+        $node.CommandElements[1].Value -eq '4.3c'
+    }, $true)
+    $pullGate = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Invoke-Gate' -and
+        $node.CommandElements[1].Value -eq '4.4'
+    }, $true)
+    $runtime = '1' * 40
+    $published = '2' * 40
+    $newHead = '3' * 40
+    $unrelated = '4' * 40
+    $expectedDigest = 'sha256:' + ('a' * 64)
+    $RegistryGhcr = 'registry.example.test/owner/image'
+    $runtimeInputPaths = @('Dockerfile', 'api/src', 'web/src')
+    $originalDigest = $script:verifiedGhcrDigest
+    $originalSource = $script:verifiedSourceCommit
+    $originalHead = $script:expectedHeadSha
+    $originalExit = $global:LASTEXITCODE
+    $cases = @(
+        @{ Name = 'fresh runtime merge'; Runtime = $published; Head = $published; Source = $published; Commits = @(); Accept = $true },
+        @{ Name = 'fresh publication after tooling-only merge'; Runtime = $runtime; Head = $published; Source = $published; Commits = @($published); Accept = $true },
+        @{ Name = 'immutable reuse after later docs-only merge'; Runtime = $runtime; Head = $newHead; Source = $published; Commits = @($newHead, $published); Accept = $true },
+        @{ Name = 'missing matching source tag'; Runtime = $runtime; Head = $newHead; Source = $null; Commits = @($newHead, $published); Accept = $false },
+        @{ Name = 'unrelated source branch'; Runtime = $runtime; Head = $newHead; Source = $unrelated; Commits = @($newHead, $published); Accept = $false },
+        @{ Name = 'runtime input drift'; Runtime = $published; Head = $newHead; Source = $published; Commits = @($newHead); DiffExit = 1; Accept = $false },
+        @{ Name = 'unmerged source'; Runtime = $published; Head = $newHead; Source = $published; Commits = @($newHead); AncestorExit = 1; Accept = $false },
+        @{ Name = 'Git history failure'; Runtime = $runtime; Head = $newHead; Source = $published; Commits = @($newHead, $published); HistoryExit = 128; Accept = $false },
+        @{ Name = 'semantic source digest drift'; Runtime = $published; Head = $published; Source = $published; Commits = @(); SourceDigest = 'sha256:' + ('b' * 64); Accept = $false },
+        @{ Name = 'latest digest drift'; Runtime = $published; Head = $published; Source = $published; Commits = @(); LatestDigest = 'sha256:' + ('b' * 64); Accept = $false }
+    )
+    function Get-RemoteImageDigest {
+        param($Reference)
+        if ($state.Source -and $Reference -eq "${RegistryGhcr}:sha-$($state.Source)") {
+            return $(if ($state.SourceDigest) { $state.SourceDigest } else { $expectedDigest })
+        }
+        return $null
+    }
+    function git {
+        $global:LASTEXITCODE = 0
+        switch ($args[0]) {
+            'rev-list' {
+                $global:LASTEXITCODE = [int]$state.HistoryExit
+                $state.Commits
+            }
+            'merge-base' { $global:LASTEXITCODE = [int]$state.AncestorExit }
+            'diff' { $global:LASTEXITCODE = [int]$state.DiffExit }
+            default { throw "Unexpected Git command in provenance fixture: $($args[0])" }
+        }
+    }
+    function docker {
+        $global:LASTEXITCODE = 0
+        switch ($args[0]) {
+            'logout' { }
+            'rmi' { }
+            'pull' {
+                if ($args[1] -notin @("${RegistryGhcr}:$version", "${RegistryGhcr}:latest", "${RegistryGhcr}:sha-$($state.Source)")) {
+                    $global:LASTEXITCODE = 1
+                }
+            }
+            'image' {
+                $digest = if ($args[2] -eq "${RegistryGhcr}:latest" -and $state.LatestDigest) {
+                    $state.LatestDigest
+                } else { $expectedDigest }
+                "${RegistryGhcr}@$digest"
+            }
+            default { throw "Unexpected Docker command in provenance fixture: $($args[0])" }
+        }
+    }
+    try {
+        foreach ($case in $cases) {
+            $state = $case
+            $runtimeSourceCommit = $case.Runtime
+            $script:expectedHeadSha = $case.Head
+            $existingVersionDigest = $expectedDigest
+            $version = '0.55.54'
+            $sourceShaDigest = Get-RemoteImageDigest "${RegistryGhcr}:sha-$runtimeSourceCommit"
+            $script:verifiedGhcrDigest = $null
+            $script:verifiedSourceCommit = $runtimeSourceCommit
+            $accepted = $false
+            try {
+                & ($sourceGate.CommandElements[3].ScriptBlock.GetScriptBlock())
+                $sourceVerified = $script:verifiedGhcrDigest -eq $expectedDigest -and
+                    $script:verifiedSourceCommit -eq $case.Source
+                if ($sourceVerified) {
+                    $publishedSourceCommit = $script:verifiedSourceCommit
+                    $verifiedGhcrDigest = $script:verifiedGhcrDigest
+                    & ($pullGate.CommandElements[3].ScriptBlock.GetScriptBlock())
+                    $accepted = $true
+                }
+            } catch {
+                Write-Host "  Provenance fixture $($case.Name): $($_.Exception.Message)"
+            }
+            Invoke-Assert "release provenance: $($case.Name)" ($accepted -eq $case.Accept)
+        }
+    } finally {
+        $script:verifiedGhcrDigest = $originalDigest
+        $script:verifiedSourceCommit = $originalSource
+        $script:expectedHeadSha = $originalHead
+        $global:LASTEXITCODE = $originalExit
+    }
+}
+
+& {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
     $imageHelper = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
