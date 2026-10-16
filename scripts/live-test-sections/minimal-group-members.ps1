@@ -9,6 +9,91 @@ function Invoke-MinimalGroupMembersContract {
     $base = $BaseUrl.TrimEnd('/')
     $userUrn = 'urn:ietf:params:scim:schemas:core:2.0:User'
     $groupUrn = 'urn:ietf:params:scim:schemas:core:2.0:Group'
+    function Test-MemberStateUnchanged([object]$Before, [object]$After) {
+        return ($Before | ConvertTo-Json -Depth 20 -Compress) -ceq ($After | ConvertTo-Json -Depth 20 -Compress)
+    }
+    function Assert-MemberStateOracle {
+        $before = @{ displayName = 'Group'; members = @(@{ value = 'user-1'; '$ref' = 'https://scim.example.test/Users/ABC' }) }
+        $after = $before | ConvertTo-Json -Depth 20 | ConvertFrom-Json -ErrorAction Stop
+        Test-Result -Success (Test-MemberStateUnchanged $before $after) -Message '9z-DQ: state oracle identical serialization'
+        $after.members[0].'$ref' = 'https://scim.example.test/Users/abc'
+        Test-Result -Success (-not (Test-MemberStateUnchanged $before $after)) -Message '9z-DQ: state oracle rejects case-only reference mutation'
+    }
+    function Test-MemberErrorContract([object]$Response, [string]$ScimType, [hashtable]$Diagnostics) {
+        $content = if ($Response.Content -is [byte[]]) {
+            [System.Text.Encoding]::UTF8.GetString($Response.Content)
+        } else { $Response.Content }
+        $body = ConvertFrom-Json -InputObject $content -AsHashtable -ErrorAction Stop
+        $diagnosticUrn = 'urn:scimserver:api:messages:2.0:Diagnostics'
+        $allowed = @('schemas', 'status', 'detail', 'scimType', $diagnosticUrn)
+        if ($body -isnot [System.Collections.IDictionary] -or
+            $Response.StatusCode -ne 400 -or
+            ($Response.Headers['Content-Type'] -join ';') -notmatch '^application/scim\+json(?:;|$)' -or
+            $body.schemas -isnot [array] -or
+            $body.schemas -cnotcontains 'urn:ietf:params:scim:api:messages:2.0:Error' -or
+            $body.status -isnot [string] -or $body.status -cne '400' -or
+            $body.detail -isnot [string] -or [string]::IsNullOrWhiteSpace($body.detail) -or
+            $body.scimType -cne $ScimType -or
+            @($body.Keys | Where-Object { $_ -cnotin $allowed }).Count -ne 0 -or
+            $body[$diagnosticUrn] -isnot [System.Collections.IDictionary]) {
+            return $false
+        }
+        foreach ($key in $Diagnostics.Keys) {
+            if (-not $body[$diagnosticUrn].Contains($key)) { return $false }
+            $actual = ConvertTo-Json -InputObject $body[$diagnosticUrn][$key] -Depth 10 -Compress
+            $expected = ConvertTo-Json -InputObject $Diagnostics[$key] -Depth 10 -Compress
+            if ($actual -cne $expected) { return $false }
+        }
+        return $true
+    }
+    function Assert-MemberErrorOracle {
+        $diagnosticUrn = 'urn:scimserver:api:messages:2.0:Diagnostics'
+        $diagnostics = @{
+            errorCode = 'VALIDATION_SCHEMA'; triggeredBy = 'StrictSchemaValidation'
+            attributePath = 'members[0].display'; attributePaths = @('members[0].display')
+            activeConfig = @{ StrictSchemaValidation = $true }
+        }
+        $baseline = @{
+            schemas = @('urn:ietf:params:scim:api:messages:2.0:Error')
+            status = '400'; detail = 'Unknown member attribute'; scimType = 'invalidSyntax'
+            $diagnosticUrn = $diagnostics
+        }
+        $mutations = [ordered]@{
+            'valid contract' = { param($body, $response) }
+            'valid UTF-8 byte response' = { param($body, $response) }
+            'HTTP status' = { param($body, $response) $response.StatusCode = 503 }
+            'media type' = { param($body, $response) $response.Headers['Content-Type'] = 'application/json' }
+            'schemas' = { param($body, $response) $body.schemas = @() }
+            'body status' = { param($body, $response) $body.status = 400 }
+            'detail' = { param($body, $response) $body.detail = $null }
+            'extra response key' = { param($body, $response) $body._rawPayload = @{} }
+            'scimType' = { param($body, $response) $body.scimType = 'invalidValue' }
+            'errorCode' = { param($body, $response) $body[$diagnosticUrn].errorCode = 'incorrect' }
+            'triggeredBy' = { param($body, $response) $body[$diagnosticUrn].triggeredBy = 'incorrect' }
+            'attributePath' = { param($body, $response) $body[$diagnosticUrn].attributePath = 'incorrect' }
+            'attributePaths' = { param($body, $response) $body[$diagnosticUrn].attributePaths = @('incorrect') }
+            'activeConfig' = { param($body, $response) $body[$diagnosticUrn].activeConfig.StrictSchemaValidation = $false }
+        }
+        foreach ($mutation in $mutations.GetEnumerator()) {
+            $body = $baseline | ConvertTo-Json -Depth 10 | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            $response = [pscustomobject]@{
+                StatusCode = 400; Headers = @{ 'Content-Type' = 'application/scim+json; charset=utf-8' }; Content = ''
+            }
+            & $mutation.Value $body $response
+            $response.Content = ConvertTo-Json -InputObject $body -Depth 10
+            if ($mutation.Key -eq 'valid UTF-8 byte response') {
+                $response.Content = [System.Text.Encoding]::UTF8.GetBytes($response.Content)
+            }
+            try {
+                $accepted = Test-MemberErrorContract $response 'invalidSyntax' $diagnostics
+            } catch [System.Management.Automation.ParameterBindingException] {
+                Test-Result -Success $false -Message "9z-DQ: error oracle $($mutation.Key) could not bind HTTP response content"
+                continue
+            }
+            Test-Result -Success ($accepted -eq ($mutation.Key -in @('valid contract', 'valid UTF-8 byte response'))) `
+                -Message "9z-DQ: error oracle $($mutation.Key)"
+        }
+    }
     function Send-MemberRequest([string]$Uri, [string]$Method, [object]$Body) {
         Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers -ErrorAction Stop `
             -ContentType 'application/scim+json' -Body ($Body | ConvertTo-Json -Depth 20)
@@ -33,6 +118,8 @@ function Invoke-MinimalGroupMembersContract {
         Test-Result -Success $matches -Message "9z-DQ: $Label exact persisted member references"
     }
     try {
+        Assert-MemberStateOracle
+        Assert-MemberErrorOracle
         $profile = @{
             schemas = @(
                 @{ id = $userUrn; name = 'User'; attributes = @(@{ name = 'userName'; type = 'string'; required = $true }) }
@@ -92,9 +179,16 @@ function Invoke-MinimalGroupMembersContract {
                 }
                 $rejected = Invoke-WebRequest -Uri $uri -Method Patch -Headers $Headers -ContentType 'application/scim+json' `
                     -Body ($invalid | ConvertTo-Json -Depth 20) -SkipHttpErrorCheck -ErrorAction Stop
-                Test-Result -Success ($rejected.StatusCode -eq 400) -Message "9z-DQ: genuine undeclared $field rejected"
+                $attributePath = "members[2].$field"
+                $diagnostics = @{
+                    errorCode = 'VALIDATION_SCHEMA'; triggeredBy = 'StrictSchemaValidation'
+                    attributePath = $attributePath; attributePaths = @($attributePath)
+                    activeConfig = @{ StrictSchemaValidation = $true }
+                }
+                Test-Result -Success (Test-MemberErrorContract $rejected 'invalidSyntax' $diagnostics) `
+                    -Message "9z-DQ: genuine undeclared $field exact Error/media-type/diagnostic contract"
                 $after = Invoke-RestMethod -Uri $uri -Headers $Headers -ErrorAction Stop
-                Test-Result -Success (($before | ConvertTo-Json -Depth 20 -Compress) -eq ($after | ConvertTo-Json -Depth 20 -Compress)) `
+                Test-Result -Success (Test-MemberStateUnchanged $before $after) `
                     -Message "9z-DQ: rejected $field operation leaves complete state unchanged"
             }
             $null = Send-MemberRequest $uri 'PATCH' @{
@@ -135,9 +229,14 @@ function Invoke-MinimalGroupMembersContract {
         }
         $rejected = Invoke-WebRequest -Uri $uri -Method Patch -Headers $Headers -ContentType 'application/scim+json' `
             -Body ($invalid | ConvertTo-Json -Depth 20) -SkipHttpErrorCheck -ErrorAction Stop
-        Test-Result -Success ($rejected.StatusCode -eq 400) -Message '9z-DQ: immutable reference change rejected'
+        $diagnostics = @{
+            errorCode = 'VALIDATION_PATCH'; triggeredBy = 'PatchEngine'; failedOperationIndex = 1
+            failedOp = 'replace'; failedPath = "members[value eq `"$($users[0])`"].`$ref"
+        }
+        Test-Result -Success (Test-MemberErrorContract $rejected 'mutability' $diagnostics) `
+            -Message '9z-DQ: immutable reference exact Error/media-type/diagnostic contract'
         $after = Invoke-RestMethod -Uri $uri -Headers $Headers -ErrorAction Stop
-        Test-Result -Success (($before | ConvertTo-Json -Depth 20 -Compress) -ceq ($after | ConvertTo-Json -Depth 20 -Compress)) `
+        Test-Result -Success (Test-MemberStateUnchanged $before $after) `
             -Message '9z-DQ: rejected reference change preserves complete state'
         $null = Send-MemberRequest $uri 'PATCH' @{
             schemas = @('urn:ietf:params:scim:api:messages:2.0:PatchOp')

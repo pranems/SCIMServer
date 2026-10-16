@@ -1,7 +1,7 @@
 # Responsive endpoint inventory and compact dashboard
 
 **Last verified:** 2026-10-16
-**Status:** UI and isolated image handoff merged with exact-tip CI. Full delivery stopped before deployment on source provenance. The separate tooling correction is locally GREEN; protected review, dev/canary and operator visual acceptance remain pending.
+**Status:** UI, isolated image handoff and source-provenance correction merged with exact-tip CI. The separate membership error-contract closeout is locally GREEN on both backends. Its protected consolidation, full dev/canary delivery and operator visual acceptance remain pending.
 
 ## Executive summary
 
@@ -117,6 +117,8 @@ directory. No screenshot baseline has been regenerated at this checkpoint.
 | UI-H12 | Test authoring / Low | An ambiguous patch anchor placed the new Docker mock inside a Git switch clause, producing a parser error before tests ran. | Move the mock to its own function boundary using complete surrounding context. The actual selector and all 68 behavioral cases pass. Anchor edits on complete unique boundaries; parser rejection remains a failed admission, never test evidence. | Focused contract parser / focused contract parser |
 | UI-H13 | Diagnostic AST extraction / Low | SafeGetValue rejected an array-expression wrapper when extracting declared runtime paths for the read-only proof. | Extract its 12 literal string nodes without executing dynamic expressions. Real source/digest proof passes; no production-code workaround. | Read-only proof admission / AST shape inspection |
 | UI-H14 | Evidence lookup / Low | A bounded review lookup assumed a helper path that did not exist. | Locate the existing HTTP contract helpers before constructing the follow-up assertion plan. The retained review identifies actual exported shape/key helpers and exact diagnostic expectations; no duplicate helper or production change. | Review source lookup / file discovery |
+| UI-H15 | GitHub CLI admission / Low | PR creation succeeded, but the following read-only gh pr view omitted the target required with --repo. Its usage failure is not inspection evidence. | Supply PR 237 explicitly and check native exit codes. The actual head and all seven completed checks were verified before ordinary merge at 72eb4fd0. No source or permission workaround. | Read-only CLI admission / explicit target validation |
+| UI-H16 | Tool output formatting / Low | A wide absolute-path column combined with Format-Table -Wrap expanded a bounded lookup into 52 KB of one-character wrapping. | Extract only relevant paths from the offloaded artifact, then emit shortened filename/line strings. Bounded output exposes the real helper and diagnostic contracts without another transcript dump. | Tool output budget / output-column design |
 
 UI PR #235 merged normally at `0fd0a87a`, preserving reviewed `8827402b`
 after seven exact-tip checks. The delivery handoff correction is a separate
@@ -138,6 +140,13 @@ resolver reuses the digest reader and Git's ancestry/tree contracts. It does
 not add a publication framework, permission dependency, mutable source alias
 or new runtime responsibility. The anonymous pull consumes the resolved
 identity instead of reintroducing the incorrect anchor assumption.
+
+Provenance PR #237 merged normally at `72eb4fd0`, preserving reviewed
+`6e0496ca`, after all 25 protected Fast gates and seven exact-tip CI checks.
+The original failed full matrix remains unchanged. The separate membership
+assertion closeout now passes 28 cases on each backend and 66 local live
+assertions; its [transport/oracle RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#rejection-contract-evidence-closeout)
+records the byte-response defect caught immediately before batching.
 
 The retained old-runtime benchmark is not candidate membership proof.
 Candidate performance comparison, complete negative-response contracts,

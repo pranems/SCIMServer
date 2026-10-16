@@ -124,3 +124,62 @@ Design/architecture disposition: **accepted**. Two bounded changes in existing
 validation/adapter responsibilities; no controller growth, new framework,
 speculative strategy or persistence coupling. The wider `$ref` storage contract
 remains separate.
+
+## Rejection-contract evidence closeout
+
+This separate test/evidence-only follow-up starts from merged `72eb4fd0`
+(provenance PR #237). It changes no runtime input, release version or lockfile.
+The existing shared Error/ListResponse/key helpers now check the new HTTP
+rejections alongside SCIM media type, string status, exact scimType and
+deterministic diagnostic values. Each rejected operation gets immediate
+unchanged-state readback and a one-Group collection assertion, including
+rejected POST. List/search tests check their envelopes and exact reference
+projection, not only successful status.
+
+Thirteen TypeScript oracle cases include a valid contract and twelve corrupt
+variants. Eleven false acceptances were observed RED before strengthening
+the assertion. The focused InMemory HTTP/oracle suite passes 28 cases.
+The live runner carries its own permanent oracle on every invocation, with
+fourteen cases including both text and UTF-8 byte response representations.
+Its initial eleven corruption failures and subsequent byte-response RED are
+retained. Two additional state-oracle cases prove identical serialization
+passes and a case-only reference mutation fails; the latter is RED under
+the old case-insensitive comparison. The modified live section then passes
+66 assertions against the
+owned compiled local 0.55.54 node; inventory readback verifies zero remaining
+owned endpoints and the exact node PID is stopped. The identical 28 cases
+also pass on isolated fresh PostgreSQL 17, with all 29 migrations confirmed.
+The existing owner/run guard verifies the disposable container before removal;
+its run-label query then confirms absence. Focused ESLint passes. Raw API
+TypeScript remains at its three unchanged activity/logging/reporter errors,
+with zero diagnostics in this changed test. Protected consolidation remains
+pending at this checkpoint.
+
+| ID | Type / severity | Symptom and root cause | Fix and prevention | Detection / earliest |
+|---|---|---|---|---|
+| GM-C01 | Test completeness / High | New negative tests proved status but not complete Error/diagnostic correctness; corrupted bodies passed the old status-only oracle. | Use shared allowlists and exact values, retain independent atomicity/list readbacks, and execute permanent mutation controls. Eleven wrong acceptances per language become GREEN. | Consolidation review / negative-contract oracle during original test authoring |
+| GM-C02 | HTTP representation / Medium | The first real strengthened live smoke reached a SCIM rejection but ConvertFrom-Json received System.Byte[]; string-only oracle fixtures had hidden the transport representation. | Reuse the existing live runner's explicit UTF-8 byte decoding pattern before JSON parsing. A permanent valid-byte control fails first; the final local section passes all 66 assertions. No permissive parse fallback. | Immediate mandatory author smoke / a binary transport fixture in the local oracle |
+| GM-C03 | Readiness harness / Low | Initial private-node probe used root health rather than the globally prefixed SCIM health route. The node had started, but the readiness probe never succeeded. | Verify the canonical route and body before fixture creation, and retain a reusable local harness with finally-scoped exact PID cleanup. Corrected readiness and subsequent full smoke pass. | Private readiness admission / canonical route inspection |
+| GM-C04 | Test discovery / Low | VS Code test discovery did not include the separately owned worktree and found no tests. | Use the repository's existing Jest command with explicit InMemory backend and exact file/name selectors. Meaningful eleven-assertion RED and 28-case GREEN are retained; no speculative install. | Test-provider discovery / explicit repository runner |
+| GM-C05 | Atomicity oracle / High | PowerShell's default equality treats case-only changes as equal, potentially hiding a changed reference URL path in rejected-operation readback. | One case-sensitive serialized-state helper serves both live readbacks. A permanent desired-rejection control fails under the old comparison, then passes with the unchanged-state positive control and all 66 local assertions. | Consolidation review plus focused RED / exact-state oracle during original authoring |
+
+Test/gate self-improvement disposition: **applied**. The live oracle runs
+inside the already registered live section, so it cannot become a test that
+exists only in an uninvoked gate. Both real transport representations and
+corrupted response values have permanent controls. Case-sensitive serialized
+state comparison prevents case-only changes from passing atomicity checks.
+
+Design/architecture disposition: **accepted**. Small local test assertions
+reuse the shared API helpers and established PowerShell byte decoding.
+No production framework, service responsibility, new authentication behavior,
+cross-language runner dependency or speculative abstraction is introduced.
+
+Closeout completeness: the full available reconstructed continuation was
+rescanned through event 15,908 with expanded error/signal and causal-narration
+passes. All 124 candidates were reconciled with the Group/UI ledgers.
+New actual failures map to GM-C02..04; expected oracle RED failures map to
+GM-C01/C02. The three existing type errors, repeated unavailable search tool,
+source patches and scanner echoes are explicitly dismissed as new incidents.
+The additional case-only state RED receipt is mapped separately to GM-C05;
+the four later scan candidates are historical/scanner/source echoes.
+Earlier scan receipts above remain historical, not overwritten evidence.

@@ -658,6 +658,19 @@ The [infrastructure contract](../DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
 and [UI-H10](../RESPONSIVE_ENDPOINT_INVENTORY.md) retain the failed full-run
 receipt separately from successful local and read-only artifact proof.
 
+## Test the error oracle and the real transport representation
+
+2026-10-16: Status-only negative assertions passed corrupted SCIM schemas,
+media types, status types and diagnostics. Mutation controls exposed eleven
+false acceptances in each test language. A string-only fake then missed that
+PowerShell's real SCIM HTTP response carries UTF-8 bytes. The mandatory first
+author smoke caught it before batching; a permanent valid-byte control locks
+the established explicit decoder alongside valid-text and corrupted-body
+controls. Keep live oracle checks inside the invoked section, not in an
+unregistered test. This operationalizes the existing outcome-not-presence
+rule for the assertion machinery itself. See
+[GM-C01 and GM-C02](../GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#rejection-contract-evidence-closeout).
+
 ## Verify the complete height chain, independently of content masks
 
 2026-10-16: A percentage-height page did not become bounded when its result

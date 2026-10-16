@@ -9,10 +9,12 @@
 
 ## Active Delivery Process
 
-**Active implementation:** immutable release source provenance on
-`fix/release-source-provenance-20261016`, based on merged `c3ef1f0d`.
+**Active implementation:** membership rejection-contract evidence on
+`test/minimal-group-error-contract-20261016`, based on merged `72eb4fd0`.
 Group items A/B merged in PRs #233/#234 with exact-tip CI; strict validation
-remains enabled. Current API/Web totals: 6,060 units, 2,447 HTTP, 1,624 Web.
+remains enabled. Current inventory: 6,060 units, 2,460 HTTP/oracle cases,
+1,624 Web. The last full HTTP receipt has 2,447; thirteen new pure oracle
+cases account for the delta pending protected consolidation.
 UI local proof: 36 browser cases, 26 DOM/error-boundary units, four visual
 comparisons, build/size/table audit PASS; raw types unchanged at 66/66.
 Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at c04b06f1;
@@ -28,9 +30,18 @@ commit; downstream shipping ACR tags failed and deployment was blocked.
 Dev remains 0.55.51. The separate correction has four expected RED assertions,
 68 GREEN pipeline controls and 22 selector checks; actual read-only OCI proof
 retains the immutable 0.55.54 digest 42613fe0/source c3ef1f0d.
-Protected review/merge and complete negative membership error assertions
-remain next, then a new authoritative dev/Entra/canary matrix and candidate
-performance comparison. No version/lock change for tooling or tests.
+PR #237 merged at 72eb4fd0 with 25 protected gates and seven exact-tip checks.
+Separate test-only closeout confirms eleven old wrong-contract acceptances
+RED per language. Now 28 cases PASS on each backend, 29 fresh migrations
+confirmed, and 66 local compiled-node live assertions PASS with exact cleanup.
+Its permanent live oracle includes actual UTF-8 byte bodies after immediate
+author smoke exposed a string-only assumption. Two additional state controls
+prove the same helper used by real readbacks rejects case-only reference
+changes. Focused lint passes; raw API
+types retain three unchanged errors and zero new-file diagnostics.
+Protected test-only consolidation remains next, then a new authoritative
+dev/Entra/canary matrix and candidate performance comparison.
+No version/lock change for tooling or tests.
 The other active session released its cloud window; do not infer operator
 visual acceptance. Customer production is not authorized. See
 [layout contract and RCA](RESPONSIVE_ENDPOINT_INVENTORY.md).
