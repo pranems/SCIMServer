@@ -1,7 +1,7 @@
 # Minimal imported Group membership correctness
 
 **Last verified:** 2026-10-16
-**Status:** Item A and reference item B are delivered to dev and the same-tenant canary in 0.55.54. Both backends, actual dev HTTP membership and native Entra add/remove readbacks pass. Operator visual acceptance and performance follow-up remain open; customer production is not promoted.
+**Status:** Item A and reference item B are delivered to dev and the same-tenant canary in 0.55.54. Both backends, actual dev HTTP membership and native Entra add/remove readbacks pass. Matched performance assurance is complete with documented CPU-quota tail limits; operator visual acceptance remains open. Customer production is not promoted.
 
 ## Deployed 0.55.54 evidence
 
@@ -35,7 +35,7 @@ The accepted artifact remains
 `sha256:42613fe093bcb770c8eec849f2ac8840afa1b0ca85a1b8baf98efa33665745f9`,
 published from `c3ef1f0d`; the later merged release head is not a fabricated
 publication-source tag. See
-[the release closeout and open performance observation](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
+[the release closeout and bounded performance evidence](RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 The historical local-only and pending-deployment entries below describe their
 original checkpoints, not the current release status.
 

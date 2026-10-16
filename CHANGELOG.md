@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.54 matched assurance evidence
+
+- Documentation and local diagnostic evidence only; no runtime, version,
+  lockfile, deployed quota or immutable-artifact change. Existing inventory
+  remains 6,060 API units / 2,460 HTTP-oracle / 1,624 Web.
+- Retain all actual measurements. The larger 0.5-CPU comparison has 2,000
+  samples/version/operation, with remove p95 +14.23%, remove p99 +36.30%
+  and empty-read p99 +22.19%. Its later logging-oracle failure is preserved;
+  raw timing distributions survive, but lost resource counters are not invented.
+- A successful 0.5-CPU instrumented comparison has equal pooled SQL calls,
+  near-identical CPU and 84.31% candidate memory headroom, with substantial
+  throttling in both versions. The separate 2-CPU sensitivity diagnostic
+  has 2,000 samples/version/operation: all candidate p50/p95/p99 values
+  decrease, SQL calls remain equal, CPU decreases 4.27%, and peak memory
+  increases 8.18% while retaining 72.07% headroom under the same 1 GiB limit.
+  This justifies a bounded dev/canary disposition, not a claim that the
+  observed 0.5-CPU tail thresholds passed or that production quotas changed.
+- Each successful private trace executes 66 real membership outcomes and
+  checks 200 persisted Group log rows, including seven errors, for UUID
+  correlation, duration, expected statuses and actual Authorization redaction.
+  Generated credentials are absent from the checked stored/console samples;
+  raw logs are not exported. No whole-product privacy certification is implied.
+- Actual-helper RED/GREEN controls fix multiline native JSON and substring
+  checks; counter receipts now persist before later probes. Official RFC
+  text verifies relative, case-exact references and ordered atomic PATCH.
+  See [the full measurements, limits and RCA](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#matched-measurement-and-quota-sensitivity).
+  Operator visual acceptance remains unavailable; customer production is untouched.
+
 ### 0.55.54 deployed evidence closeout
 
 - PR #238 merged normally at `db10b13e` after 25 protected gates and seven

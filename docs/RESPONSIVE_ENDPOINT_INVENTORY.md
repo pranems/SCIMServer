@@ -1,7 +1,7 @@
 # Responsive endpoint inventory and compact dashboard
 
 **Last verified:** 2026-10-16
-**Status:** Delivered in 0.55.54 to dev and the same-tenant canary from merged `db10b13e`. All 324 authoritative dev browser cases pass with zero skips. Operator visual acceptance remains unavailable; performance observations need follow-up. Customer production is not promoted.
+**Status:** Delivered in 0.55.54 to dev and the same-tenant canary from merged `db10b13e`. All 324 authoritative dev browser cases pass with zero skips. Matched assurance is complete with explicit CPU-quota tail limits; operator visual acceptance remains unavailable. Customer production is not promoted.
 
 ## Executive summary
 
@@ -50,7 +50,7 @@ Automated layout measurements are not a substitute for that confirmation.
 The release is deployed and automatically verified, not operator-accepted
 or approved for customer production.
 
-### Open performance observation
+### Initial performance observation
 
 The same version-admitted membership harness compared the retained 0.55.51
 baseline with two serial 0.55.54 batches, each containing 18 post-warmup
@@ -68,17 +68,135 @@ Retain both observations, not only the better repeat. The initial mutation
 slowdown did not reproduce at the same magnitude, but other repeat metrics
 still exceed the 10% threshold. With 18 samples, both p95 and p99 select the
 batch maximum; network-inclusive timings cannot establish the server cause.
-No performance PASS, approved regression waiver, query-count bound or
-memory-headroom claim is inferred.
+At this initial checkpoint, no performance PASS, approved regression waiver,
+query-count bound or memory-headroom claim was established.
 
-Follow-up owner: SCIMServer maintainer. Target: 2026-10-19. Obtain a larger
-matched-environment comparison with request/query and memory evidence before
-closing performance acceptance or claiming customer-production readiness.
+The follow-up was assigned to the SCIMServer maintainer by 2026-10-19.
+The larger matched comparison and resource evidence are now recorded below.
 Receipts remain local: `group-membership-perf-baseline.json`,
 `group-membership-perf-candidate.json`,
 `group-membership-perf-candidate-repeat.json` and their comparison under
 `test-results/`. This observation is not a reason to alter schema strictness,
 fabricate a green gate or mutate existing provisioning mappings.
+
+### Matched measurement and quota sensitivity
+
+The follow-up used the actual cached 0.55.51 and 0.55.54 immutable images,
+not rebuilt approximations. Their digests start `4edcaa07` and `42613fe0`.
+Private PostgreSQL 17 databases, loopback-only application ports, generated
+process-local credentials and an exact owner/run cleanup boundary isolate
+these measurements from dev, canary and customer provisioning.
+Each comparison runs baseline, candidate, candidate, baseline, with 100
+discarded warmup cycles per batch. Every measured cycle verifies actual
+add, populated read, remove and empty read values. Raw distributions are
+pooled by version before percentile calculation; batch percentiles are
+not averaged.
+
+The larger 0.5-CPU/1-GiB comparison retains 2,000 samples per version per
+operation. Median changes are between -0.91% and -0.03%.
+
+| Operation | p95 baseline / candidate milliseconds (change) | p99 baseline / candidate milliseconds (change) |
+|---|---|---|
+| Add | 69.91 / 76.62 (+9.59%) | 171.59 / 169.50 (-1.21%) |
+| Populated read | 38.73 / 41.41 (+6.91%) | 80.26 / 74.73 (-6.89%) |
+| Remove | 67.29 / 76.87 (+14.23%) | 115.67 / 157.67 (+36.30%) |
+| Empty read | 42.55 / 41.88 (-1.57%) | 69.14 / 84.48 (+22.19%) |
+
+All four measurement batches and exact cleanup succeeded, but a subsequent
+private logging probe failed parsing native multiline SQL JSON. That entire
+attempt remains a failed orchestration receipt. Its timing arrays survive;
+resource totals not saved before that failure cannot be reconstructed.
+
+After fixing the oracle and checkpointing counters after every round, the
+successful 0.5-CPU run has 400 samples/version/operation and 1,207 lifecycle
+HTTP requests per batch. Its complete changes are retained:
+
+| Operation | p50 change | p95 change | p99 change |
+|---|---|---|---|
+| Add | +1.94% | -1.12% | +18.08% |
+| Populated read | +0.44% | -1.62% | -15.28% |
+| Remove | -0.24% | +12.73% | +10.87% |
+| Empty read | +2.78% | -11.14% | -29.68% |
+
+Both versions make 30,221 pooled SQL calls. Candidate/baseline CPU use is
+28,928.44 / 29,065.45 milliseconds, and SQL execution is 2,828.66 /
+2,852.84 milliseconds. Peak cgroup memory is 160.71 / 160.66 MiB, leaving
+84.31% candidate headroom under 1 GiB. Both applications are substantially
+CPU-throttled: 37.18 / 37.15 seconds of accumulated throttled time.
+
+One separate diagnostic changes only the matched application CPU limit to
+2 CPU, retaining 1 GiB and 100 warmups. Actual container quotas are checked,
+not inferred from arguments. With 1,000 samples per batch, there are 2,000
+samples/version/operation and 4,407 lifecycle requests per batch.
+
+| Operation | p95 baseline / candidate milliseconds (change) | p99 baseline / candidate milliseconds (change) |
+|---|---|---|
+| Add | 28.67 / 27.76 (-3.18%) | 38.74 / 35.83 (-7.53%) |
+| Populated read | 11.13 / 10.38 (-6.76%) | 13.49 / 13.47 (-0.16%) |
+| Remove | 27.31 / 25.36 (-7.15%) | 37.79 / 34.82 (-7.85%) |
+| Empty read | 11.34 / 10.60 (-6.49%) | 14.49 / 13.74 (-5.17%) |
+
+All median changes also decrease, by 2.33% to 2.47%. Both versions make
+110,608 pooled SQL calls. Candidate/baseline CPU use is 91,047.48 /
+95,106.69 milliseconds (-4.27%); SQL execution is 10,397.89 /
+10,552.60 milliseconds (-1.47%). Accumulated throttled time falls to
+13.22 / 40.90 milliseconds. Peak memory is 285.99 / 264.37 MiB (+8.18%),
+with 72.07% candidate headroom. All measured states and guarded cleanup pass.
+
+**Performance disposition:** accepted for this bounded dev/canary assurance,
+with the over-10% small-quota tails explicitly retained and justified by
+the quota-sensitivity result, stable query totals and comparable resource
+cost. This is evidence of scheduling-sensitive tails, not proof of a
+specific production-code cause. It does not relabel the 0.5-CPU thresholds
+as passed, guarantee a production latency objective, alter deployed quotas,
+or authorize customer promotion. SQL counts include authentication, logging
+and fixture lifecycle work; they do not certify every multi-member workload.
+Cgroup peaks include startup/migrations, not only steady application heap.
+No speculative performance refactor or schema relaxation was introduced.
+
+Local receipts use these run IDs under `test-results/`:
+
+- `0d10963c956847219c402bcb3532581a`: initial 200-sample batches,
+  two warmups; retained separately, not pooled with the warmed comparisons.
+- `e4abded34cf84ce9a1b816acebc412dc`: larger 0.5-CPU timing distributions;
+  later logging-oracle failure and unavailable resource counters retained.
+- `f3238f2fd8aa4b83b79972374a2ce476`: successful instrumented 0.5-CPU run.
+- `448c0923258b45ba99465d1ccd9f830a`: successful 2-CPU sensitivity diagnostic.
+
+### Supplemental changed-path assurance
+
+Each successful instrumented run additionally executes the 66 actual
+minimal-schema membership outcomes on its private candidate. Each checks
+200 persisted Group request-log rows, including seven errors, for UUID
+request/endpoint correlation, nonnegative duration, expected 200/201/400
+statuses and actual Authorization header value `[REDACTED]`. Generated
+credentials are absent from the inspected stored payloads and last 300
+console lines. A persisted error UUID prefix and the `scim.group` category
+are observed in console output. Raw logs are not exported. This is sampled
+changed-path evidence, not an exhaustive personal-data or startup-log audit.
+Unchanged shared logger/slow-threshold behavior retains its existing unit
+coverage; no new logging path was added.
+
+Direct official text, rather than a search summary, verifies:
+
+- [RFC 7643 sections 2.3.7, 2.5 and 4.2](https://www.rfc-editor.org/rfc/rfc7643.txt):
+  references may be relative or absolute and are case-exact; defined
+  unassigned values may be omitted; Group member subattributes are immutable
+  by default. Unassigned-value handling is not permission to accept genuinely
+  supplied undeclared fields.
+- [RFC 7644 section 3.5.2](https://www.rfc-editor.org/rfc/rfc7644.txt):
+  PATCH operations are ordered and atomic. Existing exact-value and rejected
+  state/readback controls exercise these changed paths on both backends.
+
+The scoped security review retains strict negative controls and response
+allowlists, additive migration/legacy-record evidence, unchanged authorization
+and parameterized repository paths. Accepted references are stored/projected,
+not fetched; no new outbound, authentication or dependency surface is added.
+Existing protected CodeQL, supply-chain and full-pipeline checks remain
+separate evidence. This is direct changed-scope self-review, not independent
+GitHub approval or whole-product security/interoperability certification.
+The original matrix's nine reviewer-PENDING rows remain immutable; this
+supplement records later evidence and its limits rather than rewriting them.
 
 ## Layout contract
 
@@ -241,17 +359,37 @@ verification. New observations and diagnostic friction are recorded below;
 quoted failures, intentional rejections, expected REDs and old-receipt echoes
 were dismissed, not counted as fresh deployment defects.
 
+The later matched-assurance reconciliation scans the complete available
+continuation through 17,362 events with 166 candidate signals, using error/
+signal and causal-narration passes. Actual new diagnoses map to UI-H21 through
+UI-H26. Native JSON parsing, missing counter checkpoints, comma-argument
+binding and continuity contradictions are retained; discovery-output parsing
+and normative-summary errors are recorded together as UI-H25. Expected
+admission/sample/warmup/oracle REDs are successful detection, not product
+failures. Repeated output offload belongs to UI-H20; quoted throw statements,
+patches, historical receipt reads and scanner echoes are dismissed non-issues.
+This is the available reconstructed continuation, not the deleted original.
+
 | ID | Type / severity | Symptom and cause | Resolution and why it works | Detection / prevention |
 |---|---|---|---|---|
-| UI-H17 | Performance evidence / Medium, open | First candidate add/remove latency exceeded the 10% threshold; a serial repeat changed the outliers and still crossed other thresholds. Network-inclusive 18-sample tails cannot identify the server cause. | Not resolved or waived. Both receipts retained; maintainer owns larger matched comparison plus query/memory evidence by 2026-10-19. | Detected post-canary; earliest candidate-runtime measurement was after dev admission and before canary. Stage 3b.6 remained PENDING, not PASS. Do not convert automated deployment success into performance acceptance. |
+| UI-H17 | Performance evidence / Medium, investigated | Initial 18-sample add/remove increases varied on repeat; larger 0.5-CPU measurements still cross tail thresholds. | Retain all results. Completed matched query/CPU/memory proof and a separate 2-CPU sensitivity diagnostic. Equal query totals and decreasing candidate latency with negligible throttling justify the bounded dev/canary disposition above, not a claim that the 0.5-CPU thresholds passed or a production latency guarantee. | Initially detected post-canary; earliest candidate measurement was after dev admission. Original Stage 3b.6 remains PENDING in the immutable matrix. Later scoped evidence and explicit tail justification are separate. |
 | UI-H18 | PowerShell tooling / Low | A read-only verification command piped directly from a foreach statement and failed parsing before any Azure read ran. | Collect loop results in an array, then pipe the array; corrected command verifies actual same-digest traffic and revision counts. | Shell parser caught it before execution; use explicit result collection rather than dense chained statements. |
 | UI-H19 | Receipt interpretation / Low | A diagnostic queried cleanup.status, but this structured receipt exposes cleanup.removed; missing values looked like 15 failures. | Inspect the receipt schema and count explicit removed=true: 15/15. No cleanup rerun or live mutation was needed. | Caught by the conflicting successful journey and schema read; assert the published field and its value, not an invented key. |
 | UI-H20 | Diagnostic output / Low | Combined documentation reads exceeded the output limit; long existing change-log rows amplified the output. | Used the saved output artifact and bounded line/pattern reads without dumping it. | Output offload caught it; batch independent small ranges, not whole combined sections. Related to existing UI-H16, not another product defect. |
+| UI-H21 | PowerShell/native binding / Low | An unquoted comma-separated Docker mount argument crossed a function boundary as multiple arguments, causing invalid reference format before any application/database started. | Quote the complete mount argument. Actual isolated runs then succeed; exact network cleanup also succeeds on the initial failure. | First author smoke caught it; preserve native argument shape across PowerShell function boundaries. |
+| UI-H22 | Measurement methodology / Medium | Fixed 18-sample/two-warmup behavior could not implement the larger comparison or distinguish startup effects; small-sample p95/p99 were batch maxima. | Actual-harness controls first fail at 18 versus 200 samples and 815 versus 1,207 requests, then pass configurable validated samples/warmups, exact request accounting and raw distributions. CPU/sample admission controls also lock defaults, actual quotas and six invalid inputs. | Harness controls catch it before larger measurement claims; retain all trials and pool raw samples, never averaged percentiles or favorable repeats. |
+| UI-H23 | Evidence oracle / High | Native SQL JSON was returned as multiple stdout lines. Per-line JSON parsing failed; string-array Contains also tested element equality rather than credential substring presence and could create a false privacy claim. | Join output once to scalar text, check exact credential substrings, then parse the complete JSON. Desired multiline-success and embedded-credential controls are RED before the fix and GREEN afterward; both actual 200-row/seven-error probes pass. | The real private probe caught parsing before privacy acceptance; the embedded-credential negative control exposes the independent false-negative risk. Normalize the actual transport representation and test the oracle itself. |
+| UI-H24 | Evidence durability / Medium | Resource counters were saved only after an optional later probe; its failure lost otherwise valid completed measurement totals. | Persist each completed round before subsequent work. Raw timing receipts survive the first failed attempt; new complete instrumented runs retain CPU/query/memory totals even if later probes fail. Missing older counters are never invented. | Detected on the failed orchestration; earliest protection is the first completed measurement checkpoint, before optional probes/cleanup. |
+| UI-H25 | Standards/source interpretation / Medium | A search summary incorrectly required absolute reference URIs and mislabeled Group schema section 4.2 as PATCH; saved discovery output also contained multiple JSON records. | Read official RFC plaintext for conclusions; it permits relative references and places PATCH in RFC 7644 section 3.5.2. Parse only the intended discovery record rather than the entire multi-record export. | Direct primary-source verification catches this before a false compatibility rule or code change; discovery summaries are not normative evidence. |
+| UI-H26 | Continuity state / Low | Historical footer strings still named completed workers/pipeline as active and said canary had not been reached, despite current successful delivery objects. | Refresh the current authority/active-process fields and explicitly label old nested snapshots historical. Actual known-shell completion and exact run-label cleanup determine current ownership. | Bounded state reconciliation caught the contradiction; check both current headers and unqualified footers, not only newly added status fields. |
 
-Self-improvement disposition: **applied** for receipt scope and explicit pending
-acceptance; performance investigation **scheduled** as UI-H17 with owner/date.
-Design/architecture disposition: **accepted** for this documentation-only
-closeout; no runtime responsibility, dependency or abstraction is added.
+Self-improvement disposition: **applied** for actual-helper local regression
+controls, raw distribution/request accounting, per-round evidence durability
+and primary-source verification. These diagnostic controls remain session-local;
+they are not represented as new repository pipeline gates.
+Design/architecture disposition: **accepted** for this evidence-only closeout.
+No runtime responsibility, dependency, deployment quota or speculative
+optimization is added. Explicit operator visual acceptance remains blocked.
 
 The full available reconstructed continuation was scanned through event 15,306,
 from execution start event 11,599, using expanded error/signal and causal

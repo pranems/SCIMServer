@@ -697,3 +697,37 @@ The maintainer owns the larger matched-environment follow-up by 2026-10-19
 in [UI-H17](../RESPONSIVE_ENDPOINT_INVENTORY.md#provenance-and-completeness).
 This is an explicit evidence boundary, not a change to canary authorization
 or a silent redesign of pipeline policy.
+The later matched comparison below completes that follow-up with an explicit
+quota-sensitive tail disposition; the original matrix remains unchanged.
+
+## Normalize native output and checkpoint independent evidence
+
+2026-10-16: A real PostgreSQL JSON aggregation crossed the native-process
+boundary as multiple stdout lines. Parsing each line failed; calling Contains
+on the resulting string array checked element equality, not embedded credential
+absence. An actual-helper multiline-success control and an embedded-secret
+negative control both fail before the fix. Join once to scalar text before
+substring checks and whole-JSON parsing; both controls and the actual private
+200-row/seven-error probes then pass. This extends the existing transport/oracle
+lesson, not a claim that session-local diagnostic tests are repository gates.
+
+Save each completed measurement before optional later probes. A subsequent
+logging failure lost unsaved CPU/query/memory totals even though raw timing
+files and all membership readbacks survived. Incremental checkpoints preserve
+independent evidence without relabeling an overall failed orchestration.
+Never reconstruct unavailable counters or collapse distinct outcomes into one
+green run. See [UI-H23 and UI-H24](../RESPONSIVE_ENDPOINT_INVENTORY.md#provenance-and-completeness).
+
+## Treat quotas as an explicit performance variable, not a favorable rerun
+
+2026-10-16: Larger matched immutable-image comparisons preserve 0.5-CPU
+tail increases despite stable query/CPU cost. A separate, quota-verified 2-CPU
+diagnostic largely eliminates throttling and all candidate percentile increases.
+Retain both results and their distinct limits. The sensitivity experiment
+justifies a bounded dev/canary disposition; it neither makes the 0.5-CPU
+thresholds green nor changes a deployed quota or production latency commitment.
+Pool raw sample distributions, discard declared warmups, count actual lifecycle
+requests and preserve baseline/candidate/candidate/baseline order.
+Use official standards text for compatibility conclusions: a discovery summary
+incorrectly forbade relative references, but direct RFC verification prevented
+a false implementation rule. See [the complete measurements and limits](../RESPONSIVE_ENDPOINT_INVENTORY.md#matched-measurement-and-quota-sensitivity).
