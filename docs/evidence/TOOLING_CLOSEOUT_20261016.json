@@ -1,0 +1,62 @@
+{
+  "verifiedAt": "2026-10-16",
+  "continuity": "Reconstructed continuation, not restoration of the deleted original transcript.",
+  "ownership": {
+    "pullRequest": 231,
+    "reviewedHead": "b0c647057b41cf2084c0a852591dd34a567e3c5e",
+    "mergeCommit": "8887584c0ab889fe80c10f0e67b4eb875b6e1a14",
+    "focusedAssertionsPassed": 31,
+    "protectedPushGatesPassed": 25,
+    "protectedPushSeconds": 633.7,
+    "apiUnitCasesPassed": 6048,
+    "selectedInMemoryE2ECasesPassed": 2432,
+    "nativeOnlyCasesExcluded": 4,
+    "exactHeadChecksPassed": 7,
+    "successfulWorkflowRuns": [
+      38862447630,
+      38862618110,
+      38862618115,
+      38862618150
+    ],
+    "mergedMasterCodeQLRun": 38863401990,
+    "mergedMasterCodeQLConclusion": "success",
+    "reviewScope": "Direct change-scoped self-review recorded as COMMENTED, not independent approval.",
+    "historyPreserved": true
+  },
+  "mermaid": {
+    "existingReviewedPinSource": "f70a96a1",
+    "manifestAndLockedVersion": "11.17.0",
+    "initialInstalledVersion": "11.15.0",
+    "initialDependencyCheck": "npm ls mermaid --depth=0: exit 1, ELSPROBLEMS",
+    "initialDoctorExit": 1,
+    "physicalPathsVerifiedBeforeRestore": 6,
+    "restoreCommand": "npm ci --ignore-scripts --no-audit --no-fund",
+    "restoreScope": "Root dependencies only, exact existing lock, existing corporate proxy and quarantine retained.",
+    "finalInstalledVersion": "11.17.0",
+    "authoritativeBuiltInVersion": "11.17.0",
+    "installedRenderers": 1,
+    "finalDoctorExit": 0,
+    "strictChromiumDiagramsPassed": 763,
+    "themes": [
+      "default",
+      "dark"
+    ],
+    "localLockRegeneration": false,
+    "newDependencyVersionSelection": false,
+    "unchangedSha256": {
+      "package.json": "2D6D16428EB034FC48DC4A8940C779D4EB80EB4683F54A6308A3197A119B059E",
+      "package-lock.json": "B921EDB8309785986E5B5027C287F94D9104B5170042DB343AF0FE99323400AB",
+      "api/package-lock.json": "1D8DADB342F0807E428AA66F559A9891FF008A654E58CBCEB1E9E09E33377174",
+      "web/package-lock.json": "75F8067A41DDB94BC82E341F4A870EBF6BCAEFD537D7E3839F5A42E3D28D332C"
+    }
+  },
+  "release": {
+    "devVersion": "0.55.51",
+    "runtimeCommit": "c1a466ec11bb5df817a9ed486b99282c296436ad",
+    "runtimeChangesSinceDeployment": 0,
+    "additionalVersionBumpOrDeployment": false,
+    "originalFailedPipelineReceiptPreserved": true,
+    "operatorVisualAcceptance": "Blocked; unavailable on two requests. No approval inferred.",
+    "productionActions": "None"
+  }
+}

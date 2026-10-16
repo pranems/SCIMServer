@@ -9,8 +9,10 @@
 
 ## Active Delivery Process
 
-**Latest consolidation:** PR #230 merged normally at `5bf94f93` after seven
-exact-final-tip checks; its merged-master CodeQL also passes. Dev remains
+**Latest consolidation:** PR #231 merged normally at `8887584c`, preserving
+`b0c64705`, after 25 protected push gates and seven exact-tip checks.
+Merged-master CodeQL `38863401990` passes. Earlier visual PR #230 merged
+at `5bf94f93`. Dev remains
 on unchanged runtime `c1a466ec`, version 0.55.51, revision
 `scimserver-dev--vc1a466ec`, digest
 `sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c`.
@@ -41,16 +43,23 @@ of 33.08% is not workload-comparable: 84 versus 29,405 requests; current
 headroom is 711.62 MiB. Dev pruning keeps two active revisions, unchanged
 100% serving `c1a466ec` plus `096ee65f` rollback.
 
-Active separate tooling: `fix/dependency-ownership-preflight-20261016`
+Merged separate tooling: `fix/dependency-ownership-preflight-20261016`
 implements physical dependency ownership checks across five validation
 entry points. Its 31 assertions include real subprocess refusals and
-external-command sentinels. Related runner contracts pass; protected
-consolidation remains. See the
+external-command sentinels. Related runner contracts and all 25 protected
+gates pass, as do all four exact-head workflows. See the
 [ownership guide](strategy/DEPENDENCY_OWNERSHIP_PREFLIGHT.md).
 
-Remaining: operator visual approval, ownership-tooling consolidation and
-the separate Mermaid editor/gate alignment. No runtime bump is needed for
-this test-only follow-up. No canary or customer production was changed.
+Mermaid alignment is closed without a dependency declaration change:
+the manifest/CI lock already pinned 11.17.0; only the private installed
+copy was stale at 11.15.0. Explicit failed dependency/doctor checks justified
+an exact existing-lock root restore. The manifest and all three lock hashes
+are unchanged; the doctor confirms 11.17.0 parity and all 763 diagrams render
+in strict light/dark Chromium. No local lock regeneration occurred.
+
+Remaining: actual operator visual approval only, still blocked, not inferred.
+No runtime bump is needed for this tooling/documentation follow-up.
+No canary or customer production was changed.
 See [inventory visual proof and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
 and [portable dev acceptance](evidence/DEV_05551_ACCEPTANCE_20261016.json).
 The retained paragraphs below describe previous receipts, not active runners.
