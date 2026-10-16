@@ -15,8 +15,12 @@ HTTP cases on each of InMemory and private PostgreSQL pass. The exact owned
 PostgreSQL container and volume were removed, with absence verified.
 Identical local warmed 74-row/six-profile
 benchmark: 2,220 -> 0 clones/revisions; CPU p95 43.6404 -> 13.3925 ms.
-This is not deployed HTTP evidence. Plan 0.55.51 with CI-generated locks at
-consolidation; the original live +60.45% latency failure is still open.
+This is not deployed HTTP evidence. Source commit `848412c4` passes all 24
+protected Fast gates in 465.5 seconds: 6,048 API units/210 suites and 2,432
+selected InMemory E2E cases/116 suites, with four native-only exclusions.
+Version 0.55.51 locks came from successful CI run `38843457859`; only root
+version metadata changed. Final-tip consolidation/CI remains pending.
+The original live +60.45% latency failure is still open.
 See [freshness and execution issues](docs/SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
 
 Remaining: complete runtime consolidation and exact-tip CI, fresh dev

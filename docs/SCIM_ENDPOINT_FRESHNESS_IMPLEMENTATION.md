@@ -130,8 +130,13 @@ pass 37 cases, including response-key allowlists and runtime-cache exclusion.
 The identical three suites also pass 37 cases on a private PostgreSQL 17
 database, including separate reader/writer application instances. Its exact
 owned container and anonymous volume were removed and absence verified.
-The API TypeScript build passes. Complete release gates,
-the planned 0.55.51 version/CI-generated locks, and deployment remain pending.
+The API TypeScript build passes. Normal protected push at `848412c4` passes
+all 24 Fast gates in 465.5 seconds, including 6,048 API units across 210
+suites and 2,432 selected InMemory E2E cases across 116 suites. Four
+native-only exclusions remain explicit. Version 0.55.51 locks were generated
+by successful CI run `38843457859`; structural comparison proves that only
+root version metadata changed. Complete release gates, final-tip CI and
+deployment remain pending.
 
 ### 4.2 Execution issues and prevention
 
@@ -142,6 +147,7 @@ the planned 0.55.51 version/CI-generated locks, and deployment remain pending.
 | EC-I03 | Tooling / Low | The editor test runner discovered no tests in the separately owned worktree. | Run the existing Jest command from that worktree with explicit test paths. No dependency installation or alternate-checkout access. | Test discovery / test discovery; no escape. |
 | EC-I04 | Documentation / Low | The version-freshness update touched a guide containing seven pre-existing single-line JSON envelopes. All parsed, but they violated the readability rule. | Pretty-printed those seven examples; all 174 literal JSON blocks in changed documentation parse, with no single-line envelopes remaining. No payload values changed. | Pre-commit documentation check / the same check; no escape. |
 | EC-I05 | Tooling / Low | A batched documentation patch updated the README badge before a stale INDEX header context stopped later hunks. The freshness tool had already updated that INDEX header. | Kept the successful badge edit and applied only the remaining RCA hunk. Do not retry an entire partially applied patch or assume every header transformation is identical. | Patch context check / patch context check; no escape. |
+| EC-I06 | Tooling / Low | Printing a successfully saved transcript scan failed on the Windows console's cp1252 encoding when an assertion contained a Unicode bullet. | Read the retained JSON artifact with ASCII-escaped output. The scan itself was intact, so no scan or validation needed repeating. | Evidence presentation / evidence presentation; no escape. |
 
 Self-improvement **applied**: warmed startup/create/update regressions assert
 zero deep clones and canonical revisions as well as authoritative repository
@@ -150,9 +156,15 @@ Architecture disposition **accepted**: the existing service is a large-file
 candidate, but this change adds no responsibility or dependency and reuses its
 existing fingerprint map. Splitting it here would be a separate refactor.
 
-Provenance: these entries were captured when focused tests and the local
-benchmark turned green. Full continuation-transcript reconciliation is still
-pending at release consolidation; unavailable deleted history is not claimed.
+Provenance: entries were captured as fixes turned green. The full available
+continuation transcript was scanned through event 8,330 using separate
+error/signal and causal-narration passes, extending the previous reconciliation
+through 7,377. Thirty candidates were classified: the intended RED failures
+map to EC-I01/02, test discovery to EC-I03, and partial patching to EC-I05.
+Formatting is EC-I04; the subsequently observed console failure is EC-I06.
+Historical GM-I27, source/patch/search echoes and repeated receipt narration
+were verified and dismissed as new incidents. Unavailable deleted history
+is not claimed. Reconcile any later failures again at final release closure.
 
 The live helper measured 30 successful, sequential admin reads after warmup:
 

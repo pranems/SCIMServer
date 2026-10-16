@@ -10,17 +10,21 @@
 ## Active Delivery Process
 
 **Latest consolidation:** Gallery PR #228 merged normally at `4d11770c`
-after24/24 protected push gates and all seven exact-tip CI checks at
-`97b071b7`. Its tooling-only final native proof is50/50 with15 cleanup PASS.
+after 24/24 protected push gates and all seven exact-tip CI checks at
+`97b071b7`. Its tooling-only final native proof is 50/50 with 15 cleanup PASS.
 The assigned branch is now `fix/endpoint-list-cache-admission-20261016`.
 Four assertion-level RED regressions preceded persisted-fingerprint admission
-before profile cloning/canonicalization. API build,191 focused unit cases and
+before profile cloning/canonicalization. API build, 191 focused unit cases and
 37 selected HTTP cases on each of InMemory and private PostgreSQL pass.
 The exact owned database container and anonymous volume were removed.
-A matching warmed74-row/six-profile
-CPU benchmark reduces2,220 repeat clones/revisions to0 and p95 from43.6404
-to13.3925ms. This is not live HTTP proof; the +60.45% deployed latency
-failure remains open. Plan0.55.51 at consolidation with CI-only version locks.
+A matching warmed 74-row/six-profile
+CPU benchmark reduces 2,220 repeat clones/revisions to zero and p95 from
+43.6404 to 13.3925 ms. This is not live HTTP proof; the +60.45% deployed latency
+failure remains open. Source commit `848412c4` passes all 24 protected Fast
+gates, including 6,048 API units and 2,432 selected InMemory E2E cases.
+Version 0.55.51 locks came from successful CI run `38843457859`, with only
+root version metadata changes and unchanged dependencies/provenance.
+Final-tip consolidation and CI remain pending.
 Full release gates and fresh deployment remain pending. See
 [freshness evidence and RCA](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
 The retained paragraphs below describe previous receipts, not active runners.
