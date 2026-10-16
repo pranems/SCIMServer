@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Membership rejection evidence
+
+- Strengthen existing minimal-schema membership tests, without production,
+  version or lock changes. Verify complete SCIM Error/media/status/key
+  contracts and exact diagnostics for genuine undeclared fields, immutable
+  references and disabled membership policies. Retain independent full-state
+  readbacks after each rejection; verify rejected POST leaves the collection
+  unchanged. Assert list/search envelope values and exact reference projection.
+- RED first: eleven corrupted responses passed each old status-only assertion
+  in TypeScript and PowerShell. Thirteen permanent TypeScript oracle cases
+  grow focused cases 15 -> 28 and total HTTP/oracle inventory 2,447 -> 2,460.
+  All 28 pass identically on InMemory and private fresh PostgreSQL 17; all
+  29 migrations confirmed and exact owner/run-scoped cleanup verified.
+- Immediate author smoke caught SCIM response Content as UTF-8 bytes, not
+  text. A new desired-success byte control fails before explicit decoding
+  using the established live-runner pattern. Fourteen permanent error-oracle
+  cases and two exact-state controls run inside the existing section. A
+  case-only reference mutation fails first under the old insensitive guard.
+  Local live checks grow 50 -> 66,
+  all PASS with exact inventory cleanup and owned node shutdown.
+- Focused ESLint PASS. Raw API types retain three unchanged errors, zero in
+  the changed file. API units 6,060, Web units 1,624 and browser inventory 324
+  are unchanged. Protected consolidation and new deployed evidence remain
+  pending. See [closeout evidence and RCA](docs/GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#rejection-contract-evidence-closeout).
+
 ### Immutable release source proof
 
 - Distinguish actual CI publication source from the last runtime-input commit.
@@ -28,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deployment. Dev remains 0.55.51; candidate dev/Entra/canary and human visual
   acceptance remain pending. See [source contract](docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
   and [execution issues](docs/RESPONSIVE_ENDPOINT_INVENTORY.md).
+- PR #237 merged normally at 72eb4fd0, preserving reviewed 6e0496ca, after
+  25 protected Fast gates and seven exact-tip checks. Direct scoped review
+  is recorded as self-review, not independent GitHub approval.
 
 ## [0.55.54] - 2026-10-16
 

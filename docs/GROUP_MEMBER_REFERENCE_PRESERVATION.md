@@ -17,6 +17,13 @@ This change stores accepted strings without rewriting URLs or dereferencing
 them. It adds no outbound request, authentication rule, mapping workaround,
 schema widening or synthetic reference for old records.
 
+The separate [rejection-contract closeout](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md#rejection-contract-evidence-closeout)
+adds complete immutable-PATCH/PUT error contracts, exact list/search envelopes
+and reference projection, without another production change. All 28 focused
+cases pass on each backend, and 66 local compiled-node assertions pass,
+including real UTF-8 HTTP bodies and case-sensitive unchanged-state checks.
+Candidate live dev/Entra evidence still requires deployment.
+
 ## Data flow
 
 ```mermaid

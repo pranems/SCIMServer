@@ -2,11 +2,12 @@
 
 **Last verified:** 2026-10-16
 
-**Active execution:** immutable source provenance on
-`fix/release-source-provenance-20261016`, based on reviewed merged
-`c3ef1f0d`. Group items A/B merged in PRs #233/#234 after seven exact-tip checks
+**Active execution:** membership rejection evidence on
+`test/minimal-group-error-contract-20261016`, based on reviewed merged
+`72eb4fd0`. Group items A/B merged in PRs #233/#234 after seven exact-tip checks
 each. Their local proof includes both backends, populated/fresh migrations and
-50 live assertions. Current API/Web totals are 6,060/2,447/1,624.
+50 live assertions. Current API/Web inventory is 6,060/2,460/1,624;
+the HTTP/oracle delta adds 13 pure assertion tests to the last full 2,447 run.
 UI proof: 36 adjacent browser cases, 26 DOM/error-boundary units, four unchanged
 visual comparisons, build/size/layout audit PASS. Exact raw type diagnostics
 remain 66/66. Candidate 0.55.54 Validate passes 28/28 in 883.7 seconds at
@@ -21,9 +22,16 @@ cascade. No deployment occurred and dev remains 0.55.51.
 Separate provenance correction has four expected RED assertions and 68 GREEN
 pipeline controls plus 22 selector checks. Real public OCI proof resolves
 0.55.54 to publication source c3ef1f0d and retained digest 42613fe0.
-Protected review/merge remains pending; no runtime/version/lock change.
-Retain the failed matrix. Close negative membership response-contract gaps,
-then resume full dev/Entra and guarded canary evidence. Operator visual
+PR #237 merged at 72eb4fd0 after 25 protected gates and seven exact-tip checks.
+No runtime/version/lock change. The separate rejection closeout has eleven
+expected corruption failures per language, then 28 GREEN cases on each backend
+and 66 GREEN local live checks. Fresh PostgreSQL confirms 29 migrations and
+exact owned cleanup. A valid-byte control catches the real SCIM transport
+representation; decoding follows existing prior art. Two state-oracle controls
+also prove case-only reference mutations cannot pass as unchanged. Focused lint passes;
+raw API types retain three existing errors, zero in the changed test.
+Protected closeout review/merge remains next, followed by the full dev/Entra
+and guarded canary matrix. Retain the failed original matrix. Operator visual
 acceptance and candidate performance comparison remain explicit pending
 claims. See UI-H08 through UI-H14 in the layout RCA.
 The user authorizes dev and canary through the normal process, not customer
