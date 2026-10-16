@@ -22,8 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not one zero-skip full pipeline. API unit/E2E, Web vitest and live counts
   are unchanged by this test-only change; no new runtime version is needed.
 - Original 74 endpoint IDs, count and deployed 0.55.51 digest are verified
-  unchanged after the browser runs. Reviewer gates, reference fixture,
-  revision pruning and operator visual approval remain open.
+  unchanged after the browser runs. Subsequent original-reference proof
+  passes 19/19 with the original raw profile revision and zero fixture rows
+  remaining. Nine direct change-scoped review dispositions and safe dev
+  revision pruning are recorded in the
+  [portable acceptance receipt](docs/evidence/DEV_05551_ACCEPTANCE_20261016.json).
+  Protected consolidation and explicit operator visual approval remain open.
+- Actual read-only PostgreSQL tracing shows one SELECT per endpoint-list
+  service call. Three identical-workload process pairs reduce peak memory
+  and p95 while retained heap is effectively unchanged. Cloud working set
+  has 711.62 MiB headroom; its 33.08% rise is not a controlled comparison
+  because the two windows served 84 versus 29,405 requests. No concurrent
+  load-capacity claim or new runtime version follows.
 - Capture stylesheet API mismatch, below-tolerance false greens, response
   navigation race and explicit opt-in replay in the
   [inventory execution ledger](docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md).

@@ -33,6 +33,24 @@ This rule is enforced by the inventory-count browser control, not only by
 documentation. See IS-I20 through IS-I22 in
 [the inventory RCA](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md#execution-issues-and-root-causes).
 
+### Qualify memory comparisons and trace the real persistence boundary
+
+A production memory peak rose 33.08% across windows serving 84 versus
+29,405 requests. That is a useful headroom observation, not a controlled
+implementation comparison. Retain the observation, quantify the workload
+difference, and compare exact before/after source in fresh processes with
+identical fixtures and request counts. Distinguish peak RSS, heap after
+garbage collection and cloud working set; they are not interchangeable.
+
+Likewise, one mocked repository call is not proof of one SQL query. Trace
+the actual generated client and adapter against a READ ONLY transaction,
+count cold and warm query events, and state whether HTTP authentication
+and middleware are excluded. The release follow-up records both controls
+and their limitations in the
+[portable acceptance receipt](../evidence/DEV_05551_ACCEPTANCE_20261016.json).
+See IS-I27/28 in
+[the inventory RCA](../UI_INVENTORY_SELECTION_IMPLEMENTATION.md#execution-issues-and-root-causes).
+
 ### Cache admission must precede expensive derived work
 
 An authoritative database read can remain mandatory while its hydrated

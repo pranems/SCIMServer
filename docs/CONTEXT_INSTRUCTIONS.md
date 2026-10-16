@@ -29,13 +29,23 @@ baseline and 9.25% against the original pre-UI baseline; both relative
 checks pass. API units are 6,048, selected InMemory E2E 2,432 with four
 native-only exclusions, and native gallery 50/50 with 15 cleanup PASS.
 
-Remaining: visual-test protected consolidation/CI/PR, nine reviewer gates,
-legacy reference fixture, registry-policy revision pruning and operator
+The original legacy reference now passes 19/19 checks, preserving its
+original 0.55.47 raw profile revision and persisted resource counts, with
+zero fixture rows left. Nine change-scoped reviewer dispositions are
+recorded as direct self-review, not independent approval. Actual READ ONLY
+Prisma tracing proves one SELECT per endpoint-list service call. Three
+controlled before/after process pairs show lower peak memory/p95 and
+effectively unchanged retained heap. The separate cloud working-set rise
+of 33.08% is not workload-comparable: 84 versus 29,405 requests; current
+headroom is 711.62 MiB. Dev pruning keeps two active revisions, unchanged
+100% serving `c1a466ec` plus `096ee65f` rollback.
+
+Remaining: visual-test protected consolidation/CI/PR and operator
 visual approval. Dependency ownership preflight and Mermaid editor/gate
 alignment are separate tooling changes. No runtime bump is needed for
 this test-only follow-up. No canary or customer production was changed.
 See [inventory visual proof and RCA](UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
-and [freshness evidence](SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
+and [portable dev acceptance](evidence/DEV_05551_ACCEPTANCE_20261016.json).
 The retained paragraphs below describe previous receipts, not active runners.
 
 **Historical 0.55.50 UI receipt:** PR #226 merged normally at `096ee65f`

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-10-16",
+  "productVersion": "0.55.51",
+  "runtimeCommit": "c1a466ec11bb5df817a9ed486b99282c296436ad",
+  "reviewedVisualTestCommit": "ce77a384f5a856c7d86e2622690824d7e2459c08",
+  "imageDigest": "sha256:4edcaa07534fc1fa06e4985a8067cbbe56f743d8187d6c36c489374da7865b4c",
+  "originalPipeline": {
+    "passed": 34,
+    "failed": 1,
+    "skipped": 5,
+    "reviewerPending": 9,
+    "disposition": "Preserved failed receipt; supplemental closure does not relabel or rerun it."
+  },
+  "browser": {
+    "completeInvocationPassed": 310,
+    "completeInvocationOptInSkipped": 11,
+    "exactOptInReplayPassed": 11,
+    "distinctPassingCases": 321,
+    "unexpectedFailures": 0,
+    "flaky": 0,
+    "claim": "Exact file/line/title/project-key union across two receipts, not one zero-skip pipeline."
+  },
+  "integrity": {
+    "originalEndpointIds": 74,
+    "currentEndpointIds": 74,
+    "missingIds": 0,
+    "newIds": 0,
+    "claim": "Endpoint identity inventory and deployed version/digest, not every resource attribute."
+  },
+  "legacyReference": {
+    "sameOriginalEndpoint": true,
+    "originalVersion": "0.55.47",
+    "originalUsersPostStatus": 409,
+    "originalGroupsPostStatus": 409,
+    "passed": 19,
+    "failed": 0,
+    "operationsPerResourceType": [
+      "POST",
+      "PUT",
+      "PATCH",
+      "GET",
+      "DELETE"
+    ],
+    "resourceTypes": [
+      "User",
+      "Group"
+    ],
+    "publishedRequiredDisplayNamePreserved": true,
+    "responseKeyAllowlistsPassed": true,
+    "rawRevisionBefore": "247d138b0a91c7192472a240d09b18e08e95f8f2987ce22df849877811b01580",
+    "rawRevisionAfter": "247d138b0a91c7192472a240d09b18e08e95f8f2987ce22df849877811b01580",
+    "matchesOriginalBeforeDeploymentRevision": true,
+    "retiredPersistedSettingStillPresent": true,
+    "originalPersistedUsersBefore": 1,
+    "originalPersistedUsersAfter": 1,
+    "originalPersistedGroupsBefore": 0,
+    "originalPersistedGroupsAfter": 0,
+    "ownedFixtureDatabaseRowsRemaining": 0
+  },
+  "endpointListPerformance": {
+    "deployedHttp": {
+      "samples": 20,
+      "discardedWarmups": 2,
+      "p50Ms": 82.1,
+      "p95Ms": 240.97,
+      "p99Ms": 240.97,
+      "immediateBaselineP95Ms": 430.93,
+      "originalBaselineP95Ms": 265.52,
+      "bothRelative10PercentChecksPassed": true,
+      "claim": "Sequential network-inclusive GET samples; not a concurrent load test."
+    },
+    "realSqlTrace": {
+      "transactionReadOnly": true,
+      "backend": "dev PostgreSQL through generated Prisma client and pg adapter",
+      "coldAndWarmCalls": 3,
+      "selectsPerCall": [
+        1,
+        1,
+        1
+      ],
+      "endpointRowsPerCall": 74,
+      "claim": "Actual endpoint-list service SQL, excluding HTTP authentication/middleware queries."
+    },
+    "controlledServiceComparison": {
+      "beforeCommit": "4d11770c7c8776a93aedd3ea042d945da295bd76",
+      "afterCommit": "c1a466ec11bb5df817a9ed486b99282c296436ad",
+      "freshProcessPairs": 3,
+      "requestsPerProcess": 200,
+      "endpointRows": 74,
+      "expandedBuiltInProfiles": 6,
+      "beforePeakRssMiB": [
+        171.26953125,
+        171.7421875,
+        172.40234375
+      ],
+      "afterPeakRssMiB": [
+        140.765625,
+        140.05859375,
+        141.015625
+      ],
+      "beforePeakHeapMiB": [
+        67.1939468383789,
+        67.12064361572266,
+        70.28315734863281
+      ],
+      "afterPeakHeapMiB": [
+        50.895042419433594,
+        50.90325164794922,
+        53.874977111816406
+      ],
+      "beforeRetainedHeapMiB": [
+        34.78742218017578,
+        34.783302307128906,
+        34.78087615966797
+      ],
+      "afterRetainedHeapMiB": [
+        34.76329040527344,
+        34.762176513671875,
+        34.76255798339844
+      ],
+      "beforeP95Ms": [
+        34.26019999999971,
+        34.398299999999836,
+        38.71150000000034
+      ],
+      "afterP95Ms": [
+        6.864699999999857,
+        7.074000000000069,
+        6.704999999999927
+      ],
+      "claim": "Only exact committed EndpointService source differs. Current unchanged dependencies and deterministic fixtures are shared; persistence is mocked. This is local service CPU/memory evidence, not cloud load equivalence."
+    },
+    "observedCloudHeadroom": {
+      "samplesPerRevision": 60,
+      "intervalSeconds": 60,
+      "containerLimitMiB": 1024,
+      "beforePeakWorkingSetMiB": 234.74,
+      "afterPeakWorkingSetMiB": 312.38,
+      "afterHeadroomMiB": 711.62,
+      "beforeWindowRequests": 84,
+      "afterWindowRequests": 29405,
+      "peakChangePercent": 33.08,
+      "disposition": "Different workloads, not an apples-to-apples regression comparison. Retain the higher observation; use identical-workload service comparison for the changed service's memory claim."
+    }
+  },
+  "reviewerGates": {
+    "scope": "Runtime delta 078e741b..c1a466ec and visual follow-up ce77a384; direct change-scoped self-review, not exhaustive repository review or independent approval.",
+    "independentApprovalClaimed": false,
+    "passedWithinDeclaredScope": [
+      "3a.1",
+      "3a.2",
+      "3a.3",
+      "3b.1",
+      "3b.2",
+      "3b.4",
+      "3b.6",
+      "3c.1",
+      "3c.2"
+    ]
+  },
+  "devRevisionHygiene": {
+    "beforeActive": 4,
+    "afterActive": 2,
+    "retentionSource": "estate registry",
+    "servingRevision": "scimserver-dev--vc1a466ec",
+    "servingTrafficPercent": 100,
+    "rollbackRevision": "scimserver-dev--v096ee65f",
+    "postCheckPassed": true
+  },
+  "operatorVisualApproval": "Blocked: operator unavailable; no approval inferred.",
+  "productionActions": "None",
+  "selfImprovementDisposition": "Applied: exact matcher control, exact case-key union, actual SQL trace and workload-qualified memory comparison.",
+  "designDisposition": "Accepted: cohesive test/evidence additions; no new production abstraction or dependency."
+}

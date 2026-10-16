@@ -30,13 +30,24 @@ comparison proves 321 distinct passing cases across two receipts, not one
 zero-skip pipeline. Read-only integrity proves the original 74 endpoint IDs
 are unchanged, with no new IDs and the exact deployed version/digest intact.
 
-Remaining: protected visual-test consolidation/CI/PR, nine reviewer gates,
-legacy reference fixture, registry-policy dev revision pruning and explicit
+Follow-up release proof now closes the original legacy reference: 19/19
+checks, identical raw revision to its 0.55.47 receipt, unchanged persisted
+counts and zero remaining fixture rows. Nine change-scoped reviewer
+dispositions are recorded as direct self-review, not independent approval.
+Real READ ONLY Prisma tracing proves one SELECT per endpoint-list service
+call. Three controlled before/after process pairs show lower peak memory
+and p95 with effectively unchanged retained heap. Cloud peak memory is
+312.38 MiB of 1 GiB; its 33.08% rise is not a controlled regression because
+the windows served 84 versus 29,405 requests.
+Dev pruning passes: four -> two active revisions, unchanged serving image
+at 100%, and the prior 0.55.50 revision retained for rollback.
+
+Remaining: protected visual-test consolidation/CI/PR and explicit
 operator visual acceptance. Dependency ownership preflight and Mermaid
 editor/gate alignment remain separate tooling changes. No further runtime
 bump applies to this test-only follow-up. No canary/customer-prod work.
 See [inventory visual follow-up and RCA](docs/UI_INVENTORY_SELECTION_IMPLEMENTATION.md#dev-visual-follow-up-2026-10-16)
-and [deployed freshness/latency proof](docs/SCIM_ENDPOINT_FRESHNESS_IMPLEMENTATION.md#41-locally-verified-derived-work-correction).
+and [portable dev acceptance](docs/evidence/DEV_05551_ACCEPTANCE_20261016.json).
 
 ### Previous deployment and retained failed receipts
 
@@ -109,6 +120,7 @@ No canary or customer-production change. See the
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | Original legacy reference passes 19/19 with its unchanged 0.55.47 raw revision and zero fixture rows left. Nine direct change-scoped review dispositions, actual one-SELECT tracing and three controlled memory/latency pairs are recorded. Dev pruning keeps serving plus rollback only. Protected visual consolidation and operator acceptance remain open; tooling follow-ups stay separate. |
 | 2026-10-16 | PR #229 merged at `c1a466ec`; dev 0.55.51 deployed. Both endpoint-list latency comparisons pass. Three inspected visual baselines corrected, zero-tolerance actual-matcher control passes, and 321 distinct browser cases pass across 310 + 11 receipts. Original 74 endpoint IDs and exact deployed digest verified unchanged. Protected visual-test consolidation, reviewer gates, reference proof, pruning and operator acceptance remain open. |
 | 2026-10-16 | PR #228 merged at4d11770c with7 exact-tip checks PASS. Separate endpoint-list correction passes4 RED/GREEN regressions,191 focused units,37 InMemory HTTP cases and API build; warmed CPU p95 falls43.6404->13.3925ms, with0 repeat clones/revisions. Runtime version/CI/deployment and live latency closure remain pending. |
 | 2026-10-16 | PR #227 merged at f5046202; native linked-member/target-aware correction passes contracts78->92 and final complete gallery50/50 with15cleanupPASS. Independent target state, partial-failure precedence and target-effect guards close observed false-green gaps. |

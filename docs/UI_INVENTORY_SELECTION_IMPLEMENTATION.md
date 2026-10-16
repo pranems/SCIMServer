@@ -175,6 +175,9 @@ The evidence-only follow-up does not change any runtime or test source.
 | IS-I23 | Tooling / Low | Direct TypeScript file checking returned TS5112 because an existing tsconfig would otherwise be ignored. | Supply the compiler's explicit `--ignoreConfig` option with the intended ESM/compiler settings. The selected spec compiles without changing project configuration or installing tools. | Focused type check / same. |
 | IS-I24 | Tooling / Low | The transcript scanner printed its complete candidate list and the tool offloaded the 14.2 KB output. | Inspect only targeted candidate fields and bounded ranges in the saved artifact. The scan completed successfully; no validation was repeated to recover presentation output. | Reconciliation output / same. |
 | IS-I25 | Validation configuration / Medium | The manual full browser follow-up omitted two process-local flags set by the canonical pipeline, so 11 opt-in cases skipped despite exit zero. | Inspect every skip; enable both existing dev-only flags and run precisely the 11 omitted cases. They pass without skips. An executable exact case-key comparison proves complete distinct coverage rather than adding unrelated counts. Future manual replays must copy the canonical Stage 5.3 environment and assert zero unexplained skips. The original receipt remains 310 PASS/11 SKIP. | JSON result inspection / environment parity check before a manual replay. |
+| IS-I26 | Procedure discovery / Low | Historical references assumed `.github/prompts`, but this checkout stores migrated procedures under `.github/skills`. A few guessed historical filenames also did not exist. | Discover the actual procedure and retained-artifact names before reading; use current source and the estate registry instead of stale paths or environment examples. No customization file or other worktree was modified. | Release-review discovery / path discovery before invoking a historical procedure. |
+| IS-I27 | Measurement tooling / Low | The controlled service comparison passed TypeScript source to `transpileModule` with a `.js` filename, producing TS8006 instead of measurements. | Preserve a `.ts` source filename while resolving runtime imports from the compiled service location. Limit diagnostic output to three causal errors. All six fresh-process runs then complete with output-shape and read-count assertions. | First controlled measurement / source-language check before transpilation. |
+| IS-I28 | Measurement comparability / Medium | Cloud peak working set rose 234.74 -> 312.38 MiB, but the compared windows served 84 versus 29,405 requests. Treating the 33.08% rise as a controlled service regression would conflate workload and implementation. | Retain both observations and the 711.62 MiB current headroom. Add three fresh-process before/after pairs with identical 74-row/six-profile fixtures: peak RSS and heap fall, retained heap remains effectively unchanged, and p95 falls in every pair. Trace actual read-only PostgreSQL queries separately: one SELECT per cold/warm service call. No cloud load-equivalence claim is made. | Reviewer performance follow-up / workload qualification before a relative memory claim. |
 
 Fix SHAs are assigned by the containing logical commits, not fabricated before
 commit creation. IS-I01 through IS-I08 were resolved in `892d0192`; subsequent
@@ -195,6 +198,18 @@ The final full-browser result and later consolidation are separate receipts;
 this cutoff does not claim to include future events or the deleted original
 project3 transcript.
 
+The later release-closure reconciliation scanned the available continuation
+through event 10,341 with the same two passes, retaining the previous
+reconciliations. It yielded 49 cumulative candidates, including 15 after the
+prior 9,368-event checkpoint. New real tooling failure TS8006 maps to IS-I27;
+procedure discovery and the new incomparable-memory investigation map to
+IS-I26/28. Historical test results, successful patches, status/SQL echoes and
+previous scan output were verified and dismissed as new incidents. The
+PostgreSQL driver warning describes a future SSL-mode semantic change; its
+current alias uses certificate-verifying `verify-full` behavior, so it is
+not evidence of a newly weakened connection. The deleted original project3
+transcript remains unavailable.
+
 The full raw `events.jsonl` for session
 `2e6e7d76-3fb6-499e-8b54-3c7f962e5577` was reconciled, not just the compacted
 summary. The result pass scanned all 1,117 events through
@@ -213,6 +228,41 @@ reasoning/narration-field check extended to all 1,426 events through
 HTTP 400 responses in negative API tests, existing warnings, normal CRLF
 normalization and scan/tool-request echoes are not additional defects.
 
+## Change-scoped release review, 2026-10-16
+
+The nine outstanding reviewer judgments were completed as **direct
+self-review**, not independent approval. Scope is the deployed runtime delta
+`078e741b..c1a466ec` plus visual-test follow-up `ce77a384`.
+The [portable acceptance receipt](evidence/DEV_05551_ACCEPTANCE_20261016.json)
+records the finite claims and limitations. The original failed pipeline is
+unchanged; this table is supplemental evidence, not a claim that it reran green.
+
+| Gate | Disposition | Evidence and boundary |
+|---|---|---|
+| 3a.1 Test completeness | PASS within scope | Timestamp/identity browser cases assert values, copy behavior and measured bounds. Cache regressions cover authoritative errors, unchanged/same-timestamp rows and immutable snapshots. Actual-matcher control and exact omitted-case replay close the observed visual gaps. Retained applicable backend suites are not replaced by browser evidence. |
+| 3a.2 Response contracts | PASS within scope | Full/summary endpoint serializers retain explicit shapes and exclude runtime schema-cache fields. Existing unit/HTTP contract tests and the original reference's four-response key allowlists verify values and allowed keys, not just HTTP success. |
+| 3a.3 Error paths | PASS within scope | Authoritative database errors still propagate rather than returning cached success or 404. Revision-conflict rejection remains covered separately from repaired raw-legacy writes. Invalid/ambiguous UI expiry is not presented as valid forever. No new SCIM error envelope was introduced. |
+| 3b.1 Logging | PASS within scope | Timestamp formatting changes presentation, not stored/raw log payloads. Cache work introduces no new log category or level contract. Changed gallery diagnostics were reviewed for token/assertion disclosure; no new raw credential output was found. This is not a full logging-system audit. |
+| 3b.2 RFC compliance | PASS within scope | Date and time remain presentational; SCIM wire/storage values are unchanged. Published schema characteristics govern the original-reference fixture, including required displayName. Raw-profile revision coordination and real-edit conflict tests remain distinct. No new protocol behavior is claimed. |
+| 3b.4 Security | PASS within scope | No new authorization route, trust policy or dependency was added by the timestamp/cache/visual fixes. Changed transport/diagnostic paths and explicit response shaping were reviewed; exact-tip CodeQL passes. This does not claim a fresh exhaustive dependency or repository vulnerability audit. |
+| 3b.6 Performance | PASS within measured scope | Deployed endpoint-list p50/p95/p99 are 82.10/240.97/240.97 ms; both p95 relative limits pass. Actual Prisma SQL tracing in a READ ONLY transaction proves one SELECT per service call. Three identical-workload process pairs show lower peak memory/p95 and effectively unchanged retained heap. Cloud headroom is measured separately; differing request volumes prevent cloud before/after causal attribution. Concurrent-load capacity is not claimed. |
+| 3c.1 Code/design hygiene | PASS within scope | Changed source retains authoritative reads, explicit serialization and established UI primitives. Reviewed visual tests use actual responses, actual matcher options and a discriminating threshold. No blocking changed-code defect was found. No speculative service split or new strategy seam is justified by this follow-up. |
+| 3c.2 Documentation | PASS within scope | The current profile-reference status, acceptance limitations, RCA, session/context and changelog now match the deployed proof. Historical failed receipts remain explicitly historical. No future push, merge or operator approval is invented. |
+
+Procedures were read from their actual migrated `.github/skills` locations;
+historical environment examples did not override the estate registry.
+The optional knowledge graph is absent, so no graph-derived completeness
+or dashboard overlay is claimed; `/understand` is needed before a future
+graph-based review.
+
+The original reference now passes 19/19 checks with unchanged raw profile,
+unchanged original persisted counts and zero remaining fixture rows.
+Registry-policy dev pruning also passes: four active revisions become two,
+the same `c1a466ec` revision retains 100% traffic, and `096ee65f` remains
+the rollback target. Operator visual approval remains blocked, and protected
+consolidation must still finish. No production action is authorized by this
+review.
+
 ## Self-improvement and design disposition
 
 Visual follow-up disposition: test/gate improvement **applied** through
@@ -221,6 +271,11 @@ counter-mutation control. A proxy API or normal scene tolerance is not proof
 of screenshot stabilization. Design disposition **accepted**: one cohesive
 test helper and screenshot-only stylesheet, no new production responsibility,
 dependency or speculative abstraction.
+
+Release-closure improvement **applied**: qualify workload cohorts before
+comparing memory and prove actual database query counts separately from
+mocked service reads. Design disposition **accepted**: cohesive test and
+evidence additions, no production dependency or abstraction.
 
 Test/gate improvement **applied**: finite large-inventory geometry, exact
 filter counts, full selected IDs, keyboard navigation and URL-history checks
