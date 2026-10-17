@@ -2,6 +2,13 @@
 
 **Last verified:** 2026-10-16
 
+**Candidate 0.55.55, 2026-10-17:** the isolated OAuth media-type repair preserves
+JSON on global and per-endpoint token success responses and shares token-route
+classification with existing OAuth error handling. Seven regression cases fail
+before the fix and pass afterwards; focused units 48/48, HTTP 31/31 and API
+build pass. Development deployment, full release checks and Entra saved
+connectivity are not yet verified. The deployed 0.55.54 state below is unchanged.
+
 **Current release:** 0.55.54 is deployed to dev and the same-tenant canary
 using the image published from merged master `c3ef1f0d` and replayed from
 runtime-input-equivalent checkout `db10b13e`. PR #238 merged after 25 protected gates and

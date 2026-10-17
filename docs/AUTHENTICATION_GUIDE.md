@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+> **Status:** Living reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
 >
 > **The captured protocol examples below were measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -338,6 +338,12 @@ Content-Type: application/json
 ```
 
 **Response `200`:**
+
+Global and per-endpoint token success responses use
+`Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store` and
+`Pragma: no-cache` (RFC 6749 section 5.1). This includes WIF assertion exchanges.
+Token endpoints are OAuth surfaces, not SCIM resources; SCIM Users, Groups and
+discovery responses retain `application/scim+json`.
 
 ```json
 {

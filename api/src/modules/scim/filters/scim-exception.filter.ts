@@ -13,6 +13,7 @@ import { LogCategory } from '../../logging/log-levels';
 import { LoggingService } from '../../logging/logging.service';
 import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
 import { resolveRequestBodyForLog, type RawBodyRequest } from '../../logging/request-body-capture';
+import { isOAuthTokenEndpoint } from '../../../oauth/token-endpoint-path';
 
 /**
  * Global exception filter for SCIM endpoints.
@@ -60,7 +61,7 @@ export class ScimExceptionFilter implements ExceptionFilter {
     // OAuth body through and enrich it with a `correlation_id` + `timestamp`
     // (RFC 6749 section 5.2 permits `error_description` / `error_uri`; Entra's
     // reference implementation adds correlation_id + timestamp the same way).
-    if (this.isOAuthTokenEndpoint(url) && this.isOAuthErrorBody(exceptionResponse)) {
+    if (isOAuthTokenEndpoint(url) && this.isOAuthErrorBody(exceptionResponse)) {
       const oauthBody = this.buildOAuthErrorBody(exceptionResponse as Record<string, unknown>, exception.message, response);
       // Keep the same auth-error logging as the SCIM path (WARN for 401/403).
       if (status === 401 || status === 403) {
@@ -215,15 +216,6 @@ export class ScimExceptionFilter implements ExceptionFilter {
       endpointId: meta?.endpointId,
       requestId: meta?.requestId,
     });
-  }
-
-  /** WI-D1: is this an OAuth token endpoint (global or per-endpoint)? */
-  private isOAuthTokenEndpoint(url: string): boolean {
-    // Strip any query string, then match the two token-endpoint shapes:
-    //   /scim/oauth/token                         (global)
-    //   /scim/endpoints/{id}/oauth/token          (per-endpoint)
-    const path = url.split('?')[0];
-    return /\/oauth\/token\/?$/.test(path);
   }
 
   /** WI-D1: does the thrown body look like an RFC-6749 OAuth error (has `error`)? */
