@@ -31,6 +31,41 @@ syntax failure cannot masquerade as meaningful disclosure RED.
 The [startup redaction ledger](../STARTUP_DATABASE_CONFIGURATION_REDACTION.md)
 records the actual escape and the permanent source/runtime regressions.
 
+### Migration execution and evidence transport are separate success claims
+
+2026-10-17: a protected actual-data worker exited zero, but unrelated CLI
+extension discovery prevented console capture. Exit status does not recover
+missing migration timings, fingerprints or lock measurements. Smoke-test the
+actual live transport without credentials before starting consequential work,
+retain a bounded final receipt drain window and reject missing unique receipts.
+Use actual publisher provenance rather than assuming optional OCI labels exist.
+Restrict extension discovery to the already-installed component required by
+the operation; do not change shared permissions or tooling to fix unrelated
+metadata. These session controls still require live proof on the next copy.
+
+### Cleanup dependencies and read permissions belong in creation preflight
+
+2026-10-17: a private DNS zone could not be deleted before its VNet link.
+Record exact child ownership, delete dependencies before parents and verify
+absence, not just command success. Application-RG Contributor rights did not
+grant read access to a separately created provider infrastructure group.
+Verify each cleanup scope in advance. Forbidden is unknown, never absence;
+retain the cleanup obligation and obtain authorized verification rather than
+substituting accounts or deleting provider-managed infrastructure manually.
+
+### Liveness cannot stand in for authenticated database readiness
+
+2026-10-17: two exploratory exact-image checks assumed direct Node startup
+would fail fast and that process health verified DB authentication. Actual
+old/new artifacts and the health controller show these assumptions were
+incorrect: the shipping migration guard is bypassed, and liveness performs
+no database query. Preserve failed probes and inspect the contract before
+changing an assertion. Prove positive database access with an authenticated
+database-backed request; independently prove the real shipping failure guard.
+This operationalizes PB-2 below and the existing outcome-not-presence rule,
+not a new health contract or a weakened gate.
+See [the delivery RCA](../STARTUP_DATABASE_CONFIGURATION_REDACTION.md#execution-issues-and-root-cause-analysis).
+
 ### Release assurance must name the actual promoted artifact
 
 A green Trivy scan of a PR test image does not certify a separately built
