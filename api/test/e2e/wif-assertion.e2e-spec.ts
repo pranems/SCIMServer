@@ -132,6 +132,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     const assertion = await signAssertion();
     const res = await postAssertion(assertion)
       .expect(200)
+      .expect('Content-Type', /^application\/json\b/i)
       .expect('Cache-Control', 'no-store')
       .expect('Pragma', 'no-cache');
 

@@ -88,6 +88,7 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
     const res = await mintEndpointToken(endpointA, clientId, clientSecret)
       .expect(200)
+      .expect('Content-Type', /^application\/json\b/i)
       .expect('Cache-Control', 'no-store')
       .expect('Pragma', 'no-cache');
 
@@ -117,7 +118,10 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
       .post(`/scim/endpoints/${endpointA}/oauth/token`)
       .set('Authorization', `Basic ${basic}`)
       .send({ grant_type: 'client_credentials' })
-      .expect(200);
+      .expect(200)
+      .expect('Content-Type', /^application\/json\b/i)
+      .expect('Cache-Control', 'no-store')
+      .expect('Pragma', 'no-cache');
 
     expect(res.body.token_type).toBe('Bearer');
     const payload = decodePayload(res.body.access_token);
@@ -133,7 +137,8 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     await request(app.getHttpServer())
       .get(`/scim/endpoints/${endpointA}/Users`)
       .set('Authorization', `Bearer ${epToken}`)
-      .expect(200);
+      .expect(200)
+      .expect('Content-Type', /^application\/scim\+json\b/i);
   });
 
   it('the per-endpoint token is REJECTED on a DIFFERENT endpoint (Q1 scoping)', async () => {

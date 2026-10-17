@@ -29,11 +29,21 @@ retention. After deploying the corrected image, rotate the affected database
 credential through a coordinated update of its consumers. This patch prevents
 new startup disclosure; it does not erase retained logs or rotate credentials.
 
+### Fixed
+
+- OAuth token responses now retain `application/json`, as required by OAuth
+  2.0. Previously the SCIM response interceptor replaced it with
+  `application/scim+json` on token routes under `/scim`. Global and per-endpoint
+  token contents, credential rules and cache headers are unchanged; actual SCIM
+  resources still use their SCIM media type. No database migration is needed.
+  Development deployment and Entra saved-credential validation remain pending.
+
 ### Changed
 
-- Documentation-only release-note navigation, current behavior descriptions and
-  upgrade guidance. No runtime, package version, lockfile, deployed quota or
-  immutable image changed.
+- Prior 0.55.54 documentation-only closeout added release-note navigation,
+  current behavior descriptions and upgrade guidance. Those documentation
+  changes did not alter runtime, package versions, lockfiles, deployed quotas
+  or the immutable image; the candidate fixes above are separate changes.
 
 ## 0.55.54 - 2026-10-16
 

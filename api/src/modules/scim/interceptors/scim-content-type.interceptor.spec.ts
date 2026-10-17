@@ -1,6 +1,6 @@
 import { ScimContentTypeInterceptor } from './scim-content-type.interceptor';
 import { ExecutionContext, CallHandler } from '@nestjs/common';
-import { of } from 'rxjs';
+import { lastValueFrom, of } from 'rxjs';
 
 describe('ScimContentTypeInterceptor', () => {
   let interceptor: ScimContentTypeInterceptor;
@@ -14,6 +14,42 @@ describe('ScimContentTypeInterceptor', () => {
   });
 
   describe('intercept', () => {
+    it.each([
+      '/scim/oauth/token',
+      '/scim/oauth/token/',
+      '/scim/oauth/token?diagnostic=true',
+      '/scim/endpoints/endpoint-a/oauth/token',
+      '/scim/endpoints/endpoint-a/oauth/token/',
+      '/scim/v2/endpoints/endpoint-a/oauth/token?diagnostic=true',
+    ])('preserves OAuth JSON serialization for %s', async (url) => {
+      const setHeader = jest.fn();
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => ({ originalUrl: url, url }),
+          getResponse: () => ({ headersSent: false, setHeader }),
+        }),
+      } as unknown as ExecutionContext;
+      const body = { access_token: 'test-access-token', token_type: 'Bearer', expires_in: 3600 };
+      const handler: CallHandler = { handle: () => of(body) };
+
+      expect(await lastValueFrom(interceptor.intercept(context, handler))).toBe(body);
+      expect(setHeader).not.toHaveBeenCalled();
+    });
+
+    it('preserves OAuth JSON serialization when only request.url is available', async () => {
+      const setHeader = jest.fn();
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => ({ url: '/scim/endpoints/endpoint-a/oauth/token' }),
+          getResponse: () => ({ headersSent: false, setHeader }),
+        }),
+      } as unknown as ExecutionContext;
+      const handler: CallHandler = { handle: () => of({ token_type: 'Bearer' }) };
+
+      await lastValueFrom(interceptor.intercept(context, handler));
+      expect(setHeader).not.toHaveBeenCalled();
+    });
+
     it('should set Content-Type header to application/scim+json', (done) => {
       const mockSetHeader = jest.fn();
       const mockResponse = {

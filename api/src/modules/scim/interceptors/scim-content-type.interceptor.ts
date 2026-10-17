@@ -7,6 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import type { Request, Response } from 'express';
+import { isOAuthTokenEndpoint } from '../../../oauth/token-endpoint-path';
 
 /**
  * Interceptor to set SCIM-required HTTP headers for all successful responses.
@@ -26,8 +27,8 @@ export class ScimContentTypeInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const url = request.originalUrl ?? request.url ?? '';
 
-    // Only apply SCIM content type to /scim/* routes
-    const isScimRoute = url.startsWith('/scim');
+    // OAuth token responses require application/json, even beneath /scim.
+    const isScimRoute = url.startsWith('/scim') && !isOAuthTokenEndpoint(url);
 
     return next.handle().pipe(
       tap((data: any) => {

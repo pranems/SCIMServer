@@ -30,6 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retains 66 diagnostics within its existing ratchet. No zero-diagnostic,
   no-skip, final-image or postdeployment-browser claim is made.
 
+### OAuth token response media type
+
+- Preserve `application/json` on successful global and per-endpoint OAuth token
+  responses, including the client-secret and WIF assertion routes. The SCIM
+  content-type interceptor no longer overwrites these responses with
+  `application/scim+json`. Actual SCIM resource responses remain unchanged.
+- Reuse the token-route classifier for success and OAuth error handling.
+  Token contents, credential placement, HTTP 200, cache-control headers and
+  authorization decisions are unchanged. No migration is required.
+- Regression evidence includes seven failing-before/passing-after unit cases,
+  real global/per-endpoint HTTP media-type assertions and live-suite checks.
+  Whether this correction resolves Entra saved-credential validation must be
+  verified after development deployment; it is not claimed from local tests.
+
 ### 0.55.54 exact-artifact and actual-browser assurance
 
 - Close the exact release-image scan gap: official checksum-verified native

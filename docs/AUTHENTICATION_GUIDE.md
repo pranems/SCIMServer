@@ -339,6 +339,12 @@ Content-Type: application/json
 
 **Response `200`:**
 
+Global and per-endpoint token success responses use
+`Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store` and
+`Pragma: no-cache` (RFC 6749 section 5.1). This includes WIF assertion exchanges.
+Token endpoints are OAuth surfaces, not SCIM resources; SCIM Users, Groups and
+discovery responses retain `application/scim+json`.
+
 ```json
 {
   "access_token": "<jwt>",
