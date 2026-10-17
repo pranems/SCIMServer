@@ -7,10 +7,13 @@
 
 ---
 
-## 0.55.55 candidate startup-output hardening
+## 0.55.56 candidate startup-output hardening
 
 The container entrypoint now reports database configuration presence only,
 never the connection URI, username, password or hostname. The existing
+Prisma application startup message and fallback warning likewise reveal
+status only, rather than interpolating a URI into otherwise structured logs.
+The existing
 Prisma migrate-before-start sequence and InMemory migration bypass are
 unchanged. This is a candidate source change, not a claim that any estate
 has been upgraded.

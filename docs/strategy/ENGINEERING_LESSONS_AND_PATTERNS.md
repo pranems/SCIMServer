@@ -16,10 +16,14 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
-### Redaction must cover output before the application logger exists
+### Startup redaction must cover shell output and application messages
 
 A container entrypoint can disclose a connection URI even when application
-redaction and an exact-image CVE scan pass. Test shell startup independently
+redaction and an exact-image CVE scan pass. A Prisma startup message can
+independently disclose the same URI by interpolating it before the logger
+sanitizes structured data. Inventory both boundaries, inject optional loggers
+in lifecycle tests, and assert on every captured logging argument.
+Test shell startup independently
 with synthetic credentials and observable application/migration child markers.
 Require both absence of sensitive values and accurate configured/unset output.
 Normalize Windows fixture newlines before Linux shell execution, so a fixture

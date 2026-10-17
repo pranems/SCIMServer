@@ -1,18 +1,22 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.55
-> **Last Updated**: October 16, 2026
-> **Last verified:** 2026-10-16
+> **Version**: 0.55.56
+> **Last Updated**: October 17, 2026
+> **Last verified:** 2026-10-17
 
 ---
 
 ## Active Delivery Process
 
-**Candidate:** 0.55.55 removes raw database connection-string startup output,
-without changing migration ordering, API behavior or UI. Focused unit 7/7 and
-real-shell contract 24/24 pass after observed RED; final-artifact and release
-gates are pending. Customer deployment is explicitly authorized as of
+**Candidate:** 0.55.56 removes raw connection-string output from shell startup,
+Prisma application messages and the fallback warning, without changing
+migration ordering, API behavior or UI. Expanded focused lifecycle/logging
+tests pass 41/41; real-shell contract remains 24/24 after observed RED.
+The separate reviewed OAuth 0.55.55 dev pipeline is active; the next version
+avoids competing for its release tag. Fresh clean-CI lock metadata, final
+protected source, artifact and release gates remain pending.
+Customer deployment is explicitly authorized as of
 2026-10-17, but the customer application remains on 0.55.20. Authorization does
 not replace technical gates or actual human visual observations.
 Source consolidation at `c907b05` passes all 28 protected Validate gates:

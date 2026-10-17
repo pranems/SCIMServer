@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 0.55.55 candidate - container startup credential redaction
+### 0.55.56 candidate - startup credential redaction
 
 - Stop printing the database connection string before application logging
   initializes. Startup reports only `DATABASE_URL: configured` or
   `DATABASE_URL: (not set)`. Migration and application startup behavior is unchanged.
+- Remove the Prisma startup message that embedded the URI and make its fallback
+  warning status-only. Inject the optional logger in regression tests and
+  inspect every captured argument, not just message text. Observed combined
+  RED: 4 failed / 18 passed; service/source GREEN: 22 passed. Expanded pool,
+  shutdown and logging-race preservation: 41 passed across five suites.
 - Permanent source regression: 6 -> 7 targeted unit assertions. Observed RED
   was one disclosure-guard failure; GREEN is 7 PASS. Disposable real-shell
   startup contract against the old published image: RED 20 PASS / 4 FAIL;
@@ -21,14 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mounted and stubbed Node children. It verifies output and migration/start
   ordering, not database connectivity. Exact final-image and full release
   gates remain pending; retained 0.55.54 suite counts are not new 0.55.55 proof.
-- API and Web candidate versions move together from 0.55.54 to 0.55.55.
-  Lockfiles must be regenerated on the existing clean CI runner, not locally.
+- API and Web versions move to 0.55.56 rather than competing with the separately
+  running reviewed OAuth 0.55.55 dev delivery. Clean-CI run `39030193007`
+  supplied the initial 0.55.55 lockfiles with identical dependency graphs.
+  Fresh 0.55.56 metadata must likewise come from CI, never local regeneration.
 - Normal protected Validate push at `c907b05`: 28/28 gates PASS in 1,129.5
   seconds. API units: 6,060 -> 6,061 in 211 suites; InMemory HTTP: unchanged
   2,460 PASS / 4 retained skips in 117 suites; Web: unchanged 1,624 PASS in
   123 files. API lint retains 513 warnings with zero errors; Web type checking
   retains 66 diagnostics within its existing ratchet. No zero-diagnostic,
   no-skip, final-image or postdeployment-browser claim is made.
+- The preceding full totals predate the integrated OAuth and latest Prisma
+  changes. Final applicable source checks are pending; unchanged independent
+  evidence is retained only where input equality is established.
 
 ### OAuth token response media type
 

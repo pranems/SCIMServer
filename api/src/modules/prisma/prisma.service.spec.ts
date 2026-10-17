@@ -11,6 +11,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
 import { PrismaService } from './prisma.service';
+import { Test } from '@nestjs/testing';
+import { ScimLogger } from '../logging/scim-logger.service';
+import { LogCategory } from '../logging/log-levels';
 
 // Mock pg module
 const mockPoolEnd = jest.fn().mockResolvedValue(undefined);
@@ -53,6 +56,7 @@ describe('PrismaService', () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     if (originalDbUrl === undefined) {
       delete process.env.DATABASE_URL;
     } else {
@@ -83,6 +87,9 @@ describe('PrismaService', () => {
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('DATABASE_URL not set'),
       );
+      expect(consoleSpy.mock.calls.every(
+        ([message]) => message === '[PrismaService] DATABASE_URL not set - using local development fallback.',
+      )).toBe(true);
       consoleSpy.mockRestore();
     });
 
@@ -131,6 +138,40 @@ describe('PrismaService', () => {
   // ── onModuleInit ───────────────────────────────────────────────────────────
 
   describe('onModuleInit', () => {
+    it('reports connection success without disclosing configured URI components', async () => {
+      const password = 'prisma-startup-fixture-password';
+      const username = 'prisma-startup-fixture-user';
+      const hostname = 'prisma-startup-fixture.invalid';
+      const url = `postgresql://${username}:${password}@${hostname}:5432/fixture_database`;
+      process.env.DATABASE_URL = url;
+      process.env.PERSISTENCE_BACKEND = 'prisma';
+      const logger: jest.Mocked<Pick<ScimLogger, 'info' | 'warn' | 'error'>> = {
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      };
+      const module = await Test.createTestingModule({
+        providers: [PrismaService, { provide: ScimLogger, useValue: logger }],
+      }).compile();
+      const service = module.get(PrismaService);
+
+      try {
+        await service.onModuleInit();
+
+        expect(service.$connect).toHaveBeenCalledTimes(1);
+        expect(pg.Pool).toHaveBeenCalledWith(expect.objectContaining({ connectionString: url }));
+        expect(logger.info).toHaveBeenCalledWith(LogCategory.DATABASE, 'PostgreSQL connected successfully');
+        const output = JSON.stringify({
+          info: logger.info.mock.calls,
+          warn: logger.warn.mock.calls,
+          error: logger.error.mock.calls,
+        });
+        expect([url, password, username, hostname].some(marker => output.includes(marker))).toBe(false);
+      } finally {
+        await module.close();
+      }
+    });
+
     it('should skip $connect when PERSISTENCE_BACKEND is inmemory', async () => {
       process.env.PERSISTENCE_BACKEND = 'inmemory';
       const service = new PrismaService();

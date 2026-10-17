@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -15,11 +15,15 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
-### 0.55.55 candidate: startup credential redaction
+### 0.55.56 candidate: startup credential redaction
 
 Container startup no longer prints the database connection string. It reports
 only whether the setting is configured. This affects output before the normal
 application logger initializes; its redaction cannot protect shell startup.
+Prisma startup also stops embedding the URI in application messages and
+fallback warnings. Structured-data redaction does not sanitize a URI already
+interpolated into a message. The separate OAuth 0.55.55 delivery retains its
+own release identity.
 No API, UI, authentication, database migration or resource-ID contract changes.
 The candidate is not yet published or deployed.
 

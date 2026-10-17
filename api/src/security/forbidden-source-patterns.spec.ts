@@ -53,6 +53,20 @@ const DEFAULT_EXCLUDE_DIRS: ReadonlyArray<string> = [
 
 const FORBIDDEN_PATTERNS: ReadonlyArray<ForbiddenPattern> = [
   {
+    id: 'STARTUP-2',
+    rationale:
+      'Prisma startup must not interpolate the connection URI into a log message.',
+    needle: 'Using database: ' + '$',
+    onlyInPaths: ['modules/prisma/prisma.service.ts'],
+  },
+  {
+    id: 'STARTUP-3',
+    rationale:
+      'Prisma fallback diagnostics must report status without printing default credentials.',
+    needle: "using fallback '" + '$',
+    onlyInPaths: ['modules/prisma/prisma.service.ts'],
+  },
+  {
     id: 'STARTUP-1',
     rationale:
       'Container startup must report database configuration presence, never the ' +

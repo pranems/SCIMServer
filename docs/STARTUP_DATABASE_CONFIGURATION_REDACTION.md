@@ -1,16 +1,19 @@
 # Container startup database-configuration redaction
 
 **Date:** 2026-10-17
-**Status:** 0.55.55 candidate; publication and deployment gates pending.
+**Status:** 0.55.56 candidate; publication and deployment gates pending.
 
 ## Executive summary
 
 The published 0.55.54 shell entrypoint printed `DATABASE_URL` before the
-application logger initialized. A password-bearing connection URI could
-therefore appear in container console logs even when application-level
-redaction and image vulnerability scanning passed.
+application logger initialized. Follow-through inspection also found the
+Prisma service interpolating that value into an application log message
+and printing its default URI in a fallback warning. A password-bearing URI
+could therefore appear in logs even when structured-data redaction and image
+vulnerability scanning passed.
 
-The narrow fix reports configuration presence only. It does not change
+The narrow fix reports configuration presence and connection status only,
+and removes the redundant credential-bearing Prisma info message. It does not change
 database credentials, migrations, APIs, authentication or UI behavior.
 Customer production remains on its previously deployed image until the
 reviewed candidate and independent deployment gates pass.
@@ -28,6 +31,7 @@ flowchart LR
     MODE -->|"no"| MIGRATE["Run Prisma migrate deploy"]
     MIGRATE -->|"success"| APP
     MIGRATE -->|"failure"| STOP["Exit without starting application"]
+    APP --> STATUS["Prisma reports connection status without URI"]
 ```
 
 Configured nonempty values produce `DATABASE_URL: configured`. Unset and
@@ -41,7 +45,9 @@ Existing application redaction remains independently required.
 
 | Layer | What it proves | Result |
 |---|---|---|
-| Permanent API unit guard | The known raw connection-string logging pattern cannot return | RED: 1 failed / 6 passed; GREEN: 7 passed |
+| Permanent API unit guard | Known shell, Prisma message and fallback URI patterns cannot return | Initial shell GREEN: 7; expanded guard: 9 tests |
+| Injected Prisma logger and fallback diagnostics | No URI components appear in any logger argument; connection/pool/lifecycle behavior is retained | Combined service/guard RED: 4 failed / 18 passed; GREEN: 22 passed |
+| Expanded lifecycle preservation | Existing pool options, shutdown ordering and logging-shutdown race remain correct | Five focused suites: 41 PASS in 21.872 seconds |
 | Disposable Linux shell | Both backends preserve application startup and migrate-before-start or bypass ordering | Runtime contract includes explicit child markers and ordering |
 | Configured, unset and empty values | Presence is accurate and no synthetic URI/user/password/host is disclosed | Old published-image RED: 20 PASS / 4 FAIL; fixed source-mounted GREEN: 24 PASS / 0 FAIL |
 | Exact final image | The shipping entrypoint, not a mounted source replacement, is corrected | Pending publication; run with `-ImageEntrypoint` |
@@ -86,6 +92,9 @@ source-consolidation results at `c907b05`, not final-image/deployment proof.
 | START-02 | Cross-platform test fixture / Low | Initial contract failed before startup: Windows here-string CRLF reached Linux `sh` as part of `set -eu` | Normalize fixture newlines to LF before Docker execution; only the later child-success plus disclosure-assertion failures count as meaningful RED | First focused contract run / first focused contract run |
 | START-03 | Tooling / Low | VS Code's test adapter found no tests in this separately owned worktree | Run the existing package's targeted Jest command from its actual directory; no new test tooling or dependency installation | Focused unit invocation / focused unit invocation |
 | START-04 | Documentation version coupling / Low | Existing freshness autofix updated headers, not the separate README version badge; protected push failed C13 | Update the badge and run the existing content audit before retrying the normal hook. C13 already provides a permanent negative control; no gate weakening or new harness is needed | Protected Stage 1 content audit / focused content audit immediately after the version/header update |
+| START-05 | Tooling / Low | A multi-file patch applied five edits before its last hunk failed because the expected phrase crossed a line break | Inspect only the failed anchor and retry only that hunk; prior successful edits stay applied, with no duplicated sections | Immediate patch result / immediate patch result |
+| START-06 | Security coverage / High | Follow-through found a second runtime disclosure: Prisma put the URI directly into the message, bypassing structured-data sanitization. Existing lifecycle tests never injected the optional logger | Inject the logger through a real Nest test module, observe expected disclosure RED, remove the redundant info call and redact the fallback warning. Add two source guards and retain connection/status assertions | Cross-surface source inspection before final push / initial startup logging inventory and logger-injected lifecycle test |
+| START-07 | Release coordination / Medium | Independently reviewed OAuth delivery and the tentative startup patch both used 0.55.55; another worktree began its dev pipeline | Reserve unused 0.55.56 for this correction, regenerate its lock metadata only in CI, serialize local heavy checks and recheck semantic-tag ownership before publication. No other worktree or process is changed | Prepublication coordination / candidate-version assignment |
 | REST-01 | Azure scope / Low | New resource-group availability probe returned Forbidden before creation; existing resource-group operations remained permitted | Use only the existing authorized customer resource group, with exact owned temporary server IDs and no role/account changes | Initial group probe / read-only permissions or group probe |
 | REST-02 | Provisioning evidence / Medium | Provisional restore metadata reported public access Enabled; the later Dropping response reported Disabled | Abort and verify exact deletion. Final-setting disregard is not established. Future acceptance must check Ready-state network configuration and firewall rules, not provisional defaults | First restore metadata check / first restore metadata check |
 
@@ -95,8 +104,10 @@ A validated isolated production-copy migration rehearsal is still pending.
 
 ## Self-improvement and architecture disposition
 
-**Test/gate improvement: applied.** Check output before the application's logger
-as a separate boundary; synthetic runtime failures must also prove startup
+**Test/gate improvement: applied.** Check both output before the application's
+logger and interpolated application messages as separate boundaries. Inject
+optional logger dependencies in lifecycle tests, capture all logging arguments,
+and keep pool/connection assertions. Synthetic runtime failures must also prove startup
 reached the intended child, rather than counting fixture failures as RED.
 The permanent source guard runs in the existing unit gate. The runtime
 contract is an explicit exact-image release check, not an implicit claim that
@@ -118,4 +129,7 @@ not new compiler/runtime failures; HTTP-like digits in identifiers and test
 source were not treated as HTTP failures. This is not a claim to restore the
 deleted original conversation. Historical source, browser and migration
 receipts retain their original artifact identities. START-04 was captured
-immediately when the later protected-push failure was diagnosed.
+when the later protected-push failure was diagnosed; START-05 and START-06
+were appended after their confirmed fixes. The queued integrated-master push
+was stopped before it started; remote remained `c907b05` while the second
+runtime disclosure was corrected.
