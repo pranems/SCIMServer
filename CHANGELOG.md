@@ -37,8 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retains 66 diagnostics within its existing ratchet. No zero-diagnostic,
   no-skip, final-image or postdeployment-browser claim is made.
 - The preceding full totals predate the integrated OAuth and latest Prisma
-  changes. Final applicable source checks are pending; unchanged independent
-  evidence is retained only where input equality is established.
+  changes. Fresh normal Validate at `58967716`: 28/28 PASS in 1,107.3 seconds,
+  API 6,061 -> 6,072 in 211 suites, HTTP unchanged at 2,460 PASS / four retained
+  skips in 117 suites, Web unchanged at 1,624 in 123 files. Lint retains 513
+  warnings / zero errors; Web retains 66 type diagnostics under its ratchet.
+- Clean-CI run `39036287752` supplies both 0.55.56 locks. Full dependency
+  graphs are identical apart from root version metadata; public-registry and
+  sha512 provenance checks pass. Final protected artifact push/CI/review,
+  immutable image and postdeployment gates remain pending.
 
 ### OAuth token response media type
 

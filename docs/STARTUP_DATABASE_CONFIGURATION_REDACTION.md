@@ -48,6 +48,8 @@ Existing application redaction remains independently required.
 | Permanent API unit guard | Known shell, Prisma message and fallback URI patterns cannot return | Initial shell GREEN: 7; expanded guard: 9 tests |
 | Injected Prisma logger and fallback diagnostics | No URI components appear in any logger argument; connection/pool/lifecycle behavior is retained | Combined service/guard RED: 4 failed / 18 passed; GREEN: 22 passed |
 | Expanded lifecycle preservation | Existing pool options, shutdown ordering and logging-shutdown race remain correct | Five focused suites: 41 PASS in 21.872 seconds |
+| Integrated protected source | Normal hook validates actual combined source, without bypass | `58967716`: 28/28 PASS; API 6,072, HTTP 2,460 plus four retained skips, Web 1,624 |
+| CI-only version lock metadata | No corporate-feed or dependency-graph contamination | Run `39036287752` succeeds on `58967716`; both 0.55.56 locks have identical graphs and public/sha512 provenance |
 | Disposable Linux shell | Both backends preserve application startup and migrate-before-start or bypass ordering | Runtime contract includes explicit child markers and ordering |
 | Configured, unset and empty values | Presence is accurate and no synthetic URI/user/password/host is disclosed | Old published-image RED: 20 PASS / 4 FAIL; fixed source-mounted GREEN: 24 PASS / 0 FAIL |
 | Exact final image | The shipping entrypoint, not a mounted source replacement, is corrected | Pending publication; run with `-ImageEntrypoint` |
@@ -95,6 +97,8 @@ source-consolidation results at `c907b05`, not final-image/deployment proof.
 | START-05 | Tooling / Low | A multi-file patch applied five edits before its last hunk failed because the expected phrase crossed a line break | Inspect only the failed anchor and retry only that hunk; prior successful edits stay applied, with no duplicated sections | Immediate patch result / immediate patch result |
 | START-06 | Security coverage / High | Follow-through found a second runtime disclosure: Prisma put the URI directly into the message, bypassing structured-data sanitization. Existing lifecycle tests never injected the optional logger | Inject the logger through a real Nest test module, observe expected disclosure RED, remove the redundant info call and redact the fallback warning. Add two source guards and retain connection/status assertions | Cross-surface source inspection before final push / initial startup logging inventory and logger-injected lifecycle test |
 | START-07 | Release coordination / Medium | Independently reviewed OAuth delivery and the tentative startup patch both used 0.55.55; another worktree began its dev pipeline | Reserve unused 0.55.56 for this correction, regenerate its lock metadata only in CI, serialize local heavy checks and recheck semantic-tag ownership before publication. No other worktree or process is changed | Prepublication coordination / candidate-version assignment |
+| START-08 | Tooling / Low | Whole-file JSON parsing failed on oversized documentation output containing multiple JSON records | Parse the first complete record and read bounded excerpts; no source or deployment failed | Documentation retrieval / documentation retrieval |
+| START-09 | Tooling / Low | A process probe returned nonzero because the old HTTP PID exited between checks | Use nullable CIM process results for the validation queue. An exited process releases ownership; it is not a failed quality gate | Process observation / process observation |
 | REST-01 | Azure scope / Low | New resource-group availability probe returned Forbidden before creation; existing resource-group operations remained permitted | Use only the existing authorized customer resource group, with exact owned temporary server IDs and no role/account changes | Initial group probe / read-only permissions or group probe |
 | REST-02 | Provisioning evidence / Medium | Provisional restore metadata reported public access Enabled; the later Dropping response reported Disabled | Abort and verify exact deletion. Final-setting disregard is not established. Future acceptance must check Ready-state network configuration and firewall rules, not provisional defaults | First restore metadata check / first restore metadata check |
 
@@ -132,4 +136,14 @@ receipts retain their original artifact identities. START-04 was captured
 when the later protected-push failure was diagnosed; START-05 and START-06
 were appended after their confirmed fixes. The queued integrated-master push
 was stopped before it started; remote remained `c907b05` while the second
-runtime disclosure was corrected.
+runtime disclosure was corrected. The subsequent normal `58967716` Validate
+push passes all 28 gates.
+
+The refreshed two-pass reconciliation scans 23,764 available current-session
+records, including 1,745 in the approved delivery window. Signal and narration
+passes identify the entries above; two apparent module-error hits are verified
+as an earlier frequency report and a workflow comment, not module failures.
+Retained diagnostic baselines, expected RED runs, negative fixtures and
+version-availability probes are not relabeled as new production defects.
+This is evidence from the recovered continuation, not restoration of the
+deleted original Project 3 transcript.

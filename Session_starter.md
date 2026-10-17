@@ -7,14 +7,16 @@ startup and Prisma application messages. The separate reviewed OAuth 0.55.55
 dev pipeline is running; do not compete for its immutable release tag.
 Expanded focused lifecycle/logging/source guards pass 41/41 across five suites
 after disclosure RED. Real-shell startup contract GREEN remains 24/24.
-This is not final integrated-source, final-image or deployment evidence.
+Integrated source Validate at `58967716` now passes 28/28 gates in 1,107.3
+seconds: 6,072 API units, 2,460 HTTP passes plus four retained skips, and
+1,624 Web tests. This is not final-image or deployment evidence.
 The user explicitly authorized customer-production gates and deployment on
 2026-10-17; customer remains on 0.55.20 until technical gates pass.
-Normal protected Validate at `c907b05`: 28/28 PASS; API 6,061, InMemory HTTP
-2,460 PASS plus four retained skips, Web 1,624 PASS. Clean-CI lockfile
-regeneration for the initial candidate succeeded in run `39030193007`.
-The 0.55.56 metadata needs fresh clean-CI lockfiles; final source/image/deployment
-proof remains pending. The queued integrated push was stopped before it began.
+Historical Validate at `c907b05` remains 28/28 PASS with 6,061 API units.
+Fresh 0.55.56 clean-CI run `39036287752` succeeded on `58967716`; imported
+locks match manifests, retain exactly the same dependency graphs, and pass
+public-registry/sha512 verification. Final artifact/evidence push, exact-tip
+CI, review, image and deployment proof remain pending.
 An approved temporary PITR was aborted during ambiguous provisioning network
 metadata and confirmed deleted. Final `Dropping` metadata reported network
 disabled, so an ignored final network setting is not established.
@@ -98,6 +100,7 @@ normal hook rather than bypass it.
 
 | Date | Summary |
 |---|---|
+| 2026-10-17 | Startup redaction covers both shell and injected Prisma logging. Normal Validate push `58967716` passes 28/28: 6,072 API, 2,460 HTTP plus four retained skips, 1,624 Web. Clean-CI 0.55.56 lockfiles verified; final artifact push/review/deployment remain pending. Customer approval is recorded, not substituted for technical evidence. |
 | 2026-10-16 | Closed exact-release-digest scan and actual-data headed-browser measurement evidence; retained canary opt-in, review-order, Git release/tag and performance limits without changing the harness or deployed artifact. |
 | 2026-10-16 | Reconciled current user guides and curated release notes; version-to-release-note and missing behavior/doc bindings use the existing freshness gate. Provisional visual feedback recorded without an unverified target or promotion approval. |
 | 2026-10-16 | Completed matched performance/resource and private logging assurance; retained quota-sensitive tail limits, official RFC verification and measurement-oracle RCA. Operator visual acceptance is still required. |
