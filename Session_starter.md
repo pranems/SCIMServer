@@ -60,6 +60,11 @@ mutation ownership remains unavailable. Do not create `v0.55.54` casually:
 the existing tag workflow rebuilds and can overwrite the semantic image.
 No harness/runtime/version/deployment/customer-prod change. See
 [portable assurance](docs/evidence/RELEASE_05554_ASSURANCE_20261016.json).
+The first documentation Validate push was blocked at Prisma CLI config loading
+because `DATABASE_URL` was absent. The focused gate passes with CI's
+non-production placeholder in the process environment; no database connection,
+`.env` or harness edit is needed. Preserve the failed push, then retry the
+normal hook rather than bypass it.
 
 | Date | Summary |
 |---|---|
