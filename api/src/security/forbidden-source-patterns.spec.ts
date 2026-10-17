@@ -53,6 +53,29 @@ const DEFAULT_EXCLUDE_DIRS: ReadonlyArray<string> = [
 
 const FORBIDDEN_PATTERNS: ReadonlyArray<ForbiddenPattern> = [
   {
+    id: 'STARTUP-2',
+    rationale:
+      'Prisma startup must not interpolate the connection URI into a log message.',
+    needle: 'Using database: ' + '$',
+    onlyInPaths: ['modules/prisma/prisma.service.ts'],
+  },
+  {
+    id: 'STARTUP-3',
+    rationale:
+      'Prisma fallback diagnostics must report status without printing default credentials.',
+    needle: "using fallback '" + '$',
+    onlyInPaths: ['modules/prisma/prisma.service.ts'],
+  },
+  {
+    id: 'STARTUP-1',
+    rationale:
+      'Container startup must report database configuration presence, never the ' +
+      'connection string and its embedded credentials. See docs/LOGGING_AND_OBSERVABILITY.md.',
+    needle: 'DATABASE_URL: ' + '$',
+    onlyInPaths: ['../docker-entrypoint.sh'],
+    extensions: ['.sh'],
+  },
+  {
     id: 'S-1',
     rationale:
       'Hardcoded legacy bearer credential removed when ScimAuthGuard was deleted. ' +

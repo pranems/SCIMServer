@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -15,6 +15,24 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
+### 0.55.56 candidate: startup credential redaction
+
+Container startup no longer prints the database connection string. It reports
+only whether the setting is configured. This affects output before the normal
+application logger initializes; its redaction cannot protect shell startup.
+Prisma startup also stops embedding the URI in application messages and
+fallback warnings. Structured-data redaction does not sanitize a URI already
+interpolated into a message. The separate OAuth 0.55.55 delivery retains its
+own release identity.
+No API, UI, authentication, database migration or resource-ID contract changes.
+The candidate is not yet published or deployed.
+
+If an older container has started with a password-bearing connection string,
+treat its startup logs as potentially sensitive. Restrict access and review
+retention. After deploying the corrected image, rotate the affected database
+credential through a coordinated update of its consumers. This patch prevents
+new startup disclosure; it does not erase retained logs or rotate credentials.
+
 ### Fixed
 
 - OAuth token responses now retain `application/json`, as required by OAuth
@@ -26,9 +44,10 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ### Changed
 
-- Documentation-only release-note navigation, current behavior descriptions and
-  upgrade guidance. No runtime, package version, lockfile, deployed quota or
-  immutable image changed.
+- Prior 0.55.54 documentation-only closeout added release-note navigation,
+  current behavior descriptions and upgrade guidance. Those documentation
+  changes did not alter runtime, package versions, lockfiles, deployed quotas
+  or the immutable image; the candidate fixes above are separate changes.
 
 ## 0.55.54 - 2026-10-16
 

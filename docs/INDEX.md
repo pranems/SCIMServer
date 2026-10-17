@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
 
-> **Version:** 0.55.55 - **Updated:** 2026-10-16
+> **Version:** 0.55.56 - **Updated:** 2026-10-16
 > 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 ### Start here
@@ -18,6 +18,7 @@ explain 0.55.54, changes since 0.55.20, migration/rollback and known limits.
 
 | If you want to... | Read |
 |---|---|
+| Verify container startup does not print database credentials, and distinguish source-mounted tests from shipping-image proof | [Startup redaction and execution RCA](STARTUP_DATABASE_CONFIGURATION_REDACTION.md) |
 | Prevent validation from mutating another checkout through linked dependency directories | [Physical dependency ownership preflight](strategy/DEPENDENCY_OWNERSHIP_PREFLIGHT.md) |
 | Understand shared-schema uniqueness admission and runtime binding precedence without changing default externalId duplicates | [Binding-qualified integration](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29), [receipt](evidence/scim-binding-uniqueness-integration-20260929.json) |
 | Diagnose Entra without disabling strict validation; review 19 default-running compatibility cases and separate both-strict-mode flag proof | [SCIM_ENTRA_COMPATIBILITY.md](SCIM_ENTRA_COMPATIBILITY.md), [integrated receipt](evidence/scim-flags-default-corpus-20260929/validation.json) |

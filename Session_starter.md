@@ -1,6 +1,30 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-16
+**Last verified:** 2026-10-17
+
+**Candidate work:** 0.55.56 removes raw `DATABASE_URL` output from both shell
+startup and Prisma application messages. The separate reviewed OAuth 0.55.55
+dev pipeline is running; do not compete for its immutable release tag.
+Expanded focused lifecycle/logging/source guards pass 41/41 across five suites
+after disclosure RED. Real-shell startup contract GREEN remains 24/24.
+Integrated source Validate at `58967716` now passes 28/28 gates in 1,107.3
+seconds: 6,072 API units, 2,460 HTTP passes plus four retained skips, and
+1,624 Web tests. This is not final-image or deployment evidence.
+The user explicitly authorized customer-production gates and deployment on
+2026-10-17; customer remains on 0.55.20 until technical gates pass.
+Historical Validate at `c907b05` remains 28/28 PASS with 6,061 API units.
+Fresh 0.55.56 clean-CI run `39036287752` succeeded on `58967716`; imported
+locks match manifests, retain exactly the same dependency graphs, and pass
+public-registry/sha512 verification. Final artifact/evidence push, exact-tip
+CI, review, image and deployment proof remain pending.
+An approved temporary PITR was aborted during ambiguous provisioning network
+metadata and confirmed deleted. Final `Dropping` metadata reported network
+disabled, so an ignored final network setting is not established.
+Authentication-advertisement implementation remains stopped.
+Test/gate improvement: **applied**, permanent source and real-shell regression
+checks cover pre-logger output and all injected Prisma logger arguments.
+Design/architecture disposition: **accepted**, cohesive status-only startup
+diagnostics and removal of a redundant message, without a new abstraction.
 
 **Candidate 0.55.55, 2026-10-17:** the isolated OAuth media-type repair preserves
 JSON on global and per-endpoint token success responses and shares token-route
@@ -31,7 +55,8 @@ The scoped dev/canary performance disposition explicitly retains the
 small-quota tail risk, rather than claiming that its thresholds passed.
 Private changed-path logging checks pass for 200 rows and seven errors,
 including actual credential redaction. No production code, quota, version or
-deployed artifact changed. Customer production is not authorized or promoted. See
+deployed artifact changed. At that closeout customer production was not
+authorized or promoted; current authorization is recorded above. See
 [current closeout and limits](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 
 **Documentation closeout:** freshness and source-content gates cover 27
@@ -75,6 +100,7 @@ normal hook rather than bypass it.
 
 | Date | Summary |
 |---|---|
+| 2026-10-17 | Startup redaction covers both shell and injected Prisma logging. Normal Validate push `58967716` passes 28/28: 6,072 API, 2,460 HTTP plus four retained skips, 1,624 Web. Clean-CI 0.55.56 lockfiles verified; final artifact push/review/deployment remain pending. Customer approval is recorded, not substituted for technical evidence. |
 | 2026-10-16 | Closed exact-release-digest scan and actual-data headed-browser measurement evidence; retained canary opt-in, review-order, Git release/tag and performance limits without changing the harness or deployed artifact. |
 | 2026-10-16 | Reconciled current user guides and curated release notes; version-to-release-note and missing behavior/doc bindings use the existing freshness gate. Provisional visual feedback recorded without an unverified target or promotion approval. |
 | 2026-10-16 | Completed matched performance/resource and private logging assurance; retained quota-sensitive tail limits, official RFC verification and measurement-oracle RCA. Operator visual acceptance is still required. |

@@ -1,13 +1,32 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.55
-> **Last Updated**: October 16, 2026
-> **Last verified:** 2026-10-16
+> **Version**: 0.55.56
+> **Last Updated**: October 17, 2026
+> **Last verified:** 2026-10-17
 
 ---
 
 ## Active Delivery Process
+
+**Candidate:** 0.55.56 removes raw connection-string output from shell startup,
+Prisma application messages and the fallback warning, without changing
+migration ordering, API behavior or UI. Expanded focused lifecycle/logging
+tests pass 41/41; real-shell contract remains 24/24 after observed RED.
+The separate reviewed OAuth 0.55.55 dev pipeline is active; the next version
+avoids competing for its release tag. Integrated source `58967716` passes
+28 protected Validate gates: 6,072 API units, 2,460 HTTP passes plus four
+retained skips, 1,624 Web tests. Fresh CI-only locks from `39036287752`
+match both 0.55.56 manifests with unchanged dependency graphs and verified
+registry/integrity provenance. Final artifact push/CI/review and release
+gates remain pending.
+Customer deployment is explicitly authorized as of
+2026-10-17, but the customer application remains on 0.55.20. Authorization does
+not replace technical gates or actual human visual observations.
+Source consolidation at `c907b05` passes all 28 protected Validate gates:
+6,061 API units, 2,460 HTTP tests plus four retained InMemory skips, and
+1,624 Web tests. This is not final-artifact or postdeployment-browser proof.
+Authentication-advertisement implementation remains stopped.
 
 **Current delivery:** 0.55.54 is on dev and same-tenant canary using the image
 published from merged `c3ef1f0d` and replayed at runtime-input-equivalent

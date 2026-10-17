@@ -23,7 +23,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     if (!process.env.DATABASE_URL) {
       // eslint-disable-next-line no-console
-      console.warn(`[PrismaService] DATABASE_URL not set – using fallback '${fallback}'.`);
+      console.warn('[PrismaService] DATABASE_URL not set - using local development fallback.');
     }
 
     // ── Connection pool (X15-F3) ──
@@ -69,7 +69,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw error;
     }
     this.scimLogger?.info(LogCategory.DATABASE, 'PostgreSQL connected successfully');
-    this.scimLogger?.info(LogCategory.DATABASE, `Using database: ${process.env.DATABASE_URL || 'postgresql://scim:scim@localhost:5432/scimdb (fallback)'}`);
   }
 
   /**
