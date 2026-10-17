@@ -2,24 +2,37 @@
 
 **Last verified:** 2026-10-17
 
-**Candidate work:** 0.55.56 removes raw `DATABASE_URL` output from both shell
-startup and Prisma application messages. The separate reviewed OAuth 0.55.55
-dev pipeline is running; do not compete for its immutable release tag.
-Expanded focused lifecycle/logging/source guards pass 41/41 across five suites
-after disclosure RED. Real-shell startup contract GREEN remains 24/24.
-Integrated source Validate at `58967716` now passes 28/28 gates in 1,107.3
-seconds: 6,072 API units, 2,460 HTTP passes plus four retained skips, and
-1,624 Web tests. This is not final-image or deployment evidence.
-The user explicitly authorized customer-production gates and deployment on
-2026-10-17; customer remains on 0.55.20 until technical gates pass.
-Historical Validate at `c907b05` remains 28/28 PASS with 6,061 API units.
-Fresh 0.55.56 clean-CI run `39036287752` succeeded on `58967716`; imported
-locks match manifests, retain exactly the same dependency graphs, and pass
-public-registry/sha512 verification. Final artifact/evidence push, exact-tip
-CI, review, image and deployment proof remain pending.
-An approved temporary PITR was aborted during ambiguous provisioning network
-metadata and confirmed deleted. Final `Dropping` metadata reported network
-disabled, so an ignored final network setting is not established.
+**Current delivery:** PR #244 merged as `d43959e1`. Version 0.55.56 is
+published by successful canonical run `39043579816` and deployed to dev
+from clean merged master, using immutable GHCR digest
+`07f08b855ebe178c6a9a5b60af80d4177c267b8878c959a09e5f1a64fdc03aa2`.
+Semantic, full-SHA and latest aliases match. Full pipeline: 5,855 seconds,
+39 PASS / 0 FAIL / 1 deliberate manual-canary SKIP / 9 reviewer PENDING.
+Fresh real Chromium: 324 PASS, zero skipped/flaky; additional headed
+actual-data geometry: six sets PASS, 74 endpoint IDs preserved.
+Full API units: 6,072; PostgreSQL HTTP: 2,520; InMemory HTTP: 2,516 plus four
+PostgreSQL-specific exclusions; Web: 1,624. Docker/dev live: 1,797 each.
+Native Entra: 50 PASS, all 15 cleanups succeeded.
+
+Exact-image Trivy has zero blocking HIGH/CRITICAL under existing policy.
+Shipping shell contract: 24 PASS. Additional real PostgreSQL/image checks
+apply all 29 migrations, authenticate a database-backed inventory read,
+verify safe startup output and stop startup on migration authentication
+failure. Synthetic Docker resources are removed. Liveness is not DB readiness.
+
+**Customer hold:** deployment is authorized, but customer still serves its
+0.55.20 digest `8b00fff0`. No 0.55.56 canary/customer promotion has run.
+The protected actual-data worker exited zero, but console capture lost the
+required structured receipt; no measured-rehearsal PASS is claimed.
+Every receipt-owned rehearsal resource is verified deleted. Final absence
+of its provider-managed infrastructure group is unverified because the
+approved principal receives Forbidden. Do not infer absence or substitute
+accounts. Corrected live-console preflight and drain window await another
+protected rehearsal after authorized cleanup verification.
+Customer performance disposition, actual target-specific human visual
+observation, historical log/credential response and production gates remain
+open. Automation and blanket deployment approval do not supply observation.
+See [the current evidence and execution ledger](docs/STARTUP_DATABASE_CONFIGURATION_REDACTION.md#merged-master-dev-checkpoint).
 Authentication-advertisement implementation remains stopped.
 Test/gate improvement: **applied**, permanent source and real-shell regression
 checks cover pre-logger output and all injected Prisma logger arguments.
@@ -100,6 +113,7 @@ normal hook rather than bypass it.
 
 | Date | Summary |
 |---|---|
+| 2026-10-17 | Published/deployed exact-master 0.55.56 to dev: 324 Chromium PASS without skips, six additional headed geometry sets, 1,797 Docker/dev live assertions each, 50 Entra PASS and real-image PostgreSQL startup checks. Customer remains 0.55.20; measured-copy receipt, managed-group read permission, performance disposition and human observation remain explicit holds. |
 | 2026-10-17 | Startup redaction covers both shell and injected Prisma logging. Normal Validate push `58967716` passes 28/28: 6,072 API, 2,460 HTTP plus four retained skips, 1,624 Web. Clean-CI 0.55.56 lockfiles verified; final artifact push/review/deployment remain pending. Customer approval is recorded, not substituted for technical evidence. |
 | 2026-10-16 | Closed exact-release-digest scan and actual-data headed-browser measurement evidence; retained canary opt-in, review-order, Git release/tag and performance limits without changing the harness or deployed artifact. |
 | 2026-10-16 | Reconciled current user guides and curated release notes; version-to-release-note and missing behavior/doc bindings use the existing freshness gate. Provisional visual feedback recorded without an unverified target or promotion approval. |

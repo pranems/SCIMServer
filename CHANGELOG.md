@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 0.55.56 candidate - startup credential redaction
+### Documentation
+
+- Reconcile actual 0.55.56 dev delivery, customer hold, operational recorder/
+  cleanup RCA and liveness-versus-database-readiness lessons. No runtime,
+  dependency, migration, version or deployed-artifact change in this closeout.
+
+## [0.55.56] - 2026-10-17
+
+### Published dev checkpoint
+
+- PR #244 normally merged as `d43959e1`. Canonical publisher `39043579816`
+  builds that clean master; semantic/full-SHA/latest aliases share digest
+  `07f08b855ebe178c6a9a5b60af80d4177c267b8878c959a09e5f1a64fdc03aa2`.
+- Full dev pipeline: 5,855 seconds, 39 PASS / 0 FAIL / 1 deliberate manual-canary
+  SKIP / 9 reviewer PENDING. API 6,072; PostgreSQL HTTP 2,520; InMemory HTTP
+  2,516 plus four PostgreSQL-specific exclusions; Web 1,624. Full Chromium
+  324 PASS, zero skipped/unexpected/flaky; six additional headed geometry
+  sets PASS. Docker/dev live 1,797 each; native Entra 50 PASS, 15 cleanups.
+- Exact-image Trivy: zero blocking HIGH/CRITICAL under existing ignore policy.
+  Shipping shell 24 PASS; extra real-image PostgreSQL tests apply 29 migrations,
+  authenticate a DB-backed inventory read and reject invalid DB credentials
+  before application startup. Every synthetic Docker resource is removed.
+- Customer remains 0.55.20. Actual-data worker exit zero is not a measured
+  rehearsal PASS because its structured receipt was lost. All receipt-owned
+  resources are removed, but final provider-managed-group read is Forbidden.
+  Customer performance disposition, human observation, repeated measured
+  rehearsal and canary/customer blue-green checks remain open.
+
+### Historical source consolidation - startup credential redaction
 
 - Stop printing the database connection string before application logging
   initializes. Startup reports only `DATABASE_URL: configured` or

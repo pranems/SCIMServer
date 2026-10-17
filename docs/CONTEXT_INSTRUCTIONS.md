@@ -9,26 +9,34 @@
 
 ## Active Delivery Process
 
-**Candidate:** 0.55.56 removes raw connection-string output from shell startup,
-Prisma application messages and the fallback warning, without changing
-migration ordering, API behavior or UI. Expanded focused lifecycle/logging
-tests pass 41/41; real-shell contract remains 24/24 after observed RED.
-The separate reviewed OAuth 0.55.55 dev pipeline is active; the next version
-avoids competing for its release tag. Integrated source `58967716` passes
-28 protected Validate gates: 6,072 API units, 2,460 HTTP passes plus four
-retained skips, 1,624 Web tests. Fresh CI-only locks from `39036287752`
-match both 0.55.56 manifests with unchanged dependency graphs and verified
-registry/integrity provenance. Final artifact push/CI/review and release
-gates remain pending.
-Customer deployment is explicitly authorized as of
-2026-10-17, but the customer application remains on 0.55.20. Authorization does
-not replace technical gates or actual human visual observations.
-Source consolidation at `c907b05` passes all 28 protected Validate gates:
-6,061 API units, 2,460 HTTP tests plus four retained InMemory skips, and
-1,624 Web tests. This is not final-artifact or postdeployment-browser proof.
+**Latest checkpoint:** 0.55.56 is published and on dev from clean merged
+master `d43959e1`, PR #244, canonical publisher `39043579816`. The exact GHCR
+digest is `07f08b855ebe178c6a9a5b60af80d4177c267b8878c959a09e5f1a64fdc03aa2`;
+semantic/full-SHA/latest aliases and the ACR mirror match. The full dev run
+completed in 5,855 seconds: 39 PASS / 0 FAIL / 1 manual-canary SKIP /
+9 reviewer PENDING. Fresh real Chromium: 324 PASS with zero skips/flakes.
+Additional headed actual-data measurements: six geometry sets PASS,
+74/74 endpoint IDs preserved. Full matrix: 6,072 API units; 2,520 PostgreSQL
+HTTP; 2,516 InMemory HTTP plus four backend-specific exclusions; 1,624 Web.
+Docker/dev live: 1,797 each. Native Entra: 50 PASS, 15 exact cleanups.
+Actual shipping shell: 24 PASS; real-image synthetic PostgreSQL checks
+apply all 29 migrations and pass authenticated inventory access, output
+redaction and fail-fast migration guards. Exact-image scan has zero
+blocking HIGH/CRITICAL under existing exception policy.
+
+**Customer hold:** explicit deployment authorization remains granted, but
+customer still serves 0.55.20 and neither 0.55.56 promotion has run.
+The protected actual-data worker exited zero without a captured structured
+migration receipt; do not label it measured PASS. All receipt-owned temporary
+resources are deleted, but provider-managed-group absence cannot be verified
+with the current principal's Forbidden response. Do not change accounts,
+elevate roles or infer absence. Authorized verification, a measured rehearsal,
+customer performance disposition and actual human visual observation remain
+open. Historical log retention/credential response also remains separate.
+See [the latest release evidence and RCA](STARTUP_DATABASE_CONFIGURATION_REDACTION.md#merged-master-dev-checkpoint).
 Authentication-advertisement implementation remains stopped.
 
-**Current delivery:** 0.55.54 is on dev and same-tenant canary using the image
+**Historical 0.55.54 delivery:** dev and same-tenant canary used the image
 published from merged `c3ef1f0d` and replayed at runtime-input-equivalent
 `db10b13e`. PR #238 merged after 25 protected gates and seven exact-tip
 checks; full inventory is 6,060 units / 2,460 HTTP-oracle / 1,624 Web.

@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-17 - **Product version:** `0.55.56`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -15,7 +15,12 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
-### 0.55.56 candidate: startup credential redaction
+The documentation checkpoint below records actual publication/dev evidence and
+the customer hold. It introduces no further runtime or version change.
+
+## 0.55.56 - 2026-10-17
+
+### Fixed
 
 Container startup no longer prints the database connection string. It reports
 only whether the setting is configured. This affects output before the normal
@@ -25,13 +30,26 @@ fallback warnings. Structured-data redaction does not sanitize a URI already
 interpolated into a message. The separate OAuth 0.55.55 delivery retains its
 own release identity.
 No API, UI, authentication, database migration or resource-ID contract changes.
-The candidate is not yet published or deployed.
+The exact merged-master image is published and deployed to dev. Its version,
+full-SHA and latest aliases match one immutable digest. Full deployed Chromium
+passed 324 cases without skips; additional headed actual-data geometry passed
+six sets. Docker/dev live checks each passed 1,797 assertions; native Entra
+passed 50 checks with all 15 cleanups successful.
+
+Customer production remains on 0.55.20. The protected-copy worker exited zero,
+but its structured migration measurements were not captured, so the rehearsal
+is not certified. All receipt-owned temporary resources are deleted; the final
+provider-managed-group check needs authorized read access. Measured migration,
+customer performance, actual human visual observation and normal canary/customer
+promotion checks remain open. See [the evidence and limits](STARTUP_DATABASE_CONFIGURATION_REDACTION.md#merged-master-dev-checkpoint).
 
 If an older container has started with a password-bearing connection string,
 treat its startup logs as potentially sensitive. Restrict access and review
 retention. After deploying the corrected image, rotate the affected database
 credential through a coordinated update of its consumers. This patch prevents
 new startup disclosure; it does not erase retained logs or rotate credentials.
+
+## 0.55.55 - 2026-10-17
 
 ### Fixed
 
@@ -40,14 +58,15 @@ new startup disclosure; it does not erase retained logs or rotate credentials.
   `application/scim+json` on token routes under `/scim`. Global and per-endpoint
   token contents, credential rules and cache headers are unchanged; actual SCIM
   resources still use their SCIM media type. No database migration is needed.
-  Development deployment and Entra saved-credential validation remain pending.
+  Included in the subsequent 0.55.56 dev delivery and its three-mode native
+  Entra validation. This does not certify a customer-production upgrade.
 
 ### Changed
 
 - Prior 0.55.54 documentation-only closeout added release-note navigation,
   current behavior descriptions and upgrade guidance. Those documentation
   changes did not alter runtime, package versions, lockfiles, deployed quotas
-  or the immutable image; the candidate fixes above are separate changes.
+  or the immutable image; the runtime fixes above are separate changes.
 
 ## 0.55.54 - 2026-10-16
 
