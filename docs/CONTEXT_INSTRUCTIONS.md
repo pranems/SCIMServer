@@ -9,7 +9,8 @@
 
 ## Active Delivery Process
 
-**Current delivery:** 0.55.54 is on dev and same-tenant canary from merged
+**Current delivery:** 0.55.54 is on dev and same-tenant canary using the image
+published from merged `c3ef1f0d` and replayed at runtime-input-equivalent
 `db10b13e`. PR #238 merged after 25 protected gates and seven exact-tip
 checks; full inventory is 6,060 units / 2,460 HTTP-oracle / 1,624 Web.
 The full no-skip AutoCanary run completed exit 0 in 6,349 seconds with
@@ -44,7 +45,23 @@ to release-note updates through the existing freshness manifest.
 Full HTTP matrix: 2,516 InMemory passes plus four exclusions / 2,520 PostgreSQL;
 protected selection: 2,460 plus four. A zero-skip outer pipeline does not prove
 the separate full compiled-node live lane: the nested Docker invocation uses
-`-SkipLocal`. No runtime/version/deployment change in this documentation work.
+`-SkipLocal`. A later private standalone run closes that claim with 1,795
+PASS / 0 FAIL and empty pre/post inventory. No runtime/version/deployment
+change in this documentation work.
+
+**Supplemental artifact/browser assurance:** native Trivy 0.76.0 passes the
+existing HIGH/CRITICAL exception/unfixed gate on the actual immutable release
+digest, not a PR test-image surrogate. Fresh headed Chromium measures actual
+dev/canary content: 12 measurement sets PASS, inventory grows 355 -> 915 pixels,
+five Dashboard rows are 48 pixels high, no mutating requests and exact endpoint
+IDs unchanged at 74/64. See [portable assurance](evidence/RELEASE_05554_ASSURANCE_20261016.json).
+Publication source is `c3ef1f0d`, while `db10b13e` and `68aa5a1c` are later
+runtime-input-equivalent shipping/docs checkouts. Nine original PENDING rows
+remain immutable; later scoped dispositions are not independent approval.
+Canary opt-in ownership could not be confirmed. GitHub Release/tag creation
+remains blocked because the `v*` workflow can rebuild/overwrite the semantic
+image. No harness change, implicit Git tag, image replacement or customer-prod
+promotion is authorized by this evidence work.
 
 **Historical predeployment implementation:** membership rejection-contract evidence on
 `test/minimal-group-error-contract-20261016`, based on merged `72eb4fd0`.

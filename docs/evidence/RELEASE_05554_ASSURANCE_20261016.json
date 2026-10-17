@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-16",
+  "release": "0.55.54",
+  "scope": "Supplemental release assurance, not a new deployment or a rewrite of historical gate receipts",
+  "publicationSource": "c3ef1f0d74dabec5d76192e1d278398236a08aa4",
+  "evidenceCheckout": "68aa5a1c1932064c9e50f6901ab49a539d150ce5",
+  "image": "ghcr.io/pranems/scimserver@sha256:42613fe093bcb770c8eec849f2ac8840afa1b0ca85a1b8baf98efa33665745f9",
+  "exactDigestScan": {
+    "status": "PASS",
+    "scanner": "Trivy 0.76.0, official Windows archive",
+    "scannerArchiveSha256": "7b4762a5a5326cb4b83dfd2bb5d9aaf15a1ed867c75cad7dd8b38840a28e7be6",
+    "databaseUpdatedAt": "2026-10-16T01:13:54.947090392Z",
+    "databaseDownloadedAt": "2026-10-17T04:54:40.5871295Z",
+    "platform": "linux/amd64",
+    "imageSource": "remote",
+    "scanners": [
+      "vuln"
+    ],
+    "severity": [
+      "HIGH",
+      "CRITICAL"
+    ],
+    "ignoreUnfixed": true,
+    "ignoreFile": ".trivyignore",
+    "ignoreFileSha256": "aa1e6329f116b289840c1b01ae576221383265b7f917d575579688d74c14822f",
+    "blockingOsFindings": 0,
+    "blockingNodeFindings": 0,
+    "exitCode": 0,
+    "rawLocalReceipt": "test-results/release-05554-exact-digest-trivy-20261016.json",
+    "rawReceiptSha256": "53b17900540658b3a8bcd1cc07e07d126167a7e42b1be49b3a9b013db38e6a37",
+    "limits": "Existing CI severity, unfixed and exception policy applied. This is not proof of zero vulnerabilities at every severity or an independent source-security review."
+  },
+  "browser": {
+    "status": "PASS",
+    "engine": "Chromium",
+    "version": "149.0.7827.55",
+    "headless": false,
+    "startedAt": "2026-10-17T04:56:42.284Z",
+    "serverMutationsAllowed": false,
+    "mutationRequestsAttempted": 0,
+    "viewports": [
+      {
+        "width": 1440,
+        "heights": [
+          540,
+          1100
+        ]
+      },
+      {
+        "width": 900,
+        "heights": [
+          540,
+          1100
+        ]
+      }
+    ],
+    "measurementsPerEstate": 6,
+    "inventoryHeightAt540": 355,
+    "inventoryHeightAt1100": 915,
+    "availableBottomGap": 0,
+    "nameColumnShareRange": [
+      0.383,
+      0.39
+    ],
+    "dashboardRowsPerWidth": 5,
+    "maximumDashboardRowHeight": 48,
+    "asserted": [
+      "Inventory fills available height and grows 560 pixels with window height",
+      "Actual rows overflow the internal scrolling region",
+      "All four headers remain inside the table",
+      "Name column neither dominates nor collapses",
+      "Endpoint names are left aligned within two pixels",
+      "Dashboard counts share the name row and remain inside the row",
+      "Dashboard names are left aligned within two pixels",
+      "No horizontal page overflow",
+      "Original endpoint IDs are unchanged"
+    ],
+    "rawLocalReceipt": "test-results/release-05554-headed-readonly-measurements-20261016.json",
+    "rawReceiptSha256": "4f787f032da8160883f6e78214c53a2ebfc2bbc4837abbb0bfde02b92537fb01",
+    "existingFullDevReceipt": {
+      "path": "test-results/playwright-dev-2026-10-16-081024.json",
+      "engine": "chromium",
+      "startedAt": "2026-10-16T15:20:37.469Z",
+      "passed": 324,
+      "unexpected": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "selection": "All configured test files, no testIgnore",
+      "limits": "Existing full suite includes both live journeys and controlled browser response fixtures. The new headed measurements use actual estate responses without mocks."
+    }
+  },
+  "estates": [
+    {
+      "purpose": "dev",
+      "revision": "scimserver-dev--vdb10b13e",
+      "authenticatedVersion": "0.55.54",
+      "endpointCountBefore": 74,
+      "endpointCountAfter": 74,
+      "exactEndpointIdsPreserved": true
+    },
+    {
+      "purpose": "canary-prod",
+      "revision": "scimserver--green-1016-0927",
+      "authenticatedVersion": "0.55.54",
+      "endpointCountBefore": 64,
+      "endpointCountAfter": 64,
+      "exactEndpointIdsPreserved": true
+    }
+  ],
+  "remaining": [
+    "Eleven canary browser exclusions require opt-in and exclusive ownership; ownership clarification was unavailable",
+    "Nine historical reviewer-PENDING rows remain immutable; later review is scoped self-review, not independent approval or review-before-promotion",
+    "Performance at 0.5 CPU retains measured over-threshold tails",
+    "GitHub Release/tag publication remains blocked because pushing v0.55.54 triggers an existing rebuild that can overwrite the immutable version image",
+    "Operator target-specific visual acceptance and customer-production approval remain separate",
+    "Docker Linux engine pipe was unavailable; native remote scanning avoided Docker recovery or restart"
+  ],
+  "selfImprovementDisposition": "applied: exact digest, real versus controlled browser data, measured versus presence assertions, and immutable historical versus supplemental status are explicit",
+  "designArchitectureDisposition": "accepted: evidence and documentation only; no harness, runtime, dependency, version or deployment change"
+}

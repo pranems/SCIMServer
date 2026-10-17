@@ -16,6 +16,23 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Release assurance must name the actual promoted artifact
+
+A green Trivy scan of a PR test image does not certify a separately built
+release image. Bind the scan receipt to the exact promoted registry digest,
+retain scanner/database/exception provenance, and distinguish an admission gate
+that ran before promotion from supplemental evidence collected later. Apply the
+same distinction to browser proof: a complete suite can combine live journeys
+and controlled fixtures, while actual-data geometry is a separate claim.
+Never rename pending review as PASS or rebuild an immutable release merely to
+repair metadata. Inspect tag-triggered workflows before adding a Git release
+tag: a metadata action can unexpectedly replace a container artifact.
+The [0.55.54 follow-up](../RESPONSIVE_ENDPOINT_INVENTORY.md#supplemental-exact-artifact-and-headed-browser-verification)
+records actual-digest scanning, headed actual-data measurements, preserved
+historical limitations and the unsafe tag-publication path. Future gate changes
+require their own authorized reviewed change; evidence work is not implicit
+permission to redesign the harness.
+
 ### Validate before representation projection can erase supplied fields
 
 A Group adapter discarded unknown member fields before strict validation.
