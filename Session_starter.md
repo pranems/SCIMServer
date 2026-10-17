@@ -7,6 +7,9 @@ Focused unit GREEN is 7/7; real-shell startup contract GREEN is 24/24 after
 observed disclosure RED. This is not final-image or deployment evidence.
 The user explicitly authorized customer-production gates and deployment on
 2026-10-17; customer remains on 0.55.20 until technical gates pass.
+Normal protected Validate at `c907b05`: 28/28 PASS; API 6,061, InMemory HTTP
+2,460 PASS plus four retained skips, Web 1,624 PASS. Clean-CI lockfile
+regeneration and exact final-artifact/deployment proof remain pending.
 An approved temporary PITR was aborted during ambiguous provisioning network
 metadata and confirmed deleted. Final `Dropping` metadata reported network
 disabled, so an ignored final network setting is not established.

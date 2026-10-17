@@ -15,6 +15,9 @@ real-shell contract 24/24 pass after observed RED; final-artifact and release
 gates are pending. Customer deployment is explicitly authorized as of
 2026-10-17, but the customer application remains on 0.55.20. Authorization does
 not replace technical gates or actual human visual observations.
+Source consolidation at `c907b05` passes all 28 protected Validate gates:
+6,061 API units, 2,460 HTTP tests plus four retained InMemory skips, and
+1,624 Web tests. This is not final-artifact or postdeployment-browser proof.
 Authentication-advertisement implementation remains stopped.
 
 **Current delivery:** 0.55.54 is on dev and same-tenant canary using the image

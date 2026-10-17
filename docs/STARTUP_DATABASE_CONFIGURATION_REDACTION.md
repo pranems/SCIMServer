@@ -75,6 +75,10 @@ Initial source fix: normal commit `c1fe8ab8`. Exact artifact and deployment
 results must be appended after they actually run. The first protected push
 stopped at C13 after 12 passing gates because the README version badge still
 said 0.55.54; no subsequent unit/HTTP/Web gates are claimed from that attempt.
+After the focused badge correction, the separate normal protected push passed
+all 28 Validate gates in 1,129.5 seconds: 6,061 API units, 2,460 HTTP tests
+with four retained InMemory-specific skips, and 1,624 Web tests. These are
+source-consolidation results at `c907b05`, not final-image/deployment proof.
 
 | ID | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest useful gate |
 |---|---|---|---|---|
