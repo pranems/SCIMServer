@@ -1,13 +1,21 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.54
+> **Version**: 0.55.55
 > **Last Updated**: October 16, 2026
 > **Last verified:** 2026-10-16
 
 ---
 
 ## Active Delivery Process
+
+**Candidate:** 0.55.55 removes raw database connection-string startup output,
+without changing migration ordering, API behavior or UI. Focused unit 7/7 and
+real-shell contract 24/24 pass after observed RED; final-artifact and release
+gates are pending. Customer deployment is explicitly authorized as of
+2026-10-17, but the customer application remains on 0.55.20. Authorization does
+not replace technical gates or actual human visual observations.
+Authentication-advertisement implementation remains stopped.
 
 **Current delivery:** 0.55.54 is on dev and same-tenant canary using the image
 published from merged `c3ef1f0d` and replayed at runtime-input-equivalent

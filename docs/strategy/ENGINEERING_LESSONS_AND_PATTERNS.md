@@ -16,6 +16,17 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Redaction must cover output before the application logger exists
+
+A container entrypoint can disclose a connection URI even when application
+redaction and an exact-image CVE scan pass. Test shell startup independently
+with synthetic credentials and observable application/migration child markers.
+Require both absence of sensitive values and accurate configured/unset output.
+Normalize Windows fixture newlines before Linux shell execution, so a fixture
+syntax failure cannot masquerade as meaningful disclosure RED.
+The [startup redaction ledger](../STARTUP_DATABASE_CONFIGURATION_REDACTION.md)
+records the actual escape and the permanent source/runtime regressions.
+
 ### Release assurance must name the actual promoted artifact
 
 A green Trivy scan of a PR test image does not certify a separately built

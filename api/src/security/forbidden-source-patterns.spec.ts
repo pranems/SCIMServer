@@ -53,6 +53,15 @@ const DEFAULT_EXCLUDE_DIRS: ReadonlyArray<string> = [
 
 const FORBIDDEN_PATTERNS: ReadonlyArray<ForbiddenPattern> = [
   {
+    id: 'STARTUP-1',
+    rationale:
+      'Container startup must report database configuration presence, never the ' +
+      'connection string and its embedded credentials. See docs/LOGGING_AND_OBSERVABILITY.md.',
+    needle: 'DATABASE_URL: ' + '$',
+    onlyInPaths: ['../docker-entrypoint.sh'],
+    extensions: ['.sh'],
+  },
+  {
     id: 'S-1',
     rationale:
       'Hardcoded legacy bearer credential removed when ScimAuthGuard was deleted. ' +

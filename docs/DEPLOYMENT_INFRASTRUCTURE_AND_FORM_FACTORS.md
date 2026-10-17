@@ -7,6 +7,21 @@
 
 ---
 
+## 0.55.55 candidate startup-output hardening
+
+The container entrypoint now reports database configuration presence only,
+never the connection URI, username, password or hostname. The existing
+Prisma migrate-before-start sequence and InMemory migration bypass are
+unchanged. This is a candidate source change, not a claim that any estate
+has been upgraded.
+
+The permanent source guard runs with API unit tests. The disposable
+[entrypoint contract](../scripts/test/docker-entrypoint.contract.ps1) additionally
+executes the real shell in both persistence modes, with synthetic connection
+values and stubbed Node children. Source-mounted execution is development
+evidence; use `-ImageEntrypoint` against the final immutable image before
+promotion. Database connectivity and real migrations remain independent gates.
+
 ## Failed prerequisites block deployment commands
 
 The default merged-master pipeline at `078e741b` recorded a failed web

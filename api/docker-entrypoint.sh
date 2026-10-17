@@ -13,7 +13,11 @@ echo "║  SCIMServer - PostgreSQL Startup                           ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 
 echo ""
-echo "DATABASE_URL: ${DATABASE_URL:-(not set)}"
+if [ -n "${DATABASE_URL:-}" ]; then
+    echo "DATABASE_URL: configured"
+else
+    echo "DATABASE_URL: (not set)"
+fi
 echo ""
 
 if [ "$PERSISTENCE_BACKEND" = "inmemory" ]; then

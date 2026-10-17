@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.55 candidate - container startup credential redaction
+
+- Stop printing the database connection string before application logging
+  initializes. Startup reports only `DATABASE_URL: configured` or
+  `DATABASE_URL: (not set)`. Migration and application startup behavior is unchanged.
+- Permanent source regression: 6 -> 7 targeted unit assertions. Observed RED
+  was one disclosure-guard failure; GREEN is 7 PASS. Disposable real-shell
+  startup contract against the old published image: RED 20 PASS / 4 FAIL;
+  fixed source-mounted GREEN: 24 PASS / 0 FAIL across both persistence modes
+  and configured/unset/empty connection settings.
+- The runtime contract uses a published base image with the current entrypoint
+  mounted and stubbed Node children. It verifies output and migration/start
+  ordering, not database connectivity. Exact final-image and full release
+  gates remain pending; retained 0.55.54 suite counts are not new 0.55.55 proof.
+- API and Web candidate versions move together from 0.55.54 to 0.55.55.
+  Lockfiles must be regenerated on the existing clean CI runner, not locally.
+
 ### 0.55.54 exact-artifact and actual-browser assurance
 
 - Close the exact release-image scan gap: official checksum-verified native

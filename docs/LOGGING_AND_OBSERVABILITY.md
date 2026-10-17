@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
 
 **Current UI presentation:** absolute timestamps in Logs, Activity, Operations
 and live/detail drawers include full UTC date/time and milliseconds. Copy
@@ -943,6 +943,15 @@ The system uses **tiered log levels** based on HTTP status codes and operation c
 ---
 
 ## 15. Sensitive Data Handling
+
+### Container startup is a separate redaction boundary
+
+The 0.55.55 candidate changes shell startup to report only whether
+`DATABASE_URL` is configured. Never print its value: application sanitization
+does not run before the logger initializes. Existing startup logs from older
+images may contain a password-bearing URI and require restricted access,
+retention review and coordinated credential rotation where affected.
+See [the regression checks and execution RCA](STARTUP_DATABASE_CONFIGURATION_REDACTION.md).
 
 **Source:** `scim-logger.service.ts` lines 361-380 (`sanitizeData`)
 

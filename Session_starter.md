@@ -1,6 +1,19 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-16
+**Last verified:** 2026-10-17
+
+**Candidate work:** 0.55.55 narrowly removes raw `DATABASE_URL` startup output.
+Focused unit GREEN is 7/7; real-shell startup contract GREEN is 24/24 after
+observed disclosure RED. This is not final-image or deployment evidence.
+The user explicitly authorized customer-production gates and deployment on
+2026-10-17; customer remains on 0.55.20 until technical gates pass.
+An approved temporary PITR was aborted during ambiguous provisioning network
+metadata and confirmed deleted. Final `Dropping` metadata reported network
+disabled, so an ignored final network setting is not established.
+Authentication-advertisement implementation remains stopped.
+Test/gate improvement: **applied**, permanent source and real-shell regression
+checks cover pre-logger output. Design/architecture disposition: **accepted**,
+one cohesive shell conditional with no new service or logging abstraction.
 
 **Current release:** 0.55.54 is deployed to dev and the same-tenant canary
 using the image published from merged master `c3ef1f0d` and replayed from
@@ -24,7 +37,8 @@ The scoped dev/canary performance disposition explicitly retains the
 small-quota tail risk, rather than claiming that its thresholds passed.
 Private changed-path logging checks pass for 200 rows and seven errors,
 including actual credential redaction. No production code, quota, version or
-deployed artifact changed. Customer production is not authorized or promoted. See
+deployed artifact changed. At that closeout customer production was not
+authorized or promoted; current authorization is recorded above. See
 [current closeout and limits](docs/RESPONSIVE_ENDPOINT_INVENTORY.md#deployed-release-closeout).
 
 **Documentation closeout:** freshness and source-content gates cover 27

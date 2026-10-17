@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,20 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.55 candidate: startup credential redaction
+
+Container startup no longer prints the database connection string. It reports
+only whether the setting is configured. This affects output before the normal
+application logger initializes; its redaction cannot protect shell startup.
+No API, UI, authentication, database migration or resource-ID contract changes.
+The candidate is not yet published or deployed.
+
+If an older container has started with a password-bearing connection string,
+treat its startup logs as potentially sensitive. Restrict access and review
+retention. After deploying the corrected image, rotate the affected database
+credential through a coordinated update of its consumers. This patch prevents
+new startup disclosure; it does not erase retained logs or rotate credentials.
 
 ### Changed
 
