@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.54`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.55`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,15 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### Fixed
+
+- OAuth token responses now retain `application/json`, as required by OAuth
+  2.0. Previously the SCIM response interceptor replaced it with
+  `application/scim+json` on token routes under `/scim`. Global and per-endpoint
+  token contents, credential rules and cache headers are unchanged; actual SCIM
+  resources still use their SCIM media type. No database migration is needed.
+  Development deployment and Entra saved-credential validation remain pending.
 
 ### Changed
 

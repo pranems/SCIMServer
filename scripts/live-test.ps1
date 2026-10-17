@@ -14195,6 +14195,8 @@ try {
     Test-Result -Success ($buGlobal.StatusCode -eq 200) -Message "9z-BU.T1: global /oauth/token success is HTTP 200 (RFC 6749 5.1), not 201"
     Test-Result -Success ($buGlobalCache -match 'no-store') -Message "9z-BU.T2: global /oauth/token success carries Cache-Control: no-store"
     Test-Result -Success ($buGlobalPragma -match 'no-cache') -Message "9z-BU.T3: global /oauth/token success carries Pragma: no-cache"
+    Test-Result -Success (($buGlobal.Headers['Content-Type'] -join ',') -match '^application/json\b') `
+        -Message "9z-BU.T8: global token success uses application/json (RFC 6749 5.1)"
 
     # T4-T6 - PER-ENDPOINT oauth_client token -> 200 + no-store + no-cache.
     $buEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
@@ -14216,6 +14218,8 @@ try {
     Test-Result -Success ($buTok.StatusCode -eq 200) -Message "9z-BU.T4: per-endpoint oauth_client token success is HTTP 200, not 201"
     Test-Result -Success ($buTokCache -match 'no-store') -Message "9z-BU.T5: per-endpoint token success carries Cache-Control: no-store"
     Test-Result -Success ($buTokPragma -match 'no-cache') -Message "9z-BU.T6: per-endpoint token success carries Pragma: no-cache"
+    Test-Result -Success (($buTok.Headers['Content-Type'] -join ',') -match '^application/json\b') `
+        -Message "9z-BU.T9: per-endpoint token success uses application/json (RFC 6749 5.1)"
 
     # T7 - an ERROR response is UNAFFECTED: a bad grant_type still returns 400
     # (RFC 6749 5.2), NOT 200 - the @HttpCode(200) applies to the success path only.

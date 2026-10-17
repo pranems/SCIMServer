@@ -38,6 +38,7 @@ describe('Authentication (E2E)', () => {
           client_secret: 'e2e-client-secret',
         })
         .expect(200)
+        .expect('Content-Type', /^application\/json\b/i)
         .expect('Cache-Control', 'no-store')
         .expect('Pragma', 'no-cache');
 
