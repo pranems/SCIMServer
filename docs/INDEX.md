@@ -458,3 +458,4 @@ These are the definitive source files for key aspects of the system:
 ## Responsive inventory layout
 
 - [Viewport-height Endpoints and compact Dashboard summaries](RESPONSIVE_ENDPOINT_INVENTORY.md).
+- [0.55.54 exact-artifact scan and actual-data headed-browser receipt](evidence/RELEASE_05554_ASSURANCE_20261016.json).

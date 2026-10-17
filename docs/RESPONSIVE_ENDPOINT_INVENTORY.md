@@ -1,7 +1,7 @@
 # Responsive endpoint inventory and compact dashboard
 
 **Last verified:** 2026-10-16
-**Status:** Delivered in 0.55.54 to dev and the same-tenant canary from merged `db10b13e`. All 324 authoritative dev browser cases pass with zero skips. Matched assurance is complete with explicit CPU-quota tail limits; operator visual acceptance remains unavailable. Customer production is not promoted.
+**Status:** Delivered in 0.55.54 to dev and the same-tenant canary using the image published from merged `c3ef1f0d`, replayed at runtime-input-equivalent `db10b13e`. All 324 authoritative dev browser cases pass with zero skips. Matched assurance is complete with explicit CPU-quota tail limits; operator visual acceptance remains unavailable. Customer production is not promoted.
 
 ## Executive summary
 
@@ -49,6 +49,71 @@ Operator acceptance was requested again against the actually deployed
 Automated layout measurements are not a substitute for that confirmation.
 The release is deployed and automatically verified, not operator-accepted
 or approved for customer production.
+
+### Supplemental exact-artifact and headed-browser verification
+
+The [portable follow-up receipt](evidence/RELEASE_05554_ASSURANCE_20261016.json)
+closes two independent evidence questions without another deployment or full
+suite replay:
+
+- Native Trivy 0.76.0 scanned the actual public release digest above, for
+  `linux/amd64`, using the existing HIGH/CRITICAL, ignore-unfixed and
+  `.trivyignore` policy: exit 0, zero blocking OS and Node findings. The
+  checksum-verified official scanner and database timestamps are recorded.
+  PR test-image scanning is not used as a substitute for this digest scan.
+- Fresh headed Chromium 149 measured actual dev and canary responses, without
+  response fixtures. Each estate passes six measurement sets at 1440/900-pixel
+  widths and 540/1100-pixel window heights. Inventory height grows from 355 to
+  915 pixels, with zero available-bottom gap. All four columns remain inside
+  the table; the name column occupies 38.3-39.0%. Dashboard summary rows are
+  48 pixels high, with left-aligned names and counts on the same row.
+  Mutating requests were blocked and none were attempted. Exact endpoint IDs
+  remain unchanged: dev 74 -> 74, canary 64 -> 64.
+- The earlier complete dev Chromium run already passed all 324 configured
+  cases after deployment, including measured layout, timestamp and Operations
+  link regressions. It combines live journeys and controlled response fixtures;
+  the new headed measurements specifically verify actual estate content.
+- A later independent compiled-node run passes all 1,795 live assertions with
+  an empty private InMemory instance, zero endpoints before/after and the
+  helper stopped. This closes the separate local-runtime evidence claim;
+  the older nested `-SkipLocal` receipt remains unchanged.
+
+Publication source is merged master `c3ef1f0d`, not the replay checkout
+`db10b13e` or later documentation master `68aa5a1c`. The existing semantic image
+was reused after declared runtime-input equality checks, not rebuilt at each
+checkout. Fresh read-only Azure inspection confirms both estates still use the
+same release digest. No GitHub Release object or `v0.55.54` Git tag was created:
+pushing that tag triggers the existing
+[build-and-push workflow](../.github/workflows/build-and-push.yml), which can
+rebuild and overwrite the immutable version tag. Do not trigger it merely to
+add release metadata, bypass workflows or change the harness implicitly.
+
+| Historical reviewer gate | Supplemental disposition and limit |
+|---|---|
+| Test completeness | Scoped PASS: both backend matrices, membership negative/state controls, native Entra and measured browser cases |
+| API response contract | Scoped PASS: permanent allowlists and exact value-level reference/readback oracles |
+| Error handling | Scoped PASS: strict negative controls and rejected-operation unchanged-state proof |
+| Logging | Scoped PASS: two private runs inspect 200 stored rows/seven errors each, actual credential redaction and correlation |
+| RFC compliance | Scoped PASS: official reference, unassigned-value, immutable-member and atomic ordered PATCH text verified |
+| Security | Scoped self-review plus separate exact-release-digest Trivy PASS; not independent approval or whole-product certification |
+| Performance | Bounded dev/canary disposition only; 0.5-CPU tail thresholds did not pass |
+| Code hygiene | Scoped self-review; cohesive changes and existing seams, no speculative abstraction |
+| Narrative documentation | Current guides and release notes reconciled; original pending matrix and provisional operator status preserved |
+
+These dispositions do not retroactively make the original nine rows PASS or
+prove review-before-promotion ordering. Canary's 11 opt-in browser exclusions
+also remain explicit: exclusive mutation ownership was requested but could not
+be confirmed, so no fixtures or server settings were changed in this follow-up.
+Some old live-runner sections report retired Admin API checks as PASS-shaped
+skip messages; the registered assertion count is not proof those retired
+journeys executed. Neither that reporting debt nor the canary opt-in policy
+was silently changed.
+
+Self-improvement disposition: **applied** through independently identified
+artifact scanning, actual-data geometry and explicit evidence limits.
+Design/architecture disposition: **accepted** because this is bounded evidence
+and documentation, not a pipeline/harness redesign. Historical ordering cannot
+be repaired by rerunning unchanged suites.
 
 ### Initial performance observation
 
@@ -370,6 +435,16 @@ failures. Repeated output offload belongs to UI-H20; quoted throw statements,
 patches, historical receipt reads and scanner echoes are dismissed non-issues.
 This is the available reconstructed continuation, not the deleted original.
 
+The exact-artifact/browser follow-up streamed all 20,585 available continuation
+events at its reconciliation checkpoint, with zero malformed records, using
+error/signal and causal-narration passes. The 686 signal and 989 narration
+matches are noisy candidates, including quoted history and search echoes,
+not incident counts. Current diagnoses map to UI-H27 through UI-H31; the
+PowerShell foreach-pipeline and output-offload recurrences map to UI-H18/20.
+Expected REDs, historical failures and retired-API skip labels were not
+invented as new deployment defects. This does not claim access to the deleted
+original session or credentials from its history.
+
 | ID | Type / severity | Symptom and cause | Resolution and why it works | Detection / prevention |
 |---|---|---|---|---|
 | UI-H17 | Performance evidence / Medium, investigated | Initial 18-sample add/remove increases varied on repeat; larger 0.5-CPU measurements still cross tail thresholds. | Retain all results. Completed matched query/CPU/memory proof and a separate 2-CPU sensitivity diagnostic. Equal query totals and decreasing candidate latency with negligible throttling justify the bounded dev/canary disposition above, not a claim that the 0.5-CPU thresholds passed or a production latency guarantee. | Initially detected post-canary; earliest candidate measurement was after dev admission. Original Stage 3b.6 remains PENDING in the immutable matrix. Later scoped evidence and explicit tail justification are separate. |
@@ -382,6 +457,12 @@ This is the available reconstructed continuation, not the deleted original.
 | UI-H24 | Evidence durability / Medium | Resource counters were saved only after an optional later probe; its failure lost otherwise valid completed measurement totals. | Persist each completed round before subsequent work. Raw timing receipts survive the first failed attempt; new complete instrumented runs retain CPU/query/memory totals even if later probes fail. Missing older counters are never invented. | Detected on the failed orchestration; earliest protection is the first completed measurement checkpoint, before optional probes/cleanup. |
 | UI-H25 | Standards/source interpretation / Medium | A search summary incorrectly required absolute reference URIs and mislabeled Group schema section 4.2 as PATCH; saved discovery output also contained multiple JSON records. | Read official RFC plaintext for conclusions; it permits relative references and places PATCH in RFC 7644 section 3.5.2. Parse only the intended discovery record rather than the entire multi-record export. | Direct primary-source verification catches this before a false compatibility rule or code change; discovery summaries are not normative evidence. |
 | UI-H26 | Continuity state / Low | Historical footer strings still named completed workers/pipeline as active and said canary had not been reached, despite current successful delivery objects. | Refresh the current authority/active-process fields and explicitly label old nested snapshots historical. Actual known-shell completion and exact run-label cleanup determine current ownership. | Bounded state reconciliation caught the contradiction; check both current headers and unqualified footers, not only newly added status fields. |
+| UI-H27 | Artifact assurance / High | PR test-image Trivy success was not evidence for the separately built release digest; publication had no scan step. | Native remote Trivy on exact digest `42613fe0` passes the existing gate. Official binary checksum, raw receipt hash and database time are retained. This closes current artifact evidence without a rebuild; future scan-before-promotion admission remains a process limitation. | User-requested process audit caught the mismatch after delivery; earliest prevention is exact artifact identity at promotion admission. No harness change was authorized. |
+| UI-H28 | Environment / Low | Docker Linux-engine pipe was missing and native Trivy was absent. | Installed only the missing official native scanner in the session workspace after command failure, verified its SHA256 and scanned the public remote image. No daemon retry, reset or disk operation. | Scanner preflight caught this before a suite/deployment; choose a supported daemon-independent scanner rather than repeat Docker startup. |
+| UI-H29 | Release metadata / Medium | Adding the missing `v0.55.54` Git tag would trigger a workflow that rebuilds and republishes the version image. | Inspected the actual tag-triggered workflow before mutation and left tag/release publication blocked. Immutable existing artifact identity is preserved. | Pre-mutation workflow inspection caught it; metadata closeout must not silently become image replacement or bypass CI. |
+| UI-H30 | Browser evidence / Low | A full-page Dashboard capture showed top-level metrics, not the measured endpoint summary below the fold. | Captured the actual summary element in headed Chromium after scrolling, and inspected its five compact rows. Existing permanent bounds tests and fresh actual-data geometry agree. Screenshots remain ignored local evidence. | Manual evidence inspection caught the wrong capture target; screenshot the promised surface, not just a page that contains it. |
+| UI-H31 | Portable metadata / Low | A manually transcribed portable browser start timestamp differed from its raw receipt by 240 milliseconds. | Exact raw-field equality found and corrected the value before commit. Portable validation now compares timestamp, hashes, digest, browser version, geometry and counts against the raw artifacts, rather than checking only JSON syntax. | Receipt validation caught it before consolidation; derive or compare evidence metadata instead of trusting transcription. |
+| UI-H32 | Process-reference drift / Low | The standing commit-message prompt path and its parent prompts directory do not exist in this checkout. | Use the existing PR template, delivery process and conventional descriptive commit format; report the absent prompt rather than claiming it ran or creating replacement harness files. | The direct file lookup caught it before commit. A referenced prompt is not executable evidence unless the actual checkout contains it. |
 
 Self-improvement disposition: **applied** for actual-helper local regression
 controls, raw distribution/request accounting, per-round evidence durability

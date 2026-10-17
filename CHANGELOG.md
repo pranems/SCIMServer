@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.54 exact-artifact and actual-browser assurance
+
+- Close the exact release-image scan gap: official checksum-verified native
+  Trivy 0.76.0 scans deployed digest `42613fe0`, exit 0 with zero blocking
+  HIGH/CRITICAL OS/Node findings under the existing exceptions/unfixed policy.
+- Record 12 fresh headed Chromium measurement sets on actual dev/canary
+  content: 355 -> 915-pixel inventory height, bounded four-column geometry,
+  left-aligned names and 48-pixel compact Dashboard rows. No mutating request;
+  exact endpoint IDs remain 74 -> 74 and 64 -> 64.
+- Close the separate standalone compiled-node evidence claim with the retained
+  later 1,795 PASS / 0 FAIL receipt. Existing full dev browser evidence remains
+  324 PASS / 0 skipped / 0 unexpected / 0 flaky; canary opt-in exclusions
+  remain unexecuted without exclusive ownership.
+- Preserve historical failures, pending review order, small-quota performance
+  limits and GitHub Release/tag-publication risk. The tag-triggered workflow
+  can rebuild/overwrite the semantic image, so no tag was created implicitly.
+- Documentation/evidence only; no runtime/version/dependency/lockfile/harness
+  or deployment change. Full retained unit/HTTP/Web counts are unchanged.
+
 ### User-facing release and documentation reconciliation
 
 - Add [curated release notes](docs/RELEASE_NOTES.md) with the 0.55.54 operator

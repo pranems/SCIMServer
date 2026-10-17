@@ -3,7 +3,8 @@
 **Last verified:** 2026-10-16
 
 **Current release:** 0.55.54 is deployed to dev and the same-tenant canary
-from merged master `db10b13e`. PR #238 merged after 25 protected gates and
+using the image published from merged master `c3ef1f0d` and replayed from
+runtime-input-equivalent checkout `db10b13e`. PR #238 merged after 25 protected gates and
 seven exact-tip CI checks; 6,060 units and 2,460 HTTP/oracle cases PASS.
 The full no-skip pipeline completed exit 0 in 6,349 seconds:
 40 PASS / 0 FAIL / 0 SKIPPED / 9 reviewer PENDING.
@@ -42,11 +43,27 @@ describe shipped Group/reference, profile/PATCH, timestamp, inventory and
 Dashboard behavior without stale local-only labels. Historical captures stay
 historical. Full matrix HTTP counts are 2,516 InMemory plus four exclusions /
 2,520 PostgreSQL; protected HTTP is the narrower 2,460 plus four selection.
-The nested Docker lane uses `-SkipLocal`; no full standalone compiled-node live
-receipt is inferred. Documentation-only delivery needs no runtime version bump.
+The nested Docker lane uses `-SkipLocal`; a later separate compiled-node live
+run closes that claim with 1,795 PASS / 0 FAIL and zero private endpoints
+before/after. Documentation-only delivery needs no runtime version bump.
+
+**Supplemental release assurance:** exact published digest `42613fe0` passes
+native Trivy 0.76.0 with existing HIGH/CRITICAL exceptions/unfixed policy.
+Fresh headed Chromium verifies actual-data Endpoints/Dashboard geometry in
+dev and canary: 12 measurement sets PASS, 355 -> 915-pixel inventory growth,
+48-pixel Dashboard rows, unchanged 74/64 endpoint IDs and no mutating requests.
+Publication source is `c3ef1f0d`; replay checkout `db10b13e` and docs checkout
+`68aa5a1c` reuse the image with identical declared runtime inputs. Original
+nine PENDING rows remain historical; later scoped dispositions are not
+independent approval or proof of review-before-promotion. Canary opt-in
+mutation ownership remains unavailable. Do not create `v0.55.54` casually:
+the existing tag workflow rebuilds and can overwrite the semantic image.
+No harness/runtime/version/deployment/customer-prod change. See
+[portable assurance](docs/evidence/RELEASE_05554_ASSURANCE_20261016.json).
 
 | Date | Summary |
 |---|---|
+| 2026-10-16 | Closed exact-release-digest scan and actual-data headed-browser measurement evidence; retained canary opt-in, review-order, Git release/tag and performance limits without changing the harness or deployed artifact. |
 | 2026-10-16 | Reconciled current user guides and curated release notes; version-to-release-note and missing behavior/doc bindings use the existing freshness gate. Provisional visual feedback recorded without an unverified target or promotion approval. |
 | 2026-10-16 | Completed matched performance/resource and private logging assurance; retained quota-sensitive tail limits, official RFC verification and measurement-oracle RCA. Operator visual acceptance is still required. |
 | 2026-10-16 | Dev/canary 0.55.54 delivery and actual Entra membership verified; visual acceptance and measured performance follow-up remain open. |

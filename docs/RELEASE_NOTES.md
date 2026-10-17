@@ -109,10 +109,21 @@ and [mirroring safeguards](PROD_TO_DEV_MIRRORING_AND_FIXTURES.md).
 
 ### Known limits
 
-- The nested Docker validation uses `-SkipLocal`. Its passing outer gate is
-  not proof of a full standalone compiled-local-node live run; focused
-  compiled-node membership evidence and full InMemory Jest evidence are
-  separate claims.
+- The nested Docker validation uses `-SkipLocal`; a later separate full
+  compiled-node live run closes that independent claim with 1,795 PASS /
+  0 FAIL, empty pre/post inventory and the helper stopped. The earlier receipt
+  is not rewritten.
+- [Supplemental release assurance](evidence/RELEASE_05554_ASSURANCE_20261016.json)
+  records the exact deployed-digest Trivy gate passing and fresh headed
+  Chromium geometry on actual dev/canary content. Both estates retain their
+  original endpoint IDs. The existing full dev browser run is 324 PASS with
+  zero skips; the canary opt-in exclusions remain unexecuted without exclusive
+  mutation ownership.
+- The image was published from merged `c3ef1f0d` and reused after runtime-input
+  equality checks at later shipping checkouts. It was not freshly rebuilt from
+  each later documentation commit. A GitHub Release page/version Git tag has
+  not been published: the existing `v*` tag workflow would rebuild the image
+  and can overwrite the version tag. GHCR release/source/latest tags exist.
 - Matched 0.5-CPU measurements retain over-10% membership tail increases.
   A 2-CPU diagnostic improved latency quantiles but did not change deployed
   quotas or establish a production latency guarantee.
