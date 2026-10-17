@@ -71,14 +71,17 @@ credential automatically.
 
 ## Execution issues and root-cause analysis
 
-No source fix commit exists at this candidate-writing checkpoint. Exact
-artifact and deployment results must be appended after they actually run.
+Initial source fix: normal commit `c1fe8ab8`. Exact artifact and deployment
+results must be appended after they actually run. The first protected push
+stopped at C13 after 12 passing gates because the README version badge still
+said 0.55.54; no subsequent unit/HTTP/Web gates are claimed from that attempt.
 
 | ID | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest useful gate |
 |---|---|---|---|---|
 | START-01 | Security / High | Shell startup printed a credential-bearing URI before logger redaction existed; image CVE scanning does not analyze shell output | Presence-only conditional, permanent source guard and real-shell contract remove the disclosure and exercise its actual output boundary | Found during customer-release preflight / first real entrypoint startup test before publication |
 | START-02 | Cross-platform test fixture / Low | Initial contract failed before startup: Windows here-string CRLF reached Linux `sh` as part of `set -eu` | Normalize fixture newlines to LF before Docker execution; only the later child-success plus disclosure-assertion failures count as meaningful RED | First focused contract run / first focused contract run |
 | START-03 | Tooling / Low | VS Code's test adapter found no tests in this separately owned worktree | Run the existing package's targeted Jest command from its actual directory; no new test tooling or dependency installation | Focused unit invocation / focused unit invocation |
+| START-04 | Documentation version coupling / Low | Existing freshness autofix updated headers, not the separate README version badge; protected push failed C13 | Update the badge and run the existing content audit before retrying the normal hook. C13 already provides a permanent negative control; no gate weakening or new harness is needed | Protected Stage 1 content audit / focused content audit immediately after the version/header update |
 | REST-01 | Azure scope / Low | New resource-group availability probe returned Forbidden before creation; existing resource-group operations remained permitted | Use only the existing authorized customer resource group, with exact owned temporary server IDs and no role/account changes | Initial group probe / read-only permissions or group probe |
 | REST-02 | Provisioning evidence / Medium | Provisional restore metadata reported public access Enabled; the later Dropping response reported Disabled | Abort and verify exact deletion. Final-setting disregard is not established. Future acceptance must check Ready-state network configuration and firewall rules, not provisional defaults | First restore metadata check / first restore metadata check |
 
@@ -93,7 +96,10 @@ as a separate boundary; synthetic runtime failures must also prove startup
 reached the intended child, rather than counting fixture failures as RED.
 The permanent source guard runs in the existing unit gate. The runtime
 contract is an explicit exact-image release check, not an implicit claim that
-every existing pipeline already invokes it.
+every existing pipeline already invokes it. For version-only documentation
+coupling, run the existing content audit as well as freshness autofix;
+header freshness alone does not certify a badge. The first protected C13
+failure demonstrates the existing check is discriminating, not a gate gap.
 
 **Design/architecture: accepted.** A small shell conditional owns one concern,
 adds no dependency edge, and preserves the existing orchestrator. A logging
@@ -102,9 +108,10 @@ framework or provider abstraction would be speculative for two fixed messages.
 **Provenance/completeness:** the complete available current-session event log
 was scanned through 22,498 records, with the approved delivery window starting
 2026-10-17 at 10:54:02 UTC containing 479 records at that checkpoint. The
-error/signal and diagnostic-narration passes were reconciled to the five issues
+error/signal and diagnostic-narration passes were reconciled to the five initial issues
 above. Apparent TypeScript/module errors were verified search-command echoes,
 not new compiler/runtime failures; HTTP-like digits in identifiers and test
 source were not treated as HTTP failures. This is not a claim to restore the
 deleted original conversation. Historical source, browser and migration
-receipts retain their original artifact identities.
+receipts retain their original artifact identities. START-04 was captured
+immediately when the later protected-push failure was diagnosed.
