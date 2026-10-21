@@ -47,6 +47,14 @@ That artifact was not applied. Pin Vite exactly to the minimal patched 8.1.6
 and regenerate in CI again; discard the unrequested API artifact. A green
 provenance check is not evidence that dependency scope is appropriate.
 
+**Bootstrap environment preflight:** a later normal Validate push reached
+`prisma generate` and correctly failed because a fresh shell had no
+`DATABASE_URL`. The value is process-local and does not survive another tool
+call. Setting the private fixture URL and smoke-running `prisma generate`
+passes before the full retry. No database connection is needed for generation.
+Validate-mode bootstrap calls must explicitly carry this prerequisite rather
+than relying on a previous shell's environment; no gate was bypassed.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as
