@@ -34,6 +34,13 @@ needed. **Self-improvement: applied.** Preserve bootstrap-versus-final evidence
 explicitly so a green hook against the old installation is never represented
 as proof of the patched dependency.
 
+**Execution issue and prevention:** the first bootstrap push was correctly
+blocked by freshness F4 because `web/package.json` is bound to
+`docs/RELEASE_NOTES.md`. Updating only this policy and the engineering changelog
+was insufficient. Update the existing user-facing release notes before the
+next dependency-manifest push; the gate remains unchanged. The failed push
+published no branch and did not bypass its hook.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as

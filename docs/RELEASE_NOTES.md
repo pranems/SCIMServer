@@ -15,6 +15,13 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
+Build-tooling security preparation raises the Vite minimum to 8.1.6, addressing
+the launch-editor advisories affecting 8.0.0-8.1.5. This patch is older than
+the seven-day quarantine. It does not change the SCIM contract or deployed
+version. The prerequisite is not merge-ready until its CI-generated lockfile,
+dependency audit and exact-tip checks pass. See the
+[supply-chain receipt](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-10-21-vite-security-prerequisite).
+
 The documentation checkpoint below records actual publication/dev evidence and
 the customer hold. It introduces no further runtime or version change.
 
