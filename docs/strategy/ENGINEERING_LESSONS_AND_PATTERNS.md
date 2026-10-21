@@ -29,6 +29,15 @@ tests remain the independent publication boundary, not a reason to bypass
 that gate after a focused repair.
 See [ER-36](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
 
+For `Validate`, preflight the Prisma configuration before the expensive
+hook-owned suites. Client generation can require a datasource environment
+variable without using a database connection. Supply an explicit,
+nonconnecting loopback code-generation URL for that process rather than
+inventing a production default, writing credentials to `.env`, dropping the
+gate or repeating the same missing-input invocation. The generation-only
+preflight passes with no server or password.
+See [ER-37](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
+
 ### Composite edits must share history without sharing form-control identity
 
 Sharing a controlled value does not mean a preset shares the input's Undo

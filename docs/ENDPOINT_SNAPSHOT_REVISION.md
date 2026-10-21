@@ -898,11 +898,21 @@ session evidence; unresolved historical scope is not marked complete.
 | ER-34 | Test environment / Low | Compiling the Node-based Playwright spec with browser-only ambient types falsely reports missing `node:crypto`/`process`. | Preserve the failed receipt; explicitly load already-installed Node types for the E2E compiler only. Baseline and changed spec both have zero diagnostics. Browser source options and its 66-diagnostic baseline are unchanged. Detected at expanded test compilation; prevention is separate browser and Node test environments. |
 | ER-35 | Supply-chain freshness / Medium | A fresh audit reports three Moderate Vitest-related findings despite the previous day's zero Web findings. | Record actual current findings and severity. No High/Critical blocker is present. Do not use `npm audit fix --force`, apply a major upgrade implicitly or weaken the seven-day quarantine. Reassess through the separate dependency process. Detected during dependency restore/audit, before publication. |
 | ER-36 | Integration test-double drift / Medium | The first protected Validate push passes all preceding static gates, then fails five of 6,208 unit cases in the newly inherited conditional-endpoint suite: its Prisma double has no `$queryRaw`. The focused pre-integration selector omitted that master-added consumer of the changed read seam. | Reuse the established snapshot-query mock, retaining every conditional write, outage and ABA assertion. All six endpoint-service suites pass 174 tests; expanded test compilation/lint has zero introduced diagnostics. No production fallback or hook bypass. Detected at full pre-push units; earliest possible detection was the post-merge endpoint-service neighborhood. The focused preflight now discovers that complete service test directory rather than relying only on the older selected filenames. |
+| ER-37 | Validation environment / Low | The second normal Validate push passes 6,208 units and the InMemory HTTP subset (2,511 PASS / 42 PostgreSQL-only pending), then code generation fails because Prisma's configuration requires `DATABASE_URL` even though generation does not connect to a database. | Explicitly provide a loopback, nonconnecting code-generation-only URL in the validation process environment, without a password, live database or persistent `.env` mutation. Isolated Prisma 7.8.0 generation passes. The corrected invocation contract requires this configuration preflight before the normal Validate hook. Detected at the post-test generation gate; earliest detection was configuration preflight. No production fallback, hook-mode downgrade or waived test. |
 
 The first normal push was blocked before API HTTP, migration and Web-test
 gates could run. Its 6,203 passing cases do not make it a passing unit run.
 The hook stopped publication as intended. The isolated six-suite GREEN
 confirms the mock correction; a complete protected retry is still required.
+
+The second invocation retains the complete unit PASS and the HTTP subset
+PASS but is not a successful push: Prisma generation stopped later gates.
+The 42 pending HTTP cases are backend-specific, not a complete PostgreSQL
+receipt. The hook also retains its two existing log-suite exclusions, which
+are not counted as executed tests. The full deployment matrix remains a
+separate requirement. The fixed validation environment supplies only a
+configuration URL for code generation; it is not permission to connect
+any test to customer or shared data.
 
 **Test/gate improvement: applied.** The new combination has its own focused
 TTL/write-safety campaign and an explicitly typed browser-spec preflight;

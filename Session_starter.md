@@ -20,8 +20,12 @@ hook/current-artifact evidence and reviewed delivery are pending.
 Consolidation commit `a6b56aeb` is local. Its first normal Validate push was
 blocked by five old-double failures in a newly inherited endpoint test suite.
 Shared snapshot mocks fix the seam; all six endpoint-service suites / 174
-cases pass, with zero new expanded type/lint diagnostics. ER-36 retains the
-failure and broadens the service-neighborhood preflight. Full retry is pending.
+cases pass. Automatic discovery now covers 23 type roots with zero errors
+and no introduced lint. ER-36 retains the failure. Commit `e44ed615` repairs
+the test seam. The second Validate push passes all 6,208 units and 2,511
+InMemory HTTP cases (42 PostgreSQL-only pending), then fails Prisma generation
+for missing `DATABASE_URL`. Explicit nonconnecting codegen configuration
+passes the isolated generation preflight; full corrected retry is pending.
 Old image `fa482c1b` proves the earlier 0.55.56 private source only, not this
 new 0.55.57 combination. Other worktrees are inspected read-only, not modified.
 
