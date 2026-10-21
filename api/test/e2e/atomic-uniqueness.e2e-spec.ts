@@ -11,6 +11,9 @@ import type { IUserRepository } from '../../src/domain/repositories/user.reposit
 import type { IGroupRepository } from '../../src/domain/repositories/group.repository.interface';
 import type { IGenericResourceRepository } from '../../src/domain/repositories/generic-resource.repository.interface';
 import { compileUniquenessPolicy } from '../../src/domain/repositories/uniqueness-policy';
+import { PrismaGroupRepository } from '../../src/infrastructure/repositories/prisma/prisma-group.repository';
+import { PrismaService } from '../../src/modules/prisma/prisma.service';
+import { SchemaValidator } from '../../src/domain/validation';
 
 const USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const GROUP = 'urn:ietf:params:scim:schemas:core:2.0:Group';
@@ -103,6 +106,119 @@ describe('atomic schema uniqueness through HTTP controllers', () => {
   afterAll(async () => {
     for (const ep of endpoints) expect((await http('delete', `/scim/admin/endpoints/${ep}`)).status).toBe(204);
     await app?.close();
+  });
+
+  it('preserves membership writes and uniqueness rejection with a non-member uniqueness policy', async () => {
+    const ep = await endpoint();
+    const user = await http('post', base(ep, 'Users'), body('Users', { badge: 'member-owner' }));
+    const left = await http('post', base(ep, 'Groups'), body('Groups', { badge: 'left' }));
+    const right = await http('post', base(ep, 'Groups'), body('Groups', { badge: 'right' }));
+    expect([user.status, left.status, right.status]).toEqual([201, 201, 201]);
+    const updated = await http('patch', `${base(ep, 'Groups')}/${left.body.id}`, {
+      schemas: [PATCH],
+      Operations: [{ op: 'add', path: 'members', value: [{ value: user.body.id }] }],
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({
+      id: left.body.id, members: [{ value: user.body.id }], [EXT]: { badge: 'left' },
+    });
+    if (groups instanceof PrismaGroupRepository) {
+      const persisted = await groups.findAllWithMembers(ep);
+      const query = jest.spyOn(app.get(PrismaService), '$queryRaw');
+      try {
+        for (const id of [left.body.id, right.body.id]) {
+          query.mockClear();
+          const snapshot = await groups.findWithMembers(ep, id);
+          expect(query).toHaveBeenCalledTimes(1);
+          expect(snapshot).toEqual(persisted.find((group) => group.scimId === id));
+        }
+      } finally {
+        query.mockRestore();
+      }
+    }
+    for (const key of Object.keys(updated.body)) {
+      expect(['schemas', 'id', 'externalId', 'displayName', 'members', 'meta', EXT]).toContain(key);
+    }
+    conflict(await http('patch', `${base(ep, 'Groups')}/${right.body.id}`, {
+      schemas: [PATCH],
+      Operations: [{ op: 'replace', path: `${EXT}:badge`, value: 'left' }],
+    }));
+    const unchanged = await http('get', `${base(ep, 'Groups')}/${right.body.id}`);
+    expect(unchanged.status).toBe(200);
+    expect(unchanged.body).toMatchObject({ id: right.body.id, [EXT]: { badge: 'right' } });
+  });
+
+  it('preserves a large persisted membership aggregate without leaking across endpoints', async () => {
+    const ep = await endpoint();
+    const other = await endpoint();
+    const memberInputs = Array.from({ length: 1000 }, (_, index) => ({
+      userId: null,
+      value: randomUUID(),
+      type: 'User',
+      display: `Synthetic member ${index}`,
+      reference: index % 2 === 0 ? `urn:example:member:${index}` : null,
+    }));
+    const created = await groups.create({
+      endpointId: ep, scimId: randomUUID(), externalId: null,
+      displayName: 'Large synthetic aggregate',
+      rawPayload: JSON.stringify({ schemas: [GROUP] }), meta: JSON.stringify({ resourceType: 'Group' }),
+    }, memberInputs);
+    const persisted = (await groups.findAllWithMembers(ep)).find((group) => group.scimId === created.scimId);
+    expect(persisted?.members).toHaveLength(1000);
+    expect(await groups.findWithMembers(ep, created.scimId)).toEqual(persisted);
+    expect(await groups.findWithMembers(other, created.scimId)).toBeNull();
+    const read = await http('get', `${base(ep, 'Groups')}/${created.scimId}`);
+    expect(read.status).toBe(200);
+    expect(read.body).toMatchObject({ id: created.scimId, displayName: created.displayName });
+    const members: unknown = read.body.members;
+    if (!Array.isArray(members)) throw new Error('Expected the full persisted Group membership array');
+    expect(members).toHaveLength(1000);
+    const actualMembers = new Map<unknown, unknown>();
+    const returnedMembers: readonly unknown[] = members;
+    for (const member of returnedMembers) {
+      if (!member || typeof member !== 'object' || !('value' in member) || !('display' in member)) {
+        throw new Error('Expected each persisted member value and display');
+      }
+      actualMembers.set(member.value, member.display);
+    }
+    expect(actualMembers).toEqual(new Map(memberInputs.map((member): [string, string] => [
+      member.value, member.display,
+    ])));
+    for (const key of Object.keys(read.body)) {
+      expect(['schemas', 'id', 'externalId', 'displayName', 'members', 'meta']).toContain(key);
+    }
+  });
+
+  it('reuses warm schema indexes but rebuilds them after a fresh profile change', async () => {
+    const ep = await endpoint();
+    const created = await http('post', base(ep, 'Groups'), body('Groups', { badge: 'warm-index' }));
+    expect(created.status).toBe(201);
+    const url = `${base(ep, 'Groups')}/${created.body.id}`;
+    expect((await http('get', url)).status).toBe(200);
+    const build = jest.spyOn(SchemaValidator, 'buildCharacteristicsCache');
+    try {
+      for (let index = 0; index < 2; index++) {
+        const read = await http('get', url);
+        expect(read.status).toBe(200);
+        expect(read.body).toMatchObject({ id: created.body.id, [EXT]: { badge: 'warm-index' } });
+      }
+      expect(build).not.toHaveBeenCalled();
+      const changed = await http('patch', `/scim/admin/endpoints/${ep}`, {
+        profile: { settings: { GroupHardDeleteEnabled: false } },
+      });
+      expect(changed.status).toBe(200);
+      build.mockClear();
+      expect((await http('get', url)).status).toBe(200);
+      expect(build).toHaveBeenCalled();
+      expect((await http('delete', url)).status).toBe(400);
+      const published = await http('get', `/scim/admin/endpoints/${ep}`);
+      expect(published.status).toBe(200);
+      const profile: unknown = published.body.profile;
+      if (!profile || typeof profile !== 'object') throw new Error('Expected a public endpoint profile');
+      expect(Object.keys(profile)).not.toContain('_schemaCaches');
+    } finally {
+      build.mockRestore();
+    }
   });
 
   /** Both requests finish service prechecks before either original repository call runs. */

@@ -7,7 +7,7 @@
  * @see RepositoryError - domain/errors/repository-error.ts
  */
 import { RepositoryError } from '../../../domain/errors/repository-error';
-import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { writeMissError, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 
 // pg/pg-pool also raise uncoded timeout errors. Match their complete messages,
 // never a bare "connect", which also appears in Prisma's query-source details.
@@ -16,6 +16,19 @@ const PG_CONNECTION_TIMEOUT_MESSAGES = new Set([
   'Connection terminated due to connection timeout',
   'timeout expired',
 ]);
+
+function rawSqlState(error: unknown): unknown {
+  if (error === null || typeof error !== 'object' || !('meta' in error)) return undefined;
+  const meta = error.meta;
+  if (meta === null || typeof meta !== 'object') return undefined;
+  if ('code' in meta) return meta.code;
+  if (!('driverAdapterError' in meta)) return undefined;
+  const adapter = meta.driverAdapterError;
+  if (adapter === null || typeof adapter !== 'object' || !('cause' in adapter)) return undefined;
+  const cause = adapter.cause;
+  return cause !== null && typeof cause === 'object' && 'originalCode' in cause
+    ? cause.originalCode : undefined;
+}
 
 /**
  * Translate a Prisma error into a typed RepositoryError.
@@ -38,11 +51,13 @@ export function wrapPrismaError(error: unknown, context: string, expectedVersion
 
   if (code === 'P2025') {
     if (expectedVersion !== undefined) {
-      return new RepositoryError('PRECONDITION_FAILED', 'Resource no longer satisfies If-Match.', err);
+      const failure = writeMissError(expectedVersion);
+      return new RepositoryError(failure.code, failure.message, err);
     }
     return new RepositoryError('NOT_FOUND', `${context}: record not found`, err);
   }
-  if (code === 'P2002') {
+  const rawUnique = code === 'P2010' && rawSqlState(error) === '23505';
+  if (code === 'P2002' || rawUnique) {
     return new RepositoryError('CONFLICT', `${context}: unique constraint violation`, err);
   }
   // Connection-related Prisma error codes + common message patterns

@@ -1,10 +1,16 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { spawnSync } from 'node:child_process';
+import {
+  endpointSnapshotFingerprint as databaseFingerprint,
+  mockEndpointSnapshotQuery,
+} from '../../../../test/helpers/endpoint-snapshot.mock';
 import { EndpointService } from './endpoint.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import type { Endpoint } from '../../../generated/prisma/client';
 import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { PrismaEndpointLifecycleRepository } from '../../../infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository';
+import { endpointProfileRevision } from '../../../domain/repositories/profile-revision';
 
 describe('Persistent endpoint cache freshness', () => {
   let module: TestingModule;
@@ -25,7 +31,14 @@ describe('Persistent endpoint cache freshness', () => {
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   });
+  let currentEndpoint: Endpoint | null;
+  let databaseError: Error | undefined;
+  const readCurrentEndpoint = async (): Promise<Endpoint | null> => {
+    if (databaseError) throw databaseError;
+    return currentEndpoint;
+  };
   const prisma = {
+    $queryRaw: jest.fn(),
     endpoint: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -45,9 +58,12 @@ describe('Persistent endpoint cache freshness', () => {
   beforeEach(async () => {
     process.env.PERSISTENCE_BACKEND = 'prisma';
     jest.resetAllMocks();
+    currentEndpoint = endpoint();
+    databaseError = undefined;
     prisma.endpoint.findMany.mockResolvedValue([endpoint()]);
-    prisma.endpoint.findUnique.mockResolvedValue(endpoint());
+    prisma.endpoint.findUnique.mockImplementation(readCurrentEndpoint);
     prisma.endpoint.findFirst.mockResolvedValue(endpoint());
+    prisma.$queryRaw.mockImplementation(mockEndpointSnapshotQuery(readCurrentEndpoint));
     prisma.scimResource.count.mockResolvedValue(0);
     prisma.resourceMember.count.mockResolvedValue(0);
     prisma.requestLog.count.mockResolvedValue(0);
@@ -72,13 +88,13 @@ describe('Persistent endpoint cache freshness', () => {
   });
 
   it('refreshes a warmed profile even when two changes have the same timestamp', async () => {
-    prisma.endpoint.findUnique.mockResolvedValue({
+    currentEndpoint = {
       ...endpoint(),
       profile: {
         schemas: [], resourceTypes: [],
         settings: { StrictSchemaValidation: false, logFileEnabled: false },
       },
-    });
+    };
 
     const result = await service.getEndpoint(id);
     expect(result.profile?.settings?.StrictSchemaValidation).toBe(false);
@@ -104,7 +120,7 @@ describe('Persistent endpoint cache freshness', () => {
   });
 
   it('does not serve a warmed endpoint after another writer deletes it', async () => {
-    prisma.endpoint.findUnique.mockResolvedValue(null);
+    currentEndpoint = null;
     prisma.endpoint.findFirst.mockResolvedValue(null);
     await expect(service.getEndpoint(id)).rejects.toMatchObject({ status: 404 });
     expect(service.getCachedProfileSettings(id)).toBeUndefined();
@@ -126,19 +142,132 @@ describe('Persistent endpoint cache freshness', () => {
 
   it('propagates database failure instead of returning a cached authorization profile', async () => {
     const failure = new Error('Synthetic database outage');
-    prisma.endpoint.findUnique.mockRejectedValue(failure);
+    databaseError = failure;
     await expect(service.getEndpoint(id)).rejects.toBe(failure);
   });
 
   it('keeps an unchanged profile cache and avoids redundant hydration', async () => {
     await service.getEndpoint(id);
     await service.getEndpoint(id);
-    expect(prisma.endpoint.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw.mock.calls[0][2]).toBeNull();
+    expect(prisma.$queryRaw.mock.calls[1][2]).toBe(databaseFingerprint(endpoint()));
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('checks a persisted revision without hashing the whole database row on cache hits', async () => {
+    await service.getEndpoint(id);
+    await service.getEndpoint(id);
+    const sql = prisma.$queryRaw.mock.calls[1][0].join('?');
+    expect(sql).toContain('e."snapshotRevision"');
+    expect(sql).not.toMatch(/sha256|convert_to/);
+    expect(sql).toContain("- 'snapshotRevision'");
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('carries the verified database snapshot with the independent profile-content revision', async () => {
+    const result = await service.getEndpointForRequest(id);
+    expect(result.profileRevision).toEqual({
+      endpointId: id,
+      contentRevision: endpointProfileRevision(endpoint().profile),
+      snapshotRevision: databaseFingerprint(endpoint()),
+    });
+    expect(Object.keys(result.endpoint)).not.toContain('snapshotRevision');
+    expect(Object.isFrozen(result.profileRevision)).toBe(true);
+  });
+
+  it.each([
+    { active: false },
+    { displayName: 'Changed display' },
+    { name: 'changed-name' },
+    { description: 'Changed description' },
+  ])('refreshes non-profile fields without relying on timestamps: %j', async changes => {
+    await service.getEndpoint(id);
+    currentEndpoint = { ...endpoint(), ...changes };
+    expect(await service.getEndpoint(id)).toMatchObject(changes);
+  });
+
+  it('preserves Prisma UTC timestamp semantics for timezone-free PostgreSQL JSON', async () => {
+    if (process.env.SCIM_ENDPOINT_TIMEZONE_PROBE === '1') {
+      expect(new Date(2026, 0, 1).getTimezoneOffset()).toBe(300);
+    }
+    const result = await service.getEndpoint(id);
+    expect(result.createdAt).toBe(endpoint().createdAt.toISOString());
+    expect(result.updatedAt).toBe(endpoint().updatedAt.toISOString());
+  });
+
+  it('checks PostgreSQL timestamp hydration in a real non-UTC Node process', () => {
+    const result = spawnSync(process.execPath, [
+      require.resolve('jest/bin/jest'),
+      '--runInBand', '--runTestsByPath', __filename,
+      '--testNamePattern', 'preserves Prisma UTC timestamp semantics',
+    ], {
+      env: { ...process.env, TZ: 'America/New_York', SCIM_ENDPOINT_TIMEZONE_PROBE: '1' },
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      throw new Error(`Non-UTC timestamp regression failed:\n${result.stdout}\n${result.stderr}`);
+    }
+  }, 35_000);
+
+  it('preserves an explicit timestamp offset without appending another timezone', async () => {
+    prisma.$queryRaw.mockResolvedValue([{
+      fingerprint: 'offset-snapshot',
+      endpoint: {
+        ...endpoint(),
+        createdAt: '2026-01-01T03:00:00.000+03:00',
+        updatedAt: '2026-01-01T03:00:00.000+03:00',
+      },
+    }]);
+    const result = await service.getEndpoint(id);
+    expect(result.createdAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(result.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('rejects invalid timestamps before publishing a changed profile', async () => {
+    prisma.$queryRaw.mockResolvedValue([{
+      fingerprint: 'invalid-time-snapshot',
+      endpoint: {
+        ...endpoint(),
+        profile: { schemas: [], resourceTypes: [], settings: { StrictSchemaValidation: false } },
+        createdAt: 'invalid',
+        updatedAt: '2026-01-01T00:00:00.000',
+      },
+    }]);
+    await expect(service.getEndpoint(id)).rejects.toThrow('Endpoint snapshot has invalid timestamps');
+    expect(service.getCachedProfileSettings(id)?.StrictSchemaValidation).toBe(true);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('returns the captured statement snapshot without reverting a newer cached profile', async () => {
+    await service.getEndpoint(id);
+    let completeRead: (value: { fingerprint: string; endpoint: null }[]) => void = () => {
+      throw new Error('Snapshot read has not started');
+    };
+    prisma.$queryRaw.mockImplementationOnce(() => new Promise(resolve => { completeRead = resolve; }));
+    const olderRead = service.getEndpoint(id);
+    currentEndpoint = {
+      ...endpoint(),
+      profile: { schemas: [], resourceTypes: [], settings: { StrictSchemaValidation: false } },
+    };
+    const newer = await service.getEndpoint(id);
+    expect(newer.profile?.settings?.StrictSchemaValidation).toBe(false);
+    completeRead([{ fingerprint: databaseFingerprint(endpoint()), endpoint: null }]);
+    expect((await olderRead).profile?.settings?.StrictSchemaValidation).toBe(true);
+    expect(service.getCachedProfileSettings(id)?.StrictSchemaValidation).toBe(false);
+  });
+
+  it('rejects an unexplained empty payload rather than serving an unvalidated cache entry', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ fingerprint: 'unexpected', endpoint: null }]);
+    await expect(service.getEndpoint(id)).rejects.toThrow('Endpoint snapshot validation failed');
+  });
+
   it('does not use cached existence to serve statistics for a deleted endpoint', async () => {
-    prisma.endpoint.findUnique.mockResolvedValue(null);
+    currentEndpoint = null;
     prisma.endpoint.findFirst.mockResolvedValue(null);
     await expect(service.getEndpointStats(id)).rejects.toMatchObject({ status: 404 });
   });

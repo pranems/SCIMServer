@@ -142,7 +142,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
 
   async update(id: string, data: GroupUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<GroupRecord> {
     const existing = this.groups.get(id);
-    assertWritePrecondition(existing, expectedVersion);
+    assertWritePrecondition(existing, expectedVersion, 'Group');
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: GroupRecord = {
       ...existing,
@@ -158,7 +158,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
 
   async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     const existing = this.groups.get(id);
-    assertWritePrecondition(existing, expectedVersion);
+    assertWritePrecondition(existing, expectedVersion, 'Group');
     this.writes.assertWritable(existing.endpointId, profileRevision);
     this.groups.delete(id);
     // Cascade: remove associated members
@@ -209,6 +209,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     const staged = this.stageMembers(groupId, members, new Date(), new Set(existing.map((m) => m.value)));
     this.assertUnique(uniqueness, group, [...existing, ...staged], groupId);
     this.writes.assertWritable(group.endpointId, profileRevision);
+    this.groups.set(groupId, { ...group, version: group.version + 1, updatedAt: new Date() });
     for (const member of staged) this.members.set(member.id, member);
   }
 
@@ -219,9 +220,9 @@ export class InMemoryGroupRepository implements IGroupRepository {
     expectedVersion?: ExpectedVersion,
     uniqueness: UniquenessPolicy = [],
     profileRevision?: ProfileRevision,
-  ): Promise<void> {
+  ): Promise<GroupWithMembers> {
     const existing = this.groups.get(groupId);
-    assertWritePrecondition(existing, expectedVersion);
+    assertWritePrecondition(existing, expectedVersion, 'Group');
     // Stage the entire aggregate before committing either map. No await can
     // interleave a second conditional writer between the check and mutation.
     const now = new Date();
@@ -240,6 +241,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     }
 
     for (const member of replacement) this.members.set(member.id, member);
+    return { ...updated, members: replacement.map(member => ({ ...member })) };
   }
 
   /** Clear all data - useful in test teardowns. */

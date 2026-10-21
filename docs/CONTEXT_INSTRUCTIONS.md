@@ -1,13 +1,24 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.57
+> **Version**: 0.55.58
 > **Last Updated**: October 21, 2026
 > **Last verified:** 2026-10-21
 
 ---
 
 ## Active Delivery Process
+
+**Current integration, 2026-10-21:** owned performance work is reconciled
+onto merged master `5841f724`, including token-lifetime PR #249 and 0.55.57.
+Named stash `320a8360d84079918d65ec88dff9542ac56ab468` remains recoverable.
+Both histories below are retained; neither renews tests for this combination.
+Integrated API build/lint (0/512), 20 expanded type roots and Web build/size
+pass; focused units pass 1,327 and PostgreSQL integration passes 303 cases.
+The 66 existing Web diagnostics are unchanged and the modified browser spec
+has zero diagnostics with its actual Node test environment. Intended version
+0.55.58 needs public-CI lock metadata. Complete hook-owned and current-artifact
+live/browser/performance evidence, reviewed CI/merge and deployment remain.
 
 **Authorized release consolidation, 2026-10-21:** the token-lifetime port is on
 `feat/endpoint-token-ttl-integration-20261021`, based on `36724c49`.
@@ -62,7 +73,232 @@ rendering and 27-document coupled freshness gate pass. Exact-HEAD comparisons
 retain 0/513 API lint and identical 66 frontend type diagnostics. Those earlier
 preparation holds are superseded by the final local evidence above. They do not
 renew the deployed receipts below.
+**Historical private performance evidence, 2026-10-20:**
 
+**Newest local membership-write implementation:** separate parent CAS and
+all locks/freshness boundaries remain. A parameterized ordered
+delete/insert statement reduces final populated-membership storage
+operations from three to two, retaining database defaults, own returned
+rows and atomic rollback. Focused units: 79 PASS. Related combined receipts:
+213 PostgreSQL PASS; 181 InMemory PASS / 32 genuine database-only exclusions.
+Latest conditional suite: 84 PostgreSQL PASS, 61 InMemory PASS / 23 exclusions;
+56 live loopback HTTP assertions pass on each backend. Twenty-root static
+proof adds no diagnostics. Private image `fa482c1b` verifies 20 serving
+modules plus two storage files. Full uninstrumented half-CPU BAAB
+`34ca7f2d` passes all twelve unchanged latency limits; database calls -4.10%,
+application CPU -13.39%, empty GET p99 48.879 versus 52.832 ms. SQL inventory,
+logging/redaction and exact cleanup PASS. SQL execution time +35.89% is an
+explicit cost, not database CPU. This is local synthetic admission only;
+reviewed/versioned integration and every independent release gate remain.
+No release or deployment is claimed.
+
+**Earlier endpoint-revision checkpoint:** a required Prisma-ignored
+UUID/ALWAYS trigger replaces full-row hashing. A frozen scoped observation
+now avoids returning/canonicalizing the profile only when a new post-lock
+statement proves the same endpoint/token. Mismatches retain the canonical
+content comparison, including metadata-only acceptance and changed-profile
+rejection; existing locks and final resource predicates remain. Combined
+unit receipts prove 746 distinct cases, not one final 16-suite invocation.
+Final focused PostgreSQL: 92 PASS; combined related receipts: 230 unique
+PASS. InMemory: 65 PASS / 31 genuine database-only exclusions.
+Build/schema and 19 test roots PASS; no introduced lint diagnostics.
+All 29 prior migrations, private populated backfill and atomic lock-timeout
+rollback PASS. Historical image `41f9ff4d` full BAAB fails seven limits.
+New image `72d2eec3` verifies 19 modules and exact schema/migration hashes.
+Full BAAB `6d80c293`: eleven latency PASS / one FAIL, empty GET p99
++15.15%; DB calls +0.026228%, application CPU -3.834776%. Values, logging,
+redaction, memory and cleanup PASS. Three-call mismatch rejects full SQL
+attribution; fixed atomic collection and bounded diagnostic `6db7e99f`
+reconcile all four rounds, without replacing failed admission.
+Actual-ID diagnostic `978e25dd` correlates 1,600 reads; two-CPU treatment
+`176f9e2e` reduces both versions' empty GET p99 to about 7 ms and almost
+eliminates throttling. It does not admit the half-CPU image or authorize
+production resizing. Those private runs are complete and cleaned.
+Same-kernel quota diagnostic `6b83fb53` is complete: all 1,600 reads
+correlate, all slow empty reads have possible throttle-update overlap,
+definite in 20/29 customer and 15/21 candidate slow reads, none in fast
+under-10-ms reads. Separate observer CPU is about 0.032/0.031 cores; worst
+71/75-ms sampling gaps remain explicit uncertainty. Earlier smoke cost
+incorrectly read host-root counters and is rejected. Exact own-cgroup
+cost, lifecycle and budget controls now pass, alongside logging/redaction
+and cleanup. Instrumented timing cannot be admission evidence. This is
+local and unreleased, not silently part of the earlier checkpoint.
+See [design, costs and RCA](ENDPOINT_SNAPSHOT_REVISION.md). All independent
+release/restore/cleanup/reviewer/credential/browser/human gates remain.
+
+**Historical scoped-write/CPU/lock checkpoint:** observed endpoint/type travels
+with all six PUT/PATCH observations and is bound at final mutation; legacy
+callers keep their identity lookup. Exact profile-key sorting fixes Unicode
+order dependence and avoids locale comparisons. Existing profile/uniqueness
+locks now acquire in one ordered statement; the protected profile read stays
+in a separate new statement after any wait. Actual PostgreSQL wait, lock-key,
+order and changed-profile rollback tests pass. Current focused units:
+577 PASS; PostgreSQL HTTP 219 PASS; InMemory 197 PASS with 22 database-only
+exclusions. Eighteen test roots compile, no introduced lint diagnostics
+(existing 11 errors / 149 warnings versus HEAD 11 / 150).
+Full unprofiled run `eba12c39`, ordered-lock image `fcdb74ca`: all twelve
+unchanged pooled latency limits PASS at 2,000 samples per operation/role;
+DB +8.27%, CPU -16.31%; values/logging/redaction/cleanup PASS. Nineteen
+modules are verified. Customer round 1 is materially slower than round 4,
+so a separate candidate-first full run `c93f2a5f` tests order sensitivity.
+It fails add p50 +11.96%, remove p50 +12.96%, empty GET p95 +18.38%;
+DB +8.28%, CPU +6.98%, values/logging/redaction/cleanup PASS. Both receipts
+remain. Performance closure is still blocked. Meaningful two-read RED now
+has a one-snapshot post-lock implementation. All three native member
+projections and actual lock/wait/freshness/duplicate-data guards pass.
+New 19-module image `55a9f64f`, full candidate-first run `82a897e8`,
+passes eleven latency limits, fails add p99 +12.84%; DB +0.028%,
+CPU +6.292%, values/logging/redaction/cleanup PASS. Timed `02888a0e`
+attributes 48.32% of database execution to fresh endpoint/fingerprint SQL
+and 21.65% to the protected snapshot; inventory/aggregate totals reconcile.
+This is not isolated SHA/p99 causality. A cheap persisted revision needs a
+separate design/migration outcome; none is silently bundled into this patch.
+Do not interpret the first pooled PASS as a stable causal speedup or release.
+These are local uncommitted corrections, not a new version or deployment.
+The [implementation/RCA](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md) distinguishes
+each immutable checkpoint. All independent release holds remain.
+
+**Newest unchanged-name checkpoint:** skip only preliminary Group PUT/PATCH
+name lookups when final and original names are exactly equal. Retain atomic
+uniqueness, profile/version protection and rename diagnostics. GREEN:
+127 Group units; 185 PostgreSQL HTTP; 175 InMemory HTTP, ten PostgreSQL-only
+exclusions. Eight test roots compile; zero introduced lint diagnostics,
+with 11 existing auth E2E errors still explicit. Candidate `b19f39c5`,
+run `dea371f8`, 400 pooled samples: six of twelve latency limits FAIL;
+database +24.87%, CPU +12.61%. Correctness/redaction/cleanup PASS.
+This supersedes the older diagnostic below, not a causal cross-run
+measurement. Strict admission and all independent release holds remain open.
+
+**Local observed-version correction:** the
+[implementation and RCA](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md) wire all six
+User/Group/custom PUT/PATCH paths with an independent internal version while
+retaining numeric 412, wildcard disappearance 412 and existing profile/
+uniqueness protections. Stale nonnumeric computations now receive 409.
+Focused units: 687 PASS. PostgreSQL combined HTTP subset: 183 PASS before
+the final added wildcard case; final conditional suite: 54 PASS. InMemory
+combined subset: 175 PASS with eight backend exclusions before that addition;
+final conditional: 48 PASS, six PostgreSQL-only exclusions. Both final
+conditional suites run the 45-assertion live PowerShell smoke. These are local
+correctness receipts, not current-source performance, full browser or
+deployment admission. DELETE remains unchanged. Group PUT/PATCH now return
+their committed aggregate: four affected unit suites pass 224 tests; final
+five-suite HTTP checks pass 144 PostgreSQL and 137 InMemory tests, with seven
+backend exclusions and 50 live assertions per backend. A subsequent precise
+common-id uniqueness optimization retains the existing UUID constraint and
+all residual namespace/profile/version checks: 107 repository units, 181
+PostgreSQL HTTP and 172 InMemory HTTP passes, with nine backend exclusions.
+Four affected test roots compile; focused lint is 48 warnings versus 49 on
+identical HEAD paths, zero errors and zero introduced diagnostics.
+The latest matched diagnostic before this final uniqueness optimization
+still fails seven of twelve latency checks at 400 pooled samples.
+No publication/version bump/deployment or new performance admission.
+
+**Local request-snapshot follow-up:** authentication/controller resolver
+calls now share one verified endpoint observation per ordinary SCIM request.
+The next request verifies again; admin/OAuth/Bulk are excluded; finish/close
+ends reuse for inherited asynchronous work. Profile and observed-version
+fences remain independent. Endpoint units: 147 PASS. PostgreSQL neighborhood
+seven suites passed, then the corrected full auth suite passed 12/12;
+246 distinct cases covered across those receipts. InMemory eight suites:
+236 PASS, ten PostgreSQL-only exclusions. Both execute 50 live assertions.
+Eight test roots compile. Expanded lint includes 11 existing auth E2E errors
+on both current and HEAD; warnings 73 versus 74; zero introduced diagnostics.
+Immutable candidate `5d8e7411` verifies 16 modules. Run `8f3f6649` at 400
+pooled samples passes eight latency checks and fails four: add p50, remove
+p50/p99 and empty GET p95. Database calls +33.07%, application CPU +6.56%.
+Value/readback, redaction and exact benchmark cleanup pass. This is not
+full admission, publication, browser certification or deployment.
+
+**Research proposal, not implementation:** [SCIM concurrency and cache
+coherence](SCIM_CONCURRENCY_AND_CACHE_COHERENCE_DESIGN.md) recommends a
+consistent aggregate snapshot, original-intent computation and one final
+internal resource CAS, while preserving independent uniqueness/profile/
+authorization protection. It critically compares invalidation, replacement,
+deltas, PostgreSQL hints, outbox and CDC, including eviction/refill, fan-out,
+commit-order and disconnect races. Nine diagrams and 21 retrieved primary
+sources support the explanation. Fourteen explanatory models pass, not
+database/HTTP acceptance tests. Prisma's current docs redirect to ORM 8;
+installed 7.8.0 APIs remain authoritative. No source/version/cloud change;
+all existing performance and independent release holds remain open.
+
+**Explanatory report:** the [comparative RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md)
+now explains the earlier 0.55.20 design, published 0.55.56 safeguards, and
+staged proposed correction using eleven diagrams, worked data examples and
+before/after tables. Implemented local optimizations, unimplemented proposals
+and unsafe diagnostic treatments are explicitly separated. Nothing in that
+explanation changes the failed admission or authorizes bypassing safeguards.
+The [full release comparison](CUSTOMER_UPGRADE_05520_TO_05556_REPORT.md)
+separately covers the exact published delta, compatibility and migration
+impact. The RCA now includes a full logical component/flow view for each design.
+
+**Comparative RCA:** exact old source `6785200f` and common-runtime controls
+identify fresh endpoint lookups (`a1a62484`) plus namespace/profile write
+coordination (`1d37e7b8`, `7332fdbc`). Full control `6a4e2ce5` fails 12/12 at
+2,000 samples, DB 53,372 / 110,614 and CPU +97.17%. Activated diagnostic
+cache/no-coordination treatments identify the cost families but deliberately
+remove required safety, still contain tail failures and must not be deployed.
+Prisma/pg/Nest versions and the expanded preset are unchanged; Node/OpenSSL
+differences were controlled. See [comparative RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md)
+for source links, SQL decomposition, PERF-27 through PERF-31 and limits.
+No production implementation or release occurred in this research phase.
+
+**Newest unreleased correction:** verified cached snapshots retain derived
+schema indexes through shallow internal request-profile copies. Public and
+persisted profiles remain clean; shared `cacheSet` invalidates the bag on any
+replacement, including InMemory updates. Actual warm HTTP reads went from
+two rebuilds to zero. Changed-profile rebuilding and changed enforcement pass
+on both backends; a dedicated InMemory unit independently reproduces its
+inherited-bag defect. Focused proof: 177 unique units, 96 PostgreSQL atomic
+HTTP PASS, 95 InMemory PASS plus its independent-pool exclusion, build/lint.
+Fresh exact-image run `93e57f5bbfd146bebb727c3c2e1cb206` fails 5/12 latency
+checks, including all four medians; DB calls +57.76%, CPU +27.50%.
+Correctness/privacy/memory/exact cleanup pass, collector0/assessor1.
+Previous failed receipts remain separate; cross-run failure counts do not
+prove a causal speedup. Strict admission remains unmet. No release/customer mutation.
+
+**Unreleased local follow-up:** reviewed documentation master is `36724c49`,
+PR #245; shipping runtime remains `d43959e1` / 0.55.56. Issue #246 holds customer
+promotion after all 12 actual 0.55.20-to-0.55.56 latency comparisons fail.
+The local credential-probe prototype has meaningful RED, 76 focused unit
+passes, 18 HTTP passes on each backend and a successful synthetic PostgreSQL
+query diagnostic. The subsequent compact authoritative-read prototype passes
+205 focused units, 34 HTTP cases on each backend, eight live assertions and
+one real Chromium case. Whole-row validation, captured-object concurrency,
+same-timestamp changes and UTC hydration are covered. Full comparison
+`e55672ee50114bc48aeac4ea714f8309` still fails nine of twelve latency checks;
+DB calls +90.74%, CPU +42.64%. All synthetic fixtures are removed.
+An additional same-SQL transport experiment is diagnostic only and does not
+establish a sufficient correction; no native production transport was added.
+The approved customer CLI identity passes registry verification, but its
+managed-group absence recheck still returns Forbidden on 2026-10-17.
+It is not committed, versioned, published or performance-admitted.
+Do not use the existing full dev receipt to certify the modified source.
+See [current performance evidence and RCA](CUSTOMER_UPGRADE_PERFORMANCE.md).
+
+**Latest additional prototype:** policy-aware namespace projection removes
+unrelated member reads but preserves all fences. Focused units 116 PASS;
+PostgreSQL HTTP 125 unique PASS across corrected runs; InMemory 124 PASS plus
+one PostgreSQL-only exclusion. The exact new image's full run
+`de8497028a4c4b1cb31f7d893914a045` fails 11/12 latency checks at customer quota,
+DB calls +82.50%, CPU +59.44%. Cross-run failure counts are not a causal
+measurement. The separate Prisma 7.8 joined-relation experiment succeeds, but
+production schema/client/preview flags are unchanged and its temporary files
+are removed. Actual approved-identity ARM readback at 19:24 UTC confirms the
+customer's original image/revision still carry 100% traffic. No release.
+
+**Further Group-read correction:** only scoped Group detail/member hydration
+uses a single PostgreSQL statement; no global Prisma preview or schema change.
+Two initial RED assertions, then 125 focused units and 180 PostgreSQL HTTP
+cases PASS; InMemory 178 PASS with two PostgreSQL-only exclusions.
+Four runtime modules match image ending `e053e3`. Small actual SQL attribution
+retains every measured fence and removes 1,201 relation statements per
+same-sized round. Full run `87b5da20784b4b759ef976cc90ad46a3` still fails
+9/12 latency checks at customer quota: DB calls +57.76%, CPU +27.29%.
+The source remains experimental and customer delivery remains blocked.
+Subsequent 1,000-member aggregate/readback and cross-endpoint isolation
+hardening raises unique HTTP coverage to 181 PostgreSQL PASS and 179 InMemory
+PASS with the same two PostgreSQL-only exclusions. No runtime change or
+benchmark rerun for this additional test-only work.
 **Latest checkpoint:** 0.55.56 is published and on dev from clean merged
 master `d43959e1`, PR #244, canonical publisher `39043579816`. The exact GHCR
 digest is `07f08b855ebe178c6a9a5b60af80d4177c267b8878c959a09e5f1a64fdc03aa2`;

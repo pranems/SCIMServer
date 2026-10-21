@@ -18,6 +18,7 @@ export type RepositoryErrorCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'PRECONDITION_FAILED'
+  | 'WRITE_CONFLICT'
   | 'PROFILE_CHANGED'
   | 'INVALID_VALUE'
   | 'CONNECTION'
@@ -54,6 +55,7 @@ export function repositoryErrorToHttpStatus(code: RepositoryErrorCode): number {
     case 'CONFLICT':   return 409;
     case 'PRECONDITION_FAILED': return 412;
     case 'PROFILE_CHANGED': return 409;
+    case 'WRITE_CONFLICT': return 409;
     case 'INVALID_VALUE': return 400;
     case 'CONNECTION': return 503;
     case 'UNKNOWN':    return 500;

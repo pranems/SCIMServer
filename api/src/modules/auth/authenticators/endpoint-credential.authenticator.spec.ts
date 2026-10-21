@@ -6,7 +6,7 @@ import type { AuthContext } from './resource-authenticator';
 /**
  * EndpointCredentialAuthenticator unit spec (W2.1). Proves the X9 not-applicable
  * fast-paths (a JWT / the global secret can never be a per-endpoint opaque
- * secret) fire BEFORE any bcrypt work, the enablement gate, an accept on a real
+ * secret) fire BEFORE any endpoint lookup or bcrypt work, the enablement gate, an accept on a real
  * bcrypt match, and that a non-match is always not-applicable (never reject).
  */
 describe('EndpointCredentialAuthenticator (W2.1)', () => {
@@ -54,19 +54,39 @@ describe('EndpointCredentialAuthenticator (W2.1)', () => {
     expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
   });
 
-  it('X9 fast-path: not-applicable for a JWT WITHOUT touching bcrypt/the repo', async () => {
+  it('X9 fast-path: not-applicable for a JWT WITHOUT reading the endpoint or credentials', async () => {
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const payload = Buffer.from(JSON.stringify({ sub: 'x' })).toString('base64url');
     const jwtLike = `${header}.${payload}.sig`;
     const r = await auth.tryAuthenticate(ctx({ token: jwtLike }));
     expect(r.outcome).toBe('not-applicable');
+    expect(endpointService.getEndpoint).not.toHaveBeenCalled();
     expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    expect(credentialRepo.findActiveByLookupKey).not.toHaveBeenCalled();
   });
 
   it('X9 fast-path: not-applicable when the token IS the global secret', async () => {
     const r = await auth.tryAuthenticate(ctx({ token: SECRET }));
     expect(r.outcome).toBe('not-applicable');
+    expect(endpointService.getEndpoint).not.toHaveBeenCalled();
     expect(credentialRepo.findActiveByEndpoint).not.toHaveBeenCalled();
+    expect(credentialRepo.findActiveByLookupKey).not.toHaveBeenCalled();
+  });
+
+  it('reads current enablement for each applicable credential instead of caching authorization', async () => {
+    const minted = mintCredentialToken();
+    endpointService.getEndpoint
+      .mockResolvedValueOnce(enabled)
+      .mockResolvedValueOnce({ profile: { settings: {} } });
+    credentialRepo.findActiveByLookupKey.mockResolvedValue({
+      id: 'cred-k', endpointId: 'ep-1', credentialType: 'bearer',
+      hashAlgo: HASH_ALGO_HMAC_V1, secretHash: minted.secretHash, lookupKey: minted.lookupKey,
+    });
+
+    expect((await auth.tryAuthenticate(ctx({ token: minted.token }))).outcome).toBe('accept');
+    expect((await auth.tryAuthenticate(ctx({ token: minted.token }))).outcome).toBe('not-applicable');
+    expect(endpointService.getEndpoint).toHaveBeenCalledTimes(2);
+    expect(credentialRepo.findActiveByLookupKey).toHaveBeenCalledTimes(1);
   });
 
   it('accepts on a real bcrypt match and stamps the request', async () => {

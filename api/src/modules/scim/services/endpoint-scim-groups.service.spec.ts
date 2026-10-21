@@ -10,6 +10,8 @@ import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
+import { resourceWriteVersion } from '../../../domain/repositories/write-precondition';
 
 describe('EndpointScimGroupsService', () => {
   let service: EndpointScimGroupsService;
@@ -54,6 +56,17 @@ describe('EndpointScimGroupsService', () => {
     updatedAt: new Date('2024-01-01T00:00:00.000Z'),
     members: [],
     version: 1,
+  };
+
+  const commitGroup: IGroupRepository['updateGroupWithMembers'] = async (id, data, members, expected) => {
+    const version = resourceWriteVersion(expected);
+    if (version === undefined) throw new Error('Service fixture requires an observed version');
+    return {
+      ...mockGroup, ...data, id, version: version + 1,
+      members: members.map((member, index) => ({
+        ...member, id: `committed-member-${index}`, groupId: id, createdAt: mockGroup.createdAt,
+      })),
+    };
   };
 
   const mockUser = {
@@ -102,6 +115,8 @@ describe('EndpointScimGroupsService', () => {
   };
 
   beforeEach(async () => {
+    mockGroupRepo.findWithMembers.mockReset();
+    mockGroupRepo.updateGroupWithMembers.mockReset().mockImplementation(commitGroup);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointScimGroupsService,
@@ -141,7 +156,7 @@ describe('EndpointScimGroupsService', () => {
 
     // G8f: Default mock returns for uniqueness checks (no conflict)
     // These are called on PUT/PATCH paths to enforce displayName uniqueness.
-    mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+    mockGroupRepo.findByDisplayName.mockReset().mockResolvedValue(null);
 
     // Reset getConfig mock to default (clearAllMocks doesn't clear mockReturnValue)
     mockEndpointContext.getConfig.mockReturnValue(defaultTestConfig);
@@ -149,6 +164,44 @@ describe('EndpointScimGroupsService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it.each(['put', 'patch'] as const)('uses the %s repository commit result without a second resource lookup', async verb => {
+    const committed = { ...mockGroup, displayName: 'own committed value', version: 2 };
+    mockGroupRepo.findWithMembers.mockReset()
+      .mockResolvedValueOnce(mockGroup)
+      .mockResolvedValueOnce({ ...mockGroup, displayName: 'newer peer value', version: 3 });
+    mockGroupRepo.updateGroupWithMembers.mockResolvedValueOnce(committed);
+    const result = verb === 'put'
+      ? await service.replaceGroupForEndpoint(mockGroup.scimId, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: committed.displayName,
+      }, 'http://localhost:3000/scim', mockEndpoint.id)
+      : await service.patchGroupForEndpoint(mockGroup.scimId, {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: committed.displayName }],
+      }, 'http://localhost:3000/scim', mockEndpoint.id);
+    expect(result.displayName).toBe(committed.displayName);
+    expect(result.meta.version).toBe('W/"v2"');
+    expect(mockGroupRepo.findWithMembers).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['put', 'patch'] as const)('keeps atomic uniqueness but avoids the %s name probe when displayName is unchanged', async verb => {
+    mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+    const result = verb === 'put'
+      ? await service.replaceGroupForEndpoint(mockGroup.scimId, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: mockGroup.displayName,
+      }, 'http://localhost:3000/scim', mockEndpoint.id)
+      : await service.patchGroupForEndpoint(mockGroup.scimId, {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: mockGroup.displayName }],
+      }, 'http://localhost:3000/scim', mockEndpoint.id);
+    expect(result.displayName).toBe(mockGroup.displayName);
+    expect(result.meta.version).toBe('W/"v2"');
+    expect(mockGroupRepo.findByDisplayName).not.toHaveBeenCalled();
+    const policy: unknown = mockGroupRepo.updateGroupWithMembers.mock.calls[0]?.[4];
+    expect(policy).toContainEqual({
+      schemaUrn: null, path: [{ name: 'displayName', multiValued: false }], type: 'string', caseExact: false,
+    });
   });
 
   describe('createGroupForEndpoint', () => {
@@ -340,14 +393,15 @@ describe('EndpointScimGroupsService', () => {
           ...mockGroup,
           displayName: 'Updated Group Name',
         });
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       const result = await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
       expect(mockGroupRepo.findWithMembers).toHaveBeenCalledWith(mockEndpoint.id, mockGroup.scimId);
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
         displayName: 'Updated Group Name',
-      }), expect.any(Array), undefined, expect.any(Array));
+      }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+        scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
     });
 
     it('should return updated group resource with 200 OK (RFC 7644 §3.5.2)', async () => {
@@ -371,7 +425,7 @@ describe('EndpointScimGroupsService', () => {
       mockGroupRepo.findWithMembers
         .mockResolvedValueOnce(mockGroup)
         .mockResolvedValueOnce(updatedGroup);
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       const result = await service.patchGroupForEndpoint(
         mockGroup.scimId,
@@ -402,7 +456,7 @@ describe('EndpointScimGroupsService', () => {
 
       mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
       mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -437,7 +491,7 @@ describe('EndpointScimGroupsService', () => {
       };
 
       mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMember);
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -491,7 +545,7 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
         mockUserRepo.findByScimIds.mockResolvedValue([]);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Enable the flag
         mockEndpointContext.getConfig.mockReturnValue({
           MultiMemberPatchOpForGroupEnabled: 'True',
@@ -521,7 +575,7 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
         mockUserRepo.findByScimIds.mockResolvedValue([]);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Enable the flag with boolean
         mockEndpointContext.getConfig.mockReturnValue({
           MultiMemberPatchOpForGroupEnabled: true,
@@ -547,7 +601,7 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
         mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Flag is false (default)
         mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
@@ -576,7 +630,7 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
         mockUserRepo.findByScimIds.mockResolvedValue([]);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Flag is false
         mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
@@ -640,7 +694,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         mockEndpointContext.getConfig.mockReturnValue({
           MultiMemberPatchOpForGroupEnabled: 'True',
           StrictSchemaValidation: 'False',
@@ -667,7 +721,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         mockEndpointContext.getConfig.mockReturnValue({
           MultiMemberPatchOpForGroupEnabled: true,
           StrictSchemaValidation: 'False',
@@ -693,7 +747,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Flag is false (default)
         mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
@@ -715,7 +769,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Flag is false (default)
         mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
@@ -743,7 +797,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Flag is false
         mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
@@ -765,7 +819,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         // Settings v7: PatchOpAllowRemoveAllMembers defaults to false - must explicitly enable
         mockEndpointContext.getConfig.mockReturnValue({ PatchOpAllowRemoveAllMembers: true, StrictSchemaValidation: 'False' });
 
@@ -844,13 +898,14 @@ describe('EndpointScimGroupsService', () => {
             ...mockGroup,
             displayName: 'New Display Name',
           });
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'New Display Name',
-        }), expect.any(Array), undefined, expect.any(Array));
+        }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+          scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
       });
 
       it('should persist externalId as first-class column from no-path replace object', async () => {
@@ -867,13 +922,14 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce(mockGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           externalId: 'new-ext-id',
-        }), expect.any(Array), undefined, expect.any(Array));
+        }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+          scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
       });
 
       it('should handle combined displayName + externalId in no-path replace', async () => {
@@ -893,14 +949,15 @@ describe('EndpointScimGroupsService', () => {
             ...mockGroup,
             displayName: 'Combined',
           });
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'Combined',
           externalId: 'ext-combined',
-        }), expect.any(Array), undefined, expect.any(Array));
+        }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+          scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
       });
 
       it('should handle externalId path in replace operation', async () => {
@@ -918,13 +975,14 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce(mockGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           externalId: 'pathed-ext-id',
-        }), expect.any(Array), undefined, expect.any(Array));
+        }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+          scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
       });
 
       it('should accept no-path replace with string value as displayName', async () => {
@@ -944,13 +1002,14 @@ describe('EndpointScimGroupsService', () => {
             ...mockGroup,
             displayName: 'Direct String Name',
           });
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'Direct String Name',
-        }), expect.any(Array), undefined, expect.any(Array));
+        }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+          scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
       });
 
       it('should handle no-path replace with members array in object value', async () => {
@@ -974,13 +1033,14 @@ describe('EndpointScimGroupsService', () => {
             displayName: 'Group With Members',
           });
         mockUserRepo.findByScimIds.mockResolvedValue([]);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
           displayName: 'Group With Members',
-        }), expect.any(Array), undefined, expect.any(Array));
+        }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+          scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
       });
 
       it('should throw error for no-path replace with invalid value type', async () => {
@@ -1079,7 +1139,7 @@ describe('EndpointScimGroupsService', () => {
         }); // Return updated group
 
       mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       const result = await service.replaceGroupForEndpoint(
         mockGroup.scimId,
@@ -1431,13 +1491,14 @@ describe('EndpointScimGroupsService', () => {
       mockGroupRepo.findWithMembers
         .mockResolvedValueOnce(mockGroup)
         .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-updated' });
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
         externalId: 'ext-updated',
-      }), expect.any(Array), undefined, expect.any(Array));
+      }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+        scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
     });
 
     it('should update externalId via no-path PATCH replace object', async () => {
@@ -1451,14 +1512,15 @@ describe('EndpointScimGroupsService', () => {
       mockGroupRepo.findWithMembers
         .mockResolvedValueOnce(mockGroup)
         .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-via-nopath' });
-      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
       await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(mockGroup.id, expect.objectContaining({
         displayName: 'Renamed',
         externalId: 'ext-via-nopath',
-      }), expect.any(Array), undefined, expect.any(Array));
+      }), expect.any(Array), { observedVersion: mockGroup.version, ifMatch: undefined,
+        scope: { endpointId: mockGroup.endpointId, resourceType: 'Group' } }, expect.any(Array));
     });
   });
 
@@ -1800,7 +1862,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup) // initial lookup
           .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group' }); // re-read after update
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
       });
 
       it('should succeed when If-Match matches current ETag', async () => {
@@ -1835,7 +1897,7 @@ describe('EndpointScimGroupsService', () => {
       beforeEach(() => {
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
         mockGroupRepo.findByDisplayName.mockResolvedValue(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
       });
 
       it('should succeed when If-Match matches current ETag', async () => {
@@ -2111,7 +2173,7 @@ describe('EndpointScimGroupsService', () => {
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce({ ...mockGroup, displayName: 'Replaced Group' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         const result = await service.replaceGroupForEndpoint(
           mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, config
@@ -2169,7 +2231,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(existingGroup)
           .mockResolvedValueOnce(updatedGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         mockEndpointContext.getConfig.mockReturnValue(config);
 
         const result = await service.patchGroupForEndpoint(
@@ -2208,7 +2270,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(existingGroup)
           .mockResolvedValueOnce(updatedGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         mockEndpointContext.getConfig.mockReturnValue(config);
 
         const result = await service.patchGroupForEndpoint(
@@ -2247,7 +2309,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(existingGroup)
           .mockResolvedValueOnce(updatedGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
         mockEndpointContext.getConfig.mockReturnValue(config);
 
         const result = await service.patchGroupForEndpoint(
@@ -2463,7 +2525,7 @@ describe('EndpointScimGroupsService', () => {
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce({ ...mockGroup, displayName: 'Unique Name', externalId: 'ext-conflict' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         const result = await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
         expect(result.externalId).toBe('ext-conflict');
@@ -2476,21 +2538,15 @@ describe('EndpointScimGroupsService', () => {
           members: [],
         };
 
-        mockGroupRepo.findWithMembers
-          .mockResolvedValueOnce(mockGroup) // lookup
-          .mockResolvedValueOnce(mockGroup); // return after update
-        // assertUniqueDisplayName with excludeScimId - no conflict
-        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         const result = await service.replaceGroupForEndpoint(
           mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
         );
 
         expect(result.displayName).toBe('Test Group');
-        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
-          mockEndpoint.id, 'Test Group', mockGroup.scimId
-        );
+        expect(mockGroupRepo.findByDisplayName).not.toHaveBeenCalled();
       });
 
       it('should pass scimId as excludeScimId to assertUniqueDisplayName', async () => {
@@ -2504,7 +2560,7 @@ describe('EndpointScimGroupsService', () => {
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.replaceGroupForEndpoint(
           mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
@@ -2562,7 +2618,7 @@ describe('EndpointScimGroupsService', () => {
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-conflict' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         const result = await service.patchGroupForEndpoint(
           mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
@@ -2582,7 +2638,7 @@ describe('EndpointScimGroupsService', () => {
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce({ ...mockGroup, displayName: 'New Unique Name' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         const result = await service.patchGroupForEndpoint(
           mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
@@ -2607,7 +2663,7 @@ describe('EndpointScimGroupsService', () => {
           .mockResolvedValueOnce(mockGroup)
           .mockResolvedValueOnce({ ...mockGroup, displayName: 'Patched' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+        mockGroupRepo.updateGroupWithMembers.mockImplementation(commitGroup);
 
         await service.patchGroupForEndpoint(
           mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id

@@ -21,6 +21,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
 import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
+import { observeWriteVersion } from '../../../domain/repositories/write-precondition';
 import type {
   GenericResourceRecord,
   GenericResourceCreateInput,
@@ -346,7 +347,9 @@ export class EndpointScimGenericService {
         diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
-    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(existing.version,
+      enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: existing.endpointId, resourceType: existing.resourceType });
 
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
@@ -456,7 +459,9 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(existing.version,
+      enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: existing.endpointId, resourceType: existing.resourceType });
 
     // AUDIT-4: ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
     // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → reject 400

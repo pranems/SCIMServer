@@ -15,7 +15,7 @@ import type {
 import type { Prisma } from '../../../generated/prisma/client';
 import { isValidUuid } from './uuid-guard';
 import { wrapPrismaError } from './prisma-error.util';
-import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { resourceWriteWhere, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { withUniqueWrite } from './prisma-uniqueness';
 import { wrapEndpointCreateError } from './endpoint-create-error';
@@ -111,7 +111,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     prismaData.version = { increment: 1 };
     try {
       const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
-        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+        where: resourceWriteWhere(id, expectedVersion),
         data: prismaData as Prisma.ScimResourceUpdateInput,
       }), { representation: 'payload', expectedProfileRevision: profileRevision });
       return toGenericRecord(updated as unknown as Record<string, unknown>);
@@ -123,7 +123,7 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
   async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     try {
       await withUniqueWrite(this.prisma, [], { id, expectedVersion }, {}, tx => tx.scimResource.delete({
-        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+        where: resourceWriteWhere(id, expectedVersion),
       }), { expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `GenericResource delete(${id})`, expectedVersion);

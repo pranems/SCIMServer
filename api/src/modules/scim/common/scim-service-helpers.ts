@@ -30,7 +30,7 @@ import { parsePatchPath, parsePatchTarget, patchAttributePath, type ParsedPatchP
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
-import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import type { IfMatchVersion } from '../../../domain/repositories/write-precondition';
 import { compileEffectiveUniquenessPolicy, type UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 import { EndpointNotFoundError } from '../../../domain/errors/endpoint-not-found.error';
 import {
@@ -67,6 +67,16 @@ export function handleRepositoryError(
 ): never {
   if (error instanceof EndpointNotFoundError) throw error;
   if (error instanceof RepositoryError) {
+    if (error.code === 'WRITE_CONFLICT') {
+      logger.debug(logCategory, 'Computed resource write rejected after a concurrent change', {
+        operation, errorCode: error.code, ...context,
+      });
+      throw createScimError({
+        status: 409,
+        detail: 'Resource changed while the write was being computed. Read the current resource and retry the original operation.',
+        diagnostics: { errorCode: 'RESOURCE_VERSION_CHANGED', triggeredBy: 'concurrency' },
+      });
+    }
     if (error.code === 'PRECONDITION_FAILED') {
       logger.debug(logCategory, 'Conditional write rejected', { operation, errorCode: error.code, ...context });
       throw createScimError({
@@ -184,7 +194,7 @@ export function enforceIfMatch(
   ifMatch?: string,
   config?: EndpointConfig,
   profile?: EndpointProfile,
-): ExpectedVersion | undefined {
+): IfMatchVersion | undefined {
   // Gap 10: ETag/If-Match is meaningful only when etag.supported is on. When an
   // endpoint explicitly sets serviceProviderConfig.etag.supported = false,
   // versioning is inert: RequireIfMatch does not apply (no 428) and a supplied

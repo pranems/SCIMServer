@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.58`
 
-> **Version:** 0.55.57 - **Updated:** 2026-10-16
+> **Version:** 0.55.58 - **Updated:** 2026-10-21
 > 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Unreleased preparation:** [endpoint token lifetime integration and original
@@ -12,7 +12,7 @@ current-master port from earlier isolated validation and deployed behavior.
 ### Start here
 
 **Latest release:** [Release notes and upgrade guidance](RELEASE_NOTES.md)
-explain 0.55.54, changes since 0.55.20, migration/rollback and known limits.
+explain 0.55.57, changes since 0.55.20, migration/rollback and known limits.
 [CHANGELOG.md](../CHANGELOG.md) retains detailed engineering history.
 
 | UI follow-up | Read |
@@ -22,6 +22,12 @@ explain 0.55.54, changes since 0.55.20, migration/rollback and known limits.
 
 | If you want to... | Read |
 |---|---|
+| Review the locally implemented database-owned endpoint cache revision, legacy-writer protection, migration costs and release limits | [Compact endpoint snapshot revisions](ENDPOINT_SNAPSHOT_REVISION.md) |
+| Review the local observed-version PUT/PATCH safety correction, real PostgreSQL races and retained release limits | [Implementation and execution RCA](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md) |
+| Evaluate one final resource version check, coherent reads, atomic writes and event-driven cache coherence without confusing proposals with implemented behavior | [Concurrency and cache design proposal](SCIM_CONCURRENCY_AND_CACHE_COHERENCE_DESIGN.md) |
+| Understand every published change family, migration, compatibility concern and remaining upgrade hold between customer 0.55.20 and release 0.55.56 | [Complete customer release comparison](CUSTOMER_UPGRADE_05520_TO_05556_REPORT.md) |
+| Identify which changes caused the measured 0.55.20-to-0.55.56 regression, with common-runtime controls and safe next steps | [Comparative customer performance RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md) |
+| Understand the customer-matched performance hold and unreleased query correction without mistaking diagnostic success for release admission | [Customer upgrade performance](CUSTOMER_UPGRADE_PERFORMANCE.md) |
 | Verify container startup does not print database credentials, and distinguish source-mounted tests from shipping-image proof | [Startup redaction and execution RCA](STARTUP_DATABASE_CONFIGURATION_REDACTION.md) |
 | Prevent validation from mutating another checkout through linked dependency directories | [Physical dependency ownership preflight](strategy/DEPENDENCY_OWNERSHIP_PREFLIGHT.md) |
 | Understand shared-schema uniqueness admission and runtime binding precedence without changing default externalId duplicates | [Binding-qualified integration](SCIM_CORRECTNESS_DESIGN_AND_IMPLEMENTATION.md#1131-binding-qualified-uniqueness-runtime-and-admission-2026-09-29), [receipt](evidence/scim-binding-uniqueness-integration-20260929.json) |

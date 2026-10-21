@@ -141,6 +141,15 @@ export class ScimModule implements NestModule {
    */
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(this.endpointContext.createMiddleware()).forRoutes('*');
+    consumer.apply((req: Request, res: Response, next: NextFunction) => {
+      const resourceType = req.params.resourceType;
+      if (typeof resourceType !== 'string' || ['bulk', 'oauth'].includes(resourceType.toLowerCase())) return next();
+      this.endpointService.runWithRequestSnapshot(next, end => {
+        res.once('finish', end);
+        res.once('close', end);
+      });
+    }).forRoutes('endpoints/:endpointId/:resourceType{/*path}');
     consumer.apply(ScimContentTypeValidationMiddleware).forRoutes('endpoints/*');
   }
 }
+import type { Request, Response, NextFunction } from 'express';

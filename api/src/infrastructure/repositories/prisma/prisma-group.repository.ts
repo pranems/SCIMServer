@@ -17,9 +17,9 @@ import type {
   MemberCreateInput,
   MemberRecord,
 } from '../../../domain/models/group.model';
-import type { Prisma } from '../../../generated/prisma/client';
+import type { Prisma, ResourceMember, ScimResource } from '../../../generated/prisma/client';
 import { wrapPrismaError } from './prisma-error.util';
-import type { ExpectedVersion } from '../../../domain/repositories/write-precondition';
+import { resourceWriteWhere, type ExpectedVersion } from '../../../domain/repositories/write-precondition';
 import { wrapEndpointCreateError } from './endpoint-create-error';
 import { isValidUuid } from './uuid-guard';
 import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
@@ -27,6 +27,11 @@ import { withUniqueWrite } from './prisma-uniqueness';
 import type { ProfileRevision } from '../../../domain/repositories/profile-revision';
 import type { EndpointResourceCounts } from '../../../domain/repositories/endpoint-resource-counts';
 import { collectEndpointResourceCounts } from './prisma-resource-counts';
+import { replaceGroupMembers, toMemberData } from './prisma-group-members';
+
+type GroupSnapshot = ScimResource & {
+  membersAsGroup: (Omit<ResourceMember, 'createdAt'> & { createdAt: number })[];
+};
 
 /** Maps a ScimResource row (with JSONB payload) to the GroupRecord domain type. */
 function toGroupRecord(resource: Record<string, unknown>): GroupRecord {
@@ -68,18 +73,6 @@ function toGroupWithMembers(resource: Record<string, unknown>): GroupWithMembers
     ...toGroupRecord(resource),
     members: members.map(toMemberRecord),
   };
-}
-
-function toMemberData(groupId: string, members: MemberCreateInput[]): Prisma.ResourceMemberCreateManyInput[] {
-  return members.map((m) => ({
-    groupResourceId: groupId,
-    memberResourceId: m.userId,
-    value: m.value,
-    type: m.type,
-    display: m.display,
-    reference: m.reference ?? null,
-    createdAt: new Date(),
-  }));
 }
 
 @Injectable()
@@ -124,11 +117,31 @@ export class PrismaGroupRepository implements IGroupRepository {
   async findWithMembers(endpointId: string, scimId: string): Promise<GroupWithMembers | null> {
     if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
     try {
-      const resource = await this.prisma.scimResource.findFirst({
-        where: { scimId, endpointId, resourceType: 'Group' },
-        include: { membersAsGroup: true },
+      const rows = await this.prisma.$queryRaw<GroupSnapshot[]>`
+        SELECT r.*,
+          COALESCE((
+            SELECT jsonb_agg(to_jsonb(m) || jsonb_build_object(
+              'createdAt', EXTRACT(EPOCH FROM m."createdAt") * 1000
+            ))
+            FROM "public"."ResourceMember" m
+            WHERE m."groupResourceId" = r."id"
+          ), '[]'::jsonb) AS "membersAsGroup"
+        FROM "public"."ScimResource" r
+        WHERE r."scimId" = ${scimId}::uuid
+          AND r."endpointId" = ${endpointId}::uuid
+          AND r."resourceType" = 'Group'
+      `;
+      const resource = rows[0];
+      if (!resource) return null;
+      const membersAsGroup = resource.membersAsGroup.map((member) => {
+        // Epoch milliseconds avoid session-dependent JSON timestamp interpretation.
+        const createdAt = new Date(member.createdAt);
+        if (!Number.isFinite(member.createdAt) || !Number.isFinite(createdAt.getTime())) {
+          throw new Error('Group member snapshot has invalid timestamps');
+        }
+        return { ...member, createdAt };
       });
-      return resource ? toGroupWithMembers(resource as unknown as Record<string, unknown>) : null;
+      return toGroupWithMembers({ ...resource, membersAsGroup });
     } catch (error) {
       throw wrapPrismaError(error, `Group findWithMembers(${scimId})`);
     }
@@ -185,7 +198,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     prismaData.version = { increment: 1 };
     try {
       const updated = await withUniqueWrite(this.prisma, uniqueness, { id, expectedVersion }, data, (tx) => tx.scimResource.update({
-        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+        where: resourceWriteWhere(id, expectedVersion),
         data: prismaData as Prisma.ScimResourceUpdateInput,
       }), { expectedProfileRevision: profileRevision });
       return toGroupRecord(updated as unknown as Record<string, unknown>);
@@ -197,7 +210,7 @@ export class PrismaGroupRepository implements IGroupRepository {
   async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     try {
       await withUniqueWrite(this.prisma, [], { id, expectedVersion }, {}, tx => tx.scimResource.delete({
-        where: { id, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+        where: resourceWriteWhere(id, expectedVersion),
       }), { expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `Group delete(${id})`, expectedVersion);
@@ -256,8 +269,9 @@ export class PrismaGroupRepository implements IGroupRepository {
     if (members.length === 0) return;
     try {
       await withUniqueWrite(this.prisma, uniqueness, { id: groupId }, {}, async (tx) => {
+        await tx.scimResource.update({ where: { id: groupId }, data: { version: { increment: 1 } } });
         await tx.resourceMember.createMany({ data: toMemberData(groupId, members) });
-      }, { members, appendMembers: true, expectedProfileRevision: profileRevision });
+      }, { members, appendMembers: true, transaction: true, expectedProfileRevision: profileRevision });
     } catch (error) {
       throw wrapPrismaError(error, `Group addMembers(${groupId})`);
     }
@@ -270,7 +284,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     expectedVersion?: ExpectedVersion,
     uniqueness: UniquenessPolicy = [],
     profileRevision?: ProfileRevision,
-  ): Promise<void> {
+  ): Promise<GroupWithMembers> {
     // Convert rawPayload string → JSONB if present in the update
     const prismaData: Record<string, unknown> = { ...data };
     if (data.rawPayload !== undefined) {
@@ -278,24 +292,24 @@ export class PrismaGroupRepository implements IGroupRepository {
       delete prismaData.rawPayload;
     }
 
-    await withUniqueWrite(this.prisma, uniqueness, { id: groupId, expectedVersion }, data,
+    return await withUniqueWrite(this.prisma, uniqueness, { id: groupId, expectedVersion }, data,
       async (tx: Prisma.TransactionClient) => {
         // Phase 7: Include version increment in the transaction
-        await tx.scimResource.update({
-          where: { id: groupId, version: typeof expectedVersion === 'number' ? expectedVersion : undefined },
+        const updated = await tx.scimResource.update({
+          where: resourceWriteWhere(groupId, expectedVersion),
           data: {
             ...prismaData,
             version: { increment: 1 },
           } as Prisma.ScimResourceUpdateInput,
         });
 
-        await tx.resourceMember.deleteMany({ where: { groupResourceId: groupId } });
-
+        let inserted: ResourceMember[] = [];
         if (members.length > 0) {
-          await tx.resourceMember.createMany({
-            data: toMemberData(groupId, members),
-          });
+          inserted = await replaceGroupMembers(tx, groupId, members);
+        } else {
+          await tx.resourceMember.deleteMany({ where: { groupResourceId: groupId } });
         }
+        return { ...toGroupRecord(updated), members: inserted.map(toMemberRecord) };
       },
       { members, transaction: true, expectedProfileRevision: profileRevision },
     ).catch((error) => {

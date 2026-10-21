@@ -7,7 +7,7 @@
  * flags. It NEVER reject-stops: a non-match is always `not-applicable` so the
  * guard falls through to OAuth/legacy. The X9 perf short-circuits (a JWT, or the
  * global shared secret, can never be a per-endpoint opaque secret) return
- * `not-applicable` BEFORE the expensive bcrypt loop - this is the `isApplicable`
+ * `not-applicable` BEFORE the endpoint lookup and expensive bcrypt loop - this is the `isApplicable`
  * fast-path that keeps the probe O(1) for the dominant token shapes.
  */
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
@@ -65,16 +65,6 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
     }
 
     try {
-      // An explicit authentication method entry wins over its dedicated setting.
-      const endpoint = await this.endpointService.getEndpoint(endpointId);
-      const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-      const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
-
-      if (!effective.secretTokenBearer && !effective.oauthClientCredentials) {
-        this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });
-        return na('per-endpoint credentials not enabled');
-      }
-
       // PERF (X9): a per-endpoint secret is an OPAQUE random secret, never a JWT.
       // A JWT can therefore never match - skip the O(N) x bcrypt loop and let the
       // OAuth/JWKS path validate it.
@@ -89,6 +79,16 @@ export class EndpointCredentialAuthenticator implements ResourceAuthenticator {
       if (expectedSecret && safeCompare(token, expectedSecret)) {
         this.logger.debug(LogCategory.AUTH, 'Presented token is the global shared secret - skipping per-endpoint secret comparison (legacy acceptor handles it)', { endpointId });
         return na('token is the global shared secret (handled by the legacy acceptor)');
+      }
+
+      // An explicit authentication method entry wins over its dedicated setting.
+      const endpoint = await this.endpointService.getEndpoint(endpointId);
+      const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+      const effective = resolveEndpointAuthEnablement(config, endpoint.profile?.authentication?.methods);
+
+      if (!effective.secretTokenBearer && !effective.oauthClientCredentials) {
+        this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });
+        return na('per-endpoint credentials not enabled');
       }
 
       // P1 - keyed fast path. A token minted after P1 names its own row, so this

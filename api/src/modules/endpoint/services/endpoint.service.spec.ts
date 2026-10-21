@@ -7,9 +7,12 @@ import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repo
 import { PrismaEndpointLifecycleRepository } from '../../../infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository';
 import { endpointProfileRevision } from '../../../domain/repositories/profile-revision';
 import * as profileRevisions from '../../../domain/repositories/profile-revision';
+import type { Endpoint } from '../../../generated/prisma/client';
+import { endpointSnapshotFingerprint, mockEndpointSnapshotQuery } from '../../../../test/helpers/endpoint-snapshot.mock';
+import { SchemaValidator } from '../../../domain/validation';
 
-// Force Prisma backend for unit tests - these tests mock PrismaService,
-// not the in-memory cache. The inmemory path uses a different code flow.
+// Default to Prisma for these mocked persistence tests. The cache-publication
+// regression explicitly constructs a separate InMemory service.
 const originalBackend = process.env.PERSISTENCE_BACKEND;
 beforeAll(() => { process.env.PERSISTENCE_BACKEND = 'prisma'; });
 afterAll(() => { process.env.PERSISTENCE_BACKEND = originalBackend; });
@@ -33,7 +36,7 @@ describe('EndpointService', () => {
   beforeEach(async () => {
     const prismaTransactionClient = {
       endpoint: {
-        findUnique: jest.fn().mockResolvedValue(mockEndpoint),
+        findUnique: jest.fn<Promise<Endpoint | null>, [unknown?]>().mockResolvedValue(mockEndpoint),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
@@ -53,6 +56,7 @@ describe('EndpointService', () => {
     };
     const prismaMock = {
       ...prismaTransactionClient,
+      $queryRaw: mockEndpointSnapshotQuery(id => prismaTransactionClient.endpoint.findUnique({ where: { id } })),
       $transaction: jest.fn((
         callback: (client: typeof prismaTransactionClient) => Promise<unknown>,
       ) => callback(prismaTransactionClient)),
@@ -496,7 +500,10 @@ describe('EndpointService', () => {
       expect(result.profile?.settings).toHaveProperty('UserSoftDeleteEnabled', 'True');
       expect(endpointProfileRevision(persisted.profile)).toBe(persistedRevision);
       const snapshot = await service.getEndpointForRequest(persisted.id);
-      expect(snapshot.profileRevision).toBe(persistedRevision);
+      expect(snapshot.profileRevision).toEqual({
+        endpointId: persisted.id, contentRevision: persistedRevision,
+        snapshotRevision: endpointSnapshotFingerprint(persisted),
+      });
       expect(endpointProfileRevision(snapshot.endpoint.profile)).not.toBe(persistedRevision);
       expect(snapshot.endpoint).not.toHaveProperty('profileRevision');
     });
@@ -920,6 +927,77 @@ describe('EndpointService', () => {
       updatedAt: new Date(),
     };
 
+    it('reuses only runtime schema indexes across fresh request snapshots without exposing them publicly', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+      const first = await service.getEndpointForRequest(cachedEndpoint.id);
+      if (!first.endpoint.profile) throw new Error('Expected an endpoint profile');
+      const cache = SchemaValidator.buildCharacteristicsCache([]);
+      first.endpoint.profile._schemaCaches ??= {};
+      first.endpoint.profile._schemaCaches.Group = cache;
+      const second = await service.getEndpointForRequest(cachedEndpoint.id);
+
+      expect(second.endpoint.profile?._schemaCaches?.Group).toBe(cache);
+      expect(second.endpoint.profile).not.toBe(first.endpoint.profile);
+      const published = await service.getEndpoint(cachedEndpoint.id);
+      for (const key of Object.keys(published)) {
+        expect(['id', 'name', 'displayName', 'description', 'profile', 'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links']).toContain(key);
+      }
+      expect(published.profile).not.toHaveProperty('_schemaCaches');
+      expect(cachedEndpoint.profile).not.toHaveProperty('_schemaCaches');
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+    });
+
+    it('discards runtime schema indexes on a changed profile while preserving an in-flight snapshot', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+      const before = await service.getEndpointForRequest(cachedEndpoint.id);
+      if (!before.endpoint.profile) throw new Error('Expected an endpoint profile');
+      const cache = SchemaValidator.buildCharacteristicsCache([]);
+      before.endpoint.profile._schemaCaches ??= {};
+      before.endpoint.profile._schemaCaches.Group = cache;
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+        ...cachedEndpoint,
+        profile: { ...cachedEndpoint.profile, settings: { GroupHardDeleteEnabled: false } },
+      });
+      const after = await service.getEndpointForRequest(cachedEndpoint.id);
+
+      expect(after.endpoint.profile?._schemaCaches?.Group).toBeUndefined();
+      expect(before.endpoint.profile._schemaCaches.Group).toBe(cache);
+      expect(after.profileRevision).not.toBe(before.profileRevision);
+      expect(after.endpoint.profile?.settings?.GroupHardDeleteEnabled).toBe(false);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+
+    it('invalidates inherited runtime schema indexes when InMemory publishes an updated profile', async () => {
+      const previousBackend = process.env.PERSISTENCE_BACKEND;
+      let memoryService: EndpointService;
+      try {
+        process.env.PERSISTENCE_BACKEND = 'inmemory';
+        memoryService = new EndpointService(prisma, scimLogger, new PrismaEndpointLifecycleRepository(prisma));
+      } finally {
+        if (previousBackend === undefined) delete process.env.PERSISTENCE_BACKEND;
+        else process.env.PERSISTENCE_BACKEND = previousBackend;
+      }
+      const created = await memoryService.createEndpoint({ name: 'runtime-cache-memory', profilePreset: 'rfc-standard' });
+      const before = await memoryService.getEndpointForRequest(created.id);
+      if (!before.endpoint.profile) throw new Error('Expected an endpoint profile');
+      const cache = SchemaValidator.buildCharacteristicsCache([]);
+      before.endpoint.profile._schemaCaches ??= {};
+      before.endpoint.profile._schemaCaches.Group = cache;
+      const warm = await memoryService.getEndpointForRequest(created.id);
+      expect(warm.endpoint.profile?._schemaCaches?.Group).toBe(cache);
+
+      await memoryService.updateEndpoint(created.id, { profile: { settings: { GroupHardDeleteEnabled: false } } });
+      const after = await memoryService.getEndpointForRequest(created.id);
+
+      expect(after.endpoint.profile?._schemaCaches?.Group).toBeUndefined();
+      expect(before.endpoint.profile._schemaCaches.Group).toBe(cache);
+      expect(after.profileRevision).not.toBe(before.profileRevision);
+      expect(after.endpoint.profile?.settings?.GroupHardDeleteEnabled).toBe(false);
+      expect((await memoryService.getEndpoint(created.id)).profile).not.toHaveProperty('_schemaCaches');
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.endpoint.update).not.toHaveBeenCalled();
+    });
+
     it('onModuleInit should populate cache from DB', async () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
 
@@ -1068,8 +1146,14 @@ describe('EndpointService', () => {
       expect(list.endpoints[0].profile?.settings?.UserSoftDeleteEnabled).toBe('False');
       expect(before.endpoint.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(after.endpoint.profile?.settings?.UserSoftDeleteEnabled).toBe('False');
-      expect(before.profileRevision).toBe(endpointProfileRevision(original.profile));
-      expect(after.profileRevision).toBe(endpointProfileRevision(changed.profile));
+      expect(before.profileRevision).toEqual({
+        endpointId: persisted.id, contentRevision: endpointProfileRevision(original.profile),
+        snapshotRevision: endpointSnapshotFingerprint(original),
+      });
+      expect(after.profileRevision).toEqual({
+        endpointId: changed.id, contentRevision: endpointProfileRevision(changed.profile),
+        snapshotRevision: endpointSnapshotFingerprint(changed),
+      });
       expect(after.profileRevision).not.toBe(before.profileRevision);
       expect(changed.updatedAt).toBe(persisted.updatedAt);
       expect(persisted).toEqual(original);

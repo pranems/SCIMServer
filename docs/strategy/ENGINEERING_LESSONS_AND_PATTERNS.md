@@ -42,6 +42,346 @@ that cap while retaining two workers passes the two heavy component suites,
 122 tests; complete-matrix success remains a separate claim.
 See the [consolidation execution ledger](../auth/EXECUTION_ISSUES_AND_RCA.md#authorized-lifetime-release-consolidation-2026-10-21).
 
+### Live statistics need a shared capture boundary
+
+2026-10-20: the complete SQL inventory still differed from aggregate totals
+by three calls / 0.349323 ms because both were sampled in separate calls,
+with a CPU read between them. A two-second delay does not freeze background
+statistics. Retain the reconciliation failure and original performance
+result. A single materialized statistics read now produces both totals and
+the complete inventory; call/time/scope negative controls and the real
+four-round diagnostic pass. This proves a shared capture, not independently
+sampled equality. Do not retroactively patch old receipts or use the short
+diagnostic to replace failed full admission.
+See [ER-13](../ENDPOINT_SNAPSHOT_REVISION.md#11-follow-up-reuse-the-verified-snapshot-at-the-protected-profile-boundary).
+
+### A client tail needs matching server timing before attribution
+
+2026-10-20: correlate actual response request ids with persisted duration
+rows, rather than assuming a slow client observation is network delay.
+Some slow requests also spend most of that time inside the server; others
+do not. State both clocks' boundaries. Compare a CPU-quota treatment only
+as a diagnostic: the same images' empty-read tails shrink substantially
+at two CPU, while the original half-CPU full failure remains held.
+Aggregate throttling counters do not identify an individual request's pause.
+Collect no raw headers/credentials, keep the trace off for admission, join
+native multiline JSON before parsing, and verify exact read-correlation
+counts before interpreting the result.
+See [the worked examples and limits](../ENDPOINT_SNAPSHOT_REVISION.md#12-remaining-tail-server-timing-and-cpu-quota-treatment).
+
+### Instrumentation must prove its clock and resource scope
+
+2026-10-20: a host-cgroup-namespace observer read host-root CPU counters,
+producing an impossible seven-core cost despite a quarter-CPU limit.
+Separately, cross-host clock calibration was too uncertain for request
+overlap and a parser-only test missed the observer's first-sample crash.
+Require actual lifecycle coverage, exact target and observer cgroup
+identity, verified clock-domain offsets, monotonic interval deltas and a
+budget-bound sanity check. Container namespace inode equality is not a
+substitute for measured clock offsets. Preserve rejected receipts and
+explicitly reject instrumented timing at the admission boundary.
+Counter-update overlap is not exact stalled duration or CPU-consumer
+attribution. See [ER-16 through ER-22](../ENDPOINT_SNAPSHOT_REVISION.md#14-request-specific-quota-investigation-bounded-private-instrumentation).
+
+### A filtered test result needs registration and execution proof
+
+2026-10-20: nested registration recurred after OV-05, as ER-08. A selector
+skipped every case because the new test was inside another test callback.
+An all-skipped run is neither RED nor GREEN. The isolated PostgreSQL runner
+now checks registration before creating a database, using a TypeScript AST
+guard with positive and negative controls, and requires an actual failed
+case for its filtered RED receipt. Final GREEN records the exact discovered,
+passed and excluded counts. The guard covers this fixture's direct
+`it`/`test`/`pgOnly` registrations; it is not a universal Jest alias analyzer.
+Use unique suite-boundary patch anchors rather than a generic closing brace.
+See [ER-08 and the closure receipts](../ENDPOINT_SNAPSHOT_REVISION.md#11-follow-up-reuse-the-verified-snapshot-at-the-protected-profile-boundary).
+
+ER-26 subsequently exposed a curried `it.each(...)` registration that the
+direct-call guard missed. Unwrap call/property chains to their registration
+root; exercise nested parameterized and hook controls before database
+creation. Passing direct-call controls is not proof of parameterized coverage.
+
+### Attribute I/O by caller and preserve real adapter error shapes
+
+2026-10-20: current-image workload-bounded profiles identify PostgreSQL
+query submission, console output and response writing behind similar native
+I/O frames. Inspect the caller chain before choosing an optimization;
+exclude startup and state the remaining background-work uncertainty.
+A small ordered membership-write statement reduces a real boundary
+without removing locks, profile checks, redaction or own-commit responses.
+
+Synthetic Prisma raw-error metadata was insufficient: the real PostgreSQL
+driver adapter nests SQLSTATE under `driverAdapterError.cause.originalCode`.
+Retain a real adapter-shaped regression plus malformed/non-unique negatives
+and an actual PostgreSQL rollback/error-contract case. Only the exact raw
+uniqueness code maps to conflict; never classify by message contents.
+See [ER-23 through ER-26 and the write-boundary design](../ENDPOINT_SNAPSHOT_REVISION.md#15-reducing-the-final-populated-membership-write-boundary).
+
+### Image labels are not runtime versions, and one green is not all metrics
+
+2026-10-20: a descriptive private-image suffix repeated an earlier
+runtime-version mismatch. Probe both pinned images' package versions
+before allocating benchmark networks/databases, retaining the actual
+HTTP runtime-version check as a separate later assertion. A Docker-free
+mock proves rejection precedes allocation and correct versions reach that
+boundary; the actual image probe verifies the assumed package path.
+
+The changed-image full latency gate passes all twelve unchanged limits,
+but SQL execution time rises while client latency and application CPU
+fall. Preserve the SQL inventories and expose the trade-off, its largest
+measured family and unknown database CPU. Never turn a scoped latency PASS
+into an all-resource or customer-production claim.
+See [ER-28 through ER-32](../ENDPOINT_SNAPSHOT_REVISION.md#15-reducing-the-final-populated-membership-write-boundary).
+
+### A verified row token can avoid repeated work, not replace the authority
+
+2026-10-20: carry a frozen endpoint-scoped content/token observation through
+the existing revision seam. After acquiring the established locks, compare
+the current database token in a new statement. Only an exact scoped match
+may omit the profile body and repeated canonicalization. On token mismatch,
+compare actual profile content so metadata-only changes remain valid.
+Test wrong endpoint, missing proof, changed profile and real lock waits;
+retain legacy content-only and InMemory paths. Verify image schema/migration
+hashes alongside serving modules. A successful optimization-specific test
+does not admit an immutable image whose full performance comparison fails.
+See [the protected boundary design](../ENDPOINT_SNAPSHOT_REVISION.md#11-follow-up-reuse-the-verified-snapshot-at-the-protected-profile-boundary).
+
+### A persisted cache token is a database writer contract, not a cache shortcut
+
+2026-10-20: replace repeated content hashing only when every relevant writer
+changes the token atomically with the row. Database-owned insert/update
+triggers cover legacy ORM and direct SQL without requiring all callers to
+upgrade together. Test rollback, unchanged timestamps, explicit token
+replacement, replica session mode, change-and-revert, delete/recreate,
+populated migration backfill and lock-timeout rollback. Keep equality tokens,
+profile-content revisions and resource write versions separate. A missing
+migration must fail explicitly; restore requires quiescence and cache-owner
+restart. Removing one measured SQL cost is not overall performance admission:
+the first full token candidate still fails seven latency limits.
+See [the implementation and execution ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+### A rendered diagram can still be unreadable
+
+2026-10-20: a long horizontal flow rendered cleanly with nonzero SVG bounds
+but shrank to a 6.19 px actual font in the standalone report. Switch a long
+linear flow to vertical layout and wrap long sequence messages, preserving
+every node, edge and word. Measure font size after the SVG screen transform,
+not only computed CSS or diagram presence. The report now checks every
+diagram at a 1,440 px viewport against a 12 px minimum; all eight pass.
+See [PS-04](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md#25-document-readability-and-evidence-closure).
+
+### Combine protected reads only after the wait, with an explicit projection
+
+2026-10-20: reading a profile and its uniqueness namespace in one statement
+removes a roundtrip and gives both checks the same snapshot, but only if
+the statement starts after both existing locks are held. Project the exact
+domain comparison fields rather than serializing whole ORM records:
+timestamps that are not comparison inputs need no JSON rehydration.
+Pair statement-count assertions with real blocked-writer freshness and
+lock-identity checks. Explicitly exercise every optional member field used
+by uniqueness, including rejection rollback and unchanged self values.
+Retain the independent final observed-version predicate.
+See [PS-01/02 and the typed snapshot](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md#22-one-protected-data-snapshot-after-both-locks).
+
+### A pooled performance PASS still needs per-round interpretation
+
+2026-10-20: a full matched comparison passed every unchanged pooled
+latency limit, but the same customer image had materially different first
+and last rounds. Keep the PASS and all raw receipts; do not claim that its
+aggregate CPU benefit is a stable causal speedup. Report per-round latency,
+CPU and quota variation, then use an explicit counterbalanced order when
+that observed limitation needs a separate check. Record and validate the
+actual order without changing thresholds or silently relabeling roles.
+The session assessor's default-order and explicit reversed-order positive
+and negative controls prevent the evidence tool from accepting the wrong
+experiment. See [CL-02 and the measured round table](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md#20-full-pooled-pass-with-a-material-round-order-limitation).
+
+### Batch lock acquisition without carrying a pre-wait data snapshot forward
+
+2026-10-20: acquire dependent write locks in the same established order and
+prove both exact keys are held by the real transaction. A materialized
+dependency can remove a SQL roundtrip, but it does not make a statement
+snapshot fresh after waiting. Read protected profile data in a separate
+statement after acquisition. Test an actual PostgreSQL advisory wait, prove
+the second namespace is not acquired first, commit a peer profile change,
+and assert the waiting request rejects without changing its aggregate.
+Document the earlier namespace-acquisition timing and contention cost.
+See [the ordered-lock implementation/RCA](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md#18-acquire-the-same-write-locks-in-one-ordered-statement).
+
+### Content revision ordering must compare exact keys, not human-language equivalents
+
+2026-10-20: a real CPU profile identified recursive profile canonicalization.
+The existing locale comparator also treated distinct Unicode keys as equal,
+so a revision could depend on insertion order. Sort exact keys by code units
+and retain own-key, array-order and runtime-cache exclusion coverage. Test
+the output invariant and zero locale comparisons, not a flaky unit timing
+threshold. Do not replace the fresh protected database comparison with an
+unchecked mutable-object cache. This changes internal hash bytes, not stored
+profile data or public resource versions.
+
+### Carry observed scope only when the final mutation binds it
+
+2026-10-20: avoiding a redundant identity query is safe only if endpoint,
+resource type, internal id and observed version all constrain the final
+mutation. Preserve legacy callers without an observed scope and enforce the
+same scope synchronously in InMemory. Test all six PUT/PATCH paths through
+real transaction delegates, assert instrumentation ran and inspect exact
+final predicates. Separately inject wrong scope with earlier profile and
+namespace probes absent, then assert unchanged row/version/members.
+
+### Skip a preliminary check only when authoritative enforcement still runs
+
+2026-10-20: unchanged Group names need not trigger a separate service-level
+lookup before an atomic repository uniqueness check. Compare the exact final
+and original name; do not widen the shortcut with case folding. Keep rename
+diagnostics and the complete repository policy. A zero-query assertion alone
+would also pass if enforcement were accidentally removed, so pair it with
+real invalid legacy data and assert conflict, unchanged version and unchanged
+members on both backends. Reset queued mocks when a newly skipped branch
+stops consuming them. See the
+[implementation and execution RCA](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md).
+
+### A request-scoped cache must end for inherited asynchronous work too
+
+2026-10-20: a fresh first database observation can be shared by ordinary
+authentication and controller resolution within one request, but an
+AsyncLocalStorage context may survive in logging or event work after the
+HTTP response. Clearing a map alone is not a lifetime contract: mark it
+inactive on both response finish and connection close so inherited work
+verifies again. Test expiration, late fills, failed loads, concurrent request
+isolation, new-request deactivation and deliberate admin/OAuth/Bulk exclusions.
+Correlate query instrumentation with the actual request identity rather than
+counting unrelated asynchronous queries. Explain that an admitted read may
+finish under its initial snapshot; final profile fences still protect writes.
+See [the implementation and execution RCA](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md).
+
+### Return the committed aggregate and prove database-backed enforcement
+
+2026-10-20: a write can commit correctly while its response incorrectly
+describes a later peer's update or fails after a peer deletion. Return the
+parent and child rows from the successful repository transaction; test a
+deterministic pause after commit and before response mapping. Check response
+values, membership and header/body version separately from final stored state.
+Do not add a post-commit read merely to construct a successful response.
+
+When an existing database constraint already enforces a policy, remove only
+the exactly equivalent software term. Check scope, representation, scalar
+type and nested/extension homonyms. Preserve independent profile/version
+fences. Instrument the actual transaction delegates and assert instrumentation
+was reached; a root-client spy can miss all transactional queries.
+The [local implementation/RCA](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md)
+contains meaningful RED, negative controls and actual PostgreSQL races.
+
+### Prove the final write predicate separately from earlier fences
+
+2026-10-20 implementation: real PostgreSQL and InMemory races reproduced
+stale writes when optional client conditions stood in for the internal
+observed resource version. Test no-header, wildcard and ETag-disabled
+computation separately from explicit numeric conditions. Verify the stored
+winner and one version increment, not just response statuses. Child-only
+append must advance the root atomically; failed insertion must not.
+
+An HTTP race with namespace/profile checks can pass because an earlier
+probe detects the conflict, leaving the final numeric database predicate
+untested. Additional independent-pool repository races with empty uniqueness
+policies and no profile revision prove that final boundary directly.
+Exercise wildcard existence diagnostics after a real Prisma CAS miss,
+including changed-existing and disappeared rows. A simulated P2025 alone
+does not prove that a diagnostic query remains usable inside that actual
+transaction. See the [implementation and execution RCA](../SCIM_OBSERVED_VERSION_IMPLEMENTATION.md).
+
+### Separate client preconditions, internal versions and event freshness
+
+2026-10-20 design research: optional client `If-Match`, internal aggregate
+read-version CAS, cross-resource uniqueness, profile fencing and authorization
+freshness protect different facts. One final resource check cannot replace
+them all. Child-only writes must participate in the aggregate version.
+Test the absent-header/wildcard/ETag-disabled paths explicitly, not just
+numeric preconditions. Event tests must include stale in-flight fills,
+eviction of version knowledge, disconnect/reconcile and fan-out to every
+local cache. Increasing allocated outbox IDs are not commit order.
+Fourteen isolated counterexample models support the explanation, not a
+claim of actual database acceptance or a fixed runtime issue.
+See the [proposal and acceptance matrix](../SCIM_CONCURRENCY_AND_CACHE_COHERENCE_DESIGN.md).
+
+Verify the version of external documentation before copying its API: the
+former Prisma transaction URL now redirects to ORM 8 while this repository
+uses 7.8.0. Direct primary-source fetching also distinguishes a failed search
+tool's discovery step from unavailable research sources.
+Formatting checks must accept both LF and Windows CRLF without weakening
+structure or indentation assertions; pair those positive controls with a
+minified-example negative control. The research checker now does so.
+
+### Causal performance claims require active treatments and matched runtimes
+
+Communicate the result as an earlier/newer/proposed design comparison, not
+just commit identifiers and percentages. Show the actual request and data
+boundaries, explain why the safeguards were introduced, and distinguish
+an implemented but failing prototype from an untested proposal. A diagram
+must not imply that removing a safety check is an accepted optimization.
+For a complete design comparison, keep the same logical layers in all three
+component views and trace numbered request/data flows through them. Draw
+telemetry and artifact-delivery paths separately from runtime operations.
+State whether a diagram is a logical component map, a class graph or a
+verified live topology; do not let a complete-looking picture imply evidence
+that was never collected.
+
+2026-10-18: exact old publisher provenance and a common-runtime control
+separated application-bundle changes from Node/OpenSSL drift. A preloader
+installed only through image ENTRYPOINT was bypassed by the existing runner;
+identical SQL counts exposed that neither intended treatment had activated.
+Verify the actual serving process's treatment hooks, image/run identity,
+working directory and inherited runtime flags before accepting a result.
+Preserve the heap cap when appending instrumentation. Then require the
+expected database-work change, not merely a successful container exit.
+
+Do not demand exact statement-inventory accounting without checking the
+instrumentation: separately sampled, top-50 before/after inventories can
+include old startup statements that enter the later ranking. Retain aggregate
+counters, boundary differences and stable high-volume shapes separately.
+Do not relabel startup DDL as measured workload or weaken an assertion just
+to hide an unexplained difference. Unsafe diagnostic ablations identify cost
+families, not deployable fixes. See PERF-27 through PERF-30 in the
+[comparative performance RCA](../CUSTOMER_UPGRADE_PERFORMANCE_RCA.md).
+
+### Internal derived state must not depend on public serialization
+
+2026-10-17: reusing a privacy-safe public profile projection for internal
+request context discarded schema indexes and repeated their construction.
+Keep derived state owned by the verified immutable snapshot, not by the
+persisted/public profile. Invalidate it at the shared cache-publication seam:
+InMemory's spread-based update otherwise carries the old bag forward.
+Test warm reuse, actual changed-profile rebuilding, both backends, public
+non-disclosure and preservation of old in-flight maps. Count actual builds;
+equal response values alone cannot expose repeated derived work.
+The InMemory service negative control and real HTTP counters now enforce
+this boundary. See PERF-23/24 in the
+[performance ledger](../CUSTOMER_UPGRADE_PERFORMANCE.md).
+
+### Native timestamp hydration needs a permanent non-UTC gate
+
+2026-10-17: PostgreSQL JSON serialized UTC `timestamp` columns without a
+timezone suffix. A mock that added `Z` masked native JavaScript interpreting
+them as local time. Preserve the database client's UTC semantics, reject
+invalid timestamps before cache publication, and compare real HTTP values
+against stored Date values. Do not rely on a developer remembering to set
+`TZ`: the unit gate runs one source-level case in a separate non-UTC Node
+process, asserts that process's actual offset, and is negative-control proven
+from an ordinary UTC parent. See PERF-06 in the
+[performance ledger](../CUSTOMER_UPGRADE_PERFORMANCE.md).
+
+### Applicability tests must cover every avoidable persistence boundary
+
+2026-10-17: existing JWT/global-secret fast-path tests proved no credential
+scan occurred while still allowing a full endpoint policy lookup. When
+endpoint freshness became database-backed, those tests remained green but
+the request acquired avoidable database and serialization work. Assert on
+both endpoint and credential reads. Preserve fresh authorization in the
+matching method and the controller's independent profile snapshot; do not
+replace an unnecessary read with stale authorization caching. Distinguish
+full-row reads from required profile-fence projections in SQL attribution.
+The [customer-upgrade performance ledger](../CUSTOMER_UPGRADE_PERFORMANCE.md)
+records the focused correction and the still-failing release admission.
 ### Startup redaction must cover shell output and application messages
 
 A container entrypoint can disclose a connection URI even when application

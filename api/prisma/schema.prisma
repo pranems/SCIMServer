@@ -22,6 +22,8 @@ model Endpoint {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt     @db.Timestamptz
+  // Database-owned cache equality token; never a writable Prisma/public field.
+  snapshotRevision String @default(dbgenerated("gen_random_uuid()")) @db.Uuid @ignore
 
   // Phase 2: Unified resource relation
   resources ScimResource[]

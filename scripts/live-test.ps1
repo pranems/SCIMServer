@@ -16235,6 +16235,8 @@ Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 Invoke-ScimProfileRevisionContract -BaseUrl $baseUrl -Headers $headers
 . "$PSScriptRoot\live-test-sections\minimal-group-members.ps1"
 Invoke-MinimalGroupMembersContract -BaseUrl $baseUrl -Headers $headers
+. "$PSScriptRoot\live-test-sections\endpoint-snapshot.ps1"
+Invoke-EndpointSnapshotContract -BaseUrl $baseUrl -Headers $headers -SharedSecret $SharedSecret
 
 # TEST SECTION 9z-DR: Endpoint token lifetimes
 $script:currentSection = "9z-DR: Endpoint token lifetimes"

@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
+> **Status:** Living reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.58`
 >
 > **The captured protocol examples below were measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -18,6 +18,21 @@ Entra journey passed all three tested auth modes, but does not establish every
 first-party/sovereign acquisition-mode claim. See
 [release scope and limits](RELEASE_NOTES.md). Historical wire captures below
 retain their original endpoint and capture provenance; they were not recaptured.
+
+**Unreleased performance investigation:** a local correction skips the
+per-endpoint credential policy lookup for tokens already known to be a JWT or
+the global shared secret. The matching method still checks current enablement;
+ordinary SCIM authentication and controller resolution now share that
+request's freshly verified endpoint snapshot. The next request verifies
+again, and profile-write fences remain independent. Admin, endpoint OAuth
+and Bulk routes are excluded; response finish/close also ends reuse for
+inherited asynchronous work. An admitted read can finish under its initial
+snapshot; this is not immediate mid-request revocation or a cross-request
+authorization cache. See the
+[implementation boundaries and actual tests](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md#9-one-verified-endpoint-observation-within-an-ordinary-request).
+This does not change supported authentication methods, and the
+customer-baseline performance hold is not closed. See
+[the measured result, prototype boundaries and remaining gates](CUSTOMER_UPGRADE_PERFORMANCE.md).
 
 ---
 

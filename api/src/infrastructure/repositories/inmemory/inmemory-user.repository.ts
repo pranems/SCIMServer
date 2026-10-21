@@ -122,7 +122,7 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async update(id: string, data: UserUpdateInput, expectedVersion?: ExpectedVersion, uniqueness: UniquenessPolicy = [], profileRevision?: ProfileRevision): Promise<UserRecord> {
     const existing = this.users.get(id);
-    assertWritePrecondition(existing, expectedVersion);
+    assertWritePrecondition(existing, expectedVersion, 'User');
     this.assertUniqueUserName(existing.endpointId, data.userName ?? existing.userName, id);
     if (uniqueness.length > 0) assertUnique(uniqueness, uniquenessPayload({ ...existing, ...data }), [...this.users.values()]
       .filter((r) => r.id !== id && r.endpointId === existing.endpointId).map((r) => uniquenessPayload(r)));
@@ -140,7 +140,7 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async delete(id: string, expectedVersion?: ExpectedVersion, profileRevision?: ProfileRevision): Promise<void> {
     const existing = this.users.get(id);
-    assertWritePrecondition(existing, expectedVersion);
+    assertWritePrecondition(existing, expectedVersion, 'User');
     this.writes.assertWritable(existing.endpointId, profileRevision);
     this.users.delete(id);
   }

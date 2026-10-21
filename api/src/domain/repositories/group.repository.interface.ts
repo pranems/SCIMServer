@@ -77,7 +77,7 @@ export interface IGroupRepository {
 
   /**
    * Atomically update group fields and replace all members.
-   * Wraps update + deleteMany + createMany in a single transaction.
+   * Return this commit's aggregate, not a later read of the resource.
    */
   updateGroupWithMembers(
     groupId: string,
@@ -86,5 +86,5 @@ export interface IGroupRepository {
     expectedVersion?: ExpectedVersion,
     uniqueness?: UniquenessPolicy,
     profileRevision?: ProfileRevision,
-  ): Promise<void>;
+  ): Promise<GroupWithMembers>;
 }
