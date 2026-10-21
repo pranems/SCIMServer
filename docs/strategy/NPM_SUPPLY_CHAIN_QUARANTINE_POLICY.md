@@ -9,6 +9,74 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-21 Vite security prerequisite
+
+The unchanged 0.55.56 web lockfile reports a High Vite advisory through the
+three launch-editor findings
+[GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv),
+[GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw) and
+[GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm).
+The affected range is 8.0.0-8.1.5. Corporate-proxy metadata reports Vite 8.1.6
+published on 2026-10-06 at 04:51:51 UTC, more than seven days before this work.
+
+This prerequisite is separate from token-lifetime behavior. The sanctioned
+bootstrap changes the manifest minimum, pushes with the normal hook, and lets
+the existing `Regenerate lockfile` workflow generate the web lockfile on its
+public-registry runner. That bootstrap is not a green dependency remediation:
+the old installed dependency/audit remains explicitly RED until the generated
+artifact is verified, restored privately and audited. No local lockfile
+regeneration, quarantine override or hook bypass is permitted. The final PR
+must have exact-tip validation before merge.
+
+**Design disposition: accepted.** The existing regeneration workflow and
+provenance/age gates already cover this case; no new dependency tooling is
+needed. **Self-improvement: applied.** Preserve bootstrap-versus-final evidence
+explicitly so a green hook against the old installation is never represented
+as proof of the patched dependency.
+
+**Execution issue and prevention:** the first bootstrap push was correctly
+blocked by freshness F4 because `web/package.json` is bound to
+`docs/RELEASE_NOTES.md`. Updating only this policy and the engineering changelog
+was insufficient. Update the existing user-facing release notes before the
+next dependency-manifest push; the gate remains unchanged. The failed push
+published no branch and did not bypass its hook.
+
+**Artifact review:** run `39611974515` passed provenance and age checks, but
+the caret range selected Vite 8.3.4 and refreshed its transitive build stack.
+That artifact was not applied. Pin Vite exactly to the minimal patched 8.1.6
+and regenerate in CI again; discard the unrequested API artifact. A green
+provenance check is not evidence that dependency scope is appropriate.
+
+**Bootstrap environment preflight:** a later normal Validate push reached
+`prisma generate` and correctly failed because a fresh shell had no
+`DATABASE_URL`. The value is process-local and does not survive another tool
+call. Setting the private fixture URL and smoke-running `prisma generate`
+passes before the full retry. No database connection is needed for generation.
+Validate-mode bootstrap calls must explicitly carry this prerequisite rather
+than relying on a previous shell's environment; no gate was bypassed.
+
+**Shared-host worker preflight:** concurrent default Vitest pools exhausted
+worker-start responsiveness: 110 files passed, but 13 worker-start errors
+blocked the hook, rather than failed test assertions. The integration matrix
+also encountered worker-start errors. The installed Vitest supports
+`VITEST_MAX_WORKERS`; setting it to `2` makes the two implicated smoke files
+pass all 18 tests. Carry that process-local cap into every full retry. This
+does not relax test timeouts, assertions or coverage thresholds. Separate
+worktrees and databases do not by themselves isolate CPU and memory pressure.
+
+**Exact-patch confirmation:** normal Validate completed successfully on
+`ca4c292d5475cf54bec55804c4c1ec5022cccb57`. Public-registry regeneration run
+`39624070616` produced Vite 8.1.6 with 21 changed entries, all at least
+15.43 days old, public `registry.npmjs.org` URLs and sha512 integrity.
+The API artifact is structurally identical to the existing lockfile and was
+not applied. The applied web lockfile SHA-256 is
+`717ee192312848c489bc958a4547181e23e21975e2e62e21187c88e91be78ed2`.
+Private `npm ci --no-audit --no-fund` installs Vite 8.1.6; the fresh
+`npm audit --json` receipt reports zero vulnerabilities at every severity,
+versus the original one High. This closes the local dependency RED/GREEN.
+Final patched-toolchain Validate, reviewed exact-tip CI and merge remain
+separate release checks; no deployment is implied.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as

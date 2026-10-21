@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security tooling
+
+- Pin Vite to patched 8.1.6 to remediate the three launch-editor
+  advisories affecting 8.0.0-8.1.5. This version was published on 2026-10-06,
+  exceeding the seven-day quarantine. Public-registry CI run `39624070616`
+  generated the applied web lockfile. All 21 changed entries have public URLs,
+  sha512 integrity and publication ages of at least 15.43 days. The unchanged
+  API artifact was not applied. A private `npm ci` installs Vite 8.1.6 and
+  `npm audit --json` reports zero vulnerabilities, down from one High.
+- Pre-artifact normal Validate evidence: 6072 API unit tests / 211 suites,
+  2460 in-memory CI-subset HTTP tests / 117 suites plus four backend-only
+  exclusions, and 1624 Web tests / 123 files. The final patched-toolchain
+  normal hook and exact-tip CI remain the merge gates; no product version,
+  SCIM contract or deployed estate is changed by this tooling prerequisite.
+
 ### Documentation
 
 - Reconcile actual 0.55.56 dev delivery, customer hold, operational recorder/
