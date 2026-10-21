@@ -32,6 +32,13 @@ live/browser evidence, review, CI, merge and dev deployment are still pending.
 The earlier private 0.55.56 performance pass is not a receipt for this version.
 See [the current integration and limitations](ENDPOINT_SNAPSHOT_REVISION.md#16-reconciliation-with-merged-token-lifetime-master-2026-10-21).
 
+The subsequent normal protected push passes all 28 gates, including
+6,208 API units, 2,511 InMemory HTTP cases (42 database-only pending)
+and 1,655 Web tests. Existing hook log-suite exclusions remain, so this is
+not a complete deployment matrix. Public CI produces version-only 0.55.58
+lock metadata with unchanged dependency graphs and verified provenance.
+Final artifact publication/review and current-image proof are still pending.
+
 Fresh Web audit on 2026-10-21 reports three Moderate findings in
 Vitest/coverage/mocker and zero High/Critical. This supersedes the earlier
 zero-finding snapshot below; no major dependency upgrade or quarantine

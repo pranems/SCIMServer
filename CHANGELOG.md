@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bootstrap API/Web manifests for 0.55.58. Lockfile metadata must come from
   sanctioned public-registry CI. Full hook-owned gates and current-artifact
   performance/live/browser/deployment proof remain pending.
+- Subsequent normal Validate publication at `85f01c7d` passes all 28 gates:
+  API units 6,128 -> 6,208 (213 suites); Web 1,655 -> 1,655 (124 files).
+  The InMemory HTTP CI subset passes 2,511 cases with 42 genuine
+  PostgreSQL-only pending; two existing excluded log suites are outside
+  that count. Do not compare this subset to a prior full-backend count.
+  Prisma generation passes; migration lint finds zero violations in 30
+  migrations. All 811 Mermaid blocks render in both strict-mode themes.
+- Public-CI lock generation `39690345727` passes at that exact source.
+  Reviewed artifacts change only root/root-package version metadata to
+  0.55.58; every dependency and other metadata remain equal. Public
+  npm/SHA-512 and post-import hashes pass; age policy remains seven days
+  with no changed third-party package. Final protected lock push, CI,
+  current-artifact performance/live/browser, review/merge and dev proof remain.
 - Fresh Web audit: three Moderate Vitest-related findings, zero High/Critical.
   No unrelated major upgrade or quarantine exception applied.
 

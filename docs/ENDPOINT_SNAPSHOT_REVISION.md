@@ -865,14 +865,49 @@ run remain valid historical evidence, **not proof of this combination**.
 
 Version **0.55.58** is the intended correction release. The API/Web manifests
 are bootstrapped first; lockfile version metadata must come from the sanctioned
-public-registry CI workflow, not local regeneration. Complete hook-owned
-tests, current-artifact live/browser/performance proof, reviewed exact-tip CI,
-merge and deployment remain separate gates.
+public-registry CI workflow, not local regeneration. At that bootstrap
+boundary, hook-owned tests and the lock artifact were still pending. The
+completed protected checkpoint below supersedes that preparation status;
+current-artifact live/browser/performance, exact-tip review, merge and
+deployment remain separate gates.
 
 One independent read-only automated code review of the combined changes
 reported no significant issues. That is a bounded automated result, not
 human approval, exact-tip CI or runtime certification. The focused receipts
 above precede only the version metadata bootstrap, not a production logic edit.
+
+### Protected publication and CI-only locks
+
+The normal `Validate` push of **`85f01c7d`** passes **all 28 gates** in
+893.4 seconds. Commits `a6b56aeb`, `e44ed615` and `85f01c7d` remain intact.
+There was no history rewrite, hook bypass, production fallback or deployment.
+
+| Evidence | Current actual result | Comparison / limit |
+|---|---|---|
+| API units | 213 suites / 6,208 PASS | Merged TTL baseline 6,128; 80 additional cases |
+| Hook InMemory HTTP subset | 117 passing suites / 2,511 PASS; 42 PostgreSQL-only pending in 119 suites | Not comparable to a full matrix count; two existing log-suite exclusions remain outside this run |
+| Web Vitest | 124 files / 1,655 PASS | Unchanged from TTL baseline; 445.9-second runner duration, no failure |
+| Prisma generation | PASS, client 7.8.0 | Explicit generation-only nonconnecting loopback configuration, no database/password |
+| Migration linter | PASS, zero violations across 30 migrations | No destructive override |
+| Hook static/governance gates | All PASS | The Web type gate accepts the independently unchanged 66-diagnostic baseline, not zero errors |
+| Mermaid render gate | All 811 blocks render, strict mode in both themes | Real Chromium content check, not application browser acceptance |
+| Public lockfile CI | Run [39690345727](https://github.com/pranems/SCIMServer/actions/runs/39690345727), source `85f01c7d`, PASS | No local regeneration |
+| Downloaded API/Web locks | Only root and root-package version fields change from 0.55.57 to 0.55.58 | All other metadata and the complete dependency graphs are equal |
+| Lock provenance | API 685 package entries; Web 396; public npm/SHA-512 checks PASS | Exact artifact hashes verified again after import |
+| Package-age report | Minimum seven days, no changed third-party packages | Version-only product metadata is not a dependency update |
+
+The 42 pending HTTP cases are atomic uniqueness (1), conditional writes
+(23), endpoint deletion (2), snapshot revision (8), aggregate reads (1)
+and member commits (7). These backend-specific exclusions must not be
+confused with the separately excluded endpoint-scoped-logs/log-config
+suites. The 303-case PostgreSQL campaign proves its selected behavior,
+not an unexecuted complete backend matrix.
+
+The final version/lock/receipt commit still needs its normal protected push
+and exact-tip CI. No current 0.55.58 image, full shipping live test, measured
+application browser run, merge or deployment is claimed by this checkpoint.
+JSDOM's scroll/navigation warnings during the completed Web gate are not a
+browser result or a failed test.
 
 ### Other worktrees and remaining history
 
@@ -899,11 +934,12 @@ session evidence; unresolved historical scope is not marked complete.
 | ER-35 | Supply-chain freshness / Medium | A fresh audit reports three Moderate Vitest-related findings despite the previous day's zero Web findings. | Record actual current findings and severity. No High/Critical blocker is present. Do not use `npm audit fix --force`, apply a major upgrade implicitly or weaken the seven-day quarantine. Reassess through the separate dependency process. Detected during dependency restore/audit, before publication. |
 | ER-36 | Integration test-double drift / Medium | The first protected Validate push passes all preceding static gates, then fails five of 6,208 unit cases in the newly inherited conditional-endpoint suite: its Prisma double has no `$queryRaw`. The focused pre-integration selector omitted that master-added consumer of the changed read seam. | Reuse the established snapshot-query mock, retaining every conditional write, outage and ABA assertion. All six endpoint-service suites pass 174 tests; expanded test compilation/lint has zero introduced diagnostics. No production fallback or hook bypass. Detected at full pre-push units; earliest possible detection was the post-merge endpoint-service neighborhood. The focused preflight now discovers that complete service test directory rather than relying only on the older selected filenames. |
 | ER-37 | Validation environment / Low | The second normal Validate push passes 6,208 units and the InMemory HTTP subset (2,511 PASS / 42 PostgreSQL-only pending), then code generation fails because Prisma's configuration requires `DATABASE_URL` even though generation does not connect to a database. | Explicitly provide a loopback, nonconnecting code-generation-only URL in the validation process environment, without a password, live database or persistent `.env` mutation. Isolated Prisma 7.8.0 generation passes. The corrected invocation contract requires this configuration preflight before the normal Validate hook. Detected at the post-test generation gate; earliest detection was configuration preflight. No production fallback, hook-mode downgrade or waived test. |
+| ER-38 | Documentation formatting / Low | The pre-commit whitespace check rejects two Markdown hard-break spaces on an edited status line. | Replace them with a blank line; `git diff --check` passes. Keep the existing pre-commit whitespace check and avoid adding trailing spaces when editing metadata. Detected at the first whitespace check after the edit, before staging/commit; no execution-stage escape or production change. |
 
 The first normal push was blocked before API HTTP, migration and Web-test
 gates could run. Its 6,203 passing cases do not make it a passing unit run.
 The hook stopped publication as intended. The isolated six-suite GREEN
-confirms the mock correction; a complete protected retry is still required.
+confirmed the mock correction; a complete protected retry was still required.
 
 The second invocation retains the complete unit PASS and the HTTP subset
 PASS but is not a successful push: Prisma generation stopped later gates.

@@ -1,7 +1,8 @@
 # Observed-version write safety: implementation and execution RCA
 
 **Last verified:** 2026-10-20  
-**Status:** Local implementation, not published or performance-admitted  
+**Status:** Consolidated source, not released or current-artifact performance-admitted
+
 **Product context:** 0.55.56 plus existing unreleased performance prototypes.
 
 ## Executive summary

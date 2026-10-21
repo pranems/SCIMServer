@@ -20,6 +20,15 @@ has zero diagnostics with its actual Node test environment. Intended version
 0.55.58 needs public-CI lock metadata. Complete hook-owned and current-artifact
 live/browser/performance evidence, reviewed CI/merge and deployment remain.
 
+The corrected normal Validate push now succeeds at `85f01c7d`: 28 gates
+PASS, 6,208 units, 2,511 InMemory HTTP PASS / 42 backend-specific pending,
+and 1,655 Web tests. The hook's two log-suite exclusions remain explicit.
+Prisma generation and all 30 migration lint checks pass. Public-CI run
+`39690345727` produces only 0.55.58 version metadata changes in API/Web
+locks; dependency graphs/public SHA-512 provenance and imported hashes pass.
+Final lock/receipt commit and exact-tip protected publication/review remain;
+this is not current-artifact browser, performance or deployment acceptance.
+
 **Authorized release consolidation, 2026-10-21:** the token-lifetime port is on
 `feat/endpoint-token-ttl-integration-20261021`, based on `36724c49`.
 It adds 60-604800-second endpoint lifetimes, default 3600, and preset/custom UI

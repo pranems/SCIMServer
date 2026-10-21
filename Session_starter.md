@@ -25,7 +25,15 @@ and no introduced lint. ER-36 retains the failure. Commit `e44ed615` repairs
 the test seam. The second Validate push passes all 6,208 units and 2,511
 InMemory HTTP cases (42 PostgreSQL-only pending), then fails Prisma generation
 for missing `DATABASE_URL`. Explicit nonconnecting codegen configuration
-passes the isolated generation preflight; full corrected retry is pending.
+passes the isolated generation preflight. The corrected normal Validate push
+of `85f01c7d` succeeds: all 28 gates, 6,208 units, 2,511 InMemory HTTP PASS /
+42 genuine backend-specific pending, and 1,655 Web tests. Both existing
+log-suite hook exclusions remain explicit. Migration lint has zero violations
+across 30 migrations. CI run `39690345727` generates clean public locks:
+only version metadata changes to 0.55.58, dependency graphs unchanged and
+seven-day age policy retained. Artifact hashes pass after import. Final lock/
+receipt commit and protected push, exact-tip CI/review and current-artifact
+matrix/performance/live/measured browser/dev gates are next, not completed.
 Old image `fa482c1b` proves the earlier 0.55.56 private source only, not this
 new 0.55.57 combination. Other worktrees are inspected read-only, not modified.
 
