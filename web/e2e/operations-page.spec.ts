@@ -52,14 +52,20 @@ test.describe('Operations (/operations)', () => {
   test('the All-users table renders all 4 columns bounded (userName does not swallow the row)', async ({
     page,
   }) => {
+    const usersLoaded = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === '/scim/admin/database/users' &&
+        response.request().method() === 'GET',
+    );
     await openOperations(page);
     await page.getByTestId('operations-tab-users').click();
     await expect(page.getByTestId('operations-users-search')).toBeVisible({ timeout: 20_000 });
 
-    // Skip on an empty tenant - the table only renders with >= 1 user row.
+    const response = await usersLoaded;
+    expect(response.status()).toBe(200);
+    const { users }: { users: unknown[] } = await response.json();
+    expect(Array.isArray(users)).toBe(true);
+    test.skip(users.length === 0, 'Tenant has zero users; the All-users table is not rendered.');
     const firstRow = page.locator('[data-testid^="operations-user-row-"]').first();
-    const hasRows = await firstRow.count();
-    test.skip(hasRows === 0, 'Tenant has zero users; the All-users table is not rendered.');
     await expect(firstRow).toBeVisible({ timeout: 20_000 });
 
     // R1 (copilot-instructions.md Visual Layout Discipline): measure REAL

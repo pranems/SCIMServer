@@ -91,6 +91,7 @@ import {
 import { AUTH_METHOD_FLAGS, effectiveAuthFlag } from './endpoint-auth-flags';
 import { EndpointRelatedSettings } from './EndpointRelatedSettings';
 import { TAB_SETTING_KEYS } from './endpoint-settings-definitions';
+import { TokenLifetimeField, tokenLifetimeError } from './TokenLifetimeField';
 import type { EndpointOverviewCredential } from '@scim/types/dashboard.types';
 import type { ConnectionInfo, ConnectionMethod } from '@scim/types/connection-info.types';
 import type { ConnectSearch } from '../routes/search-schemas';
@@ -465,6 +466,7 @@ interface WifTrustForm {
   allowedTenantId: string;
   requiredRoles: string;
   scope: string;
+  issuedTokenTtlSec: string;
   /** Item E - how a missing required role is handled at auth time. */
   roleEnforcement: 'off' | 'shadow' | 'enforce';
   /** X3 - optional operator notes about the trust (never a secret). */
@@ -481,6 +483,7 @@ const EMPTY_WIF_FORM: WifTrustForm = {
   allowedTenantId: '',
   requiredRoles: '',
   scope: '',
+  issuedTokenTtlSec: '',
   roleEnforcement: 'off',
   label: '',
   description: '',
@@ -851,6 +854,13 @@ const WifTrustFieldGrid: React.FC<{
       placeholder="scim.read scim.write"
       data-testid="wif-field-scope"
     />
+    <TokenLifetimeField
+      label="Token lifetime override in seconds (optional, 60-604800)"
+      value={form.issuedTokenTtlSec}
+      onChange={setField('issuedTokenTtlSec')}
+      placeholder="Blank inherits the endpoint WIF lifetime; assertion expiry always caps it"
+      data-testid="wif-field-token-ttl"
+    />
     <Field
       label="Required-role enforcement"
       hint="Roles are advisory by default: a missing required role is logged but still authenticates so the flow continues. Choose Enforce to reject an assertion that lacks a required role."
@@ -993,6 +1003,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       allowedTenantId: form.allowedTenantId.trim(),
       ...(roles.length > 0 ? { requiredRoles: roles } : {}),
       ...(form.scope.trim() ? { scope: form.scope.trim() } : {}),
+      ...(form.issuedTokenTtlSec.trim() ? { issuedTokenTtlSec: Number(form.issuedTokenTtlSec) } : {}),
       // Item E - only send a non-default enforcement mode.
       ...(form.roleEnforcement !== 'off' ? { roleEnforcement: form.roleEnforcement } : {}),
     };
@@ -1015,7 +1026,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
     trustPayload.expectedSubject !== '' &&
     trustPayload.expectedAudience !== '' &&
     trustPayload.jwksUri !== '' &&
-    trustPayload.allowedTenantId !== '';
+    trustPayload.allowedTenantId !== '' &&
+    !tokenLifetimeError(form.issuedTokenTtlSec);
 
   const onSave = (): void => {
     // Item C: first attempt runs the server-side reachability + liveness gate
@@ -1105,6 +1117,7 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
       allowedTenantId: t.allowedTenantId ?? '',
       requiredRoles: (t.requiredRoles ?? []).join(', '),
       scope: t.scope ?? '',
+      issuedTokenTtlSec: t.issuedTokenTtlSec == null ? '' : String(t.issuedTokenTtlSec),
       roleEnforcement: (t.roleEnforcement as WifTrustForm['roleEnforcement']) ?? 'off',
       label: cred.label ?? '',
       description: cred.description ?? '',
@@ -1649,8 +1662,8 @@ const WifCredentialsSection: React.FC<WifCredentialsSectionProps> = ({
                     {/* V1 - validity line (a WIF trust does not expire). */}
                     <Caption1 className={wif.wifMeta} data-testid={`wif-credential-${cred.id}-expiry`}>
                       {cred.wif?.issuedTokenTtlSec
-                        ? `Trust does not expire; minted tokens valid ${cred.wif.issuedTokenTtlSec}s`
-                        : 'Trust does not expire; minted tokens use the default TTL'}
+                        ? `Trust does not expire; requested token lifetime ${cred.wif.issuedTokenTtlSec}s, capped by assertion expiry`
+                        : 'Trust does not expire; tokens inherit the endpoint WIF lifetime, capped by assertion expiry'}
                     </Caption1>
                     <div className={classes.exportRow} data-testid={`wif-credential-exports-${cred.id}`}>
                       <Caption1><strong>Trust JSON</strong></Caption1>
@@ -2210,9 +2223,9 @@ export const CredentialsTab: React.FC<CredentialsTabProps> = ({ endpointId }) =>
           : [];
   const methodSettingsTitle =
     activeTab === 'wif'
-      ? 'WIF trust and JWKS settings'
+      ? 'WIF token lifetime, trust and JWKS settings'
       : activeTab === 'oauth_client'
-        ? 'OAuth client credential limits'
+        ? 'OAuth token lifetime and credential limits'
         : 'Bearer credential limits';
   // A method tab only appears when its method is enabled, so per-tab creation is
   // always allowed.

@@ -46,7 +46,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
   let fetchMock: jest.Mock;
 
   /** Sign an RS256 assertion with the test key, overriding claims as needed. */
-  async function signAssertion(overrides: Record<string, unknown> = {}): Promise<string> {
+  async function signAssertion(overrides: Record<string, unknown> = {}, lifetime = '10m'): Promise<string> {
     const pj = await exportJWK(privateKey);
     const key = await importJWK({ ...pj, alg: 'RS256' }, 'RS256');
     return new SignJWT({
@@ -59,7 +59,7 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
     })
       .setProtectedHeader({ alg: 'RS256', kid: KID })
       .setIssuedAt()
-      .setExpirationTime('10m')
+      .setExpirationTime(lifetime)
       .sign(key);
   }
 
@@ -127,6 +127,87 @@ describe('WIF jwt-bearer assertion (Q6)', () => {
       .type('form')
       .send({ grant_type: 'client_credentials', client_assertion: assertion, client_assertion_type: JWT_BEARER });
   }
+
+  it('applies the endpoint WIF default, trust override, inheritance reset and assertion cap', async () => {
+    const id = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: true,
+      WifTokenTtlSec: 10800,
+    });
+    const trust = {
+      expectedIssuer: ISSUER, expectedSubject: SUBJECT, expectedAudience: AUDIENCE,
+      jwksUri: JWKS_URI, allowedTenantId: TENANT,
+    };
+    const created = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${id}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ credentialType: 'wif', wif: trust }).expect(201);
+    const longAssertion = await signAssertion({}, '6h');
+    const inherited = await postAssertion(longAssertion, id).expect(200);
+    expect(inherited.body.expires_in).toBe(10800);
+    const payload = decodePayload(inherited.body.access_token);
+    expect(Number(payload.exp) - Number(payload.iat)).toBe(10800);
+    expect(Object.keys(inherited.body).sort()).toEqual(['access_token', 'expires_in', 'scope', 'token_type'].sort());
+
+    const trustUrl = `/scim/admin/endpoints/${id}/credentials/${created.body.id}`;
+    await request(app.getHttpServer()).put(trustUrl)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ wif: { ...trust, issuedTokenTtlSec: 7200 } }).expect(200);
+    expect((await postAssertion(longAssertion, id).expect(200)).body.expires_in).toBe(7200);
+
+    const short = await postAssertion(await signAssertion(), id).expect(200);
+    expect(short.body.expires_in).toBeGreaterThan(0);
+    expect(short.body.expires_in).toBeLessThanOrEqual(600);
+
+    await request(app.getHttpServer()).put(trustUrl)
+      .set('Authorization', `Bearer ${adminToken}`).send({ wif: trust }).expect(200);
+    expect((await postAssertion(longAssertion, id).expect(200)).body.expires_in).toBe(10800);
+    await request(app.getHttpServer()).patch(`/scim/admin/endpoints/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ profile: { settings: { WifTokenTtlSec: 14400 } } }).expect(200);
+    expect((await postAssertion(longAssertion, id).expect(200)).body.expires_in).toBe(14400);
+  });
+
+  it.each([60, 604800])('honors %s-second WIF inheritance and trust override bounds', async (ttl) => {
+    const id = await createEndpointWithConfig(app, adminToken, {
+      WifCredentialsEnabled: true, WifTokenTtlSec: ttl,
+    });
+    const trust = {
+      expectedIssuer: ISSUER, expectedSubject: SUBJECT, expectedAudience: AUDIENCE,
+      jwksUri: JWKS_URI, allowedTenantId: TENANT,
+    };
+    const created = await request(app.getHttpServer())
+      .post(`/scim/admin/endpoints/${id}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ credentialType: 'wif', wif: trust }).expect(201);
+    const assertion = await signAssertion({}, '8d');
+    expect((await postAssertion(assertion, id).expect(200)).body.expires_in).toBe(ttl);
+    await request(app.getHttpServer()).put(`/scim/admin/endpoints/${id}/credentials/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ wif: { ...trust, issuedTokenTtlSec: ttl } }).expect(200);
+    const minted = await postAssertion(assertion, id).expect(200);
+    expect(minted.body.expires_in).toBe(ttl);
+    const payload = decodePayload(minted.body.access_token);
+    expect(Number(payload.exp) - Number(payload.iat)).toBe(ttl);
+    const capped = await postAssertion(await signAssertion({}, '30s'), id).expect(200);
+    expect(capped.body.expires_in).toBeGreaterThan(0);
+    expect(capped.body.expires_in).toBeLessThanOrEqual(30);
+  });
+
+  it.each([59, 604801, 3600.5, '7200', null])('rejects an invalid trust lifetime %s on create and edit', async (ttl) => {
+    const body = {
+      credentialType: 'wif',
+      wif: {
+        expectedIssuer: ISSUER, expectedSubject: SUBJECT, expectedAudience: AUDIENCE,
+        jwksUri: JWKS_URI, allowedTenantId: TENANT, issuedTokenTtlSec: ttl,
+      },
+    };
+    await request(app.getHttpServer()).post(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`).send(body).expect(400);
+    const list = await request(app.getHttpServer()).get(`/scim/admin/endpoints/${endpointId}/credentials`)
+      .set('Authorization', `Bearer ${adminToken}`).expect(200);
+    await request(app.getHttpServer()).put(`/scim/admin/endpoints/${endpointId}/credentials/${list.body[0].id}`)
+      .set('Authorization', `Bearer ${adminToken}`).send(body).expect(400);
+  });
 
   it('mints the endpoint token for a valid assertion (accept) (RFC 6749 5.1 + RFC 8693: 200 + no-store)', async () => {
     const assertion = await signAssertion();

@@ -12,6 +12,305 @@
 
 ## 1. Methodology - how issues are classified
 
+### Current-master lifetime integration preparation (2026-10-21)
+
+This is an uncommitted port onto `36724c49`, version `0.55.56`, in a new
+worktree. It does not replace the historical rebuild evidence below.
+The original stash and worktree remain intact. There is no commit SHA for
+these fixes yet, and no release, dependency upgrade or deployment is authorized.
+
+| Issue | Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest / prevention |
+|---|---|---|---|---|
+| Integration baseline moved substantially | Integration / Medium | The rebuild was 390 commits behind master; 29 modified tracked paths had also changed upstream. A textual merge alone could discard newer behavior. | Port into a separate current-master worktree and retain method enablement, effective JWKS policy, fixed secret-retention policy and collapsed disclosures. Fresh RED is 30 API and seven component assertions before production changes. | Preflight / preflight / record the exact base and repeat contract-sensitive tests after a long-lived port. |
+| Clean test merges were semantically stale | Test harness / Medium | An automatic merge duplicated the endpoint-service mock. Older WIF fixtures omitted required enablement, and HTTP fixtures used the removed `PerEndpointCredentialsEnabled` key. | Use one shared service mock; enable WIF explicitly; use `OAuthClientCredentialsAuthEnabled`. The focused API and HTTP suites now pass. | Focused tests / merge review and focused tests / never treat a conflict-free merge as semantic proof. |
+| Critical and observation-only reads differ | Error handling / High | An old controller test rejected every endpoint lookup, accidentally blocking the new authoritative policy read while attempting to test the later shadow read. | Resolve the policy read, reject only the observation lookup, and assert two reads. Separately assert that an authoritative failure prevents minting. Both cases pass without weakening fail-closed issuance. | Focused controller test / focused controller test / test each read's responsibility, not a blanket mock failure. |
+| Numeric null is an inheritance reset | Contract compatibility / Medium | The newer settings contract accepts null to clear an override; the old invalid-value table rejected it. | Preserve reset behavior and assert that the stored key disappears and the next token lasts exactly 3600 seconds. The combined HTTP run passes 70 tests. | HTTP / contract review and HTTP / assert both persisted shape and minted outcome on reset. |
+| Disclosure and menu assumptions changed | Browser harness / Medium | Two ported browser tests looked for lifetime controls inside collapsed panels or Edit inside a closed More menu. | Open the existing menu and expand only when `aria-expanded` is not true. Preserve product behavior rather than making panels always open. The affected browser assertions pass. | Browser / affected browser smoke / drive the current interaction hierarchy before checking field values. |
+| Blind expansion toggled an already-open panel closed | Browser test correctness / Medium | The related-settings component retains its open state when switching methods. An unconditional click closed WIF; fill briefly succeeded during the closing animation, then its draft disappeared. | Add state-aware expansion and explicit value/focus assertions. The same complete browser-to-JWT journey passes, including 61-second issuance and both viewport bounds. No production workaround or delay was added. | Browser / state-aware disclosure assertion / check expanded state, not merely transient element presence. |
+| Live section identifiers had been reused | Integration / Low | Both the original `9z-CN` and the attempted `9z-DP` already belonged to newer tests. | Place the helper in `9z-DR`, preserving all current sections before cleanup. | Port review / section inventory / choose identifiers against the target revision rather than the source branch. |
+| Settings evidence omitted new registry rows | Documentation contract / Medium | The first full API run failed its documentation inventory test because the two new settings were absent from the evidence matrix. | Add the two six-column rows. The unchanged full unit command then passes 211 suites and 6128 tests. | Full unit / focused registry/documentation test / include evidence-inventory coverage when extending the registry. |
+| Negative control overlapped conformance reading | Validation orchestration / Low | A registry-to-UI conformance run read files while the UI was temporarily reverted for a RED control and reported missing keys. | Restore the UI before running conformance, then rerun the focused API checks. Serialize negative-control edits with any tests reading those sources. | Focused test / scheduling review / source mutation and source-reading gates must not overlap. |
+| Private worktree needed dependencies and generated types | Environment / Low | Jest was initially missing. Existing API/web dependency lockfiles did not match, and a tracked-source archive omits the generated Prisma client. | Restore private dependencies from the unchanged lockfiles, generate the private client without connecting to a database, and reproduce generated inputs in the exact-HEAD type baseline. A missing runner is not TDD RED. | Bootstrap / bootstrap / verify dependency and generated-input parity before interpreting results. |
+| Existing frontend type debt differs from the old branch | Baseline / Low | The current port has 66 frontend TypeScript diagnostics, not the old branch's 94. | Compare all diagnostic lines against a private archive of exact HEAD. All 66 are identical; preserve the failed type-check status rather than claiming a clean build. | Static / static / never reuse another revision's ratchet. |
+| Existing High Vite advisory remains open | Dependency / High | The unchanged current-master web lockfile reports a High advisory affecting its Vite version. | Record the audit artifact and hold release consolidation for separately approved dependency remediation. No local audit-fix or lockfile regeneration was performed. This is unresolved, not a green security gate. | Dependency restore/audit / dependency audit / keep inherited blockers explicit and separate from feature fixes. |
+| Source-bound navigation documentation was missing | Documentation / Medium | Freshness F4 identified the navigation reference as coupled to the changed Connect sources but unchanged. | Document the unreleased disclosure/menu behavior in that existing user-facing reference instead of only writing an internal feature handoff. | Freshness F4 / source-to-doc inventory / run the coupled documentation gate before handoff. |
+| Patch tooling required precise retry scope | Tooling / Low | A relative source patch path failed under `git -C`; a multi-file manual patch applied earlier hunks before reporting one failed hunk. | Use the absolute preserved patch path and retry only the failed hunk. No user changes were reset or overwritten. | Tool invocation / tool invocation / treat partial edit output explicitly, and inspect unresolved paths rather than replaying a whole patch blindly. |
+| Full live logging fixture was too restrictive | Validation environment / Medium | The private server used `LOG_LEVEL=ERROR` to reduce output. Two ring-buffer assertions require the existing INFO-level bulk start/completion entries; two dependent checks were consequently omitted. | Restart the same isolated API with standard INFO logging and rerun the entire unchanged suite. It passes 1811/1811 with no leaked endpoints. Keep the original 1807/1809 log. No logger behavior, product code or assertion was weakened. | Full live / fixture preflight / include effective log level in the owning live-runner environment checklist. |
+| Startup readiness preceded the listener | Validation orchestration / Low | The first authenticated probe after the private restart received connection refused while the owned Node process was still starting. | Check the owned process and retry readiness before launching the live gate. HTTP 200 precedes the successful complete run. A started process is not readiness; a failed readiness probe is not a product assertion. | Startup probe / startup probe / require authenticated readiness with a bounded startup wait before tests. |
+| Lookup and transcript filtering needed actual metadata | Tooling / Low | One targeted search guessed a nonexistent API module path; the first continuation-narration filter compared locale-formatted timestamps as strings and returned no matches. | Follow the route's actual `api/queries` import and compare parsed DateTime values. The corrected scan identifies both continuation narratives. | Tool invocation / tool invocation / use actual imports and typed timestamps rather than guessed paths or display strings. |
+
+**Self-improvement applied:** the browser helper checks actual disclosure state
+and verifies the draft before blur. Exact current-HEAD diagnostic comparison
+replaces stale baseline assumptions. Registry evidence rows now satisfy the
+existing executable documentation inventory.
+
+**Design disposition: accepted.** The port retains the existing small policy
+module and reusable UI control, while preserving current authentication and
+egress-policy seams. No new strategy or migration is justified by this change.
+
+**Provenance checkpoint:** the full session transcript was scanned through
+2026-10-21 12:04 UTC (2960 events) with error/status/RED/conflict frequency
+checks and a separate diagnosis-narration pass. The current continuation's
+two narrative matches describe the baseline drift; tool outputs and retained
+gate logs provide the detailed failures tabulated above. Later browser and
+live-fixture fixes were added when their formerly failing gates passed.
+Historical instruction quotations, deliberate negative controls, expected
+invalid-auth HTTP statuses, ordinary Jest warnings from successful tests,
+self-referential search echoes and the existing live recorder's JSON-depth
+warning are not separate product defects. This checkpoint is supplemented
+by the final reconciliation recorded in the integration gate report.
+
+**Final reconciliation:** 3254 events through 2026-10-21 12:26 UTC were
+covered by the signal/narration passes and the retained nonzero-exit logs.
+Both tool-level failures (partial patch and nonexistent-path search) map to
+the tooling entries above; shell test failures are classified by their actual
+logs, not the wrapper's tool-success flag. The final frontend run passes
+1643 tests with coverage. Exact-HEAD lint matches 0/513, and the unchanged
+snapshot file's CRLF warning has no Git content difference. Final freshness
+passes all 27 docs. These verified warnings are not additional product bugs.
+
+### Authorized lifetime release consolidation (2026-10-21)
+
+The preparation account above is historical. The operator subsequently authorized the remaining tests/gates, version bump,
+commit, push and reviewed merge. Those are now active work, not the earlier
+preparation-only scope. Customer production is not implicitly authorized.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / earliest / prevention |
+|---|---|---|---|---|
+| Full gates refuse a linked root dependency tree | Validation ownership / Medium | Preparation reused a read-only matching-lockfile junction, but the current gate rejects every linked dependency directory. | Remove only that junction entry, confirm the resulting missing-tool prerequisite, and restore a private root tree with npm ci. The ownership guard now passes; the shared target is untouched. | Consolidation preflight / dependency ownership guard / require physical dependency directories before full-gate execution. |
+| New Settings controls duplicated their root identifier | UI testability / Medium | Both the existing numeric-setting row and its new EditableField used `settings-number-<key>`. Existing input-specific assertions missed the ambiguity. | Two new unit tests first failed with two roots instead of one. Let the shared editable primitive own the lifetime root and retain the old row ID for other numeric settings. Both tests pass; browser assertions also require one root plus persisted field values. No layout or interaction contract is changed. | Changed-source review / unique-root component assertion / assert unique interactive roots as well as individual input presence. |
+| Authoritative policy validation duplicated the observation read | Performance / Medium | Matched PostgreSQL ABBA sampling initially measured baseline/candidate p50 11.778/18.525 ms, p95 24.628/42.148 ms and p99 50.992/94.352 ms. SQL statistics show 553/1103 endpoint selects across 550 mints per side, including fixture operations. The new mandatory lookup and the existing observation-only lookup both materialized the endpoint. Concurrent validation limits latency attribution, but the duplicate query is proven. | A controller regression first failed with two calls instead of one. Return the already-authoritative profile as internal provider metadata and reuse it for the observation-only decision. Both provider/controller suites pass, 27 tests, and the API builds. Fresh policy lookup still fails closed; disabled-method observation still warns without enforcing; the public token envelope excludes the internal profile. The final extended counterbalanced benchmark passes the unchanged 10% limit: 2000 measured mints per side, p50 9.148/9.063 ms, p95 16.358/13.190 ms, p99 29.455/25.215 ms, and exactly 2403 endpoint selects per side. | Consolidation benchmark / per-mint query-count unit assertion / enforce one authoritative snapshot per mint, reused for non-enforcing observations. |
+| Complete browser run exposed an unchanged selector | Test correctness / Low | The WIF disclosure now includes token lifetime in its title, but an existing contextual-settings spec still matched only the old title. The first repair then incorrectly expected a stored 3600 override instead of the existing blank/inherited field. | Update the title selector and assert the actual inherited state: empty input with `server default: 3600`. The final targeted case passes. Real-issuance lifetime coverage separately proves the effective default and custom values. | Complete browser matrix / owning contextual-settings spec / include surrounding disclosure specs when changing contextual labels; distinguish inherited defaults from persisted overrides. |
+| Private browser environment lacked complete-suite fixtures | Validation environment / Medium | The first full run reported 312 pass, 13 fail and one skip. Nine failures required absent seeded shapes, one used the standard global OAuth secret rather than the private custom secret, and two visual comparisons expected a populated inventory mask. The remaining failure was the coupled selector above. | Seed the existing six-profile fixture into a separate owned PostgreSQL database, configure its standard browser OAuth secret, and add 12 clearly named private padding endpoints to reproduce the populated-inventory geometry. All nine seeded outcomes and the token-log case pass. Both visual diff PNGs were inspected, baselines were not changed, and the two formerly failing visual cases pass against the same committed PNGs. The seeded Node checkpoint passes 326 cases; the final corrected 0.55.57 Docker checkpoint passes 327, zero skips/flakes, preserving all 18 exact fixture IDs. | Complete browser matrix / browser environment preflight / check all six shape names, expected OAuth configuration and populated-inventory geometry before enabling complete shape/pixel coverage. |
+| Bounded inspection and patch syntax errors | Tooling / Low | A negative view range and an extra parenthesis in a diagnostic Node command were rejected. A documentation patch used the wrong table separator and partially applied; another overly short heading match removed its marker. None was a product failure. | Correct the rejected invocations, retry only the unapplied hunk and restore the heading. Inspect only the implicated hunk after ambiguous patch output. The intended diagnostic and updates then succeed. | Tool result / invocation / use positive bounded ranges and exact, sufficiently specific patch context; never count wrapper failure as test RED. |
+| Default parallel Vitest pools exceeded shared-host responsiveness | Validation resources / Medium | The prerequisite hook passed 110 files but reported 13 fork-start errors. Concurrent default pools were not suitable for this shared host. The integration runner's superficially similar 61-error summary was initially grouped with this symptom, but its first causal stack proves the separate heap-limit issue below. | Preserve the failure logs and stop only task-owned processes. Installed Vitest supports `VITEST_MAX_WORKERS=2`; the prerequisite's complete bootstrap Validate hook then passes 123 files and 1624 web tests. No assertion, timeout or coverage threshold changed. | Full web gate / bounded-runner preflight / cap concurrency and inspect the first causal stack before attributing worker errors to host contention. |
+| A benchmark-sized heap limit was inherited by the web matrix | Validation environment / Medium | Both integration attempts inherited `NODE_OPTIONS=--max_old_space_size=512`. The first fatal stack reports allocation failure at approximately 508 MiB, followed by 61 worker-start errors. Capping worker count could not fix this independent per-worker heap limit. Reading only the final wrapper summary delayed correct diagnosis by one retry. | Stop the owned failing matrix and archive both attempts. Remove the artificial heap limit while retaining two workers; CredentialsTab and SettingsTab then pass all 122 tests in 34.95 seconds. The final complete six-mode runner passes every mode, including 1655 Web tests both plain and with coverage. API benchmark heap limits are no longer propagated into unrelated React gates. | Second full web failure / first fatal stack in the first full web log / record the earliest fatal or causal message before retrying; configure concurrency and per-worker heap independently, and smoke-test the actual heavy component suites. |
+
+#### Publishing and interaction-review issues
+
+The independent source review accepted prerequisite PR #247, which merged
+normally as `d9feb62489967e2faa35acefe3b15bc746096134` after exact-tip CI.
+It requested three Medium product corrections in the lifetime feature.
+Their RCA severity below is High because the earlier green unit/browser
+receipts did not assert these promised outcomes, not because they are rated
+as High security vulnerabilities. The feature remains unreleased.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / earliest / prevention |
+|---|---|---|---|---|
+| Hosted review returned an error rather than findings | Tooling / Medium | The GitHub Copilot review request was accepted and produced a COMMENTED review whose body reported missing billing configuration. Review state alone did not prove that code was reviewed. | Read the body, record the error, and obtain an independent read-only automated source review of the complete release set when the unavailable operator delegated the practical choice. Publish the actual prerequisite disposition as review `5602719842`, explicitly not human approval. Required exact-tip CI was green before normal merge. | Review body / review body / inspect substantive review output and exact commit, not just COMMENTED state. |
+| Version-header repair omitted the separate version badge | Documentation / Low | Governed header refresh moved to 0.55.57, but README's badge still claimed 0.55.56. The first bootstrap push stopped at C13 before test gates. | Update the badge and the closely coupled 39-setting summary. The unchanged `audit-doc-content.mjs` then passes all 27 docs. Header freshness and source-claim verification are separate claims; no gate was relaxed. | C13 pre-push / version source-claim preflight / run content verification as well as header freshness after version edits. |
+| Clearing a lifetime did not clear its stored policy | UI policy / High | The shared field ignored blank drafts and accepted only numeric commits. Connect could show the default placeholder while the server retained 604800. Settings additionally converted commit values to strings. Previous tests covered initially unset inputs and API null directly, not the UI reset. | Permit a changed blank draft to commit null, carry it through both endpoint consumers, and reuse Settings' numeric persistence path without changing other numeric blank-input behavior. Unit RED confirms missing null writes; browser RED observes the retained 604800 key. Corrected browser checks require key removal and real 3600-second JWT issuance. | Independent source review / focused clear-to-inherit unit and browser tests / assert persisted absence and minted expiry, not placeholder presence. |
+| Preset selection committed before composite exit | UI commit behavior / High | Option selection called onCommit immediately. Earlier tests explicitly expected that early write, although the control's focus boundary was meant to protect draft edits. | Route selection only through draft editing. Save once on leaving the whole composite, not when moving to its input, popup or toolbar. Unit RED observes one premature mutation; browser RED observes one PATCH where zero is required. The corrected journey checks zero writes during internal interactions and exactly one after exit. | Independent source review / preset focus-boundary regression / test request counts and stored values before and after leaving the composite. |
+| Preset edits bypassed Undo and reset ownership | UI history / High | Updating a preset outside EditableField's edit dispatcher looked like an external refresh, clearing history and replacing its loaded baseline. Typed-only Undo tests could not detect this, including in an unsaved trust form. | Add a small optional render-controls slot that receives the existing edit dispatcher; no second history implementation. Presets, typing, Undo, Redo and Reset now share that history. Genuine external refresh still resets its baseline. Unit and unsaved-trust browser RED reproduce disabled Undo; corrected journeys restore the loaded value and make no trust PUT before Save. | Independent source review / preset-to-Undo-to-Redo-to-Reset unit and browser journey / exercise every edit entry path, not only typing. |
+| Re-selecting the current preset created a no-op history entry | UI history / Low | The first history integration pushed an identical string, enabling Undo even though the value did not change. | A focused test first fails, then selection ignores the unchanged draft. The same full control suites pass; browser coverage requires Undo to remain disabled when re-selecting a loaded preset. | Focused composition unit / focused composition unit / assert no history or network change for unchanged selections. |
+| Shared Field context duplicated HTML control identities | UI accessibility / Medium | Placing the accessory Dropdown inside Fluent Field gave it the input's generated control ID. The first integrated suites did not check that identity, so a second targeted RED was added before commit. | Render the accessory beside Field while retaining the same edit dispatcher and outer composite. Consumers without an accessory keep their original DOM. Distinct-ID assertions first observe the duplicated `field-...__control`, then pass with all 82 focused tests. | Focused composition unit / focused composition unit / share history, not framework form-control identity; assert unique real IDs as well as test IDs. |
+| A browser assertion confused contextual inheritance with full inventory display | Test correctness / Medium | Reset successfully removed the key and minted a 3600-second JWT, but the new test expected a blank full Settings input. The existing full inventory intentionally displays the effective default, while contextual Connect leaves inheritance blank. | Preserve production display behavior. Assert 3600 in full Settings, an absent stored key, real JWT expiry, and a blank inherited value after returning to Connect. The failed case then passes alone in 6.0 seconds; the other two corrected journeys had already passed. | Focused browser GREEN attempt / cross-surface display contract review / distinguish effective-value display from persisted configuration instead of forcing one representation everywhere. |
+| Playwright positional paths were interpreted as regex selectors | Tooling / Low | Windows backslashes in positional file selectors produced No tests found. This was discovery failure, not behavioral RED. | Preserve that log and use the unambiguous test filenames. The rerun discovers all three intended journeys and reproduces the three actual defects independently. | CLI discovery / CLI smoke / distinguish filesystem paths from regex arguments and require an observed test count. |
+| Inventory readiness counted the envelope rather than its resources | Tooling / Low | The authenticated readiness response was counted as one object because it is a paged envelope, not an endpoint array. | Inspect its actual keys, then use `endpoints`: 18 resources. Before/after ID comparison confirms all 18 fixture endpoints remain and no regression endpoint leaks. No API response contract changed. | Readiness inspection / response-shape inspection / validate the resource array and preserved IDs, not the wrapper count. |
+
+The 82-test focused GREEN follows ten original review-regression failures
+and two additional composition failures. Browser RED uses the retained
+pre-fix bundle from the bootstrap build, not a deliberately mocked failure.
+Its three screenshots were opened: an apparently inherited empty field with
+an unchanged server policy, a premature Saved message, and disabled trust Undo.
+There were no pixel-diff artifacts and no baseline was regenerated.
+The corrected bundle was verified byte-for-byte through a freshly restarted
+preview. Two journeys pass in the first corrected run; the inherited-display
+test correction then passes its single-case rerun. These are not represented
+as one final three-case pass. Final-image full browser and full matrix remain
+separate gates.
+
+#### Final-image coverage and receipt validation
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / earliest / prevention |
+|---|---|---|---|---|
+| A loading table was mistaken for an empty tenant | Validation correctness / Medium | The first versioned Docker browser run reported 326 passed and one skipped. Structured JSON identified the Operations column-bounds case: it counted DOM rows immediately after the toolbar appeared and skipped before the asynchronous user response rendered. The real database feed contained 18 users. A completeness assertion genuinely failed with one skipped outcome instead of zero. | Wait for the actual `/scim/admin/database/users` response, assert HTTP 200 and its users array, and base the existing empty-tenant skip on that completed response. Then await the visible row before measuring the existing wide/narrow column bounds. The unchanged populated target passes the focused case in 3.5 seconds with zero skips. No production code, fixture data, timeout, sleep or pixel baseline changed. | Final browser JSON completeness / response-aware focused browser assertion / decide data availability from completed data, not transient DOM absence; preserve per-test JSON and require every seeded outcome to execute. |
+| A standalone browser-spec type check used app-only ambient types | Tooling / Low | A focused compiler invocation reused the web application's strict options, whose ambient types intentionally omit Node. The existing `process.env` in the Playwright spec therefore produced TS2591; the edited response code was not the failing symbol. | Keep the application's strict options and add the already-installed Node ambient types only to the standalone Node-runner check. The edited spec then has zero diagnostics. No dependency installation, application configuration change or suppressed diagnostic is needed. | Focused standalone type check / runner-context preflight / browser specs execute in Node, so validate them with Node ambient types without exposing Node globals to browser application source. |
+| A receipt counter included historical sibling subsections | Tooling / Low | A scratch structural check expected 20 consolidation rows but counted 33. It stopped only at the next level-two heading, although historical executions resume at level three. The assertion correctly rejected the ambiguous scope; the documentation itself was not missing entries. | Stop at the next sibling level-three heading, assert that boundary exists, and count only the authorized consolidation subsection. The corrected check confirms 20 entries before recording this tooling issue, with matching severity/chart totals and all 175 literal JSON blocks valid. | Focused documentation structure check / bounded section extraction / scope a receipt checker to the actual heading level and assert both its boundary and totals before trusting its output. |
+
+The diagnostic first tried an unregistered `/scim/admin/users` URL and received
+404. Reading the existing query client established the real database-feed route;
+its 18 rows disprove the empty-tenant explanation. This was diagnostic tooling
+friction, not a product route regression. The first run's JSON, screenshots and
+explicit completeness RED remain archived. After the repair, the complete
+versioned Docker browser run passes all 327 cases in 511.877 seconds, with
+zero skipped, unexpected or flaky outcomes. All 18 original fixture IDs remain
+and no temporary endpoint leaks. Pixel baselines are unchanged. The final
+six-mode runner remains a separate claim, not inferred from this browser pass.
+
+**Self-improvement: applied.** The existing browser spec now distinguishes a
+completed empty response from loading and asserts response success before
+deciding whether the bounds outcome can execute. This extends pattern PA-13.
+**Design disposition: accepted.** A small test-only synchronization correction
+is sufficient; no production change or new gate framework is justified.
+
+#### Current consolidation issue dashboard
+
+The eight earlier consolidation entries, ten publishing/interaction entries
+and three final-image/receipt validation entries total 21 issues.
+Counts describe root-cause entries, not failed assertions or retry attempts.
+The diagrams cover this consolidation subsection only; the original build's
+charts below retain their historical scope.
+
+```mermaid
+pie showData
+  title Consolidation issues by grouped type
+  "Harness and environment" : 7
+  "UI behavior and identity" : 6
+  "Tooling and documentation" : 7
+  "Performance" : 1
+```
+
+```mermaid
+pie showData
+  title Consolidation issues by RCA severity
+  "High - green-but-blind outcome coverage" : 3
+  "Medium" : 10
+  "Low" : 8
+```
+
+The detection-stage view shows where each distinct root cause was found.
+Its independent-review cluster is the three missing interaction outcomes;
+the subsequent focused-unit cluster is the two composition edge cases.
+
+```mermaid
+xychart-beta
+  title "Issues by detection activity"
+  x-axis ["Preflight", "Source", "Benchmark", "Full browser", "Tooling", "Review request", "Full web", "Version", "Source review", "Focused unit", "UI smoke"]
+  y-axis "Issues" 0 --> 5
+  bar [1, 1, 1, 3, 5, 1, 2, 1, 3, 2, 1]
+```
+
+**Self-improvement: applied.** The new component tests explicitly enforce
+root uniqueness; browser coverage checks it in the existing real-issuance
+journey. **Design disposition: accepted.** One local boolean avoids repeated
+lifetime classification without introducing another abstraction. The policy-read
+regression test also closes the duplicate-query gap. Reusing an internal profile
+snapshot follows the existing provider/controller boundary without adding a cache
+or weakening policy freshness.
+
+**Policy-read fix confirmation:** the first short post-fix sample restored equal
+endpoint query counts but retained noisy tail latency (candidate p95 20.943 ms
+versus baseline 13.272 ms). Before further sampling, the diagnostic was extended
+to a counterbalanced eight-run order, 100 warmups and 500 measurements per run.
+Across 2000 measured mints and 400 warmups per side, baseline/candidate
+p50 is 9.148/9.063 ms, p95 16.358/13.190 ms and p99 29.455/25.215 ms.
+Endpoint selects are exactly 2403 per side, including fixture operations; total
+SQL calls are 4967/4970 with asynchronous logging flush timing included.
+Observed resident memory is 240.8/241.1 MiB, with private memory 261.0/260.3 MiB
+and the same 384 MiB Node heap limit. These are local observations, not a
+production capacity claim. The extended performance check now passes the
+10-percent regression threshold without relaxing it. Keep both initial
+regression and short post-fix measurements alongside the extended receipt.
+
+**Browser fix confirmation:** the complete seeded private Node/PostgreSQL run
+now passes all 326 cases in 511.5 seconds, with zero skipped, unexpected or
+flaky outcomes. All 18 intended fixture endpoints remain, all padding IDs are
+preserved and no temporary test endpoint remains. Both previously failing
+pixel cases pass against the unchanged committed baselines. This confirms a
+fixture-population difference, not an intended visual product change. The
+receipt uses the pre-prerequisite toolchain and version 0.55.56; final-image
+validation remains distinct.
+
+**Prerequisite issue cross-reference:** the separate minimal Vite security
+change records its caught freshness-F4 failure, rejected minor-upgrade
+artifact, missing process-local Prisma environment and bounded-worker
+preflight in the
+[supply-chain receipt](../strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-10-21-vite-security-prerequisite).
+An unavailable assumed path and an editor discovery miss were corrected by
+actual path discovery and the package runner. A research-tool HTTP 504 was
+resolved by fetching the official GitHub documentation directly; it confirms
+the supported automated PR reviewer identity without exposing source.
+
+**Final local checkpoint:** runtime input `abb90c9f` is version 0.55.57 with
+public-CI lockfiles from run `39644598993`, exact source `577baf07`. The complete
+six-mode runner passes: 6128 API units per backend, HTTP 2528 plus four
+PostgreSQL-only exclusions in memory and 2532 on PostgreSQL, and Web 1655 both
+plain and with coverage. Coverage is 85.74% lines, 75.89% branches, 75.53%
+functions and 83.06% statements against unchanged 82/70/69/78 floors.
+Final Node and Docker live runs each pass 1811 assertions; the actual shipping
+entrypoint passes 24 contracts. The final Docker browser run passes 327 cases
+with zero skips/flakes, unchanged pixel baselines and 18 preserved fixture IDs.
+The first 326-pass/one-skip image receipt remains archived as insufficient
+coverage, not replaced or counted as a complete pass. The local Node inventory
+starts and finishes empty. No driver/fatal stdout signal is found on either
+target. No cloud deployment or operator visual approval is claimed.
+
+**Consolidation provenance / completeness:** the full session event log was
+reconciled through event 8342, timestamp `2026-10-21T18:43:19.330Z`, using both
+failure-signal and diagnosis-narration passes, not compacted recollection.
+Signal-containing events were classified across TypeScript (5), environment
+(5), heap (2), assertions (48), workers (9), review (10), discovery (11) and
+conflicts (4), plus two diagnosis-narration matches. Twelve wrapper failures
+were inspected; none is new after event 7349. Counts include deliberate REDs,
+search echoes, source reads and successful zero-failure summaries, so they are
+not incident counts. The loading/empty false skip and standalone compiler's
+incorrect ambient type context are included in the entries above. A subsequent
+scratch receipt-counter scope error is recorded separately, bringing the
+dashboard to 21; its initial failed assertion and corrected check are retained
+in the operational transcript.
+The HTTP 504 duplicates the prerequisite tooling cross-reference rather than
+adding a root cause. Verified non-issues are the unchanged CRLF snapshot blob,
+PG16 lacking optional Docker Health metadata while `pg_isready` succeeds,
+existing React act/JSDOM scroll warnings, and the live recorder's JSON-depth
+warning. Final publication/CI/merge are tracked operationally after this local
+checkpoint and must not be inferred from it.
+
+### Token-lifetime TDD rebuild (2026-10-20)
+
+This is a new execution, not a replay of the earlier implementation's test
+claims. The original changes are preserved in stash
+`064483284a56ce5f135afb8b09ed63c06f3b368f`. Tests were restored and changed
+to the requested bounds before production files were reintroduced.
+No commit, version bump, push or deployment is part of this local build.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / earliest / prevention |
+|---|---|---|---|---|
+| Old issuer window contradicted the requested range | Policy correctness / Medium | The shared issuer raised 60 to 3600 and reduced 604800 to 21600. A settings-only fix would advertise values the JWT could never honor. | Use shared backend constants for 60 minimum, 3600 default and 604800 maximum in the registry, trust validation and issuer. Keep the assertion-expiry cap after the static clamp. | RED unit and HTTP / unit / exact `expires_in` and `exp - iat` assertions at both bounds, including a 30-second assertion below the configured floor. |
+| Test discovery was not evidence | Tooling / Low | The editor runner found no tests; Playwright interpreted Windows backslash paths as regular expressions and also found none. | Use the package's Jest/Vitest runners and Playwright basename selectors. Zero tests is a failed invocation, not an assertion RED. | First runner / first runner / retain the actual assertion failures in the RED logs. |
+| Child script broke the live HTTP recorder | PowerShell scope / Medium | Standalone TTL checks passed, but the full runner failed with `PSObject ... op_Addition`. The parent's HTTP wrapper uses script-scoped arrays; calling a child script made those references resolve in the child's script scope. Buffering output alone did not fix it. | Dot-source the helper inside a child scriptblock, then report its buffered results from the parent. This retains the recorder's script scope while isolating helper variables from the main runner's case-insensitive endpoint variables. The full in-memory live suite is now 1499/1499. | Full live / integrated smoke / always smoke new helper checks through the owning runner, not just standalone. |
+| Auto-save disrupted Undo | Browser interaction / Medium | Filling 61 then clicking Undo moved focus out of the input, auto-saved 61 and refreshed the value during the undo action. | Commit when focus leaves the whole lifetime control, not when it moves between the text input, copy/undo/redo/reset buttons and preset dropdown. A browser RED reproduced the wrong value; final browser regression passes with Undo, Redo, custom mint and measured 900/1440px bounds. | Added browser negative control / component focus test / cover the complete control's focus boundary and actual persisted/minted result. |
+| Unit runner retained open handles | Test harness / Low | All 173 suites and 4976 assertions passed, but Jest did not exit. | Stop only that owned process after recording the completed assertion summary. Use the repository's existing `--forceExit` convention for the remaining matrix runs. No product code or global processes were changed. | Full unit / runner completion / distinguish assertion success from natural process exit in the gate report. |
+| Parallel local suites could share cleanup state | Validation isolation / Medium | Full live cleanup and browser-created endpoints must not share a database even inside a task-specific instance. | Separate browser port 8181/database `scimttl_live` from full-live port 8182/database `scimttl_wire`; E2E uses `scimttl` on port 5481. No release resources were reused. | Execution review / isolation preflight / assign one cleanup owner per test database. |
+| Existing frontend type debt | Baseline / Low | `tsc --noEmit` reports 94 diagnostics. | Compare complete output with exact HEAD in an ignored isolated archive. All 94 diagnostic lines are identical; do not suppress them or claim a clean type check. | Static / static / preserve complete baseline comparison and require no new diagnostics. |
+| Numeric browser inventory needed explicit new values | Test completeness / Medium | The full browser matrix rejected the two new numeric settings because its explicit test-value map did not include them. | Add 61 and 604800 as actual saved values and require exactly 16 numeric controls. The final Docker settings/lifetime/trust run passes all 31 tests. | Full browser / affected settings matrix / include the owning complete-inventory spec in focused validation when adding registered controls. |
+| Two unrelated full-browser failures | Existing fixture baseline / Medium | An onboarding backdrop intercepted the auth-diagnostics click, and the Endpoints screenshot's masked table height differed from its baseline. | Independently build exact HEAD and reproduce both failures. Inspect actual/diff PNGs; retain the failures as release blockers without changing unrelated UI or regenerating baselines. | Full browser / full browser / require exact-HEAD reproduction before classifying an unrelated failure. |
+| First coverage run did not complete | Runner friction / Low | The first single-worker run produced no completion summary within its observation window. The underlying cause was not established, so a product defect or a deadlock is not claimed. | Stop only that owned run; retry with two explicit thread workers and verbose progress. All 106 files / 1320 tests pass in 564.60 seconds, exceeding all existing coverage floors. | Full coverage / runner completion / require a natural successful exit and final coverage summary, not apparent progress. |
+| Archived lint initially lacked generated types | Baseline setup / Low | The exact-HEAD archive omits the ignored generated Prisma client, producing four unresolved-type lint errors unrelated to either source revision. | Supply the archive's explicit generated-client junction. Exact HEAD and the rebuild both report 0 errors / 518 warnings. Remove junction entries non-recursively before deleting the scratch archive. | Baseline lint / archive preflight / reproduce generated inputs as well as tracked source when comparing static baselines. |
+| Tooling metadata and optional fields | Tooling / Low | Optional-path lookup and editor discovery were unavailable; renderer discovery reported an invalid editor Mermaid version of `0.0.0`. The first transcript scan assumed every failed tool had a result field. A guessed `/health` route returned 404. | Use package runners, guard missing result/error fields, and complete the transcript scan. Use the actual root route for the transport comparison, then verify API behavior through the complete live suite. Preserve the successful strict-theme diagram render but leave exact editor-version parity unverified; do not install the invalid reported version. | Tool invocation / tool invocation / distinguish missing metadata from product failures and never treat empty discovery as validation; consult the existing PB-2 readiness-path lesson. |
+| Localhost transport confounded the Docker latency gate | Environment / Medium | The first full Docker run passed 1498/1499, but credential rejection took 2057 ms against the unchanged 1500 ms limit. Even root-page requests took 2036-2091 ms via `localhost`, compared with 5-8 ms via literal IPv4. The exact resolver/connection mechanism was not traced. | Re-run the entire unchanged suite against the same container through `127.0.0.1`. It passes 1499/1499 in 67 seconds, including rejection in 10 ms; no product code or threshold change. All 14 lifetime assertions also passed in the original run. | Full live / transport preflight / verify loopback address latency before a local timing gate and keep both original and recovered logs; the gate report now specifies literal IPv4. |
+
+**Self-improvement applied:** the browser spec tests preset and custom values
+against real token issuance, exercises Undo/Redo, and measures actual control
+bounds. The live suite itself verifies helper integration. The shared backend
+constants prevent the validator and issuer from drifting independently.
+
+**Design disposition: applied.** One small policy module owns the three backend
+constants. One cohesive UI control owns presets, validation and focus behavior
+for all three real consumers: Connect, Settings and trust editing. Existing
+providers and the issuer retain their responsibilities; no migration, strategy
+framework or new protocol is needed. The pre-existing large credential
+controller is not broadened with UI or signing concerns.
+
+**Provenance:** retained RED/GREEN, browser and live logs support these
+observations. Although the transcript environment pointer was unavailable,
+the current session's `events.jsonl` was located in its own session directory.
+The full transcript was scanned through 2026-10-20 13:18 UTC (1769 events):
+an error/status/RED/parity frequency pass, a diagnosis-narration pass, and
+classification of bounded failure excerpts. This reconciliation added the
+numeric-inventory, baseline-browser, coverage-runner, archived-lint and tooling
+entries above. Historical issues quoted by context files, expected invalid-auth
+statuses, deliberately failing RED assertions, source-code error strings and
+self-referential search echoes were verified and excluded as separate issues.
+An incremental continuation scan after the initial 1463-event pass captured
+the Docker timing failure, incorrect health-path probe, address comparison
+and successful full-suite retry.
+Existing live-report JSON-depth warnings do not invalidate the recorded
+console assertion totals; complete nested JSON serialization is not claimed.
+No unresolved product failure was dismissed on the strength of a green subset.
+Final gate totals and release-only checks are recorded in the
+[feature handoff](ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md).
+
 Every issue is tagged with a **type**, a **severity**, the **step** it surfaced in, and the **detection stage** (which quality gate caught it). The most valuable column is **detection stage vs earliest-possible**: when a gate catches an issue LATER than it could have, that delta is itself a finding.
 
 ### 1.1 Type taxonomy

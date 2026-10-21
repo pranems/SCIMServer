@@ -18,10 +18,44 @@ function makeProvider(credentials: unknown[] = []) {
   const credentialRepo: any = {
     findActiveByEndpoint: jest.fn().mockResolvedValue(credentials),
   };
-  return { provider: new ClientSecretTokenProvider(credentialRepo, oauthService), oauthService, credentialRepo };
+  const endpointService = {
+    getEndpoint: jest.fn().mockResolvedValue({ profile: { settings: {} } }),
+  };
+  return {
+    provider: new ClientSecretTokenProvider(credentialRepo, oauthService, endpointService),
+    oauthService, credentialRepo, endpointService,
+  };
 }
 
 describe('ClientSecretTokenProvider (W2.3)', () => {
+  it('passes the endpoint OAuth lifetime to the issuer', async () => {
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('right', 4);
+    const { provider, oauthService, endpointService } = makeProvider([
+      { credentialType: 'oauth_client', credentialHash: hash, metadata: { clientId: 'epc_x' } },
+    ]);
+    endpointService.getEndpoint.mockResolvedValue({ profile: { settings: { OAuthClientTokenTtlSec: 7200 } } });
+    await provider.mintFromClientSecret(ENDPOINT_ID, {
+      clientId: 'epc_x', clientSecret: 'right', credentialLocation: 'client_secret_post',
+    });
+    expect(oauthService.generateEndpointAccessToken).toHaveBeenCalledWith(
+      ENDPOINT_ID, 'epc_x', undefined, { authMethod: 'client_secret', ttlSec: 7200 },
+    );
+  });
+
+  it('does not mint if endpoint lifetime policy cannot be read', async () => {
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('right', 4);
+    const { provider, oauthService, endpointService } = makeProvider([
+      { credentialType: 'oauth_client', credentialHash: hash, metadata: { clientId: 'epc_x' } },
+    ]);
+    endpointService.getEndpoint.mockRejectedValue(new Error('endpoint policy unavailable'));
+    await expect(provider.mintFromClientSecret(ENDPOINT_ID, {
+      clientId: 'epc_x', clientSecret: 'right', credentialLocation: 'client_secret_post',
+    })).rejects.toThrow('endpoint policy unavailable');
+    expect(oauthService.generateEndpointAccessToken).not.toHaveBeenCalled();
+  });
+
   it('accepts a matching client_id + secret and mints a token', async () => {
     const bcrypt = require('bcrypt');
     const hash = await bcrypt.hash('right', 4);

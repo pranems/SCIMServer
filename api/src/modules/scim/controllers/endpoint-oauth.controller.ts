@@ -199,11 +199,10 @@ export class EndpointOAuthController {
     // be validated against real traffic first. Fails OPEN (never blocks a mint).
     if (this.endpointService) {
       try {
-        const endpoint = await this.endpointService.getEndpoint(endpointId);
-        const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+        const config = (result.endpointProfile?.settings ?? {}) as EndpointConfig;
         const enabled = resolveEndpointAuthEnablement(
           config,
-          endpoint.profile?.authentication?.methods,
+          result.endpointProfile?.authentication?.methods,
         ).oauthClientCredentials;
         if (!enabled) {
           this.logger.warn(
@@ -219,7 +218,7 @@ export class EndpointOAuthController {
           received: enabled ? 'enabled' : 'disabled (shadow - not enforced)',
         });
       } catch {
-        // Shadow read must never block a mint - swallow any lookup error.
+        // Observation-only evaluation must never block a policy-validated mint.
       }
     }
 

@@ -1,10 +1,10 @@
 # Endpoint Configuration Flags Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-09-29 - **Product version:** `0.55.57`
 
-> **Version:** 0.55.56 - **Updated:** September 29, 2026
+> **Version:** 0.55.57 - **Updated:** September 29, 2026
 > **Source of truth:** [endpoint-profile.types.ts](../api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts) (`ProfileSettings`)
-> 37 registered settings: 20 boolean + 14 numeric (11 runtime-egress overrides + 3 active-credential caps) + 3 other typed values. `PersistRequestSecrets` is inert and `CredentialSecretVisibility` supports only `always`. See the [behavioral evidence and explicit coverage gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) and [Entra compatibility guide](SCIM_ENTRA_COMPATIBILITY.md). Registry membership is not evidence of enforcement.
+> 39 registered settings in the unreleased lifetime port: 20 boolean + 16 numeric (11 runtime-egress overrides + 3 active-credential caps + 2 token lifetimes) + 3 other typed values. `PersistRequestSecrets` is inert and `CredentialSecretVisibility` supports only `always`. See the [behavioral evidence and explicit coverage gaps](SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md) and [Entra compatibility guide](SCIM_ENTRA_COMPATIBILITY.md). Registry membership is not evidence of enforcement.
 > 6 value types: `boolean`, `logLevel`, `primaryEnforcement`, `credentialVisibility`, `structured`, and `number` (the last added for the runtime JWKS-fetch egress knobs).
 >
 > **Authentication ownership:** Flat authentication flags are compatibility inputs. An explicit `profile.authentication.methods[]` entry has higher precedence. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) for desired/effective provenance and migration rules.
@@ -156,6 +156,14 @@ Settings are **deep-merged** - only specified flags are updated, others remain u
 | 35 | `MaxActiveBearerCredentials` | number | `5` | Active bearer credential cap |
 | 36 | `MaxActiveOAuthClientCredentials` | number | `5` | Active OAuth credential cap |
 | 37 | `MaxActiveWifTrusts` | number | `10` | Active WIF trust cap |
+| 38 | `OAuthClientTokenTtlSec` | number | `3600` | Endpoint OAuth token lifetime, 60-604800 whole seconds |
+| 39 | `WifTokenTtlSec` | number | `3600` | Endpoint WIF token lifetime, 60-604800 whole seconds |
+
+The two lifetime settings are unreleased. They apply to future endpoint token
+mints, not existing tokens, static credentials or the global OAuth endpoint.
+WIF trusts may override the endpoint default, but verified assertion expiry
+remains authoritative. Missing endpoint policy cannot silently become a
+default-policy mint. See [configuration and safety details](AUTHENTICATION_GUIDE.md#55-configuring-endpoint-access-token-lifetime).
 
 ### CredentialSecretVisibility
 

@@ -24,6 +24,7 @@ import {
   useEndpointOverview,
   useUpdateEndpointConfig,
 } from '../api/queries';
+import { TokenLifetimeField } from './TokenLifetimeField';
 import {
   ALL_ENDPOINT_SETTINGS,
   effectiveBooleanSetting,
@@ -159,7 +160,7 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
   const settings = (overview.data.configFlags ?? {}) as Record<string, unknown>;
   const pendingKey = pendingSettingKey(update.variables);
 
-  async function persist(definition: EndpointSettingDefinition, value: boolean | string | number) {
+  async function persist(definition: EndpointSettingDefinition, value: boolean | string | number | null) {
     setFeedback(null);
     try {
       await update.mutateAsync({ profile: { settings: { [definition.key]: value } } });
@@ -295,6 +296,20 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
 
           const current = effectiveNumberSetting(settings[definition.key]);
           const display = current === undefined ? '' : String(current);
+          if (definition.key === 'OAuthClientTokenTtlSec' || definition.key === 'WifTokenTtlSec') {
+            return (
+              <div key={definition.key} className={classes.control}>
+                <TokenLifetimeField
+                  label={definition.displayLabel}
+                  value={display}
+                  disabled={disabled}
+                  onCommit={(value) => { void persist(definition, value); }}
+                  data-testid={`${testId}-${definition.key}`}
+                />
+                <Caption1 className={classes.description}>{definition.description}</Caption1>
+              </div>
+            );
+          }
           return (
             <Field key={definition.key} label={definition.displayLabel} hint={definition.description} className={classes.control}>
               <Input

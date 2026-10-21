@@ -28,6 +28,7 @@
  *     `AllowAndCoerceBooleanStrings` machinery accepts either form.
  */
 import React from 'react';
+import { TokenLifetimeField } from './TokenLifetimeField';
 import {
   makeStyles,
   tokens,
@@ -242,9 +243,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
     }
   }
 
+  async function persistNumberSetting(setting: NumberSetting, n: number | null) {
+    const fieldName = EGRESS_FIELD_BY_SETTING[setting.key];
+    const effectiveValue = fieldName ? effectiveEgressPolicy[fieldName]?.effective : undefined;
+    if ((getNumberFlag(flags[setting.key]) ?? effectiveValue) === n) return;
+    setFeedback(null);
+    try {
+      await updateMutation.mutateAsync({
+        profile: { settings: { [setting.key]: n } },
+      });
+      setFeedback({
+        type: 'success',
+        message: n === null ? `${setting.label} reset to server default.` : `${setting.label} set to ${n}.`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update failed.';
+      setFeedback({ type: 'error', message: `Failed to update ${setting.label}: ${msg}` });
+    }
+  }
+
   async function handleNumberChange(setting: NumberSetting, raw: string) {
     const trimmed = raw.trim();
-    // Blank = inherit the server default (no-op; keep the existing value).
     if (trimmed === '') return;
     const n = Number(trimmed);
     if (!Number.isFinite(n) || !Number.isInteger(n)) {
@@ -258,19 +277,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
       });
       return;
     }
-    const fieldName = EGRESS_FIELD_BY_SETTING[setting.key];
-    const effectiveValue = fieldName ? effectiveEgressPolicy[fieldName]?.effective : undefined;
-    if ((getNumberFlag(flags[setting.key]) ?? effectiveValue) === n) return;
-    setFeedback(null);
-    try {
-      await updateMutation.mutateAsync({
-        profile: { settings: { [setting.key]: n } },
-      });
-      setFeedback({ type: 'success', message: `${setting.label} set to ${n}.` });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update failed.';
-      setFeedback({ type: 'error', message: `Failed to update ${setting.label}: ${msg}` });
-    }
+    await persistNumberSetting(setting, n);
   }
 
   return (
@@ -451,18 +458,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
 
         {/* ── Runtime egress (WIF JWKS fetch) numeric overrides ─── */}
         <Card className={classes.card} data-testid="settings-number-settings">
-          <Caption1>Runtime egress (WIF JWKS fetch)</Caption1>
+          <Caption1>Authentication lifetimes, credential limits and JWKS settings</Caption1>
           {NUMBER_SETTINGS.map((setting) => {
             const current = getNumberFlag(flags[setting.key]);
             const fieldName = EGRESS_FIELD_BY_SETTING[setting.key];
             const field = fieldName ? effectiveEgressPolicy[fieldName] : undefined;
             const currentDisplay = String(current ?? field?.effective ?? setting.serverDefault);
             const disabled = isPending && pendingKey === setting.key;
+            const isTokenLifetime = setting.key === 'OAuthClientTokenTtlSec' || setting.key === 'WifTokenTtlSec';
             return (
-              <div key={setting.key} className={classes.flagRow} data-testid={`settings-number-${setting.key}`}>
+              <div key={setting.key} className={classes.flagRow} data-testid={isTokenLifetime ? undefined : `settings-number-${setting.key}`}>
                 <div className={classes.flagHeader}>
                   <Text className={classes.monospace}>{setting.label}</Text>
-                  <Input
+                  {isTokenLifetime ? (
+                    <TokenLifetimeField
+                      label={setting.displayLabel}
+                      value={currentDisplay}
+                      disabled={disabled}
+                      onCommit={(value) => { void persistNumberSetting(setting, value); }}
+                      data-testid={`settings-number-${setting.key}`}
+                    />
+                  ) : <Input
                     key={`${setting.key}-${currentDisplay}`}
                     type="number"
                     defaultValue={currentDisplay}
@@ -472,7 +488,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                     aria-label={setting.label}
                     onBlur={(e) => { void handleNumberChange(setting, e.target.value); }}
                     data-testid={`settings-number-${setting.key}-input`}
-                  />
+                  />}
                 </div>
                 <Caption1 className={classes.flagDescription}>{setting.description}</Caption1>
                 {field && (

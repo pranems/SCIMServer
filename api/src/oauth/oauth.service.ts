@@ -5,6 +5,7 @@ import * as crypto from 'node:crypto';
 import { safeCompare } from '../security/safe-compare';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
+import { TOKEN_LIFETIME_DEFAULT_SEC, TOKEN_LIFETIME_MAX_SEC, TOKEN_LIFETIME_MIN_SEC } from './token-lifetime-policy';
 
 /**
  * Default `aud` claim for issued access tokens (Q0). Identifies the SCIM
@@ -144,8 +145,8 @@ export class OAuthService {
    * Q6.4 - `options.trustedScope` lets the WIF flow mint with an
    * admin-configured scope verbatim (the scope is set by the operator on the
    * `wif` trust, not requested by the caller, so it bypasses the caller-scope
-   * filter). `options.ttlSec` sets the lifetime, clamped to the Entra-spec
-   * 1-6h window.
+   * filter). `options.ttlSec` sets the lifetime within the server's
+   * one-minute-to-one-week policy, defaulting to one hour.
    */
   generateEndpointAccessToken(
     endpointId: string,
@@ -187,17 +188,14 @@ export class OAuthService {
       grantedScope = (allowed.length > 0 ? allowed : defaultScopes).join(' ');
     }
 
-    // Clamp the lifetime to the Entra WIF 1-6h window; default 1h.
-    const TTL_FLOOR = 3600;
-    const TTL_CEIL = 21600;
-    let expiresIn = TTL_FLOOR;
+    let expiresIn = TOKEN_LIFETIME_DEFAULT_SEC;
     if (typeof options?.ttlSec === 'number' && Number.isFinite(options.ttlSec)) {
-      expiresIn = Math.min(TTL_CEIL, Math.max(TTL_FLOOR, Math.floor(options.ttlSec)));
+      expiresIn = Math.min(TOKEN_LIFETIME_MAX_SEC, Math.max(TOKEN_LIFETIME_MIN_SEC, Math.floor(options.ttlSec)));
     }
 
     // W3.6 (guide 13.5) - never issue a token that outlives the verified
     // assertion that authorized it. This cap is applied AFTER the static
-    // window clamp so the 1h floor can never raise the lifetime back above the
+    // window clamp so the configured floor can never raise the lifetime above the
     // assertion: a 6h configured TTL against a 1h assertion yields 1h, and an
     // assertion with only minutes left yields only those minutes.
     if (

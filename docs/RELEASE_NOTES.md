@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.57`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -19,12 +19,40 @@ Build-tooling security preparation pins Vite to patched 8.1.6, addressing
 the launch-editor advisories affecting 8.0.0-8.1.5. This patch is older than
 the seven-day quarantine. It does not change the SCIM contract or deployed
 version. The exact-patch CI lockfile has been verified and restored privately;
-the fresh web dependency audit now reports zero vulnerabilities. Reviewed
-exact-tip CI remains the merge gate, not this local audit alone. See the
+the fresh web dependency audit now reports zero vulnerabilities. Prerequisite
+PR #247 merged after substantive automated review and green exact-tip CI,
+not the audit alone. See the
 [supply-chain receipt](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-10-21-vite-security-prerequisite).
 
 The documentation checkpoint below records actual publication/dev evidence and
 the customer hold. It introduces no further runtime or version change.
+
+## 0.55.57 - 2026-10-21, locally validated source candidate
+
+Endpoint-scoped OAuth client tokens and WIF tokens can be configured from
+60 seconds to 604800 seconds, inclusive, in whole seconds. The default is
+3600 seconds. Connect, Settings and the WIF trust form offer common-value
+dropdowns alongside editable inputs, including custom values such as 61.
+Clearing an endpoint override restores inheritance.
+
+A WIF trust override takes precedence over the endpoint WIF setting.
+The verified assertion's remaining validity still caps the issued token, so a
+short-lived assertion can correctly produce a token shorter than 60 seconds.
+Existing tokens are not revoked or rewritten. Global OAuth lifetime, static
+credential retention and authentication-method enablement are unchanged.
+
+All six local matrix modes pass. The versioned Docker candidate passes
+1811 live assertions, 24 shipping-entrypoint contracts and all 327 browser
+cases without skips or flakes; local Node independently passes 1811 live
+assertions. Both report 0.55.57. The preserved original stash and separate
+validation resources keep the parallel release cycle untouched.
+
+This version is not deployed by this consolidation work. Normal publication,
+reviewed exact-tip CI and merge are PR-controlled release boundaries, not
+inferred from local passes. Existing deployed 0.55.56 receipts below are not
+evidence for a 0.55.57 deployment. Operator visual verification remains a
+later deployment requirement.
+See the [active validation handoff](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#authorized-release-consolidation-2026-10-21).
 
 ## 0.55.56 - 2026-10-17
 

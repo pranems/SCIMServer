@@ -1,9 +1,13 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
 
-> **Version:** 0.55.56 - **Updated:** 2026-10-16
-> 6 presets - **37 endpoint settings controls** (20 boolean flags + 3 enums + 14 numerics) - profile-driven User, Group, and custom ResourceType forms
+> **Version:** 0.55.57 - **Updated:** 2026-10-16
+> 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
+
+**Unreleased preparation:** [endpoint token lifetime integration and original
+TDD evidence](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md) distinguishes the
+current-master port from earlier isolated validation and deployed behavior.
 
 ### Start here
 

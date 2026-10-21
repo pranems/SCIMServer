@@ -16236,6 +16236,18 @@ Invoke-ScimProfileRevisionContract -BaseUrl $baseUrl -Headers $headers
 . "$PSScriptRoot\live-test-sections\minimal-group-members.ps1"
 Invoke-MinimalGroupMembersContract -BaseUrl $baseUrl -Headers $headers
 
+# TEST SECTION 9z-DR: Endpoint token lifetimes
+$script:currentSection = "9z-DR: Endpoint token lifetimes"
+try {
+    # Keep the HTTP recorder's script scope, but isolate the helper's local variables.
+    $lifetimeResults = @(& { . "$PSScriptRoot\test-token-lifetime-live.ps1" -BaseUrl $baseUrl -Headers $headers })
+    foreach ($lifetimeResult in $lifetimeResults) {
+        Test-Result -Success $lifetimeResult.Success -Message "9z-DR: $($lifetimeResult.Message)"
+    }
+} catch {
+    Test-Result -Success $false -Message "9z-DR: token lifetime checks failed: $($_.Exception.Message)"
+}
+
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"

@@ -22,6 +22,22 @@ import {
 } from './endpoint-config.interface';
 
 describe('endpoint-config.interface', () => {
+  describe.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('%s lifetime policy', (key) => {
+    it('publishes a one-hour default with one-minute-to-one-week bounds', () => {
+      expect(Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS)).toContainEqual(
+        expect.objectContaining({ key, type: 'number', default: 3600, min: 60, max: 604800 }),
+      );
+    });
+
+    it.each([60, 61, 3600, 7200, 86400, 604800, '7200'])('accepts %s seconds', (value) => {
+      expect(() => validateEndpointConfig({ [key]: value })).not.toThrow();
+    });
+
+    it.each([0, 59, 604801, 60.5, '3600.5', null, true, '', 'no', Infinity, NaN])('rejects %s', (value) => {
+      expect(() => validateEndpointConfig({ [key]: value })).toThrow();
+    });
+  });
+
   describe('ENDPOINT_CONFIG_FLAGS', () => {
     it('does not expose the retired per-endpoint credentials umbrella', () => {
       expect(ENDPOINT_CONFIG_FLAGS).not.toHaveProperty('PER_ENDPOINT_CREDENTIALS_ENABLED');

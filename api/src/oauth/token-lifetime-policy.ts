@@ -1,0 +1,3 @@
+export const TOKEN_LIFETIME_MIN_SEC = 60;
+export const TOKEN_LIFETIME_DEFAULT_SEC = 3600;
+export const TOKEN_LIFETIME_MAX_SEC = 604800;

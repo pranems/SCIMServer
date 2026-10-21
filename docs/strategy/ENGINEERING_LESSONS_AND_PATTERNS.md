@@ -16,6 +16,32 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Composite edits must share history without sharing form-control identity
+
+Sharing a controlled value does not mean a preset shares the input's Undo
+history: EditableField correctly treats an edit that bypasses its dispatcher
+as an external refresh. Route every user edit through the same dispatcher,
+ignore unchanged selections, and preserve genuine refresh behavior.
+Keep accessory controls outside Fluent Field's control context so they do not
+inherit the input's generated HTML ID. Regression coverage must assert distinct
+real control IDs, preset Undo/Redo/Reset, zero writes during internal focus
+changes, and the persisted/minted outcome of a clear-to-inherit action.
+An empty input with a default placeholder does not prove that a server override
+was removed. The [lifetime review ledger](../auth/EXECUTION_ISSUES_AND_RCA.md#publishing-and-interaction-review-issues)
+records the actual unit/browser RED controls and their fixes.
+
+### Worker startup errors require first-cause classification
+
+A worker-start timeout can be the final wrapper for an earlier fatal heap
+allocation error. During lifetime consolidation, both integration web attempts
+inherited a 512 MiB API-oriented heap limit; reducing concurrency alone did not
+fix it. Inspect and record the first fatal or causal stack before a retry.
+Budget worker concurrency independently from each worker's heap, and do not
+carry a benchmark-specific memory cap into unrelated React gates. Removing
+that cap while retaining two workers passes the two heavy component suites,
+122 tests; complete-matrix success remains a separate claim.
+See the [consolidation execution ledger](../auth/EXECUTION_ISSUES_AND_RCA.md#authorized-lifetime-release-consolidation-2026-10-21).
+
 ### Startup redaction must cover shell output and application messages
 
 A container entrypoint can disclose a connection URI even when application
@@ -508,7 +534,40 @@ and [pipeline contract](../../scripts/test/dev-deployment-pipeline.contract.ps1)
 the [execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) records the
 confirmed RED/GREEN controls and their live-validation boundary.
 
+**PA-13 extension, 2026-10-21:** A skipped data-view assertion needs proof that
+the data is actually absent, not merely still loading. The complete private
+Docker browser run skipped Operations bounds while its real feed held 18 users:
+the toolbar was visible before the first row. Await the actual successful
+response, validate its resource array, and use that completed result for an
+empty-data decision before awaiting the rendered outcome. The
+[Operations spec](../../web/e2e/operations-page.spec.ts) now applies that guard;
+the [lifetime RCA](../auth/EXECUTION_ISSUES_AND_RCA.md) retains the one-skip
+completeness RED and the focused zero-skip GREEN. No fixed sleep or weaker
+coverage policy is needed.
+
 ### Category B - Cross-environment and deployment drift
+
+**Token-lifetime validation lesson (2026-10-20):** when a configurable bound
+changes, test both the configuration validator and the final serialized
+outcome. The old issuer clamp would silently defeat a newly accepted range.
+Use one backend policy for bounds and defaults, then assert `expires_in` and
+JWT `exp - iat` at both limits. Composite editable controls must save when
+focus leaves the complete control, not when it moves to an Undo button.
+Finally, a PowerShell helper that inherits the caller's HTTP-recording
+functions must be smoke-tested through that caller: a standalone pass cannot
+detect script-scope counter corruption. These gaps are covered in-place by
+the token-lifetime unit, HTTP, browser and full live tests.
+
+**Loopback timing lesson (same execution):** a local latency failure can
+measure hostname-dependent transport overhead rather than application work.
+The same Docker root request took 2036-2091 ms via `localhost` and 5-8 ms
+via `127.0.0.1`. The unchanged 1499-assertion suite passed on literal IPv4,
+including its original 1500 ms credential-rejection budget at 10 ms.
+Preflight a cheap route and authenticated API readiness on the intended
+address before a local timing gate. Do not raise the budget or dismiss the
+failure as noise; preserve the failed measurement and full recovered run.
+The exact resolver/connection mechanism needs tracing before attributing this
+specifically to IPv6 or a particular operating-system implementation.
 
 Values that differ silently across local / Docker / Azure.
 
@@ -798,3 +857,23 @@ requests and preserve baseline/candidate/candidate/baseline order.
 Use official standards text for compatibility conclusions: a discovery summary
 incorrectly forbade relative references, but direct RFC verification prevented
 a false implementation rule. See [the complete measurements and limits](../RESPONSIVE_ENDPOINT_INVENTORY.md#matched-measurement-and-quota-sensitivity).
+
+## Port behavior, not just conflict-free text
+
+2026-10-21: A token-lifetime feature port crossed 390 master commits. Clean
+merges still retained obsolete authentication flags and duplicated test mocks;
+newer contracts also allowed null as an inheritance reset and moved Edit
+behind More. Repeat real RED on the target revision and preserve its current
+contracts. Compare static debt against that exact revision rather than copying
+the source branch's baseline.
+
+A disclosure may preserve its open state when its contextual contents change.
+Blindly clicking its header can close it; an input can remain briefly fillable
+during the closing animation. Browser helpers must check `aria-expanded`,
+then assert the edited value and the persisted/minted outcome. Do not fix this
+test error by making production panels always open or adding sleeps.
+
+Include the server's effective log level in live-fixture preflight: suppressing
+INFO output also suppresses ring-buffer evidence that an observability gate
+is meant to verify. Require authenticated readiness after every restart.
+See the [integration execution issues](../auth/EXECUTION_ISSUES_AND_RCA.md#current-master-lifetime-integration-preparation-2026-10-21).

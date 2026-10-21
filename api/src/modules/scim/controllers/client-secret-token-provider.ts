@@ -21,6 +21,8 @@ import { OAuthService } from '../../../oauth/oauth.service';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import type { AuthCheck } from '../../../oauth/auth-decision-trace';
+import { EndpointService, type EndpointResponse } from '../../endpoint/services/endpoint.service';
+import { ENDPOINT_CONFIG_FLAGS, getConfigNumber } from '../../endpoint/endpoint-config.interface';
 
 /** The already-parsed client_secret request (W2.2 union member fields). */
 export interface ClientSecretMintRequest {
@@ -32,7 +34,7 @@ export interface ClientSecretMintRequest {
 
 /** Three-outcome result the controller turns into a response + decision event. */
 export type ClientSecretMintOutcome =
-  | { outcome: 'accept'; token: AccessToken; checks: AuthCheck[] }
+  | { outcome: 'accept'; token: AccessToken; checks: AuthCheck[]; endpointProfile: EndpointResponse['profile'] }
   | { outcome: 'reject'; reasonCode: string; checks: AuthCheck[] };
 
 @Injectable()
@@ -41,6 +43,8 @@ export class ClientSecretTokenProvider {
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly oauthService: OAuthService,
+    @Inject(EndpointService)
+    private readonly endpointService: Pick<EndpointService, 'getEndpoint'>,
   ) {}
 
   /**
@@ -132,14 +136,16 @@ export class ClientSecretTokenProvider {
       return { outcome: 'reject', reasonCode: 'oauth_client_auth_failed', checks };
     }
 
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    const ttlSec = getConfigNumber(endpoint.profile?.settings, ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_TOKEN_TTL_SEC);
     const token = await this.oauthService.generateEndpointAccessToken(
       endpointId,
       req.clientId,
       req.scope,
       // W3.8 (guide 13.4) - name the profile that authorized this mint so a
       // consumer can tell a plain client_secret token from a federated one.
-      { authMethod: 'client_secret' },
+      { authMethod: 'client_secret', ttlSec },
     );
-    return { outcome: 'accept', token, checks };
+    return { outcome: 'accept', token, checks, endpointProfile: endpoint.profile };
   }
 }

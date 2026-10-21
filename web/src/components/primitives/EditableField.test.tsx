@@ -106,6 +106,39 @@ describe('EditableField', () => {
     expect((screen.getByTestId('ef-redo-button') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('includes accessory edits in history but resets the baseline on a genuine external refresh', () => {
+    function AccessoryHarness() {
+      const [value, setValue] = React.useState('original');
+      return (
+        <>
+          <EditableField
+            label="value"
+            value={value}
+            onChange={setValue}
+            data-testid="ef"
+            renderControls={(edit: (next: string) => void) => (
+              <button onClick={() => edit('preset')}>Choose preset</button>
+            )}
+          />
+          <button onClick={() => setValue('refreshed')}>Refresh resource</button>
+        </>
+      );
+    }
+    renderWithFluent(<AccessoryHarness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose preset' }));
+    expect(screen.getByTestId('ef-input')).toHaveValue('preset');
+    fireEvent.click(screen.getByTestId('ef-undo-button'));
+    expect(screen.getByTestId('ef-input')).toHaveValue('original');
+    fireEvent.click(screen.getByTestId('ef-redo-button'));
+    expect(screen.getByTestId('ef-input')).toHaveValue('preset');
+    fireEvent.click(screen.getByTestId('ef-reset-button'));
+    expect(screen.getByTestId('ef-input')).toHaveValue('original');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh resource' }));
+    expect(screen.getByTestId('ef-input')).toHaveValue('refreshed');
+    expect(screen.getByTestId('ef-undo-button')).toBeDisabled();
+    expect(screen.getByTestId('ef-reset-button')).toBeDisabled();
+  });
+
   it('disabling the field disables all action buttons', () => {
     renderWithFluent(
       <EditableField

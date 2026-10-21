@@ -1,6 +1,34 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-17
+**Last verified:** 2026-10-21
+
+### Isolated token-lifetime release consolidation (2026-10-21)
+
+| Date | Summary |
+|---|---|
+| 2026-10-21 | Final isolated 0.55.57 local gates pass: all six modes; 6128 API units per backend; full HTTP 2532 Prisma / 2528 InMemory plus four backend exclusions; 1655 Web tests with passing coverage; 1811 live assertions on each of final Node and Docker; 24 shipping-entrypoint contracts; complete Docker browser 327/327, zero skips/flakes and unchanged pixel baselines. Both runtime versions are verified, all 18 Docker fixture IDs remain and Node returns to zero endpoints. Public-CI version-only locks from run `39644598993` are independently accepted at `abb90c9f`; source corrections were accepted at `577baf07`. PR-controlled normal push, exact-tip CI and reviewed merge are separate from this pre-merge receipt. No cloud deployment. |
+| 2026-10-21 | Security prerequisite #247 merged normally as `d9feb624` after exact-tip CI and a substantive independent automated review; GitHub Copilot's billing error was not counted as review. The feature has separate test/runtime/docs/0.55.57 bootstrap commits and integrates merged master without history rewrite. Review found three UI interaction gaps; real browser RED reproduces all three. Corrections pass 82 focused unit tests and all three targeted journeys across the first run and one repaired assertion. Final complete matrix, versioned CI lockfiles, feature PR/CI/review/merge and Docker browser remain pending. |
+| 2026-10-21 | Full seeded private browser passes 326/326 with zero skips/flakes and unchanged pixel baselines. Separate exact Vite 8.1.6 patch uses a verified public CI lockfile and audits at zero vulnerabilities; final normal Validate push is active. Two integration web attempts failed because a 512 MiB benchmark heap cap leaked into React workers; removing it with two workers passes 122 heavy-component tests. Final matrix, version, review and merge remain pending. |
+| 2026-10-21 | Operator authorized release consolidation, version bump, normal-hook push, PR and reviewed green merge. Fresh PostgreSQL HTTP passes 2532 tests. TDD fixes enforce unique Settings roots and one authoritative OAuth policy snapshot per mint. Extended PostgreSQL benchmark passes the 10-percent regression threshold after eliminating the duplicate observation read. Six-mode matrix and separate minimal Vite security prerequisite are in progress; no cloud deployment or customer promotion. |
+| 2026-10-21 | Prepared the uncommitted token-lifetime port on `feat/endpoint-token-ttl-integration-20261021`, based on master `36724c49` / 0.55.56. Fresh local results: 6128 API units, 70 focused HTTP, 1643 Web tests with coverage and 1811 complete in-memory live assertions pass. The original worktree and stash `064483284a56ce5f135afb8b09ed63c06f3b368f` are untouched. Commit, push, PR and deployment remain held. |
+
+The original base is 390 commits behind this integration base; 29 modified
+tracked paths also changed upstream. Fresh assertion RED was captured before
+runtime edits. Preserve current authentication method gating, fixed secret
+retention, collapsed contextual panels and effective JWKS controls.
+See [the active integration checkpoint](docs/auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#current-master-integration-preparation-2026-10-21).
+
+Earlier rows preserve their checkpoint-time holds, not the current local-gate
+state. Final Web coverage is lines 85.74%, branches 75.89%, functions 75.53%
+and statements 83.06%, above unchanged floors. Build/size and structured
+documentation checks pass. API lint remains 0 errors / 513 warnings; all
+66 frontend type diagnostics match the exact baseline. Vite 8.1.6 closes the
+inherited High advisory; final Web audit is zero and API retains 23 Moderate,
+zero High/Critical. The final-image browser run caught a loading-state skip;
+its existing bounds spec now waits for actual data and executes without skips.
+The original stash remains intact. Older deployed receipts below were not
+renewed by these isolated checks. Operator visual approval and cloud deployment
+remain separate boundaries.
 
 **Current delivery:** PR #244 merged as `d43959e1`. Version 0.55.56 is
 published by successful canonical run `39043579816` and deployed to dev

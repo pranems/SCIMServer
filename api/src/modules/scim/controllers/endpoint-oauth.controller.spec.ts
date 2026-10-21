@@ -35,16 +35,17 @@ function makeController(opts: {
   const credentialRepo: any = {
     findActiveByEndpoint: jest.fn().mockResolvedValue(opts.credentials ?? []),
   };
-  const endpointService = opts.endpointService
-    ? {
-        getCachedEndpointDisplayName: jest.fn().mockReturnValue(undefined),
-        ...opts.endpointService,
-      }
-    : null;
+  const endpointService = {
+    getEndpoint: jest.fn().mockResolvedValue({ profile: { settings: {} } }),
+    getCachedEndpointDisplayName: jest.fn().mockReturnValue(undefined),
+    ...opts.endpointService,
+  };
   // W2.3 - the controller delegates the client_secret mint to the real provider,
   // constructed here with the mock repo + oauthService so the existing setup
   // (credentials + secrets) still drives the mint through the extracted logic.
-  const clientSecretProvider = new ClientSecretTokenProvider(credentialRepo, oauthService);
+  const clientSecretProvider = new ClientSecretTokenProvider(
+    credentialRepo, oauthService, endpointService,
+  );
   const controller = new EndpointOAuthController(
     clientSecretProvider,
     logger,
@@ -292,11 +293,13 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     expect(endpointService.getEndpoint).toHaveBeenCalledWith(ENDPOINT_ID);
   });
 
-  it('W2.5 shadow: an endpoint lookup error never blocks a mint (fails open)', async () => {
+  it('W2.5 shadow: reuses the authoritative policy snapshot without a second endpoint lookup', async () => {
     const bcrypt = require('bcrypt');
     const hash = await bcrypt.hash('right-secret', 4);
     const endpointService: any = {
-      getEndpoint: jest.fn().mockRejectedValue(new Error('boom')),
+      getEndpoint: jest.fn()
+        .mockResolvedValueOnce({ profile: { settings: {} } })
+        .mockRejectedValueOnce(new Error('boom')),
     };
     const { controller, oauthService } = makeController({
       credentials: [{ credentialType: 'oauth_client', credentialHash: hash, metadata: { clientId: 'epc_x' } }],
@@ -309,6 +312,27 @@ describe('EndpointOAuthController routing cascade (A3)', () => {
     });
     expect(res.access_token).toBe('secret-path-token');
     expect(oauthService.generateEndpointAccessToken).toHaveBeenCalled();
+    expect(endpointService.getEndpoint).toHaveBeenCalledTimes(1);
+    expect(Object.keys(res).sort()).toEqual(['access_token', 'expires_in', 'scope', 'token_type']);
+  });
+
+  it('does not mint when the authoritative endpoint lifetime policy lookup fails', async () => {
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('right-secret', 4);
+    const endpointService = {
+      getEndpoint: jest.fn().mockRejectedValue(new Error('endpoint policy unavailable')),
+    };
+    const { controller, oauthService } = makeController({
+      credentials: [{ credentialType: 'oauth_client', credentialHash: hash, metadata: { clientId: 'epc_x' } }],
+      endpointService,
+    });
+
+    await expect(controller.getToken(ENDPOINT_ID, {
+      grant_type: 'client_credentials',
+      client_id: 'epc_x',
+      client_secret: 'right-secret',
+    })).rejects.toThrow('endpoint policy unavailable');
+    expect(oauthService.generateEndpointAccessToken).not.toHaveBeenCalled();
   });
 
   it('WI-D4: emits exactly one AUTH decision event (accept) on a successful oauth_client mint', async () => {
