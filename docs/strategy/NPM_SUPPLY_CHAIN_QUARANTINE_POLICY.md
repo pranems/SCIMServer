@@ -41,6 +41,12 @@ was insufficient. Update the existing user-facing release notes before the
 next dependency-manifest push; the gate remains unchanged. The failed push
 published no branch and did not bypass its hook.
 
+**Artifact review:** run `39611974515` passed provenance and age checks, but
+the caret range selected Vite 8.3.4 and refreshed its transitive build stack.
+That artifact was not applied. Pin Vite exactly to the minimal patched 8.1.6
+and regenerate in CI again; discard the unrequested API artifact. A green
+provenance check is not evidence that dependency scope is appropriate.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as

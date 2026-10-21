@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security tooling
 
-- Raise the Vite minimum to 8.1.6 to remediate the three launch-editor
+- Pin Vite to patched 8.1.6 to remediate the three launch-editor
   advisories affecting 8.0.0-8.1.5. This version was published on 2026-10-06,
   exceeding the seven-day quarantine. Lockfile regeneration is owned by the
   existing public-registry CI workflow; the bootstrap manifest commit is not

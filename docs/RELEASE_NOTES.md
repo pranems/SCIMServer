@@ -15,7 +15,7 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
-Build-tooling security preparation raises the Vite minimum to 8.1.6, addressing
+Build-tooling security preparation pins Vite to patched 8.1.6, addressing
 the launch-editor advisories affecting 8.0.0-8.1.5. This patch is older than
 the seven-day quarantine. It does not change the SCIM contract or deployed
 version. The prerequisite is not merge-ready until its CI-generated lockfile,
