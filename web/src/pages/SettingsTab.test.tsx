@@ -13,7 +13,7 @@
  * mutate call and surfaces success / error feedback.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
@@ -104,6 +104,20 @@ describe('SettingsTab', () => {
       isLoading: false,
       error: null,
     });
+  });
+
+  it.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('clears a persisted %s override with null', async (key) => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({ [key]: 604800 }), isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    const input = screen.getByTestId(`settings-number-${key}-input`);
+    expect(input).toHaveValue('604800');
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledExactlyOnceWith({
+      profile: { settings: { [key]: null } },
+    }));
   });
 
   it.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('renders a unique interactive root for %s', (key) => {

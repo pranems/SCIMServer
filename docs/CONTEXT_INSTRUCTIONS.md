@@ -23,13 +23,24 @@ Fresh PostgreSQL HTTP passes 2532 tests. TDD regression guards now enforce uniqu
 Settings roots and one authoritative endpoint lookup per OAuth mint, reusing
 that snapshot for observation-only method diagnostics. The extended matched
 PostgreSQL benchmark passes the 10-percent threshold with equal query counts.
-Full seeded private browser coverage passes 326/326 with zero skips/flakes and
+Earlier seeded private browser coverage passes 326/326 with zero skips/flakes and
 unchanged pixel baselines. The separate exact Vite 8.1.6 patch audits at zero
 vulnerabilities using its verified public CI artifact; its final normal Validate
 push is active. Both integration web attempts inherited an undersized 512 MiB
 benchmark heap limit. Removing that cap with two workers passes 122 heavy
 component tests; final full matrix proof remains pending. No final version or
 merge receipt is claimed yet.
+
+Prerequisite PR #247 subsequently merged normally as `d9feb624` after exact-tip
+CI and substantive independent automated source review. The hosted Copilot
+review produced only a billing error, not an approval. Four feature commits
+bootstrap 0.55.57 and integrate merged master without rewriting history.
+The independent feature review found clear/reset, early-save and preset-history
+gaps that the earlier green browser cases did not assert. Real browser RED
+reproduces all three. Corrections pass 82 focused unit tests; the three journeys
+have successful observations across the first corrected run and one targeted
+test repair, not one final full browser run. All 18 fixture IDs are preserved.
+Final CI-versioned lockfiles, complete matrix and final-image proof remain open.
 
 **Fresh local preparation evidence:** 6128 API units, 70 focused in-memory
 HTTP tests, 1643 Web tests with passing coverage and 1811 complete in-memory

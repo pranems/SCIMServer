@@ -160,7 +160,7 @@ export const EndpointRelatedSettings: React.FC<EndpointRelatedSettingsProps> = (
   const settings = (overview.data.configFlags ?? {}) as Record<string, unknown>;
   const pendingKey = pendingSettingKey(update.variables);
 
-  async function persist(definition: EndpointSettingDefinition, value: boolean | string | number) {
+  async function persist(definition: EndpointSettingDefinition, value: boolean | string | number | null) {
     setFeedback(null);
     try {
       await update.mutateAsync({ profile: { settings: { [definition.key]: value } } });

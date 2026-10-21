@@ -17,18 +17,25 @@ pull request and reviewed merge after the preparation checkpoint below.
 The preserved original stash remains untouched. All local services and
 databases remain task-owned; no cloud deployment has occurred.
 
-The prerequisite is PR #247. Its exact Vite 8.1.6 patch passes the full normal
+The prerequisite is merged PR #247, master
+`d9feb62489967e2faa35acefe3b15bc746096134`. Its exact Vite 8.1.6 patch passes the full normal
 Validate push, including 6072 API units, 2460 HTTP tests plus four exclusions,
-and 1624 Web tests. The lifetime branch is temporarily stacked on that
-published prerequisite, not falsely described as merged master.
+and 1624 Web tests. The lifetime branch integrates that normally merged master
+without rebasing or rewriting its four preparation commits.
 Owned temporary stash `0faea613ca41c2b6835257804537ac229955c477` preserves the
 pre-stack feature; the original preservation stash is untouched. The expected
 changelog overlap was resolved by retaining both the security and feature entries.
 
 GitHub Copilot's review request produced a billing-configuration error, not
 substantive findings. With the operator unavailable, an independent automated
-review of the full release change set will be published on the PRs before
-merge. It is not human approval. Exact-tip CI and actual review remain gates.
+review accepted the prerequisite and requested three Medium lifetime interaction
+fixes. Its prerequisite disposition was published before normal merge, explicitly
+not as human approval. Clear-to-inherit, draft-only presets and preset history
+each reproduce through real browser RED. Corrections pass 82 focused unit tests,
+including two additional no-op/HTML-identity regressions. Two corrected browser
+journeys pass together; the third passes its targeted rerun after preserving the
+full Settings effective-default display. All 18 fixture IDs remain intact.
+The feature still requires follow-up source review and final exact-tip CI.
 
 Fresh consolidation evidence supplements, rather than replaces, the dated
 preparation results:

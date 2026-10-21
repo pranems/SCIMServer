@@ -86,6 +86,76 @@ preparation-only scope. Customer production is not implicitly authorized.
 | Default parallel Vitest pools exceeded shared-host responsiveness | Validation resources / Medium | The prerequisite hook passed 110 files but reported 13 fork-start errors. Concurrent default pools were not suitable for this shared host. The integration runner's superficially similar 61-error summary was initially grouped with this symptom, but its first causal stack proves the separate heap-limit issue below. | Preserve the failure logs and stop only task-owned processes. Installed Vitest supports `VITEST_MAX_WORKERS=2`; the prerequisite's complete bootstrap Validate hook then passes 123 files and 1624 web tests. No assertion, timeout or coverage threshold changed. | Full web gate / bounded-runner preflight / cap concurrency and inspect the first causal stack before attributing worker errors to host contention. |
 | A benchmark-sized heap limit was inherited by the web matrix | Validation environment / Medium | Both integration attempts inherited `NODE_OPTIONS=--max_old_space_size=512`. The first fatal stack reports allocation failure at approximately 508 MiB, followed by 61 worker-start errors. Capping worker count could not fix this independent per-worker heap limit. Reading only the final wrapper summary delayed correct diagnosis by one retry. | Stop the owned failing matrix and archive both attempts. Remove the artificial heap limit while retaining two workers; CredentialsTab and SettingsTab then pass all 122 tests in 34.95 seconds. Full final matrix completion remains pending. API benchmark heap limits are no longer propagated into unrelated React gates. | Second full web failure / first fatal stack in the first full web log / record the earliest fatal or causal message before retrying; configure concurrency and per-worker heap independently, and smoke-test the actual heavy component suites. |
 
+#### Publishing and interaction-review issues
+
+The independent source review accepted prerequisite PR #247, which merged
+normally as `d9feb62489967e2faa35acefe3b15bc746096134` after exact-tip CI.
+It requested three Medium product corrections in the lifetime feature.
+Their RCA severity below is High because the earlier green unit/browser
+receipts did not assert these promised outcomes, not because they are rated
+as High security vulnerabilities. The feature remains unreleased.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / earliest / prevention |
+|---|---|---|---|---|
+| Hosted review returned an error rather than findings | Tooling / Medium | The GitHub Copilot review request was accepted and produced a COMMENTED review whose body reported missing billing configuration. Review state alone did not prove that code was reviewed. | Read the body, record the error, and obtain an independent read-only automated source review of the complete release set when the unavailable operator delegated the practical choice. Publish the actual prerequisite disposition as review `5602719842`, explicitly not human approval. Required exact-tip CI was green before normal merge. | Review body / review body / inspect substantive review output and exact commit, not just COMMENTED state. |
+| Version-header repair omitted the separate version badge | Documentation / Low | Governed header refresh moved to 0.55.57, but README's badge still claimed 0.55.56. The first bootstrap push stopped at C13 before test gates. | Update the badge and the closely coupled 39-setting summary. The unchanged `audit-doc-content.mjs` then passes all 27 docs. Header freshness and source-claim verification are separate claims; no gate was relaxed. | C13 pre-push / version source-claim preflight / run content verification as well as header freshness after version edits. |
+| Clearing a lifetime did not clear its stored policy | UI policy / High | The shared field ignored blank drafts and accepted only numeric commits. Connect could show the default placeholder while the server retained 604800. Settings additionally converted commit values to strings. Previous tests covered initially unset inputs and API null directly, not the UI reset. | Permit a changed blank draft to commit null, carry it through both endpoint consumers, and reuse Settings' numeric persistence path without changing other numeric blank-input behavior. Unit RED confirms missing null writes; browser RED observes the retained 604800 key. Corrected browser checks require key removal and real 3600-second JWT issuance. | Independent source review / focused clear-to-inherit unit and browser tests / assert persisted absence and minted expiry, not placeholder presence. |
+| Preset selection committed before composite exit | UI commit behavior / High | Option selection called onCommit immediately. Earlier tests explicitly expected that early write, although the control's focus boundary was meant to protect draft edits. | Route selection only through draft editing. Save once on leaving the whole composite, not when moving to its input, popup or toolbar. Unit RED observes one premature mutation; browser RED observes one PATCH where zero is required. The corrected journey checks zero writes during internal interactions and exactly one after exit. | Independent source review / preset focus-boundary regression / test request counts and stored values before and after leaving the composite. |
+| Preset edits bypassed Undo and reset ownership | UI history / High | Updating a preset outside EditableField's edit dispatcher looked like an external refresh, clearing history and replacing its loaded baseline. Typed-only Undo tests could not detect this, including in an unsaved trust form. | Add a small optional render-controls slot that receives the existing edit dispatcher; no second history implementation. Presets, typing, Undo, Redo and Reset now share that history. Genuine external refresh still resets its baseline. Unit and unsaved-trust browser RED reproduce disabled Undo; corrected journeys restore the loaded value and make no trust PUT before Save. | Independent source review / preset-to-Undo-to-Redo-to-Reset unit and browser journey / exercise every edit entry path, not only typing. |
+| Re-selecting the current preset created a no-op history entry | UI history / Low | The first history integration pushed an identical string, enabling Undo even though the value did not change. | A focused test first fails, then selection ignores the unchanged draft. The same full control suites pass; browser coverage requires Undo to remain disabled when re-selecting a loaded preset. | Focused composition unit / focused composition unit / assert no history or network change for unchanged selections. |
+| Shared Field context duplicated HTML control identities | UI accessibility / Medium | Placing the accessory Dropdown inside Fluent Field gave it the input's generated control ID. The first integrated suites did not check that identity, so a second targeted RED was added before commit. | Render the accessory beside Field while retaining the same edit dispatcher and outer composite. Consumers without an accessory keep their original DOM. Distinct-ID assertions first observe the duplicated `field-...__control`, then pass with all 82 focused tests. | Focused composition unit / focused composition unit / share history, not framework form-control identity; assert unique real IDs as well as test IDs. |
+| A browser assertion confused contextual inheritance with full inventory display | Test correctness / Medium | Reset successfully removed the key and minted a 3600-second JWT, but the new test expected a blank full Settings input. The existing full inventory intentionally displays the effective default, while contextual Connect leaves inheritance blank. | Preserve production display behavior. Assert 3600 in full Settings, an absent stored key, real JWT expiry, and a blank inherited value after returning to Connect. The failed case then passes alone in 6.0 seconds; the other two corrected journeys had already passed. | Focused browser GREEN attempt / cross-surface display contract review / distinguish effective-value display from persisted configuration instead of forcing one representation everywhere. |
+| Playwright positional paths were interpreted as regex selectors | Tooling / Low | Windows backslashes in positional file selectors produced No tests found. This was discovery failure, not behavioral RED. | Preserve that log and use the unambiguous test filenames. The rerun discovers all three intended journeys and reproduces the three actual defects independently. | CLI discovery / CLI smoke / distinguish filesystem paths from regex arguments and require an observed test count. |
+| Inventory readiness counted the envelope rather than its resources | Tooling / Low | The authenticated readiness response was counted as one object because it is a paged envelope, not an endpoint array. | Inspect its actual keys, then use `endpoints`: 18 resources. Before/after ID comparison confirms all 18 fixture endpoints remain and no regression endpoint leaks. No API response contract changed. | Readiness inspection / response-shape inspection / validate the resource array and preserved IDs, not the wrapper count. |
+
+The 82-test focused GREEN follows ten original review-regression failures
+and two additional composition failures. Browser RED uses the retained
+pre-fix bundle from the bootstrap build, not a deliberately mocked failure.
+Its three screenshots were opened: an apparently inherited empty field with
+an unchanged server policy, a premature Saved message, and disabled trust Undo.
+There were no pixel-diff artifacts and no baseline was regenerated.
+The corrected bundle was verified byte-for-byte through a freshly restarted
+preview. Two journeys pass in the first corrected run; the inherited-display
+test correction then passes its single-case rerun. These are not represented
+as one final three-case pass. Final-image full browser and full matrix remain
+separate gates.
+
+#### Current consolidation issue dashboard
+
+The eight earlier consolidation entries and ten entries above total 18 issues.
+Counts describe root-cause entries, not failed assertions or retry attempts.
+The diagrams cover this consolidation subsection only; the original build's
+charts below retain their historical scope.
+
+```mermaid
+pie showData
+  title Consolidation issues by grouped type
+  "Harness and environment" : 6
+  "UI behavior and identity" : 6
+  "Tooling and documentation" : 5
+  "Performance" : 1
+```
+
+```mermaid
+pie showData
+  title Consolidation issues by RCA severity
+  "High - green-but-blind outcome coverage" : 3
+  "Medium" : 9
+  "Low" : 6
+```
+
+The detection-stage view shows where each distinct root cause was found.
+Its independent-review cluster is the three missing interaction outcomes;
+the subsequent focused-unit cluster is the two composition edge cases.
+
+```mermaid
+xychart-beta
+  title "Issues by detection activity"
+  x-axis ["Preflight", "Source", "Benchmark", "Full browser", "Tooling", "Review request", "Full web", "Version", "Source review", "Focused unit", "UI smoke"]
+  y-axis "Issues" 0 --> 3
+  bar [1, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1]
+```
+
 **Self-improvement: applied.** The new component tests explicitly enforce
 root uniqueness; browser coverage checks it in the existing real-issuance
 journey. **Design disposition: accepted.** One local boolean avoids repeated

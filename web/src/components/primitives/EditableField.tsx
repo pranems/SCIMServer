@@ -130,6 +130,8 @@ export interface EditableFieldProps {
   validationMessage?: string;
   /** Validation state driving the message styling. Default 'error'. */
   validationState?: 'error' | 'warning' | 'success' | 'none';
+  /** Additional edit controls that share the input's history and reset baseline. */
+  renderControls?: (changeValue: (next: string) => void) => React.ReactNode;
 }
 
 const HISTORY_CAP = 50;
@@ -148,6 +150,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   hideButtons = false,
   validationMessage,
   validationState = 'error',
+  renderControls,
 }) => {
   const classes = useStyles();
   const { copy, status } = useCopyToClipboard();
@@ -258,7 +261,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     />
   );
 
-  return (
+  const field = (
     <Field
       label={label}
       className={classes.root}
@@ -322,4 +325,11 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       </div>
     </Field>
   );
+
+  return renderControls ? (
+    <div className={classes.root}>
+      {field}
+      {renderControls(handleChange)}
+    </div>
+  ) : field;
 };

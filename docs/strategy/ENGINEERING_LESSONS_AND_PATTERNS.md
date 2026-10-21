@@ -16,6 +16,20 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Composite edits must share history without sharing form-control identity
+
+Sharing a controlled value does not mean a preset shares the input's Undo
+history: EditableField correctly treats an edit that bypasses its dispatcher
+as an external refresh. Route every user edit through the same dispatcher,
+ignore unchanged selections, and preserve genuine refresh behavior.
+Keep accessory controls outside Fluent Field's control context so they do not
+inherit the input's generated HTML ID. Regression coverage must assert distinct
+real control IDs, preset Undo/Redo/Reset, zero writes during internal focus
+changes, and the persisted/minted outcome of a clear-to-inherit action.
+An empty input with a default placeholder does not prove that a server override
+was removed. The [lifetime review ledger](../auth/EXECUTION_ISSUES_AND_RCA.md#publishing-and-interaction-review-issues)
+records the actual unit/browser RED controls and their fixes.
+
 ### Worker startup errors require first-cause classification
 
 A worker-start timeout can be the final wrapper for an earlier fatal heap

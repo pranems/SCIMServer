@@ -28,7 +28,7 @@ interface TokenLifetimeFieldProps {
   label: string;
   value: string;
   onChange?: (value: string) => void;
-  onCommit?: (value: number) => void;
+  onCommit?: (value: number | null) => void;
   disabled?: boolean;
   placeholder?: string;
   'data-testid': string;
@@ -49,7 +49,7 @@ export const TokenLifetimeField: React.FC<TokenLifetimeFieldProps> = ({
     <div onBlur={(event) => {
       if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
       const raw = draft.trim();
-      if (raw && !tokenLifetimeError(raw) && raw !== value) onCommit?.(Number(raw));
+      if (!tokenLifetimeError(raw) && raw !== value) onCommit?.(raw === '' ? null : Number(raw));
     }}>
       <EditableField
         label={label}
@@ -59,23 +59,24 @@ export const TokenLifetimeField: React.FC<TokenLifetimeFieldProps> = ({
         placeholder={placeholder}
         validationMessage={tokenLifetimeError(draft)}
         data-testid={testId}
+        renderControls={(edit) => (
+          <Dropdown
+            aria-label={`${label} common values`}
+            value={preset ? `${preset[1]} (${preset[0]} seconds)` : draft ? 'Custom lifetime' : 'Choose a common lifetime'}
+            selectedOptions={preset ? [String(preset[0])] : []}
+            disabled={disabled}
+            inlinePopup
+            onOptionSelect={(_, data) => {
+              if (data.optionValue && data.optionValue !== draft) edit(data.optionValue);
+            }}
+            data-testid={`${testId}-presets`}
+          >
+            {PRESETS.map(([seconds, text]) => (
+              <Option key={seconds} value={String(seconds)}>{`${text} (${seconds} seconds)`}</Option>
+            ))}
+          </Dropdown>
+        )}
       />
-      <Dropdown
-        aria-label={`${label} common values`}
-        value={preset ? `${preset[1]} (${preset[0]} seconds)` : draft ? 'Custom lifetime' : 'Choose a common lifetime'}
-        selectedOptions={preset ? [String(preset[0])] : []}
-        disabled={disabled}
-        onOptionSelect={(_, data) => {
-          if (!data.optionValue) return;
-          change(data.optionValue);
-          onCommit?.(Number(data.optionValue));
-        }}
-        data-testid={`${testId}-presets`}
-      >
-        {PRESETS.map(([seconds, text]) => (
-          <Option key={seconds} value={String(seconds)}>{`${text} (${seconds} seconds)`}</Option>
-        ))}
-      </Dropdown>
     </div>
   );
 };

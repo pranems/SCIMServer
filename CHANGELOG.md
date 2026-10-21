@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unique interactive Settings roots and one authoritative endpoint lookup per
   OAuth mint. Reusing that snapshot for observation avoids a second SQL read
   without caching policy or exposing internal metadata in token responses.
+- **Independent review corrections:** clearing an endpoint lifetime writes
+  null to restore inheritance; preset selection remains a draft until the full
+  control loses focus; presets share input Undo/Redo/Reset. Ten observed unit
+  failures and three real browser failures reproduce those gaps. Additional
+  RED guards prevent no-op history and duplicate Fluent control IDs; the final
+  focused suite passes 82 tests. Existing fields without accessory controls
+  keep their original DOM and external-refresh behavior.
 - **Observed before/after evidence:** API unit 6072 -> 6128, 211 suites;
   full PostgreSQL HTTP 2520 -> 2532, 119 suites; full in-memory HTTP
   2516 -> 2528 plus the same four backend exclusions; complete local live

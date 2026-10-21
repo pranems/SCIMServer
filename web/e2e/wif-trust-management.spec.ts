@@ -157,6 +157,17 @@ test.describe('WIF trust management (2026-07 overhaul)', () => {
     await expect(lifetime).toHaveValue('');
     await page.getByTestId('wif-field-token-ttl-presets').click();
     await page.getByRole('option', { name: '1 week (604800 seconds)', exact: true }).click();
+    await expect(lifetime).toHaveValue('604800');
+    await expect(page.getByTestId('wif-field-token-ttl-undo-button')).toBeEnabled();
+    await page.getByTestId('wif-field-token-ttl-undo-button').click();
+    await expect(lifetime).toHaveValue('');
+    await page.getByTestId('wif-field-token-ttl-redo-button').click();
+    await expect(lifetime).toHaveValue('604800');
+    await page.getByTestId('wif-field-token-ttl-reset-button').click();
+    await expect(lifetime).toHaveValue('');
+    expect(saved).toHaveLength(0);
+    await page.getByTestId('wif-field-token-ttl-presets').click();
+    await page.getByRole('option', { name: '1 week (604800 seconds)', exact: true }).click();
     await page.getByTestId('wif-trust-edit-save-wt-a').click();
     await expect.poll(() => saved.length).toBe(1);
     expect(saved[0].issuedTokenTtlSec).toBe(604800);

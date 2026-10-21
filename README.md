@@ -5,16 +5,17 @@
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
 **What's new and how to upgrade:** [User-facing release notes](docs/RELEASE_NOTES.md)
-cover 0.55.56, cumulative changes since 0.55.20, migration/rollback steps and
-known limits. See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
+cover the 0.55.57 source consolidation, the deployed 0.55.56 checkpoint,
+cumulative changes since 0.55.20, migration/rollback steps and known limits.
+See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
 
 For actual supported shapes and integration limits, see
 [SCIM/Entra compatibility](docs/SCIM_ENTRA_COMPATIBILITY.md) and
-[the 37-setting behavior/evidence matrix](docs/SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
+[the 39-setting behavior/evidence matrix](docs/SCIM_SETTINGS_BEHAVIOR_EVIDENCE.md).
 Keep strict validation enabled for Entra; diagnose the request and effective
 schema before applying a targeted compatibility setting.
 
-[![Version](https://img.shields.io/badge/version-0.55.56-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.57-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()

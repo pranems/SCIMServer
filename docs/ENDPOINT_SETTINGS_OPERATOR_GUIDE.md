@@ -77,8 +77,9 @@ This avoids presenting the same common setting in both Users and Groups, where a
 inventory and WIF trust forms provide editable whole-second inputs plus common
 presets from one minute to one week. The default is 3600 seconds; custom values
 such as 61 are valid. `OAuthClientTokenTtlSec` controls endpoint OAuth tokens;
-`WifTokenTtlSec` controls WIF tokens without a trust override. Clearing a trust
-override restores endpoint inheritance. The admin API's existing numeric-setting
+`WifTokenTtlSec` controls WIF tokens without a trust override. Clearing an
+endpoint input and leaving the full control removes that endpoint override.
+Clearing a trust override restores endpoint inheritance. The admin API's existing numeric-setting
 `null` reset clears either endpoint override rather than configuring a null
 lifetime.
 WIF assertion expiry can produce a shorter token; a configured minimum never
@@ -302,7 +303,14 @@ Open **Endpoints -> (your endpoint) -> Settings**.
 
 ![Settings tab](screenshots/prod-09-settings.png)
 
-Each control saves immediately on change and confirms with a green **Saved** message bar. There is no separate Save button.
+Switches and ordinary dropdowns save immediately and confirm with a green
+**Saved** message bar. Token-lifetime inputs and their common-value presets
+share one draft: moving between the input, preset selector and Copy/Undo/Redo/
+Reset buttons does not save. Leaving the entire control saves the final value
+once. Choosing the unchanged preset does not create an Undo entry, and clearing
+an endpoint lifetime restores the server default. WIF trust edits still use
+their explicit **Save changes** button; clearing their override means inheriting
+the endpoint WIF lifetime.
 
 ---
 

@@ -127,10 +127,28 @@ describe('EndpointRelatedSettings', () => {
     expandPanel();
     fireEvent.click(screen.getByTestId(`related-settings-${key}-presets`));
     fireEvent.click(screen.getByRole('option', { name: '1 week (604800 seconds)' }));
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    fireEvent.blur(screen.getByTestId(`related-settings-${key}-presets`));
     await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
       profile: { settings: { [key]: 604800 } },
     }));
     expect(screen.getByTestId(`related-settings-${key}-input`)).toHaveValue('604800');
+  });
+
+  it.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('clears a persisted %s override with null', async (key) => {
+    mockUseEndpointOverview.mockReturnValue({
+      data: { ...overview, configFlags: { ...overview.configFlags, [key]: 604800 } },
+      isLoading: false, error: null,
+    });
+    renderPanel([key]);
+    expandPanel();
+    const input = screen.getByTestId(`related-settings-${key}-input`);
+    expect(input).toHaveValue('604800');
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledExactlyOnceWith({
+      profile: { settings: { [key]: null } },
+    }));
   });
 
   it.each([59, 604801, 60.5])('rejects invalid custom lifetime %s without saving', async (value) => {
