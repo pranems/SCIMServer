@@ -1,12 +1,21 @@
 # Global navigation and workflow context
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
 
 See [current release notes](RELEASE_NOTES.md) for deployment and acceptance
 boundaries. Endpoints now uses available window height, Dashboard uses compact
 left-aligned endpoint rows, and Operations keeps plain endpoint links with
 separate copy/open actions. These presentation changes preserve URL-owned
 selection and Back/Forward context; they do not merge the distinct workflows.
+
+**Unreleased integration preparation (2026-10-21):** Connect's OAuth and WIF
+related-settings disclosures now include token lifetime inputs with presets.
+They retain the existing collapsed-by-default behavior and URL-owned method
+selection. Switching methods can preserve the disclosure's open state, so
+browser tests check `aria-expanded` before expanding it. WIF trust editing
+remains under each trust's More menu. See the
+[isolated integration checkpoint](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#current-master-integration-preparation-2026-10-21);
+this is not a deployed navigation change.
 
 ## Purpose
 

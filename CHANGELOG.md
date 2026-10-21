@@ -21,12 +21,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exclusions, and 1624 Web tests / 123 files. The final patched-toolchain
   normal hook and exact-tip CI remain the merge gates; no product version,
   SCIM contract or deployed estate is changed by this tooling prerequisite.
-
 ### Documentation
 
 - Reconcile actual 0.55.56 dev delivery, customer hold, operational recorder/
   cleanup RCA and liveness-versus-database-readiness lessons. No runtime,
   dependency, migration, version or deployed-artifact change in this closeout.
+
+## [0.55.57] - 2026-10-21
+
+### Added
+
+- **Endpoint token-lifetime port, 2026-10-21:** per-endpoint OAuth and WIF
+  lifetimes accept 60-604800 whole seconds, defaulting to 3600. Connect,
+  Settings and WIF trust forms offer common presets alongside editable inputs.
+  Trust overrides retain precedence; verified assertion expiry remains a cap.
+  Existing method enablement, fixed secret-retention policy and JWKS
+  effective-policy controls are preserved.
+- **TDD and coupled regressions:** fresh API RED observed 30 failures and
+  expanded-panel UI RED observed seven. Additional RED/GREEN guards enforce
+  unique interactive Settings roots and one authoritative endpoint lookup per
+  OAuth mint. Reusing that snapshot for observation avoids a second SQL read
+  without caching policy or exposing internal metadata in token responses.
+- **Observed before/after evidence:** API unit 6072 -> 6128, 211 suites;
+  full PostgreSQL HTTP 2520 -> 2532, 119 suites; full in-memory HTTP
+  2516 -> 2528 plus the same four backend exclusions; complete local live
+  1797 -> 1811; complete seeded browser 324 -> 326, zero skips/flakes and
+  unchanged visual baselines. These are pre-version consolidation receipts.
+  Final patched Web total/coverage, Docker live, shipping-shell contract and
+  final six-mode completion remain pending, not projected passes.
+- **Performance:** 2000 matched measured mints per side pass the unchanged
+  10-percent threshold; baseline/candidate p95 16.358/13.190 ms and p99
+  29.455/25.215 ms. Endpoint selects are equal at 2403 per side including
+  fixture operations. No production capacity claim follows from local timing.
+- **Release state:** API/web manifests move 0.55.56 -> 0.55.57; sanctioned
+  public CI must supply both versioned lockfiles. The separate exact Vite
+  8.1.6 prerequisite has a zero-vulnerability audit and a green normal Validate
+  push. Reviewed exact-tip CI, final gates and merge remain required.
+  No cloud deployment or customer promotion is performed. See the
+  [active release handoff](docs/auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md).
 
 ## [0.55.56] - 2026-10-17
 

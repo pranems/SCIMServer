@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
 
-> **Version:** 0.55.56 - **Updated:** 2026-10-16
+> **Version:** 0.55.57 - **Updated:** 2026-10-16
 > **Current release:** [Release notes, upgrade steps and validation limits](RELEASE_NOTES.md). Earlier isolated P1-P9 receipts remain historical; the correctness consolidation is included in the deployed release.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
@@ -12,6 +12,14 @@
 ---
 
 ## Table of Contents
+
+**Unreleased endpoint token-lifetime port:** endpoint profile settings
+`OAuthClientTokenTtlSec` and `WifTokenTtlSec` accept whole seconds from 60 to
+604800, default 3600. WIF trust `issuedTokenTtlSec` overrides the endpoint
+default; clearing it restores inheritance. A verified assertion's expiry still
+caps issuance. Token response keys and global OAuth behavior do not change.
+See [the request examples](AUTHENTICATION_GUIDE.md#55-configuring-endpoint-access-token-lifetime)
+and [current integration evidence](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#current-master-integration-preparation-2026-10-21).
 
 **Legacy-profile correction, included since 0.55.48:** SCIM controllers capture
 the persisted profile revision and normalized runtime profile together. A

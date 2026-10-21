@@ -1,13 +1,44 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.56
-> **Last Updated**: October 17, 2026
-> **Last verified:** 2026-10-17
+> **Version**: 0.55.57
+> **Last Updated**: October 21, 2026
+> **Last verified:** 2026-10-21
 
 ---
 
 ## Active Delivery Process
+
+**Authorized release consolidation, 2026-10-21:** the token-lifetime port is on
+`feat/endpoint-token-ttl-integration-20261021`, based on `36724c49`.
+It adds 60-604800-second endpoint lifetimes, default 3600, and preset/custom UI
+controls without changing current authentication ownership or WIF assertion
+caps. Earlier 0.55.23 totals are historical, not current-tip validation.
+The original worktree/stash are preserved. The operator subsequently authorized
+remaining validation, versioning, commits, normal-hook pushes, PR and reviewed
+green merge. Cloud deployment is not part of this isolated release consolidation.
+See [the active integration checkpoint](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#authorized-release-consolidation-2026-10-21).
+
+Fresh PostgreSQL HTTP passes 2532 tests. TDD regression guards now enforce unique
+Settings roots and one authoritative endpoint lookup per OAuth mint, reusing
+that snapshot for observation-only method diagnostics. The extended matched
+PostgreSQL benchmark passes the 10-percent threshold with equal query counts.
+Full seeded private browser coverage passes 326/326 with zero skips/flakes and
+unchanged pixel baselines. The separate exact Vite 8.1.6 patch audits at zero
+vulnerabilities using its verified public CI artifact; its final normal Validate
+push is active. Both integration web attempts inherited an undersized 512 MiB
+benchmark heap limit. Removing that cap with two workers passes 122 heavy
+component tests; final full matrix proof remains pending. No final version or
+merge receipt is claimed yet.
+
+**Fresh local preparation evidence:** 6128 API units, 70 focused in-memory
+HTTP tests, 1643 Web tests with passing coverage and 1811 complete in-memory
+live assertions. The affected browser cases, builds, size budgets, diagram
+rendering and 27-document coupled freshness gate pass. Exact-HEAD comparisons
+retain 0/513 API lint and identical 66 frontend type diagnostics. The inherited
+High Vite advisory remains a release blocker; the full integration backend/
+Docker/browser matrix and CI are still pending. Owned services and scratch
+archives are cleaned up. This does not renew the deployed receipts below.
 
 **Latest checkpoint:** 0.55.56 is published and on dev from clean merged
 master `d43959e1`, PR #244, canonical publisher `39043579816`. The exact GHCR
@@ -908,7 +939,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 21 boolean + 2 enum + 14 numeric + 1 bespoke radio (38 settings)
+  endpoint-config.interface.ts                           # 20 boolean + 3 other typed values + 16 numeric (39 settings, unreleased lifetime port)
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction

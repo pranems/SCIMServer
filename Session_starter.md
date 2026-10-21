@@ -1,6 +1,28 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-17
+**Last verified:** 2026-10-21
+
+### Isolated token-lifetime integration preparation (2026-10-21)
+
+| Date | Summary |
+|---|---|
+| 2026-10-21 | Full seeded private browser passes 326/326 with zero skips/flakes and unchanged pixel baselines. Separate exact Vite 8.1.6 patch uses a verified public CI lockfile and audits at zero vulnerabilities; final normal Validate push is active. Two integration web attempts failed because a 512 MiB benchmark heap cap leaked into React workers; removing it with two workers passes 122 heavy-component tests. Final matrix, version, review and merge remain pending. |
+| 2026-10-21 | Operator authorized release consolidation, version bump, normal-hook push, PR and reviewed green merge. Fresh PostgreSQL HTTP passes 2532 tests. TDD fixes enforce unique Settings roots and one authoritative OAuth policy snapshot per mint. Extended PostgreSQL benchmark passes the 10-percent regression threshold after eliminating the duplicate observation read. Six-mode matrix and separate minimal Vite security prerequisite are in progress; no cloud deployment or customer promotion. |
+| 2026-10-21 | Prepared the uncommitted token-lifetime port on `feat/endpoint-token-ttl-integration-20261021`, based on master `36724c49` / 0.55.56. Fresh local results: 6128 API units, 70 focused HTTP, 1643 Web tests with coverage and 1811 complete in-memory live assertions pass. The original worktree and stash `064483284a56ce5f135afb8b09ed63c06f3b368f` are untouched. Commit, push, PR and deployment remain held. |
+
+The original base is 390 commits behind this integration base; 29 modified
+tracked paths also changed upstream. Fresh assertion RED was captured before
+runtime edits. Preserve current authentication method gating, fixed secret
+retention, collapsed contextual panels and effective JWKS controls.
+See [the active integration checkpoint](docs/auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#current-master-integration-preparation-2026-10-21).
+
+Local preparation also passes build/size, 27-document freshness, content,
+JSON/diagram checks and the affected browser journeys. API lint matches exact
+HEAD at 0 errors / 513 warnings; all 66 frontend TypeScript diagnostics match
+exact HEAD. An inherited High Vite advisory, the remaining integration matrix
+and release-boundary confirmation still block consolidation. Owned services
+and scratch archives are cleaned up. The older deployed receipts below were
+not reverified by this local work.
 
 **Current delivery:** PR #244 merged as `d43959e1`. Version 0.55.56 is
 published by successful canonical run `39043579816` and deployed to dev

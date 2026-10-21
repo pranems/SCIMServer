@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Worker startup errors require first-cause classification
+
+A worker-start timeout can be the final wrapper for an earlier fatal heap
+allocation error. During lifetime consolidation, both integration web attempts
+inherited a 512 MiB API-oriented heap limit; reducing concurrency alone did not
+fix it. Inspect and record the first fatal or causal stack before a retry.
+Budget worker concurrency independently from each worker's heap, and do not
+carry a benchmark-specific memory cap into unrelated React gates. Removing
+that cap while retaining two workers passes the two heavy component suites,
+122 tests; complete-matrix success remains a separate claim.
+See the [consolidation execution ledger](../auth/EXECUTION_ISSUES_AND_RCA.md#authorized-lifetime-release-consolidation-2026-10-21).
+
 ### Startup redaction must cover shell output and application messages
 
 A container entrypoint can disclose a connection URI even when application
@@ -510,6 +522,28 @@ confirmed RED/GREEN controls and their live-validation boundary.
 
 ### Category B - Cross-environment and deployment drift
 
+**Token-lifetime validation lesson (2026-10-20):** when a configurable bound
+changes, test both the configuration validator and the final serialized
+outcome. The old issuer clamp would silently defeat a newly accepted range.
+Use one backend policy for bounds and defaults, then assert `expires_in` and
+JWT `exp - iat` at both limits. Composite editable controls must save when
+focus leaves the complete control, not when it moves to an Undo button.
+Finally, a PowerShell helper that inherits the caller's HTTP-recording
+functions must be smoke-tested through that caller: a standalone pass cannot
+detect script-scope counter corruption. These gaps are covered in-place by
+the token-lifetime unit, HTTP, browser and full live tests.
+
+**Loopback timing lesson (same execution):** a local latency failure can
+measure hostname-dependent transport overhead rather than application work.
+The same Docker root request took 2036-2091 ms via `localhost` and 5-8 ms
+via `127.0.0.1`. The unchanged 1499-assertion suite passed on literal IPv4,
+including its original 1500 ms credential-rejection budget at 10 ms.
+Preflight a cheap route and authenticated API readiness on the intended
+address before a local timing gate. Do not raise the budget or dismiss the
+failure as noise; preserve the failed measurement and full recovered run.
+The exact resolver/connection mechanism needs tracing before attributing this
+specifically to IPv6 or a particular operating-system implementation.
+
 Values that differ silently across local / Docker / Azure.
 
 | ID | Pattern | Anti-pattern (what bit) | Lesson | Became | Origin |
@@ -798,3 +832,23 @@ requests and preserve baseline/candidate/candidate/baseline order.
 Use official standards text for compatibility conclusions: a discovery summary
 incorrectly forbade relative references, but direct RFC verification prevented
 a false implementation rule. See [the complete measurements and limits](../RESPONSIVE_ENDPOINT_INVENTORY.md#matched-measurement-and-quota-sensitivity).
+
+## Port behavior, not just conflict-free text
+
+2026-10-21: A token-lifetime feature port crossed 390 master commits. Clean
+merges still retained obsolete authentication flags and duplicated test mocks;
+newer contracts also allowed null as an inheritance reset and moved Edit
+behind More. Repeat real RED on the target revision and preserve its current
+contracts. Compare static debt against that exact revision rather than copying
+the source branch's baseline.
+
+A disclosure may preserve its open state when its contextual contents change.
+Blindly clicking its header can close it; an input can remain briefly fillable
+during the closing animation. Browser helpers must check `aria-expanded`,
+then assert the edited value and the persisted/minted outcome. Do not fix this
+test error by making production panels always open or adding sleeps.
+
+Include the server's effective log level in live-fixture preflight: suppressing
+INFO output also suppresses ring-buffer evidence that an observability gate
+is meant to verify. Require authenticated readiness after every restart.
+See the [integration execution issues](../auth/EXECUTION_ISSUES_AND_RCA.md#current-master-lifetime-integration-preparation-2026-10-21).

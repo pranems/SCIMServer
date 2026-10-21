@@ -48,13 +48,14 @@ independent extension fields, including schemas shared across resource types.
 
 Every endpoint in SCIMServer carries a **profile**, and the profile's `settings` block decides how that endpoint behaves on the wire: what it accepts, what it rejects, what it advertises, and who may talk to it.
 
-The Settings tab renders **all 37 server-registered endpoint settings**:
+The Settings tab renders **all 39 server-registered endpoint settings** in the
+unreleased token-lifetime port (37 in the deployed reference):
 
 | Kind | Count | Examples |
 |---|---|---|
 | Boolean switches | **19** | `StrictSchemaValidation`, `RequireIfMatch`, `UserHardDeleteEnabled` |
 | Enum dropdowns | **2** | `PrimaryEnforcement`, `logLevel` |
-| Numeric inputs | **14** | JWKS egress/safety/refresh knobs and per-method credential caps |
+| Numeric inputs | **16** | Token lifetimes, JWKS egress/safety/refresh knobs and per-method credential caps |
 | Fixed policy statuses | **2** | encrypted admin secret retention; durable request-log redaction |
 
 Settings remains the complete, structured inventory. Operational tabs also show a collapsed **Related settings** disclosure containing only controls unique to that workflow. Both presentations consume `web/src/pages/endpoint-settings-definitions.ts`, so changing a value in either place writes the same endpoint profile and the other surface reflects it.
@@ -68,9 +69,21 @@ The ownership rule is deliberate:
 | Schemas | Discovery and schema-validation controls | Unrelated lifecycle, auth and logging controls |
 | Resource types | Discovery and resource-type enforcement | Unrelated lifecycle, auth and logging controls |
 | Logs | Redacted persistence status, file output and endpoint log level | Unrelated resource and auth controls |
-| Connect method | The selected method's credential cap or WIF/JWKS policy | Other methods and unrelated endpoint behavior |
+| Connect method | The selected method's credential cap, token lifetime or WIF/JWKS policy | Other methods and unrelated endpoint behavior |
 
 This avoids presenting the same common setting in both Users and Groups, where an operator could reasonably mistake it for two independent values. The collapsed header always shows the pane title and setting count; expand it only when changing that workflow's behavior.
+
+**Unreleased token lifetimes:** Connect's related settings, the full Settings
+inventory and WIF trust forms provide editable whole-second inputs plus common
+presets from one minute to one week. The default is 3600 seconds; custom values
+such as 61 are valid. `OAuthClientTokenTtlSec` controls endpoint OAuth tokens;
+`WifTokenTtlSec` controls WIF tokens without a trust override. Clearing a trust
+override restores endpoint inheritance. The admin API's existing numeric-setting
+`null` reset clears either endpoint override rather than configuring a null
+lifetime.
+WIF assertion expiry can produce a shorter token; a configured minimum never
+extends the assertion's authorization. See [the API examples and safety
+tradeoff](AUTHENTICATION_GUIDE.md#55-configuring-endpoint-access-token-lifetime).
 
 Two properties of this system matter before you change anything:
 

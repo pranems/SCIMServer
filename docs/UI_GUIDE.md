@@ -1,8 +1,8 @@
 # SCIMServer Web Admin UI Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
 
-> **Status:** Active | **Last Updated:** 2026-10-16 | **Version:** 0.55.56
+> **Status:** Active | **Last Updated:** 2026-10-16 | **Version:** 0.55.57
 > Single-page React + Fluent UI v9 admin console. Nine pages, one shared app shell, live SSE log stream.
 > **Endpoint/profile/authentication flows:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) distinguishes the current Create, Discovery, Connect, endpoint Settings, and global Settings surfaces from the target profile-import workflow.
 > **Screenshot provenance:** every image below was re-captured on **2026-07-31** from the live **dev** estate (then `scimserver-dev.proudbush-ae90986e.eastus.azurecontainerapps.io`) running **v0.55.6 / Node v24.18.1**, at a pinned 1440x900 viewport, using:
@@ -230,11 +230,16 @@ Eleven standard tabs, plus one tab for each custom ResourceType:
 | **Schemas** | `/endpoints/{id}/schemas` | The `/Schemas` this endpoint publishes |
 | **Connect** | `/endpoints/{id}/connect` | Authentication: set up, connect, and monitor. See [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) |
 | **Logs** | `/endpoints/{id}/logs` | This endpoint's request log, with auth decision detail |
-| **Settings** | `/endpoints/{id}/settings` | Complete structured inventory of all 38 endpoint settings. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
+| **Settings** | `/endpoints/{id}/settings` | Complete structured inventory of all 39 endpoint settings in the unreleased lifetime port. See [ENDPOINT_SETTINGS_OPERATOR_GUIDE.md](ENDPOINT_SETTINGS_OPERATOR_GUIDE.md) |
 | **Custom type** | `/endpoints/{id}/resources/{id}` | List, create, inspect, edit, and delete that custom resource type; the second id is the ResourceType id |
 
 Two details worth knowing:
 
+- **Unreleased lifetime controls:** expand the active OAuth or WIF method's
+  Related settings to edit whole seconds or choose a common preset. Settings
+  exposes both lifetime controls; WIF trust forms also expose an optional
+  override. Bounds are 60-604800 seconds and the default is 3600. Existing
+  collapsed panels, JWKS editing and fixed secret-retention policy are unchanged.
 - **Resource tabs follow the profile.** Users and Groups render only when declared, and every custom ResourceType gets its own tab. A profile update invalidates endpoint discovery immediately; a removed active type redirects to Resource types instead of leaving a stale page mounted.
 - **There is no Credentials tab.** It was merged into **Connect**; `/endpoints/{id}/credentials` still resolves but redirects there.
 

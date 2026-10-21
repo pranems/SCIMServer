@@ -54,6 +54,18 @@ Ten `type` values are accepted by the admin API ([admin-authentication-method.co
 
 ## 4. How an operator changes each thing
 
+**Unreleased endpoint token-lifetime extension (2026-10-20):**
+`Endpoint.profile.settings.OAuthClientTokenTtlSec` controls client-secret
+endpoint mints; `Endpoint.profile.settings.WifTokenTtlSec` is the WIF default.
+Both accept 60-604800 whole seconds and default to 3600. Change them using
+`PATCH /scim/admin/endpoints/{id}`, **Connect -> the relevant method**, or
+**Endpoint -> Settings**. A WIF credential's `metadata.issuedTokenTtlSec`
+overrides the endpoint default; the add/edit trust form exposes and preserves
+it, and clearing the field restores inheritance. Each lifetime control offers
+common presets alongside its editable input. Assertion expiry caps every
+WIF mint. Global OAuth and credential `expiresAt` are unchanged. See
+[the worked API and UI instructions](AUTHENTICATION_GUIDE.md#55-configuring-endpoint-access-token-lifetime).
+
 ### 4.1 Per-endpoint credentials (the common case)
 
 All under `/scim/admin/endpoints/{endpointId}/credentials`, all requiring admin bearer auth ([admin-credential.controller.ts](../api/src/modules/scim/controllers/admin-credential.controller.ts)):

@@ -1,6 +1,6 @@
 # Authentication Guide
 
-> **Status:** Living reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.56`
+> **Status:** Living reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
 >
 > **The captured protocol examples below were measured against a running server.** Request and response bodies are verbatim wire captures. Status codes and `reason_code` values are what the server actually returned. The reason-code table in [Section 8](#8-troubleshooting) is generated from [auth-reason-catalog.ts](../api/src/oauth/auth-reason-catalog.ts), so it cannot drift from the implementation.
 >
@@ -359,6 +359,69 @@ discovery responses retain `application/scim+json`.
 ### 5.4 Workload Identity Federation
 
 Covered in depth in [Section 6](#6-workload-identity-federation-in-depth).
+
+### 5.5 Configuring endpoint access-token lifetime
+
+**Unreleased worktree change, locally verified on 2026-10-20:** newly minted
+endpoint OAuth and WIF tokens have independently configurable lifetimes.
+Existing deployments are not changed by this documentation.
+
+| Setting in `profile.settings` | Applies to | Default | Inclusive bounds |
+|---|---|---|---|
+| `OAuthClientTokenTtlSec` | Endpoint OAuth client-credentials tokens | 3600 seconds | 60-604800 whole seconds |
+| `WifTokenTtlSec` | Endpoint WIF tokens without a trust override | 3600 seconds | 60-604800 whole seconds |
+
+In the UI, open **Endpoint -> Connect -> OAuth2 Client-Credential** or **WIF**
+and change the lifetime under related settings. The same controls appear in
+**Endpoint -> Settings**. A blank inherited setting shows the 3600-second
+default as its placeholder. Enter a valid value and leave the field to save;
+errors are displayed rather than treated as successful saves.
+
+Each control also offers a dropdown: 1, 5, 15 and 30 minutes; 1 hour
+(the default), 2, 6 and 12 hours; 1 and 3 days; and 1 week. Selecting a preset
+saves an endpoint setting immediately. Custom whole-second values such as
+61 remain supported. The trust form uses the same control, but saves with
+the rest of the trust when **Save changes** is selected. Longer lifetimes
+extend the period a stolen bearer JWT could be reused; prefer the shortest
+duration that fits the integration.
+
+The admin API accepts a settings-only update:
+
+```http
+PATCH /scim/admin/endpoints/{endpointId} HTTP/1.1
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "profile": {
+    "settings": {
+      "OAuthClientTokenTtlSec": 7200,
+      "WifTokenTtlSec": 10800
+    }
+  }
+}
+```
+
+For WIF, **trust `issuedTokenTtlSec` -> endpoint `WifTokenTtlSec` -> 3600**
+is the precedence order. The WIF add/edit form exposes the optional trust
+override. Leave it blank to inherit, or clear an existing override to resume
+inheritance. A full trust `PUT` through the admin credential API has the same
+behavior: preserve all other trust fields and omit `issuedTokenTtlSec` to
+remove the override. New overrides must be JSON numbers, not numeric strings,
+and must be whole seconds in the same range.
+
+The verified incoming assertion's remaining lifetime always caps the WIF
+token. For example, a 10800-second endpoint default plus an assertion expiring
+in 600 seconds produces a token lasting at most 600 seconds. Read the actual
+`expires_in` response and the JWT `exp` claim; a requested lifetime is not a
+promise that the assertion lasts that long.
+
+Changes apply to future mints immediately, without a restart. Already issued
+JWTs keep their embedded expiry. A credential's `expiresAt` remains separate
+from access-token lifetime. Global `/scim/oauth/token` stays at 3600 seconds
+because it has no endpoint identity; static bearer credentials and the global
+shared secret do not use these lifetime settings. No new auth protocol is
+enabled by these controls.
 
 ---
 

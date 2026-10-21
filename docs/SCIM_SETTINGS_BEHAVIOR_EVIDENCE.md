@@ -1,4 +1,4 @@
-# All 37 endpoint settings: behavior and evidence
+# All 39 endpoint settings: behavior and evidence
 
 **Last verified:** 2026-09-29
 
@@ -6,7 +6,8 @@ This reconciles the [frozen independent inventory](evidence/scim-fresh-20260925/
 with P7a/P1 and the [P9 corpus](SCIM_ENTRA_COMPATIBILITY.md).
 The frozen inventory stays unchanged. It indexes names, not proof of behavior.
 
-The registry has **37 keys: 20 booleans, 14 numbers, 3 other typed values**.
+The unreleased lifetime port has **39 keys: 20 booleans, 16 numbers,
+3 other typed values**; the deployed reference has 37.
 One Boolean (`PersistRequestSecrets`) is retained but inert; credential
 visibility is fixed. A registered key is not necessarily an adjustable control.
 No default or stored endpoint setting changes in P9.
@@ -53,6 +54,8 @@ setting/characteristic cross-product.
 
 | Setting | Unset effective value | Actual outcome / limitation | Unit evidence | HTTP evidence | Live evidence |
 | --- | --- | --- | --- | --- | --- |
+| `OAuthClientTokenTtlSec` | 3600 seconds | Unreleased: future endpoint OAuth tokens honor 60-604800 whole seconds; null resets inheritance; existing tokens and global OAuth are unchanged | Registry/issuer/provider bounds, fail-closed policy read and controller shadow distinction | Current-master OAuth HTTP asserts exact expires_in/JWT exp, runtime update and null reset | Current-master private in-memory live runner: exact issuance, invalid values and runtime updates pass; Docker/deployment reruns remain pending |
+| `WifTokenTtlSec` | 3600 seconds | Unreleased: endpoint WIF fallback behind a trust override; verified assertion expiry remains a final cap | Registry/issuer/provider precedence and method-disabled rejection | Current-master WIF HTTP checks defaults, override, reset and assertion cap | Current-master private in-memory live runner: stored endpoint value, trust override and inheritance reset pass; real assertion issuance is covered by HTTP tests; Docker/deployment reruns remain pending |
 | `PatchOpAllowRemoveAllMembers` | false | Gates bare removal of all Group members; explicit filtered/value-array removal remains available | Group service remove-all assertions | config-flags deny/allow; P9 E10/E11 explicit removals | P9 E10/E11 do not certify bare-remove toggle |
 | `VerbosePatchSupported` | false | OFF rejects explicit core dotted User paths without a write in both strict modes. No-path objects, extension child paths and selectors remain independent | User patch engine flag controls; registry guidance regression | P9 E06/E17/I03 plus P2 flag suite | 19-case P9 plus expanded P2 contract on both backends |
 | `logLevel` | inherit | Endpoint logging threshold overrides category/global threshold, not resource behavior | scim-logger level filtering | test-gaps-audit M6 is config acceptance/CRUD smoke only; does not inspect emitted levels | gap: P9 disables log volume |

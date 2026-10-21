@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.57`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -25,6 +25,25 @@ exact-tip CI remains the merge gate, not this local audit alone. See the
 
 The documentation checkpoint below records actual publication/dev evidence and
 the customer hold. It introduces no further runtime or version change.
+
+## 0.55.57 - 2026-10-21, source consolidation in progress
+
+Endpoint-scoped OAuth client tokens and WIF tokens can be configured from
+60 seconds to 604800 seconds, inclusive, in whole seconds. The default is
+3600 seconds. Connect, Settings and the WIF trust form offer common-value
+dropdowns alongside editable inputs, including custom values such as 61.
+Clearing an endpoint override restores inheritance.
+
+A WIF trust override takes precedence over the endpoint WIF setting.
+The verified assertion's remaining validity still caps the issued token, so a
+short-lived assertion can correctly produce a token shorter than 60 seconds.
+Existing tokens are not revoked or rewritten. Global OAuth lifetime, static
+credential retention and authentication-method enablement are unchanged.
+
+This version is not deployed by this consolidation work. Final patched-image,
+matrix, reviewed exact-tip CI and merge checks remain required. Existing
+deployed 0.55.56 receipts below are not evidence for this unreleased version.
+See the [active validation handoff](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#authorized-release-consolidation-2026-10-21).
 
 ## 0.55.56 - 2026-10-17
 
