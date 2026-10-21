@@ -64,6 +64,19 @@ pass all 18 tests. Carry that process-local cap into every full retry. This
 does not relax test timeouts, assertions or coverage thresholds. Separate
 worktrees and databases do not by themselves isolate CPU and memory pressure.
 
+**Exact-patch confirmation:** normal Validate completed successfully on
+`ca4c292d5475cf54bec55804c4c1ec5022cccb57`. Public-registry regeneration run
+`39624070616` produced Vite 8.1.6 with 21 changed entries, all at least
+15.43 days old, public `registry.npmjs.org` URLs and sha512 integrity.
+The API artifact is structurally identical to the existing lockfile and was
+not applied. The applied web lockfile SHA-256 is
+`717ee192312848c489bc958a4547181e23e21975e2e62e21187c88e91be78ed2`.
+Private `npm ci --no-audit --no-fund` installs Vite 8.1.6; the fresh
+`npm audit --json` receipt reports zero vulnerabilities at every severity,
+versus the original one High. This closes the local dependency RED/GREEN.
+Final patched-toolchain Validate, reviewed exact-tip CI and merge remain
+separate release checks; no deployment is implied.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as

@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-17 - **Product version:** `0.55.56`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.56`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -18,8 +18,9 @@ notes rather than assuming that a patch label makes every rollback lossless.
 Build-tooling security preparation pins Vite to patched 8.1.6, addressing
 the launch-editor advisories affecting 8.0.0-8.1.5. This patch is older than
 the seven-day quarantine. It does not change the SCIM contract or deployed
-version. The prerequisite is not merge-ready until its CI-generated lockfile,
-dependency audit and exact-tip checks pass. See the
+version. The exact-patch CI lockfile has been verified and restored privately;
+the fresh web dependency audit now reports zero vulnerabilities. Reviewed
+exact-tip CI remains the merge gate, not this local audit alone. See the
 [supply-chain receipt](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-10-21-vite-security-prerequisite).
 
 The documentation checkpoint below records actual publication/dev evidence and
