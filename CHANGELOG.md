@@ -18,9 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `npm audit --json` reports zero vulnerabilities, down from one High.
 - Pre-artifact normal Validate evidence: 6072 API unit tests / 211 suites,
   2460 in-memory CI-subset HTTP tests / 117 suites plus four backend-only
-  exclusions, and 1624 Web tests / 123 files. The final patched-toolchain
-  normal hook and exact-tip CI remain the merge gates; no product version,
-  SCIM contract or deployed estate is changed by this tooling prerequisite.
+  exclusions, and 1624 Web tests / 123 files. The patched-toolchain normal
+  Validate push and required exact-tip CI subsequently pass; prerequisite
+  PR #247 merged normally as `d9feb624`. No product version, SCIM contract
+  or deployed estate is changed by that separate tooling prerequisite.
 ### Documentation
 
 - Reconcile actual 0.55.56 dev delivery, customer hold, operational recorder/
@@ -51,19 +52,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep their original DOM and external-refresh behavior.
 - **Observed before/after evidence:** API unit 6072 -> 6128, 211 suites;
   full PostgreSQL HTTP 2520 -> 2532, 119 suites; full in-memory HTTP
-  2516 -> 2528 plus the same four backend exclusions; complete local live
-  1797 -> 1811; complete seeded browser 324 -> 326, zero skips/flakes and
-  unchanged visual baselines. These are pre-version consolidation receipts.
-  Final patched Web total/coverage, Docker live, shipping-shell contract and
-  final six-mode completion remain pending, not projected passes.
+  2516 -> 2528 plus the same four backend exclusions; Web 1624 -> 1655,
+  123 -> 124 files; complete local Node and Docker live 1797 -> 1811 each;
+  complete seeded browser 324 -> 327 with zero skips, unexpected failures
+  or flaky outcomes and unchanged visual baselines. The final six-mode
+  orchestrator passes all six modes, with no skip flags. Actual-image
+  startup contracts pass 24/24. Both running local form factors report
+  version 0.55.57; Docker preserves all 18 fixture IDs and local Node leaves
+  zero endpoints, matching its initial inventory.
+- **Coverage and static gates:** Web coverage is 85.74% lines, 75.89%
+  branches, 75.53% functions and 83.06% statements, above unchanged
+  82/70/69/78 floors. Production size budgets pass. API lint retains
+  0 errors / 513 warnings; frontend type checking retains the identical
+  66 pre-existing diagnostics, not a clean type-check claim.
+- **Validation reliability:** the first final-image browser run exposed a
+  false empty-tenant skip while Operations had 18 users. A completeness
+  assertion fails first; waiting for the actual successful users response
+  restores the existing wide/narrow bounds assertion. Focused and full
+  zero-skip runs pass. The edited spec also type-checks with strict project
+  options and Node ambient types for its Node runner. No runtime code,
+  fixture, timeout, sleep or visual baseline changes for this correction.
 - **Performance:** 2000 matched measured mints per side pass the unchanged
   10-percent threshold; baseline/candidate p95 16.358/13.190 ms and p99
   29.455/25.215 ms. Endpoint selects are equal at 2403 per side including
   fixture operations. No production capacity claim follows from local timing.
-- **Release state:** API/web manifests move 0.55.56 -> 0.55.57; sanctioned
-  public CI must supply both versioned lockfiles. The separate exact Vite
-  8.1.6 prerequisite has a zero-vulnerability audit and a green normal Validate
-  push. Reviewed exact-tip CI, final gates and merge remain required.
+- **Release state:** API/web manifests and public-CI lockfiles move
+  0.55.56 -> 0.55.57. Run `39644598993` generated both locks from exact
+  reviewed source `577baf07`; artifact commit `abb90c9f` changes only their
+  root version metadata. Dependency graphs are unchanged, all resolved
+  entries use public npm URLs and sha512, and independent artifact review
+  accepts them. Final audits: Web zero vulnerabilities; API 23 Moderate,
+  zero High/Critical. Normal publication, reviewed exact-tip CI and merge
+  are tracked by the PR separately from these local receipts.
   No cloud deployment or customer promotion is performed. See the
   [active release handoff](docs/auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md).
 

@@ -534,6 +534,17 @@ and [pipeline contract](../../scripts/test/dev-deployment-pipeline.contract.ps1)
 the [execution ledger](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md) records the
 confirmed RED/GREEN controls and their live-validation boundary.
 
+**PA-13 extension, 2026-10-21:** A skipped data-view assertion needs proof that
+the data is actually absent, not merely still loading. The complete private
+Docker browser run skipped Operations bounds while its real feed held 18 users:
+the toolbar was visible before the first row. Await the actual successful
+response, validate its resource array, and use that completed result for an
+empty-data decision before awaiting the rendered outcome. The
+[Operations spec](../../web/e2e/operations-page.spec.ts) now applies that guard;
+the [lifetime RCA](../auth/EXECUTION_ISSUES_AND_RCA.md) retains the one-skip
+completeness RED and the focused zero-skip GREEN. No fixed sleep or weaker
+coverage policy is needed.
+
 ### Category B - Cross-environment and deployment drift
 
 **Token-lifetime validation lesson (2026-10-20):** when a configurable bound

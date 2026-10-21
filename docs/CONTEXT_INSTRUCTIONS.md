@@ -23,33 +23,45 @@ Fresh PostgreSQL HTTP passes 2532 tests. TDD regression guards now enforce uniqu
 Settings roots and one authoritative endpoint lookup per OAuth mint, reusing
 that snapshot for observation-only method diagnostics. The extended matched
 PostgreSQL benchmark passes the 10-percent threshold with equal query counts.
-Earlier seeded private browser coverage passes 326/326 with zero skips/flakes and
-unchanged pixel baselines. The separate exact Vite 8.1.6 patch audits at zero
-vulnerabilities using its verified public CI artifact; its final normal Validate
-push is active. Both integration web attempts inherited an undersized 512 MiB
-benchmark heap limit. Removing that cap with two workers passes 122 heavy
-component tests; final full matrix proof remains pending. No final version or
-merge receipt is claimed yet.
+The final six-mode orchestrator passes every mode: API units 6128/211 suites
+on each backend; full HTTP 2532 Prisma and 2528 InMemory plus four backend-only
+exclusions; Web unit and coverage runs each pass 1655 tests in 124 files.
+Coverage is lines 85.74%, branches 75.89%, functions 75.53%, statements 83.06%,
+above unchanged 82/70/69/78 floors. Earlier heap-limited attempts remain failed
+historical receipts; the final runner uses two workers without that artificial
+heap cap. API lint remains 0/513 and all 66 existing frontend type diagnostics
+are unchanged, not resolved.
 
 Prerequisite PR #247 subsequently merged normally as `d9feb624` after exact-tip
 CI and substantive independent automated source review. The hosted Copilot
 review produced only a billing error, not an approval. Four feature commits
 bootstrap 0.55.57 and integrate merged master without rewriting history.
 The independent feature review found clear/reset, early-save and preset-history
-gaps that the earlier green browser cases did not assert. Real browser RED
-reproduces all three. Corrections pass 82 focused unit tests; the three journeys
-have successful observations across the first corrected run and one targeted
-test repair, not one final full browser run. All 18 fixture IDs are preserved.
-Final CI-versioned lockfiles, complete matrix and final-image proof remain open.
+gaps that earlier green browser cases did not assert. Real browser RED reproduces
+all three; corrections pass 82 focused unit tests and source review accepts
+`577baf07`. Public CI run `39644598993` supplies both 0.55.57 lockfiles;
+independent artifact review accepts `abb90c9f`. Only root version metadata
+changes, with no dependency-graph change and only public npm/sha512 entries.
 
-**Fresh local preparation evidence:** 6128 API units, 70 focused in-memory
+The final Docker image, source `abb90c9f`, passes 1811 live assertions,
+24 actual-entrypoint contracts and all 327 browser cases with zero skipped,
+unexpected or flaky outcomes. Pixel baselines are unchanged and all 18 fixture
+IDs remain. A newly caught false empty-tenant skip is fixed by waiting for the
+real user response before measuring Operations bounds; no runtime input changes.
+Final local Node also passes 1811 live assertions and returns to its initial
+zero endpoints. Both authenticated version routes report 0.55.57.
+Web audit is zero; API retains 23 Moderate and zero High/Critical.
+Normal push, reviewed exact-tip CI and merge are tracked by the PR, not inferred
+from these pre-merge local receipts. No cloud deployment or operator visual
+approval is claimed.
+
+**Historical local preparation evidence:** 6128 API units, 70 focused in-memory
 HTTP tests, 1643 Web tests with passing coverage and 1811 complete in-memory
 live assertions. The affected browser cases, builds, size budgets, diagram
 rendering and 27-document coupled freshness gate pass. Exact-HEAD comparisons
-retain 0/513 API lint and identical 66 frontend type diagnostics. The inherited
-High Vite advisory remains a release blocker; the full integration backend/
-Docker/browser matrix and CI are still pending. Owned services and scratch
-archives are cleaned up. This does not renew the deployed receipts below.
+retain 0/513 API lint and identical 66 frontend type diagnostics. Those earlier
+preparation holds are superseded by the final local evidence above. They do not
+renew the deployed receipts below.
 
 **Latest checkpoint:** 0.55.56 is published and on dev from clean merged
 master `d43959e1`, PR #244, canonical publisher `39043579816`. The exact GHCR

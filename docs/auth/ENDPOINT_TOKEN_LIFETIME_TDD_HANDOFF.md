@@ -1,12 +1,12 @@
 # Endpoint token lifetime - TDD rebuild and release handoff
 
-> **Status:** Authorized release consolidation in progress, not a deployment approval
+> **Status:** Isolated 0.55.57 local validation complete; PR-controlled publication/merge and deployment are separate boundaries
 >
 > **Last verified:** 2026-10-21
 >
 > **Original integration base:** `36724c4910ed538b6be1b6588fa1908a0348e014`, version `0.55.56`
 >
-> **Active source:** stacked onto prerequisite `695d0a3784759fa9be218841dd2696fc93d3b6b3`; manifests `0.55.57`, CI-versioned lockfiles pending
+> **Runtime input checkpoint:** `abb90c9f04f11daa4fda9e44c97016d74d83711f`; manifests and public-CI lockfiles `0.55.57`
 >
 > **Integration branch:** `feat/endpoint-token-ttl-integration-20261021`
 
@@ -35,7 +35,11 @@ each reproduce through real browser RED. Corrections pass 82 focused unit tests,
 including two additional no-op/HTML-identity regressions. Two corrected browser
 journeys pass together; the third passes its targeted rerun after preserving the
 full Settings effective-default display. All 18 fixture IDs remain intact.
-The feature still requires follow-up source review and final exact-tip CI.
+Follow-up source review accepts `577baf07`; independent artifact review accepts
+`abb90c9f`. These are automated reviews, not human approval. A subsequent
+test-only Operations loading guard and receipt updates do not change the
+shipping image inputs. Normal publication, reviewed exact-tip CI and merge
+are tracked by the PR rather than inferred from local passes.
 
 Fresh consolidation evidence supplements, rather than replaces, the dated
 preparation results:
@@ -44,14 +48,21 @@ preparation results:
 |---|---|
 | Empty PostgreSQL migration replay | PASS |
 | Complete PostgreSQL HTTP suite | PASS: 119 suites / 2532 tests |
+| Complete in-memory HTTP suite | PASS: 119 suites / 2528 tests, four PostgreSQL-only exclusions |
+| API units, each backend | PASS: 211 suites / 6128 tests |
 | Settings root identifiers | Two genuine RED assertions, then both GREEN after removing duplicate interactive roots; browser uniqueness assertions added |
 | OAuth policy snapshot reuse | Genuine RED: two endpoint lookups instead of one; provider/controller suites GREEN, 27 tests, API build PASS |
 | PostgreSQL mint performance | Extended counterbalanced local comparison: 2000 measured mints per side; baseline/candidate p50 9.148/9.063 ms, p95 16.358/13.190 ms, p99 29.455/25.215 ms |
 | Endpoint SQL reads | Equal: 2403 per side, including fixture operations across 2400 warmup/measured mints |
 | Resident memory after extended benchmark | Baseline/candidate 240.8/241.1 MiB; not a production capacity claim |
-| Complete real browser, seeded private Node/PostgreSQL | PASS: 326 cases, zero skips/flakes, 18 fixture endpoints preserved and no temporary endpoint remaining; unchanged pixel baselines |
-| Mandatory six-mode runner | Four API modes pass; web attempts fail because an inherited 512 MiB heap cap causes allocation failures. That cap is removed while retaining two workers; 122 heavy-component tests pass. Final complete runner remains pending |
-| Vite security prerequisite | Exact aged 8.1.6 patch and public CI artifact applied in separate worktree; private restore and audit pass with zero web vulnerabilities. Final normal-hook push, review and exact-tip CI remain pending |
+| Historical complete browser, seeded Node/PostgreSQL | PASS: 326 cases before the final toolchain/version and review corrections; not substituted for the final image receipt |
+| Mandatory final six-mode runner | PASS: all six modes, no skip flags; two Web workers without the inherited artificial heap cap |
+| Final Web units and coverage | PASS: 124 files / 1655 tests; lines 85.74%, branches 75.89%, functions 75.53%, statements 83.06%; unchanged floors 82/70/69/78 |
+| Final complete local Node / Docker live | PASS: 1811 assertions each; both authenticated version routes report 0.55.57 |
+| Final shipping-image startup contract | PASS: 24/24 using the actual image entrypoint, not a source bind mount |
+| Final complete Docker browser | PASS: 327 cases in 511.877 seconds, zero skips/unexpected/flaky; unchanged pixel baselines and all 18 fixture IDs preserved |
+| Final static gates and dependency audit | Size budgets pass; API 0 errors / 513 warnings and identical 66 existing Web type diagnostics; Web zero vulnerabilities, API 23 Moderate and zero High/Critical |
+| Vite security prerequisite | Exact aged 8.1.6 patch; PR #247 independently reviewed and normally merged after green exact-tip CI |
 
 The first benchmark found a real duplicate lookup and a greater-than-10-percent
 regression. Its logs and the short post-fix noisy tail sample are retained.
@@ -61,17 +72,52 @@ The public token response is explicitly tested to exclude that internal profile.
 The extended follow-up uses a predefined counterbalanced order and equal
 warmups; no latency threshold was relaxed.
 
-The earlier preparation holds below are historical. Remaining release work
-still includes the dependency prerequisite, final matrix, browser/Docker checks,
-version, normal-hook pushes and reviewed exact-tip-green merge. Deployment and
-operator visual approval remain distinct boundaries.
+The first final-image browser run passed 326 cases but skipped Operations
+bounds while its real feed had 18 users. A completeness assertion fails first;
+the owning spec now waits for the successful user response instead of treating
+loading as empty. The targeted case and the new full 327-case run execute
+without skips. No runtime change, fixed sleep or baseline replacement is needed.
+Local Node returns to its initial zero endpoints; Docker retains all 18 exact
+fixture IDs. Driver/fatal stdout signals are zero on both targets.
 
-Version consolidation will update the API/web manifests surgically and obtain
-both versioned lockfiles from the existing public-registry CI workflow.
-The legacy version helpers are not used: one edits lockfile headers locally,
-and the other regenerates locally while replacing historical version receipts.
-Historical deployed evidence must retain its original version and provenance.
-The next patch is confirmed against merged master after the prerequisite lands.
+Public-registry CI run `39644598993`, exact source `577baf07`, supplies both
+versioned lockfiles. After excluding their two root version fields, independent
+JSON comparison proves every dependency and other metadata unchanged.
+All 684 API and 395 Web resolved entries retain public npm URLs and sha512.
+The publish-age delta is empty because no package version changed; the
+seven-day policy is unchanged. Artifact SHA-256 values are:
+
+- API: `2741efc7fbf65fbcf4998fa4c95f3811dfc83cc8fe7a999a21558d5a15042a3e`.
+- Web: `247343e594face97df73ace64727dc7050b28b1bf6563c83ad7ec8e5b8178d90`.
+
+The isolated image `scimserver-ttl-release-20261021:0.55.57` is built from
+runtime checkpoint `abb90c9f`, runs Node `v24.16.0`, and has local manifest-list
+digest `sha256:2b4b1b8a224831ae7e2c1a099fddf4998afc2ad3ba8a7d5e8b4c56479089b408`.
+It is not a published merged-master deployment artifact. Historical deployed
+evidence below retains its original version and provenance. The legacy helpers
+that regenerate locks locally or rewrite historical version receipts were not used.
+
+### Required outcomes and their assertions
+
+| Promised outcome | Specific proof |
+|---|---|
+| Inclusive 60-604800 whole-second range, 3600 default and exact JWT duration | [OAuth HTTP spec](../../api/test/e2e/endpoint-oauth-client.e2e-spec.ts) asserts boundary/default issuance, reset, invalid values and decoded `exp - iat`; [service tests](../../api/src/oauth/oauth.service.spec.ts) include custom 61 and clamp boundaries |
+| Trust override, endpoint inheritance and assertion-expiry cap | [WIF HTTP spec](../../api/test/e2e/wif-assertion.e2e-spec.ts) asserts trust replacement/reset, exact 60/604800 issuance and a real 30-second assertion capped at 30 or less |
+| Preset and editable custom values produce persisted behavior | [Endpoint browser spec](../../web/e2e/endpoint-token-lifetime.spec.ts) selects 604800, edits 61, reloads both surfaces and checks real minted tokens |
+| Draft-only preset selection and shared Undo/Redo/Reset | The same endpoint browser journey asserts zero PATCH calls inside the composite and exactly one on exit, restored draft values and no history entry for an unchanged preset |
+| Clear-to-inherit changes policy, not just the placeholder | Its clear/reset journey requires stored-key absence, a real 3600-second JWT, effective 3600 in full Settings and blank inheritance in contextual Connect |
+| Trust edits remain explicit-save and can clear the override | [Trust browser spec](../../web/e2e/wif-trust-management.spec.ts) captures no PUT before Save, exact numeric override after Save and omitted override on reset; real persistence/issuance is covered separately by WIF HTTP on both backends |
+| Correct control identity and responsive bounds | Endpoint browser assertions require distinct input/preset HTML IDs, one Settings root per lifetime, and actual field bounds within the viewport at widths 1440 and 900 |
+| One authoritative read and no internal response leakage | [Controller tests](../../api/src/modules/scim/controllers/endpoint-oauth.controller.spec.ts) assert one endpoint lookup and the four-key public token envelope |
+
+**Self-improvement: applied.** Persistent tests cover policy reset, edit-entry
+history, request counts, control identity and loading-aware bounds coverage.
+**Design disposition: accepted.** Existing provider/primitive seams remain
+cohesive; no speculative cache, history implementation or gate framework is added.
+
+Earlier preparation holds below are historical. No cloud deployment, native
+Entra run, customer promotion or operator visual approval is implied by this
+pre-merge local receipt.
 
 ## Current-master integration preparation (2026-10-21)
 

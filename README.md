@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-17 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.57`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -19,9 +19,9 @@ schema before applying a targeted compatibility setting.
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
-[![API units](https://img.shields.io/badge/API_units-6%2C072%20pass-brightgreen)](#testing)
-[![PostgreSQL HTTP](https://img.shields.io/badge/PostgreSQL_HTTP-2%2C520%20pass-brightgreen)](#testing)
-[![Web units](https://img.shields.io/badge/Web_units-1%2C624%20pass-brightgreen)](#testing)
+[![API units](https://img.shields.io/badge/API_units-6%2C128%20pass-brightgreen)](#testing)
+[![PostgreSQL HTTP](https://img.shields.io/badge/PostgreSQL_HTTP-2%2C532%20pass-brightgreen)](#testing)
+[![Web units](https://img.shields.io/badge/Web_units-1%2C655%20pass-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
 ---
@@ -1389,7 +1389,27 @@ See the full walkthrough with per-page screenshots and API endpoint tables in th
 
 ## Testing
 
-### Current validation selections
+### Current source validation: 0.55.57, isolated local instances
+
+| Layer | Observed result |
+|---|---|
+| Complete six-mode orchestrator | All six modes PASS, no skip flags |
+| API units, each backend | 6,128 PASS, 211 suites |
+| Full HTTP, InMemory | 2,528 PASS, four PostgreSQL-only exclusions, 119 suites |
+| Full HTTP, PostgreSQL | 2,532 PASS, 119 suites |
+| Web units and coverage | 1,655 PASS, 124 files; lines 85.74%, branches 75.89%, functions 75.53%, statements 83.06% |
+| Complete Node / Docker live suites | 1,811 PASS each, both targets report 0.55.57 |
+| Shipping-image entrypoint | 24 PASS, zero FAIL |
+| Complete Docker browser | 327 PASS, zero skipped/unexpected/flaky; unchanged pixel baselines |
+| Existing static-analysis debt | API 0 errors / 513 warnings; 66 unchanged frontend TypeScript diagnostics |
+| Dev, native Entra and customer deployment | Not performed by this isolated source consolidation |
+
+The original stash and the other release cycle's resources are preserved.
+These local receipts do not renew older deployed-version evidence. Normal
+push, reviewed exact-tip CI and merge remain PR-controlled boundaries; see
+[the release handoff](docs/auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md).
+
+### Historical deployed validation selections
 
 | Layer | 0.55.54 result |
 |---|---|
