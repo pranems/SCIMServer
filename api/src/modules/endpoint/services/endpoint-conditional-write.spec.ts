@@ -5,6 +5,7 @@ import { endpointETag } from '../common/endpoint-etag';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { ENDPOINT_LIFECYCLE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import { mockEndpointSnapshotQuery } from '../../../../test/helpers/endpoint-snapshot.mock';
 
 describe('Persistent conditional endpoint writes', () => {
   const priorBackend = process.env.PERSISTENCE_BACKEND;
@@ -13,6 +14,7 @@ describe('Persistent conditional endpoint writes', () => {
   let service: EndpointService;
   let row: Endpoint;
   const prisma = {
+    $queryRaw: jest.fn(),
     endpoint: {
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -41,6 +43,9 @@ describe('Persistent conditional endpoint writes', () => {
       updatedAt: new Date('2026-01-01T00:00:00Z'),
     };
     prisma.endpoint.findUnique.mockImplementation(() => structuredClone(row));
+    prisma.$queryRaw.mockImplementation(mockEndpointSnapshotQuery(
+      endpointId => prisma.endpoint.findUnique({ where: { id: endpointId } }),
+    ));
     prisma.endpoint.update.mockImplementation(() => ({ ...structuredClone(row), displayName: 'Changed' }));
     module = await Test.createTestingModule({
       providers: [

@@ -17,6 +17,11 @@ build/size pass, its exact included-source baseline remains 66 diagnostics,
 and the changed browser spec has zero Node-environment type errors.
 Target 0.55.58 manifests are bootstrapped; public-CI lock metadata, complete
 hook/current-artifact evidence and reviewed delivery are pending.
+Consolidation commit `a6b56aeb` is local. Its first normal Validate push was
+blocked by five old-double failures in a newly inherited endpoint test suite.
+Shared snapshot mocks fix the seam; all six endpoint-service suites / 174
+cases pass, with zero new expanded type/lint diagnostics. ER-36 retains the
+failure and broadens the service-neighborhood preflight. Full retry is pending.
 Old image `fa482c1b` proves the earlier 0.55.56 private source only, not this
 new 0.55.57 combination. Other worktrees are inspected read-only, not modified.
 

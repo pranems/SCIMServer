@@ -16,6 +16,19 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Integration must refresh the consumers of a changed test seam
+
+A focused selector written before a master update can omit a newly inherited
+test even when Git merges its production code cleanly. The first correction
+push caught five conditional-endpoint tests whose double lacked the new
+snapshot query. Reuse the shared double, preserve the original failure-path
+assertions, and discover the complete directly affected service test directory
+in focused compilation and neighborhood tests. A clean merge and an older
+focused PASS do not prove compatibility with new consumers. Full pre-push
+tests remain the independent publication boundary, not a reason to bypass
+that gate after a focused repair.
+See [ER-36](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
+
 ### Composite edits must share history without sharing form-control identity
 
 Sharing a controlled value does not mean a preset shares the input's Undo
