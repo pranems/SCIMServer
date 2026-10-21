@@ -84,7 +84,7 @@ test('live global-secret decision explains the credential skip before disabled-m
     await expect(time).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} UTC$/);
   } finally {
     const ownedId = endpointId;
-    endpointId = await deleteFixtureEndpoint(page, endpointId);
+    await deleteFixtureEndpoint(page, endpointId);
     if (ownedId) {
       const missing = await page.request.get(`/scim/admin/endpoints/${ownedId}`, {
         headers: { Authorization: `Bearer ${TOKEN}` },

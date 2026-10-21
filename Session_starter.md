@@ -34,6 +34,14 @@ only version metadata changes to 0.55.58, dependency graphs unchanged and
 seven-day age policy retained. Artifact hashes pass after import. Final lock/
 receipt commit and protected push, exact-tip CI/review and current-artifact
 matrix/performance/live/measured browser/dev gates are next, not completed.
+
+PR #250 is now draft at `164859e5`; its final normal Fast push passes all
+25 default gates and all seven exact-tip GitHub checks pass. The only
+subsequent source edit removes a CodeQL-reported unused assignment in the
+browser fixture cleanup, retaining awaited deletion and its actual 404
+assertion. Browser-spec compilation stays zero/zero; rescan/browser proof
+remain pending. Copilot review is requested through the working `@copilot`
+alias, not assumed approved. ER-39/40 retain those actual review/tool outcomes.
 Old image `fa482c1b` proves the earlier 0.55.56 private source only, not this
 new 0.55.57 combination. Other worktrees are inspected read-only, not modified.
 
