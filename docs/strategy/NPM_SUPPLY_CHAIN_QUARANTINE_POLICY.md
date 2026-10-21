@@ -9,6 +9,31 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-21 Vite security prerequisite
+
+The unchanged 0.55.56 web lockfile reports a High Vite advisory through the
+three launch-editor findings
+[GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv),
+[GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw) and
+[GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm).
+The affected range is 8.0.0-8.1.5. Corporate-proxy metadata reports Vite 8.1.6
+published on 2026-10-06 at 04:51:51 UTC, more than seven days before this work.
+
+This prerequisite is separate from token-lifetime behavior. The sanctioned
+bootstrap changes the manifest minimum, pushes with the normal hook, and lets
+the existing `Regenerate lockfile` workflow generate the web lockfile on its
+public-registry runner. That bootstrap is not a green dependency remediation:
+the old installed dependency/audit remains explicitly RED until the generated
+artifact is verified, restored privately and audited. No local lockfile
+regeneration, quarantine override or hook bypass is permitted. The final PR
+must have exact-tip validation before merge.
+
+**Design disposition: accepted.** The existing regeneration workflow and
+provenance/age gates already cover this case; no new dependency tooling is
+needed. **Self-improvement: applied.** Preserve bootstrap-versus-final evidence
+explicitly so a green hook against the old installation is never represented
+as proof of the patched dependency.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as
