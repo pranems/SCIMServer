@@ -6,6 +6,8 @@
  *
  * For default values and full metadata see {@link ENDPOINT_CONFIG_FLAGS_DEFINITIONS}.
  */
+import { TOKEN_LIFETIME_DEFAULT_SEC, TOKEN_LIFETIME_MAX_SEC, TOKEN_LIFETIME_MIN_SEC } from '../../oauth/token-lifetime-policy';
+
 export const ENDPOINT_CONFIG_FLAGS = {
   /**
    * When true, allows removing all members from a group via path=members without value array.
@@ -303,6 +305,8 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * counted separately so one type cannot exhaust another's budget. Bounds: 1 - 25.
    */
   MAX_ACTIVE_OAUTH_CLIENT_CREDENTIALS: 'MaxActiveOAuthClientCredentials',
+  OAUTH_CLIENT_TOKEN_TTL_SEC: 'OAuthClientTokenTtlSec',
+  WIF_TOKEN_TTL_SEC: 'WifTokenTtlSec',
 
   /**
    * P2. Maximum ACTIVE WIF trusts. Deliberately separate and more generous: WIF
@@ -388,6 +392,7 @@ export interface EndpointConfigFlagDefinition {
   readonly min?: number;
   /** For `number` flags only: inclusive upper bound (clamp/validate ceiling). */
   readonly max?: number;
+  readonly integer?: boolean;
 }
 
 /**
@@ -701,6 +706,27 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     description:
       'Maximum ACTIVE per-endpoint oauth_client credentials. Counted separately from bearer so one ' +
       'type cannot exhaust another type budget. Bounds: 1 - 25.',
+  },
+  OAUTH_CLIENT_TOKEN_TTL_SEC: {
+    key: ENDPOINT_CONFIG_FLAGS.OAUTH_CLIENT_TOKEN_TTL_SEC,
+    type: 'number',
+    default: TOKEN_LIFETIME_DEFAULT_SEC,
+    min: TOKEN_LIFETIME_MIN_SEC,
+    max: TOKEN_LIFETIME_MAX_SEC,
+    integer: true,
+    description: 'Lifetime in whole seconds for newly minted endpoint OAuth client-credentials tokens. ' +
+      'Default 3600; bounds 60-604800. Does not affect global OAuth or existing tokens.',
+  },
+  WIF_TOKEN_TTL_SEC: {
+    key: ENDPOINT_CONFIG_FLAGS.WIF_TOKEN_TTL_SEC,
+    type: 'number',
+    default: TOKEN_LIFETIME_DEFAULT_SEC,
+    min: TOKEN_LIFETIME_MIN_SEC,
+    max: TOKEN_LIFETIME_MAX_SEC,
+    integer: true,
+    description: 'Default lifetime in whole seconds for newly minted endpoint WIF tokens. ' +
+      'A trust issuedTokenTtlSec overrides this default; assertion expiry always caps the result. ' +
+      'Default 3600; bounds 60-604800.',
   },
   MAX_ACTIVE_WIF_TRUSTS: {
     key: ENDPOINT_CONFIG_FLAGS.MAX_ACTIVE_WIF_TRUSTS,
@@ -1351,6 +1377,7 @@ function validateNumberFlag(
   flagName: string,
   min?: number,
   max?: number,
+  integer = false,
 ): void {
   const value = config[flagName];
   if (value === undefined) return;
@@ -1369,6 +1396,9 @@ function validateNumberFlag(
     throw new Error(
       `Invalid value "${value}" for config flag "${flagName}". Expected a finite number.`,
     );
+  }
+  if (integer && !Number.isInteger(n)) {
+    throw new Error(`Invalid value "${value}" for config flag "${flagName}". Expected a whole number of seconds.`);
   }
   if (min !== undefined && n < min) {
     throw new Error(
@@ -1462,7 +1492,7 @@ export function validateEndpointConfig(
     } else if (def.type === 'structured') {
       validateStructuredFlag(config, def.key, def.structuredSchema);
     } else if (def.type === 'number') {
-      validateNumberFlag(config, def.key, def.min, def.max);
+      validateNumberFlag(config, def.key, def.min, def.max, def.integer);
     }
   }
 }

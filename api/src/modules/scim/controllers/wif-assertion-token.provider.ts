@@ -21,6 +21,8 @@ import type { IAssertionTokenProvider, AssertionMintRequest } from './assertion-
 import { WIF_PROFILE_RFC7523, resolveTrustProfiles, trustEnablesProfile } from './assertion-token-provider';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import {
+  ENDPOINT_CONFIG_FLAGS,
+  getConfigNumber,
   resolveEndpointAuthEnablement,
   resolveEndpointEgressOverrides,
   type EndpointConfig,
@@ -104,14 +106,9 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
       return null;
     }
 
-    // Resolve the ENDPOINT-level runtime egress overrides (JWKS fetch timeout /
-    // retries / backoff / cache max-age) once for this mint. Any field the
-    // endpoint sets OVERRIDES the server-level default; unset fields fall
-    // through to the server. A missing/unreadable endpoint is non-fatal - we
-    // simply mint with the server defaults.
-    const endpoint = await this.endpointService
-      .getEndpoint(endpointId)
-      .catch(() => undefined);
+    // Read endpoint policy before minting; lookup failures must not silently
+    // replace the operator's lifetime or authentication policy with defaults.
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
     const config = (endpoint?.profile?.settings ?? {}) as EndpointConfig;
     const wifEnabled = resolveEndpointAuthEnablement(
       config,
@@ -243,7 +240,8 @@ export class WifAssertionTokenProvider implements IAssertionTokenProvider {
         issuedClientId,
         undefined,
         {
-          ttlSec: trust.issuedTokenTtlSec,
+          ttlSec: trust.issuedTokenTtlSec ??
+            getConfigNumber(endpoint.profile?.settings, ENDPOINT_CONFIG_FLAGS.WIF_TOKEN_TTL_SEC),
           trustedScope: trust.scope,
           // WI-17 - stamp the winning trust's issuer for source attribution.
           sourceIssuer: trust.expectedIssuer,

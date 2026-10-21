@@ -48,6 +48,7 @@ import {
   type ScimCredentialEventPayload,
 } from '../../stats/scim-events';
 import { WifTrustCacheService } from '../services/wif-trust-cache.service';
+import { TOKEN_LIFETIME_MAX_SEC, TOKEN_LIFETIME_MIN_SEC } from '../../../oauth/token-lifetime-policy';
 
 // P1: this controller no longer hashes anything. Both credential types are
 // minted as keyed tokens with a peppered HMAC, so bcrypt survives only in the
@@ -165,6 +166,14 @@ function normalizeWifTrustAliases(raw: Record<string, unknown>): Record<string, 
     delete out[alias];
   }
   return out;
+}
+
+function validateWifLifetime(trust: Record<string, unknown>): void {
+  const ttl = trust.issuedTokenTtlSec;
+  if (ttl === undefined) return;
+  if (typeof ttl !== 'number' || !Number.isInteger(ttl) || ttl < TOKEN_LIFETIME_MIN_SEC || ttl > TOKEN_LIFETIME_MAX_SEC) {
+    throw new BadRequestException('wif.issuedTokenTtlSec must be a whole number between 60 and 604800 seconds.');
+  }
 }
 
 /**
@@ -730,6 +739,7 @@ export class AdminCredentialController {
       throw new BadRequestException('A "wif" credential update requires a "wif" trust object.');
     }
     const trust = normalizeWifTrustAliases(rawTrust as unknown as Record<string, unknown>);
+    validateWifLifetime(trust);
     this.applyTenantGleaning(trust);
     for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
       if (!trust[required] || typeof trust[required] !== 'string') {
@@ -1035,6 +1045,7 @@ export class AdminCredentialController {
     // onto their canonical keys BEFORE validation, so a pasted decoded-token
     // shape is accepted. A canonical key set explicitly always wins.
     const trust = normalizeWifTrustAliases(rawTrust as unknown as Record<string, unknown>);
+    validateWifLifetime(trust);
     this.applyTenantGleaning(trust);
     for (const required of ['expectedIssuer', 'expectedSubject', 'expectedAudience', 'jwksUri', 'allowedTenantId'] as const) {
       if (!trust[required] || typeof trust[required] !== 'string') {

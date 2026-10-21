@@ -28,6 +28,7 @@
  *     `AllowAndCoerceBooleanStrings` machinery accepts either form.
  */
 import React from 'react';
+import { TokenLifetimeField } from './TokenLifetimeField';
 import {
   makeStyles,
   tokens,
@@ -451,18 +452,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
 
         {/* ── Runtime egress (WIF JWKS fetch) numeric overrides ─── */}
         <Card className={classes.card} data-testid="settings-number-settings">
-          <Caption1>Runtime egress (WIF JWKS fetch)</Caption1>
+          <Caption1>Authentication lifetimes, credential limits and JWKS settings</Caption1>
           {NUMBER_SETTINGS.map((setting) => {
             const current = getNumberFlag(flags[setting.key]);
             const fieldName = EGRESS_FIELD_BY_SETTING[setting.key];
             const field = fieldName ? effectiveEgressPolicy[fieldName] : undefined;
             const currentDisplay = String(current ?? field?.effective ?? setting.serverDefault);
             const disabled = isPending && pendingKey === setting.key;
+            const isTokenLifetime = setting.key === 'OAuthClientTokenTtlSec' || setting.key === 'WifTokenTtlSec';
             return (
-              <div key={setting.key} className={classes.flagRow} data-testid={`settings-number-${setting.key}`}>
+              <div key={setting.key} className={classes.flagRow} data-testid={isTokenLifetime ? undefined : `settings-number-${setting.key}`}>
                 <div className={classes.flagHeader}>
                   <Text className={classes.monospace}>{setting.label}</Text>
-                  <Input
+                  {isTokenLifetime ? (
+                    <TokenLifetimeField
+                      label={setting.displayLabel}
+                      value={currentDisplay}
+                      disabled={disabled}
+                      onCommit={(value) => { void handleNumberChange(setting, String(value)); }}
+                      data-testid={`settings-number-${setting.key}`}
+                    />
+                  ) : <Input
                     key={`${setting.key}-${currentDisplay}`}
                     type="number"
                     defaultValue={currentDisplay}
@@ -472,7 +482,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ endpointId }) => {
                     aria-label={setting.label}
                     onBlur={(e) => { void handleNumberChange(setting, e.target.value); }}
                     data-testid={`settings-number-${setting.key}-input`}
-                  />
+                  />}
                 </div>
                 <Caption1 className={classes.flagDescription}>{setting.description}</Caption1>
                 {field && (

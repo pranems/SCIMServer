@@ -261,6 +261,16 @@ export const NUMBER_SETTINGS: ReadonlyArray<NumberSettingDefinition> = [
     description: 'Maximum active WIF trusts for this endpoint.', min: 1, max: 25, serverDefault: 10,
   },
   {
+    kind: 'number', key: 'OAuthClientTokenTtlSec', label: 'OAuthClientTokenTtlSec', displayLabel: 'OAuth access-token lifetime (seconds)',
+    description: 'Lifetime of newly minted endpoint OAuth tokens, in whole seconds (1 minute to 1 week). Existing tokens and global OAuth are unchanged.',
+    min: 60, max: 604800, serverDefault: 3600,
+  },
+  {
+    kind: 'number', key: 'WifTokenTtlSec', label: 'WifTokenTtlSec', displayLabel: 'WIF access-token default lifetime (seconds)',
+    description: 'Default for newly minted WIF tokens (1 minute to 1 week). A per-trust override takes precedence; assertion expiry always caps the result.',
+    min: 60, max: 604800, serverDefault: 3600,
+  },
+  {
     kind: 'number', key: 'JwksTotalDeadlineMs', label: 'JwksTotalDeadlineMs', displayLabel: 'JWKS total deadline (ms)',
     description: 'Total wall-clock deadline for a JWKS fetch including retries.', min: 100, max: 120000, serverDefault: 10000,
   },
@@ -305,9 +315,10 @@ export const TAB_SETTING_KEYS = {
   resourceTypes: ['SchemaDiscoveryEnabled', 'EnforceResourceTypes'],
   logs: ['PersistRequestSecrets', 'logFileEnabled', 'logLevel'],
   connectBearer: ['MaxActiveBearerCredentials'],
-  connectOauthClient: ['MaxActiveOAuthClientCredentials'],
+  connectOauthClient: ['MaxActiveOAuthClientCredentials', 'OAuthClientTokenTtlSec'],
   connectWif: [
     'MaxActiveWifTrusts',
+    'WifTokenTtlSec',
     'JwksFetchTimeoutMs',
     'JwksFetchRetries',
     'JwksFetchRetryBackoffMs',
