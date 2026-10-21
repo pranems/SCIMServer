@@ -84,6 +84,57 @@ describe('Per-endpoint OAuth client + token issuer (Q1)', () => {
     expect(res.body.token).toBeUndefined();
   });
 
+  it('uses each endpoint lifetime in expires_in and JWT exp, with no extra response keys', async () => {
+    for (const ttl of [60, 3600, 7200, 604800]) {
+      const id = await createEndpointWithConfig(app, adminToken, {
+        OAuthClientCredentialsAuthEnabled: true,
+        OAuthClientTokenTtlSec: ttl,
+      });
+
+      const { clientId, clientSecret } = await createOauthClient(id);
+      const response = await mintEndpointToken(id, clientId, clientSecret).expect(200);
+      expect(Object.keys(response.body).sort()).toEqual(
+        ['access_token', 'token_type', 'expires_in', 'scope'].sort(),
+      );
+      expect(response.body.expires_in).toBe(ttl);
+      const payload = decodePayload(response.body.access_token);
+      expect(Number(payload.exp) - Number(payload.iat)).toBe(ttl);
+      expect(payload.endpoint_id).toBe(id);
+    }
+    const { clientId, clientSecret } = await createOauthClient(endpointB);
+    const unchanged = await mintEndpointToken(endpointB, clientId, clientSecret).expect(200);
+    expect(unchanged.body.expires_in).toBe(3600);
+  });
+
+  it('applies lifetime updates and inheritance resets only to future tokens without a restart', async () => {
+    const id = await createEndpointWithConfig(app, adminToken, { OAuthClientCredentialsAuthEnabled: true });
+    const { clientId, clientSecret } = await createOauthClient(id);
+    const before = await mintEndpointToken(id, clientId, clientSecret).expect(200);
+    await request(app.getHttpServer()).patch(`/scim/admin/endpoints/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ profile: { settings: { OAuthClientTokenTtlSec: 7200 } } }).expect(200);
+    const after = await mintEndpointToken(id, clientId, clientSecret).expect(200);
+    expect(after.body.expires_in).toBe(7200);
+    await request(app.getHttpServer()).patch(`/scim/admin/endpoints/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ profile: { settings: { OAuthClientTokenTtlSec: null } } }).expect(200);
+    const reset = await mintEndpointToken(id, clientId, clientSecret).expect(200);
+    expect(reset.body.expires_in).toBe(3600);
+    const endpoint = await request(app.getHttpServer()).get(`/scim/admin/endpoints/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`).expect(200);
+    expect(endpoint.body.profile.settings).not.toHaveProperty('OAuthClientTokenTtlSec');
+    const original = decodePayload(before.body.access_token);
+    expect(Number(original.exp) - Number(original.iat)).toBe(3600);
+  });
+
+  it.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('rejects invalid %s values through HTTP', async (key) => {
+    for (const value of [59, 604801, 3600.5, 'invalid']) {
+      await request(app.getHttpServer()).patch(`/scim/admin/endpoints/${endpointB}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ profile: { settings: { [key]: value } } }).expect(400);
+    }
+  });
+
   it('mints a per-endpoint token carrying the endpoint_id claim (RFC 6749 5.1: 200 + no-store)', async () => {
     const { clientId, clientSecret } = await createOauthClient(endpointA);
     const res = await mintEndpointToken(endpointA, clientId, clientSecret)

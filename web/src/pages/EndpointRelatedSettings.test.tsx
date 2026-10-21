@@ -108,6 +108,41 @@ function expandPanel() {
 }
 
 describe('EndpointRelatedSettings', () => {
+  it.each([
+    ['connectOauthClient', 'OAuthClientTokenTtlSec'],
+    ['connectWif', 'WifTokenTtlSec'],
+  ] as const)('saves a token lifetime from %s', async (tab, key) => {
+    renderPanel(TAB_SETTING_KEYS[tab]);
+    expandPanel();
+    const input = screen.getByTestId(`related-settings-${key}-input`);
+    fireEvent.change(input, { target: { value: '7200' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { [key]: 7200 } },
+    }));
+  });
+
+  it.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('saves a common preset for %s', async (key) => {
+    renderPanel([key]);
+    expandPanel();
+    fireEvent.click(screen.getByTestId(`related-settings-${key}-presets`));
+    fireEvent.click(screen.getByRole('option', { name: '1 week (604800 seconds)' }));
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
+      profile: { settings: { [key]: 604800 } },
+    }));
+    expect(screen.getByTestId(`related-settings-${key}-input`)).toHaveValue('604800');
+  });
+
+  it.each([59, 604801, 60.5])('rejects invalid custom lifetime %s without saving', async (value) => {
+    renderPanel(['WifTokenTtlSec']);
+    expandPanel();
+    const input = screen.getByTestId('related-settings-WifTokenTtlSec-input');
+    fireEvent.change(input, { target: { value: String(value) } });
+    fireEvent.blur(input);
+    expect(await screen.findByText(/whole number.*60.*604800/i)).toBeInTheDocument();
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockMutateAsync.mockResolvedValue({});

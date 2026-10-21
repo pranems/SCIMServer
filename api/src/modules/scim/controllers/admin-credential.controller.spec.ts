@@ -1043,6 +1043,22 @@ describe('AdminCredentialController', () => {
       mockCredentialRepo.create.mockResolvedValue({ ...mockCredential, credentialType: 'wif', credentialHash: '' });
     });
 
+    it.each([60, 3600, 604800])('persists a valid %s-second trust override', async (issuedTokenTtlSec) => {
+      await controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif', wif: { ...wifTrust, issuedTokenTtlSec },
+      });
+      expect(mockCredentialRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+        metadata: expect.objectContaining({ issuedTokenTtlSec }),
+      }));
+    });
+
+    it.each([59, 604801, 60.5])('rejects a %s-second override before persistence', async (issuedTokenTtlSec) => {
+      await expect(controller.createCredential(mockEndpoint.id, {
+        credentialType: 'wif', wif: { ...wifTrust, issuedTokenTtlSec },
+      })).rejects.toThrow(BadRequestException);
+      expect(mockCredentialRepo.create).not.toHaveBeenCalled();
+    });
+
     it('does NOT verify when verify is absent/false (backward compat, pre-staging allowed)', async () => {
       await controller.createCredential(mockEndpoint.id, { credentialType: 'wif', wif: wifTrust } as never);
       expect(mockWifResolver.verifyTrust).not.toHaveBeenCalled();

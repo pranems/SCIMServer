@@ -51,6 +51,41 @@ describe('WifAssertionTokenProvider (Q6.4)', () => {
     };
   }
 
+  it('uses the endpoint WIF lifetime when the trust has no override', async () => {
+    const credential = wifCredential();
+    delete credential.metadata!.issuedTokenTtlSec;
+    findActiveByEndpoint.mockResolvedValue([credential]);
+    getEndpoint.mockResolvedValue({ profile: { settings: { WifCredentialsEnabled: true, WifTokenTtlSec: 10800 } } });
+    validate.mockResolvedValue({ sub: wifMetadata.expectedSubject });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'token', expiresIn: 10800, scope: 'scim.read' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion');
+
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1', 'ep-1', undefined, expect.objectContaining({ ttlSec: 10800 }),
+    );
+  });
+
+  it('preserves a trust override over the endpoint WIF default', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    getEndpoint.mockResolvedValue({ profile: { settings: { WifCredentialsEnabled: true, WifTokenTtlSec: 10800 } } });
+    validate.mockResolvedValue({ sub: wifMetadata.expectedSubject });
+    generateEndpointAccessToken.mockResolvedValue({ accessToken: 'token', expiresIn: 7200, scope: 'scim.read' });
+
+    await provider.mintFromAssertion('ep-1', 'assertion');
+
+    expect(generateEndpointAccessToken).toHaveBeenCalledWith(
+      'ep-1', 'ep-1', undefined, expect.objectContaining({ ttlSec: 7200 }),
+    );
+  });
+
+  it('does not mint under defaults if endpoint policy cannot be read', async () => {
+    findActiveByEndpoint.mockResolvedValue([wifCredential()]);
+    getEndpoint.mockRejectedValue(new Error('endpoint policy unavailable'));
+    await expect(provider.mintFromAssertion('ep-1', 'assertion')).rejects.toThrow('endpoint policy unavailable');
+    expect(generateEndpointAccessToken).not.toHaveBeenCalled();
+  });
+
   beforeEach(async () => {
     findActiveByEndpoint = jest.fn();
     findActiveByEndpointAndType = jest.fn(async (endpointId: string, credentialType: string) => {

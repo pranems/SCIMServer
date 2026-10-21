@@ -115,10 +115,13 @@ test.describe('Endpoint contextual settings', () => {
     await expect(page.getByTestId('connect-related-settings-wif')).toBeVisible();
     const wifSettingsToggle = page
       .getByTestId('connect-related-settings-wif')
-      .getByRole('button', { name: /WIF trust and JWKS settings/i });
+      .getByRole('button', { name: /WIF token lifetime, trust and JWKS settings/i });
     await wifSettingsToggle.click();
     await expect(wifSettingsToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByTestId('connect-related-settings-wif-MaxActiveWifTrusts')).toBeVisible();
+    const inheritedLifetime = page.getByTestId('connect-related-settings-wif-WifTokenTtlSec-input');
+    await expect(inheritedLifetime).toHaveValue('');
+    await expect(inheritedLifetime).toHaveAttribute('placeholder', 'server default: 3600');
     await expect(
       page.getByTestId('connect-related-settings-wif-effective-JwksMaxKeys'),
     ).toContainText('Effective:');

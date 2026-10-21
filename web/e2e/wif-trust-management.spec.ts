@@ -55,7 +55,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 /** Route-mock the endpoint detail + overview + JWKS allowlist for the WIF endpoint. */
-async function mockWifEndpoint(page: Page): Promise<void> {
+async function mockWifEndpoint(page: Page, trust = TRUST_A): Promise<void> {
   await page.route(`**/scim/admin/endpoints/${EP}`, async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     if (!route.request().url().endsWith(`/${EP}`)) return route.continue();
@@ -96,7 +96,7 @@ async function mockWifEndpoint(page: Page): Promise<void> {
           createdAt: '2026-01-01T00:00:00Z',
         },
         stats: { userCount: 0, activeUserCount: 0, groupCount: 0, activeGroupCount: 0, genericResourceCount: 0 },
-        credentials: [TRUST_A],
+        credentials: [trust],
         recentActivity: [],
         configFlags: { WifCredentialsEnabled: true },
         connectionInfo: {
@@ -132,14 +132,56 @@ async function mockWifEndpoint(page: Page): Promise<void> {
   });
 }
 
-async function openCredentials(page: Page): Promise<void> {
-  await mockWifEndpoint(page);
+async function openCredentials(page: Page, trust = TRUST_A): Promise<void> {
+  await mockWifEndpoint(page, trust);
   await page.goto(`/endpoints/${EP}/credentials`);
   await expect(page.getByTestId('tab-credentials')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('wif-section')).toBeVisible();
 }
 
 test.describe('WIF trust management (2026-07 overhaul)', () => {
+  test('token lifetime override survives editing, validates bounds and can return to endpoint inheritance', async ({ page }) => {
+    const trust = structuredClone(TRUST_A);
+    const saved: Record<string, unknown>[] = [];
+    await page.route(`**/scim/admin/endpoints/${EP}/credentials/wt-a`, async (route) => {
+      if (route.request().method() !== 'PUT') return route.continue();
+      const body = route.request().postDataJSON();
+      saved.push(body.wif);
+      Object.assign(trust.wif, { issuedTokenTtlSec: null }, body.wif);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(trust) });
+    });
+    await openCredentials(page, trust);
+    await page.getByTestId('wif-credential-more-wt-a').click();
+    await page.getByTestId('wif-credential-edit-wt-a').click();
+    const lifetime = page.getByTestId('wif-field-token-ttl-input');
+    await expect(lifetime).toHaveValue('');
+    await page.getByTestId('wif-field-token-ttl-presets').click();
+    await page.getByRole('option', { name: '1 week (604800 seconds)', exact: true }).click();
+    await page.getByTestId('wif-trust-edit-save-wt-a').click();
+    await expect.poll(() => saved.length).toBe(1);
+    expect(saved[0].issuedTokenTtlSec).toBe(604800);
+    await page.reload();
+    await page.getByTestId('wif-credential-more-wt-a').click();
+    await page.getByTestId('wif-credential-edit-wt-a').click();
+    await expect(lifetime).toHaveValue('604800');
+    await page.getByTestId('wif-field-description-input').fill('Keep the token lifetime');
+    await page.getByTestId('wif-trust-edit-save-wt-a').click();
+    await expect.poll(() => saved.length).toBe(2);
+    expect(saved[1].issuedTokenTtlSec).toBe(604800);
+    await page.getByTestId('wif-credential-more-wt-a').click();
+    await page.getByTestId('wif-credential-edit-wt-a').click();
+    for (const invalid of ['59', '604801', '60.5']) {
+      await lifetime.fill(invalid);
+      await expect(page.getByTestId('wif-trust-edit-save-wt-a')).toBeDisabled();
+      await expect(page.getByTestId('wif-field-token-ttl')).toContainText('whole number');
+    }
+    await lifetime.fill('');
+    await page.getByTestId('wif-trust-edit-save-wt-a').click();
+    await expect.poll(() => saved.length).toBe(3);
+    expect(saved[2]).not.toHaveProperty('issuedTokenTtlSec');
+    await expect(page.getByTestId('wif-credential-wt-a-expiry')).toContainText('inherit the endpoint WIF lifetime');
+  });
+
   test('item 5: the configured-trust grid renders every public field VALUE', async ({ page }) => {
     await openCredentials(page);
     const details = page.getByTestId('wif-credential-details-wt-a');

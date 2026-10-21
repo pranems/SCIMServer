@@ -106,6 +106,15 @@ describe('SettingsTab', () => {
     });
   });
 
+  it.each(['OAuthClientTokenTtlSec', 'WifTokenTtlSec'])('renders a unique interactive root for %s', (key) => {
+    (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: overviewWith({}), isLoading: false, error: null,
+    });
+    wrap(<SettingsTab endpointId={EP_ID} />);
+    expect(screen.getAllByTestId(`settings-number-${key}`)).toHaveLength(1);
+    expect(screen.getByTestId(`settings-number-${key}-input`)).toHaveValue('3600');
+  });
+
   it('shows loading state while overview is loading', () => {
     (useEndpointOverview as ReturnType<typeof vi.fn>).mockReturnValue({
       data: undefined, isLoading: true, error: null,

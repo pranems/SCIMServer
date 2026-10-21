@@ -206,7 +206,7 @@ describe('OAuthService', () => {
       );
     });
 
-    it('honors a custom issuedTokenTtlSec within the 1-6h window (Q6.4)', async () => {
+    it('honors a custom issuedTokenTtlSec within the configured window (Q6.4)', async () => {
       const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 7200 });
       expect(result.expiresIn).toBe(7200);
       expect(jwtService.sign).toHaveBeenCalledWith(
@@ -215,14 +215,20 @@ describe('OAuthService', () => {
       );
     });
 
-    it('clamps a ttlSec below the 1h floor up to 3600 (Q6.4)', async () => {
-      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 60 });
-      expect(result.expiresIn).toBe(3600);
+    it('clamps a ttlSec below the one-minute floor up to 60', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 59 });
+      expect(result.expiresIn).toBe(60);
     });
 
-    it('clamps a ttlSec above the 6h ceiling down to 21600 (Q6.4)', async () => {
-      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 99999 });
-      expect(result.expiresIn).toBe(21600);
+    it('clamps a ttlSec above the one-week ceiling down to 604800', async () => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec: 604801 });
+      expect(result.expiresIn).toBe(604800);
+    });
+
+    it.each([60, 61, 3600, 86400, 604800])('issues an exact configured lifetime of %s seconds', async (ttlSec) => {
+      const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, { ttlSec });
+      expect(result.expiresIn).toBe(ttlSec);
+      expect(jwtService.sign).toHaveBeenCalledWith(expect.any(Object), { expiresIn: `${ttlSec}s` });
     });
 
     it('uses an admin-trusted scope verbatim, bypassing the caller-scope filter (Q6.4 WIF)', async () => {
@@ -293,14 +299,13 @@ describe('OAuthService', () => {
       expect(result.expiresIn).toBeGreaterThan(3500);
     });
 
-    it('W3.6: an assertion expiring sooner than the 1h floor still caps below the floor', async () => {
+    it('W3.6: an assertion expiring below the one-minute floor still caps below the floor', async () => {
       const nowSec = Math.floor(Date.now() / 1000);
       const result = await service.generateEndpointAccessToken('ep-1', 'sp-x', undefined, {
         ttlSec: 3600,
-        assertionExpiresAt: nowSec + 120,
+        assertionExpiresAt: nowSec + 30,
       });
-      // The static 1h floor must NOT re-raise the lifetime above the assertion.
-      expect(result.expiresIn).toBeLessThanOrEqual(120);
+      expect(result.expiresIn).toBeLessThanOrEqual(30);
       expect(result.expiresIn).toBeGreaterThan(0);
     });
 

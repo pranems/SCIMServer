@@ -401,14 +401,12 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
           .map((el) => (el.getAttribute('data-testid') || '').replace('settings-number-', '').replace(/-input$/, ''))
           .filter(Boolean),
       );
-      // The numeric surface grew from 4 to 14 (v0.55.15: seven more JWKS bounds
-      // plus the three P2 active-credential caps), so a `>= 4` bound would now
-      // pass while ten controls went undriven. The floor tracks the real surface
-      // and the explicit check below names the caps, because those three are the
-      // ones with a security consequence if they silently stop persisting.
-      expect(nums.length, 'expected the full numeric settings surface').toBeGreaterThanOrEqual(14);
-      for (const cap of ['MaxActiveBearerCredentials', 'MaxActiveOAuthClientCredentials', 'MaxActiveWifTrusts']) {
-        expect(nums, `${cap} must be operator-reachable in the Settings tab`).toContain(cap);
+      expect(nums.length, 'expected the full numeric settings surface').toBe(16);
+      for (const key of [
+        'MaxActiveBearerCredentials', 'MaxActiveOAuthClientCredentials', 'MaxActiveWifTrusts',
+        'OAuthClientTokenTtlSec', 'WifTokenTtlSec',
+      ]) {
+        expect(nums, `${key} must be operator-reachable in the Settings tab`).toContain(key);
       }
 
       // In-bounds values chosen per the documented ranges.
@@ -435,6 +433,8 @@ test.describe('Settings matrix - every control is driven in a real browser', () 
         MaxActiveBearerCredentials: '7',      // 1 - 25
         MaxActiveOAuthClientCredentials: '4', // 1 - 25
         MaxActiveWifTrusts: '12',             // 1 - 25
+        OAuthClientTokenTtlSec: '61',
+        WifTokenTtlSec: '604800',
       };
 
       const unmapped = nums.filter((k) => value[k] === undefined);
