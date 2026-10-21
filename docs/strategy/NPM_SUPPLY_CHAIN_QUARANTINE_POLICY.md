@@ -55,6 +55,15 @@ passes before the full retry. No database connection is needed for generation.
 Validate-mode bootstrap calls must explicitly carry this prerequisite rather
 than relying on a previous shell's environment; no gate was bypassed.
 
+**Shared-host worker preflight:** concurrent default Vitest pools exhausted
+worker-start responsiveness: 110 files passed, but 13 worker-start errors
+blocked the hook, rather than failed test assertions. The integration matrix
+also encountered worker-start errors. The installed Vitest supports
+`VITEST_MAX_WORKERS`; setting it to `2` makes the two implicated smoke files
+pass all 18 tests. Carry that process-local cap into every full retry. This
+does not relax test timeouts, assertions or coverage thresholds. Separate
+worktrees and databases do not by themselves isolate CPU and memory pressure.
+
 ### 2026-10-14 root documentation tooling continuation
 
 The existing lockfile-regeneration workflow now accepts `root` as well as
