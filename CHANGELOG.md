@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report reordering explicitly. Add useful bounded CLI validation reasons.
   Focused tests: 71 -> 72 PASS. Separate exact replay verifies nine producer
   hashes, 17,628 spans and 16,000 timings without relabeling the failed campaign.
+- Remove redundant nested Jest startup from the real non-UTC endpoint timestamp
+  regression. A standalone Node fixture calls the production service and checks
+  exact timezone/read-count/timestamp receipt values. All 21 freshness tests
+  pass; reversing the production UTC interpretation still fails both fields.
+  Keep the original 30-second child and 35-second parent limits, all assertions
+  and ordinary protected validation. No serving-code or version change.
 - Focused contracts increase 44 -> 68 PASS, zero failures/skips. New coverage
   includes actual analyzer CLI failures, immutable role/runtime identity,
   all 17,628 request spans and 16,000 timings, explicit profiler authorization,

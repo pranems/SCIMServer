@@ -690,8 +690,36 @@ and execution phases under the ordinary unit gate. The separate Web startup
 task stays open with the same owner/target. Design disposition: **accepted**;
 no speculative test-runner or serving refactor is justified by these timings.
 
+**ER-68l implementation follow-up:** inspection identifies unnecessary nested
+framework startup: the real-timezone assertion launches another complete Jest
+runner and Nest testing module inside the 30-second process bound.
+Replace only that harness with a fresh Node process using the existing
+`ts-node/register/transpile-only` loader and a small source fixture.
+The fixture calls the actual `EndpointService.getEndpoint` path with the real
+lifecycle repository and a mocked timezone-free PostgreSQL snapshot. It does
+not duplicate the date conversion, load a stale build or connect to a database.
+The ordinary parent suite still tests Nest wiring and warmed-cache behavior.
+
+The parent validates the complete structured receipt: real UTC-5 January
+offset, exactly one snapshot read, both returned UTC timestamps and the
+standalone runner identity. The original nested runner first fails that
+receipt assertion (RED); all 21 freshness tests then pass with the new harness.
+A production negative control temporarily removes UTC interpretation and
+produces `05:00:00Z` instead of `00:00:00Z` for **both** fields (RED).
+Restore the production line exactly and all 21 cases pass again.
+The direct child command completes in 2,720.8 ms in one retained observation;
+this is not a runtime benchmark or a full-load guarantee.
+
+Neither the 30-second child bound nor 35-second parent bound changes.
+There are no retries, exclusions, worker/pool changes or serving-code changes.
+Targeted ESLint and fixture syntax pass. Full ordinary protected validation
+is still required. This removes redundant harness work without claiming the
+earlier OS/framework delay phase or the separate Web-startup cause is proven.
+Design disposition: **applied**; use a standalone fixture and the existing
+production seam, not a new runtime abstraction or a larger deadline.
+
 **Updated completeness note:** reconciled the full available continuation
-through event record 60,068 using signal-frequency and causal-narration passes.
+through event record 60,385 using signal-frequency and causal-narration passes.
 Confirmed native issues map to ER-68a-l; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not

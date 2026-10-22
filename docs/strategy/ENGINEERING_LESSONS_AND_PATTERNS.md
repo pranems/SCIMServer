@@ -123,6 +123,16 @@ startup failure. Avoid installing competing IPC listeners, preserve call
 and return behavior, and keep instrumented runs separate from gate admission.
 See ER-68k in the same ledger.
 
+A real-process timezone regression need not launch a second complete test
+framework. Use a bounded fresh Node process with the established source loader,
+the actual production entry point and mocked external I/O. Assert a complete
+receipt proving the process timezone, production read count and returned values.
+Retain ordinary dependency-injection coverage separately. Before accepting the
+cheaper harness, reverse the relevant production behavior and confirm that the
+new assertion fails for the original defect; restore it before any gate run.
+Keep deadlines unchanged and distinguish isolated timings from full-load proof.
+See ER-68l in the same ledger.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

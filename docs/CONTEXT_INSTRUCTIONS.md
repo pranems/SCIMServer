@@ -20,6 +20,14 @@ Later gates do not run. Do not combine focused/diagnostic results into a
 full PASS or repeat full suites blindly. No new-source CI, merge, deployment,
 serving change or version bump. Master is still `e1070ba2`; see ER-68e/h-l.
 
+**Timezone harness follow-up:** replace redundant nested Jest startup with
+a fresh Node/ts-node fixture calling actual `EndpointService.getEndpoint`.
+Validate a full receipt proving non-UTC offset, one snapshot read and both
+returned UTC fields. Receipt RED, all 21 freshness cases GREEN, actual
+production UTC negative control RED and restored 21-case GREEN are retained.
+Targeted lint/syntax pass. No serving change or 30/35-second deadline increase.
+Full ordinary protected publication remains required; Web cause stays open.
+
 **Latest actual native execution, 2026-10-22:** `30fbea59` is published through
 28 passing gates and fresh review `5618294791` has no open code issues.
 Both preceding review findings are resolved. Actual Linux `39822577851`

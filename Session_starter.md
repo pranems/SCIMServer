@@ -15,6 +15,14 @@ not substitutes for a complete ordinary hook. No further blind full retries,
 new-source CI, merge or deployment. Startup/deadline investigation remains
 open; performance admission is independently still held. See ER-68e/h-l.
 
+**Timezone-harness implementation:** remove only the redundant nested Jest
+runner. A fresh non-UTC Node fixture uses existing ts-node and calls actual
+`EndpointService.getEndpoint`; parent checks timezone offset, one snapshot
+read and both UTC timestamps. Receipt RED, 21-case GREEN, production UTC
+negative-control RED and restored 21-case GREEN are retained. Production
+source is unchanged; 30/35-second bounds, workers and assertions are preserved.
+Targeted lint/syntax pass. Full ordinary protected publication remains required.
+
 | Date | Summary |
 |---|---|
 | 2026-10-22 | Native signed-clock correction passes 72 focused tests and exact retained-data replay; ordinary publication remains blocked by separately retained Web and nested-Jest startup/deadline failures. |

@@ -359,7 +359,7 @@ Invoke-Gate -Name 'docs: RFC corpus current + intact' -WorkingDir $repoRoot -Act
 # database, no Docker and no network - it stays deterministic and works offline.
 
 Invoke-Gate -Name 'api: unit tests (jest)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
-    # A nested real-timezone child deadline is not a failed timestamp assertion.
+    # A real-timezone child deadline is not a failed timestamp assertion.
     # Retain its elapsed/status/signal evidence; a focused pass is not this gate.
     npm test 2>&1 | Out-Host
 }
