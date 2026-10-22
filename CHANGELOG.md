@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Fix review `5621836110` and the new exact-source Linux privacy failure:
+  Group PATCH records use `scim.patch`, not `scim.group`. Preserve same-record
+  request identity and every privacy safeguard; correct JSON, pretty and
+  receipt predicates. An isolated frozen-image 66-outcome probe verifies the
+  actual category without exporting logs/IDs. Production-shaped fixtures,
+  wrong-domain negatives and a producer-mapping guard increase focused
+  contracts 107 -> 110 PASS; 15 actual Linux privacy cases and one producer
+  guard PASS after ten RED. The actual corrected guard also passes the
+  isolated frozen-image 66-outcome contract with exact cleanup.
+  Record ER-68ah-ai. Prior `6febc534` publication passes 28 normal gates in
+  1184.5 seconds; its post-round correlation FAIL remains retained.
+  No new latency/admission result, serving change or product bump.
 - Fix Linux environment restoration exposed by exact `6a710734` CI before
   benchmark allocation: use a real .NET null for originally absent variables
   while preserving present empty values. Reproduce three RED controls on

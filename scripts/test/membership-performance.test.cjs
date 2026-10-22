@@ -15,10 +15,20 @@ function load() {
   return require(implementation);
 }
 
+test('privacy fixtures use the production Group PATCH logger category', () => {
+  const service = fs.readFileSync(path.resolve(__dirname, '..', '..', 'api', 'src',
+    'modules', 'scim', 'services', 'endpoint-scim-groups.service.ts'), 'utf8');
+  const categories = fs.readFileSync(path.resolve(__dirname, '..', '..', 'api', 'src',
+    'modules', 'logging', 'log-levels.ts'), 'utf8');
+  assert.match(service, /this\.logger\.info\(LogCategory\.SCIM_PATCH, 'Patch group'/);
+  assert.match(categories, /SCIM_PATCH = 'scim\.patch'/);
+});
+
 for (const scenario of [
   'buffered', 'functional-failure', 'flush-failure', 'secret-leak',
   'no-errors', 'missing-request', 'missing-category', 'invalid-row', 'functional-write-failure',
   'split-records', 'json-buffered', 'json-split-records', 'json-unrelated-payload',
+  'group-category', 'json-group-category',
 ]) {
   test(`actual privacy phase drains buffered logs and retains sanitized failure evidence: ${scenario}`, () => {
     const runner = fs.readFileSync(path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1'), 'utf8');
@@ -83,24 +93,29 @@ for (const scenario of [
           }
           if ($args[0] -eq 'logs' -and $args[-1] -eq $apps.candidate.Id) {
             $prefix = if ($scenario -eq 'missing-request') { '87654321' } else { '12345678' }
-            $category = if ($scenario -eq 'missing-category') { 'other' } else { 'scim.group' }
+            $category = if ($scenario -eq 'missing-category') { 'other' }
+              elseif ($scenario -in @('group-category', 'json-group-category')) { 'scim.group' }
+              else { 'scim.patch' }
             if ($scenario -eq 'secret-leak') { return $env:JWT_SECRET }
             if ($scenario -eq 'split-records') {
-              return @("12:00:00.000 WARN other [$prefix] negative", '12:00:00.001 INFO scim.group [87654321] unrelated') -join [Environment]::NewLine
+              return @("12:00:00.000 WARN other [$prefix] negative", '12:00:00.001 INFO scim.patch [87654321] unrelated') -join [Environment]::NewLine
             }
             if ($scenario.StartsWith('json-')) {
-              $record = [ordered]@{ timestamp = '2026-10-22T12:00:00.000Z'; category = $category; requestId = $requestId }
-              if ($scenario -eq 'json-unrelated-payload') { $record.category = 'other'; $record.data = @{ category = 'scim.group' } }
+              $record = [ordered]@{
+                timestamp = '2026-10-22T12:00:00.000Z'; level = 'INFO'
+                category = $category; message = 'Patch group'; requestId = $requestId
+              }
+              if ($scenario -eq 'json-unrelated-payload') { $record.category = 'other'; $record.data = @{ category = 'scim.patch' } }
               if ($scenario -eq 'json-split-records') {
                 $record.category = 'other'
                 return @(
                   (ConvertTo-Json -InputObject $record -Compress),
-                  '{"timestamp":"2026-10-22T12:00:00.001Z","category":"scim.group","requestId":"87654321-1234-4234-8234-123456789abc"}'
+                  '{"timestamp":"2026-10-22T12:00:00.001Z","category":"scim.patch","requestId":"87654321-1234-4234-8234-123456789abc"}'
                 ) -join [Environment]::NewLine
               }
               return ConvertTo-Json -InputObject $record -Depth 4 -Compress
             }
-            return "12:00:00.000 WARN $category [$prefix] synthetic"
+            return "12:00:00.000 INFO $category [$prefix] Patch group"
           }
           throw 'Unexpected private log operation'
         }

@@ -375,19 +375,19 @@ function Invoke-Block {
             $privacy.correlation.errorRows = $errors.Count
             $privacy.correlation.requestIdPresent = $errors.Count -gt 0 -and
                 $consoleLog.Contains($errors[0].requestId.Substring(0, 8))
-            $privacy.correlation.categoryPresent = $consoleLog -match 'scim\.group'
+            $privacy.correlation.categoryPresent = $consoleLog -match 'scim\.patch'
             $privacy.correlation.sameRecordPresent = $false
             if ($errors.Count -gt 0) {
                 $requestPrefix = [regex]::Escape($errors[0].requestId.Substring(0, 8))
                 foreach ($line in ($consoleLog -split '\r?\n')) {
                     if ($line.StartsWith('{"timestamp":')) {
                         $record = $line | ConvertFrom-Json -ErrorAction Stop
-                        if ($record.category -ceq 'scim.group' -and $record.requestId -ceq $errors[0].requestId) {
+                        if ($record.category -ceq 'scim.patch' -and $record.requestId -ceq $errors[0].requestId) {
                             $privacy.correlation.sameRecordPresent = $true
                             break
                         }
                     } elseif (($line -replace '\x1b\[[0-9;]*m', '') -match
-                        "^\d{2}:\d{2}:\d{2}\.\d{3}\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+scim\.group\s+\[$requestPrefix\]") {
+                        "^\d{2}:\d{2}:\d{2}\.\d{3}\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+scim\.patch\s+\[$requestPrefix\]") {
                         $privacy.correlation.sameRecordPresent = $true
                         break
                     }

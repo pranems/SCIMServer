@@ -98,6 +98,15 @@ real empty values separately. A Windows-only PASS does not prove Linux state
 restoration. Actual container controls close ER-68ad/ae; both conventions are
 promoted to the standing rules rather than left as advisory prose.
 
+Formatter fidelity is not domain fidelity. A syntactically real log line can
+still use the wrong category: Group PATCH operations emit `scim.patch`, not
+the general `scim.group` category. Derive the expected operation/category
+relationship from its producer and keep a source-to-fixture guard plus
+wrong-domain negative controls. Before a costly benchmark, a bounded actual
+contract probe can verify the selected failed request's sanitized category
+counts without exporting raw logs or IDs. This closes ER-68ah; it does not
+retroactively explain an older failure whose predicates were not retained.
+
 Resource measurements need the same failure contract as request timings.
 Persist every collected CPU, database, memory, RSS and OOM observation before
 rejecting a ceiling or deleting its owner. A missing later probe must leave

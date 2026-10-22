@@ -9,6 +9,18 @@
 
 ## Active Delivery Process
 
+**Current PATCH-correlation correction:** published `6febc534` passes 28
+ordinary gates in 1184.5 seconds. Exact Linux qualification/native complete
+four rounds, then reject correctly categorized Group PATCH logs.
+Review `5621836110` and an isolated frozen-image contract probe confirm
+`scim.patch`, not `scim.group`, is the actual producer category.
+Three corrected predicates plus source-shaped/wrong-domain guards now pass
+110 focused contracts, 15 actual Linux privacy cases and one producer-mapping
+guard after ten RED. The actual corrected guard also passes an isolated
+frozen-image 66-outcome contract with exact cleanup.
+See ER-68ah-ai; protected publication/fresh CI/review remain required.
+No performance admission, product bump or deployment.
+
 **Current Linux/review follow-up:** `6a710734` passes all 28 ordinary gates in
 1229.7 seconds, then its Linux workflows fail three campaign contracts before
 benchmark allocation. An official Linux 7.5.0/.NET 9.0.1 reproduction proves

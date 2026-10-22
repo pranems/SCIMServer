@@ -4,6 +4,18 @@
 
 ### Current master/performance reconciliation (2026-10-22)
 
+**Current PATCH-correlation correction:** published `6febc534` passes all
+28 normal gates in 1184.5 seconds. New Linux qualification/native runs pass
+contracts and all four rounds, then reject the actual negative PATCH category.
+Fresh review `5621836110` agrees: the guard/fixtures use `scim.group`, but the
+producer uses `scim.patch`. A private frozen-image 66-outcome probe proves
+one PATCH-category and zero Group-category records for the selected request.
+Correct all three predicates and add producer-shaped/wrong-domain controls:
+110 focused PASS plus 15 actual Linux privacy cases and one producer guard
+PASS after ten RED.
+See ER-68ah-ai. Protected publication/new-source CI/review remain required;
+no new latency assessment, admission, version bump, merge or deployment.
+
 **Current Linux/review follow-up:** `6a710734` publishes through 28 normal
 Validate gates in 1229.7 seconds. Its three Linux workflows fail campaign
 contracts before benchmark allocation: ordinary PowerShell null binds as
@@ -76,6 +88,7 @@ Targeted lint/syntax and full ordinary protected publication pass on `84d11af7`.
 
 | Date | Summary |
 |---|---|
+| 2026-10-22 | Published 6febc534 through 28 gates; real post-round logs and review 5621836110 expose wrong PATCH-category fixtures. Corrected guard passes 110 focused tests, 15 actual Linux privacy cases and a producer guard, plus an isolated frozen-image 66-outcome probe. No performance admission. |
 | 2026-10-22 | Published 6a710734 through 28 gates; Linux CI exposes null/empty restoration mismatch and fresh review finds leaf status-writer masking. Local fixes prove 107 focused PASS plus six Linux controls; no benchmark was allocated by the failed new-source jobs. |
 | 2026-10-22 | Corrected all four findings in review 5620999429 with 104 focused PASS; retained nine substantive RED controls and separate fixture issues. Prior abbcce07 passes 28 ordinary gates but its Linux A/A performance control fails. Publication/review of the new correction remain required. |
 | 2026-10-22 | Published signed-clock/timezone corrections through 28 green gates on 84d11af7; fresh review exposes partial-file capture loss, corrected locally with 74 focused tests. Performance control still fails. |

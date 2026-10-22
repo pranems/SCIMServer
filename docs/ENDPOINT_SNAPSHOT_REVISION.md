@@ -946,6 +946,97 @@ intentional RED controls, repeated quotations, normal CRLF warnings and
 workflow failures already retained above are not invented additional issues.
 This is not access to the deleted original transcript.
 
+### PATCH-category correlation correction (ER-68ah-ai)
+
+**Executive summary:** published `6febc534` passes all 28 ordinary Validate
+gates in 1184.5 seconds and fixes the prior Linux pre-allocation failures.
+Its new qualification `39866153855` and native `39866153894` pass contracts
+and complete all four rounds, then fail the same-record console guard.
+This is a privacy-check implementation error, not a latency-limit result.
+Fresh exact-tip review `5621836110` independently identifies the same cause.
+The original performance-admission hold remains unresolved.
+
+**ER-68ah, production-fixture mismatch / Medium.** The selected seven
+negative requests are Group PATCHes. The service logs their operation under
+`LogCategory.SCIM_PATCH`, whose value is `scim.patch`, rather than the
+general `scim.group` category used by other Group operations. The earlier
+fixtures invented `scim.group` negative records, so local and Linux contracts
+passed while correctly categorized real PATCH requests failed correlation.
+The retained failure receipt distinguishes the predicates: seven errors,
+request ID present, general Group category present, same-record match absent.
+
+An isolated, loopback-only probe runs the unchanged frozen `0.55.58` image,
+private PostgreSQL and the actual 66-outcome membership contract. It exports
+only category counts and booleans, never raw logs, IDs or credentials.
+The selected request is PATCH: one `scim.patch` record, zero `scim.group`
+records, one `http` record and two `auth` records. All exact-owned probe
+containers and its network are removed. This is a Windows/Docker diagnostic,
+not a Linux qualification, benchmark rerun or release admission.
+
+```text
+Real negative Group PATCH
+  -> patchGroupForEndpoint
+  -> logger.info(SCIM_PATCH, "Patch group")
+  -> console category scim.patch + selected request ID
+  -> old guard expects scim.group in that same record: false rejection
+  -> corrected JSON/pretty guards require scim.patch + that same ID
+```
+
+Correct all three category predicates, retaining same-record identity,
+top-level JSON matching, secret scans, redaction and fail-closed receipts.
+Make the pretty/JSON fixtures production-shaped, reject otherwise correctly
+correlated `scim.group` records, and add a source-to-fixture category guard.
+Ten privacy controls fail before the production correction, including both
+valid PATCH shapes rejected and both wrong-category shapes accepted.
+After correction: **110 focused contracts PASS, zero failures/skips**, and
+**16 selected bridge checks PASS**: 15 actual Linux PowerShell privacy
+cases with mocked Docker/IO and one Node producer-category mapping guard.
+Logs: `qualification-patch-category-red.log`,
+`qualification-patch-category-green.log`,
+`qualification-patch-category-linux-green.log` and
+`negative-log-category-probe-direct-curl.log`.
+The corrected actual PowerShell correlation phase also passes against a
+fresh isolated frozen-image contract, with `actualCorrectedGuardPassed:true`,
+66 assertions and exact resource cleanup. Log:
+`negative-log-category-probe-fixed-guard-green.log`.
+Normal protected publication, fresh review and new-source Linux evidence
+remain required. The old ER-68p failure predicate remains unknown; this
+newly observed, independently reproduced cause does not explain it retroactively.
+
+Detection: exact-source CI after measurement and fresh review. Earliest
+possible gate: the production-category fixture guard and bounded contract
+probe before publication. Prevention **applied** through permanent
+production-shaped fixtures, wrong-domain negative controls and the
+source-to-fixture mapping check. Design disposition **accepted**: correct
+three literals in the existing bounded phase; a category strategy/framework
+would be speculative for this one fixed PATCH contract.
+
+**ER-68ai, diagnostic harness / Low.** The first Windows-only probe wraps
+native curl in a PowerShell function to translate `/dev/null` to `NUL`.
+The app is healthy, but redirecting a function's text output adds CRLF:
+the retained health file is bytes `32-30-30-0D-0A`, length 5, not exact `200`.
+Readiness therefore fails and exact-owned resources are removed; this is
+not an application failure. An exit-status-scope hypothesis is disproved by
+a direct control and is not accepted as the cause. Keep curl directly in
+the temporary setup script and translate only the sink path. Its health
+file is bytes `32-30-30`, length 3; the corrected probe completes all 66
+outcomes and produces the sanitized counts above. Production Linux setup
+and its readiness assertion are unchanged.
+Detection and earliest gate: this probe's own readiness/expected-result
+assertions. Prevention: adapters must preserve both native status and output
+bytes; require the expected result and cleanup, not only a launch or process
+return. Compare actual bytes before attributing a healthy-service probe failure.
+
+**Completeness update:** reconcile the full available continuation through
+event 63,453 using the existing signal-frequency and causal-narration passes.
+The native increment has 364 matching records, not 364 incidents. ER-68ah-ai
+maps the new production-category and probe-output issues. Original failed
+artifacts stay failed; expected RED controls, search misses and the disproved
+exit-status hypothesis are not additional application incidents.
+The ignored timeline auditor now distinguishes exact-source legacy correlation
+from the new required same-record field; seven positive/negative controls pass
+without changing original artifacts. No deleted transcript is claimed.
+
 ### Linux restoration and leaf capture-status writer (ER-68ad-ag)
 
 `6a710734` publishes normally: all 28 Validate gates PASS in 1229.7 seconds,
