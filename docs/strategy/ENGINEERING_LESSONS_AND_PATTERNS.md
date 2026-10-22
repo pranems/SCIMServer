@@ -36,6 +36,16 @@ properties and runtime before adopting them. The narrow Linux qualification
 reuses the original lifecycle instead of building a new measurement framework.
 See [protocol and RCA](../ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
+### Failure evidence needs its own completion budget and contract
+
+A failed measurement is not the same thing as an absent receipt. Preserve
+explicit partial failure data, exclude it from admission and test a failure
+after samples have actually been collected. Retrieve the receipt before
+destroying its owner. Likewise, `always()` cannot run after a job has already
+exhausted its total deadline: reserve cleanup and upload time outside the work
+budget. Test that work stops, not merely that timeout fields exist.
+See [ER-64/ER-65](../ENDPOINT_SNAPSHOT_REVISION.md#hosted-qualification-review-failed-evidence-and-deadline-guards-er-64er-65).
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

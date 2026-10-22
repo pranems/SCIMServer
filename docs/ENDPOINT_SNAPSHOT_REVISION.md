@@ -59,7 +59,7 @@ Same current image: BAAB, then ABBA
 | Client identity | Same immutable candidate image's Node runtime drives both roles through host networking; this is a declared environment change from the Windows-host client |
 | Runtime controls | Original 4,407 requests/round, two version checks and exact fixture absence; 66 functional and 200 private logging/correlation checks per completed block |
 | Safety | Private labelled Docker network/databases; generated ephemeral credentials; no raw private logs exported; ownership-checked exact-ID cleanup and absence readback |
-| Budget | At most sixteen rounds; rough historical extrapolation about 43 minutes before setup, not a measured Linux duration; 75-minute job cap, no automatic retries |
+| Budget | At most sixteen rounds; rough historical extrapolation about 43 minutes before setup, not a measured Linux duration; 60-minute work deadline, 65-minute qualification step, 75-minute job cap, no automatic retries |
 | Workflow authority | [performance-qualification.yml](../.github/workflows/performance-qualification.yml) has contents-read permission only, no Azure credentials or deploy command |
 | Evidence | Every completed/failed block, raw timings, source/image identities, cgroup counters, privacy and cleanup receipts retained as a 14-day Actions artifact |
 | Scope limit | Two passing controls do not quantify false-failure probability or establish actual-customer concurrency/capacity; a runner VM can share physical hardware |
@@ -143,12 +143,58 @@ unready. Focused contracts increase from 11 to **13 PASS**.
 | Evidence preserved | Original failed run/artifact, zero completed blocks and successful exact-owned cleanup |
 | Next result | Corrected-source protected publication and Linux execution remain independent, not yet claimed |
 
-Documentation editing also hit one low-severity tooling friction: a final
-lessons-file hunk used unrelated context, so the patch tool applied four
-earlier files and rejected that hunk explicitly. Only the failed hunk was
-retried, preserving the successful edits. Detection and earliest possible
-stage were both editing feedback, with no stage escape. This is not a runtime
-failure and did not cause a test or benchmark rerun.
+Documentation editing also hit two low-severity partial-patch frictions:
+final lessons/infra-file hunks used non-matching context. The patch tool
+explicitly preserved earlier successful files. Only failed hunks were retried
+against inspected anchors, without repeating successful edits. Detection and
+earliest possible stage were both editing feedback, with no stage escape.
+This is not a runtime failure and did not cause a benchmark rerun.
+
+### Hosted qualification review: failed evidence and deadline guards (ER-64/ER-65)
+
+Review `5614222330` on `33c93e4e` reports three relevant findings, not merely
+the startup failure. The TCP correction above addresses one. The other two
+are corrected together, with permanent controls:
+
+| Finding | Earlier behavior and consequence | Correction / proof |
+|---|---|---|
+| ER-64: failed-round evidence lost | Client wrote only after successful round/cleanup; runner rejected failed exit before copying and then deleted the container. The old corrupt-read test wrongly expected no output, conflating a failed receipt with a success receipt. | Always save an explicitly complete PASS or incomplete FAIL receipt on controlled outcomes. Capture each received measurement before readback validation; retain sanitized failure stage/kind and cleanup outcome. Copy it before rejecting failed exit. Tests fail after two measured cycles and retain ten values, preserve all 4,000 measurements on cleanup failure, and execute the actual runner's copy-before-rejection path. |
+| ER-65: no upload headroom | A 75-minute qualification could exhaust the whole job; `always()` cannot guarantee a later upload after job termination. | Cooperative 60-minute work deadline in runner/client; cleanup requests retain their own bounded 30-second transport limits. A 65-minute step limit leaves headroom before the unchanged 75-minute job limit. Checkout, tests and upload have 2/3/4-minute caps. Extracted deadline and real expired-client tests prove rejection, not admission of a partial campaign. |
+
+The evaluator now rejects any row not explicitly `status: PASS` and
+`complete: true`, even if someone supplies a failed row with full-length
+arrays. Partial values are evidence only: never included in percentiles,
+pooled into a later run, or used to resume the failed block. Receipts contain
+no token, payload, raw assertion text or response body. They identify a bounded
+failure category and operation. Persistence is outside the measured request
+window: keep values in memory and save on controlled completion/failure rather
+than adding per-request disk writes that would perturb quota behavior.
+Unexpected host loss or hard process termination still cannot guarantee
+unsaved in-memory values; missing evidence fails admission.
+
+Both issues are **Medium**, type measurement tooling/test correctness.
+Hosted review caught them; unit behavior/operational-budget controls were the
+earliest possible gates, now added. Focused tests increase **13 -> 17 PASS**.
+The next TCP-only protected push was deliberately stopped, with its commit
+`216d3961` preserved, to batch all findings before one complete new hook run.
+Its partial execution is not reported as a passing push.
+
+Two Low tooling/test-harness frictions were also closed locally. The deadline
+test was initially nested inside an HTTP test's successful path, so the RED
+test count exposed its missing registration; it is now a top-level test.
+Two negative PowerShell fixtures then retained failure status after catching
+the expected exception, despite blank error streams. They now explicitly
+exit successfully only after verifying the exact expected throw and required
+outcomes. Unexpected throws still fail. The complete named 17-test GREEN
+receipt verifies that neither correction silently removed a control.
+
+**Self-improvement applied:** distinguish failed evidence from success
+receipts, test post-measurement failures, assert copy-before-delete ordering
+and reserve evidence-export time outside the operational work budget.
+**Design disposition: accepted:** the existing client/evaluator/runner seams
+remain cohesive. No production policy, resource quota, sample threshold,
+additional history stratum or general scheduling framework is added.
+Corrected-source publication, review and Linux execution remain separate.
 
 ### Earlier implementation checkpoint (historical)
 

@@ -2,6 +2,7 @@ param(
     [string]$OutputDirectory
 )
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $protocolPath = Join-Path $PSScriptRoot 'membership-protocol.json'
 $evaluator = Join-Path $PSScriptRoot 'assess-membership.cjs'
@@ -22,10 +23,20 @@ $summary = [ordered]@{
     StatisticalFalseFailureRate = 'Not estimated by this bounded qualification'
     Blocks = @()
 }
+$campaignClock = [System.Diagnostics.Stopwatch]::StartNew()
+$workDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes(60).ToUnixTimeMilliseconds()
+$summary['WorkDeadlineUtc'] = [DateTimeOffset]::FromUnixTimeMilliseconds($workDeadlineUtc).ToString('o')
 $envNames = @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET',
-    'CREDENTIAL_KEK', 'DATABASE_URL', 'SCIM_BENCH_BASE_URL', 'SCIM_BENCH_TOKEN', 'SCIM_BENCH_VERSION')
+    'CREDENTIAL_KEK', 'DATABASE_URL', 'SCIM_BENCH_BASE_URL', 'SCIM_BENCH_TOKEN', 'SCIM_BENCH_VERSION',
+    'SCIM_BENCH_DEADLINE_UTC')
 $priorEnvironment = @{}
 foreach ($key in $envNames) { $priorEnvironment[$key] = [Environment]::GetEnvironmentVariable($key) }
+
+function Assert-WithinDeadline {
+    if ($campaignClock.Elapsed.TotalMinutes -ge 60) {
+        throw 'Campaign work deadline reached; cleanup and upload time is reserved, no admission.'
+    }
+}
 
 function Invoke-Docker {
     $value = & docker @args
@@ -92,12 +103,14 @@ function Invoke-Block {
         $containers.Add($pg)
         $ready = $false
         foreach ($attempt in 1..60) {
+            Assert-WithinDeadline
             & docker exec $pg pg_isready --host=127.0.0.1 -U scim -d postgres *> $null
             if ($LASTEXITCODE -eq 0) { $ready = $true; break }
             Start-Sleep -Milliseconds 500
         }
         if (!$ready) { throw 'Private PostgreSQL readiness failed.' }
         foreach ($role in @('baseline', 'candidate')) {
+            Assert-WithinDeadline
             $null = Invoke-Docker exec $pg psql -U scim -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $role"
             $null = Invoke-Docker exec $pg psql -U scim -d $role -v ON_ERROR_STOP=1 `
                 -c 'CREATE EXTENSION citext; CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm; CREATE EXTENSION "uuid-ossp"; CREATE EXTENSION pg_stat_statements;'
@@ -123,6 +136,7 @@ function Invoke-Block {
             $url = "http://127.0.0.1:$($Matches[1])"
             $healthy = $false
             foreach ($attempt in 1..90) {
+                Assert-WithinDeadline
                 & curl --silent --output /dev/null --write-out '%{http_code}' "$url/scim/health" `
                     --max-time 2 > (Join-Path $directory "health-$role.txt")
                 if ($LASTEXITCODE -eq 0 -and (Get-Content (Join-Path $directory "health-$role.txt") -Raw) -eq '200') {
@@ -138,6 +152,7 @@ function Invoke-Block {
         } else { @('baseline', 'candidate', 'candidate', 'baseline') }
         $round = 0
         foreach ($role in $schedule) {
+            Assert-WithinDeadline
             $round++
             $app = $apps[$role]
             Assert-Owned $app.Id
@@ -146,20 +161,27 @@ function Invoke-Block {
             $env:SCIM_BENCH_BASE_URL = $app.Url
             $env:SCIM_BENCH_TOKEN = $env:SCIM_SHARED_SECRET
             $env:SCIM_BENCH_VERSION = $roles[$role].version
+            $env:SCIM_BENCH_DEADLINE_UTC = [string]$workDeadlineUtc
             $receiptPath = Join-Path $directory "round-$round-$role.json"
             $client = (Invoke-Docker create --network host --no-healthcheck `
                 --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
                 --mount "type=bind,source=$clientScript,target=/tmp/benchmark.cjs,readonly" `
-                --env SCIM_BENCH_BASE_URL --env SCIM_BENCH_TOKEN --env SCIM_BENCH_VERSION `
+                --env SCIM_BENCH_BASE_URL --env SCIM_BENCH_TOKEN --env SCIM_BENCH_VERSION --env SCIM_BENCH_DEADLINE_UTC `
                 --env SCIM_BENCH_OUTPUT=/tmp/receipt.json --entrypoint node `
                 $protocol.candidate.image /tmp/benchmark.cjs).Trim()
             if ($client -notmatch '^[a-f0-9]{64}$') { throw 'Invalid owned client id.' }
             $containers.Add($client)
-            $null = Invoke-Docker start --attach $client
-            if ([int](Invoke-Docker inspect --format '{{.State.ExitCode}}' $client) -ne 0) {
-                throw 'Client failed a lifecycle, identity, timeout or exact-cleanup assertion.'
-            }
+            & docker start --attach $client
+            $transportExit = $LASTEXITCODE
+            $clientExit = [int](Invoke-Docker inspect --format '{{.State.ExitCode}}' $client)
+            @{ transportExit = $transportExit; clientExit = $clientExit } |
+                ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
             $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
+            $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+            if ($transportExit -ne 0 -or $clientExit -ne 0 -or $receipt.status -cne 'PASS' -or $receipt.complete -ne $true) {
+                throw 'Failed/partial client receipt retained; no admission or later round.'
+            }
+            Assert-WithinDeadline
             Start-Sleep -Seconds 2
             $afterCpu = Read-CpuCounters $app.Id
             $afterSql = Read-QueryCounters $pg $role
@@ -171,9 +193,9 @@ function Invoke-Block {
             if ($oom -ne 'false' -or $peak -ge 1073741824 -or $rssBytes -ge 402653184) {
                 throw 'Original memory/Node RSS acceptance ceiling exceeded.'
             }
-            $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
             $rows.Add([pscustomobject]@{
                 role = $role; version = $receipt.version; image = $roles[$role].image
+                status = $receipt.status; complete = $receipt.complete
                 imageId = $app.ImageId; cpuLimit = 0.5; cpuMax = $app.CpuMax; memoryLimit = 1073741824
                 warmupIterations = $receipt.warmupIterations; requestCount = $receipt.requestCount
                 samples = $receipt.samples; clientNode = $receipt.nodeVersion
@@ -185,10 +207,12 @@ function Invoke-Block {
             $rows.ToArray() | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $directory 'rounds.json')
             Write-Host "Completed $($Block.name) round $round ${role}: 4407 checked requests."
         }
+        Assert-WithinDeadline
         . (Join-Path $root 'scripts\live-test-sections\minimal-group-members.ps1')
         $script:privacyPassed = 0
         function Test-Result {
             param([bool]$Success, [string]$Message)
+            Assert-WithinDeadline
             if (!$Success) { throw "Private runtime contract failed: $Message" }
             $script:privacyPassed++
         }
@@ -196,7 +220,7 @@ function Invoke-Block {
             -Headers @{ Authorization = "Bearer $env:SCIM_SHARED_SECRET" }
         if ($script:privacyPassed -ne 66) { throw 'Incomplete 66-outcome runtime contract.' }
         Start-Sleep -Seconds 2
-        $sql = 'SELECT COALESCE(json_agg(r),''[]'') FROM (SELECT "requestId","endpointId",status,"durationMs","requestHeaders" FROM "RequestLog" WHERE url LIKE ''%/Groups%'' AND (status >= 400 OR method = ''PATCH'') ORDER BY "createdAt" DESC LIMIT 200) r'
+        $sql = 'SELECT COALESCE(json_agg(r),''[]'') FROM (SELECT "requestId","endpointId",status,"durationMs","requestHeaders","responseHeaders","requestBody","responseBody","authDecision" FROM "RequestLog" WHERE url LIKE ''%/Groups%'' AND (status >= 400 OR method = ''PATCH'') ORDER BY "createdAt" DESC LIMIT 200) r'
         $privateLog = @(Invoke-Docker exec $pg psql -U scim -d candidate -tAc $sql) -join "`n"
         $consoleLog = @(Invoke-Docker logs --tail 300 $apps.candidate.Id 2>&1) -join "`n"
         foreach ($key in @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK')) {
@@ -222,6 +246,7 @@ function Invoke-Block {
         }
         @{ contractAssertions = 66; checkedRows = 200; rawLogsExported = $false; passed = $true } |
             ConvertTo-Json | Set-Content (Join-Path $directory 'privacy.json')
+        Assert-WithinDeadline
     } finally {
         for ($index = $containers.Count - 1; $index -ge 0; $index--) {
             Assert-Owned $containers[$index]
@@ -257,6 +282,7 @@ try {
     $null = Invoke-Docker info --format '{{json .}}' |
         Set-Content (Join-Path $OutputDirectory 'docker-info.json')
     foreach ($image in @($protocol.baseline.image, $protocol.candidate.image, $protocol.postgres)) {
+        Assert-WithinDeadline
         $null = Invoke-Docker pull $image
     }
     $identities = foreach ($role in @('baseline', 'candidate')) {
@@ -272,6 +298,7 @@ try {
         id = (Invoke-Docker image inspect --format '{{.Id}}' $protocol.postgres).Trim() }
     $identities | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'images.json')
     foreach ($block in $protocol.blocks) {
+        Assert-WithinDeadline
         $directory = Invoke-Block $block
         $assessment = Join-Path $directory 'assessment.json'
         & node $evaluator $protocolPath $block.name (Join-Path $directory 'rounds.json') $assessment

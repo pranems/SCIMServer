@@ -28,6 +28,12 @@ inspection confirms it has no TCP listener. Two new actual-loop RED/GREEN
 guards now require final TCP readiness; all 13 focused contracts pass.
 Original failed setup/artifact and exact cleanup remain retained. Corrected
 publication, review and Linux admission are not yet claimed.
+Hosted review `5614222330` also identifies lost failed-round evidence and
+missing upload headroom. Preserve explicit partial FAIL receipts, copy before
+rejecting a failed client and disallow partial admission. A cooperative
+60-minute work deadline and 65-minute step reserve cleanup/upload within the
+75-minute job. All 17 focused contracts pass; the earlier `216d3961` hook was
+stopped to batch these corrections, not counted as passing.
 See [the qualification protocol](docs/ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review

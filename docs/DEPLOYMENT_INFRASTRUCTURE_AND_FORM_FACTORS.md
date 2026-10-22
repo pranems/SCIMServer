@@ -13,9 +13,11 @@
 uses the repository's existing public GitHub Actions service with an
 `ubuntu-24.04` runner. It provisions no Azure resource or new paid host, grants
 only `contents: read`, serializes qualification campaigns and permits no
-deployment or package publication. The job has a 75-minute hard cap and
-retains completed/failed evidence for 14 days. It starts on relevant pull
-requests or explicit workflow dispatch, not every application change.
+deployment or package publication. A 60-minute cooperative work deadline,
+65-minute qualification-step cap and 75-minute job cap reserve time for
+cleanup/upload. Checkout, contracts and upload have 2/3/4-minute caps.
+Completed/failed evidence is retained for 14 days. The workflow starts on
+relevant pull requests or explicit dispatch, not every application change.
 
 The [fixed manifest](../scripts/performance/membership-protocol.json) pins
 actual application/PostgreSQL images and the original app resource limits.
@@ -25,6 +27,12 @@ existing within-block history. Two A/A blocks must pass before the two A/B
 blocks. This tests a fresh Linux execution environment, not the deployed
 Azure estate. Windows-hosted Docker is explicitly rejected for this lane.
 Failure stops later blocks and cannot authorize a deployment.
+
+Controlled client failures retain explicit partial FAIL receipts before
+container removal; these are never admitted. Disk persistence is outside
+the measured request window. Unexpected host loss or forced termination can
+still lose unflushed current-round memory; missing evidence is a failure,
+not permission to resume, retry automatically or infer a benchmark PASS.
 
 Only synthetic, labelled, exact-cleanup fixtures are used. No Azure
 credentials, gallery provisioning jobs or customer data are supplied.

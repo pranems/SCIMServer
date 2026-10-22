@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pinned-image confirmation and two permanent RED/GREEN loop controls.
   Focused contracts increase 11 -> 13 PASS; original failed artifact and
   successful exact-owned cleanup are retained. No timing limit is changed.
+- Address all three findings in hosted review `5614222330`: in addition to
+  final TCP readiness, retain explicit partial failed receipts before client
+  removal and reject them from admission. Reserve cleanup/upload with a
+  60-minute cooperative work deadline, 65-minute step and 75-minute job.
+  Focused tests increase 13 -> 17 PASS, including post-measurement readback
+  failure, all-sample retention on cleanup failure, actual copy-before-reject
+  orchestration and expired-deadline rejection. The partial `216d3961` push
+  was stopped to batch review fixes; it is not a passing publication.
 
 ### 0.55.58 consolidation onto token-lifetime master
 

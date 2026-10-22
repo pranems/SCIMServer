@@ -27,6 +27,12 @@ readiness accepts the official PostgreSQL bootstrap server before it restarts.
 Pinned-image inspection verifies a socket-only temporary listener. The final
 TCP readiness fix has two permanent actual-loop RED/GREEN controls; 13 focused
 tests pass. Corrected publication/review/Linux admission remain unproved.
+The completed hosted review additionally finds discarded failed samples and
+no artifact-upload headroom. These are corrected with explicit retained FAIL
+receipts, copy-before-rejection and partial-admission rejection; 60-minute
+cooperative work deadline, 65-minute step and unchanged 75-minute job cap.
+Seventeen focused contracts pass. The `216d3961` hook is deliberately stopped
+to batch all review corrections; no partial-hook PASS is claimed.
 The 0.5 CPU / 1 GiB allocation, 100 warmup cycles, 1,000 measured cycles per
 round and twelve +10% ceilings remain unchanged. No serving/dependency/version
 change; dev remains 0.55.56. Earlier failed receipts remain failed.

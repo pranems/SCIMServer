@@ -22,18 +22,22 @@ jobs:
     timeout-minutes: 75
     steps:
       - name: Checkout exact workflow source
+        timeout-minutes: 2
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Verify evaluator contracts before allocating benchmark resources
+        timeout-minutes: 3
         run: node --test scripts/test/membership-performance.test.cjs
 
       - name: Run fixed same-image controls before old/current comparisons
+        timeout-minutes: 65
         shell: pwsh
         run: |
           ./scripts/performance/run-membership-qualification.ps1 `
             -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'test-results/performance-qualification')
 
       - name: Retain all completed and failed evidence
+        timeout-minutes: 4
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
