@@ -9,6 +9,15 @@
 
 ## Active Delivery Process
 
+**Latest review follow-up:** published `e312a92f` passes all 28 normal gates
+in 1092 seconds. Review `5620142839` exposes signal/shutdown errors skipping
+authorized file collection. Five collector cases first fail; the local
+correction passes all 77 focused contracts, preserves original errors,
+bounded reinspection and incomplete FAIL status. Its publication is pending.
+Native `39844751546` separately fails negative-log console correlation,
+retaining both incomplete-work profiles. Investigate ER-68p without weakening
+privacy/correlation checks. No merge, admission or deployment is claimed.
+
 **Current publication/review checkpoint, 2026-10-22:** exact `84d11af7`
 is published through all 28 ordinary Validate gates in 1104 seconds.
 API units 6210/213, HTTP 2514/118 (42 existing backend-specific skips), Web

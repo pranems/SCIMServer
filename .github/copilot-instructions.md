@@ -568,6 +568,7 @@ Origin: 2026-06-19 operator request after the 11-step WIF authentication build -
 - **Structural-key assertion rule (live-test analog of R1).** Presence/absence-of-key assertions over a serialized payload MUST match the structural key form (`"<key>"`), never a bare substring - a bare-substring gate is simultaneously a false-positive and a false-negative generator (a loose `token` matched the legitimate `issuedTokenTtlSec`).
 - **Author-and-smoke-run-before-batch.** A new `scripts/live-test.ps1` section MUST be run against at least one live node in the same step it is authored, before deferring the rest of the live matrix to a batched checkpoint.
 - **Per-environment auth-value table.** OAuth secret / SCIM shared secret / base URL differ by form factor (Docker compose default `devscimclientsecret`; local node + dev Azure `changeme-oauth`). Pass the matching `-ClientSecret` per target; never assume the runner default fits every environment.
+- **Authorized diagnostic failure retention.** After ownership and diagnostic opt-in are verified, attempt every evidence file before cleanup even if signaling, shutdown, inspection or another copy fails. Preserve the first error/stage, record secondary inspection failure, and never mark incomplete capture successful. Test asymmetric file availability, shutdown failure and source cleanup with actual retained-content assertions. See ER-68m/o in [the native diagnostic ledger](../docs/ENDPOINT_SNAPSHOT_REVISION.md).
 
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 

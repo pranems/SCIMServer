@@ -17,34 +17,46 @@ function Save-NativeProfile {
         }
         $state = $inspection.State
         $stopped = !$state.Running
-        if (!$stopped) {
-            $receipt.failureStage = 'flush-signal'
-            $null = Invoke-Docker kill --signal=USR2 $ContainerId
-            $receipt.failureStage = 'shutdown'
-            foreach ($attempt in 1..100) {
-                $state = (Invoke-Docker inspect $ContainerId | ConvertFrom-Json)[0].State
-                if (!$state.Running) { $stopped = $true; break }
-                Start-Sleep -Milliseconds 100
+        $captureFailure = $null
+        try {
+            if (!$stopped) {
+                $receipt.failureStage = 'flush-signal'
+                $null = Invoke-Docker kill --signal=USR2 $ContainerId
+                $receipt.failureStage = 'shutdown'
+                foreach ($attempt in 1..100) {
+                    $state = (Invoke-Docker inspect $ContainerId | ConvertFrom-Json)[0].State
+                    if (!$state.Running) { $stopped = $true; break }
+                    Start-Sleep -Milliseconds 100
+                }
+            }
+            if (!$stopped) { throw 'Owned native profile shutdown exceeded ten seconds.' }
+        } catch {
+            $captureFailure = $_
+            if ($receipt.failureStage -eq 'flush-signal') {
+                try {
+                    $state = (Invoke-Docker inspect $ContainerId | ConvertFrom-Json)[0].State
+                    $stopped = !$state.Running
+                } catch { $receipt.reinspectionFailed = $true }
             }
         }
-        if (!$stopped) { throw 'Owned native profile shutdown exceeded ten seconds.' }
-        $receipt.exitCode = $state.ExitCode
-        $receipt.failureStage = 'copy-profile'
-        $copyFailure = $null
+        if ($stopped) { $receipt.exitCode = $state.ExitCode }
+        if ($null -eq $captureFailure) { $receipt.failureStage = 'copy-profile' }
         try {
             $null = Invoke-Docker cp "${ContainerId}:/tmp/membership.cpuprofile" `
                 (Join-Path $Directory "profile-$Role.cpuprofile")
-        } catch { $copyFailure = $_ }
+        } catch {
+            if ($null -eq $captureFailure) { $captureFailure = $_ }
+        }
         try {
             $null = Invoke-Docker cp "${ContainerId}:/tmp/membership-profile-meta.json" `
                 (Join-Path $Directory "profile-$Role-meta.json")
         } catch {
-            if ($null -eq $copyFailure) {
+            if ($null -eq $captureFailure) {
                 $receipt.failureStage = 'copy-metadata'
-                $copyFailure = $_
+                $captureFailure = $_
             }
         }
-        if ($null -ne $copyFailure) { throw $copyFailure }
+        if ($null -ne $captureFailure) { throw $captureFailure }
         $receipt.filesCollected = $true
         $receipt.failureStage = 'exit-check'
         if ($state.ExitCode -ne 0) { throw 'Owned native profile stopped with a failed exit; evidence retained.' }

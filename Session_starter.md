@@ -4,6 +4,16 @@
 
 ### Current master/performance reconciliation (2026-10-22)
 
+**Latest review follow-up:** `e312a92f` is published through 28 passing
+Validate gates in 1092 seconds. Review `5620142839` exposes earlier authorized
+signal/shutdown failures bypassing collection. Five real collector controls
+are RED, then all 77 focused contracts pass after local correction.
+Preserve original errors, bounded reinspection, both file attempts and FAIL
+status; no copied partial data grants admission. Publication remains pending.
+Native `39844751546` separately fails negative-log console correlation;
+both incomplete-work profiles survive. Investigate ER-68p without dropping
+privacy/correlation checks or retrying unchanged. No merge/deployment.
+
 **Current publication/review checkpoint:** `84d11af7` is published through all
 28 ordinary Validate gates (1104 seconds): API 6210/213, HTTP 2514/118 with
 42 existing backend-specific skips, Web 1655/124. Local and remote match;

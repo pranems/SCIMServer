@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Address review `5620142839`: preserve authorized diagnostic files even after
+  a signal/exit race, failed state inspection or shutdown timeout. Re-inspect
+  once after a failed signal, retain the original error/stage, explicitly
+  record a secondary inspection failure and never promote partial capture.
+  Five lifecycle controls first fail; all 77 focused contracts then pass
+  (74 -> 77). Retained contents survive simulated source-container cleanup.
+  Prior `e312a92f` publication passes all 28 normal gates in 1092 seconds.
 - Address review `5619805016`: independently attempt CPU-profile and bootstrap
   metadata copies before cleanup, propagate the first copy error and require
   both files before marking capture complete. Missing-profile/available-metadata,

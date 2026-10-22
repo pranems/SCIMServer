@@ -771,11 +771,69 @@ Original artifact retained under `test-results/linux-qualification-39840296611/`
 This is not evidence of a candidate regression or release safety.
 
 **Updated completeness note:** reconciled the full available continuation
-through event record 60,715 using signal-frequency and causal-narration passes.
-Confirmed native issues map to ER-68a-n; intentional TDD failures, expected
+through event record 61,075 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-p; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not
 the deleted original session.
+
+**ER-68o, authorized shutdown-path evidence loss / Medium:** fresh review
+`5620142839` on published `e312a92f` identifies failures before the copy
+section. Signal/exit races, a rejected signal, a polling inspection error
+or the bounded shutdown timeout all throw before either file is attempted.
+The previous file-copy correction did not cover these earlier lifecycle edges.
+Its normal publication nevertheless passes all 28 Validate gates in 1092
+seconds (API 6210/213, HTTP 2514/118, Web 1655/124); that remains valid
+evidence for what its assertions actually checked, not this missed behavior.
+
+After ownership and profiler opt-in succeed, capture the first lifecycle
+failure instead of bypassing collection. A failed signal triggers one
+bounded reinspection; a secondary inspection failure is explicitly recorded.
+Attempt both files independently, then propagate the original error/stage.
+An unknown exit stays null, and copied partial files do not make capture
+COMPLETE or `filesCollected` true. Authorization failures still prevent copies.
+
+| Failure edge | Required preserved outcome |
+|---|---|
+| Inspect says running, process exits before signal | Re-inspect once, retain available profile and metadata, preserve signal failure and observed exit |
+| Signal rejected while still running | Keep available bootstrap metadata, preserve signal error, unknown exit |
+| Signal and reinspection both fail | Preserve first signal error, record `reinspectionFailed`, retain metadata |
+| Polling inspection fails | Preserve shutdown-stage inspection error and available metadata |
+| Shutdown budget expires | Keep exactly 100 polling waits and original timeout, retain available metadata |
+
+All five actual-collector lifecycle cases are RED before correction; all 77
+focused workflow contracts then pass, zero failures/skips. The source-file
+store is cleared before assertions, proving retained contents survive
+simulated source-container cleanup. Existing caller-finally tests separately
+verify both roles are attempted before exact-owned removal.
+Evidence: `test-results/native-lifecycle-evidence-red.log` and
+`test-results/native-lifecycle-evidence-green.log`.
+Detected at hosted review; earliest possible detection is the local lifecycle
+test. Escape: earlier signal/timeout tests asserted only FAIL status, not
+available artifact contents or collection after these errors.
+Self-improvement **applied**: expand the actual failure-path matrix, extend
+the central pattern and promote the repeated retention contract to the
+repository's standing conventions.
+Design disposition **applied**: keep the cohesive collector and existing
+ownership boundary, with bounded reinspection and explicit first-error
+propagation; no generic lifecycle framework or runtime abstraction.
+
+**ER-68p, exact-source Linux negative-log correlation / Medium, open:**
+native `39844751546` on `e312a92f` fails with
+`Negative-path categorized console correlation missing.` Both raw captures
+are retained with `workComplete:false`, successful file collection and
+explicit no-admission campaign failure. This is a separate failure from the
+reviewed collector edge. Do not relabel it as profile collection or retry
+unchanged until green. Owner: continuation; target: 2026-10-23.
+Raw private and console logs are intentionally not exported, so the artifact
+does not identify which correlation predicate failed. Next action: inspect
+the verification path and add a privacy-safe failure summary of counts and
+predicate outcomes before cleanup if needed, then test that contract locally.
+Distinguish absent logging, bounded-tail selection and delayed observation
+from evidence, not speculation. Preserve the privacy/correlation checks.
+Detected by the real Linux negative-path gate; earlier possible detection is
+a deterministic local correlation fixture once the mechanism is identified.
+Artifact: `test-results/linux-native-39844751546/`.
 
 **Successful new-source native execution:** run `39840296709` on exact
 `84d11af7` completes with the corrected signed-clock consumer. Independent

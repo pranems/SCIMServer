@@ -750,6 +750,9 @@ for (const scenario of ["not-opted-in", "relative-directory"]) {
 for (const scenario of [
   "complete",
   "signal-failure",
+  "signal-race",
+  "signal-reinspection-failure",
+  "shutdown-inspection-failure",
   "nonzero-exit",
   "already-stopped",
   "copy-failure",
@@ -785,6 +788,12 @@ for (const scenario of [
         $script:waits = 0
         $script:signalled = $false
         $script:copies = [System.Collections.Generic.List[string]]::new()
+        $script:inspections = 0
+        $script:exited = $false
+        $script:sourceFiles = @{
+          'membership.cpuprofile' = '{"synthetic":true}'
+          'membership-profile-meta.json' = '{"synthetic":true}'
+        }
         function Assert-Owned {
           param($Id)
           if ($Id -cne $owned) { throw 'Unowned profile target' }
@@ -796,18 +805,27 @@ for (const scenario of [
           if ($args[0] -eq 'kill') {
             if ($scenario -eq 'missing-profile-marker') { throw 'Profile signal bypassed opt-in marker' }
             if ($args[1] -cne '--signal=USR2' -or $args[2] -cne $owned) { throw 'Unexpected profile signal' }
-            if ($scenario -eq 'signal-failure') { throw 'Profile signal rejected' }
+            if ($scenario -in @('signal-failure', 'signal-reinspection-failure')) { throw 'Profile signal rejected' }
+            if ($scenario -eq 'signal-race') {
+              $script:exited = $true
+              throw 'Profile exited before signal'
+            }
             if ($scenario -eq 'already-stopped') { throw 'Profile signalled an exited process' }
             $script:signalled = $true
             return $owned
           }
           if ($args[0] -eq 'inspect') {
             if ($args[1] -cne $owned) { throw 'Unexpected profile inspection' }
+            $script:inspections++
+            if ($script:inspections -gt 1 -and
+                $scenario -in @('signal-reinspection-failure', 'shutdown-inspection-failure')) {
+              throw 'State inspection rejected'
+            }
             $exitCode = if ($scenario -in @('nonzero-exit', 'already-stopped')) { 1 } else { 0 }
             $labels = if ($scenario -eq 'missing-profile-marker') { @{} } else { @{ 'scimserver.profile' = 'native-function' } }
             return ConvertTo-Json -Depth 5 -Compress -InputObject @(
               @{ Config = @{ Labels = $labels }; State = @{
-                Running = ($scenario -ne 'already-stopped' -and (!$script:signalled -or $scenario -eq 'shutdown-timeout'))
+                Running = (!$script:exited -and $scenario -ne 'already-stopped' -and (!$script:signalled -or $scenario -eq 'shutdown-timeout'))
                 ExitCode = $exitCode
               } })
           }
@@ -821,7 +839,10 @@ for (const scenario of [
             if ($scenario -eq 'metadata-copy-failure' -and $args[1].EndsWith('-meta.json')) {
               throw 'Metadata copy rejected'
             }
-            '{"synthetic":true}' | Set-Content -LiteralPath $args[2]
+            $name = ($args[1] -split '/')[-1]
+            if ($scenario -in @('signal-failure', 'signal-reinspection-failure', 'shutdown-inspection-failure', 'shutdown-timeout') -and
+                $name -eq 'membership.cpuprofile') { throw 'Profile not flushed' }
+            $script:sourceFiles[$name] | Set-Content -LiteralPath $args[2]
             return
           }
           throw 'Unexpected profile operation'
@@ -829,6 +850,7 @@ for (const scenario of [
         $failure = $null
         try { Save-NativeProfile -ContainerId $owned -Directory $directory -Role baseline -WorkComplete $true }
         catch { $failure = $_.Exception.Message }
+        $script:sourceFiles.Clear()
         if (($scenario -eq 'complete') -ne ($null -eq $failure)) { throw "Wrong native capture outcome: $failure" }
         if ($scenario -eq 'missing-profile-marker' -and
             $failure -cne 'Owned container is not an opted-in native profiler.') { throw 'Missing explicit profiler opt-in rejection' }
@@ -841,6 +863,35 @@ for (const scenario of [
             throw 'Native evidence lost before exit rejection or cleanup'
           }
         } elseif ($receipt.filesCollected) { throw 'Incomplete capture became complete' }
+        if ($scenario -in @('signal-failure', 'signal-race', 'signal-reinspection-failure', 'shutdown-inspection-failure', 'shutdown-timeout')) {
+          $expected = "$owned" + ':/tmp/membership.cpuprofile,' + "$owned" + ':/tmp/membership-profile-meta.json'
+          if (($script:copies -join ',') -cne $expected) { throw 'Shutdown failure bypassed independent evidence collection' }
+          $metadata = Get-Content (Join-Path $directory 'profile-baseline-meta.json') -Raw | ConvertFrom-Json
+          if ($metadata.synthetic -ne $true) { throw 'Bootstrap contents did not survive source-container cleanup' }
+          $expectedStage = if ($scenario.StartsWith('signal-')) { 'flush-signal' } else { 'shutdown' }
+          $expectedFailure = switch ($scenario) {
+            'signal-race' { 'Profile exited before signal' }
+            'shutdown-timeout' { 'Owned native profile shutdown exceeded ten seconds.' }
+            'shutdown-inspection-failure' { 'State inspection rejected' }
+            default { 'Profile signal rejected' }
+          }
+          if ($failure -cne $expectedFailure -or $receipt.failureStage -cne $expectedStage) {
+            throw 'Collection overwrote the original lifecycle failure'
+          }
+          if ($scenario.StartsWith('signal-') -and $script:inspections -ne 2) {
+            throw 'Failed signal was not followed by bounded reinspection'
+          }
+          if ($scenario -eq 'signal-reinspection-failure' -and $receipt.reinspectionFailed -ne $true) {
+            throw 'Secondary inspection failure was not recorded'
+          }
+          if ($scenario -eq 'signal-race') {
+            $profile = Get-Content (Join-Path $directory 'profile-baseline.cpuprofile') -Raw | ConvertFrom-Json
+            if ($profile.synthetic -ne $true -or $receipt.exitCode -ne 0) { throw 'Exited profile evidence was lost after signal race' }
+          } elseif ($null -ne $receipt.exitCode) { throw 'Unknown process exit became a successful exit code' }
+        }
+        if ($scenario -eq 'missing-profile-marker' -and $script:copies.Count -ne 0) {
+          throw 'Evidence copied without profiler authorization'
+        }
         if ($scenario -in @('copy-failure', 'profile-copy-failure', 'metadata-copy-failure')) {
           $expected = "$owned" + ':/tmp/membership.cpuprofile,' + "$owned" + ':/tmp/membership-profile-meta.json'
           if (($script:copies -join ',') -cne $expected) { throw 'A failed copy prevented the other evidence attempt' }

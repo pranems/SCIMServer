@@ -53,6 +53,14 @@ unless both copies succeed, and test both asymmetric failures plus both
 failures. Assert retained file contents and failure stages, not just a receipt.
 See ER-68m in the [native diagnostic ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
 
+Cover the whole authorized lifecycle, not only copying: signal/exit races,
+polling inspection failures and shutdown timeout must still reach independent
+file collection. Re-inspect once after a failed signal, keep unknown exit
+status unknown, and preserve the original lifecycle error even if collection
+or reinspection also fails. Never collect from an unauthorized owner.
+ER-68o closes this second escape and promotes the contract to a standing
+rule; tests discard their source store before checking retained contents.
+
 Resource measurements need the same failure contract as request timings.
 Persist every collected CPU, database, memory, RSS and OOM observation before
 rejecting a ceiling or deleting its owner. A missing later probe must leave
