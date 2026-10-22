@@ -74,6 +74,21 @@ also avoids raw PowerShell backticks colliding with JavaScript template
 delimiters in cross-interpreter fixtures.
 See [ER-67](../ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
 
+Native profiler samples are observations, not measured CPU microseconds.
+Wall-clock sample gaps can include scheduler suspension and must not be used
+as function CPU weights. Retain full function/source identities and idle
+samples; disclose whole-process lifetime, runtime-version and order effects.
+Match every raw request span to the original timing arrays and native clock
+range before publishing a comparative diagnostic.
+
+A generic resource owner label does not authorize a profiler-specific exit
+signal: require an explicit profiler marker as well. If the process already
+exited, collect what it wrote before rejecting its exit code. Store output
+where it survives stop, then collect all independent role receipts before
+removal even when the first capture fails. Prove these lifecycle behaviors
+with actual collector paths and frozen-image capability probes.
+See [ER-68](../ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

@@ -1,6 +1,7 @@
 param(
     [string]$OutputDirectory,
-    [switch]$TraceDiagnostic
+    [switch]$TraceDiagnostic,
+    [switch]$ProfileDiagnostic
 )
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -12,9 +13,14 @@ $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
 & node -e 'require(process.argv[1]).validateProtocol(require(process.argv[2]))' $evaluator $protocolPath
 if ($LASTEXITCODE -ne 0) { throw 'Invalid preregistered protocol; no resources allocated.' }
 if (!$IsLinux) { throw 'Qualification requires a Linux host, not a Windows-hosted Docker VM.' }
-if (!$TraceDiagnostic -and $env:SCIM_BENCH_TRACE) { throw 'Diagnostic trace cannot enter qualification.' }
+if ($TraceDiagnostic -and $ProfileDiagnostic) { throw 'Choose one diagnostic mode, never combined instrumentation.' }
+if (!$TraceDiagnostic -and !$ProfileDiagnostic -and $env:SCIM_BENCH_TRACE) { throw 'Diagnostic trace cannot enter qualification.' }
+if ($env:SCIM_BENCH_PROFILE -or $env:NODE_OPTIONS) { throw 'Inherited application profiling/options are not permitted.' }
 $cpuTrace = Join-Path $PSScriptRoot 'membership-cpu-trace.cjs'
 if ($TraceDiagnostic) { . (Join-Path $PSScriptRoot 'membership-cpu-observer.ps1') }
+$nativeProfile = Join-Path $PSScriptRoot 'membership-v8-profile.cjs'
+$profileBootstrap = Join-Path $PSScriptRoot 'membership-profile-bootstrap.cjs'
+if ($ProfileDiagnostic) { . (Join-Path $PSScriptRoot 'membership-v8-profile.ps1') }
 $run = [guid]::NewGuid().ToString('N')
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root "test-results\membership-qualification-$run" }
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'Refusing to overwrite an existing campaign.' }
@@ -26,11 +32,12 @@ $summary = [ordered]@{
     OriginalWindowsAdmission = 'FAIL/unresolved; not replaced retrospectively'
     StatisticalFalseFailureRate = 'Not estimated by this bounded qualification'
     Blocks = @()
-    Mode = $(if ($TraceDiagnostic) { 'CPU timeline diagnostic only' } else { 'Performance qualification' })
+    Mode = $(if ($TraceDiagnostic) { 'CPU timeline diagnostic only' }
+        elseif ($ProfileDiagnostic) { 'Native function diagnostic only' } else { 'Performance qualification' })
     AdmissionEligible = $false
 }
 $campaignClock = [System.Diagnostics.Stopwatch]::StartNew()
-$workMinutes = if ($TraceDiagnostic) { 15 } else { 60 }
+$workMinutes = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 } else { 60 }
 $workDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes($workMinutes).ToUnixTimeMilliseconds()
 $summary['WorkDeadlineUtc'] = [DateTimeOffset]::FromUnixTimeMilliseconds($workDeadlineUtc).ToString('o')
 $envNames = @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET',
@@ -40,7 +47,7 @@ $priorEnvironment = @{}
 foreach ($key in $envNames) { $priorEnvironment[$key] = [Environment]::GetEnvironmentVariable($key) }
 
 function Assert-WithinDeadline {
-    $limit = if ($TraceDiagnostic) { 15 } else { 60 }
+    $limit = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 } else { 60 }
     if ($campaignClock.Elapsed.TotalMinutes -ge $limit) {
         throw 'Campaign work deadline reached; cleanup and upload time is reserved, no admission.'
     }
@@ -89,6 +96,8 @@ function Invoke-Block {
     $network = "scim-qualification-$($run.Substring(0, 12))-$($Block.name)"
     $containers = [System.Collections.Generic.List[string]]::new()
     $apps = @{}
+    $profileTargets = @{}
+    $workComplete = $false
     $rows = [System.Collections.Generic.List[object]]::new()
     $directory = Join-Path $OutputDirectory $Block.name
     $null = New-Item -ItemType Directory -Path $directory
@@ -124,15 +133,24 @@ function Invoke-Block {
                 -c 'CREATE EXTENSION citext; CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm; CREATE EXTENSION "uuid-ossp"; CREATE EXTENSION pg_stat_statements;'
             $env:DATABASE_URL = '{0}://{1}:{2}@{3}:5432/{4}' -f `
                 'postgresql', 'scim', $env:POSTGRES_PASSWORD, 'database', $role
+            $profileArguments = @()
+            $appCommand = 'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node dist/main.js'
+            if ($ProfileDiagnostic) {
+                $profileArguments = @('--label', 'scimserver.profile=native-function',
+                    '--mount', "type=bind,source=$profileBootstrap,target=/tmp/profile-bootstrap.cjs,readonly",
+                    '--env', 'SCIM_BENCH_PROFILE=1', '--env', 'SCIM_BENCH_PROFILE_DIRECTORY=/tmp')
+                $appCommand = 'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node --cpu-prof --cpu-prof-dir=/tmp --cpu-prof-name=membership.cpuprofile --require /tmp/profile-bootstrap.cjs dist/main.js'
+            }
             $id = (Invoke-Docker run -d --network $network --publish 127.0.0.1::8080 `
                 --name "$network-$role" --label scimserver.owner=membership-qualification `
                 --label "scimserver.run=$run" --cpus 0.5 --memory 1g `
                 --env DATABASE_URL --env JWT_SECRET --env OAUTH_CLIENT_SECRET --env SCIM_SHARED_SECRET `
                 --env CREDENTIAL_KEK --env NODE_ENV=production --env PERSISTENCE_BACKEND=prisma `
-                --env PORT=8080 --entrypoint sh $roles[$role].image `
-                -c 'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node dist/main.js').Trim()
+                --env PORT=8080 @profileArguments --entrypoint sh $roles[$role].image `
+                -c $appCommand).Trim()
             if ($id -notmatch '^[a-f0-9]{64}$') { throw 'Invalid owned app id.' }
             $containers.Add($id)
+            if ($ProfileDiagnostic) { $profileTargets[$role] = $id }
             $inspect = (Invoke-Docker inspect $id | ConvertFrom-Json)[0]
             if ($inspect.HostConfig.NanoCpus -ne 500000000 -or $inspect.HostConfig.Memory -ne 1073741824) {
                 throw 'Actual app allocation differs from the original admission envelope.'
@@ -187,6 +205,10 @@ function Invoke-Block {
                     Wait-CpuObserverReady $observer
                     $env:SCIM_BENCH_TRACE = '1'
                 }
+                if ($ProfileDiagnostic) {
+                    $resource['diagnosticOnly'] = $true
+                    $env:SCIM_BENCH_TRACE = '1'
+                }
                 $beforeCpu = Read-CpuCounters $app.Id
                 $resource.cpuBefore = $beforeCpu
                 $resource.failureStage = 'database-before'
@@ -198,7 +220,7 @@ function Invoke-Block {
                 $env:SCIM_BENCH_VERSION = $roles[$role].version
                 $env:SCIM_BENCH_DEADLINE_UTC = [string]$workDeadlineUtc
                 $receiptPath = Join-Path $directory "round-$round-$role.json"
-                $traceEnvironment = if ($TraceDiagnostic) { @('--env', 'SCIM_BENCH_TRACE') } else { @() }
+                $traceEnvironment = if ($TraceDiagnostic -or $ProfileDiagnostic) { @('--env', 'SCIM_BENCH_TRACE') } else { @() }
                 $client = (Invoke-Docker create --network host --no-healthcheck `
                     --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
                     --mount "type=bind,source=$clientScript,target=/tmp/benchmark.cjs,readonly" `
@@ -215,10 +237,10 @@ function Invoke-Block {
                     ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
                 $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
                 $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-                if (!$TraceDiagnostic -and $receipt.PSObject.Properties.Name -contains 'diagnosticOnly') {
+                if (!$TraceDiagnostic -and !$ProfileDiagnostic -and $receipt.PSObject.Properties.Name -contains 'diagnosticOnly') {
                     throw 'Diagnostic client receipt cannot enter qualification.'
                 }
-                if ($TraceDiagnostic -and $receipt.diagnosticOnly -ne $true) {
+                if (($TraceDiagnostic -or $ProfileDiagnostic) -and $receipt.diagnosticOnly -ne $true) {
                     throw 'Diagnostic client omitted explicit non-admission marker.'
                 }
                 if ($transportExit -ne 0 -or $clientExit -ne 0 -or $receipt.status -cne 'PASS' -or $receipt.complete -ne $true) {
@@ -273,7 +295,8 @@ function Invoke-Block {
                 databaseExecutionMs = $afterSql.executionMs - $beforeSql.executionMs
                 peakCgroupBytes = $peak; nodeRssBytes = $rssBytes; oomKilled = $false
             }
-            if ($TraceDiagnostic) { $row | Add-Member -NotePropertyName diagnosticOnly -NotePropertyValue $true }
+            if ($TraceDiagnostic -or $ProfileDiagnostic) { $row | Add-Member -NotePropertyName diagnosticOnly -NotePropertyValue $true }
+            if ($ProfileDiagnostic) { $row | Add-Member -NotePropertyName appContainerId -NotePropertyValue $app.Id }
             $rows.Add($row)
             $rows.ToArray() | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $directory 'rounds.json')
             Write-Host "Completed $($Block.name) round $round ${role}: 4407 checked requests."
@@ -318,7 +341,21 @@ function Invoke-Block {
         @{ contractAssertions = 66; checkedRows = 200; rawLogsExported = $false; passed = $true } |
             ConvertTo-Json | Set-Content (Join-Path $directory 'privacy.json')
         Assert-WithinDeadline
+        $workComplete = $true
     } finally {
+        $captureFailed = $false
+        if ($ProfileDiagnostic) {
+            foreach ($role in @('baseline', 'candidate')) {
+                if (!$profileTargets.ContainsKey($role)) { continue }
+                try {
+                    Save-NativeProfile -ContainerId $profileTargets[$role] -Directory $directory `
+                        -Role $role -WorkComplete $workComplete
+                } catch {
+                    $captureFailed = $true
+                    Write-Warning "Native $role profile capture failed: $($_.Exception.Message)"
+                }
+            }
+        }
         for ($index = $containers.Count - 1; $index -ge 0; $index--) {
             Assert-Owned $containers[$index]
             $null = Invoke-Docker rm --force $containers[$index]
@@ -333,6 +370,7 @@ function Invoke-Block {
         if ($remaining.Count -or $remainingNetworks.Count) { throw 'Exact owned cleanup readback failed.' }
         @{ containersAbsent = $true; networksAbsent = $true; run = $run } |
             ConvertTo-Json | Set-Content (Join-Path $directory 'cleanup.json')
+        if ($captureFailed) { throw 'Native profile capture failed; partial receipts retained after exact cleanup.' }
     }
     return $directory
 }
@@ -348,6 +386,12 @@ try {
     if ($TraceDiagnostic) {
         foreach ($file in @($cpuTrace, (Join-Path $PSScriptRoot 'membership-cpu-observer.ps1'))) {
             $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+        }
+        if ($ProfileDiagnostic) {
+            foreach ($file in @($nativeProfile, $profileBootstrap, $cpuTrace,
+                (Join-Path $PSScriptRoot 'membership-v8-profile.ps1'))) {
+                $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+            }
         }
     }
     $sourceHashes | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'source-hashes.json')
@@ -367,18 +411,32 @@ try {
             --label "scimserver.run=$run" --entrypoint node $image `
             -p "require('/app/package.json').version").Trim()
         if ($version -cne $protocol.$role.version) { throw 'Pinned image runtime version mismatch.' }
-        [pscustomobject]@{ role = $role; reference = $image
+        $identity = [pscustomobject]@{ role = $role; reference = $image
             id = (Invoke-Docker image inspect --format '{{.Id}}' $image).Trim(); version = $version }
+        if ($ProfileDiagnostic) {
+            $nodeVersion = (Invoke-Docker run --rm --network none `
+                --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
+                --entrypoint node $image -p process.version).Trim()
+            $identity | Add-Member -NotePropertyName nodeVersion -NotePropertyValue $nodeVersion
+        }
+        $identity
     }
     $identities += [pscustomobject]@{ role = 'postgres'; reference = $protocol.postgres
         id = (Invoke-Docker image inspect --format '{{.Id}}' $protocol.postgres).Trim() }
     $identities | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'images.json')
     foreach ($block in $protocol.blocks) {
+        if ($ProfileDiagnostic -and ($block.sameImage -or $block.order -cne 'BAAB')) { continue }
         Assert-WithinDeadline
         $directory = Invoke-Block $block
         if ($TraceDiagnostic) {
             & node $cpuTrace analyze $directory
             if ($LASTEXITCODE -ne 0) { throw 'CPU timeline analysis failed; no attribution or admission.' }
+            $summary.Blocks += [ordered]@{ Name = $block.name; DiagnosticComplete = $true; AdmissionEligible = $false }
+            break
+        }
+        if ($ProfileDiagnostic) {
+            & node $nativeProfile analyze $directory
+            if ($LASTEXITCODE -ne 0) { throw 'Native function analysis failed; no attribution or admission.' }
             $summary.Blocks += [ordered]@{ Name = $block.name; DiagnosticComplete = $true; AdmissionEligible = $false }
             break
         }
@@ -391,6 +449,8 @@ try {
     }
     if ($TraceDiagnostic) {
         $summary.Status = 'DIAGNOSTIC COMPLETE: CPU temporal association only; not release admission'
+    } elseif ($ProfileDiagnostic) {
+        $summary.Status = 'DIAGNOSTIC COMPLETE: native function observations only; not release admission'
     } else {
         $summary.Status = 'PASS: bounded Linux qualification and both prospective comparison orders'
         $summary.AdmissionEligible = $true

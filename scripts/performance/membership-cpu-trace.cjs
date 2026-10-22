@@ -1,24 +1,24 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { setTimeout: delay } = require('node:timers/promises');
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { setTimeout: delay } = require("node:timers/promises");
 
-const keys = ['usage_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
-const operations = ['add', 'populatedRead', 'remove', 'emptyRead'];
+const keys = ["usage_usec", "nr_periods", "nr_throttled", "throttled_usec"];
+const operations = ["add", "populatedRead", "remove", "emptyRead"];
 
 function parseCounters(text) {
   const result = {};
   for (const line of text.trim().split(/\r?\n/)) {
     const [key, value] = line.trim().split(/\s+/);
     if (!keys.includes(key)) continue;
-    assert.ok(!Object.hasOwn(result, key), 'Duplicate CPU counter');
-    assert.match(value, /^\d+$/, 'Invalid CPU counter');
+    assert.ok(!Object.hasOwn(result, key), "Duplicate CPU counter");
+    assert.match(value, /^\d+$/, "Invalid CPU counter");
     const number = Number(value);
-    assert.ok(Number.isSafeInteger(number), 'Unsafe CPU counter');
+    assert.ok(Number.isSafeInteger(number), "Unsafe CPU counter");
     result[key] = number;
   }
   for (const key of keys)
-    assert.ok(Object.hasOwn(result, key), 'Missing CPU counter');
+    assert.ok(Object.hasOwn(result, key), "Missing CPU counter");
   return result;
 }
 
@@ -34,7 +34,7 @@ function lowerBound(items, field, target) {
 }
 
 function correlate(observations, spans) {
-  assert.ok(observations.length >= 2, 'Insufficient CPU timeline');
+  assert.ok(observations.length >= 2, "Insufficient CPU timeline");
   for (const [index, item] of observations.entries()) {
     assert.match(item.ns, /^\d+$/);
     assert.match(item.readStartNs, /^\d+$/);
@@ -42,18 +42,18 @@ function correlate(observations, spans) {
     if (index) {
       assert.ok(
         BigInt(observations[index - 1].ns) < BigInt(item.readStartNs),
-        'Nonmonotonic observation clock',
+        "Nonmonotonic observation clock",
       );
     }
     for (const key of keys) {
       assert.ok(
         Number.isSafeInteger(item[key]) && item[key] >= 0,
-        'Invalid timeline counter',
+        "Invalid timeline counter",
       );
       if (index)
         assert.ok(
           item[key] >= observations[index - 1][key],
-          'CPU counters reset',
+          "CPU counters reset",
         );
     }
   }
@@ -63,15 +63,15 @@ function correlate(observations, spans) {
     assert.ok(
       start >= BigInt(observations[0].readStartNs) &&
         end <= BigInt(observations.at(-1).ns),
-      'CPU observer does not cover the request clock',
+      "CPU observer does not cover the request clock",
     );
-    assert.ok(end > start, 'Invalid request span');
-    const first = lowerBound(observations, 'readStartNs', start);
-    const last = lowerBound(observations, 'ns', end + 1n) - 1;
+    assert.ok(end > start, "Invalid request span");
+    const first = lowerBound(observations, "readStartNs", start);
+    const last = lowerBound(observations, "ns", end + 1n) - 1;
     const count = Math.max(0, last - first + 1);
     if (count < 2)
       return {
-        classification: 'insufficient-interior-samples',
+        classification: "insufficient-interior-samples",
         observationsInside: count,
         throttleEvents: null,
         throttledMicroseconds: null,
@@ -81,8 +81,8 @@ function correlate(observations, spans) {
     return {
       classification:
         events > 0
-          ? 'counter-increased-inside-span'
-          : 'no-counter-increase-observed-inside-span',
+          ? "counter-increased-inside-span"
+          : "no-counter-increase-observed-inside-span",
       observationsInside: count,
       throttleEvents: events,
       throttledMicroseconds:
@@ -94,20 +94,20 @@ function correlate(observations, spans) {
 async function monitor([directory, output, ready, stop, deadlineText]) {
   assert.ok(
     directory && output && ready && stop,
-    'Explicit observer paths required',
+    "Explicit observer paths required",
   );
   const deadline = Number(deadlineText);
   assert.ok(
     Number.isSafeInteger(deadline) && deadline > Date.now(),
-    'Valid observer deadline required',
+    "Valid observer deadline required",
   );
   const receipt = {
     diagnosticOnly: true,
     admissionEligible: false,
     complete: false,
     failure: null,
-    failureStage: 'quota',
-    clock: 'process.hrtime.bigint',
+    failureStage: "quota",
+    clock: "process.hrtime.bigint",
     pollIntervalMs: 2,
     sampleCap: 120000,
     cpuMax: null,
@@ -117,12 +117,12 @@ async function monitor([directory, output, ready, stop, deadlineText]) {
   const initialCpu = process.cpuUsage();
   function snapshot() {
     if (receipt.observations.length >= receipt.sampleCap) {
-      receipt.failure = 'SAMPLE_CAP_REACHED';
-      throw new Error('Observer sample cap reached');
+      receipt.failure = "SAMPLE_CAP_REACHED";
+      throw new Error("Observer sample cap reached");
     }
     const readStartNs = process.hrtime.bigint().toString();
     const counters = parseCounters(
-      fs.readFileSync(path.join(directory, 'cpu.stat'), 'utf8'),
+      fs.readFileSync(path.join(directory, "cpu.stat"), "utf8"),
     );
     receipt.observations.push({
       readStartNs,
@@ -132,32 +132,32 @@ async function monitor([directory, output, ready, stop, deadlineText]) {
   }
   try {
     receipt.cpuMax = fs
-      .readFileSync(path.join(directory, 'cpu.max'), 'utf8')
+      .readFileSync(path.join(directory, "cpu.max"), "utf8")
       .trim();
     assert.equal(
       receipt.cpuMax,
-      '50000 100000',
-      'Original quota/period required',
+      "50000 100000",
+      "Original quota/period required",
     );
-    receipt.failureStage = 'initial-counters';
+    receipt.failureStage = "initial-counters";
     snapshot();
-    receipt.failureStage = 'readiness';
-    fs.writeFileSync(ready, '');
-    receipt.failureStage = 'sampling';
+    receipt.failureStage = "readiness";
+    fs.writeFileSync(ready, "");
+    receipt.failureStage = "sampling";
     while (!fs.existsSync(stop)) {
       if (Date.now() >= deadline) {
-        receipt.failure = 'DEADLINE_REACHED';
-        throw new Error('Observer deadline reached');
+        receipt.failure = "DEADLINE_REACHED";
+        throw new Error("Observer deadline reached");
       }
       snapshot();
       await delay(receipt.pollIntervalMs);
     }
-    receipt.failureStage = 'final-counters';
+    receipt.failureStage = "final-counters";
     snapshot();
     receipt.complete = true;
     receipt.failureStage = null;
   } catch (error) {
-    receipt.failure ??= 'INVALID_OR_UNAVAILABLE_COUNTERS';
+    receipt.failure ??= "INVALID_OR_UNAVAILABLE_COUNTERS";
     console.error(
       `CPU timeline failed at ${receipt.failureStage}: ${receipt.failure} (${error.code ?? error.name}); no attribution or admission.`,
     );
@@ -179,70 +179,74 @@ function percentile(values, q) {
   ];
 }
 
+function validateDiagnosticRound(row, client) {
+  assert.equal(row.diagnosticOnly, true);
+  assert.equal(row.status, "PASS");
+  assert.equal(row.complete, true);
+  assert.equal(row.cpuMax, "50000 100000");
+  assert.equal(row.cpuLimit, 0.5);
+  assert.equal(row.memoryLimit, 1073741824);
+  assert.equal(row.requestCount, 4407);
+  assert.equal(client.diagnosticOnly, true);
+  assert.equal(client.traceClock, "process.hrtime.bigint");
+  assert.equal(client.complete, true);
+  assert.equal(client.spans.length, 4407);
+  for (const operation of operations) {
+    const measured = client.spans.filter(
+      (span) => span.operation === operation && span.phase === "measured",
+    );
+    assert.equal(measured.length, 1000);
+    assert.deepEqual(
+      measured.map((span) => span.ms),
+      row.samples[operation],
+      "Every original sample retained",
+    );
+    assert.deepEqual(
+      measured.map((span) => span.cycle),
+      Array.from({ length: 1000 }, (_, i) => i),
+    );
+  }
+}
+
 function analyze(directory) {
   const load = (name) =>
-    JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8'));
-  const rows = load('rounds.json');
+    JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
+  const rows = load("rounds.json");
   assert.equal(
     rows.length,
     4,
-    'Exactly the diagnostic four-round block required',
+    "Exactly the diagnostic four-round block required",
   );
   assert.deepEqual(
     rows.map((row) => row.role),
-    ['candidate', 'baseline', 'baseline', 'candidate'],
+    ["candidate", "baseline", "baseline", "candidate"],
   );
   const frames = [];
   const observerCosts = [];
   for (const [index, row] of rows.entries()) {
-    assert.equal(row.diagnosticOnly, true);
-    assert.equal(row.status, 'PASS');
-    assert.equal(row.complete, true);
-    assert.equal(row.cpuMax, '50000 100000');
-    assert.equal(row.cpuLimit, 0.5);
-    assert.equal(row.memoryLimit, 1073741824);
-    assert.equal(row.requestCount, 4407);
     assert.equal(
       row.image,
       rows[0].image,
-      'Diagnostic uses the same image in both roles',
+      "Diagnostic uses the same image in both roles",
     );
     const client = load(`round-${index + 1}-${row.role}.json`);
     const cpu = load(`round-${index + 1}-${row.role}-cpu.json`);
-    assert.equal(client.diagnosticOnly, true);
-    assert.equal(client.traceClock, 'process.hrtime.bigint');
-    assert.equal(client.complete, true);
-    assert.equal(client.spans.length, 4407);
+    validateDiagnosticRound(row, client);
     assert.equal(cpu.diagnosticOnly, true);
     assert.equal(cpu.admissionEligible, false);
     assert.equal(cpu.complete, true);
     assert.equal(
       cpu.clock,
-      'process.hrtime.bigint',
-      'Observer and client must share the monotonic clock',
+      "process.hrtime.bigint",
+      "Observer and client must share the monotonic clock",
     );
     assert.ok(
       Number.isSafeInteger(cpu.observerCpuMicroseconds) &&
         cpu.observerCpuMicroseconds >= 0,
-      'Observer cost must be retained',
+      "Observer cost must be retained",
     );
     assert.equal(cpu.cpuMax, row.cpuMax);
     const associations = correlate(cpu.observations, client.spans);
-    for (const operation of operations) {
-      const measured = client.spans.filter(
-        (span) => span.operation === operation && span.phase === 'measured',
-      );
-      assert.equal(measured.length, 1000);
-      assert.deepEqual(
-        measured.map((span) => span.ms),
-        row.samples[operation],
-        'Every original sample retained',
-      );
-      assert.deepEqual(
-        measured.map((span) => span.cycle),
-        Array.from({ length: 1000 }, (_, i) => i),
-      );
-    }
     let maximumGapNs = 0n;
     for (let i = 1; i < cpu.observations.length; i++) {
       const gap =
@@ -265,13 +269,13 @@ function analyze(directory) {
       }),
     );
   }
-  const comparisons = ['baseline', 'candidate'].flatMap((role) =>
+  const comparisons = ["baseline", "candidate"].flatMap((role) =>
     operations.map((operation) => {
       const selected = frames.filter(
         (frame) =>
           frame.role === role &&
           frame.operation === operation &&
-          frame.phase === 'measured',
+          frame.phase === "measured",
       );
       const tail = percentile(
         selected.map((frame) => frame.ms),
@@ -296,23 +300,23 @@ function analyze(directory) {
         tailRequests: tailFrames.length,
         tailWithInteriorCounterIncrease: count(
           tailFrames,
-          'counter-increased-inside-span',
+          "counter-increased-inside-span",
         ),
         tailWithoutObservedInteriorIncrease: count(
           tailFrames,
-          'no-counter-increase-observed-inside-span',
+          "no-counter-increase-observed-inside-span",
         ),
         tailWithInsufficientInteriorSamples: count(
           tailFrames,
-          'insufficient-interior-samples',
+          "insufficient-interior-samples",
         ),
         allWithInteriorCounterIncrease: count(
           selected,
-          'counter-increased-inside-span',
+          "counter-increased-inside-span",
         ),
         allWithInsufficientInteriorSamples: count(
           selected,
-          'insufficient-interior-samples',
+          "insufficient-interior-samples",
         ),
       };
     }),
@@ -321,32 +325,32 @@ function analyze(directory) {
     diagnosticOnly: true,
     admissionEligible: false,
     interpretation:
-      'Temporal CPU-group counter association only; no request-specific causal delay or release admission.',
+      "Temporal CPU-group counter association only; no request-specific causal delay or release admission.",
     comparisons,
     observerCosts,
     limitations: [
-      'Counter increases belong to the whole app CPU group, including background work.',
-      'No observed increase is not proof that a request was never throttled.',
-      'Short requests can have insufficient sampling coverage.',
-      'Observer runs outside app quota but can perturb the shared host; its cost and gaps are retained.',
-      'No data is discarded and no original admission failure is rewritten.',
+      "Counter increases belong to the whole app CPU group, including background work.",
+      "No observed increase is not proof that a request was never throttled.",
+      "Short requests can have insufficient sampling coverage.",
+      "Observer runs outside app quota but can perturb the shared host; its cost and gaps are retained.",
+      "No data is discarded and no original admission failure is rewritten.",
     ],
   };
   fs.writeFileSync(
-    path.join(directory, 'cpu-attribution.json'),
+    path.join(directory, "cpu-attribution.json"),
     `${JSON.stringify(summary, null, 2)}\n`,
   );
   console.table(comparisons);
 }
 
-module.exports = { parseCounters, correlate };
+module.exports = { parseCounters, correlate, validateDiagnosticRound };
 
 if (require.main === module) {
   (async () => {
     const [command, ...args] = process.argv.slice(2);
-    if (command === 'monitor') await monitor(args);
-    else if (command === 'analyze' && args.length === 1) analyze(args[0]);
-    else throw new Error('Explicit monitor or analyze invocation required');
+    if (command === "monitor") await monitor(args);
+    else if (command === "analyze" && args.length === 1) analyze(args[0]);
+    else throw new Error("Explicit monitor or analyze invocation required");
   })().catch((error) => {
     console.error(
       `CPU trace command failed: ${error.code ?? error.name}; no attribution or admission.`,

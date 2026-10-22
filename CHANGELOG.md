@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Add an explicitly non-admitting native function diagnostic for one frozen
+  0.55.20/0.55.58 BAAB block. Preserve original resource limits, workload and
+  first/second process visits. Profile only the application Node process,
+  not migrations, and retain both profiles before exact-owned cleanup even
+  if the first capture fails. Ordinary qualification remains uninstrumented.
+- Focused contracts increase 44 -> 68 PASS, zero failures/skips. New coverage
+  includes actual analyzer CLI failures, immutable role/runtime identity,
+  all 17,628 request spans and 16,000 timings, explicit profiler authorization,
+  stopped/nonzero-exit evidence retention, independent capture failures,
+  actual mode selection and migration/app launch separation. Two real frozen
+  images also pass network-disabled collector/bootstrap capability probes.
+  These synthetic probes are not application-performance results.
+- Exact-source Linux native execution and its fresh review remain pending
+  at this local implementation checkpoint. Native samples are unweighted
+  observations, not CPU microseconds; whole-process startup/idle/privacy
+  work and different bundled Node versions limit causal interpretation.
+  Do not change admission thresholds or bump the product for tooling alone.
 - Add a read-only-permission workflow on existing public GitHub Actions Linux
   runners, using pinned current 0.55.58, customer-baseline 0.55.20 and PostgreSQL
   images. No serving artifact, dependency, database schema or product-version

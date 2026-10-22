@@ -56,6 +56,22 @@ shared-host perturbation and insufficient short-request sampling remain
 limitations. It has `contents: read` only and no cloud or deployment authority.
 See [ER-67](ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
 
+The source-only [membership-function-diagnostic.yml](../.github/workflows/membership-function-diagnostic.yml)
+uses the same read-only authority, concurrency group, public Linux service,
+15-minute cooperative budget, 20-minute step, 30-minute job and 14-day artifact
+retention. It selects one frozen old/current BAAB block, bypassing admission
+controls only because it cannot produce admission. Both application processes
+retain their first/second visits. Native profiling is applied only to the app
+Node command, not migrations or ordinary qualification; no inspector port,
+cloud credential, customer data, new host or quota increase is introduced.
+An explicit readonly bootstrap mount, environment opt-in and exact-owned
+profiler label authorize the diagnostic exit signal. Output uses the ordinary
+container writable layer, copied before removal rather than a disappearing
+tmpfs. Both role captures are attempted even if one fails, and partial receipts
+remain failures. Profiles include startup/idle/privacy work, and sample gaps
+are not CPU time. Linux execution of this new mode is not yet claimed.
+See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
 This header's 2026-10-22 verification covers the source workflows above.
 The estate snapshots below retain their original capture dates; no fresh
 Azure inventory or serving change is claimed by this diagnostic work.

@@ -4,6 +4,23 @@
 
 ### Current master/performance reconciliation (2026-10-21)
 
+**Latest 2026-10-22 native-profile continuation:** published `a7e51d10` passes
+all 28 protected gates and fresh review `5616280374` has no open code finding.
+Its successful Linux timeline associates 142/168 p99-tail spans with an
+interior app-group throttling-counter increase, not causal delay. Independent
+untraced qualification still fails three same-image limits; no release
+admission, merge or deployment follows. Master remains `e1070ba2`.
+
+Next local tooling adds one diagnostic-only old/current BAAB native profile
+block, retaining original quotas and each process's two visits. All 68 focused
+contracts pass. Actual collector/bootstrap capability probes succeed on both
+frozen images (Node v24.20.0 and v24.22.1), with exact-owned cleanup. These
+are synthetic Node probes, not SCIM performance comparisons. Profiles remain
+unweighted observations; wall-clock gaps are never treated as CPU time.
+Exact-source Linux function profiles and fresh review are still pending.
+See [ER-68](docs/ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+No product-version bump or serving change is made.
+
 **2026-10-22 merged-master and qualification continuation:** PR #250 is now
 merged at `e1070ba2`, after reviewed head `5b3136d1`, all 25 protected-push
 gates and seven exact-tip CI checks. Current immutable 0.55.58 image is

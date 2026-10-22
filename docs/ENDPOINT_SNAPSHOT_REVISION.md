@@ -294,6 +294,18 @@ explicitly unverified by Linux execution.
 
 ### Diagnostic-only request and CPU timeline (ER-67)
 
+**Published execution follow-up:** exact source `a7e51d10` passes all 28
+protected gates. Linux diagnostic `39799891906` retains 17,628 spans and
+44,489 CPU observations. Of 168 p99-tail spans, 142 (84.52%) contain an
+interior throttling-counter increase. This establishes temporal association,
+not causal per-request delay. The independent untraced qualification
+`39799892493` still fails three same-image limits: populated-read p95
+-74.04%, remove p95 +13.69%, and empty-read p95 -68.24%. Faster controls
+outside the reciprocal floor also fail. The two jobs use different CPU
+models, so their timing difference cannot measure profiler overhead.
+All functional, private-log and exact-cleanup checks pass. Fresh review
+`5616280374` reports no open code finding; release admission remains blocked.
+
 **Recommendation: measure the unresolved scheduling hypothesis before changing
 application code or release limits.** Corrected source `117d5b1e` passed all
 28 protected Validate gates. Fresh review `5615359957` reported no remaining
@@ -377,6 +389,104 @@ cannot become analysis success.
 | RED / GREEN | Initial implementation RED: 34 tests, 25 PASS / 9 FAIL. Initial implementation GREEN: 34 PASS; integration coverage: 40 PASS. Additional assurance RED reproduces wrong-clock/missing-cost admission and missing failure stages; final combined run: 44 PASS, zero skips (28 existing/client and 16 CPU) |
 | Prevention | Actual analyzer CLI negative controls, real monitor success/failure/deadline controls, actual PowerShell child lifecycle, actual diagnostic-first-block-only execution and rejection of diagnostic-marked clients by normal qualification |
 | Detection / earliest gate | Focused tests / focused tests; no review or live escape |
+
+### Native function-profile capture assurance (ER-68)
+
+**Current status: local diagnostic implementation, not published or release
+admission.** Native function observations can identify candidate code paths
+behind the broader CPU totals. They do not turn wall-clock profiler gaps
+into CPU time. Retain unweighted exclusive sample counts, including idle
+observations, and compare source locations rather than only function names.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Prevention and detection-stage escape |
+|---|---|---|---|---|
+| ER-68a | Evidence retention / Low | The first synthetic capability probe cannot copy a profile after container stop because its output was on a tmpfs mount, which disappears at stop. | Use the app container's ordinary writable overlay and copy before removal. The actual collector now succeeds on both frozen images without a new persistent mount or permission workaround. | Real frozen-image collector probe verifies profile and metadata after stop. Capability probe detects the fault; earliest useful gate is the same probe. |
+| ER-68b | Lifecycle assurance / Medium | A failed app may already be stopped, so sending its flush signal first prevents collection of the profile it already wrote. | Inspect initial state, skip the signal for an exited process, copy evidence and only then reject its nonzero exit. Preserve an explicit partial capture receipt in `finally`. | Focused already-stopped scenario is confirmed RED, then GREEN. This closes the gap before runner integration. |
+| ER-68c | Ownership boundary / Medium | Generic benchmark ownership alone does not authorize sending the profiler's exit signal to an ordinary app. The new negative test reproduces a signal reaching a non-profiler container. | Require both existing exact-run ownership and `scimserver.profile=native-function` before signalling. Missing-marker RED becomes GREEN with the exact rejection message, not an unrelated mock failure. | Actual collector negative controls verify no signal without opt-in; all 13 native tests pass. Earliest useful gate and detecting gate are the focused collector test. |
+
+The actual collector, bootstrap and strict parser are also exercised against
+both immutable images in network-disabled synthetic Node containers. Baseline
+runtime is **v24.20.0** and current runtime is **v24.22.1**. Both exit zero,
+retain complete non-admitting capture receipts and have bootstrap clocks
+within their native profile ranges; the parser counts 20,905 and 20,805
+samples respectively. These are capability observations, **not SCIM application
+comparisons**. Exact-owned container absence is verified after removal.
+
+**Test/gate self-improvement: applied.** Preserve already-exited evidence and
+test the explicit profiler authorization marker before integration.
+**Design/architecture disposition: accepted.** Keep profiling in opt-in
+benchmark helpers, separate from application runtime and release evaluation.
+No product change, dependency, policy relaxation or version bump is justified.
+
+**Integrated local mode:** the new read-only workflow selects only the original
+old/current BAAB schedule. It preserves the pinned protocol and each app's
+first/second visit, profiles only `exec node ... dist/main.js`, and keeps
+migrations and ordinary qualification uninstrumented. App output stays in the
+writable container overlay. Both profile captures are attempted before exact
+cleanup, even if one fails. Each capture retains explicit completion, work
+status, exit and container identity. The analysis requires the original role
+images, actual bundled Node identities, all four complete diagnostic rows,
+all 17,628 ordered request spans, every original measured timing, successful
+privacy checks and cleanup readback. It never calls the admission evaluator.
+
+```text
+Frozen old image + private baseline database
+  migration, without profiler
+    -> opted-in app Node + native profiler
+       -> first baseline visit -> same live process -> second baseline visit
+
+Frozen current image + private candidate database
+  migration, without profiler
+    -> opted-in app Node + native profiler
+       -> first candidate visit -> same live process -> second candidate visit
+
+Original BAAB order and quotas
+  -> raw clients, timings and resource receipts
+  -> candidate-only functional/private-log checks
+  -> collect baseline profile, then candidate profile, even on capture failure
+  -> exact-owned container/network removal and absence check
+  -> validate immutable identities, profile clocks and every original timing
+  -> diagnostic function/module observations, never release admission
+```
+
+**Worked example, illustrative:** a validation function observed twice and an
+idle frame once contribute two and one unweighted samples. A 50 ms gap before
+one observation does not assign that function 50 ms of CPU: the process may
+have been suspended by its quota. Real profiles also cover startup, idle,
+background work and the candidate-only privacy checks, so lifetime sample
+differences cannot establish a measured-request-only version regression.
+Different bundled Node versions are another explicit confounder.
+
+The initial analyzer/selection RED and independent-capture RED are retained.
+The first combined run passes 65/66 cases: the intended clock-coverage negative
+fixture mistakenly still fits within its profile window. Move its synthetic
+round clocks beyond that window rather than weakening the assertion.
+Final focused result is **68 PASS, zero failures/skips**, including CLI
+negative controls and actual runner selection/launch/finally execution.
+This is a local implementation result; exact-source Linux application
+profiles, publication and fresh review are still required.
+
+**RCA follow-up:** ER-68d, test correctness / Low. The initial negative fixture
+did not reproduce its stated missing-clock-coverage condition. The focused
+suite catches its unexpected success; the corrected fixture spans multiple
+visits beyond the truncated profile and fails for missing coverage. Detecting
+and earliest useful gate are the same focused analyzer test.
+
+**Design/architecture disposition: accepted.** The existing orchestration file
+already exceeds 400 lines; native parsing/capture stay in dedicated helpers,
+and shared raw-round validation is extracted from the timeline analyzer rather
+than duplicated. This adds one finite diagnostic mode, not a general policy
+language or a new production strategy hierarchy. Broader runner decomposition
+is not required for this coherent diagnostic outcome.
+
+**Provenance / completeness:** reconcile this increment against the complete
+available recovered continuation through record 58,275 (about 308 MB), using
+separate error-signal and causal-narration passes. The native increment has
+93 relevant matching records, not 93 distinct incidents. Confirmed problems
+map to ER-68a-d; absent-implementation REDs, expected negative-control errors,
+source-read echoes and repeated receipts are dismissed as non-incidents.
+The earlier template/CSPRNG issues remain ER-67. This scan does not restore
+or claim access to the deleted original UI transcript.
 
 Two Low execution frictions were also caught locally. A raw PowerShell
 continuation backtick inside a JavaScript template caused a parser error;

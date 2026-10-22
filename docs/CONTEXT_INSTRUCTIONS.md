@@ -9,6 +9,20 @@
 
 ## Active Delivery Process
 
+**Latest local 2026-10-22 diagnostic:** one explicit native-profile mode selects
+only the frozen old/current BAAB block, never the admission evaluator.
+Application-only native flags exclude migration and ordinary qualification.
+Both role captures are attempted before exact cleanup; already-exited
+evidence survives and missing profiler authorization prevents an exit signal.
+All 68 focused contracts pass. Network-disabled real-image capability
+probes pass on Node v24.20.0/v24.22.1, not application benchmarks.
+Linux execution/publication/fresh review of this new mode remain pending.
+Published `a7e51d10` already passes 28 gates and review `5616280374` has no
+open code finding. Its timeline is verified, but untraced same-image
+qualification still fails three limits. Master remains `e1070ba2`; no merge,
+deployment, admission waiver or product-version bump is claimed.
+See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
 **2026-10-22 current merged checkpoint:** PR #250 merged at `e1070ba2` after
 the final `5b3136d1` review and exact-tip CI. Immutable 0.55.58 image digest:
 `sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.
