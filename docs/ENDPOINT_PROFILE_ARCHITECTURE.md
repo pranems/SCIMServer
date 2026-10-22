@@ -398,6 +398,16 @@ flowchart TD
 
 These caches enable O(1) lookups during request processing instead of scanning the full schema definition on every request.
 
+**Unreleased 0.55.58 review correction:** generic cache identity includes the
+ResourceType id, name, endpoint, core schema and ordered extension bindings
+(schema plus required flag). These prefixed tuple keys cannot alias the
+builtin services' core-URN keys. Types sharing a core but binding different
+extensions therefore cannot reuse incomplete protection maps. The verified
+snapshot owns the bag; replacing it invalidates the maps as before.
+Both warming orders reproduce the earlier fault and pass the correction
+at unit, HTTP and live layers. See [ER-55 and current evidence](ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
+The earlier image receipts do not certify this serving-code follow-up.
+
 **Note:** The `_schemaCaches` field is runtime-only and is never included in API responses.
 
 ---

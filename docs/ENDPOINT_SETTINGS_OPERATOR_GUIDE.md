@@ -13,6 +13,15 @@ limits. Minimal value-only Group members no longer require a schema expansion
 or disabling strict mode. Actual undeclared input still fails; accepted
 member references persist without changing membership policy flags.
 
+**Unreleased 0.55.58 review correction:** custom ResourceTypes may share a
+core schema while binding different extensions. Their runtime protection
+caches are now isolated by the complete binding. No setting enables disclosure
+of `returned:never` or `writeOnly` fields, including explicit attribute
+projection; read-only input is still ignored or handled by the existing
+PATCH policy. Both request warming orders are covered by
+[unit, HTTP and live regression evidence](ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
+This is tested unreleased behavior, not a deployment claim.
+
 **C0 behavior, included since 0.55.36:** profile creation and profile edits
 now reject unsupported uniqueness promises through the same capability
 compiler used by resource writes. This does not depend on

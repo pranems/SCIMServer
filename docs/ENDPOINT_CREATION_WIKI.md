@@ -17,6 +17,13 @@ and deployment limits, start with [release notes](RELEASE_NOTES.md).
 
 An endpoint profile is portable configuration, not a complete running endpoint export. It includes schemas, ResourceTypes, capability inputs, endpoint settings, and non-secret authentication method declarations. Credentials, secrets, resources, logs, and server policy are configured separately. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
 
+**Unreleased 0.55.58 binding correction:** when two custom ResourceTypes share
+one core schema, declare each type's extensions in its own `schemaExtensions`
+list. The derived runtime caches now distinguish those complete bindings, so
+accessing the core-only type first cannot remove the other type's hidden,
+write-only or read-only extension rules. No new profile setting is needed.
+See [the regression and release boundary](ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
+
 **P7a behavior, included since 0.55.36:** when creating/updating an inline
 profile, use Boolean characteristic values, valid SCIM type/mutability/returned
 keywords and arrays of attribute definitions. Omitted RFC defaults remain
