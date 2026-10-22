@@ -13,12 +13,10 @@
 onto merged master `5841f724`, including token-lifetime PR #249 and 0.55.57.
 Named stash `320a8360d84079918d65ec88dff9542ac56ab468` remains recoverable.
 Both histories below are retained; neither renews tests for this combination.
-Integrated API build/lint (0/512), 20 expanded type roots and Web build/size
+Integrated API build/lint (0/512), 23 expanded type roots and Web build/size
 pass; focused units pass 1,327 and PostgreSQL integration passes 303 cases.
-The 66 existing Web diagnostics are unchanged and the modified browser spec
-has zero diagnostics with its actual Node test environment. Intended version
-0.55.58 needs public-CI lock metadata. Complete hook-owned and current-artifact
-live/browser/performance evidence, reviewed CI/merge and deployment remain.
+The 66 existing Web diagnostics are unchanged. Version 0.55.58 manifests
+and public-CI-generated locks now align, with no dependency-graph change.
 
 The corrected normal Validate push now succeeds at `85f01c7d`: 28 gates
 PASS, 6,208 units, 2,511 InMemory HTTP PASS / 42 backend-specific pending,
@@ -26,8 +24,46 @@ and 1,655 Web tests. The hook's two log-suite exclusions remain explicit.
 Prisma generation and all 30 migration lint checks pass. Public-CI run
 `39690345727` produces only 0.55.58 version metadata changes in API/Web
 locks; dependency graphs/public SHA-512 provenance and imported hashes pass.
-Final lock/receipt commit and exact-tip protected publication/review remain;
-this is not current-artifact browser, performance or deployment acceptance.
+The public locks are committed and PR #250 is draft at `4bf55093`. Its latest
+normal protected push passes 25 gates and all seven exact-tip checks pass.
+CodeQL alert 336's PR instance is fixed. Copilot returns a billing-entity error,
+not a substantive review; the user is unavailable to select a reviewer path.
+Hold merge and continue independent validation without changing billing.
+The 0.55.58 CI image `27264427` verifies all 246 serving modules after only
+line-ending canonicalization (239 raw-byte equal), plus schema/migration.
+Full current-image BAAB `883e4aa1` passes all 12 original latency limits at
+0.5 CPU / 1 GiB, 2,000 samples per operation/role against actual 0.55.20.
+Calls fall 4.10% and application CPU 8.02%; removal p99 rises 9.07%, close
+to the unchanged +10% ceiling. SQL execution rises 37.14%, not measured
+database CPU; its cause/capacity review remains open.
+
+The current six-mode closure passes: 6,208 API units on each backend; full
+HTTP 2,609 PostgreSQL and 2,567 InMemory with 42 database-only exclusions;
+1,655 Web units and 1,655 coverage tests. Both hook-excluded log suites are
+included in the full HTTP runs. The original fork-startup failure remains
+failed; a complete supported-thread unit pass closes only that mode.
+Coverage stays 85.74/75.89/75.53/83.06 percent (lines/branches/functions/
+statements), above unchanged floors.
+
+Actual-image entrypoint contracts pass 24 cases and all 30 migrations apply.
+Complete Docker and native Node live suites each pass 1,819 assertions.
+The complete real Chromium repair run `b6ecd1118891` passes all 328 cases
+in 50 files, zero skipped/unexpected/flaky, all opt-ins enabled and no
+baseline-update request. All six seeded endpoint IDs remain; owned cleanup
+and credential-redaction checks pass. Preserve the original 321/7 browser
+failure and the inspected one-PNG mask correction, not a falsely green first
+attempt. All four repaired browser specs compile with zero diagnostics.
+The repair changes tests/docs only; the verified 0.55.58 runtime is unchanged.
+Use `E2E_OAUTH_CLIENT_SECRET` when the browser target's global OAuth secret
+differs from the ordinary development default.
+
+These are isolated pre-merge proofs, not merged-master or dev deployment.
+The follow-up receives its own normal protected push and exact-tip CI.
+Substantive review remains blocked by Copilot billing configuration; keep
+PR #250 draft and do not infer approval from the error comment. Customer
+restore/upgrade, cleanup permission, credential/log/rotation, SQL capacity
+and actual-target human visual acceptance remain independent. The older
+token-lifetime history below is not the authoritative combined checkpoint.
 
 **Authorized release consolidation, 2026-10-21:** the token-lifetime port is on
 `feat/endpoint-token-ttl-integration-20261021`, based on `36724c49`.

@@ -903,11 +903,82 @@ confused with the separately excluded endpoint-scoped-logs/log-config
 suites. The 303-case PostgreSQL campaign proves its selected behavior,
 not an unexecuted complete backend matrix.
 
-The final version/lock/receipt commit still needs its normal protected push
-and exact-tip CI. No current 0.55.58 image, full shipping live test, measured
-application browser run, merge or deployment is claimed by this checkpoint.
+The final lock commit `164859e5` and CodeQL cleanup `4bf55093` both pass
+their normal protected Fast pushes, 25 gates each. All seven exact-tip CI
+checks pass at `4bf55093`; alert 336's PR instance is fixed. PR #250 remains
+draft. Copilot's returned billing-entity error is not a substantive review,
+so merge remains held while independent validation continues.
 JSDOM's scroll/navigation warnings during the completed Web gate are not a
 browser result or a failed test.
+
+### Current immutable-image latency admission
+
+The 0.55.58 CI image has digest
+`sha256:272644270ea012f551edf7027b2d6800f8b8b2ac36cf460b800259d805b1e410`.
+Its OCI source label is `4bf5509382e4da59b7196754d616f9b8a6122ed5`,
+runtime is Node v24.22.1, and the actual package reports 0.55.58. All 246
+serving JavaScript modules match after only CRLF-to-LF canonicalization:
+239 are byte-identical and seven contain platform-preserved line endings.
+Raw hashes and the initial strict rejection remain retained. Changed-code
+and raw-template VM controls prevent accepting a non-line-ending difference.
+Schema and additive migration hashes also match. Generated platform-specific
+Prisma code is explicitly outside the cross-platform byte comparison.
+
+Full run `883e4aa1fabb4bc88a276e1eb3aa6573`, measured 2026-10-22 UTC,
+compares that image with the actual 0.55.20 baseline `8b00fff0`.
+It uses the predeclared BAAB order, 0.5 CPU / 1 GiB, 100 warmups and
+1,000 measured lifecycles per round: 2,000 pooled samples per operation/role.
+Profiling and read/quota instrumentation are disabled. All 12 original
+latency ceilings pass without an unchanged retry or relaxed threshold.
+
+| Operation | p50 baseline / candidate ms | p95 baseline / candidate ms | p99 baseline / candidate ms |
+|---|---:|---:|---:|
+| Add member | 12.942 / 11.876 | 51.055 / 49.427 | 101.619 / 93.205 |
+| Read populated Group | 5.180 / 5.196 | 18.675 / 11.150 | 62.933 / 53.036 |
+| Remove member | 10.913 / 10.624 | 46.036 / 45.632 | 84.410 / 92.064 |
+| Read empty Group | 5.112 / 5.078 | 17.042 / 11.880 | 51.179 / 47.138 |
+
+Database calls decrease from 53,378 to 51,192 (-4.10%), and application
+CPU decreases from 58,400,790 to 53,716,855 microseconds (-8.02%).
+Candidate maximum measured Node resident memory is 187.965 MiB.
+Removal p99 increases **9.07%**, inside but close to the +10% boundary.
+Do not hide that limited margin behind an aggregate improvement.
+
+**Separate cost remains open:** database SQL execution totals increase
+from 1,850.131 to 2,537.255 ms (**+37.14%**). This is execution-time
+accounting, not measured database CPU or a proven field/index cause.
+The earlier +35.89% receipt remains historical rather than overwritten.
+All four complete statement inventories reconcile their calls exactly and
+their execution totals within 0.000001 ms. The largest observed differences
+are below; the categories explain where time was recorded, not why a
+particular field or index caused it.
+
+| SQL category | Baseline calls / candidate calls | Baseline ms / candidate ms | Execution delta ms |
+|---|---:|---:|---:|
+| Request-log inserts | 178 / 178 | 623.107 / 969.908 | +346.801 |
+| Resource reads and uniqueness probes | 19,814 / 15,418 | 475.385 / 748.635 | +273.250 |
+| Compact endpoint observation | 0 / 8,804 | 0 / 178.114 | +178.114 |
+| Transaction control | 9,164 / 13,568 | 9.479 / 50.110 | +40.631 |
+| Protected write locks | 0 / 4,404 | 0 / 39.243 | +39.243 |
+| Membership persistence | 6,600 / 4,400 | 342.604 / 353.203 | +10.599 |
+| Other endpoint reads | 10 / 12 | 1.147 / 2.322 | +1.175 |
+| Resource parent writes | 4,400 / 4,400 | 209.974 / 186.729 | -23.245 |
+| Separate member reads | 13,204 / 0 | 182.263 / 0 | -182.263 |
+| Remaining fixture statements | 8 / 8 | 6.171 / 8.991 | +2.820 |
+
+Request-log inserts account for about half the net execution-time increase
+despite the same 178 batches on each side. That rules out an increased batch
+count in this run; it does not identify row-size, index, buffer or CPU causes.
+Coherent Group reads remove the separate member queries while adding work
+inside the resource-read statement. These safety/cost tradeoffs remain
+explicit rather than being hidden by the lower application latency.
+
+Database capacity/cause review, full backend matrix, shipping-entrypoint live
+tests and measured application browser checks remain independent gates.
+Synthetic local latency admission does not certify customer data, larger
+Groups, concurrent load, Azure service levels or a merged-master artifact.
+Changed-path values/logging/redaction checks pass; exact owned containers
+and network are removed and absence is verified.
 
 ### Other worktrees and remaining history
 
@@ -935,8 +1006,20 @@ session evidence; unresolved historical scope is not marked complete.
 | ER-36 | Integration test-double drift / Medium | The first protected Validate push passes all preceding static gates, then fails five of 6,208 unit cases in the newly inherited conditional-endpoint suite: its Prisma double has no `$queryRaw`. The focused pre-integration selector omitted that master-added consumer of the changed read seam. | Reuse the established snapshot-query mock, retaining every conditional write, outage and ABA assertion. All six endpoint-service suites pass 174 tests; expanded test compilation/lint has zero introduced diagnostics. No production fallback or hook bypass. Detected at full pre-push units; earliest possible detection was the post-merge endpoint-service neighborhood. The focused preflight now discovers that complete service test directory rather than relying only on the older selected filenames. |
 | ER-37 | Validation environment / Low | The second normal Validate push passes 6,208 units and the InMemory HTTP subset (2,511 PASS / 42 PostgreSQL-only pending), then code generation fails because Prisma's configuration requires `DATABASE_URL` even though generation does not connect to a database. | Explicitly provide a loopback, nonconnecting code-generation-only URL in the validation process environment, without a password, live database or persistent `.env` mutation. Isolated Prisma 7.8.0 generation passes. The corrected invocation contract requires this configuration preflight before the normal Validate hook. Detected at the post-test generation gate; earliest detection was configuration preflight. No production fallback, hook-mode downgrade or waived test. |
 | ER-38 | Documentation formatting / Low | The pre-commit whitespace check rejects two Markdown hard-break spaces on an edited status line. | Replace them with a blank line; `git diff --check` passes. Keep the existing pre-commit whitespace check and avoid adding trailing spaces when editing metadata. Detected at the first whitespace check after the edit, before staging/commit; no execution-stage escape or production change. |
-| ER-39 | Browser-test hygiene / Low | CodeQL comments on a dead assignment in the new real auth-diagnostic test's `finally`: the local ID is assigned the deletion helper's result and never read again. Overall CI is green, which does not mean its review comments are empty. | Keep the awaited deletion and actual 404 assertion; remove only the unused assignment. Browser-spec baseline/current compilation remains zero/zero, with the same 66 existing application diagnostics. CodeQL rescan and actual browser execution remain pending at this entry. Detected during PR code-scanning review; an earlier unused-store analyzer could have caught it, but the existing CI analyzer is retained rather than adding a duplicate text-matching gate. |
+| ER-39 | Browser-test hygiene / Low | CodeQL comments on a dead assignment in the new real auth-diagnostic test's `finally`: the local ID is assigned the deletion helper's result and never read again. Overall CI is green, which does not mean its review comments are empty. | Keep the awaited deletion and actual 404 assertion; remove only the unused assignment in `4bf55093`. Browser-spec baseline/current compilation remains zero/zero, with the same 66 existing application diagnostics. All seven fresh exact-tip CI checks pass and alert 336's PR instance reports `fixed`. Actual browser execution remains separate. Detected during PR code-scanning review; retain that analyzer and inspect comments as well as check conclusions, rather than adding a duplicate text-matching gate. |
 | ER-40 | GitHub CLI identity / Low | Requesting reviewer `copilot` is treated as an ordinary user login and fails GraphQL resolution. | Use the supported `@copilot` reviewer alias; `gh pr edit 250 --add-reviewer '@copilot'` succeeds. This requests review, not approval or a billing/availability guarantee. Detected at the first reviewer request; use the alias in the reviewer invocation contract. |
+| ER-41 | Cross-platform artifact verification / Low | An initial strict byte comparison of the exact CI image rejects seven of 246 modules. All seven contain platform-preserved template line endings: Windows CRLF versus Linux LF. There is no filename/count difference. | Retain the rejection and both raw hash maps. Compare only canonical CRLF-to-LF source hashes: all 246 agree, 239 are byte-identical. Explicit Node VM controls confirm template raw-string line-ending equivalence; a changed-code control remains unequal. OCI source label/version still match exact tip `4bf55093` / 0.55.58. Do not call canonical equality byte equality or normalize any other difference. Detected at the first image-source comparison, the earliest cross-platform artifact boundary. |
+| ER-42 | External review service / Medium | The real Copilot review is a COMMENTED billing error: billing is not configured or multiple standalone licenses require a billing entity selection. A successful request and green CI did not produce a substantive Copilot review. | Keep PR #250 draft and the merge hold explicit. An authorized user must select the billing entity under GitHub Settings / Copilot / Features, or arrange a substantive human review. Do not alter billing/account identity or treat blanket deployment approval, the error comment or the separate internal automated review as GitHub approval. Continue independent isolated validation. Detected in the returned review body, before merge. |
+| ER-43 | Documentation coupling / Low | The initial integration freshness run rejects F4: API/Web version manifests changed but their bound release notes did not. Updating context headers alone did not document the new release. This confirmed issue was initially summarized without its own ledger row. | Update the actual 0.55.58 release-note scope and retain the initial rejection; the 27-document audit and protected Validate gate pass. Keep source-bound F4 as the earlier detection gate, not just automatic date/version stamping. Full transcript reconciliation catches the missing ledger entry; source-read/search examples and ordinary Git CRLF warnings are dismissed as non-incidents rather than inflated into new defects. |
+| ER-44 | Test-worker infrastructure / Medium | The current two-fork Web unit mode exits 1: 122 files / 1,531 tests pass, but CredentialsTab and SettingsTab workers do not finish startup. The first causal stack is Vitest's 60-second worker-response handshake timeout, not an assertion failure. There is no fatal heap signal; npm node-options is null and the observed host has 17.16 GiB free of 63.95 GiB. Do not reuse the earlier lifetime run's 512 MiB heap diagnosis without evidence. | The supported thread pool passes both affected files / 124 tests in 24.49 seconds, then the complete 124 files / 1,655 tests in 663.47 seconds. Separate complete fork coverage also passes 1,655 tests with unchanged floors. Retain the original failed matrix; the six-mode closure references its five passing modes and the complete thread-unit repair rather than relabeling the original run. The shipping queue correctly refuses the original receipt and resumes only after complete closure. No timeout, assertion, coverage floor, dependency or product behavior changes. The lower-level reason for the missed fork handshake is not proven; a startup smoke and explicit complete-case counts prevent false acceptance. |
+| ER-45 | Patch tooling / Low | A batched documentation patch applies ER-44, then rejects a redundant no-op handoff hunk whose context does not match. | Keep the successfully applied RCA row and drop the unnecessary hunk. Do not roll back the earlier successful edit or claim that the entire patch failed. The tool's per-file result is the first detection boundary; retry only intended remaining changes. |
+| ER-46 | Time-dependent browser fixture / Medium | The first complete 328-case Chromium run fails three notification timestamp cases. Their persisted 2026-10-14 notification has aged beyond the production seven-day retention window; the store correctly removes it before rendering. | Browser fixed-time setup keeps the fixture within retention without stopping timers or changing production retention. All three viewport cases pass in the focused 28-pass neighborhood. Keep literal timestamp/value/clipboard assertions, not a presence-only substitute. Detected in full Chromium; earliest detection is the fixture clock/retention preflight. |
+| ER-47 | Browser concurrency fixture / Medium | The same full run fails one stale-edit conflict case. The retained network trace shows a fresh endpoint ETag reaching the browser after navigation but before its late GET freeze, so the PATCH legitimately uses the fresh version and returns 200. | Read the real endpoint and install its frozen GET before navigation. Assert the actual stale If-Match and HTTP 412 before checking the dialog; preserve force-overwrite and successful-save cases. All three cases pass focused Chromium. The server's compare-and-swap is unchanged. Detected by the full conflict case; earliest detection is the test's first-read/interleaving contract. |
+| ER-48 | Browser authentication fixture / Low | The activity-table case receives 401 because it hardcodes the default global OAuth secret while the isolated shipping campaign correctly generates a nondefault one. | Accept `E2E_OAUTH_CLIENT_SECRET`, retaining the ordinary development default, and pass the generated value only through the private runner environment. The focused real token-mint/log case passes. No secret is committed, displayed or put in a URL. Detected at real token issuance; the earliest useful gate is a nondefault-secret browser smoke. |
+| ER-49 | Pixel-mask geometry / Medium | Two endpoint pixel cases fail: their table mask follows inventory-dependent row height and can cover off-screen content beyond the visible scroll panel. The original and repaired diffs are each inspected. This is not a production layout change. | Mask the actual scroll panel and independently assert row identity/value, four column bounds, proportional name width and viewport containment. Those outcomes pass in the focused run. Intended baseline correction: replace the invalid off-screen table mask with the visible panel mask; preserve thresholds and all other baselines. The exact two-case update passes with effective mode `changed`; only the Windows endpoint PNG changes. The complete unchanged-baseline rerun is a separate check. Detected in the first full small-inventory browser campaign; earliest detection is a low-row-count mask/height-chain control. |
+| ER-50 | Windows runner discovery / Low | The browser-only repair runner's first discovery finds zero tests because Playwright treats Windows backslashes in its filename selectors as regular-expression escapes. A later two-case selection is correctly discovered but rejected because the parser expects plural `files`, not singular `file`. Neither rejection allocates application resources. | Use unique filename-only selectors, accept both summary forms and require exactly two cases for the narrow baseline update. The corrected discovery finds 30 neighborhood cases or the intended two baseline cases. Keep the zero-discovery rejection and unique per-run evidence directories. Detected before resource allocation, the earliest selector boundary. |
+| ER-51 | Inherited test typing / Low | Expanded compilation of all four touched browser specs finds an existing TS2322 in the conflict spec: `expect.poll` receives a function-valued diagnostic message, but Playwright requires a string. The first overly strict check also incorrectly expects the unchanged baseline to have zero diagnostics. | Preserve the baseline error receipt, use the correctly typed message string, then verify current zero against the actual one-error baseline. Production Web inputs remain unchanged, so the separate 66-diagnostic application baseline is not relabeled zero. Detected in expanded browser-spec compilation; earliest detection is including this spec in that compiler. |
+| ER-52 | PowerShell native arguments / Low | The first narrow baseline attempt runs with effective Playwright mode `missing`, not the requested `changed`. A single-element array emitted from an `if` expression becomes a scalar string; native splatting expands it into characters. The snapshots remain unchanged and both comparisons correctly fail. | Explicitly type every native selector/option collection as `string[]`. A native argument probe demonstrates scalar expansion, an allocation-free CLI check verifies the intended option, and the repaired two-case campaign reports effective mode `changed`, two PASS and verified cleanup. Record the effective mode in every repair receipt. Detected by the retained failed pixel run; earliest detection is the native argument/configuration preflight. |
 
 The first normal push was blocked before API HTTP, migration and Web-test
 gates could run. Its 6,203 passing cases do not make it a passing unit run.
@@ -952,9 +1035,71 @@ separate requirement. The fixed validation environment supplies only a
 configuration URL for code generation; it is not permission to connect
 any test to customer or shared data.
 
+### Complete current-source and shipping-browser closure
+
+The six-mode closure retains the original failed matrix rather than changing
+its outcome. API units pass **6,208 per backend**. Complete PostgreSQL HTTP
+passes **2,609 / 121 suites**; InMemory passes **2,567**, with 42 genuinely
+database-only cases and two wholly database-only suites excluded. Both log
+suites excluded by the normal hook run in these complete HTTP campaigns.
+Web unit and coverage each pass **124 files / 1,655 tests**. Coverage remains
+85.74% lines, 75.89% branches, 75.53% functions and 83.06% statements,
+above unchanged floors. Only the failed unit mode uses the complete supported
+thread-pool replacement described in ER-44.
+
+| Independent shipping claim | Actual result |
+|---|---|
+| Immutable serving image | `272644270ea012f551edf7027b2d6800f8b8b2ac36cf460b800259d805b1e410`, runtime source `4bf55093`, actual 0.55.58 |
+| Actual image entrypoint | 24 contract assertions PASS; no source bind-mount |
+| Real PostgreSQL startup | All 30 migrations applied |
+| Complete Docker live | 1,819 PASS, zero FAIL |
+| Complete native Windows Node/InMemory live | 1,819 PASS, zero FAIL; initial/final zero endpoints; owned listener removed |
+| Original complete real Chromium | 321 PASS / seven unexpected failures, zero skips or flakes; remains FAIL |
+| Repaired browser neighborhood | 28 PASS; two inspected baseline differences remain before deliberate regeneration |
+| Narrow baseline update | Exactly two cases PASS; effective mode `changed`; only the inspected Windows endpoint PNG updated |
+| Final complete real Chromium `b6ecd1118891` | 328 PASS / 50 files in 360.56 seconds; zero skipped/unexpected/flaky, all opt-ins enabled; no update flag |
+| Fixture and cleanup controls | Six seeded endpoint IDs preserved; initially 18 persisted users; credential-redaction and fatal-signal checks PASS; exact owned containers/network removed |
+| Expanded changed-spec compilation | All four specs zero diagnostics; actual inherited baseline had one TS2322 |
+
+The native app uses the existing listener binding, not a test listener shim;
+only the Docker app is explicitly loopback-bound. Generated secrets are passed
+through environment/configuration, never committed or displayed. In particular,
+set `E2E_OAUTH_CLIENT_SECRET` to the target's global OAuth secret when it
+differs from the usual development default. The private repair runner passes
+its generated secret this way. All mutation, shape and pixel opt-ins are
+enabled in the full browser campaign, with three workers and zero retries.
+
+Both endpoint diff PNGs were inspected before baseline regeneration.
+**Intended visual baseline correction because the mask now follows the
+visible scroll panel, not off-screen table height.** The production UI layout
+is unchanged. Independent assertions verify actual first-row identity/value,
+four column bounds, proportional name width and viewport containment.
+The baseline PNG's SHA-256 equals the previously inspected repaired actual
+image. Pixel thresholds remain unchanged. The final complete browser run
+uses Playwright's normal existing-baseline comparison, not an update run.
+
+No production code, manifest, dependency, schema or lockfile changes during
+this browser repair; the exact-image performance/backend/live receipts retain
+their unchanged runtime inputs. The test/docs follow-up still requires its
+own normal protected push and exact-tip CI. Copilot's billing error remains
+an external substantive-review hold. These results authorize neither a merge
+without review nor a claim of merged-master, Azure dev or customer validation.
+
+**Continuation provenance:** the entire available continuation event stream
+was reconciled through **47,571 records**, using signal-frequency and causal
+narration passes. This is not recovery of the deleted original transcript.
+Confirmed integration issues map to ER-33 through ER-52. Source/search/patch
+echoes, ordinary Git CRLF warnings, deliberate invalid-input HTTP rejections
+and the native-argument negative probe are not counted as new product bugs.
+The existing depth-10 live-report serialization warning does not truncate
+executed assertions; no complete nested-payload export claim is made.
+
 **Test/gate improvement: applied.** The new combination has its own focused
 TTL/write-safety campaign and an explicitly typed browser-spec preflight;
 neither the prior TTL release nor the prior performance image is substituted.
+The browser failures add durable time/interleaving/secret/mask controls and
+real outcome assertions; the central engineering-patterns document records
+their reusable lessons and the native-argument preflight.
 **Design/architecture disposition: accepted.** Existing token-lifetime policy
 providers and snapshot seams remain separate, with no speculative strategy
 or event-invalidation layer added during consolidation.

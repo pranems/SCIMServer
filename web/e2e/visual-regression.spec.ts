@@ -138,7 +138,7 @@ const DASHBOARD_LIVE_SELECTORS = [
 const ENDPOINTS_LIVE_SELECTORS = [
   ...NON_DETERMINISTIC_SELECTORS,
   '[data-testid="endpoints-page"] > div:first-child',
-  '[data-testid="endpoints-table"]',
+  '[data-testid="endpoints-results"]',
 ];
 
 const SETTINGS_LIVE_SELECTORS = [
@@ -216,7 +216,39 @@ async function expectEndpointInventory(page: Page, body: unknown): Promise<void>
   await expect(page.getByTestId('endpoints-search')).toHaveValue('');
   await expect(page.getByTestId('endpoints-results-filters').getByRole('status'))
     .toHaveText(`${count} of ${count} endpoints`);
-  await expect(page.getByTestId('endpoints-table').locator('tbody tr')).toHaveCount(count);
+  const table = page.getByTestId('endpoints-table');
+  await expect(table.locator('tbody tr')).toHaveCount(count);
+  if (count > 0) {
+    const first = body.endpoints[0];
+    expect(typeof first.id).toBe('string');
+    const row = page.getByTestId(`endpoint-${first.id}`);
+    await expect(row.locator('td').nth(0)).toContainText(first.displayName ?? first.name);
+    await expect(row.locator('td').nth(1)).toContainText(first.id);
+  }
+  const bounds = await table.evaluate(element => {
+    const region = element.closest('[data-testid="endpoints-results"]');
+    if (!region) throw new Error('Endpoint table has no scroll region.');
+    const panel = region.getBoundingClientRect();
+    const table = element.getBoundingClientRect();
+    return {
+      panelBottom: panel.bottom,
+      panelRight: panel.right,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+      columns: Array.from(element.querySelectorAll('th'), header => {
+        const column = header.getBoundingClientRect();
+        return { right: column.right, share: column.width / table.width };
+      }),
+    };
+  });
+  expect(bounds.panelBottom).toBeLessThanOrEqual(bounds.viewportHeight);
+  expect(bounds.panelRight).toBeLessThanOrEqual(bounds.viewportWidth);
+  expect(bounds.columns).toHaveLength(4);
+  expect(bounds.columns[0].share).toBeGreaterThan(0.38);
+  expect(bounds.columns[0].share).toBeLessThan(0.42);
+  for (const column of bounds.columns) {
+    expect(column.right).toBeLessThanOrEqual(bounds.panelRight);
+  }
 }
 
 /**

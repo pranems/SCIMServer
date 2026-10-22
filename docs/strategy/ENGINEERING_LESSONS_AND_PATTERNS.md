@@ -64,6 +64,16 @@ that cap while retaining two workers passes the two heavy component suites,
 122 tests; complete-matrix success remains a separate claim.
 See the [consolidation execution ledger](../auth/EXECUTION_ISSUES_AND_RCA.md#authorized-lifetime-release-consolidation-2026-10-21).
 
+The later combined 0.55.58 run reaches the same startup wrapper without a
+fatal heap signal or an inherited npm heap cap. Its first causal stack is the
+60-second fork-worker handshake timeout; the lower-level cause is unproven.
+The supported thread pool passes both affected files, then the entire
+124-file / 1,655-test inventory. Preserve the failed original matrix and
+reference a separate complete closure; a targeted pass alone does not repair
+a full-suite claim. Do not transplant an earlier heap diagnosis or weaken a
+timeout merely because the final wrapper looks similar. See
+[ER-44](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
+
 ### Live statistics need a shared capture boundary
 
 2026-10-20: the complete SQL inventory still differed from aggregate totals
@@ -1170,6 +1180,34 @@ Keep dynamic-data visual masks for stable chrome, but never mistake their
 green snapshots for row-layout evidence. Use unmasked values, left edges,
 vertical centers, available-bottom equality and scroll/client bounds.
 See [the regression evidence and RCA](../RESPONSIVE_ENDPOINT_INVENTORY.md).
+
+The 0.55.58 small-inventory campaign exposes a related mask error: masking
+the table follows row height and can paint over off-screen content outside
+its scroll panel. Mask the visible scroll panel, inspect both differences
+before changing the baseline, and separately assert real row values,
+column bounds and viewport containment. A large live estate can hide this
+defect, so include a small nonempty inventory in the pixel campaign.
+See [ER-49](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
+
+## Keep browser fixtures independent of wall-clock age and late refreshes
+
+Stored notification fixtures can correctly disappear once their literal date
+exceeds production retention. Fix the browser's Date clock while leaving
+timers running; do not weaken retention or replace value checks with presence.
+For stale-edit tests, install the captured endpoint response before navigation,
+not after a real refresh may already be in flight. Assert the submitted
+version and actual 412 response before the conflict dialog. These controls
+distinguish a legitimate fresh write from a broken concurrency safeguard.
+See [ER-46 and ER-47](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
+
+## Verify native argument shape and effective runner configuration
+
+PowerShell unwraps a one-element array returned from an `if` expression.
+Splatting the resulting scalar into a native command expands its characters.
+Declare selector and option collections as `string[]`, smoke-check exact
+discovery before allocation, and record the runner's effective configuration.
+A successful command launch does not prove that a requested mode arrived.
+See [ER-50 and ER-52](../ENDPOINT_SNAPSHOT_REVISION.md#integration-issues-and-prevention).
 
 ## Keep deployment success separate from remaining acceptance claims
 

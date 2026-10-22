@@ -20,7 +20,7 @@ schema before applying a targeted compatibility setting.
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
 [![API units](https://img.shields.io/badge/API_units-6%2C208%20pass-brightgreen)](#testing)
-[![PostgreSQL HTTP](https://img.shields.io/badge/PostgreSQL_HTTP-2%2C532%20pass-brightgreen)](#testing)
+[![PostgreSQL HTTP](https://img.shields.io/badge/PostgreSQL_HTTP-2%2C609%20pass-brightgreen)](#testing)
 [![Web units](https://img.shields.io/badge/Web_units-1%2C655%20pass-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 

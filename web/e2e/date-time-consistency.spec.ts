@@ -10,6 +10,8 @@ const token = process.env.E2E_TOKEN || 'changeme-scim';
 const display = (iso: string): string => iso.replace('T', ' ').replace('Z', ' UTC');
 
 async function fixtures(page: Page): Promise<void> {
+  // Keep the persisted fixture within the production notification retention window.
+  await page.clock.setFixedTime(new Date('2026-10-15T12:00:00.000Z'));
   const flags = {
     SecretTokenBearerAuthEnabled: true,
     WifCredentialsEnabled: true,

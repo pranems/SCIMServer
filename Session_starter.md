@@ -4,46 +4,57 @@
 
 ### Current master/performance reconciliation (2026-10-21)
 
-The owned performance branch is fast-forwarded to merged master `5841f724`
-(PR #249, token lifetimes, version 0.55.57). All prior local work is retained
-in named stash `320a8360d84079918d65ec88dff9542ac56ab468`, reapplied without
-deleting that stash. Seven documentation-only overlaps are reconciled by
-preserving both the new lifetime release and the private performance history.
-Runtime/test changes auto-merge. Integrated build and API lint pass (0/512);
-20 expanded API roots have zero type errors, with no new lint diagnostics.
-Focused units pass 1,327 cases; PostgreSQL integration passes 303 cases across
-nine suites including TTL, auth, snapshots and conditional writes. Web
-build/size pass, its exact included-source baseline remains 66 diagnostics,
-and the changed browser spec has zero Node-environment type errors.
-Target 0.55.58 manifests are bootstrapped; public-CI lock metadata, complete
-hook/current-artifact evidence and reviewed delivery are pending.
-Consolidation commit `a6b56aeb` is local. Its first normal Validate push was
-blocked by five old-double failures in a newly inherited endpoint test suite.
-Shared snapshot mocks fix the seam; all six endpoint-service suites / 174
-cases pass. Automatic discovery now covers 23 type roots with zero errors
-and no introduced lint. ER-36 retains the failure. Commit `e44ed615` repairs
-the test seam. The second Validate push passes all 6,208 units and 2,511
-InMemory HTTP cases (42 PostgreSQL-only pending), then fails Prisma generation
-for missing `DATABASE_URL`. Explicit nonconnecting codegen configuration
-passes the isolated generation preflight. The corrected normal Validate push
-of `85f01c7d` succeeds: all 28 gates, 6,208 units, 2,511 InMemory HTTP PASS /
-42 genuine backend-specific pending, and 1,655 Web tests. Both existing
-log-suite hook exclusions remain explicit. Migration lint has zero violations
-across 30 migrations. CI run `39690345727` generates clean public locks:
-only version metadata changes to 0.55.58, dependency graphs unchanged and
-seven-day age policy retained. Artifact hashes pass after import. Final lock/
-receipt commit and protected push, exact-tip CI/review and current-artifact
-matrix/performance/live/measured browser/dev gates are next, not completed.
+The owned performance branch incorporates merged master `5841f724` / PR #249
+and preserves endpoint token lifetimes. Version 0.55.58 manifests and
+public-CI-generated locks align; dependencies are unchanged. All constituent
+commits and stash `320a8360d84079918d65ec88dff9542ac56ab468` are preserved.
+Other worktrees remain read-only. This is the reconstructed continuation,
+not restoration of the deleted original transcript.
 
-PR #250 is now draft at `164859e5`; its final normal Fast push passes all
-25 default gates and all seven exact-tip GitHub checks pass. The only
-subsequent source edit removes a CodeQL-reported unused assignment in the
-browser fixture cleanup, retaining awaited deletion and its actual 404
-assertion. Browser-spec compilation stays zero/zero; rescan/browser proof
-remain pending. Copilot review is requested through the working `@copilot`
-alias, not assumed approved. ER-39/40 retain those actual review/tool outcomes.
-Old image `fa482c1b` proves the earlier 0.55.56 private source only, not this
-new 0.55.57 combination. Other worktrees are inspected read-only, not modified.
+PR #250 contains runtime source `4bf55093`. Its last source-tip protected push
+passes 25 Fast gates and seven exact-tip CI checks; the earlier full Validate
+push passes 28 gates. CodeQL alert 336's PR instance is fixed. The current
+follow-up changes only browser tests, one inspected pixel baseline and docs;
+its own protected publication/CI is a separate receipt.
+
+| Current pre-merge check | Verified result |
+|---|---|
+| API units, both backends | 6,208 PASS per backend |
+| Complete PostgreSQL HTTP | 2,609 PASS / 121 suites |
+| Complete InMemory HTTP | 2,567 PASS; 42 genuine PostgreSQL-only exclusions; both hook-excluded log suites included |
+| Web unit and coverage | Complete 124 files / 1,655 PASS each; unchanged coverage floors |
+| Actual image entrypoint | 24 PASS; real startup applies all 30 migrations |
+| Docker and native Node live | 1,819 PASS each; both authenticate version 0.55.58 |
+| Complete real Chromium | 328 PASS / 50 files, zero skipped, unexpected or flaky; all mutation/shape/pixel opt-ins enabled |
+| Type/build/lint | API build and lint PASS, zero errors / 512 warnings; Web build/size PASS and unchanged 66-diagnostic application baseline; all four repaired browser specs compile with zero diagnostics |
+| Cleanup and fixture integrity | All owned resources removed; native listener absent; all six seeded browser endpoint IDs preserved; unrelated containers untouched |
+
+The original fork-worker matrix failure and first browser result
+(321 PASS / seven FAIL) remain failed receipts. The verified six-mode closure
+uses a complete supported-thread unit run, not a targeted substitute.
+Browser repairs pin fixture time, freeze endpoint reads before navigation,
+pass the actual OAuth secret through `E2E_OAUTH_CLIENT_SECRET` and mask the
+visible results panel. Both pixel differences were inspected before the
+intended Windows baseline correction. New assertions measure row values,
+column bounds and viewport containment. The final complete browser run
+`b6ecd1118891` does not request baseline updates.
+
+The immutable 0.55.58 image `27264427` verifies all 246 serving modules
+(239 byte-identical, seven CRLF-only), schema and migration. BAAB `883e4aa1`
+passes all 12 original latency limits against actual customer 0.55.20 at
+0.5 CPU / 1 GiB and 2,000 samples per operation/role. Calls decrease 4.10%
+and application CPU 8.02%; removal p99 increases 9.07%, near the +10% limit.
+SQL execution increases 37.14%, not measured database CPU. Its cause/capacity
+review remains required before customer promotion.
+
+**Remaining delivery hold:** Copilot returns a billing-entity error, not a
+substantive PR review. Keep PR #250 draft until an authorized review path is
+resolved. No merge or cloud deployment has occurred. After reviewed green
+merge, build the canonical merged-master image and run the complete dev
+pipeline. Customer restore/upgrade proof, cleanup permission, historical
+credential/log/rotation disposition, SQL capacity and actual-target human
+visual acceptance remain separate holds. Auth-advertisement work stays stopped.
+See [current evidence and ER-33 through ER-52](docs/ENDPOINT_SNAPSHOT_REVISION.md#16-reconciliation-with-merged-token-lifetime-master-2026-10-21).
 
 ### Isolated token-lifetime release consolidation (2026-10-21)
 

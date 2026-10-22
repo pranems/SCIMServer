@@ -17,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   warnings, down from 513); 20 expanded API test roots have zero diagnostics.
   Web build/size pass; exact included source/config retains the 66-diagnostic
   baseline and the modified browser spec compiles with zero diagnostics.
-- Bootstrap API/Web manifests for 0.55.58. Lockfile metadata must come from
-  sanctioned public-registry CI. Full hook-owned gates and current-artifact
-  performance/live/browser/deployment proof remain pending.
+- Bootstrap API/Web manifests for 0.55.58. The later public-CI lock and
+  current-artifact receipts below supersede this initial preparation boundary;
+  no local lockfile regeneration or dependency update is used.
 - Subsequent normal Validate publication at `85f01c7d` passes all 28 gates:
   API units 6,128 -> 6,208 (213 suites); Web 1,655 -> 1,655 (124 files).
   The InMemory HTTP CI subset passes 2,511 cases with 42 genuine
@@ -31,10 +31,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Reviewed artifacts change only root/root-package version metadata to
   0.55.58; every dependency and other metadata remain equal. Public
   npm/SHA-512 and post-import hashes pass; age policy remains seven days
-  with no changed third-party package. Final protected lock push, CI,
-  current-artifact performance/live/browser, review/merge and dev proof remain.
+  with no changed third-party package. Later protected publication and
+  current-artifact receipts follow; review/merge and dev proof remain separate.
 - Fresh Web audit: three Moderate Vitest-related findings, zero High/Critical.
   No unrelated major upgrade or quarantine exception applied.
+- Current exact source `4bf55093`, PR #250 draft: seven CI checks pass and
+  CodeQL alert 336's PR instance is fixed. Copilot's billing error is not
+  substantive review; merge and cloud deployment remain held.
+- Complete backend evidence: API units 6,208 on each backend; full PostgreSQL
+  HTTP 2,532 -> 2,609 across 121 suites; full InMemory HTTP 2,528 -> 2,567,
+  with 42 database-only cases and two entirely database-only suites pending.
+  Both hook-excluded log suites are included in these full HTTP runs.
+  Web unit and coverage each pass all 124 files / 1,655 tests. Coverage remains
+  lines 85.74%, branches 75.89%, functions 75.53%, statements 83.06%.
+  The initial fork unit mode failed worker startup; the retained six-mode
+  closure uses a complete supported-thread unit pass, not a relabeled failure.
+- Current immutable CI image `27264427`, actual 0.55.58: full BAAB `883e4aa1`
+  passes all 12 unchanged latency limits against actual customer 0.55.20.
+  Database calls decrease 4.10%, application CPU 8.02%; removal p99 increases
+  9.07%, close to the +10% limit. SQL execution increases 37.14%, an explicit
+  cause/capacity-review item, not measured database CPU or a customer-data claim.
+- Actual-image entrypoint contracts pass 24 cases and all 30 real migrations
+  apply. Docker and native Node live assertions increase 1,811 -> 1,819 each.
+  Final complete real Chromium increases 327 -> 328 PASS across 50 files,
+  zero skipped/unexpected/flaky, all mutation/shape/pixel opt-ins enabled.
+  All six seeded endpoint IDs remain and exact owned cleanup/redaction pass.
+- Retain the initial 321-PASS / seven-FAIL browser receipt. Correct test-clock
+  aging, stale-read setup and nondefault OAuth-secret input without changing
+  application behavior. All four repaired browser specs compile with zero
+  diagnostics, down from one inherited diagnostic in their expanded baseline.
+- Intended visual baseline correction because the endpoint screenshot mask
+  now follows the visible scroll panel rather than inventory-dependent
+  off-screen table height. Both differences were inspected before regenerating
+  the single Windows endpoint PNG. Real row values, four column bounds and
+  viewport containment are asserted independently; pixel thresholds are
+  unchanged. The final full browser run requests no snapshot updates.
 
 ### Security tooling
 

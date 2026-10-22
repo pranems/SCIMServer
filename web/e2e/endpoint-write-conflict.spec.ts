@@ -45,21 +45,19 @@ test.describe('endpoint write conflict (C)', () => {
     });
   });
 
-  async function openResourceTypes(page: import('@playwright/test').Page): Promise<{
-    body: string;
-    etag?: string;
-  }> {
-    const endpointRead = page.waitForResponse((response) =>
-      response.request().method() === 'GET' &&
-      response.url().includes(`/scim/admin/endpoints/${endpointId}`) &&
-      response.ok());
+  async function openResourceTypes(page: import('@playwright/test').Page): Promise<string> {
+    const response = await page.request.get(`/scim/admin/endpoints/${endpointId}`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    expect(response.status()).toBe(200);
+    const etag = response.headers().etag;
+    expect(etag).toBeTruthy();
+    expect((await response.json()).id).toBe(endpointId);
+    // Freeze before navigation so no in-flight refresh can replace the stale version.
+    await freezeEndpointReads(page, { body: await response.text(), etag });
     await page.goto(`/endpoints/${endpointId}/resource-types`);
-    const response = await endpointRead;
     await expect(page.getByTestId('resource-types-tab')).toBeVisible();
-    return {
-      body: await response.text(),
-      etag: response.headers().etag,
-    };
+    return etag;
   }
 
   async function freezeEndpointReads(
@@ -81,8 +79,7 @@ test.describe('endpoint write conflict (C)', () => {
   }
 
   test('C-P1: a save built on a stale view raises the conflict dialog', async ({ page, request, baseURL }) => {
-    const snapshot = await openResourceTypes(page);
-    await freezeEndpointReads(page, snapshot);
+    const etag = await openResourceTypes(page);
 
     // The other operator. The UI still holds the version it loaded with, which
     // is what makes the next save a genuine mid-air collision.
@@ -96,15 +93,20 @@ test.describe('endpoint write conflict (C)', () => {
     await page.getByTestId('resource-types-create-name').fill('Device');
     await page.getByTestId('resource-types-create-endpoint').fill('/Devices');
     await page.getByTestId('resource-types-create-schema').fill('urn:ietf:params:scim:schemas:custom:Device');
+    const write = page.waitForResponse(response =>
+      response.request().method() === 'PATCH' &&
+      new URL(response.url()).pathname === `/scim/admin/endpoints/${endpointId}`);
     await page.getByTestId('resource-types-create-dialog-submit').click();
+    const response = await write;
+    expect(response.request().headers()['if-match']).toBe(etag);
+    expect(response.status()).toBe(412);
 
     await expect(page.getByTestId('conflict-dialog')).toBeVisible();
     await expect(page.getByTestId('conflict-refresh')).toBeVisible();
   });
 
   test('C-P2: force-overwrite applies the operator edit and the type appears', async ({ page, request, baseURL }) => {
-    const snapshot = await openResourceTypes(page);
-    await freezeEndpointReads(page, snapshot);
+    await openResourceTypes(page);
 
     await request.patch(`${baseURL}/scim/admin/endpoints/${endpointId}`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
@@ -166,6 +168,6 @@ test.describe('endpoint write conflict (C)', () => {
         headers: { Authorization: `Bearer ${TOKEN}` },
       });
       return (await after.json()).profile.resourceTypes.map((r: { name: string }) => r.name);
-    }, { timeout: 15_000, message: () => `PATCH responses seen: ${JSON.stringify(writes)}` }).toContain('Printer');
+    }, { timeout: 15_000, message: `PATCH responses seen: ${JSON.stringify(writes)}` }).toContain('Printer');
   });
 });
