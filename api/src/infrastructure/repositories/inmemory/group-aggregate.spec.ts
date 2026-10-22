@@ -23,6 +23,16 @@ describe('InMemory Group aggregate publication', () => {
     expect(stored).toMatchObject({ id: result.id, version: 1, rawPayload: input().rawPayload });
   });
 
+  it('returns a detached snapshot of the exact committed replacement', async () => {
+    const group = await create(input(), [member('initial')]);
+    const result = await repo.updateGroupWithMembers(group.id, { displayName: 'own' }, [member('own')], 1);
+    expect(result).toMatchObject({ version: 2, displayName: 'own', members: [{ value: 'own' }] });
+    await repo.updateGroupWithMembers(group.id, { displayName: 'peer' }, [member('peer')], 2);
+    expect(result).toMatchObject({ version: 2, displayName: 'own', members: [{ value: 'own' }] });
+    const stored = await repo.findWithMembers('ep-a', 'group-a');
+    expect(stored).toMatchObject({ version: 3, displayName: 'peer', members: [{ value: 'peer' }] });
+  });
+
   it('rejects duplicate initial member values without publishing a Group', async () => {
     await expect(create(input(), [member('same'), member('same')]))
       .rejects.toMatchObject({ code: 'CONFLICT' });
@@ -64,7 +74,7 @@ describe('InMemory Group aggregate publication', () => {
     const before = await repo.findWithMembers('ep-a', 'group-a');
     await expect(repo.updateGroupWithMembers(group.id, {
       displayName: 'changed', rawPayload: '{"description":"changed"}', externalId: 'changed', meta: '{"changed":true}',
-    }, [member('duplicate'), member('duplicate')], 1)).rejects.toMatchObject({ code: 'CONFLICT' });
+    }, [member('duplicate'), member('duplicate')], before?.version)).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(await repo.findWithMembers('ep-a', 'group-a')).toEqual(before);
   });
 
@@ -75,7 +85,7 @@ describe('InMemory Group aggregate publication', () => {
     const bad = member('bad');
     Object.defineProperty(bad, 'display', { get: () => { throw new Error('injected member failure'); } });
     await expect(repo.updateGroupWithMembers(group.id, { displayName: 'changed' },
-      [member('first'), bad], 1)).rejects.toThrow('injected member failure');
+      [member('first'), bad], before?.version)).rejects.toThrow('injected member failure');
     expect(await repo.findWithMembers('ep-a', 'group-a')).toEqual(before);
   });
 
@@ -99,6 +109,16 @@ describe('InMemory Group aggregate publication', () => {
     expect(await repo.findWithMembers('ep-a', 'group-a')).toEqual(before);
   });
 
+  it('advances the root version for a membership-only append and leaves no-op appends unchanged', async () => {
+    const group = await repo.create(input());
+    await repo.addMembers(group.id, [member('new')], []);
+    expect(await repo.findWithMembers('ep-a', 'group-a')).toMatchObject({
+      version: group.version + 1, members: [{ value: 'new' }],
+    });
+    await repo.addMembers(group.id, [], []);
+    expect((await repo.findWithMembers('ep-a', 'group-a'))?.version).toBe(group.version + 1);
+  });
+
   it('does not create orphan members for an absent Group', async () => {
     await expect(repo.addMembers('missing', [member('one')], [])).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((repo as unknown as { members: Map<string, unknown> }).members.size).toBe(0);
@@ -108,9 +128,9 @@ describe('InMemory Group aggregate publication', () => {
     const group = await repo.create(input());
     await repo.addMembers(group.id, [member('original')], []);
     const reading = repo.findWithMembers('ep-a', 'group-a');
-    await repo.updateGroupWithMembers(group.id, { displayName: 'changed' }, [member('changed')], 1);
+    await repo.updateGroupWithMembers(group.id, { displayName: 'changed' }, [member('changed')], 2);
     const snapshot = await reading;
-    expect(snapshot?.version).toBe(1);
+    expect(snapshot?.version).toBe(2);
     expect(snapshot?.displayName).toBe('group-a');
     expect(snapshot?.members.map((m) => m.value)).toEqual(['original']);
   });

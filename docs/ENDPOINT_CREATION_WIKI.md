@@ -1,8 +1,8 @@
 # Create Your Own SCIM Endpoint - Self-Service Wiki
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.58`
 
-> **Version:** 0.55.57 - **Updated:** 2026-10-16
+> **Version:** 0.55.58 - **Updated:** 2026-10-16
 > Beginner-friendly, copy-paste guide for standing up a SCIM endpoint in minutes.
 > **Source of truth:** [endpoint.controller.ts](../api/src/modules/endpoint/controllers/endpoint.controller.ts) - [built-in-presets.ts](../api/src/modules/scim/endpoint-profile/built-in-presets.ts)
 
@@ -16,6 +16,13 @@ For current user-visible changes, minimal Group schemas, migration/rollback
 and deployment limits, start with [release notes](RELEASE_NOTES.md).
 
 An endpoint profile is portable configuration, not a complete running endpoint export. It includes schemas, ResourceTypes, capability inputs, endpoint settings, and non-secret authentication method declarations. Credentials, secrets, resources, logs, and server policy are configured separately. See [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md).
+
+**Unreleased 0.55.58 binding correction:** when two custom ResourceTypes share
+one core schema, declare each type's extensions in its own `schemaExtensions`
+list. The derived runtime caches now distinguish those complete bindings, so
+accessing the core-only type first cannot remove the other type's hidden,
+write-only or read-only extension rules. No new profile setting is needed.
+See [the regression and release boundary](ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
 
 **P7a behavior, included since 0.55.36:** when creating/updating an inline
 profile, use Boolean characteristic values, valid SCIM type/mutability/returned

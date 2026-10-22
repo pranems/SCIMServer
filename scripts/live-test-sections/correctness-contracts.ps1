@@ -81,7 +81,7 @@ function Invoke-ScimCorrectnessContractTests {
         if (-not $endpointId) { throw 'Conditional contract endpoint creation returned no id.' }
         . "$PSScriptRoot\conditional-writes.ps1"
         $count = Invoke-ScimConditionalWriteContract -EndpointUrl "$base/scim/endpoints/$endpointId" -Headers $Headers
-        Test-Result -Success ($count -eq 33) -Message '9z-CR: 33 conditional write version, winner value and wildcard assertions'
+        Test-Result -Success ($count -ge 56) -Message "9z-CR: $count conditional write, committed membership, response contract and cleanup assertions"
     } catch {
         Test-Result -Success $false -Message "9z-CR: conditional write contract failed: $($_.Exception.Message)"
     } finally {

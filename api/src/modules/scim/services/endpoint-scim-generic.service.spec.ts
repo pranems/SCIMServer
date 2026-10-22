@@ -12,6 +12,7 @@ import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage'
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { SCIM_EVENTS } from '../../stats/scim-events';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 describe('EndpointScimGenericService', () => {
   let service: EndpointScimGenericService;
@@ -117,6 +118,49 @@ describe('EndpointScimGenericService', () => {
     service = module.get<EndpointScimGenericService>(EndpointScimGenericService);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
     registry = module.get(ScimSchemaRegistry);
+  });
+
+  describe('shared schema-cache ResourceType binding isolation', () => {
+    it.each([false, true])('keeps extension protections when protected type warms first: %s', async protectedFirst => {
+      const extensionUrn = 'urn:example:device:protected';
+      const protectedType: ScimResourceType = {
+        ...deviceResourceType, id: 'ProtectedDevice', name: 'ProtectedDevice', endpoint: '/ProtectedDevices',
+        schemaExtensions: [{ schema: extensionUrn, required: false }],
+      };
+      const profile: EndpointProfile = {
+        schemas: [
+          { id: deviceResourceType.schema, name: 'Device', description: 'Core fixture', attributes: [
+            { name: 'displayName', type: 'string', multiValued: false, required: false },
+          ] },
+          { id: extensionUrn, name: 'Protected', description: 'Protection fixture', attributes: [
+            { name: 'hidden', type: 'string', multiValued: false, required: false, returned: 'never' },
+            { name: 'password', type: 'string', multiValued: false, required: false, mutability: 'writeOnly' },
+            { name: 'visible', type: 'string', multiValued: false, required: false },
+          ] },
+        ],
+        resourceTypes: [deviceResourceType, protectedType],
+        serviceProviderConfig: {
+          patch: { supported: true }, bulk: { supported: false }, filter: { supported: true },
+          changePassword: { supported: false }, sort: { supported: true }, etag: { supported: true },
+        },
+        settings: {},
+      };
+      service['endpointContext'].getProfile = jest.fn(() => profile);
+      mockGenericRepo.findByScimId.mockResolvedValue({
+        ...mockGenericRecord,
+        rawPayload: JSON.stringify({ displayName: 'Device', [extensionUrn]: {
+          hidden: 'never disclose', password: 'never disclose either', visible: 'public',
+        } }),
+      });
+      const order = protectedFirst ? [protectedType, deviceResourceType] : [deviceResourceType, protectedType];
+      for (const rt of [...order, ...order]) {
+        const response = await service.getResource(mockGenericRecord.scimId, baseUrl, endpointId, rt);
+        if (rt === protectedType) {
+          expect(response[extensionUrn]).toEqual({ visible: 'public' });
+        }
+      }
+      expect(Object.keys(profile._schemaCaches ?? {})).toHaveLength(2);
+    });
   });
 
   function registerQuerySchema() {

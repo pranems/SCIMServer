@@ -21,6 +21,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
 import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
+import { observeWriteVersion } from '../../../domain/repositories/write-precondition';
 import type {
   GenericResourceRecord,
   GenericResourceCreateInput,
@@ -346,7 +347,9 @@ export class EndpointScimGenericService {
         diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
-    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(existing.version,
+      enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: existing.endpointId, resourceType: existing.resourceType });
 
     // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
@@ -456,7 +459,9 @@ export class EndpointScimGenericService {
     // GEN-12: Config-aware soft-delete guard
     // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
-    const expectedVersion = enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(existing.version,
+      enforceIfMatch(existing.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: existing.endpointId, resourceType: existing.resourceType });
 
     // AUDIT-4: ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
     // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → reject 400
@@ -1082,7 +1087,11 @@ export class EndpointScimGenericService {
     endpointId: string,
   ): SchemaCharacteristicsCache | undefined {
     const profile = this.endpointContext.getProfile?.();
-    const cacheKey = resourceType.schema;
+    // Generic bindings must not alias each other or the builtin core-URN caches.
+    const cacheKey = `resourceType:${JSON.stringify([
+      resourceType.id, resourceType.name, resourceType.endpoint, resourceType.schema,
+      resourceType.schemaExtensions.map(extension => [extension.schema, extension.required]),
+    ])}`;
     if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
       return profile._schemaCaches[cacheKey];
     }
@@ -1091,7 +1100,7 @@ export class EndpointScimGenericService {
     if (schemaDefs.length === 0) return undefined;
     const extensionUrns = resourceType.schemaExtensions?.map(e => e.schema) ?? [];
     const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs, extensionUrns);
-    // Attach to profile for next access within this request
+    // The verified endpoint snapshot owns this binding-specific derived cache.
     if (profile) {
       if (!profile._schemaCaches) profile._schemaCaches = {};
       profile._schemaCaches[cacheKey] = cache;

@@ -1,6 +1,19 @@
 # Conditional resource writes and User uniqueness
 
-**Last verified:** 2026-09-28
+**Last verified:** 2026-10-20
+
+**Local safety follow-up, not released:** the
+[observed-version implementation and RCA](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md)
+now separates computed PUT/PATCH snapshots from optional client conditions.
+The current local behavior below includes this correction. Historical counts
+remain labeled as historical; they do not certify a new release.
+
+The local observation now also carries the original endpoint/resource type.
+Its final mutation matches internal id, endpoint, type and observed version,
+so the repository can omit a redundant identity read without trusting unbound
+scope. InMemory checks the same invariant before mutation. Legacy callers
+without this observation retain their existing lookup. Profile serialization,
+uniqueness and client-facing DELETE conditions are unchanged.
 
 **Status:** P3 implemented and locally validated on both backends. Release,
 reviewed integration, version metadata and deployment gates remain pending.
@@ -48,7 +61,7 @@ PostgreSQL 14 passed / 10 failed. RED unit controls additionally showed
 duplicate creation succeeding and the precondition helper returning no
 persistence condition.
 
-Final dual-backend run: `postgres-69bf7bf777debff5`. Each backend passed
+Historical dual-backend run: `postgres-69bf7bf777debff5`. Each backend passed
 **55 HTTP tests**: 28 new conditional-write tests plus 27 existing ETag tests.
 The new suite includes one live PowerShell test with **33 assertions** per
 backend. The targeted unit set passes **692 tests in 13 suites**.
@@ -61,11 +74,11 @@ backend. The targeted unit set passes **692 tests in 13 suites**.
 | Stored version changes before persistence | Typed `PRECONDITION_FAILED`, mapped to SCIM 412 |
 | Target disappears after the initial successful read | Conditional write returns 412, including wildcard |
 | Target absent at the initial scoped lookup | Existing 404 behavior is preserved |
-| No If-Match | Existing unconditional write policy; successful updates increment once |
-| `If-Match: *` | Requires existence at mutation, not a snapshot version; two wildcard updates may both succeed |
+| No If-Match | Local PUT/PATCH additionally match the internally observed resource version; a stale computation receives 409 |
+| `If-Match: *` | Requires existence at mutation; local PUT/PATCH also reject stale computed snapshots with 409, while disappearance remains 412 |
 | Comma-separated ETag list | Existing parser does not support lists and rejects them with 412; no list is silently reduced to one version |
 | `RequireIfMatch` enabled and header missing | Existing 428 behavior |
-| Profile has `etag.supported: false` | Neither header validation nor persistence precondition applies |
+| Profile has `etag.supported: false` | Client header is ignored; local PUT/PATCH still enforce the independent observed version |
 
 The existing weak-tag comparison and `versionMismatch` error vocabulary are
 preserved. This is not a redesign of HTTP validator parsing or the error
@@ -93,7 +106,9 @@ sequenceDiagram
 ```
 
 The existing repository ports take an optional `expectedVersion`, either a
-number or `'*'`. The service first resolves the endpoint and resource type,
+legacy number/`'*'` or a local internal pair of `observedVersion` and optional
+client `ifMatch`. PUT/PATCH use the pair. DELETE retains its scalar contract.
+The service first resolves the endpoint and resource type,
 then looks up the resource in that scope. It passes the resulting immutable,
 globally unique internal storage id to the write. A foreign endpoint cannot
 substitute a resource's SCIM-visible id into this internal-id port. Updates
@@ -102,7 +117,10 @@ do not accept identity, endpoint or resource-type changes in their input.
 * **Prisma:** a typed update/delete predicate combines the internal id and
   numeric version. PostgreSQL evaluates that predicate atomically with the
   version increment. Prisma P2025 from a conditional mutation becomes a typed
-  precondition failure; without a condition it remains NOT_FOUND.
+  precondition failure for explicit numeric conditions. An observed-version
+  miss becomes a typed internal write conflict (409); wildcard disappearance
+  is separately distinguished as 412. Legacy calls without any condition
+  retain NOT_FOUND.
 * **Group with members:** the version predicate is on the first write inside
   the existing transaction. A losing writer never deletes or inserts members.
 * **InMemory:** lookup, precondition check and map mutation contain no `await`.

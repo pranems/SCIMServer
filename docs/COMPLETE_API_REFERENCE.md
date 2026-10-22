@@ -1,8 +1,8 @@
 # Complete API Reference
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.58`
 
-> **Version:** 0.55.57 - **Updated:** 2026-10-16
+> **Version:** 0.55.58 - **Updated:** 2026-10-16
 > **Current release:** [Release notes, upgrade steps and validation limits](RELEASE_NOTES.md). Earlier isolated P1-P9 receipts remain historical; the correctness consolidation is included in the deployed release.
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)
 > **121 route handlers** across 33 controllers (includes 2 dashboard analytics routes and the web SPA catch-all). Counted from the `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Sse` decorators in `api/src/**/*.controller.ts` with comments stripped; the count is enforced by `node scripts/audit-doc-content.mjs`.
@@ -114,6 +114,15 @@ All requests (except public routes) are evaluated against 3 tiers in order:
 | `Content-Type` | POST/PUT/PATCH | `application/scim+json` or `application/json` | RFC 7644 S3.1 |
 | `If-Match` | Conditional | `W/"{version}"` or `*` | ETag for PUT/PATCH/DELETE. Required if `RequireIfMatch: true` |
 | `If-None-Match` | Optional | `W/"{version}"` | Conditional GET - returns 304 if match |
+
+**Local follow-up, not published:** computed User, Group and custom-resource
+PUT/PATCH now carry an internal observed version independently of client
+`If-Match`. Concurrent stale computations without a numeric client condition
+receive 409 with diagnostic `RESOURCE_VERSION_CHANGED`, including wildcard
+and ETag-disabled paths. Read current state and retry the original operation,
+not the previously computed replacement. Numeric conditions keep existing
+412 behavior; DELETE behavior is unchanged. See the
+[implementation, compatibility and validation limits](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md).
 
 **Conditional resource writes (P3, included since 0.55.36):**
 User, Group and custom-resource PUT/PATCH/DELETE enforce a numeric If-Match

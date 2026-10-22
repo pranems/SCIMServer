@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.58`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -15,6 +15,60 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
+### 0.55.58 correction, validated privately and awaiting reviewed merge
+
+The pending correction preserves the merged 0.55.57 endpoint token-lifetime
+controls while reducing avoidable endpoint/profile and Group persistence work.
+Computed writes retain scoped resource-version checks, profile/uniqueness
+locks and responses from their own commit. An additive database-owned endpoint
+revision supports compact freshness checks; it is not an event bus or a
+cross-request resource cache.
+
+The combined source passes 1,327 focused units and 303 PostgreSQL integration
+tests, including lifetime issuance and write safety. API lint is zero errors /
+512 warnings; Web build/size pass and the existing 66-diagnostic type baseline
+is unchanged. These initial preparation checks are superseded by the complete
+pre-merge checkpoint below, not by the older private performance receipt.
+The earlier private 0.55.56 performance pass is not a receipt for this version.
+See [the current integration and limitations](ENDPOINT_SNAPSHOT_REVISION.md#16-reconciliation-with-merged-token-lifetime-master-2026-10-21).
+
+The subsequent normal protected push passes all 28 gates, including
+6,208 API units, 2,511 InMemory HTTP cases (42 database-only pending)
+and 1,655 Web tests. Existing hook log-suite exclusions remain, so this is
+not a complete deployment matrix. Public CI produces version-only 0.55.58
+lock metadata with unchanged dependency graphs and verified provenance.
+Later publication and current-image proof are recorded below; review and
+merged-master deployment remain separate.
+
+**Current pre-merge checkpoint:** PR #250 publishes 0.55.58 at `4bf55093`
+with seven passing exact-tip checks. Complete HTTP now passes 2,609 cases
+on PostgreSQL and 2,567 on InMemory, with 42 genuine database-only exclusions.
+Both full Web unit and coverage inventories pass 1,655 tests. The failed
+fork-worker startup run is retained separately from the successful complete
+thread-pool unit run; no assertions, timeouts or coverage floors are relaxed.
+The actual immutable CI image passes all 12 matched latency limits against
+0.55.20. Calls decrease 4.10% and application CPU 8.02%; removal p99 is
++9.07% and SQL execution +37.14%, so capacity review is still explicit.
+Actual-image entrypoint contracts pass 24 cases, all 30 migrations apply,
+and complete Docker/native live suites each pass 1,819 assertions. The final
+real Chromium run passes all 328 cases in 50 files, zero skips/failures/flakes,
+all mutation/shape/pixel opt-ins enabled. Six seeded endpoint IDs remain and
+owned cleanup/redaction pass. The first 321/7 browser result stays failed;
+test-only fixes address fixture aging, stale-read setup and OAuth input.
+The one inspected Windows pixel-baseline correction masks the visible
+scroll panel, with separate real row/column/viewport measurements.
+No application layout or runtime behavior changes in that follow-up.
+Copilot returns a billing error rather than substantive review; there is
+no merge or cloud deployment.
+
+Fresh Web audit on 2026-10-21 reports three Moderate findings in
+Vitest/coverage/mocker and zero High/Critical. This supersedes the earlier
+zero-finding snapshot below; no major dependency upgrade or quarantine
+exception is silently applied. The 0.55.58 version-only lock updates came
+from public-registry CI, not local regeneration.
+
+### Historical Vite prerequisite receipt
+
 Build-tooling security preparation pins Vite to patched 8.1.6, addressing
 the launch-editor advisories affecting 8.0.0-8.1.5. This patch is older than
 the seven-day quarantine. It does not change the SCIM contract or deployed
@@ -27,7 +81,11 @@ not the audit alone. See the
 The documentation checkpoint below records actual publication/dev evidence and
 the customer hold. It introduces no further runtime or version change.
 
-## 0.55.57 - 2026-10-21, locally validated source candidate
+## 0.55.57 - 2026-10-21, merged source with separate deployment gates
+
+PR #249 is now merged as `5841f724`. The local receipts below describe its
+pre-merge validation, not a new cloud deployment or the later 0.55.58
+performance combination.
 
 Endpoint-scoped OAuth client tokens and WIF tokens can be configured from
 60 seconds to 604800 seconds, inclusive, in whole seconds. The default is

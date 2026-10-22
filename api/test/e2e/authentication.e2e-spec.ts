@@ -2,11 +2,15 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken, getLegacyToken } from './helpers/auth.helper';
+import { EndpointService } from '../../src/modules/endpoint/services/endpoint.service';
+import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import {
   scimGet,
   scimPost,
   createEndpoint,
   scimBasePath,
+  scimPatch,
+  scimDelete,
 } from './helpers/request.helper';
 import { validUser, resetFixtureCounter } from './helpers/fixtures';
 
@@ -118,6 +122,76 @@ describe('Authentication (E2E)', () => {
       const legacyToken = getLegacyToken();
 
       await scimGet(app, `/scim/endpoints/${endpointId}/Users`, legacyToken).expect(200);
+    });
+  });
+
+  describe('Inapplicable credential query fast path', () => {
+    it('shares a fresh request snapshot without a credential-probe read and validates later lookups again', async () => {
+      const oauthToken = await getAuthToken(app);
+      const endpointId = await createEndpoint(app, oauthToken);
+      const endpointService = app.get(EndpointService);
+      const authorizationRead = jest.spyOn(endpointService, 'getEndpoint');
+      const controllerSnapshot = jest.spyOn(endpointService, 'getEndpointForRequest');
+      const rawRead = jest.spyOn(app.get(PrismaService), '$queryRaw');
+
+      try {
+        const response = await scimGet(
+          app, `/scim/endpoints/${endpointId}/Groups`, getLegacyToken(),
+        ).expect(200);
+
+        expect(authorizationRead.mock.calls.filter(([id]) => id === endpointId)).toHaveLength(1);
+        expect(controllerSnapshot).toHaveBeenCalledWith(endpointId);
+        if (process.env.PERSISTENCE_BACKEND?.toLowerCase() !== 'inmemory') {
+          const snapshots: unknown[] = [];
+          for (const [index, call] of rawRead.mock.calls.entries()) {
+            if (!Array.isArray(call[0]) || !call[0].join('').includes('WITH current_endpoint')) continue;
+            const rows: unknown = await rawRead.mock.results[index].value;
+            if (!Array.isArray(rows)) throw new Error('Endpoint snapshot query did not return rows');
+            for (const row of rows) snapshots.push(row);
+          }
+          expect(snapshots).toHaveLength(1);
+          rawRead.mockClear();
+          await endpointService.getEndpoint(endpointId);
+          expect(rawRead).toHaveBeenCalledTimes(1);
+          const warmRows: unknown = await rawRead.mock.results[0].value;
+          expect(warmRows).toMatchObject([{ endpoint: null }]);
+          const stored = await app.get(PrismaService).endpoint.findUniqueOrThrow({ where: { id: endpointId } });
+          const fetched = await scimGet(app, `/scim/admin/endpoints/${endpointId}`, oauthToken).expect(200);
+          expect(fetched.body).toMatchObject({
+            createdAt: stored.createdAt.toISOString(),
+            updatedAt: stored.updatedAt.toISOString(),
+          });
+        }
+        expect(response.body).toEqual({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 0,
+          startIndex: 1,
+          itemsPerPage: 0,
+          Resources: [],
+        });
+      } finally {
+        authorizationRead.mockRestore();
+        controllerSnapshot.mockRestore();
+        rawRead.mockRestore();
+        await scimDelete(app, `/scim/admin/endpoints/${endpointId}`, oauthToken).expect(204);
+      }
+    });
+
+    it('refuses the global secret after an endpoint disables it between requests', async () => {
+      const oauthToken = await getAuthToken(app);
+      const endpointId = await createEndpoint(app, oauthToken);
+      const groupsPath = `/scim/endpoints/${endpointId}/Groups`;
+
+      try {
+        await scimGet(app, groupsPath, getLegacyToken()).expect(200);
+        await scimPatch(app, `/scim/admin/endpoints/${endpointId}`, oauthToken, {
+          profile: { settings: { SharedSecretBearerAuthEnabled: false } },
+        }).expect(200);
+        const refused = await scimGet(app, groupsPath, getLegacyToken()).expect(401);
+        expect(refused.body).toMatchObject({ detail: 'This endpoint does not accept the global shared secret.' });
+      } finally {
+        await scimDelete(app, `/scim/admin/endpoints/${endpointId}`, oauthToken).expect(204);
+      }
     });
   });
 

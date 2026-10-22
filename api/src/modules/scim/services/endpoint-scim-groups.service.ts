@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
 import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
+import { observeWriteVersion } from '../../../domain/repositories/write-precondition';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import type {
   GroupWithMembers,
@@ -246,7 +247,9 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    const expectedVersion = enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(group.version,
+      enforceIfMatch(group.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: group.endpointId, resourceType: 'Group' });
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -388,15 +391,16 @@ export class EndpointScimGroupsService {
 
     // G8f: Uniqueness enforcement on PATCH - only displayName must remain unique
     // externalId is NOT checked - saved as received per RFC 7643.
-    await this.assertUniqueDisplayName(displayName, endpointId, scimId);
+    if (displayName !== group.displayName) await this.assertUniqueDisplayName(displayName, endpointId, scimId);
 
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
       : [];
 
+    let updatedGroup: GroupWithMembers;
     try {
-      await this.groupRepo.updateGroupWithMembers(group.id, {
+      updatedGroup = await this.groupRepo.updateGroupWithMembers(group.id, {
         displayName,
         externalId,
         rawPayload: JSON.stringify(rawPayload),
@@ -408,13 +412,6 @@ export class EndpointScimGroupsService {
       ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, 'patch group (transaction)', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
-    }
-
-    // RFC 7644 §3.5.2: Return the updated resource with 200 OK
-    const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
-    if (!updatedGroup) {
-      this.logger.error(LogCategory.SCIM_PATCH, 'Failed to retrieve group after PATCH', { scimId, endpointId });
-      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: { errorCode: 'DATABASE_ERROR' } });
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
@@ -447,7 +444,9 @@ export class EndpointScimGroupsService {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-    const expectedVersion = enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(group.version,
+      enforceIfMatch(group.version, ifMatch, endpointConfig, this.endpointContext.getProfile?.()),
+      { endpointId: group.endpointId, resourceType: 'Group' });
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
@@ -476,7 +475,7 @@ export class EndpointScimGroupsService {
 
     // G8f: Uniqueness enforcement on PUT - only displayName must remain unique
     // externalId is NOT checked - saved as received per RFC 7643.
-    await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
+    if (dto.displayName !== group.displayName) await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
     const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
@@ -489,8 +488,9 @@ export class EndpointScimGroupsService {
       ? await this.resolveMemberInputs(dto.members, endpointId)
       : [];
 
+    let updatedGroup: GroupWithMembers;
     try {
-      await this.groupRepo.updateGroupWithMembers(group.id, {
+      updatedGroup = await this.groupRepo.updateGroupWithMembers(group.id, {
         displayName: dto.displayName,
         externalId: newExternalId,
         rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
@@ -502,13 +502,6 @@ export class EndpointScimGroupsService {
       ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()));
     } catch (error) {
       handleRepositoryError(error, 'replace group (transaction)', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
-    }
-
-    // Return updated group
-    const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
-    if (!updatedGroup) {
-      this.logger.error(LogCategory.SCIM_GROUP, 'Failed to retrieve group after PUT', { scimId, endpointId });
-      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: { errorCode: 'DATABASE_ERROR' } });
     }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Group replaced', { scimId, displayName: dto.displayName, endpointId });

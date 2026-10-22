@@ -1,23 +1,31 @@
 import { createHash } from 'node:crypto';
 import { RepositoryError } from '../errors/repository-error';
 
-export type ProfileRevision = string;
+export interface ProfileSnapshotRevision {
+  readonly endpointId: string;
+  readonly contentRevision: string;
+  readonly snapshotRevision: string;
+}
+
+export type ProfileRevision = string | ProfileSnapshotRevision;
+type SnapshotIdentity = Pick<ProfileSnapshotRevision, 'endpointId' | 'snapshotRevision'>;
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value !== null && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => key !== '_schemaCaches')
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, child]) => [key, canonicalize(child)]),
+      Object.keys(object)
+        .filter(key => key !== '_schemaCaches')
+        .sort()
+        .map(key => [key, canonicalize(object[key])]),
     );
   }
   return value;
 }
 
 /** Content revision for the persisted endpoint profile, independent of object-key order. */
-export function endpointProfileRevision(profile: unknown): ProfileRevision {
+export function endpointProfileRevision(profile: unknown): string {
   return createHash('sha256')
     .update(JSON.stringify(canonicalize(profile ?? null)))
     .digest('hex');
@@ -26,7 +34,12 @@ export function endpointProfileRevision(profile: unknown): ProfileRevision {
 export function assertProfileRevision(
   profile: unknown,
   expectedRevision: ProfileRevision | undefined,
+  snapshot?: SnapshotIdentity,
 ): void {
+  if (expectedRevision === undefined) return;
+  if (typeof expectedRevision === 'object' && snapshot?.snapshotRevision &&
+      snapshot.endpointId === expectedRevision.endpointId &&
+      snapshot.snapshotRevision === expectedRevision.snapshotRevision) return;
   assertProfileRevisionValue(endpointProfileRevision(profile), expectedRevision);
 }
 
@@ -34,7 +47,9 @@ export function assertProfileRevisionValue(
   actualRevision: ProfileRevision | undefined,
   expectedRevision: ProfileRevision | undefined,
 ): void {
-  if (expectedRevision !== undefined && actualRevision !== expectedRevision) {
+  const actual = typeof actualRevision === 'object' ? actualRevision.contentRevision : actualRevision;
+  const expected = typeof expectedRevision === 'object' ? expectedRevision.contentRevision : expectedRevision;
+  if (expected !== undefined && actual !== expected) {
     throw new RepositoryError(
       'PROFILE_CHANGED',
       'Endpoint profile changed while the resource write was in progress.',

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
+import { observeWriteVersion } from '../../../domain/repositories/write-precondition';
 import type { UserRecord, UserCreateInput, UserUpdateInput } from '../../../domain/models/user.model';
 import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -233,7 +234,9 @@ export class EndpointScimUsersService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(user.version,
+      enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: user.endpointId, resourceType: 'User' });
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId, config);
 
@@ -283,7 +286,9 @@ export class EndpointScimUsersService {
     if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-    const expectedVersion = enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.());
+    const expectedVersion = observeWriteVersion(user.version,
+      enforceIfMatch(user.version, ifMatch, config, this.endpointContext.getProfile?.()),
+      { endpointId: user.endpointId, resourceType: 'User' });
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)

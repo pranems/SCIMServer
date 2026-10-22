@@ -1,7 +1,32 @@
 import { wrapPrismaError } from './prisma-error.util';
 import { RepositoryError } from '../../../domain/errors/repository-error';
+import { observeWriteVersion } from '../../../domain/repositories/write-precondition';
 
 describe('wrapPrismaError', () => {
+  it.each([
+    { code: '23505' },
+    { driverAdapterError: { cause: { originalCode: '23505' } } },
+  ])('maps raw PostgreSQL uniqueness to the same conflict without exposing row values: %j', meta => {
+    const cause = Object.assign(new Error('Raw query failed: private member value'), {
+      code: 'P2010', meta,
+    });
+    expect(wrapPrismaError(cause, 'Group replacement')).toMatchObject({
+      code: 'CONFLICT', message: 'Group replacement: unique constraint violation', cause,
+    });
+  });
+  it.each([null, {}, { code: '23503' }, { driverAdapterError: null },
+    { driverAdapterError: { cause: { originalCode: '23503' } } }])(
+    'does not misclassify other raw failures as uniqueness: %j',
+    meta => {
+      const cause = Object.assign(new Error('Raw failure'), { code: 'P2010', meta });
+      expect(wrapPrismaError(cause, 'replacement').code).toBe('UNKNOWN');
+    },
+  );
+  it.each([undefined, '*'] as const)('maps an observed-version CAS miss with %s to WRITE_CONFLICT', condition => {
+    const cause = Object.assign(new Error('Record not found'), { code: 'P2025' });
+    expect(wrapPrismaError(cause, 'update', observeWriteVersion(10, condition)))
+      .toMatchObject({ code: 'WRITE_CONFLICT', cause });
+  });
   it.each([1, '*'] as const)('maps a conditional miss (%s), including deletion, to PRECONDITION_FAILED', (expected) => {
     const error = Object.assign(new Error('Record not found'), { code: 'P2025' });
     expect(wrapPrismaError(error, 'conditional write', expected)).toMatchObject({ code: 'PRECONDITION_FAILED' });

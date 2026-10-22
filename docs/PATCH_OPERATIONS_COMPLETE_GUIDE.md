@@ -11,7 +11,7 @@ rejected later operation saves no earlier mutation. See
 [reference persistence and rollback compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
 and [current release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.58`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
@@ -168,6 +168,15 @@ The RFC 2.0 path variant `{baseUrl}/scim/v2/endpoints/{endpointId}/...` is also 
 | `Authorization: Bearer <token>` | Yes | OAuth2 client-credentials JWT, global `SCIM_SHARED_SECRET`, or a per-endpoint token when `SecretTokenBearerAuthEnabled` is on |
 | `Content-Type: application/scim+json` | Recommended | `application/json` is also accepted |
 | `If-Match: W/"vN"` | Conditional | Optional by default; **required** when `RequireIfMatch` is on (missing -> 428). When present it is always validated (mismatch -> 412) |
+
+**Local follow-up, not published:** all three resource families additionally
+protect the state used to compute PATCH with an internal observed version.
+A concurrent stale computation returns 409 with
+`RESOURCE_VERSION_CHANGED`, even without a header, with `If-Match: *`, or
+with public ETags disabled. Read current state and retry the original PATCH
+operations. Explicit stale numeric conditions still return 412.
+The [implementation and RCA](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md)
+separate these current local tests from release/deployment evidence.
 
 ### 2.3 Response headers
 

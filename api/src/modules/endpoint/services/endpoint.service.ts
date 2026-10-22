@@ -22,6 +22,7 @@ import { USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_LIFECYCLE_REPOSITORY } from
 import type { IEndpointLifecycleRepository } from '../../../domain/repositories/endpoint-lifecycle.repository.interface';
 import { endpointProfileRevision, type ProfileRevision } from '../../../domain/repositories/profile-revision';
 import { withEndpointProfileLock } from '../../../infrastructure/repositories/prisma/prisma-profile-revision';
+import { EndpointRequestSnapshots } from './endpoint-request-snapshots';
 import {
   SCIM_EVENTS,
   type ScimEndpointEventPayload,
@@ -133,18 +134,24 @@ export interface EndpointStatsResponse {
 // ─── Internal Cache Type ──────────────────────────────────────────────────
 
 /** Internal cache representation - keeps Date objects and full profile for fast access */
-interface CachedEndpoint {
+export interface CachedEndpoint {
   id: string;
   name: string;
   displayName?: string;
   description?: string;
   profile?: EndpointProfile;
-  profileRevision: ProfileRevision;
+  runtimeSchemaCaches?: EndpointProfile['_schemaCaches'];
+  profileRevision: string;
   active: boolean;
   scimBasePath: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+type SerializedEndpoint = Omit<Endpoint, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
 
 @Injectable()
 export class EndpointService implements OnModuleInit {
@@ -156,6 +163,8 @@ export class EndpointService implements OnModuleInit {
   private readonly cacheById = new Map<string, CachedEndpoint>();
   private readonly cacheByName = new Map<string, CachedEndpoint>();
   private readonly cacheFingerprints = new Map<string, string>();
+  private readonly databaseFingerprints = new WeakMap<CachedEndpoint, string>();
+  private readonly requestSnapshots = new EndpointRequestSnapshots();
 
   /** Callback for registry hydration on profile changes */
   private profileChangeListener?: ProfileChangeListener;
@@ -250,6 +259,8 @@ export class EndpointService implements OnModuleInit {
   // ─── Cache helpers ──────────────────────────────────────────────────
 
   private cacheSet(ep: CachedEndpoint, persistentFingerprint?: string): void {
+    ep.runtimeSchemaCaches = undefined;
+    this.databaseFingerprints.delete(ep);
     this.cacheById.set(ep.id, ep);
     this.cacheByName.set(ep.name.toLowerCase(), ep);
     if (persistentFingerprint === undefined) this.cacheFingerprints.delete(ep.id);
@@ -258,6 +269,7 @@ export class EndpointService implements OnModuleInit {
   }
 
   private cacheDelete(ep: CachedEndpoint): void {
+    this.databaseFingerprints.delete(ep);
     this.cacheById.delete(ep.id);
     this.cacheByName.delete(ep.name.toLowerCase());
     this.cacheFingerprints.delete(ep.id);
@@ -563,7 +575,20 @@ export class EndpointService implements OnModuleInit {
 
   async getEndpointForRequest(endpointId: string): Promise<{ endpoint: EndpointResponse; profileRevision: ProfileRevision }> {
     const snapshot = await this.resolveEndpoint(endpointId);
-    return { endpoint: this.toFullResponse(snapshot), profileRevision: snapshot.profileRevision };
+    const endpoint = this.toFullResponse(snapshot);
+    if (snapshot.profile) {
+      // Keep derived indexes with this verified snapshot, never in its public profile.
+      endpoint.profile = { ...snapshot.profile, _schemaCaches: snapshot.runtimeSchemaCaches ??= {} };
+    }
+    const token = this.databaseFingerprints.get(snapshot);
+    return {
+      endpoint,
+      profileRevision: token === undefined ? snapshot.profileRevision : Object.freeze({
+        endpointId: snapshot.id,
+        contentRevision: snapshot.profileRevision,
+        snapshotRevision: token,
+      }),
+    };
   }
 
   async getEndpointWithETag(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<{ endpoint: EndpointResponse; etag: string }> {
@@ -574,26 +599,74 @@ export class EndpointService implements OnModuleInit {
     };
   }
 
-  private async resolveEndpoint(endpointId: string): Promise<CachedEndpoint> {
+  runWithRequestSnapshot<T>(work: () => T, registerEnd: (end: () => void) => void): T {
+    return this.isInMemoryBackend ? work() : this.requestSnapshots.run(work, registerEnd);
+  }
+
+  private resolveEndpoint(endpointId: string): Promise<CachedEndpoint> {
+    return this.requestSnapshots.resolve(endpointId, () => this.readCurrentEndpoint(endpointId));
+  }
+
+  private async readCurrentEndpoint(endpointId: string): Promise<CachedEndpoint> {
     const cached = this.cacheById.get(endpointId.toLowerCase()) ?? this.cacheByName.get(endpointId.toLowerCase());
     if (this.isInMemoryBackend) {
       if (cached) return cached;
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
 
-    let endpoint = isUuid(endpointId)
-      ? await this.prisma.endpoint.findUnique({ where: { id: endpointId } })
-      : null;
-    if (!endpoint) {
-      endpoint = await this.prisma.endpoint.findFirst({
-        where: { name: { equals: endpointId, mode: 'insensitive' } },
-      });
+    if (isUuid(endpointId)) {
+      const snapshot = await this.readPersistentSnapshot(endpointId, cached);
+      if (snapshot) return snapshot;
     }
+    const endpoint = await this.prisma.endpoint.findFirst({
+      where: { name: { equals: endpointId, mode: 'insensitive' } },
+    });
     if (!endpoint) {
       this.forgetPersistentEndpoint(cached);
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
     return this.observePersistentEndpoint(endpoint);
+  }
+
+  private async readPersistentSnapshot(
+    endpointId: string,
+    cached: CachedEndpoint | undefined,
+  ): Promise<CachedEndpoint | undefined> {
+    const knownFingerprint = cached ? this.databaseFingerprints.get(cached) : undefined;
+    // The database changes this token on every insert/update, including legacy SQL writers.
+    // A late unchanged result must use its captured object, not a newer cache entry.
+    const rows = await this.prisma.$queryRaw<{
+      fingerprint: string;
+      endpoint: SerializedEndpoint | null;
+    }[]>`
+      WITH current_endpoint AS (
+        SELECT ${endpointId}::uuid AS id
+      )
+      SELECT e."snapshotRevision"::text AS fingerprint,
+             CASE WHEN e."snapshotRevision" = ${knownFingerprint ?? null}::uuid
+                  THEN NULL ELSE to_jsonb(e) - 'snapshotRevision' END AS endpoint
+      FROM "public"."Endpoint" e
+      JOIN current_endpoint c ON c.id = e.id
+    `;
+    if (rows.length === 0) return undefined;
+    const row = rows[0];
+    if (rows.length !== 1 || (row.endpoint === null && (!cached || row.fingerprint !== knownFingerprint))) {
+      throw new Error('Endpoint snapshot validation failed');
+    }
+    if (row.endpoint === null) return cached;
+    // PostgreSQL timestamp-without-time-zone JSON must retain Prisma's UTC interpretation.
+    const timestamp = (value: string): Date => {
+      const date = new Date(/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? value : `${value}Z`);
+      if (!Number.isFinite(date.getTime())) throw new Error('Endpoint snapshot has invalid timestamps');
+      return date;
+    };
+    const endpoint = this.observePersistentEndpoint({
+      ...row.endpoint,
+      createdAt: timestamp(row.endpoint.createdAt),
+      updatedAt: timestamp(row.endpoint.updatedAt),
+    });
+    this.databaseFingerprints.set(endpoint, row.fingerprint);
+    return endpoint;
   }
 
   async getEndpointByName(name: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {

@@ -1,8 +1,8 @@
 # Endpoint Profile Architecture
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.57`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.58`
 
-> **Updated:** 2026-10-16
+> **Updated:** 2026-10-17
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/) and [endpoint.service.ts](../api/src/modules/endpoint/services/endpoint.service.ts)
 >
 > **Cross-cutting authority:** [PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md](PORTABLE_ENDPOINT_PROFILE_AUTHENTICATION_AND_DISCOVERY_DESIGN.md) defines the portability boundary, discovery translation, authentication provenance, API/DB ownership, and target UX. This document remains authoritative for current profile expansion and PATCH merge semantics.
@@ -26,6 +26,13 @@
 ---
 
 ## Overview
+
+**Unreleased local follow-up:** endpoint snapshot verification now compares a
+database-owned UUID instead of hashing the full row on every request.
+The trigger covers legacy/direct SQL writes; protected profile-content
+checks and resource versions remain separate. This requires an additive
+migration and is not deployed. See
+[design, migration costs and evidence](ENDPOINT_SNAPSHOT_REVISION.md).
 
 For release status, upgrade steps and the member-reference migration, see
 [release notes](RELEASE_NOTES.md). Profile fingerprints avoid repeated
@@ -391,6 +398,16 @@ flowchart TD
 
 These caches enable O(1) lookups during request processing instead of scanning the full schema definition on every request.
 
+**Unreleased 0.55.58 review correction:** generic cache identity includes the
+ResourceType id, name, endpoint, core schema and ordered extension bindings
+(schema plus required flag). These prefixed tuple keys cannot alias the
+builtin services' core-URN keys. Types sharing a core but binding different
+extensions therefore cannot reuse incomplete protection maps. The verified
+snapshot owns the bag; replacing it invalidates the maps as before.
+Both warming orders reproduce the earlier fault and pass the correction
+at unit, HTTP and live layers. See [ER-55 and current evidence](ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
+The earlier image receipts do not certify this serving-code follow-up.
+
 **Note:** The `_schemaCaches` field is runtime-only and is never included in API responses.
 
 ---
@@ -578,6 +595,35 @@ snapshot retains its derived indexes. A lookup started after the save commits
 sees the new row. Reads already in progress are not cancelled. This removes the
 previous indefinite cross-process cache staleness without adding a TTL or broker.
 Database failure is surfaced rather than hidden by the cached profile.
+
+**Unreleased local performance prototype:** persistent UUID lookups compare
+the current whole-row SHA-256 with the captured cached representation before
+omitting a redundant full-row JSON transfer. Each ordinary SCIM request now
+starts with a current verified snapshot and shares it across authentication
+and controller resolution for the same identifier. The next request verifies
+again. Admin, endpoint OAuth and Bulk remain outside this request scope.
+Response finish/close clears and deactivates the scope, including for inherited
+asynchronous work. This is not a time-based authorization cache or immediate
+cancellation of an already admitted read. Profile/write fences remain
+independent, and errors propagate rather than falling back to cached success.
+Timezone-free PostgreSQL timestamps are interpreted as UTC before publication.
+The [performance evidence](CUSTOMER_UPGRADE_PERFORMANCE.md) records freshness
+and concurrency tests, but the latest full matched run fails admission.
+This prototype is not part of the published 0.55.56 artifact.
+
+A preceding local prototype also separates internal request projection from
+public profile serialization. A verified `CachedEndpoint` owns an optional
+derived schema-index bag. Shallow request-profile copies share that bag, but
+the persisted profile and public full/summary/export projections do not.
+Publishing any replacement cached record clears the bag through `cacheSet`,
+including InMemory's spread-based updates. Captured in-flight profiles retain
+their original maps; subsequent lookups rebuild against the new snapshot.
+Warm-reuse, backend invalidation and public non-disclosure have unit and
+real HTTP counter assertions. That change affected derived work, not the
+number of authoritative reads. Its exact-image measurement failed five of
+twelve latency checks. Later safety and request-scope work has separate
+receipts in the [implementation report](SCIM_OBSERVED_VERSION_IMPLEMENTATION.md).
+Earlier images are not treated as measurement of current source.
 
 The endpoint-list correction deployed in 0.55.51 compares persisted content
 before cloning or calculating the canonical profile revision. An unchanged

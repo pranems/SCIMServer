@@ -4,6 +4,7 @@ import type { Response } from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { scimGet, scimPatch, scimPost, scimDelete } from './helpers/request.helper';
+import { PrismaService } from '../../src/modules/prisma/prisma.service';
 
 function idFrom(response: Response): string {
   const body: unknown = response.body;
@@ -68,6 +69,26 @@ describe('Endpoint profile visibility across requests', () => {
     });
     const discovery = await scimGet(reader, `/scim/endpoints/${endpointId}/ServiceProviderConfig`, readerToken).expect(200);
     expect(discovery.body).toMatchObject({ patch: { supported: false } });
+  });
+
+  it('observes UUID metadata changes without relying on the update timestamp', async () => {
+    const url = `/scim/admin/endpoints/${endpointId}`;
+    await scimGet(reader, url, readerToken).expect(200);
+    const displayName = 'Same-timestamp metadata update';
+    if (process.env.PERSISTENCE_BACKEND === 'prisma') {
+      const prisma = writer.get(PrismaService);
+      const stored = await prisma.endpoint.findUniqueOrThrow({ where: { id: endpointId } });
+      await prisma.endpoint.update({
+        where: { id: endpointId },
+        data: { displayName, updatedAt: stored.updatedAt },
+      });
+      const refreshed = await scimGet(reader, url, readerToken).expect(200);
+      expect(refreshed.body).toMatchObject({ displayName, updatedAt: stored.updatedAt.toISOString() });
+    } else {
+      await scimPatch(writer, url, token, { displayName }).expect(200);
+      const refreshed = await scimGet(reader, url, readerToken).expect(200);
+      expect(refreshed.body).toMatchObject({ displayName });
+    }
   });
 
   it('refreshes mutable metadata and active-list membership when addressed by name', async () => {

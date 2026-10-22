@@ -16235,6 +16235,8 @@ Invoke-ScimCorrectnessContractTests -BaseUrl $baseUrl -Headers $headers
 Invoke-ScimProfileRevisionContract -BaseUrl $baseUrl -Headers $headers
 . "$PSScriptRoot\live-test-sections\minimal-group-members.ps1"
 Invoke-MinimalGroupMembersContract -BaseUrl $baseUrl -Headers $headers
+. "$PSScriptRoot\live-test-sections\endpoint-snapshot.ps1"
+Invoke-EndpointSnapshotContract -BaseUrl $baseUrl -Headers $headers -SharedSecret $SharedSecret
 
 # TEST SECTION 9z-DR: Endpoint token lifetimes
 $script:currentSection = "9z-DR: Endpoint token lifetimes"
@@ -16249,6 +16251,9 @@ try {
 }
 
 # ============================================
+. "$PSScriptRoot\live-test-sections\schema-cache-binding.ps1"
+Invoke-SchemaCacheBindingContract -BaseUrl $baseUrl -Headers $headers
+
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

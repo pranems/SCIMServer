@@ -11,9 +11,12 @@
  *   non-secret record as a Copy-as-JSON block.
  *
  * SAFETY
- *   Fully route-mocked (no live server dependency). READ-ONLY.
+ *   Original panel cases are route-mocked and read-only. The additional live
+ *   credential-probe case requires E2E_ALLOW_MUTATIONS=1 and deletes its fixture.
  */
 import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { createFixtureEndpoint, deleteFixtureEndpoint } from './endpoint-fixture';
 
 const TOKEN_STORAGE_KEY = 'scimserver.authToken';
 const TOKEN = process.env.E2E_TOKEN || 'changeme-scim';
@@ -24,6 +27,71 @@ test.beforeEach(async ({ page }) => {
     ({ key, value }) => window.localStorage.setItem(key, value),
     { key: TOKEN_STORAGE_KEY, value: TOKEN },
   );
+});
+
+test('live global-secret decision explains the credential skip before disabled-method policy', async ({ page }) => {
+  test.skip(process.env.E2E_ALLOW_MUTATIONS !== '1', 'Requires an explicitly mutation-enabled estate.');
+  let endpointId: string | null = null;
+  try {
+    endpointId = await createFixtureEndpoint(page, {
+      namePrefix: 'e2e-credential-probe',
+      settings: {
+        SecretTokenBearerAuthEnabled: false,
+        OAuthClientCredentialsAuthEnabled: false,
+        SharedSecretBearerAuthEnabled: true,
+      },
+    });
+    const correlationId = randomUUID();
+    const probe = await page.evaluate(async ({ id, token, correlation }) => {
+      const response = await fetch(`/scim/endpoints/${id}/Groups`, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Request-Id': correlation },
+      });
+      return { status: response.status, body: await response.json() };
+    }, { id: endpointId, token: TOKEN, correlation: correlationId });
+    expect(probe.status).toBe(200);
+    expect(probe.body).toMatchObject({
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+      totalResults: 0,
+      Resources: [],
+    });
+    const response = await page.request.get(`/scim/admin/endpoints/${endpointId}/auth-decisions`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    expect(response.status()).toBe(200);
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object' || !('records' in payload) || !Array.isArray(payload.records)) {
+      throw new Error('Expected actual authentication decision records.');
+    }
+    const record: unknown = payload.records.find((candidate: unknown) =>
+      candidate !== null && typeof candidate === 'object' &&
+      'correlationId' in candidate && candidate.correlationId === correlationId,
+    );
+    if (!record || typeof record !== 'object' || !('id' in record) || typeof record.id !== 'string' ||
+        !('recordedAt' in record) || typeof record.recordedAt !== 'string') {
+      throw new Error('Missing actual decision for the fixture request.');
+    }
+    await page.goto(`/endpoints/${endpointId}/connect`);
+    await page.getByTestId(`auth-decision-row-${record.id}`).click();
+    const detail = page.getByTestId(`auth-decision-detail-${record.id}`);
+    const check = detail.getByTestId('auth-decision-check-endpoint_bearer');
+    await expect(check).toContainText('SKIP');
+    await expect(check).toContainText('token is the global shared secret (handled by the legacy acceptor)');
+    await expect(check).not.toContainText('per-endpoint credentials not enabled');
+    const time = page.locator('time').filter({
+      has: page.getByTestId(`auth-decision-timestamp-${record.id}`),
+    });
+    await expect(time).toHaveAttribute('datetime', record.recordedAt);
+    await expect(time).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} UTC$/);
+  } finally {
+    const ownedId = endpointId;
+    await deleteFixtureEndpoint(page, endpointId);
+    if (ownedId) {
+      const missing = await page.request.get(`/scim/admin/endpoints/${ownedId}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      expect(missing.status(), 'fixture endpoint must actually be deleted').toBe(404);
+    }
+  }
 });
 
 const overview = {

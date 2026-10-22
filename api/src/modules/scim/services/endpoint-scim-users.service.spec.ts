@@ -479,7 +479,8 @@ describe('EndpointScimUsersService', () => {
       expect(result.userName).toBe('nopath@example.com');
       expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
         userName: 'nopath@example.com',
-      }), undefined, expect.any(Array));
+      }), { observedVersion: mockUser.version, ifMatch: undefined,
+        scope: { endpointId: mockUser.endpointId, resourceType: 'User' } }, expect.any(Array));
     });
 
     it('should update externalId and active via no-path replace', async () => {
@@ -985,7 +986,8 @@ describe('EndpointScimUsersService', () => {
       expect(result.externalId).toBe('pathed-ext-id');
       expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
         externalId: 'pathed-ext-id',
-      }), undefined, expect.any(Array));
+      }), { observedVersion: mockUser.version, ifMatch: undefined,
+        scope: { endpointId: mockUser.endpointId, resourceType: 'User' } }, expect.any(Array));
     });
 
     it('should remove simple attribute via path', async () => {
@@ -1801,7 +1803,8 @@ describe('EndpointScimUsersService', () => {
         expect(result.userName).toBe('normalized@example.com');
         expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
           userName: 'normalized@example.com',
-        }), undefined, expect.any(Array));
+        }), { observedVersion: mockUser.version, ifMatch: undefined,
+          scope: { endpointId: mockUser.endpointId, resourceType: 'User' } }, expect.any(Array));
       });
 
       it('should normalize DISPLAYNAME to displayName in no-path replace', async () => {
@@ -2411,7 +2414,8 @@ describe('EndpointScimUsersService', () => {
       expect(mockUserRepo.update).toHaveBeenCalledWith(
         deactivatedUser.id,
         expect.objectContaining({ active: true }),
-        undefined,
+        { observedVersion: deactivatedUser.version, ifMatch: undefined,
+          scope: { endpointId: deactivatedUser.endpointId, resourceType: 'User' } },
         expect.any(Array),
       );
     });

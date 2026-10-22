@@ -221,7 +221,7 @@ test('token-mint rows distinguish endpoint snapshots from server-wide activity',
     data: {
       grant_type: 'client_credentials',
       client_id: 'scimserver-client',
-      client_secret: 'changeme-oauth',
+      client_secret: process.env.E2E_OAUTH_CLIENT_SECRET || 'changeme-oauth',
     },
   });
   expect(globalTokenResponse.status()).toBe(200);

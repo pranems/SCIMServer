@@ -9,6 +9,7 @@
 import { PrismaGroupRepository } from './prisma-group.repository';
 import type { PrismaService } from '../../../modules/prisma/prisma.service';
 import { RepositoryError } from '../../../domain/errors/repository-error';
+import type { UniquenessPolicy } from '../../../domain/repositories/uniqueness-policy';
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ function createMockPrismaService(): PrismaService {
     scimResource: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       findMany: jest.fn(),
       groupBy: jest.fn(),
       update: jest.fn(),
@@ -24,20 +26,24 @@ function createMockPrismaService(): PrismaService {
     },
     resourceMember: {
       createMany: jest.fn(),
+      createManyAndReturn: jest.fn(),
       deleteMany: jest.fn(),
     },
-    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<void>) => {
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn(),
+    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([fakeResourceMember()]),
         scimResource: {
-          update: jest.fn(),
+          update: jest.fn().mockResolvedValue(fakeGroupResource({ version: 2 })),
         },
         resourceMember: {
           deleteMany: jest.fn(),
           createMany: jest.fn(),
+          createManyAndReturn: jest.fn().mockResolvedValue([fakeResourceMember()]),
         },
       };
-      await fn(tx);
-      return tx;
+      return fn(tx);
     }),
   } as unknown as PrismaService;
 }
@@ -88,19 +94,181 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
     repo = new PrismaGroupRepository(prisma);
   });
 
+  describe('single-statement group snapshot', () => {
+    it('reads the scoped aggregate once without a second relation query', async () => {
+      const createdAt = Date.parse('2025-01-01T00:00:00.123Z');
+      const resource = fakeGroupResource({
+        membersAsGroup: [fakeResourceMember({ createdAt, reference: 'urn:example:member:1' })],
+      });
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([resource]);
+      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue({
+        ...resource, membersAsGroup: [fakeResourceMember()],
+      });
+
+      const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const [parts, scimId, endpointId] = (prisma.$queryRaw as jest.Mock).mock.calls[0] as [
+        TemplateStringsArray, string, string,
+      ];
+      expect(parts.join('?')).toContain('r."resourceType" = \'Group\'');
+      expect(parts.join('?')).toContain('m."groupResourceId" = r."id"');
+      expect(scimId).toBe(GRP_SCIM_ID);
+      expect(endpointId).toBe('ep-1');
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        id: 'grp-1', displayName: 'Engineering', version: 1,
+        members: [{ id: 'mem-1', value: 'user-scim-1', reference: 'urn:example:member:1', createdAt: new Date(createdAt) }],
+      });
+    });
+
+    it('returns empty persisted membership and not-found without a fallback query', async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([fakeGroupResource({ membersAsGroup: [] })])
+        .mockResolvedValueOnce([]);
+      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(fakeGroupResource());
+
+      expect((await repo.findWithMembers('ep-1', GRP_SCIM_ID))?.members).toEqual([]);
+      expect(await repo.findWithMembers('ep-1', GRP_SCIM_ID)).toBeNull();
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+    });
+
+    it.each([NaN, Number.MAX_VALUE])('surfaces invalid member timestamp %s', async (createdAt) => {
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+        fakeGroupResource({ membersAsGroup: [fakeResourceMember({ createdAt })] }),
+      ]);
+      await expect(repo.findWithMembers('ep-1', GRP_SCIM_ID)).rejects.toThrow('invalid timestamps');
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
   it('reconstructs the exact persisted reference and legacy null without a synthetic URL', async () => {
     const reference = 'https://scim.example.test/Users/user-scim-1?source=import';
-    (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(fakeGroupResource({
-      membersAsGroup: [fakeResourceMember({ reference })],
-    }));
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([fakeGroupResource({
+      membersAsGroup: [fakeResourceMember({ reference, createdAt: Date.parse('2025-01-01T00:00:00Z') })],
+    })]);
     expect((await repo.findWithMembers('ep-1', GRP_SCIM_ID))?.members).toMatchObject([{ reference }]);
-    (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(fakeGroupResource({
-      membersAsGroup: [fakeResourceMember({ reference: null })],
-    }));
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([fakeGroupResource({
+      membersAsGroup: [fakeResourceMember({ reference: null, createdAt: Date.parse('2025-01-01T00:00:00Z') })],
+    })]);
     expect((await repo.findWithMembers('ep-1', GRP_SCIM_ID))?.members).toMatchObject([{ reference: null }]);
   });
 
   // ─── create ──────────────────────────────────────────────────────────
+
+  describe('uniqueness relation projection', () => {
+    const input = {
+      endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+      displayName: 'Engineering', rawPayload: '{}', meta: '{}',
+    };
+    const policy = (name: string, schemaUrn: string | null = null): UniquenessPolicy => [{
+      schemaUrn,
+      path: [{ name, multiValued: name.toLowerCase() === 'members' }],
+      type: 'string',
+      caseExact: false,
+    }];
+
+    beforeEach(() => {
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (work) => work(prisma));
+      jest.spyOn(prisma.scimResource, 'findMany').mockResolvedValue([]);
+      jest.spyOn(prisma.scimResource, 'create').mockResolvedValue(fakeGroupResource());
+    });
+
+    it.each(['id', 'ID'])('delegates common %s uniqueness to the scoped UUID constraint without namespace scans', async name => {
+      await repo.create(input, [], policy(name));
+      expect(prisma.scimResource.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.scimResource.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('retains software uniqueness for an extension id homonym', async () => {
+      const schemaUrn = 'urn:example:external-id';
+      await repo.create({ ...input, rawPayload: JSON.stringify({ [schemaUrn]: { id: 'partner-id' } }) },
+        [], policy('id', schemaUrn));
+      expect(prisma.scimResource.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('retains software uniqueness for a nested id path', async () => {
+      const path = [{ name: 'parent', multiValued: false }, { name: 'id', multiValued: false }];
+      await repo.create(input, [], [{ schemaUrn: null, path, type: 'string', caseExact: true }]);
+      expect(prisma.scimResource.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not silently discard an incompatible multi-valued common id declaration', async () => {
+      await expect(repo.create(input, [], [{
+        schemaUrn: null, path: [{ name: 'id', multiValued: true }], type: 'string', caseExact: true,
+      }])).rejects.toMatchObject({ code: 'INVALID_VALUE' });
+      expect(prisma.scimResource.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.scimResource.create).not.toHaveBeenCalled();
+    });
+
+    it('retains software uniqueness for a differently typed id declaration', async () => {
+      await repo.create(input, [], [{
+        schemaUrn: null, path: [{ name: 'id', multiValued: false }], type: 'reference', caseExact: true,
+      }]);
+      expect(prisma.scimResource.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('retains the residual displayName policy when common id is database-enforced', async () => {
+      jest.spyOn(prisma.scimResource, 'findMany').mockResolvedValue([fakeGroupResource({ id: 'existing-group' })]);
+      await expect(repo.create(input,
+        [], [...policy('id'), ...policy('displayName')])).rejects.toMatchObject({ code: 'CONFLICT' });
+      expect(prisma.scimResource.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.scimResource.create).not.toHaveBeenCalled();
+    });
+
+    it('does not fetch member relations for displayName uniqueness', async () => {
+      await repo.create(input, [], policy('displayName'));
+      expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
+        where: { endpointId: 'ep-1', resourceType: 'Group' },
+        include: { membersAsGroup: false },
+      });
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('still rejects a conflicting displayName without loading member relations', async () => {
+      jest.spyOn(prisma.scimResource, 'findMany').mockResolvedValue([
+        fakeGroupResource({ id: 'existing-group' }),
+      ]);
+      await expect(repo.create(input, [], policy('displayName'))).rejects.toMatchObject({ code: 'CONFLICT' });
+      expect(prisma.scimResource.create).not.toHaveBeenCalled();
+    });
+
+    it('does not load core members for an extension member-named attribute', async () => {
+      const extension = 'urn:example:group';
+      await repo.create({
+        ...input,
+        rawPayload: JSON.stringify({ [extension]: { members: ['external-value'] } }),
+      }, [], policy('members', extension));
+      expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
+        where: { endpointId: 'ep-1', resourceType: 'Group' },
+        include: { membersAsGroup: false },
+      });
+    });
+
+    it.each(['members', 'MeMbErS'])('keeps %s relation uniqueness authoritative', async (name) => {
+      const memberPolicy: UniquenessPolicy = [{
+        ...policy(name)[0],
+        path: [{ name, multiValued: true }, { name: 'value', multiValued: false }],
+      }];
+      jest.spyOn(prisma.scimResource, 'findMany').mockResolvedValue([
+        fakeGroupResource({ id: 'existing-group', membersAsGroup: [fakeResourceMember()] }),
+      ]);
+      await expect(repo.create(input, [{
+        userId: null, value: 'user-scim-1', type: 'User', display: 'Alice',
+      }], memberPolicy)).rejects.toMatchObject({ code: 'CONFLICT' });
+      expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
+        where: { endpointId: 'ep-1', resourceType: 'Group' },
+        include: { membersAsGroup: true },
+      });
+      expect(prisma.scimResource.create).not.toHaveBeenCalled();
+    });
+  });
 
   describe('create', () => {
     it('creates the Group and initial members using the same transaction client', async () => {
@@ -267,21 +435,20 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
     it('should return null for non-UUID scimId without hitting DB', async () => {
       expect(await repo.findWithMembers('ep-1', 'does-not-exist')).toBeNull();
       expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
 
     it('should include membersAsGroup relation', async () => {
       const dbRow = {
         ...fakeGroupResource(),
-        membersAsGroup: [fakeResourceMember()],
+        membersAsGroup: [fakeResourceMember({ createdAt: Date.parse('2025-01-01T00:00:00Z') })],
       };
-      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([dbRow]);
 
       const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
 
-      expect(prisma.scimResource.findFirst).toHaveBeenCalledWith({
-        where: { scimId: GRP_SCIM_ID, endpointId: 'ep-1', resourceType: 'Group' },
-        include: { membersAsGroup: true },
-      });
+      expect(prisma.$queryRaw).toHaveBeenCalledWith(expect.any(Array), GRP_SCIM_ID, 'ep-1');
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
 
       expect(result).not.toBeNull();
       expect(result!.members).toHaveLength(1);
@@ -298,10 +465,11 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
             value: 'user-scim-99',
             type: 'User',
             display: 'Bob',
+            createdAt: Date.parse('2025-01-01T00:00:00Z'),
           }),
         ],
       };
-      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([dbRow]);
 
       const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
       const member = result!.members[0];
@@ -312,14 +480,15 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
       expect(member.value).toBe('user-scim-99');
       expect(member.type).toBe('User');
       expect(member.display).toBe('Bob');
+      expect(member.createdAt.toISOString()).toBe('2025-01-01T00:00:00.000Z');
     });
 
     it('should handle null memberResourceId', async () => {
       const dbRow = {
         ...fakeGroupResource(),
-        membersAsGroup: [fakeResourceMember({ memberResourceId: null })],
+        membersAsGroup: [fakeResourceMember({ memberResourceId: null, createdAt: Date.parse('2025-01-01T00:00:00Z') })],
       };
-      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([dbRow]);
 
       const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
       expect(result!.members[0].userId).toBeNull();
@@ -327,7 +496,7 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
 
     it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
       const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
-      (prisma.scimResource.findFirst as jest.Mock).mockRejectedValue(prismaError);
+      (prisma.$queryRaw as jest.Mock).mockRejectedValue(prismaError);
 
       await expect(repo.findWithMembers('ep-1', GRP_SCIM_ID))
         .rejects.toMatchObject({ code: 'CONNECTION' });
@@ -509,6 +678,9 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
 
   describe('addMembers', () => {
     it('should insert into resourceMember (not groupMember)', async () => {
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (write: (tx: PrismaService) => Promise<void>) => write(prisma),
+      );
       (prisma.resourceMember.createMany as jest.Mock).mockResolvedValue({ count: 2 });
 
       const members = [
@@ -518,6 +690,10 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
 
       await repo.addMembers('grp-1', members, []);
 
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.scimResource.update).toHaveBeenCalledWith({
+        where: { id: 'grp-1' }, data: { version: { increment: 1 } },
+      });
       expect(prisma.resourceMember.createMany).toHaveBeenCalledWith({
         data: expect.arrayContaining([
           expect.objectContaining({
@@ -543,6 +719,25 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
   // ─── updateGroupWithMembers ──────────────────────────────────────────
 
   describe('updateGroupWithMembers', () => {
+    it('returns the written parent and inserted members without a post-write query', async () => {
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (write: (tx: PrismaService) => Promise<unknown>) => write(prisma),
+      );
+      (prisma.scimResource.update as jest.Mock).mockResolvedValue(
+        fakeGroupResource({ displayName: 'Own commit', version: 2 }),
+      );
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([fakeResourceMember()]);
+      const result = await repo.updateGroupWithMembers('grp-1', { displayName: 'Own commit' }, [{
+        userId: 'user-res-1', value: 'user-scim-1', type: 'User', display: 'Alice',
+      }], 1);
+      expect(result).toMatchObject({
+        version: 2, displayName: 'Own commit', members: [{ id: 'mem-1', value: 'user-scim-1' }],
+      });
+      expect(prisma.scimResource.findUnique).not.toHaveBeenCalled();
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
     it('should use transaction with scimResource and resourceMember', async () => {
       const data = { displayName: 'Updated' };
       const members = [
@@ -556,8 +751,9 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
       // The transaction function was called - verify its operations via the mock tx
       const txFn = (prisma.$transaction as jest.Mock).mock.calls[0][0];
       const tx = {
-        scimResource: { update: jest.fn() },
-        resourceMember: { deleteMany: jest.fn(), createMany: jest.fn() },
+        $queryRaw: jest.fn().mockResolvedValue([fakeResourceMember()]),
+        scimResource: { update: jest.fn().mockResolvedValue(fakeGroupResource({ version: 2 })) },
+        resourceMember: { deleteMany: jest.fn(), createManyAndReturn: jest.fn().mockResolvedValue([fakeResourceMember()]) },
       };
       await txFn(tx);
 
@@ -567,20 +763,12 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
         data: { ...data, version: { increment: 1 } },
       });
 
-      // Should delete from resourceMember using groupResourceId (not groupId)
-      expect(tx.resourceMember.deleteMany).toHaveBeenCalledWith({
-        where: { groupResourceId: 'grp-1' },
-      });
-
-      // Should create resourceMember entries
-      expect(tx.resourceMember.createMany).toHaveBeenCalledWith({
-        data: expect.arrayContaining([
-          expect.objectContaining({
-            groupResourceId: 'grp-1',
-            memberResourceId: 'user-res-1',
-          }),
-        ]),
-      });
+      expect(tx.resourceMember.deleteMany).not.toHaveBeenCalled();
+      expect(tx.resourceMember.createManyAndReturn).not.toHaveBeenCalled();
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(tx.$queryRaw).toHaveBeenCalledWith(
+        expect.anything(), 'grp-1', expect.stringContaining('"memberResourceId":"user-res-1"'),
+      );
     });
 
     it('should not create members when array is empty', async () => {
@@ -588,12 +776,12 @@ describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
 
       const txFn = (prisma.$transaction as jest.Mock).mock.calls[0][0];
       const tx = {
-        scimResource: { update: jest.fn() },
-        resourceMember: { deleteMany: jest.fn(), createMany: jest.fn() },
+        scimResource: { update: jest.fn().mockResolvedValue(fakeGroupResource({ version: 2 })) },
+        resourceMember: { deleteMany: jest.fn(), createManyAndReturn: jest.fn() },
       };
       await txFn(tx);
 
-      expect(tx.resourceMember.createMany).not.toHaveBeenCalled();
+      expect(tx.resourceMember.createManyAndReturn).not.toHaveBeenCalled();
     });
   });
 });
