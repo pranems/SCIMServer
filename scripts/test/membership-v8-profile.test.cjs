@@ -401,6 +401,81 @@ test("actual native launch instruments only the opted-in app, not migration or o
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
+for (const mode of ["qualification", "timeline", "profile"]) {
+  test(`actual ${mode}-only source hash output records exact instrumentation bytes`, () => {
+    const runner = path.resolve(
+      __dirname,
+      "..",
+      "performance",
+      "run-membership-qualification.ps1",
+    );
+    const directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "scim-profile-hashes-"),
+    );
+    try {
+      const result = spawnSync(
+        "pwsh",
+        [
+          "-NoProfile",
+          "-Command",
+          `
+        $ErrorActionPreference = 'Stop'
+        $runner = '${runner.replaceAll("'", "''")}'
+        $PSScriptRoot = Split-Path $runner
+        $sourceDirectory = $PSScriptRoot
+        $PSCommandPath = $runner
+        $root = Split-Path (Split-Path $PSScriptRoot)
+        $OutputDirectory = '${directory.replaceAll("'", "''")}'
+        $protocolPath = Join-Path $PSScriptRoot 'membership-protocol.json'
+        $evaluator = Join-Path $PSScriptRoot 'assess-membership.cjs'
+        $clientScript = Join-Path $PSScriptRoot 'benchmark-membership.cjs'
+        $cpuTrace = Join-Path $PSScriptRoot 'membership-cpu-trace.cjs'
+        $nativeProfile = Join-Path $PSScriptRoot 'membership-v8-profile.cjs'
+        $profileBootstrap = Join-Path $PSScriptRoot 'membership-profile-bootstrap.cjs'
+        $TraceDiagnostic = '${mode}' -ceq 'timeline'
+        $ProfileDiagnostic = '${mode}' -ceq 'profile'
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($runner, [ref]$null, [ref]$null)
+        $main = @($ast.EndBlock.Statements | Where-Object {
+          $_ -is [System.Management.Automation.Language.TryStatementAst]
+        })[0]
+        $statements = @($main.Body.Statements)
+        $first = -1; $last = -1
+        for ($i = 0; $i -lt $statements.Count; $i++) {
+          if ($statements[$i].Extent.Text.StartsWith('$sourceHashes =')) { $first = $i }
+          if ($statements[$i].Extent.Text.Contains("'source-hashes.json'")) { $last = $i; break }
+        }
+        if ($first -lt 0 -or $last -le $first) { throw 'Missing actual source provenance block' }
+        $fragment = ($statements[$first..$last].Extent.Text -join "\`n").
+          Replace('$PSCommandPath', '$runner').Replace('$PSScriptRoot', '$sourceDirectory')
+        . ([scriptblock]::Create($fragment))
+        $hashes = Get-Content (Join-Path $OutputDirectory 'source-hashes.json') -Raw | ConvertFrom-Json -AsHashtable
+        $files = @($protocolPath, $evaluator, $clientScript, $runner,
+          (Join-Path $root 'scripts\\live-test-sections\\minimal-group-members.ps1'))
+        if ($TraceDiagnostic) {
+          $files += @($cpuTrace, (Join-Path $PSScriptRoot 'membership-cpu-observer.ps1'))
+        }
+        if ($ProfileDiagnostic) {
+          $files += @($nativeProfile, $profileBootstrap, $cpuTrace,
+            (Join-Path $PSScriptRoot 'membership-v8-profile.ps1'))
+        }
+        if ($hashes.Count -ne $files.Count) { throw 'Mode-only source provenance omits instrumentation' }
+        foreach ($file in $files) {
+          $key = [IO.Path]::GetFileName($file)
+          if ($hashes[$key] -cne (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash) {
+            throw 'Mode-only source provenance records incorrect bytes'
+          }
+        }
+      `,
+        ],
+        { encoding: "utf8" },
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+    } finally {
+      fs.rmSync(directory, { recursive: true });
+    }
+  });
+}
+
 test("native workflow is bounded, read-only and serialized with existing qualification", () => {
   const workflow = fs.readFileSync(
     path.resolve(

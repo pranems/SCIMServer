@@ -387,11 +387,11 @@ try {
         foreach ($file in @($cpuTrace, (Join-Path $PSScriptRoot 'membership-cpu-observer.ps1'))) {
             $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
         }
-        if ($ProfileDiagnostic) {
-            foreach ($file in @($nativeProfile, $profileBootstrap, $cpuTrace,
-                (Join-Path $PSScriptRoot 'membership-v8-profile.ps1'))) {
-                $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
-            }
+    }
+    if ($ProfileDiagnostic) {
+        foreach ($file in @($nativeProfile, $profileBootstrap, $cpuTrace,
+            (Join-Path $PSScriptRoot 'membership-v8-profile.ps1'))) {
+            $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
         }
     }
     $sourceHashes | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'source-hashes.json')

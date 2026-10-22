@@ -32,6 +32,13 @@ shared-group workflows, retaining single active execution and up to 100
 waiters. Local configuration guards precede service acceptance; no measurement
 or admission rule is changed. Fresh native execution/review remains required.
 
+Fresh review `5617819970` accepts neither scheduling loss nor missing native
+instrumentation hashes. Queue correction is already local; fix the native
+hash branch nested inside the mutually exclusive timeline mode. Actual
+three-mode provenance tests require exact 5/7/9 source hashes. Final focused
+result is 71 PASS. Preserve `f7a140d8` and the stopped partial queue-only hook;
+batch both review corrections into the next complete protected publication.
+
 **2026-10-22 current merged checkpoint:** PR #250 merged at `e1070ba2` after
 the final `5b3136d1` review and exact-tip CI. Immutable 0.55.58 image digest:
 `sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.

@@ -98,6 +98,13 @@ still needs explicit failure reporting. Distinguish canceled-before-start
 from a failed measurement, and never repair scheduling loss by admitting
 unexecuted evidence.
 
+Validate mode-specific provenance by executing each real mode's hash-emission
+block and checking both keys and actual bytes. A hash branch nested under an
+incompatible mode can be unreachable while parser and workload tests all pass.
+When extracting PowerShell blocks for focused execution, preserve automatic
+script-path bindings explicitly without replacing the production branching
+or hash logic. See ER-68g in the same ledger.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

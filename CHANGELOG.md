@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Address both findings in fresh review `5617819970`: preserve every queued
+  workflow and emit the four native instrumentation hashes outside the
+  mutually exclusive timeline branch. Actual three-mode key/value checks
+  require 5/7/9 exact source hashes; focused contracts increase 68 -> 71 PASS.
+  The queue-only partial hook is stopped to consolidate the newly confirmed
+  provenance correction, not counted as passing.
 - Correct shared workflow scheduling: `cancel-in-progress: false` alone allows
   only one pending run and canceled the native lane before any job. Apply
   GitHub's documented `queue: max` to all three participants, preserving one

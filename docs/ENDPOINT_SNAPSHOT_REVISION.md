@@ -531,6 +531,29 @@ three-participant queue guard. YAML parsing independently verifies every
 participant has `queue: max` and `cancel-in-progress: false`. This is local
 configuration evidence, not proof of GitHub scheduler acceptance.
 
+**Fresh review `5617819970`: both findings accepted.** Its queue finding
+matches ER-68f and the local correction. Its second finding exposes native
+source hashes nested under the mutually exclusive timeline flag: profile-only
+execution can never reach that branch. Move it to a sibling guard.
+Three actual-mode tests execute the provenance block and compare every
+emitted key and SHA-256 value against the files' real bytes: ordinary mode
+has five, timeline mode seven and profile mode nine sources. With the test
+fixture's automatic script-path bindings preserved, profile-only is confirmed
+RED for missing instrumentation while the other two modes pass.
+After correction, all **71 focused contracts PASS**, zero failures/skips.
+
+**ER-68g, source provenance / Medium:** generic numerical/parser/selection
+tests did not execute the hash-emission surface. Hosted review catches its
+unreachable native branch before first native application execution.
+The earliest useful gate was the now-added actual three-mode provenance test.
+The initial extracted-block fixture also loses PowerShell's automatic
+`PSCommandPath`/`PSScriptRoot` bindings and fails before the intended assertion;
+bind only those path variables to the real source locations while retaining
+the branch and hash logic. The corrected RED verifies the real defect.
+The in-progress queue-only protected push is stopped to batch this review
+correction; its retained commit is not claimed as a passing publication.
+No hooks, source hashes or failed evidence are bypassed.
+
 Two Low execution frictions were also caught locally. A raw PowerShell
 continuation backtick inside a JavaScript template caused a parser error;
 use PowerShell parameter splatting in the fixture, so interpreter delimiters

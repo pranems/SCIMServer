@@ -31,6 +31,14 @@ benchmark rather than dropping a waiting lane. Focused all-participant
 configuration coverage prevents recurrence; service acceptance and actual
 native execution remain pending. See ER-68e/f.
 
+Fresh review `5617819970` confirms the queue issue and finds native source
+hashes unreachable inside the mutually exclusive timeline branch. Make the
+native branch a sibling and execute exact 5/7/9 key/value checks for ordinary/
+timeline/profile modes. All **71 focused tests pass**. Stop the queue-only
+partial hook and preserve its `f7a140d8` commit while batching this correction.
+New protected publication, Linux native execution and fresh review remain
+required; no partial hook or canceled job is called successful.
+
 **2026-10-22 merged-master and qualification continuation:** PR #250 is now
 merged at `e1070ba2`, after reviewed head `5b3136d1`, all 25 protected-push
 gates and seven exact-tip CI checks. Current immutable 0.55.58 image is
