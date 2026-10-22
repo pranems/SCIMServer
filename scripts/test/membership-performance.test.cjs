@@ -15,6 +15,140 @@ function load() {
   return require(implementation);
 }
 
+for (const scenario of [
+  'buffered', 'functional-failure', 'flush-failure', 'secret-leak',
+  'no-errors', 'missing-request', 'missing-category', 'invalid-row', 'functional-write-failure',
+]) {
+  test(`actual privacy phase drains buffered logs and retains sanitized failure evidence: ${scenario}`, () => {
+    const runner = fs.readFileSync(path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1'), 'utf8');
+    const start = runner.indexOf("        . (Join-Path $root 'scripts\\live-test-sections\\minimal-group-members.ps1')");
+    const end = runner.indexOf('        $workComplete = $true', start);
+    assert.ok(start >= 0 && end > start, 'Actual privacy phase must be selected');
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-privacy-phase-'));
+    try {
+      const fixture = path.join(directory, 'scripts', 'live-test-sections');
+      fs.mkdirSync(fixture, { recursive: true });
+      fs.writeFileSync(path.join(fixture, 'minimal-group-members.ps1'), `
+        function Invoke-MinimalGroupMembersContract {
+          foreach ($index in 1..66) {
+            Test-Result -Success (!($scenario -in @('functional-failure', 'functional-write-failure') -and $index -eq 6)) -Message 'Synthetic functional outcome'
+          }
+        }
+      `);
+      fs.writeFileSync(path.join(directory, 'phase.ps1'), runner.slice(start, end));
+      const result = spawnSync('pwsh', ['-NoProfile', '-Command', `
+        $ErrorActionPreference = 'Stop'
+        $root = '${directory.replaceAll("'", "''")}'
+        $directory = $root
+        $scenario = '${scenario}'
+        $apps = @{ candidate = @{ Url = 'http://127.0.0.1:12345'; Id = 'owned-candidate' } }
+        $pg = 'owned-pg'
+        $script:flushed = $false
+        foreach ($key in @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK')) {
+          [Environment]::SetEnvironmentVariable($key, [guid]::NewGuid().ToString('N'))
+        }
+        $requestId = '12345678-1234-4234-8234-123456789abc'
+        function Assert-WithinDeadline {}
+        function Start-Sleep {}
+        function Set-Content {
+          param([Parameter(Position=0)]$Path, [Parameter(ValueFromPipeline)]$Value)
+          process {
+            if ($scenario -eq 'functional-write-failure' -and $Path.EndsWith('privacy.json')) {
+              throw 'Synthetic privacy receipt write failure'
+            }
+            Microsoft.PowerShell.Management\\Set-Content -Path $Path -Value $Value
+          }
+        }
+        function Invoke-RestMethod {
+          param($Uri, $Method, $Headers, $TimeoutSec, $ErrorAction)
+          if ($Uri -cne 'http://127.0.0.1:12345/scim/admin/logs/flush' -or $Method -cne 'Post' -or
+              $Headers.Authorization -cne ('Bearer ' + $env:SCIM_SHARED_SECRET) -or $TimeoutSec -ne 30) {
+            throw 'Unexpected private flush request'
+          }
+          if ($scenario -eq 'flush-failure') { throw 'Synthetic flush failure' }
+          $script:flushed = $true
+        }
+        function Invoke-Docker {
+          if ($args[0] -eq 'exec' -and $args[1] -eq $pg) {
+            $rows = @(foreach ($index in 1..200) {
+              @{
+                requestId = $requestId; endpointId = $requestId
+                status = $(if ($index -eq 1 -and $script:flushed -and $scenario -ne 'no-errors') { 400 } else { 200 })
+                durationMs = $(if ($scenario -eq 'invalid-row' -and $index -eq 200) { -1 } else { 1 })
+                requestHeaders = '{"authorization":"[REDACTED]"}'
+              }
+            })
+            return ConvertTo-Json -InputObject $rows -Depth 5 -Compress
+          }
+          if ($args[0] -eq 'logs' -and $args[-1] -eq $apps.candidate.Id) {
+            $prefix = if ($scenario -eq 'missing-request') { '87654321' } else { '12345678' }
+            $category = if ($scenario -eq 'missing-category') { 'other' } else { 'scim.group' }
+            if ($scenario -eq 'secret-leak') { return $env:JWT_SECRET }
+            return "$prefix $category"
+          }
+          throw 'Unexpected private log operation'
+        }
+        $failure = $null
+        try { . (Join-Path $root 'phase.ps1') } catch { $failure = $_.Exception.Message }
+        $apps.Clear()
+        $pg = $null
+        if ($scenario -eq 'functional-write-failure') {
+          if ($failure -cne 'Private runtime contract failed: Synthetic functional outcome') {
+            throw 'Privacy receipt write failure replaced primary functional error'
+          }
+          exit 0
+        }
+        if (($scenario -eq 'buffered') -ne ($null -eq $failure)) { throw "Wrong privacy phase outcome: $failure" }
+        $json = Get-Content (Join-Path $directory 'privacy.json') -Raw
+        $receipt = $json | ConvertFrom-Json
+        foreach ($key in @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK')) {
+          if ($json.Contains([Environment]::GetEnvironmentVariable($key))) { throw 'Credential reached privacy receipt' }
+        }
+        $allowed = @('status', 'complete', 'passed', 'failureStage', 'contractAssertions', 'checkedRows',
+          'validatedRows', 'rawLogsExported', 'correlation')
+        foreach ($property in $receipt.PSObject.Properties.Name) {
+          if ($property -notin $allowed) { throw 'Undocumented privacy receipt field' }
+        }
+        foreach ($property in $receipt.correlation.PSObject.Properties.Name) {
+          if ($property -notin @('errorRows', 'requestIdPresent', 'categoryPresent')) {
+            throw 'Undocumented correlation receipt field'
+          }
+        }
+        if ($json.Contains($requestId) -or
+            $receipt.rawLogsExported -ne $false) { throw 'Privacy receipt leaked raw evidence' }
+        $expectedStage = switch ($scenario) {
+          'functional-failure' { 'functional' }
+          'flush-failure' { 'log-flush' }
+          'secret-leak' { 'secret-scan' }
+          'invalid-row' { 'row-contract' }
+          'buffered' { $null }
+          default { 'correlation' }
+        }
+        if ($receipt.failureStage -cne $expectedStage -or
+            $receipt.passed -ne ($scenario -eq 'buffered') -or
+            $receipt.complete -ne ($scenario -eq 'buffered')) { throw 'Privacy failure stage/completion lost' }
+        $expectedAssertions = if ($scenario -eq 'functional-failure') { 5 } else { 66 }
+        if ($receipt.contractAssertions -ne $expectedAssertions) { throw 'Completed functional count lost' }
+        if ($scenario -eq 'buffered' -and
+            (!$script:flushed -or $receipt.checkedRows -ne 200 -or $receipt.validatedRows -ne 200)) {
+          throw 'Buffered negative records were not durably checked'
+        }
+        if ($scenario -eq 'invalid-row' -and $receipt.validatedRows -ne 199) { throw 'Partial row validation count lost' }
+        if ($scenario -in @('no-errors', 'missing-request', 'missing-category')) {
+          if ($receipt.correlation.errorRows -ne $(if ($scenario -eq 'no-errors') { 0 } else { 1 }) -or
+              $receipt.correlation.requestIdPresent -ne ($scenario -eq 'missing-category') -or
+              $receipt.correlation.categoryPresent -ne ($scenario -ne 'missing-category')) {
+            throw 'Independent sanitized correlation predicates lost'
+          }
+        }
+      `], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
+    } finally {
+      fs.rmSync(directory, { recursive: true });
+    }
+  });
+}
+
 function receipts(ratio = 1) {
   return ['candidate', 'baseline', 'baseline', 'candidate'].map(role => ({
     role,

@@ -288,6 +288,8 @@ for (const scenario of [
   'changed-sample',
   'wrong-clock',
   'missing-cost',
+  'failed-privacy',
+  'missing-privacy',
 ]) {
   test(`actual diagnostic analyzer accepts only complete matching evidence: ${scenario}`, () => {
     implementation();
@@ -383,6 +385,14 @@ for (const scenario of [
         path.join(directory, 'rounds.json'),
         JSON.stringify(rows),
       );
+      if (scenario !== 'missing-privacy') {
+        fs.writeFileSync(path.join(directory, 'privacy.json'), JSON.stringify({
+          passed: scenario !== 'failed-privacy',
+          contractAssertions: 66,
+          checkedRows: 200,
+          rawLogsExported: false,
+        }));
+      }
       const result = spawnSync(
         process.execPath,
         [source, 'analyze', directory],

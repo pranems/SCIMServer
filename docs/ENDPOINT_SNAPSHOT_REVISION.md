@@ -771,11 +771,115 @@ Original artifact retained under `test-results/linux-qualification-39840296611/`
 This is not evidence of a candidate regression or release safety.
 
 **Updated completeness note:** reconciled the full available continuation
-through event record 61,075 using signal-frequency and causal-narration passes.
-Confirmed native issues map to ER-68a-p; intentional TDD failures, expected
+through event record 61,543 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-v; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not
 the deleted original session.
+
+**ER-68q, buffered-log snapshot race / Medium:** fresh review `5620551104`
+on published `35b66b36` identifies that the privacy phase sleeps two seconds
+but the request-log flush interval defaults to three seconds. The current
+source confirms both that interval and the existing authenticated
+`POST /scim/admin/logs/flush` endpoint, which awaits `flushPending` rather
+than returning while another flush is active.
+Replace the sleep with that explicit drain, outside all four measured
+request windows, with a 30-second HTTP timeout. No measured sample, request
+workload, percentile, quota or admission limit changes.
+The actual phase control leaves negative records buffered until that request
+arrives: old code fails correlation; corrected code passes all 66 functional
+assertions and validates 200 durable rows. This proves the snapshot race,
+but not which predicate caused the earlier ER-68p artifact's failure: raw
+logs were intentionally not exported there. `35b66b36` native execution
+`39849505885` passes without this correction, which does not close the race.
+Detected at hosted review; earliest possible gate is the buffered-row phase
+fixture. Prevention **applied**: explicit authenticated drain, not a longer
+sleep or a favorable retry.
+
+**ER-68r, missing partial privacy evidence / Medium:** the original phase
+writes `privacy.json` only on success. An earlier failure deletes the source
+containers without preserving assertion counts or distinguishing zero error
+rows, absent request-ID correlation and missing category. Wrap the phase
+in a failure-first receipt and a `finally` writer. Record completed functional
+assertions, observed/validated row counts, a bounded stage name and independent
+correlation counts/booleans. Unobserved correlation values stay null.
+No request IDs, raw logs, credentials, bodies or exception text are serialized.
+The success fields used by existing consumers remain authoritative.
+
+| Failure stage | Retained evidence |
+|---|---|
+| Functional assertion | Completed count, FAIL, `functional` |
+| Authenticated drain | 66 assertions, FAIL, `log-flush` |
+| Credential scan | FAIL, `secret-scan`, no raw leaked credential |
+| Correlation | Observed row/error counts and separate ID/category booleans |
+| Row validation | Observed count and only successfully validated row count |
+
+Actual phase controls cover every row in the table, a buffered success,
+and each independent correlation failure. They clear their source app/DB
+references before reading the retained receipt, enforce output-key allowlists
+and verify all five generated credentials stay absent.
+Detected at hosted review; earliest possible gate is this actual-phase
+failure fixture. Prevention **applied**: failure-first, sanitized receipts.
+
+**ER-68s, secondary finalization masks primary work error / Medium:**
+a throw from the capture `finally` replaces a preceding round/privacy error
+in the campaign receipt. Preserve the work ErrorRecord in the existing block
+catch, rethrow it, then treat capture and cleanup failures as secondary when
+work already failed. Without a prior work failure, capture/cleanup still
+throws and cannot look successful. Always attempt both captured roles before
+owned removal. A sanitized `finalization.json` records primary-work failure,
+failed capture roles, cleanup completion and the finalization stage.
+Actual controls combine work-only, capture-only, work-plus-capture and
+work-plus-cleanup failures; the retained primary message is asserted.
+Detected at hosted review; earliest possible gate is the combined-failure
+control. Prevention **applied**: test error precedence, not just FAIL status.
+
+**ER-68t, timeline analyzer misses privacy guard / Medium:** while wiring
+failed privacy receipts, actual CLI controls show that native analysis rejects
+them but timeline analysis accepts missing or failed privacy evidence.
+Both negative cases are RED before correction. Extract the native consumer's
+existing four privacy assertions into the already-shared trace module and
+apply them to both analyzers. No new file, schema default or admission path.
+Add explicit missing/failed timeline and failed native controls.
+Detected locally during review implementation; earliest possible gate is
+the same CLI fixture. Prevention **applied**: both consumers enforce the
+shared privacy proof rather than relying only on orchestrator control flow.
+
+**ER-68u, formatter lookup / Low:** root `npx --no-install prettier` reports
+a missing package and exits before tests. Use the already installed API
+Prettier binary directly; no install, dependency or lockfile change.
+Detected and corrected at the command preflight; no test PASS was inferred
+from the failed combined command.
+
+**ER-68v, receipt-write failure masks primary error / Medium:** new negative
+controls make privacy/finalization receipt writes fail while work has already
+failed. Both initially replace the primary error (RED). Guard those writes:
+preserve an existing privacy/work/finalization failure, explicitly warn that
+the receipt could not be written, and still throw a write failure when there
+was no earlier failure. Do not claim durable evidence when writing fails.
+Both controls then pass. Detected locally before publication; earliest
+possible gate is the same injected-write-failure control.
+
+**Consolidated assurance:** all 93 focused contracts pass, zero failures/skips,
+after the original 12 review controls, two analyzer failures and two write
+precedence controls were confirmed RED. Logs under `test-results/`:
+`qualification-finalization-review-red.log`,
+`qualification-privacy-analysis-red.log`, `qualification-receipt-write-red.log`
+and `qualification-finalization-review-allowlist-green.log`.
+Self-improvement **applied**: actual buffered-state, partial-receipt, both
+consumer and combined-failure tests close the previously blind assertions.
+Design disposition **accepted**: keep the existing campaign coordinator and
+its measurement/privacy/finalization phases; receipts add no serving concern.
+The privacy validator is shared because two real consumers need the same
+contract. No generic workflow framework or speculative strategy is introduced.
+Exact-source normal publication, CI and fresh review remain required.
+
+The earlier `35b66b36` native artifact from `39849505885` independently
+verifies nine producer hashes, four receipts, all 17,628 spans and 16,000
+timings, profile identity/windows, privacy, cleanup and exact recomputation.
+Audit: `test-results/membership-native-39849505885-audit.json`.
+This does not validate the new log-drain/receipt correction before its own
+publication and exact-source run, nor explain the old correlation predicate.
 
 **ER-68o, authorized shutdown-path evidence loss / Medium:** fresh review
 `5620142839` on published `e312a92f` identifies failures before the copy

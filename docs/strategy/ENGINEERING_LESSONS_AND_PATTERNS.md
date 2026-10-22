@@ -61,6 +61,16 @@ or reinspection also fails. Never collect from an unauthorized owner.
 ER-68o closes this second escape and promotes the contract to a standing
 rule; tests discard their source store before checking retained contents.
 
+Persistence readiness is not elapsed time. When logs are buffered, use the
+existing explicit drain endpoint before a privacy snapshot outside the
+measured window, rather than sleeping less than the configured flush interval.
+Write a sanitized failure-first receipt for functional/privacy checks,
+retaining counts and independent predicates, never raw log or credential
+values. Both diagnostic consumers must reject failed/missing privacy proof.
+Preserve a primary work error through secondary capture, cleanup and receipt
+write failures; test combined failures and report when a receipt is not
+durable. See ER-68q-v in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
 Resource measurements need the same failure contract as request timings.
 Persist every collected CPU, database, memory, RSS and OOM observation before
 rejecting a ceiling or deleting its owner. A missing later probe must leave

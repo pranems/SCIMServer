@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Address all three findings in review `5620551104`: explicitly drain buffered
+  request logs through the existing authenticated admin endpoint before
+  snapshotting, persist sanitized partial privacy receipts, and preserve a
+  primary work error when capture/cleanup also fails. Keep both role captures,
+  exact cleanup and all privacy/correlation checks. Both diagnostic analyzers
+  now share the existing privacy guard. Add buffered-state, partial-evidence,
+  analyzer and receipt-write precedence controls: 77 -> 93 focused PASS.
+  Prior `35b66b36` publication passes 28 normal gates in 1248.5 seconds.
+  No serving change, product bump or performance-limit change.
 - Address review `5620142839`: preserve authorized diagnostic files even after
   a signal/exit race, failed state inspection or shutdown timeout. Re-inspect
   once after a failed signal, retain the original error/stage, explicitly

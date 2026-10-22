@@ -98,6 +98,7 @@ function Invoke-Block {
     $apps = @{}
     $profileTargets = @{}
     $workComplete = $false
+    $workFailure = $null
     $rows = [System.Collections.Generic.List[object]]::new()
     $directory = Join-Path $OutputDirectory $Block.name
     $null = New-Item -ItemType Directory -Path $directory
@@ -304,73 +305,134 @@ function Invoke-Block {
         Assert-WithinDeadline
         . (Join-Path $root 'scripts\live-test-sections\minimal-group-members.ps1')
         $script:privacyPassed = 0
-        function Test-Result {
-            param([bool]$Success, [string]$Message)
-            Assert-WithinDeadline
-            if (!$Success) { throw "Private runtime contract failed: $Message" }
-            $script:privacyPassed++
+        $privacy = [ordered]@{
+            status = 'FAIL'; complete = $false; passed = $false; failureStage = 'functional'
+            contractAssertions = 0; checkedRows = 0; validatedRows = 0; rawLogsExported = $false
+            correlation = [ordered]@{ errorRows = $null; requestIdPresent = $null; categoryPresent = $null }
         }
-        $null = Invoke-MinimalGroupMembersContract -BaseUrl $apps.candidate.Url `
-            -Headers @{ Authorization = "Bearer $env:SCIM_SHARED_SECRET" }
-        if ($script:privacyPassed -ne 66) { throw 'Incomplete 66-outcome runtime contract.' }
-        Start-Sleep -Seconds 2
-        $sql = 'SELECT COALESCE(json_agg(r),''[]'') FROM (SELECT "requestId","endpointId",status,"durationMs","requestHeaders","responseHeaders","requestBody","responseBody","authDecision" FROM "RequestLog" WHERE url LIKE ''%/Groups%'' AND (status >= 400 OR method = ''PATCH'') ORDER BY "createdAt" DESC LIMIT 200) r'
-        $privateLog = @(Invoke-Docker exec $pg psql -U scim -d candidate -tAc $sql) -join "`n"
-        $consoleLog = @(Invoke-Docker logs --tail 300 $apps.candidate.Id 2>&1) -join "`n"
-        foreach ($key in @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK')) {
-            $secret = [Environment]::GetEnvironmentVariable($key)
-            if ($privateLog.Contains($secret) -or $consoleLog.Contains($secret)) { throw 'Generated credential leaked into private logs.' }
-        }
-        $logRows = @($privateLog | ConvertFrom-Json)
-        if ($logRows.Count -ne 200) { throw 'Incomplete private runtime log sample.' }
-        $errors = @($logRows | Where-Object status -ge 400)
-        if (!$errors.Count -or !$consoleLog.Contains($errors[0].requestId.Substring(0, 8)) -or $consoleLog -notmatch 'scim\.group') {
-            throw 'Negative-path categorized console correlation missing.'
-        }
-        foreach ($row in $logRows) {
-            $requestId = [guid]::Empty
-            $endpointId = [guid]::Empty
-            $headers = $row.requestHeaders | ConvertFrom-Json
-            if (![guid]::TryParse($row.requestId, [ref]$requestId) -or
-                ![guid]::TryParse($row.endpointId, [ref]$endpointId) -or
-                $null -eq $row.durationMs -or $row.durationMs -lt 0 -or
-                $row.status -notin @(200, 201, 400) -or $headers.authorization -cne '[REDACTED]') {
-                throw 'Runtime log status/correlation/duration/redaction failure.'
+        $privacyFailure = $null
+        try {
+            function Test-Result {
+                param([bool]$Success, [string]$Message)
+                Assert-WithinDeadline
+                if (!$Success) { throw "Private runtime contract failed: $Message" }
+                $script:privacyPassed++
+            }
+            $null = Invoke-MinimalGroupMembersContract -BaseUrl $apps.candidate.Url `
+                -Headers @{ Authorization = "Bearer $env:SCIM_SHARED_SECRET" }
+            if ($script:privacyPassed -ne 66) { throw 'Incomplete 66-outcome runtime contract.' }
+            $privacy.failureStage = 'log-flush'
+            $null = Invoke-RestMethod -Uri "$($apps.candidate.Url)/scim/admin/logs/flush" `
+                -Method Post -Headers @{ Authorization = "Bearer $env:SCIM_SHARED_SECRET" } -TimeoutSec 30 -ErrorAction Stop
+            $privacy.failureStage = 'log-snapshot'
+            $sql = 'SELECT COALESCE(json_agg(r),''[]'') FROM (SELECT "requestId","endpointId",status,"durationMs","requestHeaders","responseHeaders","requestBody","responseBody","authDecision" FROM "RequestLog" WHERE url LIKE ''%/Groups%'' AND (status >= 400 OR method = ''PATCH'') ORDER BY "createdAt" DESC LIMIT 200) r'
+            $privateLog = @(Invoke-Docker exec $pg psql -U scim -d candidate -tAc $sql) -join "`n"
+            $consoleLog = @(Invoke-Docker logs --tail 300 $apps.candidate.Id 2>&1) -join "`n"
+            $privacy.failureStage = 'secret-scan'
+            foreach ($key in @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK')) {
+                $secret = [Environment]::GetEnvironmentVariable($key)
+                if ($privateLog.Contains($secret) -or $consoleLog.Contains($secret)) { throw 'Generated credential leaked into private logs.' }
+            }
+            $privacy.failureStage = 'row-count'
+            $logRows = @($privateLog | ConvertFrom-Json)
+            $privacy.checkedRows = $logRows.Count
+            if ($logRows.Count -ne 200) { throw 'Incomplete private runtime log sample.' }
+            $privacy.failureStage = 'correlation'
+            $errors = @($logRows | Where-Object status -ge 400)
+            $privacy.correlation.errorRows = $errors.Count
+            $privacy.correlation.requestIdPresent = $errors.Count -gt 0 -and
+                $consoleLog.Contains($errors[0].requestId.Substring(0, 8))
+            $privacy.correlation.categoryPresent = $consoleLog -match 'scim\.group'
+            if (!$errors.Count -or !$privacy.correlation.requestIdPresent -or !$privacy.correlation.categoryPresent) {
+                throw 'Negative-path categorized console correlation missing.'
+            }
+            $privacy.failureStage = 'row-contract'
+            foreach ($row in $logRows) {
+                $requestId = [guid]::Empty
+                $endpointId = [guid]::Empty
+                $headers = $row.requestHeaders | ConvertFrom-Json
+                if (![guid]::TryParse($row.requestId, [ref]$requestId) -or
+                    ![guid]::TryParse($row.endpointId, [ref]$endpointId) -or
+                    $null -eq $row.durationMs -or $row.durationMs -lt 0 -or
+                    $row.status -notin @(200, 201, 400) -or $headers.authorization -cne '[REDACTED]') {
+                    throw 'Runtime log status/correlation/duration/redaction failure.'
+                }
+                $privacy.validatedRows++
+            }
+            $privacy.status = 'PASS'
+            $privacy.complete = $true
+            $privacy.passed = $true
+            $privacy.failureStage = $null
+        } catch {
+            $privacyFailure = $_
+            throw
+        } finally {
+            $privacy.contractAssertions = $script:privacyPassed
+            try {
+                $privacy | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $directory 'privacy.json')
+            } catch {
+                if ($null -eq $privacyFailure) { throw }
+                Write-Warning 'Privacy receipt write failed; primary privacy error retained.'
             }
         }
-        @{ contractAssertions = 66; checkedRows = 200; rawLogsExported = $false; passed = $true } |
-            ConvertTo-Json | Set-Content (Join-Path $directory 'privacy.json')
         Assert-WithinDeadline
         $workComplete = $true
+    } catch {
+        $workFailure = $_
+        throw
     } finally {
-        $captureFailed = $false
-        if ($ProfileDiagnostic) {
-            foreach ($role in @('baseline', 'candidate')) {
-                if (!$profileTargets.ContainsKey($role)) { continue }
-                try {
-                    Save-NativeProfile -ContainerId $profileTargets[$role] -Directory $directory `
-                        -Role $role -WorkComplete $workComplete
-                } catch {
-                    $captureFailed = $true
-                    Write-Warning "Native $role profile capture failed: $($_.Exception.Message)"
+        $finalization = [ordered]@{
+            primaryWorkFailed = ($null -ne $workFailure); captureFailed = $false
+            failedCaptureRoles = @(); cleanupComplete = $false; failureStage = 'capture'
+        }
+        $finalizationFailure = $null
+        try {
+            if ($ProfileDiagnostic) {
+                foreach ($role in @('baseline', 'candidate')) {
+                    if (!$profileTargets.ContainsKey($role)) { continue }
+                    try {
+                        Save-NativeProfile -ContainerId $profileTargets[$role] -Directory $directory `
+                            -Role $role -WorkComplete $workComplete
+                    } catch {
+                        $finalization.captureFailed = $true
+                        $finalization.failedCaptureRoles += $role
+                        Write-Warning "Native $role profile capture failed: $($_.Exception.Message)"
+                    }
                 }
             }
+            $finalization.failureStage = 'cleanup'
+            for ($index = $containers.Count - 1; $index -ge 0; $index--) {
+                Assert-Owned $containers[$index]
+                $null = Invoke-Docker rm --force $containers[$index]
+            }
+            $networks = @(Invoke-Docker network ls --filter "name=^$network$" --format '{{.Name}}')
+            if ($networks -contains $network) {
+                Assert-Owned $network -Network
+                $null = Invoke-Docker network rm $network
+            }
+            $remaining = @(Invoke-Docker ps -aq --filter "label=scimserver.run=$run")
+            $remainingNetworks = @(Invoke-Docker network ls -q --filter "label=scimserver.run=$run")
+            if ($remaining.Count -or $remainingNetworks.Count) { throw 'Exact owned cleanup readback failed.' }
+            @{ containersAbsent = $true; networksAbsent = $true; run = $run } |
+                ConvertTo-Json | Set-Content (Join-Path $directory 'cleanup.json')
+            $finalization.cleanupComplete = $true
+            $finalization.failureStage = $null
+            if ($finalization.captureFailed) {
+                $finalization.failureStage = 'capture'
+                if ($null -eq $workFailure) { throw 'Native profile capture failed; partial receipts retained after exact cleanup.' }
+            }
+        } catch {
+            $finalizationFailure = $_
+            if ($null -eq $workFailure) { throw }
+            Write-Warning 'Secondary diagnostic finalization failure; primary work error retained.'
+        } finally {
+            try {
+                $finalization | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $directory 'finalization.json')
+            } catch {
+                if ($null -eq $workFailure -and $null -eq $finalizationFailure) { throw }
+                Write-Warning 'Finalization receipt write failed; primary error retained.'
+            }
         }
-        for ($index = $containers.Count - 1; $index -ge 0; $index--) {
-            Assert-Owned $containers[$index]
-            $null = Invoke-Docker rm --force $containers[$index]
-        }
-        $networks = @(Invoke-Docker network ls --filter "name=^$network$" --format '{{.Name}}')
-        if ($networks -contains $network) {
-            Assert-Owned $network -Network
-            $null = Invoke-Docker network rm $network
-        }
-        $remaining = @(Invoke-Docker ps -aq --filter "label=scimserver.run=$run")
-        $remainingNetworks = @(Invoke-Docker network ls -q --filter "label=scimserver.run=$run")
-        if ($remaining.Count -or $remainingNetworks.Count) { throw 'Exact owned cleanup readback failed.' }
-        @{ containersAbsent = $true; networksAbsent = $true; run = $run } |
-            ConvertTo-Json | Set-Content (Join-Path $directory 'cleanup.json')
-        if ($captureFailed) { throw 'Native profile capture failed; partial receipts retained after exact cleanup.' }
     }
     return $directory
 }

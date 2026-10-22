@@ -153,6 +153,7 @@ for (const scenario of [
   "changed-sample",
   "clock-coverage",
   "missing-cleanup",
+  "failed-privacy",
 ]) {
   test(`actual native comparison CLI enforces immutable provenance and non-admission: ${scenario}`, () => {
     const root = fs.mkdtempSync(
@@ -190,6 +191,13 @@ for (const scenario of [
       }
       if (scenario === "missing-cleanup")
         fs.unlinkSync(path.join(directory, "cleanup.json"));
+      if (scenario === "failed-privacy")
+        save("privacy.json", {
+          passed: false,
+          contractAssertions: 66,
+          checkedRows: 200,
+          rawLogsExported: false,
+        });
       const result = spawnSync(
         process.execPath,
         [source, "analyze", directory],
@@ -286,23 +294,30 @@ test("actual native diagnostic selection skips controls and never invokes the ad
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test("actual block finally collects both native profiles before exact cleanup even when the first capture fails", () => {
-  const runner = path.resolve(
-    __dirname,
-    "..",
-    "performance",
-    "run-membership-qualification.ps1",
-  );
-  const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "scim-profile-finally-"),
-  );
-  try {
-    const result = spawnSync(
-      "pwsh",
-      [
-        "-NoProfile",
-        "-Command",
-        `
+for (const scenario of [
+  "capture-only",
+  "work-only",
+  "work-and-capture",
+  "work-and-cleanup",
+  "work-and-receipt",
+]) {
+  test(`actual block preserves primary work error and collects both profiles before cleanup: ${scenario}`, () => {
+    const runner = path.resolve(
+      __dirname,
+      "..",
+      "performance",
+      "run-membership-qualification.ps1",
+    );
+    const directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "scim-profile-finally-"),
+    );
+    try {
+      const result = spawnSync(
+        "pwsh",
+        [
+          "-NoProfile",
+          "-Command",
+          `
       $ErrorActionPreference = 'Stop'
       $ast = [System.Management.Automation.Language.Parser]::ParseFile(
         '${runner.replaceAll("'", "''")}', [ref]$null, [ref]$null)
@@ -315,6 +330,8 @@ test("actual block finally collects both native profiles before exact cleanup ev
       $ProfileDiagnostic = $true
       $profileTargets = @{ baseline = ('a' * 64); candidate = ('b' * 64) }
       $workComplete = $false
+      $workFailure = $null
+      $scenario = '${scenario}'
       $directory = '${directory.replaceAll("'", "''")}'
       $run = 'owned-test-run'
       $network = 'owned-test-network'
@@ -323,38 +340,68 @@ test("actual block finally collects both native profiles before exact cleanup ev
       $script:captures = [System.Collections.Generic.List[string]]::new()
       $script:removed = 0
       function Assert-Owned {}
+      function Set-Content {
+        param([Parameter(Position=0)]$Path, [Parameter(ValueFromPipeline)]$Value)
+        process {
+          if ($scenario -eq 'work-and-receipt' -and $Path.EndsWith('finalization.json')) {
+            throw 'Synthetic finalization receipt write failure'
+          }
+          Microsoft.PowerShell.Management\\Set-Content -Path $Path -Value $Value
+        }
+      }
       function Save-NativeProfile {
         param($ContainerId, $Directory, $Role, $WorkComplete)
         if ($script:removed -ne 0 -or $WorkComplete) { throw 'Capture followed removal or fabricated successful work' }
         $script:captures.Add($Role)
-        if ($Role -eq 'baseline') { throw 'Synthetic failed native capture' }
+        if ($Role -eq 'baseline' -and $scenario -ne 'work-only') { throw 'Synthetic failed native capture' }
       }
       function Invoke-Docker {
-        if ($args[0] -eq 'rm') { $script:removed++; return }
+        if ($args[0] -eq 'rm') {
+          $script:removed++
+          if ($scenario -eq 'work-and-cleanup') { throw 'Synthetic cleanup failure' }
+          return
+        }
         if ($args[0] -eq 'ps') { return }
         if ($args[0] -eq 'network' -and $args[1] -eq 'ls') { return }
         throw 'Unexpected native cleanup command'
       }
+      $work = if ($scenario -eq 'capture-only') { '' } else { "throw 'Synthetic primary work failure'" }
+      $clauses = ($outer.CatchClauses | ForEach-Object { $_.Extent.Text }) -join ' '
+      $execution = 'try { ' + $work + ' } ' + $clauses + ' finally ' + $outer.Finally.Extent.Text
+      $expectedError = if ($scenario -eq 'capture-only') {
+        'Native profile capture failed; partial receipts retained after exact cleanup.'
+      } else { 'Synthetic primary work failure' }
       try {
-        . ([scriptblock]::Create($outer.Finally.Extent.Text.Trim().Substring(1).TrimEnd().TrimEnd('}')))
-        throw 'Failed native capture was swallowed'
+        . ([scriptblock]::Create($execution))
+        throw 'Required failure was swallowed'
       } catch {
-        if ($_.Exception.Message -cne 'Native profile capture failed; partial receipts retained after exact cleanup.') { throw }
+        if ($_.Exception.Message -cne $expectedError) { throw }
       }
-      if (($script:captures -join ',') -cne 'baseline,candidate' -or $script:removed -ne 2) {
+      if (($script:captures -join ',') -cne 'baseline,candidate' -or
+          ($scenario -ne 'work-and-cleanup' -and $script:removed -ne 2)) {
         throw 'Independent capture failure prevented other evidence or exact cleanup'
       }
-      $cleanup = Get-Content (Join-Path $directory 'cleanup.json') -Raw | ConvertFrom-Json
-      if (!$cleanup.containersAbsent -or !$cleanup.networksAbsent) { throw 'Missing native cleanup outcome' }
+      if ($scenario -ne 'work-and-cleanup') {
+        $cleanup = Get-Content (Join-Path $directory 'cleanup.json') -Raw | ConvertFrom-Json
+        if (!$cleanup.containersAbsent -or !$cleanup.networksAbsent) { throw 'Missing native cleanup outcome' }
+      }
+      if ($scenario -eq 'work-and-receipt') { exit 0 }
+      $finalization = Get-Content (Join-Path $directory 'finalization.json') -Raw | ConvertFrom-Json
+      if ($finalization.primaryWorkFailed -ne ($scenario -ne 'capture-only') -or
+          $finalization.captureFailed -ne ($scenario -ne 'work-only') -or
+          $finalization.cleanupComplete -ne ($scenario -ne 'work-and-cleanup')) {
+        throw 'Primary/secondary failure evidence was not retained'
+      }
     `,
-      ],
-      { encoding: "utf8" },
-    );
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-  } finally {
-    fs.rmSync(directory, { recursive: true });
-  }
-});
+        ],
+        { encoding: "utf8" },
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+    } finally {
+      fs.rmSync(directory, { recursive: true });
+    }
+  });
+}
 
 test("actual native launch instruments only the opted-in app, not migration or ordinary qualification", () => {
   const runner = path.resolve(

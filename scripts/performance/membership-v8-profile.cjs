@@ -1,7 +1,10 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { validateDiagnosticRound } = require("./membership-cpu-trace.cjs");
+const {
+  validateDiagnosticRound,
+  validatePrivacy,
+} = require("./membership-cpu-trace.cjs");
 
 function summarizeProfile(profile) {
   assert.ok(
@@ -260,10 +263,7 @@ function analyze(directory) {
     });
   }
   const privacy = load("privacy.json");
-  assert.equal(privacy.passed, true);
-  assert.equal(privacy.contractAssertions, 66);
-  assert.equal(privacy.checkedRows, 200);
-  assert.equal(privacy.rawLogsExported, false);
+  validatePrivacy(privacy);
   const cleanup = load("cleanup.json");
   assert.equal(cleanup.containersAbsent, true);
   assert.equal(cleanup.networksAbsent, true);

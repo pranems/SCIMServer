@@ -4,6 +4,16 @@
 
 ### Current master/performance reconciliation (2026-10-22)
 
+**Latest consolidation:** review `5620551104` on published `35b66b36` finds
+three relevant gaps. Local corrections explicitly drain buffered logs through
+the authenticated admin endpoint, retain sanitized partial privacy receipts,
+and preserve primary work errors through secondary finalization failures.
+Both analyzers share the privacy guard. Actual buffered-state and failure
+controls are RED first; all 93 focused contracts pass. Receipt-write
+precedence is also tested. No sample/quota/threshold/serving change.
+Normal protected publication and new-source review/CI remain required.
+See ER-68q-v; prior native `39849505885` passes, performance control still fails.
+
 **Latest review follow-up:** `e312a92f` is published through 28 passing
 Validate gates in 1092 seconds. Review `5620142839` exposes earlier authorized
 signal/shutdown failures bypassing collection. Five real collector controls

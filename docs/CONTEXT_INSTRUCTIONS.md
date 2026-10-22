@@ -9,6 +9,14 @@
 
 ## Active Delivery Process
 
+**Latest consolidation:** review `5620551104` identifies buffered-log snapshot,
+missing partial privacy receipts and primary-work error masking. Local fixes
+use the authenticated drain endpoint, sanitized failure-first receipts and
+explicit first-error precedence. Both analyzers enforce shared privacy proof.
+All 93 focused contracts pass after actual RED controls, including receipt
+write failure. Publication/fresh exact-tip review/CI remain required.
+No serving, workload, quota or threshold change. See ER-68q-v.
+
 **Latest review follow-up:** published `e312a92f` passes all 28 normal gates
 in 1092 seconds. Review `5620142839` exposes signal/shutdown errors skipping
 authorized file collection. Five collector cases first fail; the local

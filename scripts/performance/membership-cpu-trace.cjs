@@ -208,9 +208,17 @@ function validateDiagnosticRound(row, client) {
   }
 }
 
+function validatePrivacy(privacy) {
+  assert.equal(privacy.passed, true);
+  assert.equal(privacy.contractAssertions, 66);
+  assert.equal(privacy.checkedRows, 200);
+  assert.equal(privacy.rawLogsExported, false);
+}
+
 function analyze(directory) {
   const load = (name) =>
     JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
+  validatePrivacy(load("privacy.json"));
   const rows = load("rounds.json");
   assert.equal(
     rows.length,
@@ -343,7 +351,12 @@ function analyze(directory) {
   console.table(comparisons);
 }
 
-module.exports = { parseCounters, correlate, validateDiagnosticRound };
+module.exports = {
+  parseCounters,
+  correlate,
+  validateDiagnosticRound,
+  validatePrivacy,
+};
 
 if (require.main === module) {
   (async () => {
