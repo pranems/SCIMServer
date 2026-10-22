@@ -44,6 +44,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failure, all-sample retention on cleanup failure, actual copy-before-reject
   orchestration and expired-deadline rejection. The partial `216d3961` push
   was stopped to batch review fixes; it is not a passing publication.
+- Corrected `23d23220` publication passes all 28 Validate gates in 997 seconds.
+  Linux run `39784232793` completes four same-image rounds but fails five
+  control limits. Retain all 16,000 timings, functional/privacy proof and exact
+  cleanup; neither old/current comparison runs. Moving hosts alone does not
+  establish repeatability or candidate safety.
+- Address the additional relevant finding in fresh review `5614795378`:
+  preserve collected resource measurements, explicit failure stage and
+  completeness before limit rejection or cleanup, even when a later probe
+  fails. Resource-retention RED/GREEN controls increase focused contracts
+  17 -> 26 PASS: eight actual-round/cleanup cases cover success, exact
+  memory/RSS ceilings, OOM, absent RSS/CPU/OOM observations and deadline expiry.
+  Actual A/A/A-B identity/order selection is also tested without claiming
+  those unexecuted measurements ran. Failed rows remain excluded; no quota, sample count,
+  timing policy, product version or immutable serving image is changed.
 
 ### 0.55.58 consolidation onto token-lifetime master
 

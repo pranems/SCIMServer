@@ -34,6 +34,20 @@ rejecting a failed client and disallow partial admission. A cooperative
 60-minute work deadline and 65-minute step reserve cleanup/upload within the
 75-minute job. All 17 focused contracts pass; the earlier `216d3961` hook was
 stopped to batch these corrections, not counted as passing.
+Corrected `23d23220` publication passes all 28 Validate gates in 997 seconds;
+all three original review threads are resolved. Linux run `39784232793`
+successfully measures its first same-image block, but five of twelve control
+limits fail (three slower, two faster). All 16,000 timings, 66 functional
+checks, 200 private-log checks and exact cleanup are retained. Later blocks
+correctly do not run: Linux availability alone does not establish repeatability.
+Fresh review `5614795378` confirms the original fixes and finds one missed
+resource-limit receipt loss. A resource-collection `finally` now preserves
+CPU/SQL/memory/RSS/OOM observations before failure/cleanup, including partial
+probe failures and client/deadline rejection. Eight actual-round/cleanup
+controls and actual A/A/A-B identity/order selection bring the focused suite
+to 26 PASS after the resource-retention RED. Publication remains a separate step;
+it changes no timing workload, threshold or serving artifact, and does not
+justify retrying unchanged measurements until green. Dev remains 0.55.56.
 See [the qualification protocol](docs/ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review

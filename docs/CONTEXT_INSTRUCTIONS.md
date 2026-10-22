@@ -33,6 +33,18 @@ receipts, copy-before-rejection and partial-admission rejection; 60-minute
 cooperative work deadline, 65-minute step and unchanged 75-minute job cap.
 Seventeen focused contracts pass. The `216d3961` hook is deliberately stopped
 to batch all review corrections; no partial-hook PASS is claimed.
+The full `23d23220` push subsequently passes all 28 gates in 997 seconds and
+the three initial review threads are resolved. Linux run `39784232793`
+completes its first same-image block: five of twelve calibration limits fail,
+with all 16,000 timings, 66 functional/200 log checks and exact cleanup retained.
+No later control or old/current block runs; neither candidate regression nor
+safety follows from comparing identical images. Fresh review `5614795378`
+confirms the first three fixes but finds a missed resource-failure receipt.
+The runner now saves collected CPU/SQL/memory/RSS/OOM observations in `finally`
+before rejection/cleanup. Six initial resource controls reproduce RED; eight
+actual failure/cleanup cases and A/A/A-B role selection bring focused tests
+to 26 PASS. This local correction needs publication; it
+does not repair calibration or authorize repeating the unchanged experiment.
 The 0.5 CPU / 1 GiB allocation, 100 warmup cycles, 1,000 measured cycles per
 round and twelve +10% ceilings remain unchanged. No serving/dependency/version
 change; dev remains 0.55.56. Earlier failed receipts remain failed.

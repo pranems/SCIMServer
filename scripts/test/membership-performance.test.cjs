@@ -149,6 +149,52 @@ test('actual orchestration stops at either failed control or comparison, without
   }
 });
 
+test('actual runner selects pinned role identities and orders for both A/A and A/B blocks', () => {
+  const runner = path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1');
+  const result = spawnSync('pwsh', ['-NoProfile', '-Command', `
+    $ErrorActionPreference = 'Stop'
+    $source = '${runner.replaceAll("'", "''")}'
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($source, [ref]$null, [ref]$null)
+    $assignments = foreach ($name in @('baseline', 'roles', 'schedule')) {
+      $assignment = $ast.Find({ param($item)
+        $item -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $item.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $item.Left.VariablePath.UserPath -eq $name
+      }, $true)
+      if (!$assignment) { throw "Missing actual $name selection" }
+      $assignment.Extent.Text
+    }
+    $selection = [scriptblock]::Create(($assignments -join "\`n"))
+    $protocol = Get-Content (Join-Path (Split-Path $source) 'membership-protocol.json') -Raw | ConvertFrom-Json
+    $selections = @(foreach ($Block in $protocol.blocks) {
+      . $selection
+      @{ name = $Block.name; roles = $roles; schedule = @($schedule) }
+    })
+    ConvertTo-Json -InputObject $selections -Depth 8 -Compress
+  `], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
+  const selections = JSON.parse(result.stdout);
+  const protocol = require('../performance/membership-protocol.json');
+  assert.equal(selections.length, 4);
+  for (const [index, selection] of selections.entries()) {
+    const expectedBlock = protocol.blocks[index];
+    assert.equal(selection.name, expectedBlock.name);
+    assert.deepEqual(selection.roles, {
+      baseline: expectedBlock.sameImage ? protocol.candidate : protocol.baseline,
+      candidate: protocol.candidate,
+    });
+    assert.deepEqual(selection.schedule, expectedBlock.order === 'BAAB' ?
+      ['candidate', 'baseline', 'baseline', 'candidate'] : ['baseline', 'candidate', 'candidate', 'baseline']);
+    const rows = receipts().map((row, i) => {
+      const role = selection.schedule[i];
+      return { ...row, role, image: selection.roles[role].image, version: selection.roles[role].version };
+    });
+    assert.equal(load().assessBlock(rows, expectedBlock, selection.roles).passed, true);
+    rows[0].version = 'wrong-version';
+    assert.throws(() => load().assessBlock(rows, expectedBlock, selection.roles));
+  }
+});
+
 test('preregistered protocol rejects budget and schedule changes', () => {
   const protocol = require('../performance/membership-protocol.json');
   load().validateProtocol(protocol);
@@ -338,8 +384,8 @@ test('actual round orchestration copies a failed client receipt before rejecting
       $script:copied = $false
       function Assert-Owned {}
       function Assert-WithinDeadline {}
-      function Read-CpuCounters { return @{} }
-      function Read-QueryCounters { return @{} }
+      function Read-CpuCounters { return @{ usage_usec = 1234; nr_periods = 3; nr_throttled = 1; throttled_usec = 300 } }
+      function Read-QueryCounters { return @{ calls = 2; executionMs = 5 } }
       function docker { $global:LASTEXITCODE = 1 }
       function Invoke-Docker {
         switch ($args[0]) {
@@ -365,7 +411,166 @@ test('actual round orchestration copies a failed client receipt before rejecting
     const partial = JSON.parse(fs.readFileSync(path.join(directory, 'round-1-candidate.json'), 'utf8'));
     assert.deepEqual(partial.samples.add, [12.5]);
     assert.equal(partial.complete, false);
+    const resource = JSON.parse(fs.readFileSync(path.join(directory, 'round-1-candidate-resources.json'), 'utf8'));
+    assert.equal(resource.status, 'FAIL');
+    assert.equal(resource.complete, false);
+    assert.equal(resource.failureStage, 'client');
+    assert.deepEqual(resource.cpuBefore, { usage_usec: 1234, nr_periods: 3, nr_throttled: 1, throttled_usec: 300 });
+    assert.deepEqual(resource.databaseBefore, { calls: 2, executionMs: 5 });
+    assert.equal(resource.cpuAfter, null);
   } finally {
     fs.rmSync(directory, { recursive: true });
   }
 });
+
+for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'missing-rss',
+  'cpu-unavailable', 'oom-unavailable', 'deadline-after-client']) {
+  test(`actual round preserves resource evidence through owned cleanup for ${scenario}`, () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-resource-receipt-'));
+    const runner = path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1');
+    try {
+      const result = spawnSync('pwsh', ['-NoProfile', '-Command', `
+        $ErrorActionPreference = 'Stop'
+        $source = '${runner.replaceAll("'", "''")}'
+        $directory = '${directory.replaceAll("'", "''")}'
+        $scenario = '${scenario}'
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($source, [ref]$null, [ref]$null)
+        $blockFunction = $ast.Find({ param($item)
+          $item -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $item.Name -eq 'Invoke-Block'
+        }, $true)
+        $blockTry = $blockFunction.Body.Find({ param($item)
+          $item -is [System.Management.Automation.Language.TryStatementAst]
+        }, $true)
+        $loop = $blockFunction.Body.Find({ param($item)
+          $item -is [System.Management.Automation.Language.ForEachStatementAst] -and
+          $item.Variable.VariablePath.UserPath -eq 'role' -and $item.Extent.Text.Contains('$transportExit')
+        }, $true)
+        if (!$loop -or !$blockTry.Finally) { throw 'Missing actual round/cleanup orchestration' }
+        $cleanup = ($blockTry.Finally.Statements | ForEach-Object { $_.Extent.Text }) -join "\`n"
+        $appId = 'b' * 64
+        $pg = 'c' * 64
+        $networkName = 'owned-resource-control'
+        $network = $networkName
+        $run = 'resource-control'
+        $apps = @{ candidate = @{ Id = $appId; Url = 'http://127.0.0.1'; CpuMax = '50000 100000'; ImageId = 'pinned-id' } }
+        $roles = @{ candidate = @{ version = '0.55.58'; image = 'pinned-image' } }
+        $protocol = @{ candidate = @{ image = 'pinned-client' } }
+        $Block = @{ name = 'resource-control' }
+        $clientScript = 'mounted fixture'
+        $schedule = if ($scenario -eq 'success') { @('candidate') } else { @('candidate', 'baseline') }
+        $containers = [System.Collections.Generic.List[string]]::new()
+        $containers.Add($pg)
+        $containers.Add($appId)
+        $rows = [System.Collections.Generic.List[object]]::new()
+        $workDeadlineUtc = 1
+        $round = 0
+        $script:cpuReads = 0
+        $script:sqlReads = 0
+        $script:deadlineChecks = 0
+        $script:removed = @()
+        $script:networkRemoved = $false
+        function Assert-Owned {
+          param($Id, [switch]$Network)
+          if ($Id -notin @($appId, $pg, ('a' * 64), $networkName)) { throw 'Unowned fixture operation' }
+        }
+        function Assert-WithinDeadline {
+          $script:deadlineChecks++
+          if ($scenario -eq 'deadline-after-client' -and $script:deadlineChecks -eq 2) {
+            throw 'Work deadline reached in resource control.'
+          }
+        }
+        function Start-Sleep {}
+        function Read-CpuCounters {
+          $script:cpuReads++
+          if ($scenario -eq 'cpu-unavailable' -and $script:cpuReads -eq 2) { throw 'CPU counters unavailable in resource control.' }
+          return @{ usage_usec = $script:cpuReads * 1000; nr_periods = $script:cpuReads * 20; nr_throttled = 1; throttled_usec = 100 }
+        }
+        function Read-QueryCounters {
+          $script:sqlReads++
+          return @{ calls = $script:sqlReads * 400; executionMs = $script:sqlReads * 25 }
+        }
+        function docker { $global:LASTEXITCODE = 0 }
+        function Invoke-Docker {
+          switch ($args[0]) {
+            'create' { return ('a' * 64) }
+            'inspect' {
+              if ($args -contains '{{.State.ExitCode}}') { return '0' }
+              if ($args -contains '{{.State.OOMKilled}}') {
+                if ($scenario -eq 'oom-unavailable') { return 'invalid' }
+                return $(if ($scenario -eq 'oom-killed') { 'true' } else { 'false' })
+              }
+              throw 'Unexpected inspect in resource control'
+            }
+            'cp' {
+              '{"status":"PASS","complete":true,"version":"0.55.58","warmupIterations":100,"requestCount":4407,"samples":{"add":[12.5]}}' |
+                Set-Content $args[2]
+            }
+            'exec' {
+              switch ($args[-1]) {
+                '/sys/fs/cgroup/memory.peak' { return $(if ($scenario -eq 'memory-limit') { 1073741824 } else { 200000000 }) }
+                '/proc/1/status' {
+                  if ($scenario -ne 'missing-rss') {
+                    return $(if ($scenario -eq 'rss-limit') { 'VmRSS: 393216 kB' } else { 'VmRSS: 124000 kB' })
+                  }
+                }
+                default { throw 'Unexpected resource probe' }
+              }
+            }
+            'rm' {
+              if (!(Test-Path (Join-Path $directory 'round-1-candidate-resources.json'))) {
+                throw 'Resource measurements missing before owned cleanup'
+              }
+              $script:removed += $args[-1]
+            }
+            'network' {
+              if ($args[1] -eq 'rm') { $script:networkRemoved = $true }
+              elseif ($args[1] -eq 'ls' -and !$script:networkRemoved) { return $network }
+              elseif ($args[1] -ne 'ls') { throw 'Unexpected network operation' }
+            }
+            'ps' {}
+            default { throw 'Unexpected Docker operation in resource control' }
+          }
+        }
+        $failure = $null
+        try { . ([scriptblock]::Create($loop.Extent.Text)) }
+        catch { $failure = $_.Exception.Message }
+        finally { . ([scriptblock]::Create($cleanup)) }
+        $expected = switch ($scenario) {
+          'success' { $null }
+          'missing-rss' { 'Node RSS unavailable.' }
+          'cpu-unavailable' { 'CPU counters unavailable in resource control.' }
+          'oom-unavailable' { 'Container OOM state unavailable.' }
+          'deadline-after-client' { 'Work deadline reached in resource control.' }
+          default { 'Original memory/Node RSS acceptance ceiling exceeded.' }
+        }
+        if ($failure -cne $expected) { throw "Unexpected resource outcome: $failure" }
+        $expectedRows = if ($scenario -eq 'success') { 1 } else { 0 }
+        if ($rows.Count -ne $expectedRows -or $round -ne 1) { throw 'Failed resources admitted or later round started' }
+        if ($script:removed.Count -ne 3 -or !$script:networkRemoved) { throw 'Owned cleanup incomplete' }
+        exit 0
+      `], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
+      const resource = JSON.parse(fs.readFileSync(path.join(directory, 'round-1-candidate-resources.json'), 'utf8'));
+      const cleanup = JSON.parse(fs.readFileSync(path.join(directory, 'cleanup.json'), 'utf8'));
+      assert.equal(cleanup.containersAbsent, true);
+      assert.equal(cleanup.networksAbsent, true);
+      assert.equal(resource.status, scenario === 'success' ? 'PASS' : 'FAIL');
+      const partialAfter = ['cpu-unavailable', 'deadline-after-client'].includes(scenario);
+      assert.equal(resource.complete, !['missing-rss', 'cpu-unavailable', 'oom-unavailable', 'deadline-after-client'].includes(scenario));
+      assert.equal(resource.cpuBefore.usage_usec, 1000);
+      assert.equal(resource.cpuAfter?.usage_usec ?? null, partialAfter ? null : 2000);
+      assert.equal(resource.databaseCalls, partialAfter ? null : 400);
+      assert.equal(resource.databaseExecutionMs, partialAfter ? null : 25);
+      assert.equal(resource.peakCgroupBytes, partialAfter ? null : scenario === 'memory-limit' ? 1073741824 : 200000000);
+      assert.equal(resource.oomKilled, partialAfter || scenario === 'oom-unavailable' ? null : scenario === 'oom-killed');
+      assert.equal(resource.nodeRssBytes, ['missing-rss', 'cpu-unavailable', 'oom-unavailable', 'deadline-after-client'].includes(scenario) ? null :
+        scenario === 'rss-limit' ? 402653184 : 126976000);
+      assert.equal(resource.failureStage, scenario === 'success' ? null :
+        scenario === 'cpu-unavailable' ? 'cpu-after' : scenario === 'missing-rss' ? 'node-rss' :
+          scenario === 'oom-unavailable' ? 'oom-state' : scenario === 'deadline-after-client' ? 'work-deadline' : 'acceptance-limits');
+      assert.equal(fs.existsSync(path.join(directory, 'rounds.json')), scenario === 'success');
+    } finally {
+      fs.rmSync(directory, { recursive: true });
+    }
+  });
+}

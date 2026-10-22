@@ -46,6 +46,15 @@ exhausted its total deadline: reserve cleanup and upload time outside the work
 budget. Test that work stops, not merely that timeout fields exist.
 See [ER-64/ER-65](../ENDPOINT_SNAPSHOT_REVISION.md#hosted-qualification-review-failed-evidence-and-deadline-guards-er-64er-65).
 
+Resource measurements need the same failure contract as request timings.
+Persist every collected CPU, database, memory, RSS and OOM observation before
+rejecting a ceiling or deleting its owner. A missing later probe must leave
+earlier observations marked partial, not silently absent. Test the actual
+failure and teardown paths, including exact-boundary failures, and verify
+the values still exist after cleanup. Moving to a different host is not a
+repeatability fix unless its same-image controls pass. See
+[ER-66 and the failed Linux control](../ENDPOINT_SNAPSHOT_REVISION.md#linux-control-result-and-resource-failure-retention-er-66).
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

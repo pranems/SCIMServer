@@ -156,42 +156,78 @@ function Invoke-Block {
             $round++
             $app = $apps[$role]
             Assert-Owned $app.Id
-            $beforeCpu = Read-CpuCounters $app.Id
-            $beforeSql = Read-QueryCounters $pg $role
-            $env:SCIM_BENCH_BASE_URL = $app.Url
-            $env:SCIM_BENCH_TOKEN = $env:SCIM_SHARED_SECRET
-            $env:SCIM_BENCH_VERSION = $roles[$role].version
-            $env:SCIM_BENCH_DEADLINE_UTC = [string]$workDeadlineUtc
-            $receiptPath = Join-Path $directory "round-$round-$role.json"
-            $client = (Invoke-Docker create --network host --no-healthcheck `
-                --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
-                --mount "type=bind,source=$clientScript,target=/tmp/benchmark.cjs,readonly" `
-                --env SCIM_BENCH_BASE_URL --env SCIM_BENCH_TOKEN --env SCIM_BENCH_VERSION --env SCIM_BENCH_DEADLINE_UTC `
-                --env SCIM_BENCH_OUTPUT=/tmp/receipt.json --entrypoint node `
-                $protocol.candidate.image /tmp/benchmark.cjs).Trim()
-            if ($client -notmatch '^[a-f0-9]{64}$') { throw 'Invalid owned client id.' }
-            $containers.Add($client)
-            & docker start --attach $client
-            $transportExit = $LASTEXITCODE
-            $clientExit = [int](Invoke-Docker inspect --format '{{.State.ExitCode}}' $client)
-            @{ transportExit = $transportExit; clientExit = $clientExit } |
-                ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
-            $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
-            $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-            if ($transportExit -ne 0 -or $clientExit -ne 0 -or $receipt.status -cne 'PASS' -or $receipt.complete -ne $true) {
-                throw 'Failed/partial client receipt retained; no admission or later round.'
+            $resource = [ordered]@{
+                block = $Block.name; round = $round; role = $role; status = 'FAIL'; complete = $false
+                failureStage = 'cpu-before'; image = $roles[$role].image; imageId = $app.ImageId
+                cpuLimit = 0.5; cpuMax = $app.CpuMax; memoryLimit = 1073741824
+                cpuBefore = $null; cpuAfter = $null
+                databaseBefore = $null; databaseAfter = $null
+                databaseCalls = $null; databaseExecutionMs = $null
+                peakCgroupBytes = $null; nodeRssBytes = $null; oomKilled = $null
             }
-            Assert-WithinDeadline
-            Start-Sleep -Seconds 2
-            $afterCpu = Read-CpuCounters $app.Id
-            $afterSql = Read-QueryCounters $pg $role
-            $peak = [long](Invoke-Docker exec $app.Id cat /sys/fs/cgroup/memory.peak)
-            $oom = Invoke-Docker inspect --format '{{.State.OOMKilled}}' $app.Id
-            $rss = @(Invoke-Docker exec $app.Id cat /proc/1/status | Where-Object { $_ -match '^VmRSS:\s+\d+\s+kB$' })
-            if ($rss.Count -ne 1 -or $rss[0] -notmatch '^VmRSS:\s+(\d+)\s+kB$') { throw 'Node RSS unavailable.' }
-            $rssBytes = [long]$Matches[1] * 1024
-            if ($oom -ne 'false' -or $peak -ge 1073741824 -or $rssBytes -ge 402653184) {
-                throw 'Original memory/Node RSS acceptance ceiling exceeded.'
+            try {
+                $beforeCpu = Read-CpuCounters $app.Id
+                $resource.cpuBefore = $beforeCpu
+                $resource.failureStage = 'database-before'
+                $beforeSql = Read-QueryCounters $pg $role
+                $resource.databaseBefore = $beforeSql
+                $resource.failureStage = 'client'
+                $env:SCIM_BENCH_BASE_URL = $app.Url
+                $env:SCIM_BENCH_TOKEN = $env:SCIM_SHARED_SECRET
+                $env:SCIM_BENCH_VERSION = $roles[$role].version
+                $env:SCIM_BENCH_DEADLINE_UTC = [string]$workDeadlineUtc
+                $receiptPath = Join-Path $directory "round-$round-$role.json"
+                $client = (Invoke-Docker create --network host --no-healthcheck `
+                    --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
+                    --mount "type=bind,source=$clientScript,target=/tmp/benchmark.cjs,readonly" `
+                    --env SCIM_BENCH_BASE_URL --env SCIM_BENCH_TOKEN --env SCIM_BENCH_VERSION --env SCIM_BENCH_DEADLINE_UTC `
+                    --env SCIM_BENCH_OUTPUT=/tmp/receipt.json --entrypoint node `
+                    $protocol.candidate.image /tmp/benchmark.cjs).Trim()
+                if ($client -notmatch '^[a-f0-9]{64}$') { throw 'Invalid owned client id.' }
+                $containers.Add($client)
+                & docker start --attach $client
+                $transportExit = $LASTEXITCODE
+                $clientExit = [int](Invoke-Docker inspect --format '{{.State.ExitCode}}' $client)
+                @{ transportExit = $transportExit; clientExit = $clientExit } |
+                    ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
+                $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
+                $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+                if ($transportExit -ne 0 -or $clientExit -ne 0 -or $receipt.status -cne 'PASS' -or $receipt.complete -ne $true) {
+                    throw 'Failed/partial client receipt retained; no admission or later round.'
+                }
+                $resource.failureStage = 'work-deadline'
+                Assert-WithinDeadline
+                Start-Sleep -Seconds 2
+                $resource.failureStage = 'cpu-after'
+                $afterCpu = Read-CpuCounters $app.Id
+                $resource.cpuAfter = $afterCpu
+                $resource.failureStage = 'database-after'
+                $afterSql = Read-QueryCounters $pg $role
+                $resource.databaseAfter = $afterSql
+                $resource.databaseCalls = $afterSql.calls - $beforeSql.calls
+                $resource.databaseExecutionMs = $afterSql.executionMs - $beforeSql.executionMs
+                $resource.failureStage = 'peak-memory'
+                $peak = [long](Invoke-Docker exec $app.Id cat /sys/fs/cgroup/memory.peak)
+                $resource.peakCgroupBytes = $peak
+                $resource.failureStage = 'oom-state'
+                $oom = Invoke-Docker inspect --format '{{.State.OOMKilled}}' $app.Id
+                if ($oom -notin @('true', 'false')) { throw 'Container OOM state unavailable.' }
+                $resource.oomKilled = $oom -eq 'true'
+                $resource.failureStage = 'node-rss'
+                $rss = @(Invoke-Docker exec $app.Id cat /proc/1/status | Where-Object { $_ -match '^VmRSS:\s+\d+\s+kB$' })
+                if ($rss.Count -ne 1 -or $rss[0] -notmatch '^VmRSS:\s+(\d+)\s+kB$') { throw 'Node RSS unavailable.' }
+                $rssBytes = [long]$Matches[1] * 1024
+                $resource.nodeRssBytes = $rssBytes
+                $resource.complete = $true
+                $resource.failureStage = 'acceptance-limits'
+                if ($resource.oomKilled -or $peak -ge 1073741824 -or $rssBytes -ge 402653184) {
+                    throw 'Original memory/Node RSS acceptance ceiling exceeded.'
+                }
+                $resource.status = 'PASS'
+                $resource.failureStage = $null
+            } finally {
+                $resource | ConvertTo-Json -Depth 10 |
+                    Set-Content (Join-Path $directory "round-$round-$role-resources.json")
             }
             $rows.Add([pscustomobject]@{
                 role = $role; version = $receipt.version; image = $roles[$role].image

@@ -196,6 +196,102 @@ remain cohesive. No production policy, resource quota, sample threshold,
 additional history stratum or general scheduling framework is added.
 Corrected-source publication, review and Linux execution remain separate.
 
+### Linux control result and resource-failure retention (ER-66)
+
+**The Linux host is available, but performance admission is still blocked.**
+Source `23d23220` passes all 28 protected Validate gates in 997 seconds.
+Run `39784232793` then completes the first A/A BAAB block: four successful
+rounds, 17,628 checked requests and 16,000 retained timings. Both roles use
+the **same 0.55.58 image**, not different product versions. Recomputing the
+assessment from all raw samples reproduces its five failed control limits:
+
+| Operation | Percentile | Pseudo-baseline ms | Pseudo-candidate ms | Difference |
+|---|---:|---:|---:|---:|
+| Populated read | p50 | 1.665015 | 1.833981 | +10.15% |
+| Populated read | p99 | 46.506172 | 41.384983 | -11.01% |
+| Remove member | p95 | 38.207279 | 42.583400 | +11.45% |
+| Empty read | p50 | 1.603564 | 1.773389 | +10.59% |
+| Empty read | p99 | 48.794521 | 42.834387 | -12.21% |
+
+Three exceed the original directional +10% ceiling. Two are faster, but
+outside the A/A reciprocal lower bound of 1/1.10. Those faster results also
+fail calibration; they are not product regressions. The second control and
+both actual 0.55.20/current comparisons correctly **do not run**. Functional
+checks (66), private-log checks (200) and exact owned-resource absence pass.
+All four rounds meet the original memory/RSS limits, with no OOM termination.
+This is a measurement-control failure, not another PostgreSQL setup failure.
+It establishes neither a version regression nor candidate safety.
+
+The retained resource counters also show substantial execution-history
+differences even though each round has the same warmup and measured workload:
+
+| Round / role | Process visit | Node CPU seconds, full counter window | SQL calls | Recorded CPU periods throttled / total |
+|---|---|---:|---:|---:|
+| 1 / pseudo-candidate | First | 15.840051 | 25,591 | 316 / 323 |
+| 2 / pseudo-baseline | First | 14.867627 | 25,593 | 297 / 302 |
+| 3 / pseudo-baseline | Second | 11.182160 | 25,590 | 223 / 228 |
+| 4 / pseudo-candidate | Second | 11.765579 | 25,590 | 235 / 241 |
+
+CPU counters cover the broader lifecycle and settle window, not just timed
+requests. These ratios are fractions of recorded scheduler periods, not
+percentages of requests or time spent throttled. Both roles use less CPU on
+their second visit; SQL statement counts barely change. Descriptive first/last
+250-sample read medians also fall within each round. None of those slices
+replaces the full-sample decision. Startup, runtime optimization, database
+warming and scheduling remain hypotheses: this receipt has no profile that
+separates them. Moving from Windows to Linux alone did not remove the issue.
+Do not change application logic, enlarge quotas, select favorable repeats,
+increase sample counts without a justified plan, or silently redefine admission.
+The next measurement design must address process history and decision
+repeatability prospectively, with separately reviewed calibration and cost.
+
+**One additional relevant review finding is corrected (ER-66).** Hosted
+review `5614795378`, on exact source `23d23220`, confirms the original three
+corrections but identifies a previously missed failure-evidence path:
+
+| RCA field | Evidence / correction |
+|---|---|
+| Type / severity | Measurement tooling and test correctness / Medium |
+| Symptom | Memory/RSS acceptance throws before `rounds.json` is saved; `finally` then deletes the app and its unsaved CPU, SQL, peak-memory, RSS and OOM observations |
+| Root cause | Successful admission was also the only persistence path for resource measurements, although client timings already had a separate failure receipt |
+| Fix | Save `round-<n>-<role>-resources.json` in a resource-collection `finally`, before owned cleanup; retain explicit FAIL status, collection completeness, the failed stage and every measurement collected so far |
+| Why it works | Limit rejection and missing-probe errors propagate unchanged, but destroying the container no longer destroys observations already returned; failed resources never enter admitted `rounds.json` |
+| Prevention | Eight actual-round/actual-cleanup controls cover success, exact 1 GiB memory limit, exact 384 MiB RSS limit, OOM, missing RSS/CPU/OOM observations and deadline expiry after the client; assert receipt existence before removal, exact field values after cleanup, no admitted failed row and no later round |
+| Detection / earliest gate | Fresh hosted review / local failure-path contract; one review-stage escape, now closed by executable controls |
+| RED / GREEN | Six missing-resource-receipt assertions fail before the runner fix; the complete focused suite increases 17 -> 26 PASS after extending failure coverage and testing actual A/A and A/B role selection |
+
+The resource receipt begins before the first counter probe, so a failed
+client or later deadline also retains already collected before-counters.
+Missing observations remain explicit nulls in a partial FAIL receipt, never
+fabricated zeros. A separate control executes the actual runner's image,
+version and BAAB/ABBA selection for all four blocks, then validates their
+synthetic receipts through the real evaluator. This closes branch-selection
+coverage without pretending the unexecuted old/current Linux blocks ran.
+
+A Low fixture issue appeared in the first GREEN attempt: PowerShell's
+case-insensitive `[switch]$Network` parameter hid the outer `$network` name
+inside the mock ownership check. This caused an unexpected ownership error,
+not a product failure. The fixture now uses a distinct `$networkName`, leaving
+the real ownership guard unchanged. The eight controls all execute actual
+cleanup and verify its absence receipt; no mock failure is relabelled GREEN.
+Detection and earliest possible gate are the same focused run, with no escape.
+
+The standing commit-message prompt path was also checked, but this worktree
+has neither that file nor its `.github/prompts` directory. This is Low
+documentation/tool-discovery friction, detected at commit preparation.
+The normal descriptive commit and required coauthor trailer remain applicable;
+do not claim that an absent prompt ran or create a substitute workflow here.
+
+**Self-improvement applied:** failure receipts must include resource
+observations as well as timings, and tests must assert survival through
+actual teardown, not just the presence of a write statement.
+**Design/architecture disposition: accepted.** A small local `try/finally`
+extends the existing resource owner; no production abstraction, new dependency
+or admission-policy change is warranted. The receipt-only fix does not repair
+the measured A/A instability and is not a reason to repeat unchanged timing
+experiments until one happens to pass. Both unexecuted A/B paths remain
+explicitly unverified by Linux execution.
+
 ### Earlier implementation checkpoint (historical)
 
 **Current result:** the latest immutable local candidate passes eleven of
