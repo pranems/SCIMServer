@@ -22,6 +22,11 @@ unchanged caller headers; four chart HTTP cases pass per backend, including
 forced rollover after real dashboard-cache expiry and a strict known-request
 increment. Original RED receipts remain retained. Review bodies matter even
 when their headline says "No open issues." ER-59/ER-60 record these gaps.
+The protected `23072a00` push then catches the wrapper consumer's stale
+56-check literal: the helper correctly passes 87. ER-61 updates that exact
+receipt and makes the hook-owned loopback case inherit the wildcard and prove
+caller immutability. Its focused HTTP case passes; all five type roots compile.
+The blocked hook remains a failed receipt, not a successful publication.
 
 Version remains unreleased **0.55.58**. Exact-head publication/CI/review and
 merged-master deployment are tracked separately in PR #250 and private

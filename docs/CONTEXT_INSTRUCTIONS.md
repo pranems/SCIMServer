@@ -29,6 +29,10 @@ absent-header gap is fixed by clearing inherited If-Match before an explicit
 override; 87 native-live assertions pass with the runner's inherited wildcard,
 without changing caller headers. See ER-59/ER-60. New-tip CI, final review and
 corrected merged-master deployment must be recorded separately, not inferred.
+The next protected push catches the old 56-check literal in the existing
+PowerShell loopback HTTP consumer. ER-61 updates it to the actual 87 and makes
+that automatic case inherit the wildcard and assert caller immutability.
+Focused HTTP and five-root compilation pass; the blocked push is retained.
 
 **Current integration, 2026-10-21:** owned performance work is reconciled
 onto merged master `5841f724`, including token-lifetime PR #249 and 0.55.57.

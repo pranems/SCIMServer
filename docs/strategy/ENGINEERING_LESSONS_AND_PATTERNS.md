@@ -27,6 +27,11 @@ request to increment its bucket. A frozen clock must not freeze the network
 or database flush timers, and timestamp-derived fixture names need independent
 uniqueness. See [ER-59](../ENDPOINT_SNAPSHOT_REVISION.md#follow-up-review-deliberate-conditional-request-headers-er-59)
 and [ER-60](../ENDPOINT_SNAPSHOT_REVISION.md#ci-boundary-correction-compare-the-same-chart-hours-er-60).
+When a helper returns an assertion-count receipt, trace its exact-output
+consumers across script and API test directories before the full hook. Keep
+the inherited-header scenario in the existing automatically executed wrapper,
+not only a private smoke runner; [ER-61](../ENDPOINT_SNAPSHOT_REVISION.md#protected-hook-consumer-correction-er-61)
+records this discovery gap and its permanent HTTP guard.
 
 ### Wider cache lifetime requires a complete input identity
 

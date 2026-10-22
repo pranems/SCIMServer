@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the known request to increment its bucket. Focused HTTP counts increase from
   three to four cases; all four pass on each persistence backend. Original
   hour-boundary and initial fixture/cache failures remain in the RCA.
+- Wire the existing hook-owned PowerShell loopback case to the full runner's
+  inherited wildcard and verify caller-header immutability. Its exact assertion
+  receipt changes from 56 to 87; the first stale-count hook failure is retained.
 - Preserve and reconcile the full local correction onto `5841f724` / PR #249
   without changing other worktrees or dropping stash `320a8360`.
   The earlier 0.55.56 private performance receipt does not certify this source.

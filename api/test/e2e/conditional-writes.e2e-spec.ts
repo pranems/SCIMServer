@@ -160,7 +160,8 @@ describe('conditional writes with real repositories', () => {
       '-NoProfile', '-File', join(__dirname, '..', '..', '..', 'scripts', 'live-conditional-writes.ps1'),
       '-EndpointUrl', `http://127.0.0.1:${address.port}/scim/v2/endpoints/${ep}`,
     ], { env: { ...process.env, E2E_TOKEN: getLegacyToken() } });
-    expect(stdout).toContain('conditional live contract: 56 assertions passed');
+    expect(stdout).toContain('conditional live contract: 87 assertions passed');
+    expect(stdout).toContain('conditional caller If-Match unchanged');
   });
 
   for (const route of routes) {

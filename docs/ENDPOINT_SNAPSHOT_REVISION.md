@@ -1372,3 +1372,12 @@ in this segment, including fixture/cache false-green attempts and focused
 typing/lint friction. Expected 401/404/412 negative-test traffic and source-read
 echoes are not additional incidents. This is the available reconstructed
 continuation, not recovery of the deleted original transcript.
+
+### Protected-hook consumer correction (ER-61)
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Prevention and detection-stage escape |
+|---|---|---|---|---|
+| ER-61 | Integration test contract / Medium | The normal protected push of `23072a00` passes units and all preceding gates but fails one HTTP assertion: the loopback PowerShell helper reports 87 successful checks while its wrapper test still requires the previous literal 56. The new per-request guards increased the count; initial focused discovery omitted this API-side consumer. | Update the exact expected receipt to 87. Also pass inherited `If-Match: *` through the existing loopback wrapper and assert the caller map is unchanged before printing its second success line. The selected real HTTP/PowerShell case passes; 83 intentionally unselected cases are not reported as passing. All five expanded test roots compile with zero diagnostics. | Applied: the hook-owned HTTP case now automatically exercises the full runner's inherited-header scenario and caller immutability. The full pre-push gate catches the stale count; the earliest possible gate was a focused run of this existing wrapper consumer after changing the helper. Trace helper references and exact-output consumers across both scripts and API tests, not only the script test directory. |
+
+**Design/architecture disposition: accepted.** Reuse the existing loopback
+wrapper and its hook-owned HTTP test; no new runner or gate mode is added.
