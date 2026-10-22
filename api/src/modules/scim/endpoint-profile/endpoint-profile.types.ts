@@ -227,7 +227,7 @@ export interface EndpointProfile {
 
   /**
    * Precomputed Parent→Children maps for schema attribute characteristics.
-   * Built lazily per resource type (keyed by core schema URN) at first access.
+   * Built lazily: builtin core-URN keys and separate generic binding keys.
    * Prefixed with _ to indicate it's a runtime-only field (not persisted to DB).
    * @see SchemaCharacteristicsCache
    */

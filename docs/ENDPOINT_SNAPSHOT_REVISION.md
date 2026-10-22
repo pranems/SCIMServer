@@ -1233,3 +1233,72 @@ prevent a success-shaped review carry-forward after a material change.
 **Design/architecture disposition: accepted.** No runtime abstraction,
 permission, billing setting or correctness policy changes. Normal protected
 publication, exact-tip CI, reviewed merge and deployment evidence stay distinct.
+
+### Hosted review correction: ResourceType cache binding (ER-55)
+
+**Executive summary:** the hosted Copilot review successfully completed after
+the user selected billing. Its relevant finding is reproduced and corrected:
+two ResourceTypes can share a core schema but have different extension rules.
+They must not share one characteristics-cache entry. This changes serving
+inputs, so the earlier immutable image, performance and unchanged-source
+review receipts do not certify the correction or a deployment.
+
+Previously the generic service used only the core schema URN as its key.
+For example, `PlainDevice` and `ProtectedDevice` both use the Device core,
+but only the latter binds the Protected extension. Warming PlainDevice first
+published a cache without that extension's hidden, write-only and read-only
+rules. A later ProtectedDevice request reused it.
+
+```text
+Before:
+PlainDevice request -> cache[Device core] -> no Protected extension rules
+ProtectedDevice request -> same entry -> protected fields incorrectly visible
+
+After:
+Verified endpoint snapshot
+  -> generic binding key [id, name, endpoint, core, ordered extension bindings]
+       -> PlainDevice characteristics
+       -> ProtectedDevice characteristics, including hidden/write-only/read-only
+  -> builtin core-URN entries remain in their separate existing namespace
+```
+
+The replacement key uses a prefixed JSON tuple, including each extension's
+schema and required flag. It preserves order and uses exact strings, so no
+delimiter ambiguity or lossy normalization can alias distinct bindings.
+Identical bindings still reuse the snapshot's derived cache. Profile/schema
+changes continue to invalidate the owning snapshot. Builtin helpers cannot
+consume a generic entry because their core-URN keys have a different namespace.
+No new service, strategy, migration or dependency is needed.
+
+| Evidence | Observed result |
+|---|---|
+| Unit RED | Two failures: hidden extension fields leaked in core-only-first order; reverse order produced only one entry instead of two. Existing 70 cases passed. |
+| HTTP RED | Core-only-first POST returned hidden, write-only and client-supplied read-only fields. Reverse-order control passed. |
+| API build GREEN | `npm run build`: exit 0. |
+| Unit GREEN | Generic service: 72/72, including both warming orders. |
+| Focused HTTP GREEN | Binding regression, custom ResourceType CRUD and returned-characteristic suites: 24/24 across three suites on InMemory. |
+| Focused PostgreSQL HTTP GREEN | Same three suites: 24/24 on a newly owned ephemeral PostgreSQL database; container removal verified. |
+| Native live GREEN | New section 9z-DS: 22/22 assertions through the built production server, both warming orders, POST/GET/list/projection/PUT/PATCH/DELETE; zero fixture endpoints remain and owned listener removed. |
+| Expanded test types / lint GREEN | Both new test roots compile with zero diagnostics. Changed-file lint has zero errors and the existing 11 production warnings; new unit/HTTP tests have zero warnings. |
+| Remaining evidence | Normal publication and corrected-image/deployment evidence are tracked separately; not inferred from the earlier image. |
+
+| ID | Type / severity | Symptom | Root cause | Fix and why it works | Detection / prevention |
+|---|---|---|---|---|---|
+| ER-55 | Cache identity / High | A ResourceType without extensions warms a shared cache; another type leaks hidden/write-only values and accepts read-only input. | Cross-request reuse widened the lifetime of a cache whose key described only the core schema, not the full input binding. | Partition generic entries by complete ResourceType binding in a namespace separate from builtin entries. Different rule inputs cannot reuse the same entry. | Hosted review caught it before merge; earliest gate was a two-ResourceType HTTP regression when cross-request sharing was introduced. New unit and HTTP tests exercise both warming orders, explicit hidden-field projection, list, PUT and PATCH, with exact extension-output and public-key assertions. |
+| ER-56 | Test typing / Low | Jest passed the new fixture, but expanded compilation found missing attribute fields and schema descriptions; explicit E2E lint also found 22 unsafe untyped-response/server uses. A generic server-call attempt was rejected by the actual Nest interface. | The transformer does not fully type-check, the production build excludes specs, and Supertest response bodies default to `any`. | Complete the typed fixture; follow the existing typed `Response` and `Server` assertion pattern instead of assuming a generic API or suppressing lint. Final expanded compile has zero diagnostics; new tests have zero lint errors/warnings. | Expanded compiler and explicit test-file lint caught this before publication. Keep both independent of Jest GREEN; apply the existing typed HTTP prior art directly. |
+
+**Provenance:** the exact hosted comment is
+[discussion 4345084199](https://github.com/pranems/SCIMServer/pull/250#discussion_r4345084199),
+review 5609928192 on `e565d1fe`. RED/GREEN logs are retained in the private
+integration evidence directory. This entry was captured immediately after
+confirmed GREEN, not reconstructed at build end.
+
+**Test/gate improvement: applied.** Assert cache identity with different
+ResourceTypes sharing a core schema, in both warming orders, through HTTP.
+Presence-only tests or one ResourceType cannot prove protection isolation.
+**Design/architecture disposition: applied.** Correct the existing cache key
+at its construction boundary; all generic readers/writers already use that
+single accessor. Keep builtin keys disjoint without adding an abstraction.
+
+Version remains **0.55.58**: this fixes review findings in the same unreleased
+consolidation PR, not a new release or dependency change.

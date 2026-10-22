@@ -1087,7 +1087,11 @@ export class EndpointScimGenericService {
     endpointId: string,
   ): SchemaCharacteristicsCache | undefined {
     const profile = this.endpointContext.getProfile?.();
-    const cacheKey = resourceType.schema;
+    // Generic bindings must not alias each other or the builtin core-URN caches.
+    const cacheKey = `resourceType:${JSON.stringify([
+      resourceType.id, resourceType.name, resourceType.endpoint, resourceType.schema,
+      resourceType.schemaExtensions.map(extension => [extension.schema, extension.required]),
+    ])}`;
     if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
       return profile._schemaCaches[cacheKey];
     }
@@ -1096,7 +1100,7 @@ export class EndpointScimGenericService {
     if (schemaDefs.length === 0) return undefined;
     const extensionUrns = resourceType.schemaExtensions?.map(e => e.schema) ?? [];
     const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs, extensionUrns);
-    // Attach to profile for next access within this request
+    // The verified endpoint snapshot owns this binding-specific derived cache.
     if (profile) {
       if (!profile._schemaCaches) profile._schemaCaches = {};
       profile._schemaCaches[cacheKey] = cache;

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 0.55.58 consolidation onto token-lifetime master
 
+- Address hosted review's shared-cache binding collision before release:
+  generic ResourceTypes sharing a core schema now have distinct cache entries
+  for their complete extension bindings, isolated from builtin core-URN keys.
+  Confirmed RED exposes hidden/write-only/read-only extension values; GREEN
+  passes 72 service units (70 existing plus two warming-order controls) and
+  24 focused HTTP cases (22 existing plus two binding regressions), with API
+  build PASS. Existing runtime-image/performance receipts below predate this
+  serving correction; renewed publication/image/deployment proof is pending.
 - Preserve and reconcile the full local correction onto `5841f724` / PR #249
   without changing other worktrees or dropping stash `320a8360`.
   The earlier 0.55.56 private performance receipt does not certify this source.

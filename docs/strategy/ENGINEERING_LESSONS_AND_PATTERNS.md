@@ -16,6 +16,16 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Wider cache lifetime requires a complete input identity
+
+Sharing a previously request-local derived cache can expose an existing key
+collision across requests. A core schema identifier is not a ResourceType
+binding: extension schemas and required flags also determine protection rules.
+Include the complete binding, keep different consumers' key namespaces disjoint,
+and test both warming orders with hidden/write-only/read-only fields through
+HTTP. A single-resource fixture cannot detect this class of failure.
+See [ER-55](../ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
+
 ### A reviewer-provider outage is not automatically a review-policy blocker
 
 Check the actual delivery policy, branch requirements and accepted repository

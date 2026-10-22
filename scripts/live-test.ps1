@@ -16251,6 +16251,9 @@ try {
 }
 
 # ============================================
+. "$PSScriptRoot\live-test-sections\schema-cache-binding.ps1"
+Invoke-SchemaCacheBindingContract -BaseUrl $baseUrl -Headers $headers
+
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

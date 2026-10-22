@@ -3,11 +3,20 @@
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.58
 > **Last Updated**: October 21, 2026
-> **Last verified:** 2026-10-21
+> **Last verified:** 2026-10-22
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
+selection and identifies a real shared-cache binding collision. The generic
+service now keys by full ResourceType binding, separately from builtin keys.
+New both-order unit/HTTP regressions reproduce hidden/write-only/read-only
+failures before the fix and pass afterwards (72 service units, 24 focused HTTP
+cases; API build PASS). ER-55 records the mechanism. This serving change
+invalidates carry-forward of the older unchanged-source/image proof; corrected
+publication, image and deployment evidence remain separate pending steps.
 
 **Current integration, 2026-10-21:** owned performance work is reconciled
 onto merged master `5841f724`, including token-lifetime PR #249 and 0.55.57.

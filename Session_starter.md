@@ -1,8 +1,21 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-21
+**Last verified:** 2026-10-22
 
 ### Current master/performance reconciliation (2026-10-21)
+
+**2026-10-22 hosted-review correction:** Copilot review now completes after
+the user's billing selection. Its relevant cache-binding finding is reproduced:
+core-only-first HTTP requests leak protected extension fields. Generic cache
+keys now include the complete ResourceType binding in a separate namespace
+from builtin core-URN entries. RED and GREEN logs are retained; API build,
+72 service units and 24 focused HTTP cases pass. Publication and corrected-image
+validation are pending. Earlier image/performance receipts below remain
+historical and do not certify this new serving change.
+The same 24 HTTP cases pass on owned ephemeral PostgreSQL; native live section
+9z-DS passes 22 assertions and cleans every fixture. Expanded test types and
+changed-file lint pass. Version stays 0.55.58 within this unreleased PR.
+See [ER-55](docs/ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
 
 The owned performance branch incorporates merged master `5841f724` / PR #249
 and preserves endpoint token lifetimes. Version 0.55.58 manifests and
