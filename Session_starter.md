@@ -15,6 +15,13 @@ historical and do not certify this new serving change.
 The same 24 HTTP cases pass on owned ephemeral PostgreSQL; native live section
 9z-DS passes 22 assertions and cleans every fixture. Expanded test types and
 changed-file lint pass. Version stays 0.55.58 within this unreleased PR.
+The first protected push is blocked by F4; committed guide follow-up `90318898`
+closes that gate (27 docs PASS). Its retry reaches units: 6,209 PASS / one FAIL
+in the unchanged nested non-UTC timestamp probe (`spawnSync ETIMEDOUT`).
+Isolating the parent reproduces it; running its selected child directly passes
+in 14.229 seconds. Root cause is unproven. Do not weaken deadlines, skip the
+assertion, infer full-suite success or retry unchanged hooks. ER-58 records
+the blocker. Nothing from this correction is pushed, merged or deployed yet.
 See [ER-55](docs/ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
 
 The owned performance branch incorporates merged master `5841f724` / PR #249
