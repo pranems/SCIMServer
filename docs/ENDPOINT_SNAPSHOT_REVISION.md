@@ -1118,3 +1118,82 @@ their reusable lessons and the native-argument preflight.
 **Design/architecture disposition: accepted.** Existing token-lifetime policy
 providers and snapshot seams remain separate, with no speculative strategy
 or event-invalidation layer added during consolidation.
+
+### Controlled request-log write-cost follow-up
+
+Measured 2026-10-22 UTC, diagnostic `27253acc419e` uses the actual immutable
+0.55.20 and 0.55.58 image migration chains in a disposable PostgreSQL 17
+instance. It completes **28 cases**, seven variants across four rounds,
+reversing variant order on even rounds. Every case inserts exactly
+**4,407 rows in 89 batches**: 88 batches of 50 and one batch of seven.
+All original complete statement inventories still reconcile.
+
+The original comparison also inserts the same rows and batch sizes on both
+versions. Equal batch counts do not imply equal database work: the actual
+migrated baseline has nine physical RequestLog indexes, including its
+primary key; the candidate has eleven. The candidate adds a URL trigram
+index and endpoint/time index, replaces the old three-column activity index
+with a five-column covering index, and persists endpoint name.
+
+```text
+0.55.20: buffered rows -> 19 supplied columns -> heap + 9 indexes -> WAL
+0.55.58: same row count -> 20 supplied columns -> heap + 11 indexes -> WAL
+                                      |
+                                      +-> controlled one-change variants
+                                          preserve every audit row
+```
+
+WAL means write-ahead log, the recovery information PostgreSQL generates.
+These are mean statement execution totals per 4,407-row case, not client
+latency, database CPU, physical disk-flush time or a capacity forecast.
+
+| Controlled schema variant | Mean insert execution ms | Mean WAL KiB |
+|---|---:|---:|
+| Actual 0.55.20 | 126.440 | 9,056.5 |
+| Baseline plus endpoint name only | 134.363 | 9,209.9 |
+| Actual 0.55.58 | 219.094 | 13,025.5 |
+| Candidate without endpoint name | 207.475 | 12,897.4 |
+| Candidate without URL trigram index | 140.016 | 9,640.4 |
+| Candidate without activity covering index | 202.778 | 12,182.0 |
+| Candidate without endpoint/time index | 213.278 | 12,675.1 |
+
+Removing only the trigram index lowers synthetic insert execution by
+**79.078 ms / 36.09%** and generated WAL by **3,385.1 KiB** per case.
+Every round's no-trigram case is lower than that round's full candidate.
+Removing only endpoint name lowers the aggregate by **11.619 ms / 5.30%**,
+with round-to-round variation. Do not add individual variant savings
+together: layout, cache and index effects can interact.
+
+**Established:** maintaining the trigram index has a substantial write
+cost in this controlled fixture. **Still unproven:** its exact share of the
+original application's 346.801-ms logging increase and the actual customer
+database's CPU, storage and concurrency headroom. The diagnostic uses empty
+tables, single-client SQL rather than Prisma protocol, synthetic compressible
+1,024-byte bodies and temporary in-memory filesystem storage. It does not
+reproduce production payload distributions, retained log volume, concurrent
+operator reads, or Azure durable-storage behavior. The original application
+admission remains unchanged.
+
+**Recommendation:** keep all shipped indexes and audit behavior. The trigram
+index serves URL predicates, the covering index serves narrow activity reads,
+and the endpoint/time index avoids scanning unrelated endpoint history.
+A write-only improvement does not justify removing those read access paths.
+After substantive review and reviewed merge, validate the canonical image
+through dev/canary and assess representative concurrent SCIM writes, URL
+filtering, activity summaries and endpoint log reads. Collect database CPU,
+connections, WAL, I/O, locks and client latency. Any justified index/query
+redesign is a separate measured change with read plans and migration safety.
+Customer restore, permissions, credential and visual holds remain.
+
+The run retains raw statement counters, migrated index definitions, immutable
+image identities, assessor hashes and a standalone explanatory report in
+session evidence. All **123,396** synthetic inserted rows are accounted for.
+Exact owned container/network cleanup is verified; unrelated containers are
+untouched. No runtime, manifest, dependency, schema or lockfile change occurs.
+
+**Test/gate improvement: applied.** Check rows as well as calls, and inspect
+actual migrated indexes and WAL before attributing equal-batch insert cost.
+**Design/architecture disposition: accepted.** This bounded evidence harness
+adds no production abstraction or dependency and preserves existing read/write
+responsibilities. The source documentation follow-up has its own normal
+protected publication and exact-tip CI receipt.

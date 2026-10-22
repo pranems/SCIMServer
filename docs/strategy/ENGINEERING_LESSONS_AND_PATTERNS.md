@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Equal batch counts do not prove equal database work
+
+Reconcile affected rows as well as statement calls, then inspect the actual
+migrated index catalog before blaming a newly persisted field. The controlled
+0.55.58 logging diagnostic preserves every row and batch while changing one
+field or index at a time; the URL trigram index has a much larger measured
+insert effect than endpoint name in that fixture. Retain WAL and buffer
+counters, reverse case order, and keep synthetic write attribution separate
+from original application causality and production capacity. Do not remove a
+read access path based on write-only evidence. See the
+[controlled comparison](../ENDPOINT_SNAPSHOT_REVISION.md#controlled-request-log-write-cost-follow-up).
+
 ### Integration must refresh the consumers of a changed test seam
 
 A focused selector written before a master update can omit a newly inherited

@@ -55,6 +55,15 @@ and application CPU 8.02%; removal p99 increases 9.07%, near the +10% limit.
 SQL execution increases 37.14%, not measured database CPU. Its cause/capacity
 review remains required before customer promotion.
 
+A controlled write-cost follow-up on 2026-10-22 UTC completes all 28 cases:
+seven actual migrated schema variants, four order-balanced rounds, exactly
+4,407 rows and 89 batches per case. Removing only the URL trigram index
+reduces synthetic insert execution by 36.09%; removing only endpoint name
+reduces it by 5.30%. This establishes an index-maintenance cost in that
+fixture, not the complete cause of the original run or production capacity.
+All diagnostic resources are removed; shipped indexes remain unchanged.
+See [the controlled comparison and next steps](docs/ENDPOINT_SNAPSHOT_REVISION.md#controlled-request-log-write-cost-follow-up).
+
 **Remaining delivery hold:** Copilot returns a billing-entity error, not a
 substantive PR review. Keep PR #250 draft until an authorized review path is
 resolved. No merge or cloud deployment has occurred. After reviewed green
