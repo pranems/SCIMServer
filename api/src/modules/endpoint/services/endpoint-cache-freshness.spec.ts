@@ -199,6 +199,7 @@ describe('Persistent endpoint cache freshness', () => {
   });
 
   it('checks PostgreSQL timestamp hydration in a real non-UTC Node process', () => {
+    const startedAt = Date.now();
     const result = spawnSync(process.execPath, [
       require.resolve('jest/bin/jest'),
       '--runInBand', '--runTestsByPath', __filename,
@@ -208,7 +209,14 @@ describe('Persistent endpoint cache freshness', () => {
       encoding: 'utf8',
       timeout: 30_000,
     });
-    if (result.error) throw result.error;
+    if (result.error) {
+      throw new Error(
+        `Non-UTC timestamp probe failed after ${Date.now() - startedAt}ms `
+        + `(status=${result.status}, signal=${result.signal}): ${result.error.message}\n`
+        + `${result.stdout}\n${result.stderr}`,
+        { cause: result.error },
+      );
+    }
     if (result.status !== 0) {
       throw new Error(`Non-UTC timestamp regression failed:\n${result.stdout}\n${result.stderr}`);
     }

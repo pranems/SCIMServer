@@ -1304,3 +1304,15 @@ single accessor. Keep builtin keys disjoint without adding an abstraction.
 
 Version remains **0.55.58**: this fixes review findings in the same unreleased
 consolidation PR, not a new release or dependency change.
+
+**ER-58 follow-up:** a fresh isolated parent run passes all 21 cases in
+37.797 seconds. The six-suite endpoint-service neighborhood then passes
+174 cases with two workers (39.822 seconds), and again with default scheduling
+(20.067 seconds). Jest's configured default is 15 workers on 16 available
+logical CPUs. Those observations demonstrate condition-dependent execution,
+not a proven contention mechanism or a repaired timestamp defect. The probe
+now retains child stdout/stderr, exit status, signal, original error cause and
+elapsed time on a subprocess error. Its real non-UTC assertion and existing
+30-second deadline are unchanged. The next normal protected run supplies
+complete current-state evidence or actionable child diagnostics on failure;
+none of the earlier failures is erased.
