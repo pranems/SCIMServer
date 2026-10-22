@@ -488,6 +488,22 @@ source-read echoes and repeated receipts are dismissed as non-incidents.
 The earlier template/CSPRNG issues remain ER-67. This scan does not restore
 or claim access to the deleted original UI transcript.
 
+**ER-68e, validation environment / Medium:** protected publication of
+`8f4e1697` is blocked after 27 passing gates. Web Vitest reports 1,653 passing
+assertions in 123 files, but one fork worker never completes its startup
+handshake for the endpoint-context selector file. This is **not** a 1,655-test
+PASS and no assertion failure is reported. The omitted file's two tests pass
+when run alone with the unchanged standard runner. The observed mechanism is
+worker-startup timeout; resource pressure is a hypothesis, not a proven cause.
+The original failed 1,220.9-second hook remains retained. The gate correctly
+blocks partial execution, and its definition now documents that requirement.
+No timeout, worker count, test, exit condition or application code is changed.
+One normal protected publication attempt can establish whether the transient
+recurs; an isolated PASS alone cannot satisfy the complete gate.
+Detecting and earliest useful stage are both the protected full Web gate.
+Track recurring worker-startup reliability separately rather than silently
+increasing deadlines or declaring missing files passed.
+
 Two Low execution frictions were also caught locally. A raw PowerShell
 continuation backtick inside a JavaScript template caused a parser error;
 use PowerShell parameter splatting in the fixture, so interpreter delimiters

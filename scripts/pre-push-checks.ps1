@@ -398,6 +398,8 @@ if ($Mode -in @('Validate', 'Full')) {
     }
 
     Invoke-Gate -Name 'web: vitest' -WorkingDir (Join-Path $repoRoot 'web') -Action {
+        # A worker-startup error leaves files unexecuted even when every reported
+        # assertion passes. Preserve npm's failure exit; never admit partial counts.
         npm test 2>&1 | Out-Host
     }
 }
