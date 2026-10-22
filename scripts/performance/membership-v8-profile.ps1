@@ -30,11 +30,21 @@ function Save-NativeProfile {
         if (!$stopped) { throw 'Owned native profile shutdown exceeded ten seconds.' }
         $receipt.exitCode = $state.ExitCode
         $receipt.failureStage = 'copy-profile'
-        $null = Invoke-Docker cp "${ContainerId}:/tmp/membership.cpuprofile" `
-            (Join-Path $Directory "profile-$Role.cpuprofile")
-        $receipt.failureStage = 'copy-metadata'
-        $null = Invoke-Docker cp "${ContainerId}:/tmp/membership-profile-meta.json" `
-            (Join-Path $Directory "profile-$Role-meta.json")
+        $copyFailure = $null
+        try {
+            $null = Invoke-Docker cp "${ContainerId}:/tmp/membership.cpuprofile" `
+                (Join-Path $Directory "profile-$Role.cpuprofile")
+        } catch { $copyFailure = $_ }
+        try {
+            $null = Invoke-Docker cp "${ContainerId}:/tmp/membership-profile-meta.json" `
+                (Join-Path $Directory "profile-$Role-meta.json")
+        } catch {
+            if ($null -eq $copyFailure) {
+                $receipt.failureStage = 'copy-metadata'
+                $copyFailure = $_
+            }
+        }
+        if ($null -ne $copyFailure) { throw $copyFailure }
         $receipt.filesCollected = $true
         $receipt.failureStage = 'exit-check'
         if ($state.ExitCode -ne 0) { throw 'Owned native profile stopped with a failed exit; evidence retained.' }

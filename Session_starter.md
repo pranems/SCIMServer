@@ -4,16 +4,24 @@
 
 ### Current master/performance reconciliation (2026-10-22)
 
-**Current publication hold:** remote stays `30fbea59`; all five review threads
-are resolved. Signed-clock correction `58f06800` and follow-ups are local.
-Three ordinary Validate attempts remain separately retained: missing caller
-Prisma environment (resolved directly), four Web worker-startup errors, then
-a nested real-timezone Jest child exceeding its unchanged 30-second deadline.
-The last attempt has 23 passing gates and one failing gate; later gates do
-not run. Focused success and the complete instrumented Web diagnostic are
-not substitutes for a complete ordinary hook. No further blind full retries,
-new-source CI, merge or deployment. Startup/deadline investigation remains
-open; performance admission is independently still held. See ER-68e/h-l.
+**Current publication/review checkpoint:** `84d11af7` is published through all
+28 ordinary Validate gates (1104 seconds): API 6210/213, HTTP 2514/118 with
+42 existing backend-specific skips, Web 1655/124. Local and remote match;
+the worktree was clean after publication. The three preceding failed pushes
+remain retained. Fresh review `5619805016` finds an additional metadata-loss
+path when profile copying fails. Its RED-first local correction attempts
+both files independently, propagates the first error and retains FAIL.
+All 74 focused contracts pass; normal publication of this follow-up is pending.
+Exact-source qualification `39840296611` fails its first same-image control:
+populated-read p99 ratio 1.10065341, empty-read p99 ratio 0.74715670.
+No performance admission, merge, deployment or product bump. Web startup
+cause stays open; timezone harness full ordinary validation is complete.
+See ER-68e/h-n.
+
+Native run `39840296709` on published `84d11af7` succeeds. Independent audit
+verifies nine exact Linux source hashes, four receipts, 17,628 spans and
+16,000 timings plus profile identity, privacy, cleanup and recomputation.
+It is diagnostic only and does not clear failed performance admission.
 
 **Timezone-harness implementation:** remove only the redundant nested Jest
 runner. A fresh non-UTC Node fixture uses existing ts-node and calls actual
@@ -21,10 +29,11 @@ runner. A fresh non-UTC Node fixture uses existing ts-node and calls actual
 read and both UTC timestamps. Receipt RED, 21-case GREEN, production UTC
 negative-control RED and restored 21-case GREEN are retained. Production
 source is unchanged; 30/35-second bounds, workers and assertions are preserved.
-Targeted lint/syntax pass. Full ordinary protected publication remains required.
+Targeted lint/syntax and full ordinary protected publication pass on `84d11af7`.
 
 | Date | Summary |
 |---|---|
+| 2026-10-22 | Published signed-clock/timezone corrections through 28 green gates on 84d11af7; fresh review exposes partial-file capture loss, corrected locally with 74 focused tests. Performance control still fails. |
 | 2026-10-22 | Native signed-clock correction passes 72 focused tests and exact retained-data replay; ordinary publication remains blocked by separately retained Web and nested-Jest startup/deadline failures. |
 
 **Latest actual native execution, 2026-10-22:** `30fbea59` passes all 28

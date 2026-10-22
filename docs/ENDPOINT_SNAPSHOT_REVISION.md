@@ -718,12 +718,77 @@ earlier OS/framework delay phase or the separate Web-startup cause is proven.
 Design disposition: **applied**; use a standalone fixture and the existing
 production seam, not a new runtime abstraction or a larger deadline.
 
+**ER-68l full ordinary validation:** normal Validate-protected publication
+of `84d11af7` passes all 28 gates in 1104 seconds, exit 0. API units:
+6210 tests / 213 suites; HTTP: 2514 / 118 with 42 existing backend-specific
+skips and two log suites skipped; Web: 1655 / 124. Local and remote tips
+match, with a clean worktree. This closes the timezone harness requirement,
+not the unproven root cause of the separate intermittent Web startup failures.
+Evidence: `test-results/timezone-standalone-protected-push.log`.
+
+**ER-68m, partial diagnostic file loss / Medium:** fresh exact-tip review
+`5619805016` identifies that `Save-NativeProfile` copies the CPU profile and
+metadata sequentially. A failed profile copy throws before attempting
+available metadata; the caller then cleans up the container. Role-level
+independence does not preserve files within the failed role.
+The correction attempts both files independently and then propagates the
+first error with its original failure stage. `filesCollected` remains false
+and `captureStatus` remains FAIL unless both copies succeed.
+
+| Control | Retained evidence | Required outcome |
+|---|---|---|
+| Profile missing, metadata available | Metadata file | FAIL, `copy-profile`, original error |
+| Metadata missing, profile available | CPU profile | FAIL, `copy-metadata`, original error |
+| Both unavailable | Explicit failure receipt; both attempts made | FAIL, first profile error |
+
+The actual PowerShell collector is RED in two controls before the fix,
+including the new missing-profile/available-metadata case. After correction,
+all 74 focused workflow contracts pass, zero failures/skips (previously 72).
+Logs: `native-copy-independence-red.log` and
+`native-copy-independence-complete-green.log` under `test-results/`.
+Detected at fresh hosted review; earliest possible gate is the collector's
+local asymmetric-copy test. Escape: the previous copy-failure fixture rejected
+both files and did not assert the second copy attempt or retained metadata.
+Self-improvement **applied**: exercise both asymmetric failures and assert real
+file retention, first error/stage and continued non-admission.
+Design disposition **applied**: two guarded copies in the existing small
+collector, no new abstraction. No serving code, quota or admission change.
+
+**ER-68n, focused-selector friction / Low:** an initial local command used
+`membership-cpu-timeline.test.cjs` instead of the existing
+`membership-cpu-trace.test.cjs`. Node exited 0 with only 58 tests.
+The population check caught this before consolidation; 58 was not reported
+as the complete workflow suite. Rerun the exact workflow's three paths after
+checking every path exists: all 74 pass. Prevention **applied** in the local
+validation command: explicit path-existence checks and expected suite count.
+Detection and earliest possible stage are the local selector preflight.
+
+**Latest untraced control:** exact `84d11af7` run `39840296611` fails first
+A/A BAAB: populated-read p99 44.791171 / 49.299555 ms, ratio 1.10065341;
+empty-read p99 55.203017 / 41.245304 ms, ratio 0.74715670. Both labels use the
+same frozen image. Later blocks stop; faster disagreement is still failure.
+Original artifact retained under `test-results/linux-qualification-39840296611/`.
+This is not evidence of a candidate regression or release safety.
+
 **Updated completeness note:** reconciled the full available continuation
-through event record 60,385 using signal-frequency and causal-narration passes.
-Confirmed native issues map to ER-68a-l; intentional TDD failures, expected
+through event record 60,715 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-n; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not
 the deleted original session.
+
+**Successful new-source native execution:** run `39840296709` on exact
+`84d11af7` completes with the corrected signed-clock consumer. Independent
+artifact verification confirms nine Linux checkout source hashes, four
+resource/client receipts, all 17,628 spans and 16,000 measured timings,
+profile windows/runtime identity, privacy, exact cleanup and analyzer
+recomputation. Baseline Node v24.20.0 has 128,084 observations over 177.710773
+seconds; candidate v24.22.1 has 123,153 over 168.344829 seconds.
+These are whole-process diagnostic observations, not CPU seconds or admission.
+The original failed run remains failed. This execution precedes ER-68m's
+additional capture-failure correction; that correction still needs its own
+publication and exact-source validation.
+Audit: `test-results/membership-native-39840296709-audit.json`.
 
 Two Low execution frictions were also caught locally. A raw PowerShell
 continuation backtick inside a JavaScript template caused a parser error;

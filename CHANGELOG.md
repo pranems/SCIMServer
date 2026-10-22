@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Address review `5619805016`: independently attempt CPU-profile and bootstrap
+  metadata copies before cleanup, propagate the first copy error and require
+  both files before marking capture complete. Missing-profile/available-metadata,
+  missing-metadata/available-profile and both-copy-failure controls verify
+  actual retained files and failure stages. Focused contracts: 72 -> 74 PASS.
+  Prior signed-clock/timezone publication `84d11af7` passes all 28 normal gates:
+  API 6210/213, HTTP 2514/118, Web 1655/124. No product version change.
 - Address both findings in fresh review `5617819970`: preserve every queued
   workflow and emit the four native instrumentation hashes outside the
   mutually exclusive timeline branch. Actual three-mode key/value checks

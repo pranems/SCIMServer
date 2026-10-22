@@ -46,6 +46,13 @@ exhausted its total deadline: reserve cleanup and upload time outside the work
 budget. Test that work stops, not merely that timeout fields exist.
 See [ER-64/ER-65](../ENDPOINT_SNAPSHOT_REVISION.md#hosted-qualification-review-failed-evidence-and-deadline-guards-er-64er-65).
 
+Independence must extend to files within a capture, not only separate roles.
+If a CPU profile is missing, still attempt its available bootstrap metadata
+before deleting the container. Propagate the first error, keep capture failed
+unless both copies succeed, and test both asymmetric failures plus both
+failures. Assert retained file contents and failure stages, not just a receipt.
+See ER-68m in the [native diagnostic ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
 Resource measurements need the same failure contract as request timings.
 Persist every collected CPU, database, memory, RSS and OOM observation before
 rejecting a ceiling or deleting its owner. A missing later probe must leave

@@ -9,16 +9,22 @@
 
 ## Active Delivery Process
 
-**Current publication hold, 2026-10-22:** remote remains `30fbea59`, with all
-five review threads resolved. The local signed-clock correction passes 72
-focused tests and separate exact native-data replay, but three ordinary
-Validate attempts do not authorize publication. Missing caller Prisma
-environment is corrected; Web worker startup and the nested real-timezone
-Jest child deadline remain intermittent and unresolved. Latest attempt:
-23 gates PASS, then API units FAIL (6,209 pass /1 child deadline failure).
-Later gates do not run. Do not combine focused/diagnostic results into a
-full PASS or repeat full suites blindly. No new-source CI, merge, deployment,
-serving change or version bump. Master is still `e1070ba2`; see ER-68e/h-l.
+**Current publication/review checkpoint, 2026-10-22:** exact `84d11af7`
+is published through all 28 ordinary Validate gates in 1104 seconds.
+API units 6210/213, HTTP 2514/118 (42 existing backend-specific skips), Web
+1655/124 PASS. The three prior failed attempts remain retained. Fresh review
+`5619805016` finds metadata loss when profile copying fails; the local
+RED-first correction independently attempts both files, preserves the first
+error and keeps incomplete capture failed. All 74 focused contracts pass;
+normal publication of that follow-up remains required. Exact-tip qualification
+`39840296611` fails first-control populated-read p99 (1.10065341 ratio) and
+empty-read p99 (0.74715670 ratio). No performance admission, merge, deployment,
+serving change or version bump. Master stays `e1070ba2`; see ER-68e/h-n.
+
+Native run `39840296709` on `84d11af7` succeeds and independently verifies
+nine source hashes, four receipts, 17,628 spans, 16,000 timings, profile
+identity, privacy, cleanup and exact recomputation. Diagnostic only;
+the capture-copy follow-up still needs its own exact-source publication.
 
 **Timezone harness follow-up:** replace redundant nested Jest startup with
 a fresh Node/ts-node fixture calling actual `EndpointService.getEndpoint`.
@@ -26,7 +32,7 @@ Validate a full receipt proving non-UTC offset, one snapshot read and both
 returned UTC fields. Receipt RED, all 21 freshness cases GREEN, actual
 production UTC negative control RED and restored 21-case GREEN are retained.
 Targeted lint/syntax pass. No serving change or 30/35-second deadline increase.
-Full ordinary protected publication remains required; Web cause stays open.
+Full ordinary protected publication passes on `84d11af7`; Web cause stays open.
 
 **Latest actual native execution, 2026-10-22:** `30fbea59` is published through
 28 passing gates and fresh review `5618294791` has no open code issues.

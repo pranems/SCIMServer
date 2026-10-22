@@ -753,6 +753,8 @@ for (const scenario of [
   "nonzero-exit",
   "already-stopped",
   "copy-failure",
+  "profile-copy-failure",
+  "metadata-copy-failure",
   "shutdown-timeout",
   "missing-profile-marker",
 ]) {
@@ -782,6 +784,7 @@ for (const scenario of [
         $script:ownerChecked = $false
         $script:waits = 0
         $script:signalled = $false
+        $script:copies = [System.Collections.Generic.List[string]]::new()
         function Assert-Owned {
           param($Id)
           if ($Id -cne $owned) { throw 'Unowned profile target' }
@@ -810,7 +813,14 @@ for (const scenario of [
           }
           if ($args[0] -eq 'cp') {
             if (!$args[1].StartsWith($owned + ':/tmp/membership')) { throw 'Unexpected profile source' }
-            if ($scenario -eq 'copy-failure') { throw 'Profile copy rejected' }
+            $script:copies.Add($args[1])
+            if ($scenario -eq 'copy-failure' -or
+                ($scenario -eq 'profile-copy-failure' -and $args[1].EndsWith('.cpuprofile'))) {
+              throw 'Profile copy rejected'
+            }
+            if ($scenario -eq 'metadata-copy-failure' -and $args[1].EndsWith('-meta.json')) {
+              throw 'Metadata copy rejected'
+            }
             '{"synthetic":true}' | Set-Content -LiteralPath $args[2]
             return
           }
@@ -831,6 +841,28 @@ for (const scenario of [
             throw 'Native evidence lost before exit rejection or cleanup'
           }
         } elseif ($receipt.filesCollected) { throw 'Incomplete capture became complete' }
+        if ($scenario -in @('copy-failure', 'profile-copy-failure', 'metadata-copy-failure')) {
+          $expected = "$owned" + ':/tmp/membership.cpuprofile,' + "$owned" + ':/tmp/membership-profile-meta.json'
+          if (($script:copies -join ',') -cne $expected) { throw 'A failed copy prevented the other evidence attempt' }
+          $metadataFailed = $scenario -eq 'metadata-copy-failure'
+          $expectedFailure = if ($metadataFailed) { 'Metadata copy rejected' } else { 'Profile copy rejected' }
+          $expectedStage = if ($metadataFailed) { 'copy-metadata' } else { 'copy-profile' }
+          if ($failure -cne $expectedFailure -or $receipt.failureStage -cne $expectedStage) {
+            throw 'Capture did not propagate the first copy failure and stage'
+          }
+          if ($scenario -eq 'profile-copy-failure' -and
+              !(Test-Path (Join-Path $directory 'profile-baseline-meta.json'))) {
+            throw 'Available bootstrap metadata was discarded after profile copy failure'
+          }
+          if ($metadataFailed -and !(Test-Path (Join-Path $directory 'profile-baseline.cpuprofile'))) {
+            throw 'Available CPU profile was discarded after metadata copy failure'
+          }
+          if ($scenario -ne 'copy-failure') {
+            $retainedName = if ($metadataFailed) { 'profile-baseline.cpuprofile' } else { 'profile-baseline-meta.json' }
+            $retained = Get-Content (Join-Path $directory $retainedName) -Raw | ConvertFrom-Json
+            if ($retained.synthetic -ne $true) { throw 'Retained native evidence contents changed' }
+          }
+        }
         if ($scenario -eq 'shutdown-timeout' -and $script:waits -ne 100) { throw 'Native shutdown budget changed' }
         if ($scenario -in @('nonzero-exit', 'already-stopped') -and $receipt.exitCode -ne 1) { throw 'Native failure exit lost' }
         if ($scenario -ne 'complete' -and $receipt.captureStatus -cne 'FAIL') { throw 'Failed native capture became success' }
