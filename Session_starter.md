@@ -45,9 +45,21 @@ resource-limit receipt loss. A resource-collection `finally` now preserves
 CPU/SQL/memory/RSS/OOM observations before failure/cleanup, including partial
 probe failures and client/deadline rejection. Eight actual-round/cleanup
 controls and actual A/A/A-B identity/order selection bring the focused suite
-to 26 PASS after the resource-retention RED. Publication remains a separate step;
-it changes no timing workload, threshold or serving artifact, and does not
-justify retrying unchanged measurements until green. Dev remains 0.55.56.
+to 26 PASS after the resource-retention RED. Published `117d5b1e` passes all
+28 Validate gates; fresh review `5615359957` reports no remaining code finding.
+Its Linux run `39790526704` fails add/remove p99 calibration despite identical
+images, with all four resource receipts and cleanup retained. Seven other
+exact-tip checks pass; qualification remains failed, not waived.
+
+The continuation adds one diagnostic-only same-image BAAB timeline:
+monotonic client spans plus exact-owned app CPU-group reads, outside app
+quota. Clock/cost validation, unknown coverage, actual observer lifecycle and
+diagnostic admission isolation are tested. All 44 combined contracts pass
+after RED (28 existing/client plus 16 CPU). The Linux diagnostic
+has not yet executed; publication and its exact-source artifact remain next.
+Original images, workload, quota, samples and ceilings are unchanged, with
+no serving/dependency/version change. Dev's last retained checkpoint is
+0.55.56, not a fresh cloud query. See ER-67 for local execution issues and limits.
 See [the qualification protocol](docs/ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review

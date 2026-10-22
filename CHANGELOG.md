@@ -58,6 +58,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Actual A/A/A-B identity/order selection is also tested without claiming
   those unexecuted measurements ran. Failed rows remain excluded; no quota, sample count,
   timing policy, product version or immutable serving image is changed.
+- Resource-retention source `117d5b1e` passes all 28 protected gates; fresh
+  review reports no remaining code finding. Its Linux run `39790526704`
+  still fails same-image add/remove p99 (+11.9480% / +14.8634%); all resource,
+  functional, logging and cleanup receipts pass. Neither old/current block
+  runs, and the failed control remains failed.
+- Add a bounded diagnostic-only request/CPU timeline, one same-image BAAB
+  block on the existing Linux runner. Preserve original images, quota,
+  samples and ceilings. Retain monotonic spans and exact-owned app cgroup
+  reads, observer cost/gaps and insufficient-coverage classifications.
+  Diagnostic receipts are explicitly rejected by normal qualification.
+  No causal request-delay or release-admission claim is made.
+- Initial trace RED is 25 PASS / 9 FAIL; implementation and integration reach
+  34 then 40 PASS. Additional assurance RED covers missing clock/cost validation
+  and failure-stage reporting; all 44 combined contracts pass after corrections
+  (28 existing/client plus 16 CPU),
+  including actual observer subprocess success/failure/deadline and actual
+  diagnostic control flow. Windows helper startup allows only `SystemRoot`;
+  Linux inherits no environment. Product remains 0.55.58 with no dependency,
+  lockfile, serving or cloud change. Linux diagnostic execution is pending.
 
 ### 0.55.58 consolidation onto token-lifetime master
 

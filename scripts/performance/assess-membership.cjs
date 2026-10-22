@@ -39,6 +39,7 @@ function assessBlock(rows, block, roles) {
   assert.equal(rows.length, 4, 'Exactly four round receipts are required');
   assert.deepEqual(rows.map(row => row.role), schedules[block.order], 'Actual role order must match preregistration');
   for (const row of rows) {
+    assert.ok(!Object.hasOwn(row, 'diagnosticOnly'), 'Diagnostic receipts cannot enter release admission');
     assert.equal(row.status, 'PASS', 'Failed receipts cannot be admitted');
     assert.equal(row.complete, true, 'Partial receipts cannot be admitted');
     assert.equal(row.image, roles[row.role].image, 'Round image identity');

@@ -1,5 +1,6 @@
 param(
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [switch]$TraceDiagnostic
 )
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -11,6 +12,9 @@ $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
 & node -e 'require(process.argv[1]).validateProtocol(require(process.argv[2]))' $evaluator $protocolPath
 if ($LASTEXITCODE -ne 0) { throw 'Invalid preregistered protocol; no resources allocated.' }
 if (!$IsLinux) { throw 'Qualification requires a Linux host, not a Windows-hosted Docker VM.' }
+if (!$TraceDiagnostic -and $env:SCIM_BENCH_TRACE) { throw 'Diagnostic trace cannot enter qualification.' }
+$cpuTrace = Join-Path $PSScriptRoot 'membership-cpu-trace.cjs'
+if ($TraceDiagnostic) { . (Join-Path $PSScriptRoot 'membership-cpu-observer.ps1') }
 $run = [guid]::NewGuid().ToString('N')
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root "test-results\membership-qualification-$run" }
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'Refusing to overwrite an existing campaign.' }
@@ -22,18 +26,22 @@ $summary = [ordered]@{
     OriginalWindowsAdmission = 'FAIL/unresolved; not replaced retrospectively'
     StatisticalFalseFailureRate = 'Not estimated by this bounded qualification'
     Blocks = @()
+    Mode = $(if ($TraceDiagnostic) { 'CPU timeline diagnostic only' } else { 'Performance qualification' })
+    AdmissionEligible = $false
 }
 $campaignClock = [System.Diagnostics.Stopwatch]::StartNew()
-$workDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes(60).ToUnixTimeMilliseconds()
+$workMinutes = if ($TraceDiagnostic) { 15 } else { 60 }
+$workDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes($workMinutes).ToUnixTimeMilliseconds()
 $summary['WorkDeadlineUtc'] = [DateTimeOffset]::FromUnixTimeMilliseconds($workDeadlineUtc).ToString('o')
 $envNames = @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET',
     'CREDENTIAL_KEK', 'DATABASE_URL', 'SCIM_BENCH_BASE_URL', 'SCIM_BENCH_TOKEN', 'SCIM_BENCH_VERSION',
-    'SCIM_BENCH_DEADLINE_UTC')
+    'SCIM_BENCH_DEADLINE_UTC', 'SCIM_BENCH_TRACE')
 $priorEnvironment = @{}
 foreach ($key in $envNames) { $priorEnvironment[$key] = [Environment]::GetEnvironmentVariable($key) }
 
 function Assert-WithinDeadline {
-    if ($campaignClock.Elapsed.TotalMinutes -ge 60) {
+    $limit = if ($TraceDiagnostic) { 15 } else { 60 }
+    if ($campaignClock.Elapsed.TotalMinutes -ge $limit) {
         throw 'Campaign work deadline reached; cleanup and upload time is reserved, no admission.'
     }
 }
@@ -165,7 +173,20 @@ function Invoke-Block {
                 databaseCalls = $null; databaseExecutionMs = $null
                 peakCgroupBytes = $null; nodeRssBytes = $null; oomKilled = $null
             }
+            $observer = $null
             try {
+                if ($TraceDiagnostic) {
+                    $resource['diagnosticOnly'] = $true
+                    $appPid = [int](Invoke-Docker inspect --format '{{.State.Pid}}' $app.Id)
+                    if ($appPid -le 0) { throw 'Owned app PID unavailable for CPU observation.' }
+                    $membership = @(Get-Content -LiteralPath "/proc/$appPid/cgroup")
+                    $cgroup = Get-OwnedCgroupRoot -ContainerId $app.Id -Membership $membership
+                    $prefix = Join-Path $directory "round-$round-$role"
+                    $observer = Start-CpuObserver -Script $cpuTrace -CgroupRoot $cgroup `
+                        -Prefix $prefix -DeadlineUtc $workDeadlineUtc
+                    Wait-CpuObserverReady $observer
+                    $env:SCIM_BENCH_TRACE = '1'
+                }
                 $beforeCpu = Read-CpuCounters $app.Id
                 $resource.cpuBefore = $beforeCpu
                 $resource.failureStage = 'database-before'
@@ -177,10 +198,12 @@ function Invoke-Block {
                 $env:SCIM_BENCH_VERSION = $roles[$role].version
                 $env:SCIM_BENCH_DEADLINE_UTC = [string]$workDeadlineUtc
                 $receiptPath = Join-Path $directory "round-$round-$role.json"
+                $traceEnvironment = if ($TraceDiagnostic) { @('--env', 'SCIM_BENCH_TRACE') } else { @() }
                 $client = (Invoke-Docker create --network host --no-healthcheck `
                     --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
                     --mount "type=bind,source=$clientScript,target=/tmp/benchmark.cjs,readonly" `
                     --env SCIM_BENCH_BASE_URL --env SCIM_BENCH_TOKEN --env SCIM_BENCH_VERSION --env SCIM_BENCH_DEADLINE_UTC `
+                    @traceEnvironment `
                     --env SCIM_BENCH_OUTPUT=/tmp/receipt.json --entrypoint node `
                     $protocol.candidate.image /tmp/benchmark.cjs).Trim()
                 if ($client -notmatch '^[a-f0-9]{64}$') { throw 'Invalid owned client id.' }
@@ -192,6 +215,12 @@ function Invoke-Block {
                     ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
                 $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
                 $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+                if (!$TraceDiagnostic -and $receipt.PSObject.Properties.Name -contains 'diagnosticOnly') {
+                    throw 'Diagnostic client receipt cannot enter qualification.'
+                }
+                if ($TraceDiagnostic -and $receipt.diagnosticOnly -ne $true) {
+                    throw 'Diagnostic client omitted explicit non-admission marker.'
+                }
                 if ($transportExit -ne 0 -or $clientExit -ne 0 -or $receipt.status -cne 'PASS' -or $receipt.complete -ne $true) {
                     throw 'Failed/partial client receipt retained; no admission or later round.'
                 }
@@ -226,10 +255,14 @@ function Invoke-Block {
                 $resource.status = 'PASS'
                 $resource.failureStage = $null
             } finally {
-                $resource | ConvertTo-Json -Depth 10 |
-                    Set-Content (Join-Path $directory "round-$round-$role-resources.json")
+                try {
+                    if ($observer) { Stop-CpuObserver $observer }
+                } finally {
+                    $resource | ConvertTo-Json -Depth 10 |
+                        Set-Content (Join-Path $directory "round-$round-$role-resources.json")
+                }
             }
-            $rows.Add([pscustomobject]@{
+            $row = [pscustomobject]@{
                 role = $role; version = $receipt.version; image = $roles[$role].image
                 status = $receipt.status; complete = $receipt.complete
                 imageId = $app.ImageId; cpuLimit = 0.5; cpuMax = $app.CpuMax; memoryLimit = 1073741824
@@ -239,7 +272,9 @@ function Invoke-Block {
                 databaseCalls = $afterSql.calls - $beforeSql.calls
                 databaseExecutionMs = $afterSql.executionMs - $beforeSql.executionMs
                 peakCgroupBytes = $peak; nodeRssBytes = $rssBytes; oomKilled = $false
-            })
+            }
+            if ($TraceDiagnostic) { $row | Add-Member -NotePropertyName diagnosticOnly -NotePropertyValue $true }
+            $rows.Add($row)
             $rows.ToArray() | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $directory 'rounds.json')
             Write-Host "Completed $($Block.name) round $round ${role}: 4407 checked requests."
         }
@@ -310,6 +345,11 @@ try {
         (Join-Path $root 'scripts\live-test-sections\minimal-group-members.ps1'))) {
         $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
     }
+    if ($TraceDiagnostic) {
+        foreach ($file in @($cpuTrace, (Join-Path $PSScriptRoot 'membership-cpu-observer.ps1'))) {
+            $sourceHashes[[IO.Path]::GetFileName($file)] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+        }
+    }
     $sourceHashes | ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'source-hashes.json')
     & uname -a > (Join-Path $OutputDirectory 'kernel.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Kernel identity unavailable.' }
@@ -336,6 +376,12 @@ try {
     foreach ($block in $protocol.blocks) {
         Assert-WithinDeadline
         $directory = Invoke-Block $block
+        if ($TraceDiagnostic) {
+            & node $cpuTrace analyze $directory
+            if ($LASTEXITCODE -ne 0) { throw 'CPU timeline analysis failed; no attribution or admission.' }
+            $summary.Blocks += [ordered]@{ Name = $block.name; DiagnosticComplete = $true; AdmissionEligible = $false }
+            break
+        }
         $assessment = Join-Path $directory 'assessment.json'
         & node $evaluator $protocolPath $block.name (Join-Path $directory 'rounds.json') $assessment
         $exitCode = $LASTEXITCODE
@@ -343,7 +389,12 @@ try {
         $summary | ConvertTo-Json -Depth 10 | Set-Content $summaryPath
         if ($exitCode -ne 0) { throw "Preregistered $($block.name) limits failed; later blocks not run." }
     }
-    $summary.Status = 'PASS: bounded Linux qualification and both prospective comparison orders'
+    if ($TraceDiagnostic) {
+        $summary.Status = 'DIAGNOSTIC COMPLETE: CPU temporal association only; not release admission'
+    } else {
+        $summary.Status = 'PASS: bounded Linux qualification and both prospective comparison orders'
+        $summary.AdmissionEligible = $true
+    }
     Write-Host $summary.Status
 } catch {
     $summary.Status = 'FAIL: no deployment admission'

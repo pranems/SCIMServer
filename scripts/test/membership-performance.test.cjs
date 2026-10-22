@@ -86,6 +86,7 @@ test('incomplete, reordered, nonfinite, wrong-image and changed-quota receipts f
     rows => { rows[0].requestCount = 4406; },
     rows => { rows[0].status = 'FAIL'; },
     rows => { rows[0].complete = false; },
+    rows => { rows[0].diagnosticOnly = true; },
   ];
   for (const mutate of mutations) {
     const rows = receipts();
@@ -205,7 +206,8 @@ test('preregistered protocol rejects budget and schedule changes', () => {
 });
 
 for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-expired']) {
-  test(`HTTP client retains explicit complete/partial evidence for ${scenario}`, async () => {
+  for (const traced of ['success', 'corrupt-read'].includes(scenario) ? [false, true] : [false]) {
+  test(`HTTP client retains explicit complete/partial evidence for ${scenario}${traced ? ' with diagnostic trace' : ''}`, async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-client-contract-'));
     const receiptPath = path.join(directory, 'receipt.json');
     const token = randomUUID();
@@ -257,6 +259,7 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
         env: { ...process.env,
           SCIM_BENCH_BASE_URL: `http://127.0.0.1:${server.address().port}`,
           SCIM_BENCH_TOKEN: token, SCIM_BENCH_VERSION: '0.55.58', SCIM_BENCH_OUTPUT: receiptPath,
+          SCIM_BENCH_TRACE: traced ? '1' : undefined,
           SCIM_BENCH_DEADLINE_UTC: String(Date.now() + (scenario === 'deadline-expired' ? -1000 : 60000)) },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -271,6 +274,27 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
       assert.equal(receipt.status, scenario === 'success' ? 'PASS' : 'FAIL');
       assert.equal(JSON.stringify(receipt).includes(token), false, 'No token in retained evidence');
       assert.equal(diagnostic.includes('wrong-user'), false, 'Do not export raw response/assertion data');
+      if (traced) {
+        assert.equal(receipt.diagnosticOnly, true, 'Instrumented data must never become release admission');
+        assert.equal(receipt.traceClock, 'process.hrtime.bigint');
+        assert.equal(receipt.spans.length, requests);
+        assert.equal(receipt.spans.filter(span => span.phase === 'warmup').length, 400);
+        assert.equal(receipt.spans.filter(span => span.phase === 'measured').length, scenario === 'success' ? 4000 : 10);
+        let previousEnd = 0n;
+        for (const [index, span] of receipt.spans.entries()) {
+          assert.deepEqual(Object.keys(span).sort(),
+            ['requestIndex', 'operation', 'phase', 'cycle', 'startNs', 'endNs', 'ms', 'status', 'succeeded'].sort());
+          assert.equal(span.requestIndex, index + 1);
+          assert.ok(BigInt(span.startNs) >= previousEnd);
+          assert.ok(BigInt(span.endNs) > BigInt(span.startNs));
+          assert.ok(Number(BigInt(span.endNs) - BigInt(span.startNs)) / 1e6 >= span.ms - 0.1);
+          assert.equal(span.succeeded, true);
+          previousEnd = BigInt(span.endNs);
+        }
+      } else {
+        assert.equal(Object.hasOwn(receipt, 'diagnosticOnly'), false);
+        assert.equal(Object.hasOwn(receipt, 'spans'), false);
+      }
       if (scenario === 'corrupt-read') {
         assert.deepEqual(Object.fromEntries(Object.entries(receipt.samples).map(([key, values]) => [key, values.length])),
           { add: 3, populatedRead: 3, remove: 2, emptyRead: 2 });
@@ -298,6 +322,7 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
       fs.rmSync(directory, { recursive: true });
     }
   });
+  }
 }
 
 for (const unavailable of [false, true]) {

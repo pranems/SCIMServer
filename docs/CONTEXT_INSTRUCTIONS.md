@@ -43,11 +43,23 @@ confirms the first three fixes but finds a missed resource-failure receipt.
 The runner now saves collected CPU/SQL/memory/RSS/OOM observations in `finally`
 before rejection/cleanup. Six initial resource controls reproduce RED; eight
 actual failure/cleanup cases and A/A/A-B role selection bring focused tests
-to 26 PASS. This local correction needs publication; it
-does not repair calibration or authorize repeating the unchanged experiment.
+to 26 PASS. Source `117d5b1e` then passes all 28 protected Validate gates;
+fresh review `5615359957` reports no open code finding. Its Linux run
+`39790526704` fails same-image add/remove p99 (+11.9480% / +14.8634%),
+retaining matching resource receipts and exact cleanup. Seven other exact-tip
+checks pass. Qualification remains failed.
+
+The next bounded source change records one diagnostic-only BAAB block:
+monotonic request spans and owned app cgroup observations, with observer
+cost/gaps and unknown coverage retained. It never invokes the release
+evaluator. All 44 combined contracts pass after RED, covering real subprocess
+lifecycle, explicit failure stages, clock/cost provenance and actual
+diagnostic isolation (16 CPU and 28 existing/client contracts).
+Publication, Linux execution and exact-source interpretation remain next.
 The 0.5 CPU / 1 GiB allocation, 100 warmup cycles, 1,000 measured cycles per
 round and twelve +10% ceilings remain unchanged. No serving/dependency/version
-change; dev remains 0.55.56. Earlier failed receipts remain failed.
+change; dev's last retained serving checkpoint is 0.55.56, not a fresh cloud
+inventory. Earlier failed receipts remain failed.
 See [protocol and limitations](ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing

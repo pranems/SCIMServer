@@ -292,6 +292,117 @@ the measured A/A instability and is not a reason to repeat unchanged timing
 experiments until one happens to pass. Both unexecuted A/B paths remain
 explicitly unverified by Linux execution.
 
+### Diagnostic-only request and CPU timeline (ER-67)
+
+**Recommendation: measure the unresolved scheduling hypothesis before changing
+application code or release limits.** Corrected source `117d5b1e` passed all
+28 protected Validate gates. Fresh review `5615359957` reported no remaining
+code finding. Its automatic Linux run `39790526704` still failed the first
+same-image control: add p99 was 79.200360 versus 70.747433 ms (+11.9480%);
+remove p99 was 77.481641 versus 67.455442 ms (+14.8634%). Every other comparison
+passed. All four new resource receipts match the raw rows; assessment
+recomputation, 66 functional checks, 200 logging checks and exact cleanup pass.
+The second control and both actual old/current blocks did not run.
+
+This second Linux result again compares **identical 0.55.58 images**.
+It cannot identify a version regression. CPU usage across its four broader
+counter windows was 14.826410, 14.761272, 12.235910 and 12.214127 seconds;
+SQL calls were 25,591, 25,593, 25,590 and 25,593. Lower CPU on second visits
+with almost unchanged statement counts is observed. Runtime optimization,
+database warming, logging, background work and quota scheduling remain
+possible explanations, not established causes.
+
+The new diagnostic preserves the original workload, immutable image and
+0.5 CPU / 1 GiB allocation. It executes **one** four-round current/current
+BAAB block, not a new admission campaign. It adds the following evidence:
+
+| Component | Observation / transformation | Safeguard and cost |
+|---|---|---|
+| HTTP client | In-memory monotonic start/end timestamps, original elapsed milliseconds, operation, cycle, phase and success for every request | No bodies, URLs, resource IDs or credentials; tracing is opt-in and can perturb client timing |
+| Owned host observer | Exact app PID identifies its own cgroup; read `cpu.stat` approximately every 2 ms, preserving each read's start/end | Reject another container or a root-only namespace; observer runs outside app quota but still uses shared-host CPU |
+| Analyzer | Match all 4,000 measured spans per round exactly to the original sample arrays; check clock kind, full coverage, monotonic counters and observer cost | Missing coverage, wrong clock or missing cost fails analysis; every raw sample remains retained |
+| Association | Subtract counters only between two read windows wholly inside a request span | Fewer than two interior observations means unknown/null, never a fabricated zero |
+| Output | Eight role/operation summaries with unchanged 2,000 samples each, p50/p95/p99 and counts of tail spans by association | Always `admissionEligible: false`; this output cannot replace the original twelve-comparison release decision |
+
+The following flow separates the observed request from the app-wide counter.
+Both clocks use Linux monotonic time on the same host; the analyzer checks
+their recorded kind and range rather than joining unrelated wall clocks.
+
+```text
+One serial synthetic HTTP request
+  client: start -> fetch -> read and parse body -> end
+               | same Linux host monotonic timeline |
+  host:    [read A] ... [read B] ... [read C]
+               |                 |
+               +-- only fully interior reads --+
+                                  |
+                  whole app cgroup counter difference
+                                  |
+             temporal association, not causal request delay
+
+Complete four-round diagnostic
+  raw spans + CPU reads + original samples + resource/privacy/cleanup receipts
+                                  |
+                  diagnostic analyzer, never admission evaluator
+                                  |
+                diagnostic-only summary and retained unknowns
+```
+
+**Worked example:** suppose a request spans 9-31 ms and complete counter reads
+finish at 10, 20 and 30 ms. An increase in `nr_throttled` between the first
+and last interior reads establishes an app-group counter increase inside
+that span. It does **not** establish how long that request itself was delayed:
+background work shares the group. A 21-29 ms request with only one interior
+read is classified as insufficient evidence. Neither example is a measured
+result from the new Linux diagnostic.
+
+The [diagnostic workflow](../.github/workflows/membership-cpu-diagnostic.yml)
+has read-only repository permission, no cloud credentials and the same
+concurrency group as qualification. Its cooperative work budget is 15 minutes,
+step cap 20 minutes and job cap 30 minutes; checkout/tests/upload have
+2/3/4-minute caps. One observer is owned and stopped per round before app
+cleanup. Its absolute Node executable receives no inherited Linux environment.
+Windows helper tests allow only `SystemRoot`, which Node requires for
+cryptographic startup, not application secrets or Node options.
+Complete and partial evidence is retained for 14 days. A forced process or
+host termination can still lose the current in-memory buffer; absent data
+cannot become analysis success.
+
+| RCA field | Evidence / correction |
+|---|---|
+| Type / severity | Measurement assurance / Medium |
+| Symptom | Broad CPU totals cannot associate individual long requests with scheduler-counter activity; a superficially complete diagnostic could omit clock identity or observer cost |
+| Root cause | Lifecycle counters are coarser than request spans; initial analyzer validation checked sample mapping and coverage but not both additional provenance fields |
+| Fix / why | Keep request spans and bounded external counter observations; reject mismatched clock identity and absent cost before output, explicitly retain deadline/counter failure stages |
+| RED / GREEN | Initial implementation RED: 34 tests, 25 PASS / 9 FAIL. Initial implementation GREEN: 34 PASS; integration coverage: 40 PASS. Additional assurance RED reproduces wrong-clock/missing-cost admission and missing failure stages; final combined run: 44 PASS, zero skips (28 existing/client and 16 CPU) |
+| Prevention | Actual analyzer CLI negative controls, real monitor success/failure/deadline controls, actual PowerShell child lifecycle, actual diagnostic-first-block-only execution and rejection of diagnostic-marked clients by normal qualification |
+| Detection / earliest gate | Focused tests / focused tests; no review or live escape |
+
+Two Low execution frictions were also caught locally. A raw PowerShell
+continuation backtick inside a JavaScript template caused a parser error;
+use PowerShell parameter splatting in the fixture, so interpreter delimiters
+cannot collide. The real Windows helper test then exposed Node exit 134,
+`ncrypto::CSPRNG(nullptr, 0)`, after clearing the entire environment. An
+allowlist containing only Windows `SystemRoot` restores cryptographic startup;
+the lifecycle test verifies no other parent variables reach the observer.
+Both were fixed and confirmed by the real child lifecycle control, not skipped.
+Detection and earliest possible gate are the same local parse/lifecycle tests.
+
+**Next:** publish normally, execute this diagnostic once on its exact Linux
+source, verify its full artifact, and use the result to select a justified
+prospective calibration correction. Do not enlarge quotas, discard samples,
+repeat unchanged measurements until favorable or claim a causal profile from
+counter correlation alone. Publication, Linux execution, fresh review,
+performance admission and all downstream deployment gates remain distinct.
+
+**Self-improvement: applied.** Assert clock provenance, unknown coverage and
+observer cost as outcomes; execute actual child lifecycle and admission
+isolation rather than checking that configuration text exists.
+**Design/architecture disposition: accepted.** The client records spans, the
+small observer owns counter collection, and the analyzer owns interpretation.
+Production code and the admission evaluator's numerical policy are unchanged;
+a profiler framework or new configurable admission strategy is not justified.
+
 ### Earlier implementation checkpoint (historical)
 
 **Current result:** the latest immutable local candidate passes eleven of

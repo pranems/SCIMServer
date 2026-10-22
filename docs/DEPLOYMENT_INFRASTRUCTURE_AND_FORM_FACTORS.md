@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.54`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-22 - **Repo version at capture:** `api/package.json` = `0.55.54`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -41,6 +41,24 @@ availability and noise still require the actual controls to pass. A shared
 physical host is possible even with an isolated runner VM. This source change
 does not itself prove qualification, update the live-estate inventory below,
 or replace remaining migration/live/browser/customer gates.
+
+The source-only [membership-cpu-diagnostic.yml](../.github/workflows/membership-cpu-diagnostic.yml)
+adds a separate diagnostic job on the same existing runner service and
+concurrency group. It runs one four-round same-image BAAB block with the
+original quota and workload, recording request spans and exact-owned cgroup
+CPU counter reads. It never calls the release evaluator or creates admission:
+both rows and results are explicitly diagnostic-only. Cooperative work is
+bounded to 15 minutes inside a 20-minute step and 30-minute job, with
+2/3/4-minute checkout/test/upload caps and 14-day complete/partial retention.
+The observer receives no inherited Linux environment, runs outside app quota
+and is stopped before app cleanup. Its CPU cost and sampling gaps are retained;
+shared-host perturbation and insufficient short-request sampling remain
+limitations. It has `contents: read` only and no cloud or deployment authority.
+See [ER-67](ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
+
+This header's 2026-10-22 verification covers the source workflows above.
+The estate snapshots below retain their original capture dates; no fresh
+Azure inventory or serving change is claimed by this diagnostic work.
 
 ## 0.55.56 candidate startup-output hardening
 

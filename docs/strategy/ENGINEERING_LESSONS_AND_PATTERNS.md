@@ -55,6 +55,25 @@ the values still exist after cleanup. Moving to a different host is not a
 repeatability fix unless its same-image controls pass. See
 [ER-66 and the failed Linux control](../ENDPOINT_SNAPSHOT_REVISION.md#linux-control-result-and-resource-failure-retention-er-66).
 
+### Diagnostic observations must not become admission or causal claims
+
+Retain request spans and independent counter read windows on the same
+verified monotonic clock, including observer cost, gaps and explicit unknown
+coverage. An app-wide counter increasing inside a request does not measure
+that request's lost time. Two read windows must be wholly interior before
+computing a difference; insufficient observations stay unknown, not zero.
+Reject diagnostic-marked receipts from normal admission even when complete,
+and execute the actual mode-selection branch to prove it cannot reach the
+release evaluator or later comparison blocks.
+
+Test real subprocess startup and shutdown, not only mocked lifecycle calls.
+Clearing inherited secrets is desirable, but Windows Node cryptographic
+startup still needs `SystemRoot`; allow that one OS value rather than
+restoring the parent environment or skipping the test. Parameter splatting
+also avoids raw PowerShell backticks colliding with JavaScript template
+delimiters in cross-interpreter fixtures.
+See [ER-67](../ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a
