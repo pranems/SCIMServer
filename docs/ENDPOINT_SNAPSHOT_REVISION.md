@@ -1197,3 +1197,39 @@ actual migrated indexes and WAL before attributing equal-batch insert cost.
 adds no production abstraction or dependency and preserves existing read/write
 responsibilities. The source documentation follow-up has its own normal
 protected publication and exact-tip CI receipt.
+
+### Substantive review disposition and ER-54
+
+The earlier hosted-review-only hold is superseded by verified repository
+policy and actual review evidence. PR #247 uses an explicitly labelled
+independent automated source review after the same hosted Copilot billing
+error. The delivery process requires substantive review and green exact-tip
+CI, not that specific provider; master has no required approving-review
+configuration. This is not permission to skip review or self-approve.
+
+The genuine read-only `code-review` agent reviewed the integrated correction
+against master `5841f724`, including untracked production helpers, migration
+and tests. Its actual result at 2026-10-21 22:14:37 UTC is **"No significant
+issues found in the reviewed changes."** Only documentation/private handoff
+edits occur between that result and source commit `a6b56aeb`.
+
+A fail-closed coverage check compares that committed source with `e565d1fe`.
+Serving source and migrations are unchanged. The later delta consists of
+documentation, directly reviewed fixture/test repairs, the inspected browser
+baseline and public-CI locks whose dependency graphs and provenance are
+identical after removing only root-version fields. Negative controls reject
+new serving-code or migration paths. The real 328-case browser closure and
+complete backend/live receipts remain independent validation, not a substitute
+for this actual reviewer result.
+
+| ID | Type / severity | Symptom and mechanism | Resolution and prevention |
+|---|---|---|---|
+| ER-54 | Process / Medium | Delivery was held after treating a hosted Copilot billing failure as absence of every valid review path, despite an existing substantive independent review and accepted repository precedent. | Verify the actual policy, branch requirements, reviewer result and exact scope before declaring an external-provider outage a hard blocker. Carry forward the genuine independent review only with unchanged serving inputs, explicit later-delta review and fail-closed controls. Publish it transparently as automated review, never human approval. Detected when the operator requested continued autonomous execution; the earliest check was the first hosted-review failure. |
+
+**Test/gate improvement: applied.** Review coverage is checked against Git,
+the intact continuation's actual reviewer result and intervening edits;
+production/migration negative controls and strict lock-graph comparisons
+prevent a success-shaped review carry-forward after a material change.
+**Design/architecture disposition: accepted.** No runtime abstraction,
+permission, billing setting or correctness policy changes. Normal protected
+publication, exact-tip CI, reviewed merge and deployment evidence stay distinct.

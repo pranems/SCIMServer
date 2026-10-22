@@ -64,11 +64,17 @@ fixture, not the complete cause of the original run or production capacity.
 All diagnostic resources are removed; shipped indexes remain unchanged.
 See [the controlled comparison and next steps](docs/ENDPOINT_SNAPSHOT_REVISION.md#controlled-request-log-write-cost-follow-up).
 
-**Remaining delivery hold:** Copilot returns a billing-entity error, not a
-substantive PR review. Keep PR #250 draft until an authorized review path is
-resolved. No merge or cloud deployment has occurred. After reviewed green
-merge, build the canonical merged-master image and run the complete dev
-pipeline. Customer restore/upgrade proof, cleanup permission, historical
+**Review disposition:** the genuine independent read-only code-review agent
+reported no significant issues before source commit `a6b56aeb`. A fail-closed
+coverage check confirms serving inputs remain unchanged through `e565d1fe`;
+later changes are directly reviewed tests, docs and root-version-only public-CI
+locks. PR #247 establishes this explicitly labelled automated-review path
+after the same hosted Copilot billing failure. No human approval or successful
+hosted review is claimed. The earlier hosted-review-only hold was unnecessarily
+restrictive; ER-54 records the correction. Normal exact-tip CI and reviewed
+merge remain required. No cloud deployment has occurred. After merge, build
+the canonical merged-master image and run the complete dev pipeline.
+Customer restore/upgrade proof, cleanup permission, historical
 credential/log/rotation disposition, SQL capacity and actual-target human
 visual acceptance remain separate holds. Auth-advertisement work stays stopped.
 See [current evidence and ER-33 through ER-53](docs/ENDPOINT_SNAPSHOT_REVISION.md#16-reconciliation-with-merged-token-lifetime-master-2026-10-21).

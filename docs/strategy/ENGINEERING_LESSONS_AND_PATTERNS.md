@@ -16,6 +16,16 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### A reviewer-provider outage is not automatically a review-policy blocker
+
+Check the actual delivery policy, branch requirements and accepted repository
+precedent before treating one hosted reviewer's billing error as a permanent
+delivery hold. A genuine independent automated review can be recorded as such
+when that path is accepted; it must never be relabelled human approval. Verify
+its exact source coverage, intervening edits and dependency identities before
+carrying it forward. New serving code or migrations invalidate that coverage.
+See [ER-54](../ENDPOINT_SNAPSHOT_REVISION.md#substantive-review-disposition-and-er-54).
+
 ### Equal batch counts do not prove equal database work
 
 Reconcile affected rows as well as statement calls, then inspect the actual
