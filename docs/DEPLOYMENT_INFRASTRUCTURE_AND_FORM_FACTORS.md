@@ -7,6 +7,33 @@
 
 ---
 
+## Prospective performance qualification runner (2026-10-22 source change)
+
+[performance-qualification.yml](../.github/workflows/performance-qualification.yml)
+uses the repository's existing public GitHub Actions service with an
+`ubuntu-24.04` runner. It provisions no Azure resource or new paid host, grants
+only `contents: read`, serializes qualification campaigns and permits no
+deployment or package publication. The job has a 75-minute hard cap and
+retains completed/failed evidence for 14 days. It starts on relevant pull
+requests or explicit workflow dispatch, not every application change.
+
+The [fixed manifest](../scripts/performance/membership-protocol.json) pins
+actual application/PostgreSQL images and the original app resource limits.
+Separate owned app/database processes are created per four-round block;
+each role's app/database is reused for its second visit, preserving the
+existing within-block history. Two A/A blocks must pass before the two A/B
+blocks. This tests a fresh Linux execution environment, not the deployed
+Azure estate. Windows-hosted Docker is explicitly rejected for this lane.
+Failure stops later blocks and cannot authorize a deployment.
+
+Only synthetic, labelled, exact-cleanup fixtures are used. No Azure
+credentials, gallery provisioning jobs or customer data are supplied.
+The public-runner path avoids provisioning new paid capacity; runner
+availability and noise still require the actual controls to pass. A shared
+physical host is possible even with an isolated runner VM. This source change
+does not itself prove qualification, update the live-estate inventory below,
+or replace remaining migration/live/browser/customer gates.
+
 ## 0.55.56 candidate startup-output hardening
 
 The container entrypoint now reports database configuration presence only,

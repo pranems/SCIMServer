@@ -7,6 +7,112 @@ Performance admission and the independent release gates remain open.
 
 ## 1. Executive summary
 
+### Prospective Linux performance qualification
+
+**2026-10-22 checkpoint:** PR #250 is merged at `e1070ba2`. Its current
+immutable 0.55.58 image starts with `f57b765a`. The current correctness matrix
+passes, but deployment remains blocked by performance. In the retained
+Windows/Docker BAAB run, add p99 increases 10.22% and empty-read p99 increases
+25.98% over actual customer 0.55.20. Opposite order passes all twelve limits.
+A separate identical-current-image control flags eight of twelve comparisons.
+This shows that a code difference is unnecessary for these flags in that
+allocation, not that the candidate is safe or that the gate may be waived.
+
+The user requests autonomous implementation of the next step. A separate
+tooling-only change moves a **prospective** qualification to the existing
+public GitHub Actions Linux-runner service. No paid host is provisioned and
+no serving code, migration, dependency or release version changes. The
+earlier proposed 128-round, two-history-stratum confidence-bound campaign is
+not adopted: its cost and statistical decision properties were not justified.
+
+The following figure shows the fixed fail-stop flow. Every block has four
+rounds; A is the pseudo-baseline and B the pseudo-candidate.
+
+```text
+Pinned images + source hashes + host identity, before timings
+                         |
+Same current image: BAAB, then ABBA
+  Each block: both directions of all twelve point ratios within 10%
+                         |
+                  Both controls PASS?
+                   /             \
+                 no              yes
+                  |               |
+        retain FAIL and stop       Actual 0.55.20 vs 0.55.58: BAAB, then ABBA
+                                  Each block: all twelve original +10% ceilings
+                                             |
+                                  retain every result and exact cleanup
+                                             |
+                                  remaining independent deployment gates
+```
+
+| Property | Retained behavior / explicit decision |
+|---|---|
+| Manifest | [membership-protocol.json](../scripts/performance/membership-protocol.json) freezes four blocks before execution |
+| Workload | Add member, read exact populated membership, remove member, read exact empty membership; 100 warmup plus 1,000 measured complete cycles per round |
+| Samples | Four operations x 1,000 x four rounds = 16,000 measurements/block; two visits yield 2,000 samples per operation/role |
+| Estimator | Original nearest-rank p50/p95/p99 over all 2,000 raw values, not rounded summaries, selected repeats or cross-block pooling |
+| Original ceilings | All twelve candidate/baseline ratios at most 1.10 in each A/B block; a single failure stops the campaign |
+| A/A qualification | Additionally require all twelve ratios at least 1/1.10 in each control; failure prevents either A/B block |
+| Allocation | App containers remain 0.5 CPU / 1 GiB, CPU quota/period 50,000/100,000 microseconds, original Node RSS ceiling 384 MiB; actual settings checked |
+| History | Fresh app/PG processes per block, role app/database reused on its second visit within that block; no additional history stratum |
+| Client identity | Same immutable candidate image's Node runtime drives both roles through host networking; this is a declared environment change from the Windows-host client |
+| Runtime controls | Original 4,407 requests/round, two version checks and exact fixture absence; 66 functional and 200 private logging/correlation checks per completed block |
+| Safety | Private labelled Docker network/databases; generated ephemeral credentials; no raw private logs exported; ownership-checked exact-ID cleanup and absence readback |
+| Budget | At most sixteen rounds; rough historical extrapolation about 43 minutes before setup, not a measured Linux duration; 75-minute job cap, no automatic retries |
+| Workflow authority | [performance-qualification.yml](../.github/workflows/performance-qualification.yml) has contents-read permission only, no Azure credentials or deploy command |
+| Evidence | Every completed/failed block, raw timings, source/image identities, cgroup counters, privacy and cleanup receipts retained as a 14-day Actions artifact |
+| Scope limit | Two passing controls do not quantify false-failure probability or establish actual-customer concurrency/capacity; a runner VM can share physical hardware |
+| Original failure | Remains FAIL/unresolved historically; a later valid prospective result is separate evidence, never a retrospective PASS |
+
+**Worked decision example:** if A/A empty-read p99 is 60 ms versus 80 ms,
+the ratio is 0.75, below 1/1.10, so the environment is not qualified and
+neither old/current comparison starts. If both controls pass but the first
+A/B add p99 is 98 ms versus 88 ms, 98/88 = 1.1136 exceeds 1.10; retain
+the failure and do not run the second A/B block hoping for a better result.
+Only all four passing blocks satisfy this bounded prospective protocol.
+
+**Tests and execution RCA (ER-62).** Eleven focused Node contracts pass, after
+the initial missing-evaluator RED. They exercise exact numerical outcomes,
+tail-only failure, raw unrounded limits, complete sample/image/quota validation,
+parser validity and the actual extracted PowerShell orchestration. Injecting
+failure at each of its four positions proves no later block or retry runs.
+Two real local HTTP client controls verify the full 4,407-request lifecycle,
+1,000 retained samples per operation, and exact fixture deletion even when
+incorrect membership readback deliberately fails the client.
+A local parser check caught `$role:` interpolation before execution; the
+permanent parser test reproduced the exact error before `${role}:` fixed it.
+Type: tooling/shell; severity: Low; detection and earliest possible stage:
+local parser, zero stage escape. Why it works: explicit braces delimit the
+variable before the punctuation. Prevention is now executed by the workflow
+before Docker resources are allocated. No Linux benchmark PASS is claimed at
+this authoring checkpoint.
+
+The local YAML check initially requested an absent optional `yaml` package.
+It then reused the already installed `js-yaml` dependency to parse the actual
+workflow and verify read-only permissions, PR triggering and the 75-minute
+cap. No installation or lockfile change was needed. Type: tooling; severity:
+Low; detected at the first local workflow check, with no stage escape.
+Prevention: resolve an existing parser rather than adding a dependency for
+a one-off validation. Both failed and successful commands remain in the
+available continuation transcript; no deleted predecessor transcript is claimed.
+
+**Self-improvement applied:** the previously private benchmark now has a
+versioned manifest, executable percentile/fail-stop/parser guards, immutable
+dependencies and independently retained failure evidence. The unchanged
+existing application suites remain independent; do not rerun them manually
+immediately before the required hook owns that same run.
+
+**Design/architecture disposition: accepted.** The small client measures
+HTTP, the evaluator validates data and computes comparisons, and the runner
+owns resources/order. These are distinct existing responsibilities, not a
+new general framework or production dependency. Extra history strata, eight
+blocks per phase and an unvalidated confidence formula are deliberately
+excluded. Statistical repeatability beyond these controls and actual customer
+capacity remain explicit limits, not silent success-shaped fallbacks.
+
+### Earlier implementation checkpoint (historical)
+
 **Current result:** the latest immutable local candidate passes eleven of
 twelve full half-CPU latency limits; empty Group GET p99 still fails by
 15.15%. Correctness controls pass, but release admission remains blocked.

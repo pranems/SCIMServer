@@ -16,6 +16,20 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Performance admission needs a prospective environment control
+
+Identical application images can cross regression limits when their execution
+environment is unstable. Keep the original failed receipt; do not choose a
+favorable opposite-order denominator or pool later observations to rewrite it.
+Before a new admission, freeze workload, image identities, limits, complete
+sample counts, order and stop rules. Run same-image controls first on the
+prospective environment and stop if they fail. Passing a small number of
+controls does not quantify a false-failure rate. More rounds, new history
+strata and confidence formulas are not free assurance: justify their decision
+properties and runtime before adopting them. The narrow Linux qualification
+reuses the original lifecycle instead of building a new measurement framework.
+See [protocol and RCA](../ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

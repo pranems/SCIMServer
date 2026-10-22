@@ -4,6 +4,27 @@
 
 ### Current master/performance reconciliation (2026-10-21)
 
+**2026-10-22 merged-master and qualification continuation:** PR #250 is now
+merged at `e1070ba2`, after reviewed head `5b3136d1`, all 25 protected-push
+gates and seven exact-tip CI checks. Current immutable 0.55.58 image is
+`sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.
+The merged-source matrix passes 6,210 API units per backend, 2,612 PostgreSQL
+HTTP cases, 2,570 InMemory HTTP cases with 42 genuine database exclusions,
+and 1,655 Web unit/coverage cases. These supersede older-source counts below.
+
+Deployment remains held: original BAAB fails two latency ceilings; opposite
+order passes, and one identical-image control flags eight of twelve comparisons.
+The original failed admission is retained, not waived. Dev remains 0.55.56.
+The user requests autonomous implementation rather than another planning hold.
+A separate harness-only branch adds a bounded Linux qualification workflow on
+existing public GitHub Actions runners: BAAB and ABBA A/A controls, then both
+old/current orders only if both controls pass. No new paid host, deployment
+permission, serving change, dependency update or version bump is involved.
+All raw samples, immutable inputs, private-log checks and exact cleanup remain
+required. Eleven evaluator/orchestration/parser/HTTP contracts pass after RED.
+Actual Linux execution, review and publication are not yet claimed.
+See [the qualification protocol](docs/ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
 **2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review
 works after billing selection. The cache-binding correction is published in
 `8dcf0f2d` through all 25 normal hook gates (681.4 seconds; 6,210 units /

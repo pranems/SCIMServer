@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Prospective Linux performance qualification (tooling only)
+
+- Add a read-only-permission workflow on existing public GitHub Actions Linux
+  runners, using pinned current 0.55.58, customer-baseline 0.55.20 and PostgreSQL
+  images. No serving artifact, dependency, database schema or product-version
+  change is made; 0.55.58 remains the candidate version.
+- Preregister two opposite-order same-image controls before either old/current
+  comparison. Fail immediately without retries or discarded samples. Preserve
+  0.5 CPU / 1 GiB, 100 warmup and 1,000 measured lifecycle cycles per round,
+  2,000 samples per operation/role/block and all twelve +10% point ceilings.
+- Retain all raw timings, immutable/source identities, cgroup counters,
+  66 functional checks, 200 privacy/correlation checks and exact-ID cleanup.
+  Same-image checks additionally require reciprocal 10% agreement. The bounded
+  protocol does not estimate a false-failure probability or prove customer
+  capacity. Existing failed Windows admission remains a failed receipt.
+- New focused Node contracts: 0 -> 11 passing, including actual PowerShell
+  orchestration failure controls, unrounded p99 and changed-budget rejection.
+  RED receipts include missing evaluator and a caught PowerShell interpolation
+  parser error. Real HTTP client controls verify 4,407 requests, complete
+  sample arrays and fixture deletion after corrupt readback. CI benchmark
+  execution and deployment are not claimed here.
+
 ### 0.55.58 consolidation onto token-lifetime master
 
 - Address hosted review's shared-cache binding collision before release:

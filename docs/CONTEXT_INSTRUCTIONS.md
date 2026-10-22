@@ -9,6 +9,25 @@
 
 ## Active Delivery Process
 
+**2026-10-22 current merged checkpoint:** PR #250 merged at `e1070ba2` after
+the final `5b3136d1` review and exact-tip CI. Immutable 0.55.58 image digest:
+`sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.
+Full current matrix passes 6,210 units per backend, 2,612 PostgreSQL HTTP,
+2,570 InMemory HTTP plus 42 genuine exclusions, and 1,655 Web unit/coverage
+cases. Performance, not correctness, blocks the remaining deployment stages.
+BAAB fails two original ceilings; opposite order passes; an identical-image
+control flags eight of twelve metrics. This does not establish candidate safety.
+
+The autonomous continuation implements a separate harness-only prospective
+Linux qualification on existing public Actions runners, without provisioning
+paid capacity: two opposite-order A/A blocks must pass before two opposite-order
+A/B blocks can run. Eleven local evaluator/parser/HTTP/orchestration contracts
+pass; Linux execution and publication remain separate unproved steps.
+The 0.5 CPU / 1 GiB allocation, 100 warmup cycles, 1,000 measured cycles per
+round and twelve +10% ceilings remain unchanged. No serving/dependency/version
+change; dev remains 0.55.56. Earlier failed receipts remain failed.
+See [protocol and limitations](ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
 selection and identifies a real shared-cache binding collision. The generic
 service now keys by full ResourceType binding, separately from builtin keys.
