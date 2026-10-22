@@ -17,6 +17,14 @@ push passes 28 gates. CodeQL alert 336's PR instance is fixed. The current
 follow-up changes only browser tests, one inspected pixel baseline and docs;
 its own protected publication/CI is a separate receipt.
 
+The follow-up `1e96fa33` is now normally published: all 25 Fast gates PASS,
+6,208 units and 2,511 hook-subset HTTP cases. The recorded 9,185.9-second
+push includes an overlapping Windows-reported 143-minute sleep interval;
+it is not active service-latency evidence. ER-53 preserves the exact times.
+Exact-tip CI/review remain independently tracked; a small documentation
+follow-up records this newly observed environment issue without changing
+runtime or browser inputs.
+
 | Current pre-merge check | Verified result |
 |---|---|
 | API units, both backends | 6,208 PASS per backend |
@@ -54,7 +62,7 @@ merge, build the canonical merged-master image and run the complete dev
 pipeline. Customer restore/upgrade proof, cleanup permission, historical
 credential/log/rotation disposition, SQL capacity and actual-target human
 visual acceptance remain separate holds. Auth-advertisement work stays stopped.
-See [current evidence and ER-33 through ER-52](docs/ENDPOINT_SNAPSHOT_REVISION.md#16-reconciliation-with-merged-token-lifetime-master-2026-10-21).
+See [current evidence and ER-33 through ER-53](docs/ENDPOINT_SNAPSHOT_REVISION.md#16-reconciliation-with-merged-token-lifetime-master-2026-10-21).
 
 ### Isolated token-lifetime release consolidation (2026-10-21)
 

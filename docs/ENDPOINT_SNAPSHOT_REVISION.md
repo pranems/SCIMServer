@@ -1020,6 +1020,7 @@ session evidence; unresolved historical scope is not marked complete.
 | ER-50 | Windows runner discovery / Low | The browser-only repair runner's first discovery finds zero tests because Playwright treats Windows backslashes in its filename selectors as regular-expression escapes. A later two-case selection is correctly discovered but rejected because the parser expects plural `files`, not singular `file`. Neither rejection allocates application resources. | Use unique filename-only selectors, accept both summary forms and require exactly two cases for the narrow baseline update. The corrected discovery finds 30 neighborhood cases or the intended two baseline cases. Keep the zero-discovery rejection and unique per-run evidence directories. Detected before resource allocation, the earliest selector boundary. |
 | ER-51 | Inherited test typing / Low | Expanded compilation of all four touched browser specs finds an existing TS2322 in the conflict spec: `expect.poll` receives a function-valued diagnostic message, but Playwright requires a string. The first overly strict check also incorrectly expects the unchanged baseline to have zero diagnostics. | Preserve the baseline error receipt, use the correctly typed message string, then verify current zero against the actual one-error baseline. Production Web inputs remain unchanged, so the separate 66-diagnostic application baseline is not relabeled zero. Detected in expanded browser-spec compilation; earliest detection is including this spec in that compiler. |
 | ER-52 | PowerShell native arguments / Low | The first narrow baseline attempt runs with effective Playwright mode `missing`, not the requested `changed`. A single-element array emitted from an `if` expression becomes a scalar string; native splatting expands it into characters. The snapshots remain unchanged and both comparisons correctly fail. | Explicitly type every native selector/option collection as `string[]`. A native argument probe demonstrates scalar expansion, an allocation-free CLI check verifies the intended option, and the repaired two-case campaign reports effective mode `changed`, two PASS and verified cleanup. Record the effective mode in every repair receipt. Detected by the retained failed pixel run; earliest detection is the native argument/configuration preflight. |
+| ER-53 | Host power state / Low | The normal Fast push of `1e96fa33` passes all 25 gates but reports 9,185.9 seconds overall; its HTTP gate reports 8,748.2 seconds and Jest 8,725.323 seconds. This is far above the earlier complete matrix duration. Windows Power-Troubleshooter event 1 records sleep from 2026-10-22 02:03:04.4236235 UTC to 04:26:24.7331399 UTC, overlapping this gate. | Classify the approximately 143-minute host sleep separately from active execution. Preserve the actual 6,208-unit / 2,511-HTTP PASS, 42 genuine database-only exclusions and timing; do not relabel the run as a normal seven-minute push or infer a database regression from suspended wall time. No power-policy change or favorable full-suite rerun is used to replace it. Check host power evidence before interpreting anomalous elapsed time. Detected in the hook summary; earliest useful boundary is execution-environment timing context. |
 
 The first normal push was blocked before API HTTP, migration and Web-test
 gates could run. Its 6,203 passing cases do not make it a passing unit run.
@@ -1085,10 +1086,24 @@ own normal protected push and exact-tip CI. Copilot's billing error remains
 an external substantive-review hold. These results authorize neither a merge
 without review nor a claim of merged-master, Azure dev or customer validation.
 
+The normal protected publication of `1e96fa33` subsequently passes all
+**25 Fast gates**, including 6,208 units and 2,511 InMemory HTTP cases.
+Its unusually long elapsed time is explained in ER-53, not substituted for
+the matched performance benchmark. The hook retains Jest's force-exit warning;
+an exit-zero assertion run is not a claim of leak-free worker teardown.
+That warning's individual cause remains unproven and is separate from the
+verified host sleep. No timer or cleanup diagnosis is invented.
+The same warning exists in the earlier complete InMemory matrix, confirming
+that it predates this browser-only repair. Maintainer follow-up, target
+2026-10-23: isolate its originating suite/open handle before changing teardown
+or running another broad diagnostic campaign. It is a retained baseline
+limitation, not evidence that the measured service benchmark failed.
+
 **Continuation provenance:** the entire available continuation event stream
-was reconciled through **47,571 records**, using signal-frequency and causal
+was reconciled through **47,798 records**, using signal-frequency, host-power
+and causal
 narration passes. This is not recovery of the deleted original transcript.
-Confirmed integration issues map to ER-33 through ER-52. Source/search/patch
+Confirmed integration issues map to ER-33 through ER-53. Source/search/patch
 echoes, ordinary Git CRLF warnings, deliberate invalid-input HTTP rejections
 and the native-argument negative probe are not counted as new product bugs.
 The existing depth-10 live-report serialization warning does not truncate
