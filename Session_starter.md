@@ -2,7 +2,22 @@
 
 **Last verified:** 2026-10-22
 
-### Current master/performance reconciliation (2026-10-21)
+### Current master/performance reconciliation (2026-10-22)
+
+**Current publication hold:** remote stays `30fbea59`; all five review threads
+are resolved. Signed-clock correction `58f06800` and follow-ups are local.
+Three ordinary Validate attempts remain separately retained: missing caller
+Prisma environment (resolved directly), four Web worker-startup errors, then
+a nested real-timezone Jest child exceeding its unchanged 30-second deadline.
+The last attempt has 23 passing gates and one failing gate; later gates do
+not run. Focused success and the complete instrumented Web diagnostic are
+not substitutes for a complete ordinary hook. No further blind full retries,
+new-source CI, merge or deployment. Startup/deadline investigation remains
+open; performance admission is independently still held. See ER-68e/h-l.
+
+| Date | Summary |
+|---|---|
+| 2026-10-22 | Native signed-clock correction passes 72 focused tests and exact retained-data replay; ordinary publication remains blocked by separately retained Web and nested-Jest startup/deadline failures. |
 
 **Latest actual native execution, 2026-10-22:** `30fbea59` passes all 28
 protected gates, both review findings are resolved and fresh review

@@ -2,12 +2,23 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.58
-> **Last Updated**: October 21, 2026
+> **Last Updated**: October 22, 2026
 > **Last verified:** 2026-10-22
 
 ---
 
 ## Active Delivery Process
+
+**Current publication hold, 2026-10-22:** remote remains `30fbea59`, with all
+five review threads resolved. The local signed-clock correction passes 72
+focused tests and separate exact native-data replay, but three ordinary
+Validate attempts do not authorize publication. Missing caller Prisma
+environment is corrected; Web worker startup and the nested real-timezone
+Jest child deadline remain intermittent and unresolved. Latest attempt:
+23 gates PASS, then API units FAIL (6,209 pass /1 child deadline failure).
+Later gates do not run. Do not combine focused/diagnostic results into a
+full PASS or repeat full suites blindly. No new-source CI, merge, deployment,
+serving change or version bump. Master is still `e1070ba2`; see ER-68e/h-l.
 
 **Latest actual native execution, 2026-10-22:** `30fbea59` is published through
 28 passing gates and fresh review `5618294791` has no open code issues.

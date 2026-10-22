@@ -669,9 +669,30 @@ useful gate is this now-added observer contract. Design disposition:
 **accepted**; keep the probe scratch-only, with no serving dependency or
 production instrumentation.
 
+**ER-68l, nested test-process deadline / Medium:** ordinary protected attempt
+three on `8d86bbfd` fails API unit validation before HTTP, generation, migration
+lint or Web run. One of 6,210 assertions fails: the real non-UTC timestamp
+probe in `endpoint-cache-freshness.spec.ts` spawns another complete Jest
+process, which exceeds its unchanged 30,000 ms bound after 30,103 ms
+(`status=null`, `signal=SIGTERM`, `ETIMEDOUT`). The other 6,209 assertions and
+212 suites pass; that is not a complete unit PASS or a timestamp-value failure.
+
+The exact isolated parent case passes with the same nested child/deadline
+in 18.54 seconds; the other 20 cases are intentionally outside that selector.
+This does not prove the full-run issue is resolved. The deadline is observed;
+the startup/execution phase causing the delay remains unproven. Do not raise
+timeouts, exclude the case or keep repeating the complete suite until green.
+Preserve all three blocked publication logs. The detecting gate is the full
+unit run; isolated success alone cannot expose full-load timing effects.
+**Scheduled follow-up:** continuation owner, target 2026-10-23, task
+`endpoint-timezone-child-deadline-20261022`; capture the child's actual startup
+and execution phases under the ordinary unit gate. The separate Web startup
+task stays open with the same owner/target. Design disposition: **accepted**;
+no speculative test-runner or serving refactor is justified by these timings.
+
 **Updated completeness note:** reconciled the full available continuation
-through event record 59,940 using signal-frequency and causal-narration passes.
-Confirmed native issues map to ER-68a-k; intentional TDD failures, expected
+through event record 60,068 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-l; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not
 the deleted original session.
