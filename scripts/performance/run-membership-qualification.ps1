@@ -585,7 +585,12 @@ try {
         Write-Warning 'Campaign receipt write failed; primary campaign error retained.'
     } finally {
         foreach ($key in $envNames) {
-            [Environment]::SetEnvironmentVariable($key, $priorEnvironment[$key])
+            if ($null -eq $priorEnvironment[$key]) {
+                # PowerShell $null binds as empty text on .NET 9+, not a null string.
+                [Environment]::SetEnvironmentVariable($key, [NullString]::Value)
+            } else {
+                [Environment]::SetEnvironmentVariable($key, $priorEnvironment[$key])
+            }
         }
     }
 }

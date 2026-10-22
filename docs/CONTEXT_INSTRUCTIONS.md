@@ -9,6 +9,15 @@
 
 ## Active Delivery Process
 
+**Current Linux/review follow-up:** `6a710734` passes all 28 ordinary gates in
+1229.7 seconds, then its Linux workflows fail three campaign contracts before
+benchmark allocation. An official Linux 7.5.0/.NET 9.0.1 reproduction proves
+ordinary null binds as empty text; typed null restores absence and preserves
+original empty values. Review `5621417287` adds leaf capture-status writer
+precedence. Both local corrections pass 107 focused contracts and six actual
+Linux controls after RED. See ER-68ad-ag. Protected publication, fresh CI and
+review remain required; all original admission/deployment holds remain.
+
 **Current review correction:** published `abbcce07` passes 28 ordinary Validate
 gates in 1171.7 seconds (API 6210/213, HTTP 2514/118, Web 1655/124).
 All four findings in review `5620999429` now have local fixes: independent

@@ -946,6 +946,107 @@ intentional RED controls, repeated quotations, normal CRLF warnings and
 workflow failures already retained above are not invented additional issues.
 This is not access to the deleted original transcript.
 
+### Linux restoration and leaf capture-status writer (ER-68ad-ag)
+
+`6a710734` publishes normally: all 28 Validate gates PASS in 1229.7 seconds,
+API 6210/213, HTTP 2514/118 and complete Web 1655/124. Fresh review
+`5621417287` identifies one additional relevant leaf-finalizer defect.
+The new Linux qualification, timeline and native jobs all fail three campaign
+contracts **before allocating benchmark resources**. Their missing-artifact
+upload errors are cascades, not additional performance failures. The previous
+`abbcce07` benchmark artifacts remain unchanged.
+
+**ER-68ad, runtime/platform semantics / Medium.** Windows PowerShell 7.4.21
+on .NET 8.0.32 deletes a variable when its value binds as empty text. A controlled,
+network-disabled official Linux PowerShell 7.5.0 / .NET 9.0.1 container
+reproduces the hosted failure: ordinary `$null` binds to a string parameter as
+empty text, leaving the variable present with an empty value. A real .NET
+null, passed using `[NullString]::Value`, removes it. The exact hosted patch
+version was not captured; the controlled runtime proves the changed mechanism,
+not that it is the identical hosted build.
+
+```text
+Originally absent variable
+  Old restoration: PowerShell $null -> empty string -> present but empty
+  Corrected restoration: NullString.Value -> .NET null -> absent
+
+Originally present empty variable
+  Corrected restoration: original empty string -> still present and empty
+```
+
+The [official .NET 9 compatibility note](https://learn.microsoft.com/en-us/dotnet/core/compatibility/core-libraries/9.0/empty-env-variable)
+documents the distinction; [PowerShell/PowerShell#24637](https://github.com/PowerShell/PowerShell/issues/24637)
+documents the string-binding issue. The actual null/typed-null probe records
+`present:true/isNull:false` versus `present:false/isNull:true`.
+Use typed null only for an originally absent value; preserve existing values,
+including a real empty string. All three actual campaign controls are RED on
+Linux before correction and GREEN afterwards. Extend them to assert original
+empty-state identity, not merely that generated text disappeared.
+Detection: hosted pre-allocation contracts; earliest possible gate: local
+Linux-runtime smoke before the complete protected hook. Prevention **applied**:
+cross-runtime smoke, a measured null-binding probe, and a standing restoration
+rule. The Docker reproduction image is pinned at digest `042240d57ec9...`;
+it is a test runtime, not a new application/base image or deployment.
+
+**ER-68ae, leaf error precedence / Medium.** Review `5621417287`, comment
+`4354001080`, finds that `Save-NativeProfile` still lets its own status writer
+replace an ownership/lifecycle/copy/exit error. The earlier precedence walk
+covered the caller's finalization but missed this leaf `finally`.
+Save the first outer ErrorRecord before attempting its status receipt.
+Explicitly warn if that secondary writer fails, retain the original error,
+and still throw a writer-only failure. Actual ownership-plus-write and
+failed-exit-plus-write controls are RED first; the writer-only case already
+fails correctly and remains a positive guard. They verify both retained file
+contents after source cleanup and no unauthorized signal/copy.
+Detection: fresh hosted review; earliest gate: combined leaf-writer controls.
+Prevention **applied**: three permanent controls and the existing diagnostic
+retention rule tightened explicitly to cover leaf status writers.
+
+**ER-68af, Linux probe harness / Low.** An initial line-oriented stdin probe
+returns no final JSON despite exit 0, which is not accepted as proof. Execute
+the entire script using an encoded command, matching the real full-script
+fixture semantics. Repeat all three Linux RED cases with that exact harness,
+then six campaign/capture controls GREEN after correction. Runtime-generated
+fixtures use read-only source mounts, no network, generated synthetic values
+and `--rm`; exact-run readback proves no fixture containers remain.
+Detection and earliest gate: require the expected probe result/test population,
+not only a process exit code.
+
+**ER-68ag, bounded lookup/patch friction / Low.** A guessed plural Microsoft
+documentation URL returns 404; search finds and fetches the official singular
+page above. A guessed artifact block name and an oversized source range fail
+read-only; the protocol's actual `ab-baab` block and bounded evaluator lines
+are then used. One mixed private-state/report patch partially applies before
+an unmatched report hunk; inspect only that report context and apply only the
+remaining edit. No source or immutable artifact is reverted, no failed lookup
+is treated as evidence, and the original report correction remains recorded.
+Prevention: use manifest/producer identities and inspect partial-application
+results rather than repeating the whole patch.
+
+Current focused assurance: **107 PASS, zero FAIL/skip**, plus **six real
+Linux campaign/capture controls PASS**. These execute the actual PowerShell
+functions with injected Docker/IO failures, not SCIM benchmarks or real
+application profile collection. Logs:
+`qualification-linux-environment-encoded-red.log`,
+`qualification-native-status-writer-red.log`,
+`qualification-linux-null-binding-encoded-proof.log`,
+`qualification-linux-and-native-finalization-green.log` and
+`qualification-linux-finalization-six-green.log`.
+Normal protected publication, fresh new-source CI and review remain required.
+No original performance failure is cleared and no serving/image/workload/
+quota/limit/version changes. Self-improvement **applied** through the tests
+and tightened rules above. Design disposition **accepted**: the collector
+remains one small authorized-capture function; the coordinator gains no
+responsibility, interface or speculative abstraction.
+
+**Completeness update:** reconcile the entire available continuation through
+event 62,741 using signal-frequency and causal-narration passes. The native
+increment contains 344 matching records, not 344 incidents. ER-68ad-ag maps the
+new confirmed runtime, review and tooling issues; missing benchmark-artifact
+uploads are cascades of the contract failure, and intentional negative
+controls are not new production incidents. No deleted original transcript
+is claimed.
+
 The earlier `35b66b36` native artifact from `39849505885` independently
 verifies nine producer hashes, four receipts, all 17,628 spans and 16,000
 timings, profile identity/windows, privacy, cleanup and exact recomputation.

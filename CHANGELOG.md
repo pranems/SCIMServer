@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Fix Linux environment restoration exposed by exact `6a710734` CI before
+  benchmark allocation: use a real .NET null for originally absent variables
+  while preserving present empty values. Reproduce three RED controls on
+  official Linux PowerShell 7.5.0/.NET 9.0.1, then six Linux controls PASS.
+  Address review `5621417287`: a leaf capture-status writer cannot replace
+  an earlier ownership/capture error; writer-only failure still throws.
+  Two combined controls first fail; focused contracts increase 104 -> 107 PASS.
+  Tighten the standing rules and record ER-68ad-ag. Prior normal publication
+  passes 28 gates in 1229.7 seconds; its Linux contract FAIL is retained,
+  not described as a new performance run. No product or admission change.
 - Address all four findings in review `5620999429`: independently retrieve
   client timing receipts despite status failures, preserve original round
   errors through observer/resource finalization, correlate the selected

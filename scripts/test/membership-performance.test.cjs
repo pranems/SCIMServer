@@ -817,8 +817,14 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
             $summary = [ordered]@{ Status = 'RUNNING'; AdmissionEligible = ($scenario -eq 'write-failure') }
             $summaryPath = Join-Path '${directory.replaceAll("'", "''")}' 'campaign.json'
             $campaignFailure = $null
-            $envNames = @('SCIM_TEST_RESTORE_PRESENT', 'SCIM_TEST_RESTORE_ABSENT')
-            $priorEnvironment = @{ SCIM_TEST_RESTORE_PRESENT = 'prior-value'; SCIM_TEST_RESTORE_ABSENT = $null }
+            $envNames = @('SCIM_TEST_RESTORE_PRESENT', 'SCIM_TEST_RESTORE_ABSENT', 'SCIM_TEST_RESTORE_EMPTY')
+            [Environment]::SetEnvironmentVariable($envNames[2], '')
+            $emptyWasPresent = [Environment]::GetEnvironmentVariables().Contains($envNames[2])
+            $emptyPrior = [Environment]::GetEnvironmentVariable($envNames[2])
+            $priorEnvironment = @{
+              SCIM_TEST_RESTORE_PRESENT = 'prior-value'; SCIM_TEST_RESTORE_ABSENT = $null
+              SCIM_TEST_RESTORE_EMPTY = $emptyPrior
+            }
             foreach ($key in $envNames) { [Environment]::SetEnvironmentVariable($key, 'generated-fixture-value') }
             function Set-Content {
               param([Parameter(ValueFromPipeline)]$Value, [Parameter(Position=0)]$Path)
@@ -837,6 +843,8 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
             if ($failure -cne $expected) { throw "Campaign first-error precedence lost: $failure" }
             if ([Environment]::GetEnvironmentVariable($envNames[0]) -cne 'prior-value' -or
                 $null -ne [Environment]::GetEnvironmentVariable($envNames[1])) { throw 'Environment not restored after final receipt failure' }
+            if ([Environment]::GetEnvironmentVariables().Contains($envNames[2]) -ne $emptyWasPresent -or
+                [Environment]::GetEnvironmentVariable($envNames[2]) -cne $emptyPrior) { throw 'Originally empty environment value changed identity' }
             if ($summary.Status -cne 'FAIL: no deployment admission' -or $summary.AdmissionEligible -ne $false) {
               throw 'Failed campaign retained success/admission state'
             }

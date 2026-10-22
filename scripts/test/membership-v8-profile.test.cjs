@@ -807,6 +807,9 @@ for (const scenario of [
   "metadata-copy-failure",
   "shutdown-timeout",
   "missing-profile-marker",
+  "capture-write-failure",
+  "ownership-write-failure",
+  "status-write-failure",
 ]) {
   test(`actual native profile capture preserves evidence before cleanup: ${scenario}`, () => {
     const helper = path.resolve(
@@ -844,7 +847,17 @@ for (const scenario of [
         function Assert-Owned {
           param($Id)
           if ($Id -cne $owned) { throw 'Unowned profile target' }
+          if ($scenario -eq 'ownership-write-failure') { throw 'Profile ownership rejected' }
           $script:ownerChecked = $true
+        }
+        function Set-Content {
+          param([Parameter(Position=0)][Alias('Path')]$LiteralPath, [Parameter(ValueFromPipeline)]$Value)
+          process {
+            if ($scenario.EndsWith('write-failure') -and $LiteralPath.EndsWith('-status.json')) {
+              throw 'Profile status receipt write rejected'
+            }
+            Microsoft.PowerShell.Management\\Set-Content -LiteralPath $LiteralPath -Value $Value
+          }
         }
         function Start-Sleep { param($Milliseconds) $script:waits++ }
         function Invoke-Docker {
@@ -868,7 +881,7 @@ for (const scenario of [
                 $scenario -in @('signal-reinspection-failure', 'shutdown-inspection-failure')) {
               throw 'State inspection rejected'
             }
-            $exitCode = if ($scenario -in @('nonzero-exit', 'already-stopped')) { 1 } else { 0 }
+            $exitCode = if ($scenario -in @('nonzero-exit', 'already-stopped', 'capture-write-failure')) { 1 } else { 0 }
             $labels = if ($scenario -eq 'missing-profile-marker') { @{} } else { @{ 'scimserver.profile' = 'native-function' } }
             return ConvertTo-Json -Depth 5 -Compress -InputObject @(
               @{ Config = @{ Labels = $labels }; State = @{
@@ -898,6 +911,25 @@ for (const scenario of [
         try { Save-NativeProfile -ContainerId $owned -Directory $directory -Role baseline -WorkComplete $true }
         catch { $failure = $_.Exception.Message }
         $script:sourceFiles.Clear()
+        if ($scenario.EndsWith('write-failure')) {
+          $expected = switch ($scenario) {
+            'capture-write-failure' { 'Owned native profile stopped with a failed exit; evidence retained.' }
+            'ownership-write-failure' { 'Profile ownership rejected' }
+            default { 'Profile status receipt write rejected' }
+          }
+          if ($failure -cne $expected) { throw "Status writer replaced original capture error: $failure" }
+          if (Test-Path (Join-Path $directory 'profile-baseline-status.json')) { throw 'Failed status write became durable' }
+          if ($scenario -eq 'ownership-write-failure') {
+            if ($script:copies.Count -or $script:signalled) { throw 'Writer failure bypassed ownership' }
+          } else {
+            if ($script:copies.Count -ne 2) { throw 'Status writer prevented evidence collection' }
+            foreach ($name in @('profile-baseline.cpuprofile', 'profile-baseline-meta.json')) {
+              $copied = Get-Content (Join-Path $directory $name) -Raw | ConvertFrom-Json
+              if ($copied.synthetic -ne $true) { throw 'Retained contents lost after source cleanup' }
+            }
+          }
+          exit 0
+        }
         if (($scenario -eq 'complete') -ne ($null -eq $failure)) { throw "Wrong native capture outcome: $failure" }
         if ($scenario -eq 'missing-profile-marker' -and
             $failure -cne 'Owned container is not an opted-in native profiler.') { throw 'Missing explicit profiler opt-in rejection' }
@@ -974,6 +1006,15 @@ for (const scenario of [
         0,
         result.error?.message ?? result.stdout + result.stderr,
       );
+      if (
+        scenario === "capture-write-failure" ||
+        scenario === "ownership-write-failure"
+      ) {
+        assert.match(
+          result.stdout,
+          /Native profile status receipt write failed/,
+        );
+      }
     } finally {
       fs.rmSync(directory, { recursive: true });
     }

@@ -88,6 +88,16 @@ identity separately from the current replay-consumer hash, and include all
 guard inputs in replay scratch. A replay is not a new measurement. Verify a
 wrong-run negative control cannot overwrite an older report. See ER-68w.
 
+The first-error walk includes leaf collectors' status writers. Protecting a
+caller cannot recover an error its callee's finally already replaced.
+Exercise ownership/capture plus writer failure and writer-only failure.
+PowerShell restoration also needs a runtime-family check: .NET 9 distinguishes
+empty values from deletion, while PowerShell can bind ordinary `$null` as
+empty text. Use `[NullString]::Value` for originally absent values and preserve
+real empty values separately. A Windows-only PASS does not prove Linux state
+restoration. Actual container controls close ER-68ad/ae; both conventions are
+promoted to the standing rules rather than left as advisory prose.
+
 Resource measurements need the same failure contract as request timings.
 Persist every collected CPU, database, memory, RSS and OOM observation before
 rejecting a ceiling or deleting its owner. A missing later probe must leave

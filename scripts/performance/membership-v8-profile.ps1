@@ -8,6 +8,7 @@ function Save-NativeProfile {
         captureStatus = 'FAIL'; failureStage = 'ownership'; exitCode = $null
         filesCollected = $false; containerId = $ContainerId
     }
+    $primaryFailure = $null
     try {
         Assert-Owned $ContainerId
         $receipt.failureStage = 'initial-state'
@@ -62,8 +63,16 @@ function Save-NativeProfile {
         if ($state.ExitCode -ne 0) { throw 'Owned native profile stopped with a failed exit; evidence retained.' }
         $receipt.captureStatus = 'COMPLETE'
         $receipt.failureStage = $null
+    } catch {
+        $primaryFailure = $_
+        throw
     } finally {
-        $receipt | ConvertTo-Json -Depth 5 |
-            Set-Content -LiteralPath (Join-Path $Directory "profile-$Role-status.json")
+        try {
+            $receipt | ConvertTo-Json -Depth 5 |
+                Set-Content -LiteralPath (Join-Path $Directory "profile-$Role-status.json")
+        } catch {
+            if ($null -eq $primaryFailure) { throw }
+            Write-Warning 'Native profile status receipt write failed; primary capture error retained.'
+        }
     }
 }

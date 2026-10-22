@@ -4,6 +4,17 @@
 
 ### Current master/performance reconciliation (2026-10-22)
 
+**Current Linux/review follow-up:** `6a710734` publishes through 28 normal
+Validate gates in 1229.7 seconds. Its three Linux workflows fail campaign
+contracts before benchmark allocation: ordinary PowerShell null binds as
+empty text on .NET 9. A pinned official Linux 7.5.0/.NET 9.0.1 reproduction
+proves the mechanism; typed null restores absence while preserving real empty
+values. Review `5621417287` also exposes the leaf capture-status writer masking
+an earlier error. Both fixes are local: 107 focused PASS and six real Linux
+controls PASS after RED. ER-68ad-ag and tightened standing rules record them.
+Protected publication/new-source CI/review remain; original performance hold
+is unchanged. No merge, deployment, product bump or fabricated human review.
+
 **Current review correction:** `abbcce07` is published through all 28 ordinary
 Validate gates (1171.7 seconds; API 6210/213, HTTP 2514/118, Web 1655/124).
 Review `5620999429` finds four more runner gaps. Local fixes independently
@@ -65,6 +76,7 @@ Targeted lint/syntax and full ordinary protected publication pass on `84d11af7`.
 
 | Date | Summary |
 |---|---|
+| 2026-10-22 | Published 6a710734 through 28 gates; Linux CI exposes null/empty restoration mismatch and fresh review finds leaf status-writer masking. Local fixes prove 107 focused PASS plus six Linux controls; no benchmark was allocated by the failed new-source jobs. |
 | 2026-10-22 | Corrected all four findings in review 5620999429 with 104 focused PASS; retained nine substantive RED controls and separate fixture issues. Prior abbcce07 passes 28 ordinary gates but its Linux A/A performance control fails. Publication/review of the new correction remain required. |
 | 2026-10-22 | Published signed-clock/timezone corrections through 28 green gates on 84d11af7; fresh review exposes partial-file capture loss, corrected locally with 74 focused tests. Performance control still fails. |
 | 2026-10-22 | Native signed-clock correction passes 72 focused tests and exact retained-data replay; ordinary publication remains blocked by separately retained Web and nested-Jest startup/deadline failures. |
