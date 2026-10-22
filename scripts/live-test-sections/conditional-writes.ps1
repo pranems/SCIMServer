@@ -12,7 +12,9 @@ function Check($actual, $expected, [string]$claim) {
 }
 function Send([string]$method, [string]$url, $body, [string]$etag) {
     $h = $headers.Clone()
+    $h.Remove('If-Match')
     if ($etag) { $h['If-Match'] = $etag }
+    Check ($h.ContainsKey('If-Match')) ([bool]$etag) "$method explicitly selected If-Match presence"
     $args = @{
         Method = $method
         Uri = $url

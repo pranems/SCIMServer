@@ -16,6 +16,18 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Request variants and rolling windows need semantic assertions
+
+A successful response cannot prove which request headers were sent. When a
+helper inherits default headers, explicitly clear the variant under test and
+assert the constructed map before dispatch. Likewise, equal array positions
+in two rolling charts can denote different hours. Compare aligned time
+buckets, force rollover, expire the real response cache, and require a known
+request to increment its bucket. A frozen clock must not freeze the network
+or database flush timers, and timestamp-derived fixture names need independent
+uniqueness. See [ER-59](../ENDPOINT_SNAPSHOT_REVISION.md#follow-up-review-deliberate-conditional-request-headers-er-59)
+and [ER-60](../ENDPOINT_SNAPSHOT_REVISION.md#ci-boundary-correction-compare-the-same-chart-hours-er-60).
+
 ### Wider cache lifetime requires a complete input identity
 
 Sharing a previously request-local derived cache can expose an existing key

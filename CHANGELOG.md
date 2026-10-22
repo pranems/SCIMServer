@@ -16,7 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes 72 service units (70 existing plus two warming-order controls) and
   24 focused HTTP cases (22 existing plus two binding regressions), with API
   build PASS. Existing runtime-image/performance receipts below predate this
-  serving correction; renewed publication/image/deployment proof is pending.
+  serving correction. Protected publication through `8dcf0f2d` passes 25 gates,
+  6,210 units and 2,513 HTTP cases with 42 genuine backend exclusions; corrected
+  image/deployment proof remains separate.
+- Address the next hosted review body's live-contract finding: remove the
+  inherited wildcard before selecting If-Match, retain a permanent per-request
+  presence assertion, and preserve caller headers. Native live passes 87
+  conditional/header/version/membership/response assertions after confirmed RED.
+- Correct CI's dashboard hour-boundary test without changing runtime behavior:
+  compare matching UTC-hour buckets, expire the real dashboard cache, and require
+  the known request to increment its bucket. Focused HTTP counts increase from
+  three to four cases; all four pass on each persistence backend. Original
+  hour-boundary and initial fixture/cache failures remain in the RCA.
 - Preserve and reconcile the full local correction onto `5841f724` / PR #249
   without changing other worktrees or dropping stash `320a8360`.
   The earlier 0.55.56 private performance receipt does not certify this source.

@@ -4,24 +4,31 @@
 
 ### Current master/performance reconciliation (2026-10-21)
 
-**2026-10-22 hosted-review correction:** Copilot review now completes after
-the user's billing selection. Its relevant cache-binding finding is reproduced:
-core-only-first HTTP requests leak protected extension fields. Generic cache
-keys now include the complete ResourceType binding in a separate namespace
-from builtin core-URN entries. RED and GREEN logs are retained; API build,
-72 service units and 24 focused HTTP cases pass. Publication and corrected-image
-validation are pending. Earlier image/performance receipts below remain
-historical and do not certify this new serving change.
-The same 24 HTTP cases pass on owned ephemeral PostgreSQL; native live section
-9z-DS passes 22 assertions and cleans every fixture. Expanded test types and
-changed-file lint pass. Version stays 0.55.58 within this unreleased PR.
-The first protected push is blocked by F4; committed guide follow-up `90318898`
-closes that gate (27 docs PASS). Its retry reaches units: 6,209 PASS / one FAIL
-in the unchanged nested non-UTC timestamp probe (`spawnSync ETIMEDOUT`).
-Isolating the parent reproduces it; running its selected child directly passes
-in 14.229 seconds. Root cause is unproven. Do not weaken deadlines, skip the
-assertion, infer full-suite success or retry unchanged hooks. ER-58 records
-the blocker. Nothing from this correction is pushed, merged or deployed yet.
+**2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review
+works after billing selection. The cache-binding correction is published in
+`8dcf0f2d` through all 25 normal hook gates (681.4 seconds; 6,210 units /
+213 suites; 2,513 HTTP cases plus 42 genuine backend exclusions). Its relevant
+thread is resolved and corrected-tip hosted review confirms the fix.
+Focused evidence includes 72 service units, 24 HTTP cases per backend and
+22 native live assertions. The retained F4 and nested-timezone failures are
+historical, not the latest publication status. The timezone assertion and
+30-second deadline remain unchanged; its earlier delay cause is unproven.
+
+The same tip's CI separately fails a dashboard test at 08:00 UTC because it
+compares different hour buckets. Review 5611024787 also reports that absent
+If-Match live cases inherit a wildcard. Both are corrected in this follow-up:
+87 conditional native-live assertions prove deliberately selected headers and
+unchanged caller headers; four chart HTTP cases pass per backend, including
+forced rollover after real dashboard-cache expiry and a strict known-request
+increment. Original RED receipts remain retained. Review bodies matter even
+when their headline says "No open issues." ER-59/ER-60 record these gaps.
+
+Version remains unreleased **0.55.58**. Exact-head publication/CI/review and
+merged-master deployment are tracked separately in PR #250 and private
+receipts; do not infer their success from focused tests. Earlier image,
+browser and performance receipts below certify only their recorded older
+serving source, not the cache correction. No merge or deployment has occurred
+at this authoring checkpoint.
 See [ER-55](docs/ENDPOINT_SNAPSHOT_REVISION.md#hosted-review-correction-resourcetype-cache-binding-er-55).
 
 The owned performance branch incorporates merged master `5841f724` / PR #249
@@ -31,7 +38,7 @@ commits and stash `320a8360d84079918d65ec88dff9542ac56ab468` are preserved.
 Other worktrees remain read-only. This is the reconstructed continuation,
 not restoration of the deleted original transcript.
 
-PR #250 contains runtime source `4bf55093`. Its last source-tip protected push
+Historical chronology below starts with runtime source `4bf55093`. Its protected push
 passes 25 Fast gates and seven exact-tip CI checks; the earlier full Validate
 push passes 28 gates. CodeQL alert 336's PR instance is fixed. The current
 follow-up changes only browser tests, one inspected pixel baseline and docs;
@@ -45,7 +52,7 @@ Exact-tip CI/review remain independently tracked; a small documentation
 follow-up records this newly observed environment issue without changing
 runtime or browser inputs.
 
-| Current pre-merge check | Verified result |
+| Earlier image-source checks (`4bf55093`) | Verified result |
 |---|---|
 | API units, both backends | 6,208 PASS per backend |
 | Complete PostgreSQL HTTP | 2,609 PASS / 121 suites |

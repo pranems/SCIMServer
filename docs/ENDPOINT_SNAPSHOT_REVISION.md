@@ -1316,3 +1316,59 @@ elapsed time on a subprocess error. Its real non-UTC assertion and existing
 30-second deadline are unchanged. The next normal protected run supplies
 complete current-state evidence or actionable child diagnostics on failure;
 none of the earlier failures is erased.
+
+### Follow-up review: deliberate conditional request headers (ER-59)
+
+The corrected-tip hosted review 5611024787 on `8dcf0f2d` confirms the
+cache-binding fix, but reports a previously missed live-test gap in its review
+body. "No open issues" in that review is not evidence that every relevant
+finding is resolved.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Prevention and detection-stage escape |
+|---|---|---|---|---|
+| ER-59 | Test correctness / High, false-green live gate | The full live runner supplies `If-Match: *`. The conditional helper clones that map and overwrites the header only for a nonempty argument. An empty argument therefore repeats the wildcard case rather than exercising absent-header behavior for Users, Groups and Devices. | Remove `If-Match` from the clone before optionally setting the explicitly requested value. Preserve the caller's original map. With a permanent per-request presence assertion added first, the owned native live run is RED: `POST explicitly selected If-Match presence: expected False, received True`. After the one-line removal it passes 87 assertions, including stale/current/wildcard/absent headers, committed versions, membership and response contracts. Caller wildcard remains unchanged; dedicated endpoint and listener are removed. | Applied: assert header presence immediately before dispatch, not just the response status. Existing API tests could not inspect what this separate live helper actually sends. Hosted re-review detects the gap after earlier live PASS; the earliest possible detection was this helper's first native smoke with the full runner's inherited wildcard. |
+
+**ER-58 publication follow-up:** normal protected push of `8dcf0f2d` passes
+all 25 gates in 681.4 seconds, including 6,210 units / 213 suites and 2,513
+HTTP cases with 42 genuine backend exclusions. The deadline is unchanged;
+this result does not establish the cause of the earlier subprocess delays.
+Exact-tip CI is separately RED in the dashboard hour-rollover assertion,
+not the timestamp probe. No merge or deployment is inferred from local PASS.
+
+**Test/gate improvement: applied.** Every conditional live request now proves
+that the constructed header map matches its intended header-presence case.
+**Design/architecture disposition: accepted.** A one-line correction at the
+existing request-construction boundary is cohesive; another transport
+abstraction would be speculative.
+
+### CI boundary correction: compare the same chart hours (ER-60)
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Prevention and detection-stage escape |
+|---|---|---|---|---|
+| ER-60 | Test correctness / Medium | Exact-tip CI run 39744225323 crosses 08:00 UTC and fails the dashboard's `afterCurrent >= baseCurrent` assertion (expected at least 1, received 0). A 24-hour rolling chart's last array position denotes a different hour after rollover. Its 24-hour total can also decrease when the oldest bucket expires. | Control application Date while retaining real network and flush timers, seed a nonzero baseline, expire the actual 30-second dashboard cache, and compare only matching UTC-hour buckets. Require the known request's hour to increase by at least one, rather than merely remain nondecreasing. Same-hour and rollover cases pass all four focused InMemory HTTP tests. | Applied: force an hour boundary in the test instead of waiting for wall-clock coincidence. CI detects the failure; the earliest useful gate was the original focused chart test with a controlled boundary. An initial frozen-clock attempt reused timestamp-derived endpoint names and hit HTTP 400; use unique fixture names. A subsequent apparent PASS still reused dashboard cache data; explicitly advance beyond its real TTL before claiming rollover coverage. The cache-aware old assertion is confirmed RED (expected at least 3, received 1). |
+
+**Design/architecture disposition: accepted.** Keep the correction in the
+existing HTTP test and preserve runtime caching/aggregation behavior. No
+new production clock abstraction, migration or dependency is justified.
+
+**Backend parity:** the same four chart HTTP cases also pass on an owned
+ephemeral PostgreSQL instance, with the existing Prisma migrations/setup.
+No database row timestamps are rewritten or aggregation results mocked.
+The instance is removed afterwards. Both same-hour and rollover paths retain
+the strict known-request increment.
+
+**Focused static follow-up:** all four expanded unit/HTTP type roots compile
+with zero diagnostics. Linting the newly touched chart spec exposes its
+inherited untyped Supertest assertions (14 errors / seven obsolete suppression
+warnings). The existing `Server` and typed dashboard response contract remove
+those unsafe boundaries without changing assertions; final focused lint has
+zero errors or warnings. Original failure output is retained.
+
+**Continuation completeness checkpoint:** the full available continuation's
+`events.jsonl` was streamed through record 51,138 using the existing
+signal-frequency and causal-narration passes. ER-55 through ER-60 record the
+review, documentation, subprocess, header and hour-boundary failures discussed
+in this segment, including fixture/cache false-green attempts and focused
+typing/lint friction. Expected 401/404/412 negative-test traffic and source-read
+echoes are not additional incidents. This is the available reconstructed
+continuation, not recovery of the deleted original transcript.

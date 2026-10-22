@@ -16,7 +16,19 @@ New both-order unit/HTTP regressions reproduce hidden/write-only/read-only
 failures before the fix and pass afterwards (72 service units, 24 focused HTTP
 cases; API build PASS). ER-55 records the mechanism. This serving change
 invalidates carry-forward of the older unchanged-source/image proof; corrected
-publication, image and deployment evidence remain separate pending steps.
+image and deployment evidence remain separate steps. Protected publication
+through `8dcf0f2d` passes 25 gates (6,210 units; 2,513 hook HTTP cases plus
+42 backend exclusions). Corrected-tip review confirms the cache fix and its
+thread is resolved. PR #250 is ready, not draft.
+
+That tip's independent CI fails a dashboard assertion across 08:00 UTC.
+This follow-up compares matching hour buckets and requires a known-request
+increment; all four focused HTTP cases pass per backend, including forced
+rollover and actual dashboard-cache expiry. The review body's additional
+absent-header gap is fixed by clearing inherited If-Match before an explicit
+override; 87 native-live assertions pass with the runner's inherited wildcard,
+without changing caller headers. See ER-59/ER-60. New-tip CI, final review and
+corrected merged-master deployment must be recorded separately, not inferred.
 
 **Current integration, 2026-10-21:** owned performance work is reconciled
 onto merged master `5841f724`, including token-lifetime PR #249 and 0.55.57.
@@ -33,11 +45,11 @@ and 1,655 Web tests. The hook's two log-suite exclusions remain explicit.
 Prisma generation and all 30 migration lint checks pass. Public-CI run
 `39690345727` produces only 0.55.58 version metadata changes in API/Web
 locks; dependency graphs/public SHA-512 provenance and imported hashes pass.
-The public locks are committed and PR #250 is draft at `4bf55093`. Its latest
+The public locks are committed; PR #250 was initially draft at `4bf55093`. Its
 normal protected push passes 25 gates and all seven exact-tip checks pass.
-CodeQL alert 336's PR instance is fixed. Copilot returns a billing-entity error,
-not a substantive review; the user is unavailable to select a reviewer path.
-Hold merge and continue independent validation without changing billing.
+CodeQL alert 336's PR instance is fixed. The original Copilot billing error
+was not substantive review. The later successful reviews and corrections
+above supersede that historical reviewer-availability hold.
 The 0.55.58 CI image `27264427` verifies all 246 serving modules after only
 line-ending canonicalization (239 raw-byte equal), plus schema/migration.
 Full current-image BAAB `883e4aa1` passes all 12 original latency limits at
