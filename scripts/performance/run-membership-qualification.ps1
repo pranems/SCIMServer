@@ -92,7 +92,7 @@ function Invoke-Block {
         $containers.Add($pg)
         $ready = $false
         foreach ($attempt in 1..60) {
-            & docker exec $pg pg_isready -U scim -d postgres *> $null
+            & docker exec $pg pg_isready --host=127.0.0.1 -U scim -d postgres *> $null
             if ($LASTEXITCODE -eq 0) { $ready = $true; break }
             Start-Sleep -Milliseconds 500
         }

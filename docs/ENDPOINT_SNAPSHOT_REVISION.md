@@ -111,6 +111,45 @@ blocks per phase and an unvalidated confidence formula are deliberately
 excluded. Statistical repeatability beyond these controls and actual customer
 capacity remain explicit limits, not silent success-shaped fallbacks.
 
+### Linux initialization readiness correction (ER-63)
+
+The first Linux qualification run `39778828864`, source `33c93e4e`, fails
+before its first measured round. PostgreSQL reports no socket immediately
+after the default `pg_isready` probe accepted readiness. The retained campaign
+has zero completed blocks and independently verified container/network absence.
+This is a failed setup receipt, not a performance sample or admission result.
+
+Inspection of the **actual pinned PostgreSQL image's** entrypoint confirms
+that its temporary initialization server starts with `listen_addresses=''`.
+It accepts Unix-socket probes, then stops before the final server starts.
+That makes a default socket probe a false readiness signal during first boot.
+The runner now probes `--host=127.0.0.1`: the socket-only temporary server
+cannot satisfy it. No arbitrary startup sleep, changed app quota, workload,
+sample count, threshold or retry loop is introduced.
+
+Two new tests execute the actual extracted readiness loop with a socket-ready
+but TCP-unready initialization phase. Both reproduce RED before the fix;
+GREEN waits through that phase and proceeds only on the final TCP probe.
+The unavailable-TCP control exhausts the existing bounded attempts and stays
+unready. Focused contracts increase from 11 to **13 PASS**.
+
+| RCA field | Disposition |
+|---|---|
+| Type / severity | Container initialization / Medium: first real Linux execution blocked before timings |
+| Detection | Linux workflow startup; earliest possible gate was an extracted-loop unit control, now added |
+| Escape | Unit/parser tests missed initialization-server semantics; no defect reached deployment |
+| Why the fix works | TCP distinguishes the final listener from the official image's socket-only bootstrap process |
+| Prevention | Both actual-loop controls run before Docker allocation in every qualification workflow |
+| Evidence preserved | Original failed run/artifact, zero completed blocks and successful exact-owned cleanup |
+| Next result | Corrected-source protected publication and Linux execution remain independent, not yet claimed |
+
+Documentation editing also hit one low-severity tooling friction: a final
+lessons-file hunk used unrelated context, so the patch tool applied four
+earlier files and rejected that hunk explicitly. Only the failed hunk was
+retried, preserving the successful edits. Detection and earliest possible
+stage were both editing feedback, with no stage escape. This is not a runtime
+failure and did not cause a test or benchmark rerun.
+
 ### Earlier implementation checkpoint (historical)
 
 **Current result:** the latest immutable local candidate passes eleven of

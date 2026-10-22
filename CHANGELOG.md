@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parser error. Real HTTP client controls verify 4,407 requests, complete
   sample arrays and fixture deletion after corrupt readback. CI benchmark
   execution and deployment are not claimed here.
+- Initial protected publication at `33c93e4e` passes 28 Validate gates:
+  6,210 API units, 2,514 hook HTTP plus 42 genuine exclusions/two excluded
+  log suites, 1,655 Web tests. First Linux run `39778828864` fails before
+  timings when Unix-socket readiness accepts the temporary PostgreSQL
+  initialization server. Require final TCP readiness instead, with actual
+  pinned-image confirmation and two permanent RED/GREEN loop controls.
+  Focused contracts increase 11 -> 13 PASS; original failed artifact and
+  successful exact-owned cleanup are retained. No timing limit is changed.
 
 ### 0.55.58 consolidation onto token-lifetime master
 

@@ -18,6 +18,12 @@
 
 ### Performance admission needs a prospective environment control
 
+Container readiness must identify the final service, not a bootstrap process.
+The official PostgreSQL image's temporary initialization server accepts
+Unix-socket connections before restarting. Probe its final TCP listener,
+not the default socket, and keep an actual-loop control where the socket is
+ready but TCP is not. See [ER-63](../ENDPOINT_SNAPSHOT_REVISION.md#linux-initialization-readiness-correction-er-63).
+
 Identical application images can cross regression limits when their execution
 environment is unstable. Keep the original failed receipt; do not choose a
 favorable opposite-order denominator or pool later observations to rewrite it.

@@ -21,8 +21,12 @@ control flags eight of twelve metrics. This does not establish candidate safety.
 The autonomous continuation implements a separate harness-only prospective
 Linux qualification on existing public Actions runners, without provisioning
 paid capacity: two opposite-order A/A blocks must pass before two opposite-order
-A/B blocks can run. Eleven local evaluator/parser/HTTP/orchestration contracts
-pass; Linux execution and publication remain separate unproved steps.
+A/B blocks can run. Initial source `33c93e4e` passes 28 normal Validate gates
+and opens PR #251. Linux run `39778828864` fails before timings: default socket
+readiness accepts the official PostgreSQL bootstrap server before it restarts.
+Pinned-image inspection verifies a socket-only temporary listener. The final
+TCP readiness fix has two permanent actual-loop RED/GREEN controls; 13 focused
+tests pass. Corrected publication/review/Linux admission remain unproved.
 The 0.5 CPU / 1 GiB allocation, 100 warmup cycles, 1,000 measured cycles per
 round and twelve +10% ceilings remain unchanged. No serving/dependency/version
 change; dev remains 0.55.56. Earlier failed receipts remain failed.

@@ -21,8 +21,13 @@ existing public GitHub Actions runners: BAAB and ABBA A/A controls, then both
 old/current orders only if both controls pass. No new paid host, deployment
 permission, serving change, dependency update or version bump is involved.
 All raw samples, immutable inputs, private-log checks and exact cleanup remain
-required. Eleven evaluator/orchestration/parser/HTTP contracts pass after RED.
-Actual Linux execution, review and publication are not yet claimed.
+required. Initial publication `33c93e4e` passes all 28 Validate gates and opens
+PR #251. Linux run `39778828864` fails before timings because a Unix-socket
+probe accepts PostgreSQL's temporary bootstrap server. Actual pinned-image
+inspection confirms it has no TCP listener. Two new actual-loop RED/GREEN
+guards now require final TCP readiness; all 13 focused contracts pass.
+Original failed setup/artifact and exact cleanup remain retained. Corrected
+publication, review and Linux admission are not yet claimed.
 See [the qualification protocol](docs/ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review

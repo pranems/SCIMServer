@@ -226,3 +226,37 @@ for (const corruptRead of [false, true]) {
     }
   });
 }
+
+for (const unavailable of [false, true]) {
+  test(`actual PostgreSQL readiness loop ${unavailable ? 'stays failed when final TCP listener never appears' : 'ignores socket-only initialization until final TCP readiness'}`, () => {
+    const runner = path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1');
+    const result = spawnSync('pwsh', ['-NoProfile', '-Command', `
+      $ErrorActionPreference = 'Stop'
+      $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+        '${runner.replaceAll("'", "''")}', [ref]$null, [ref]$null)
+      $loop = $ast.Find({ param($item)
+        $item -is [System.Management.Automation.Language.ForEachStatementAst] -and
+        $item.Extent.Text.Contains('pg_isready')
+      }, $true)
+      if (!$loop) { throw 'Missing actual PostgreSQL readiness loop' }
+      $pg = 'mocked owned container'
+      $ready = $false
+      $script:probes = 0
+      $script:allTcp = $true
+      function docker {
+        $script:probes++
+        $tcp = $args -contains '--host=127.0.0.1'
+        $script:allTcp = $script:allTcp -and $tcp
+        $global:LASTEXITCODE = if (!$tcp) { 0 } elseif ($${unavailable} -or $script:probes -lt 3) { 1 } else { 0 }
+      }
+      function Start-Sleep {}
+      . ([scriptblock]::Create($loop.Extent.Text))
+      @{ ready = $ready; probes = $script:probes; allTcp = $script:allTcp } | ConvertTo-Json -Compress
+    `], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
+    const actual = JSON.parse(result.stdout);
+    assert.equal(actual.allTcp, true, 'Readiness must target TCP, not the temporary initialization socket');
+    assert.equal(actual.ready, !unavailable);
+    assert.equal(actual.probes, unavailable ? 60 : 3);
+  });
+}
