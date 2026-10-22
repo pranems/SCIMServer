@@ -389,6 +389,9 @@ Invoke-Gate -Name 'api: e2e tests (inmemory, maxWorkers=2)' -WorkingDir (Join-Pa
 
 if ($Mode -in @('Validate', 'Full')) {
 
+    # Prisma's env('DATABASE_URL') throws during config load, even for codegen.
+    # Supply an explicit codegen-only URL in the caller when no DB is needed;
+    # a missing configuration must still block this gate.
     Invoke-Gate -Name 'api: prisma generate' -WorkingDir (Join-Path $repoRoot 'api') -Action {
         npx prisma generate 2>&1 | Out-Host
     }

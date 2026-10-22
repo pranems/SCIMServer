@@ -613,9 +613,24 @@ the earliest useful check is that same inspection. Prevention: verify a tool's
 actual producer/consumer handling before turning a generated interpretation
 into an input-format rejection rule.
 
+**ER-68j, validation environment / Low:** the first protected publication of
+signed-clock correction `58f06800` stops after 25 passing gates: Prisma
+generation cannot resolve `DATABASE_URL` in the new shell. Migration lint and
+Web tests do not run, so this is not a complete validation PASS.
+Prisma's `env()` throws during configuration loading before the apparent
+nullish fallback can apply, even though client generation needs no database.
+An explicit synthetic code-generation-only URL targeting loopback port 1
+makes the unchanged `npx --no-install prisma generate` command pass.
+No production connection string, dependency install, migration or fallback
+in serving code is involved. Document the inherited-environment prerequisite
+at the existing gate definition, keep the failed log and retry the normal
+full Validate hook. Detection and earliest useful gate are configuration
+loading for that exact generator command; this was caller setup, not a new
+application defect. No hook is skipped.
+
 **Updated completeness note:** reconciled the full available continuation
-through event record 59,361 using signal-frequency and causal-narration passes.
-Confirmed native issues map to ER-68a-i; intentional TDD failures, expected
+through event record 59,528 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-j; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not
 the deleted original session.
