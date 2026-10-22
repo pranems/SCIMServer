@@ -115,6 +115,14 @@ synthesis. Keep producer commit/hashes distinct from a corrected replay
 consumer's hash, and never relabel an original failed campaign as successful.
 See ER-68h/i in the same ledger.
 
+Observing IPC can change delivery semantics. Node buffers ordinary child
+messages until a message listener exists; an early diagnostic listener can
+drain the queue before the real consumer is installed. Test an observer
+against delayed-consumer delivery before using its output to diagnose a
+startup failure. Avoid installing competing IPC listeners, preserve call
+and return behavior, and keep instrumented runs separate from gate admission.
+See ER-68k in the same ledger.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

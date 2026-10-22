@@ -628,9 +628,50 @@ full Validate hook. Detection and earliest useful gate are configuration
 loading for that exact generator command; this was caller setup, not a new
 application defect. No hook is skipped.
 
+**ER-68e recurrence, still unresolved:** the next normal Validate push on
+`9378e765` passes 27 gates, then Web reports four fork-startup errors.
+Only 120 files / 1,608 tests execute. The omitted files are
+`useResizableColumns.test.tsx`, `useSSE.test.ts`,
+`SettingsJsonExport.test.tsx` and `JwtDecodeButton.test.tsx`.
+Their 47 tests pass unchanged in focused three-file and one-file runs.
+Do not combine those results into a complete full-suite PASS.
+No stale Vitest/Jest workers are observed afterwards. The post-run host has
+16 logical processors and approximately 25 GiB free; this does not measure
+peak pressure at the failure. Keep publication blocked without raising
+timeouts, reducing workers or excluding files. The startup root cause
+remains unproven.
+
+The corrected scratch observer subsequently completes all 124 worker
+handshakes and 1,655 tests. Observed startup p50/p95/maximum are
+14.120/15.832/17.476 seconds; maximum fork-to-preload delay is 0.874 seconds.
+Observed free memory never falls below 14.525 GiB, but this describes the
+instrumented successful run, not the previous failures. It does not reproduce
+or establish the cause of the 60-second ordinary-startup deadline failure.
+Keep the intermittent issue open. Only a complete ordinary protected hook
+can authorize publication; no instrumented result substitutes for it.
+
+**ER-68k, diagnostic observer effect / Medium:** the first scratch startup
+observer adds a child `message` listener before Vitest's own listener.
+Node drains queued interprocess messages when a message listener appears,
+so the observer can consume the initial request before the real handler
+exists and create the timeout it is meant to investigate. Stop that
+instrumented run and retain it as invalid partial diagnostic evidence.
+This does not explain the earlier uninstrumented gate failures.
+
+A bounded delayed-listener control proves the mechanism: baseline delivers
+the queued request, the first observer loses it (RED), and the corrected
+observer delivers it (GREEN). The correction observes existing emission and
+outbound send paths without registering an IPC listener. No timeout, pool,
+worker count or test changes. Validate the observer before another diagnostic;
+even a complete instrumented run cannot replace a passing protected gate.
+The detecting gate is inspection during the first diagnostic; the earliest
+useful gate is this now-added observer contract. Design disposition:
+**accepted**; keep the probe scratch-only, with no serving dependency or
+production instrumentation.
+
 **Updated completeness note:** reconciled the full available continuation
-through event record 59,528 using signal-frequency and causal-narration passes.
-Confirmed native issues map to ER-68a-j; intentional TDD failures, expected
+through event record 59,940 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-k; intentional TDD failures, expected
 negative controls, repeated quoted receipts and prior ER-67 findings are not
 counted as new incidents. This is the reconstructed continuation only, not
 the deleted original session.
