@@ -554,6 +554,72 @@ The in-progress queue-only protected push is stopped to batch this review
 correction; its retained commit is not claimed as a passing publication.
 No hooks, source hashes or failed evidence are bypassed.
 
+**ER-68h, native-format consumer / Medium:** actual Linux run
+[`39822577851`](https://github.com/pranems/SCIMServer/actions/runs/39822577851),
+producer `30fbea59`, completes all four original BAAB rounds and both native
+captures, but analysis rejects the baseline's two `-2` microsecond timestamp
+steps. Both captures have exit zero, complete receipts and exact-owned cleanup.
+The failure is the consumer's blanket nonnegative-delta assumption, not missing
+profiling capability. The source of the producer's two reordered observations
+is not established.
+
+Chrome DevTools' official
+[CPU profile consumer](https://github.com/ChromeDevTools/devtools-frontend/blob/main/front_end/models/cpu_profile/CPUProfileDataModel.ts)
+reconstructs cumulative timestamps and sorts matching sample/timestamp pairs.
+Our diagnostic needs only unweighted counts, so it preserves every original
+sample without sorting, discarding or assigning time weights. Accept signed
+safe-integer steps only when **every cumulative timestamp** stays inside the
+profile window. Report negative-step count and maximum backward step explicitly.
+Reject an intermediate underflow or overflow even if the final sum returns
+inside the window.
+
+| Retained producer evidence | 0.55.20 baseline | 0.55.58 candidate |
+|---|---:|---:|
+| Bundled Node runtime | v24.20.0 | v24.22.1 |
+| Unweighted native observations | 117,538 | 112,285 |
+| Whole-process profile duration, seconds | 162.582195 | 153.987114 |
+| Backward timestamp steps | 2 | 0 |
+| Largest backward step, microseconds | 2 | 0 |
+
+These durations include startup, idle time and different process histories;
+they are not request CPU time or an old/current latency comparison.
+The new signed-clock and causal-CLI-error tests first fail with the actual
+rejection and missing error text. Correcting the consumer produces **72/72
+focused PASS**, zero skips/failures. Malformed and out-of-window data still fail.
+CLI failure now includes a bounded first-line validation reason, rather than
+only `ERR_ASSERTION`, so an operator can identify the rejecting guard.
+
+Separate reanalysis verifies all nine producer source hashes against the exact
+Linux checkout bytes, four client/resource receipts, all 17,628 request spans,
+all 16,000 measured timings, privacy and cleanup. Exact analyzer recomputation
+matches the derived output. The derived audit records the corrected consumer's
+own SHA-256 separately. **The original campaign remains FAIL**, with its raw
+inputs unchanged; corrected-consumer replay is not a retrospective successful
+CI run or deployment admission. New-source protected publication and actual
+Linux execution remain required.
+
+Detection-stage escape: the real Linux application execution catches a format
+assumption that synthetic capability probes and nonnegative parser fixtures
+could not challenge. The earliest useful gate is the now-added producer-format
+fixture, including an intermediate overflow whose final sum is valid.
+Design disposition: **accepted**; keep timestamp validation inside the existing
+cohesive native parser, with no new strategy or speculative abstraction.
+
+**ER-68i, research verification / Low:** a search synthesis incorrectly claims
+the official viewer assumes monotonic sample timestamps. Direct inspection of
+the primary source contradicts it. The correction above follows the source,
+not the synthesis. Primary-source inspection catches this before implementation;
+the earliest useful check is that same inspection. Prevention: verify a tool's
+actual producer/consumer handling before turning a generated interpretation
+into an input-format rejection rule.
+
+**Updated completeness note:** reconciled the full available continuation
+through event record 59,361 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-i; intentional TDD failures, expected
+negative controls, repeated quoted receipts and prior ER-67 findings are not
+counted as new incidents. This is the reconstructed continuation only, not
+the deleted original session.
+
 Two Low execution frictions were also caught locally. A raw PowerShell
 continuation backtick inside a JavaScript template caused a parser error;
 use PowerShell parameter splatting in the fixture, so interpreter delimiters

@@ -4,6 +4,19 @@
 
 ### Current master/performance reconciliation (2026-10-21)
 
+**Latest actual native execution, 2026-10-22:** `30fbea59` passes all 28
+protected gates, both review findings are resolved and fresh review
+`5618294791` reports no open code issues. Linux run `39822577851` retains
+complete old/current profiles but fails analysis on two baseline `-2`
+microsecond timestamp steps. Local RED-first correction validates every
+reconstructed timestamp, retains unweighted samples and explicitly reports
+reordering. All 72 focused contracts pass. Separate replay verifies nine
+producer hashes, four receipts, 17,628 spans and 16,000 timings; the original
+campaign remains FAIL. Publication/new-source CI of this correction are pending.
+Untraced qualification `39822577951` also fails the first same-image block
+(add p99 too slow, empty-read p99 too fast); there is no deployment admission.
+No serving change, product bump, merge or deployment occurs. See ER-68h/i.
+
 **Latest 2026-10-22 native-profile continuation:** published `a7e51d10` passes
 all 28 protected gates and fresh review `5616280374` has no open code finding.
 Its successful Linux timeline associates 142/168 p99-tail spans with an

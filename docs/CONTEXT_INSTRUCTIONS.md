@@ -9,6 +9,18 @@
 
 ## Active Delivery Process
 
+**Latest actual native execution, 2026-10-22:** `30fbea59` is published through
+28 passing gates and fresh review `5618294791` has no open code issues.
+Both preceding review findings are resolved. Actual Linux `39822577851`
+completes both profile captures, then rejects two baseline `-2` microsecond
+steps. RED-first signed cumulative-clock validation now passes 72 focused
+contracts. Separate replay verifies nine producer hashes, four resource/client
+receipts, 17,628 request spans and 16,000 timings while retaining the original
+campaign FAIL and the corrected consumer hash. New-source publication/CI is
+pending. Qualification `39822577951` independently fails first-control add p99
+and empty-read p99; performance admission and deployment remain held.
+See ER-68h/i in the linked ledger below. Product stays 0.55.58.
+
 **Latest local 2026-10-22 diagnostic:** one explicit native-profile mode selects
 only the frozen old/current BAAB block, never the admission evaluator.
 Application-only native flags exclude migration and ordinary qualification.

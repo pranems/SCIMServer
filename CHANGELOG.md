@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first/second process visits. Profile only the application Node process,
   not migrations, and retain both profiles before exact-owned cleanup even
   if the first capture fails. Ordinary qualification remains uninstrumented.
+- Actual Linux profiles expose two baseline `-2` microsecond timestamp steps.
+  Replace the consumer's unsupported monotonic-step assumption with per-step
+  cumulative-window validation; preserve every unweighted observation and
+  report reordering explicitly. Add useful bounded CLI validation reasons.
+  Focused tests: 71 -> 72 PASS. Separate exact replay verifies nine producer
+  hashes, 17,628 spans and 16,000 timings without relabeling the failed campaign.
 - Focused contracts increase 44 -> 68 PASS, zero failures/skips. New coverage
   includes actual analyzer CLI failures, immutable role/runtime identity,
   all 17,628 request spans and 16,000 timings, explicit profiler authorization,

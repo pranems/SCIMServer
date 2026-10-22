@@ -105,6 +105,16 @@ When extracting PowerShell blocks for focused execution, preserve automatic
 script-path bindings explicitly without replacing the production branching
 or hash logic. See ER-68g in the same ledger.
 
+Do not infer timestamp ordering from an interval field's name. Real native
+profiles can contain signed steps; reconstruct and validate every cumulative
+timestamp against the original profile window, retain every observation and
+report reordering explicitly. Unweighted counts need no sorting or conversion
+of gaps into CPU time. A final in-range sum cannot prove intermediate bounds.
+Verify the official consumer's handling rather than trusting a search
+synthesis. Keep producer commit/hashes distinct from a corrected replay
+consumer's hash, and never relabel an original failed campaign as successful.
+See ER-68h/i in the same ledger.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

@@ -202,6 +202,9 @@ for (const scenario of [
       );
       const output = path.join(directory, "native-functions.json");
       assert.equal(fs.existsSync(output), scenario === "complete");
+      if (scenario === "wrong-image") {
+        assert.match(result.stderr, /Round must use the pinned role image/);
+      }
       if (scenario === "complete") {
         const receipt = JSON.parse(fs.readFileSync(output));
         assert.equal(receipt.diagnosticOnly, true);
@@ -518,6 +521,36 @@ test("native workflow is bounded, read-only and serialized with existing qualifi
   }
 });
 
+test("native analysis retains signed producer timestamp reorder without weighting or discarding samples", () => {
+  const profile = fixture();
+  profile.timeDeltas = [100, -2, 100];
+  const result = implementation().summarizeProfile(profile);
+  assert.equal(result.totalSamples, 3);
+  assert.equal(result.outOfOrderSamples, 1);
+  assert.equal(result.maximumBackwardStepMicroseconds, 2);
+  assert.equal(result.maximumSampleGapMicroseconds, 100);
+  assert.equal(
+    result.functions.find((item) => item.functionName === "validate").samples,
+    2,
+  );
+  assert.equal(
+    result.functions.find((item) => item.functionName === "(idle)").samples,
+    1,
+  );
+  assert.equal(result.admissionEligible, false);
+  for (const invalid of [
+    [-1, 100, 100],
+    [100, -101, 100],
+    [100, 50031, -101],
+  ]) {
+    assert.throws(
+      () =>
+        implementation().summarizeProfile({ ...profile, timeDeltas: invalid }),
+      /outside native profile span/,
+    );
+  }
+});
+
 test("native analysis counts function observations rather than assigning scheduler gaps as CPU time", () => {
   const result = implementation().summarizeProfile(fixture());
   assert.equal(result.diagnosticOnly, true);
@@ -579,7 +612,7 @@ test("incomplete, unsafe and internally inconsistent native profile data fails e
       p.samples[0] = 99;
     },
     (p) => {
-      p.timeDeltas[1] = -1;
+      p.timeDeltas[1] = -11;
     },
     (p) => {
       p.timeDeltas[1] = Infinity;

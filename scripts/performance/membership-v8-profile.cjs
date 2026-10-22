@@ -35,22 +35,30 @@ function summarizeProfile(profile) {
     "Invalid profile end",
   );
   let observedWallMicroseconds = 0;
+  let outOfOrderSamples = 0;
+  let maximumBackwardStepMicroseconds = 0;
+  const profileWallMicroseconds = profile.endTime - profile.startTime;
   for (const delta of profile.timeDeltas) {
-    assert.ok(
-      Number.isSafeInteger(delta) && delta >= 0,
-      "Invalid native observation gap",
-    );
+    assert.ok(Number.isSafeInteger(delta), "Invalid native observation gap");
     observedWallMicroseconds += delta;
     assert.ok(
       Number.isSafeInteger(observedWallMicroseconds),
       "Unsafe native observation clock",
     );
+    assert.ok(
+      observedWallMicroseconds >= 0 &&
+        observedWallMicroseconds <= profileWallMicroseconds,
+      "Observation timestamp outside native profile span",
+    );
+    if (delta < 0) {
+      // Count timestamp reordering without sorting, dropping or weighting samples.
+      outOfOrderSamples++;
+      maximumBackwardStepMicroseconds = Math.max(
+        maximumBackwardStepMicroseconds,
+        -delta,
+      );
+    }
   }
-  const profileWallMicroseconds = profile.endTime - profile.startTime;
-  assert.ok(
-    observedWallMicroseconds <= profileWallMicroseconds,
-    "Observations exceed native profile span",
-  );
 
   const nodes = new Map();
   const functions = new Map();
@@ -137,6 +145,8 @@ function summarizeProfile(profile) {
       "Unweighted exclusive function observations, not CPU time or causal request delay. Native idle observations remain included.",
     totalSamples: profile.samples.length,
     profileWallMicroseconds,
+    outOfOrderSamples,
+    maximumBackwardStepMicroseconds,
     maximumSampleGapMicroseconds: profile.timeDeltas.reduce(
       (maximum, delta) => Math.max(maximum, delta),
       0,
@@ -289,8 +299,9 @@ if (require.main === module) {
     );
     analyze(directory);
   } catch (error) {
+    const reason = error.message.split(/\r?\n/, 1)[0].slice(0, 200);
     console.error(
-      `Native function analysis failed: ${error.code ?? error.name}; no attribution or admission.`,
+      `Native function analysis failed: ${error.code ?? error.name}; ${reason}; no attribution or admission.`,
     );
     process.exitCode = 1;
   }
