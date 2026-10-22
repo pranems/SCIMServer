@@ -72,6 +72,14 @@ remain failures. Profiles include startup/idle/privacy work, and sample gaps
 are not CPU time. Linux execution of this new mode is not yet claimed.
 See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
 
+All three participants explicitly use `queue: max` with
+`cancel-in-progress: false`. GitHub's default retains only one pending run
+and replaces it when a third arrives; that canceled the first native run
+before any job or measurement. The documented max queue retains up to 100
+pending runs while still allowing only one active benchmark. Queue saturation
+can still cancel additional arrivals and must not look like measured success.
+See [GitHub's concurrency queue documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
 This header's 2026-10-22 verification covers the source workflows above.
 The estate snapshots below retain their original capture dates; no fresh
 Azure inventory or serving change is claimed by this diagnostic work.

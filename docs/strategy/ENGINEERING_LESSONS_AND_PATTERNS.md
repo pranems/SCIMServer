@@ -89,6 +89,15 @@ removal even when the first capture fails. Prove these lifecycle behaviors
 with actual collector paths and frozen-image capability probes.
 See [ER-68](../ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
 
+GitHub's `cancel-in-progress: false` is not a queue-all guarantee: by default
+only one pending workflow survives per concurrency group. When three or more
+independent required lanes share a group, use the documented `queue: max`
+on every participant and test the complete participant set. It preserves
+single active execution while retaining up to 100 pending runs; saturation
+still needs explicit failure reporting. Distinguish canceled-before-start
+from a failed measurement, and never repair scheduling loss by admitting
+unexecuted evidence.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

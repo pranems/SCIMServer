@@ -15,6 +15,7 @@ permissions:
 concurrency:
   group: membership-performance-qualification
   cancel-in-progress: false
+  queue: max
 
 jobs:
   profile:

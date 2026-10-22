@@ -23,6 +23,15 @@ qualification still fails three limits. Master remains `e1070ba2`; no merge,
 deployment, admission waiver or product-version bump is claimed.
 See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
 
+Published `5c60e41c` retains native implementation `8f4e1697` and passes
+all 28 Validate gates. A prior worker-startup failure correctly blocked
+partial Web execution; unchanged complete tests subsequently pass 1,655/124.
+Native CI run `39816471809` is canceled before any job: default concurrency
+retains only one pending run. Apply documented `queue: max` to all three
+shared-group workflows, retaining single active execution and up to 100
+waiters. Local configuration guards precede service acceptance; no measurement
+or admission rule is changed. Fresh native execution/review remains required.
+
 **2026-10-22 current merged checkpoint:** PR #250 merged at `e1070ba2` after
 the final `5b3136d1` review and exact-tip CI. Immutable 0.55.58 image digest:
 `sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.

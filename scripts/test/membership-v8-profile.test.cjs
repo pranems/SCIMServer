@@ -426,6 +426,21 @@ test("native workflow is bounded, read-only and serialized with existing qualifi
     workflow,
     /azure\/login|promote-to-prod|deploy-azure|write-all/,
   );
+  for (const name of [
+    "performance-qualification.yml",
+    "membership-cpu-diagnostic.yml",
+    "membership-function-diagnostic.yml",
+  ]) {
+    const participant = fs.readFileSync(
+      path.resolve(__dirname, "..", "..", ".github", "workflows", name),
+      "utf8",
+    );
+    assert.match(
+      participant,
+      /concurrency:\r?\n\s+group: membership-performance-qualification\r?\n\s+cancel-in-progress: false\r?\n\s+queue: max/,
+      `${name} must retain every waiting run, not replace the previous pending diagnostic`,
+    );
+  }
 });
 
 test("native analysis counts function observations rather than assigning scheduler gaps as CPU time", () => {

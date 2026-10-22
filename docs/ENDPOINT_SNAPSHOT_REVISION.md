@@ -504,6 +504,33 @@ Detecting and earliest useful stage are both the protected full Web gate.
 Track recurring worker-startup reliability separately rather than silently
 increasing deadlines or declaring missing files passed.
 
+**Protected publication follow-up:** the unchanged complete Web gate passes
+1,655 assertions in all 124 files on the next normal protected attempt.
+Tip `5c60e41c` passes all 28 Validate gates in 991.4 seconds and is verified
+clean and published. The first failure is retained, not relabeled successful.
+No underlying worker-startup cause is claimed fixed.
+
+**ER-68f, workflow scheduling / Medium:** native run `39816471809` is canceled
+before any job or measurement. Three workflows share a concurrency group,
+but `cancel-in-progress: false` protects the running workflow, not every
+pending workflow: the default single pending slot replaces the earlier waiter.
+The [current GitHub documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+explicitly supports `queue: max`, retaining up to 100 waiters without adding
+active concurrency. Apply it to **all three participants**, so a default-mode
+arrival cannot continue replacing existing queued work. A focused RED checks
+each workflow's real configuration before the correction. This changes no
+measurement, sample, quota, timeout or admission threshold. Queue saturation
+remains explicit, and canceled-before-start is not a timing failure or a PASS.
+The detecting stage is GitHub scheduling; earliest local prevention is the
+new all-participant configuration contract. Exact-source GitHub acceptance
+and native execution are required before claiming the correction verified
+on the service.
+
+**Local correction GREEN:** all 68 focused contracts pass, including the
+three-participant queue guard. YAML parsing independently verifies every
+participant has `queue: max` and `cancel-in-progress: false`. This is local
+configuration evidence, not proof of GitHub scheduler acceptance.
+
 Two Low execution frictions were also caught locally. A raw PowerShell
 continuation backtick inside a JavaScript template caused a parser error;
 use PowerShell parameter splatting in the fixture, so interpreter delimiters

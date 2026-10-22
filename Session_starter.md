@@ -21,6 +21,16 @@ Exact-source Linux function profiles and fresh review are still pending.
 See [ER-68](docs/ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
 No product-version bump or serving change is made.
 
+Implementation `8f4e1697` is preserved and published through `5c60e41c`,
+with all 28 normal Validate gates PASS (991.4 seconds). The earlier Web
+worker-startup failure remains retained; unchanged complete Web tests pass
+1,655/124. Native CI is then canceled before any job because the shared
+concurrency group's default allows only one pending run. All three workflows
+now explicitly use GitHub's documented `queue: max`, preserving one active
+benchmark rather than dropping a waiting lane. Focused all-participant
+configuration coverage prevents recurrence; service acceptance and actual
+native execution remain pending. See ER-68e/f.
+
 **2026-10-22 merged-master and qualification continuation:** PR #250 is now
 merged at `e1070ba2`, after reviewed head `5b3136d1`, all 25 protected-push
 gates and seven exact-tip CI checks. Current immutable 0.55.58 image is

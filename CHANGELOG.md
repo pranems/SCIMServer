@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Correct shared workflow scheduling: `cancel-in-progress: false` alone allows
+  only one pending run and canceled the native lane before any job. Apply
+  GitHub's documented `queue: max` to all three participants, preserving one
+  active benchmark and up to 100 waiters. Add an all-participant RED/GREEN
+  guard; no timing/admission rule changes. Retain the failed Web worker-startup
+  push separately from the subsequent 28-gate PASS on `5c60e41c`.
 - Add an explicitly non-admitting native function diagnostic for one frozen
   0.55.20/0.55.58 BAAB block. Preserve original resource limits, workload and
   first/second process visits. Profile only the application Node process,
