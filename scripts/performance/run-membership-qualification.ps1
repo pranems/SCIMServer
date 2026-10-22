@@ -193,6 +193,7 @@ function Invoke-Block {
                 peakCgroupBytes = $null; nodeRssBytes = $null; oomKilled = $null
             }
             $observer = $null
+            $roundFailure = $null
             try {
                 if ($TraceDiagnostic) {
                     $resource['diagnosticOnly'] = $true
@@ -233,10 +234,21 @@ function Invoke-Block {
                 $containers.Add($client)
                 & docker start --attach $client
                 $transportExit = $LASTEXITCODE
-                $clientExit = [int](Invoke-Docker inspect --format '{{.State.ExitCode}}' $client)
-                @{ transportExit = $transportExit; clientExit = $clientExit } |
-                    ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
-                $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
+                $clientFailure = $null
+                try {
+                    $clientExit = [int](Invoke-Docker inspect --format '{{.State.ExitCode}}' $client)
+                    @{ transportExit = $transportExit; clientExit = $clientExit } |
+                        ConvertTo-Json | Set-Content (Join-Path $directory "round-$round-$role-status.json")
+                } catch {
+                    $clientFailure = $_
+                }
+                try {
+                    $null = Invoke-Docker cp "${client}:/tmp/receipt.json" $receiptPath
+                } catch {
+                    if ($null -eq $clientFailure) { throw }
+                    Write-Warning 'Client receipt copy also failed; primary status error retained.'
+                }
+                if ($null -ne $clientFailure) { throw $clientFailure }
                 $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
                 if (!$TraceDiagnostic -and !$ProfileDiagnostic -and $receipt.PSObject.Properties.Name -contains 'diagnosticOnly') {
                     throw 'Diagnostic client receipt cannot enter qualification.'
@@ -277,13 +289,32 @@ function Invoke-Block {
                 }
                 $resource.status = 'PASS'
                 $resource.failureStage = $null
+            } catch {
+                $roundFailure = $_
+                throw
             } finally {
+                $hadRoundFailure = $null -ne $roundFailure
+                $observerFailure = $null
                 try {
                     if ($observer) { Stop-CpuObserver $observer }
-                } finally {
+                } catch {
+                    $observerFailure = $_
+                    $resource['observerStopFailed'] = $true
+                    $resource.status = 'FAIL'
+                    if (!$hadRoundFailure) {
+                        $roundFailure = $_
+                        $resource.failureStage = 'cpu-observer-stop'
+                    }
+                    Write-Warning 'CPU observer shutdown failed; first round error retained.'
+                }
+                try {
                     $resource | ConvertTo-Json -Depth 10 |
                         Set-Content (Join-Path $directory "round-$round-$role-resources.json")
+                } catch {
+                    if ($null -eq $roundFailure) { throw }
+                    Write-Warning 'Resource receipt write failed; first round error retained.'
                 }
+                if (!$hadRoundFailure -and $null -ne $observerFailure) { throw $observerFailure }
             }
             $row = [pscustomobject]@{
                 role = $role; version = $receipt.version; image = $roles[$role].image
@@ -308,7 +339,9 @@ function Invoke-Block {
         $privacy = [ordered]@{
             status = 'FAIL'; complete = $false; passed = $false; failureStage = 'functional'
             contractAssertions = 0; checkedRows = 0; validatedRows = 0; rawLogsExported = $false
-            correlation = [ordered]@{ errorRows = $null; requestIdPresent = $null; categoryPresent = $null }
+            correlation = [ordered]@{
+                errorRows = $null; requestIdPresent = $null; categoryPresent = $null; sameRecordPresent = $null
+            }
         }
         $privacyFailure = $null
         try {
@@ -343,7 +376,24 @@ function Invoke-Block {
             $privacy.correlation.requestIdPresent = $errors.Count -gt 0 -and
                 $consoleLog.Contains($errors[0].requestId.Substring(0, 8))
             $privacy.correlation.categoryPresent = $consoleLog -match 'scim\.group'
-            if (!$errors.Count -or !$privacy.correlation.requestIdPresent -or !$privacy.correlation.categoryPresent) {
+            $privacy.correlation.sameRecordPresent = $false
+            if ($errors.Count -gt 0) {
+                $requestPrefix = [regex]::Escape($errors[0].requestId.Substring(0, 8))
+                foreach ($line in ($consoleLog -split '\r?\n')) {
+                    if ($line.StartsWith('{"timestamp":')) {
+                        $record = $line | ConvertFrom-Json -ErrorAction Stop
+                        if ($record.category -ceq 'scim.group' -and $record.requestId -ceq $errors[0].requestId) {
+                            $privacy.correlation.sameRecordPresent = $true
+                            break
+                        }
+                    } elseif (($line -replace '\x1b\[[0-9;]*m', '') -match
+                        "^\d{2}:\d{2}:\d{2}\.\d{3}\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+scim\.group\s+\[$requestPrefix\]") {
+                        $privacy.correlation.sameRecordPresent = $true
+                        break
+                    }
+                }
+            }
+            if (!$privacy.correlation.sameRecordPresent) {
                 throw 'Negative-path categorized console correlation missing.'
             }
             $privacy.failureStage = 'row-contract'
@@ -368,6 +418,7 @@ function Invoke-Block {
             throw
         } finally {
             $privacy.contractAssertions = $script:privacyPassed
+            $campaignFailure = $null
             try {
                 $privacy | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $directory 'privacy.json')
             } catch {
@@ -517,15 +568,25 @@ try {
         $summary.Status = 'PASS: bounded Linux qualification and both prospective comparison orders'
         $summary.AdmissionEligible = $true
     }
-    Write-Host $summary.Status
 } catch {
+    $campaignFailure = $_
     $summary.Status = 'FAIL: no deployment admission'
+    $summary.AdmissionEligible = $false
     $summary['Failure'] = $_.Exception.Message
     throw
 } finally {
-    $summary['FinishedAtUtc'] = [DateTime]::UtcNow.ToString('o')
-    $summary | ConvertTo-Json -Depth 10 | Set-Content $summaryPath
-    foreach ($key in $envNames) {
-        [Environment]::SetEnvironmentVariable($key, $priorEnvironment[$key])
+    try {
+        $summary['FinishedAtUtc'] = [DateTime]::UtcNow.ToString('o')
+        $summary | ConvertTo-Json -Depth 10 | Set-Content $summaryPath
+    } catch {
+        $summary.Status = 'FAIL: no deployment admission'
+        $summary.AdmissionEligible = $false
+        if ($null -eq $campaignFailure) { throw }
+        Write-Warning 'Campaign receipt write failed; primary campaign error retained.'
+    } finally {
+        foreach ($key in $envNames) {
+            [Environment]::SetEnvironmentVariable($key, $priorEnvironment[$key])
+        }
     }
 }
+Write-Host $summary.Status

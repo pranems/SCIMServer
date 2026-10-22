@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Prospective Linux performance qualification (tooling only)
 
+- Address all four findings in review `5620999429`: independently retrieve
+  client timing receipts despite status failures, preserve original round
+  errors through observer/resource finalization, correlate the selected
+  negative request and category in one actual console record, and restore
+  environment values even when the campaign receipt cannot be written.
+  Failed finalization never grants admission or prints success.
+  Focused contracts increase 93 -> 104 PASS after nine substantive RED controls.
+  Prior `abbcce07` publication passes 28 Validate gates in 1171.7 seconds;
+  its Linux performance control still fails. Record derived audit-report
+  provenance repair and fixture lessons in ER-68w-ac. No product bump.
 - Address all three findings in review `5620551104`: explicitly drain buffered
   request logs through the existing authenticated admin endpoint before
   snapshotting, persist sanitized partial privacy receipts, and preserve a

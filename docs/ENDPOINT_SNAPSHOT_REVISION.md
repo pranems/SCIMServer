@@ -1,6 +1,6 @@
 # Compact database-owned endpoint snapshot revisions
 
-**Last verified:** 2026-10-20
+**Last verified:** 2026-10-22
 
 **Status:** Implemented and tested locally, not released or deployed.
 Performance admission and the independent release gates remain open.
@@ -872,7 +872,79 @@ Design disposition **accepted**: keep the existing campaign coordinator and
 its measurement/privacy/finalization phases; receipts add no serving concern.
 The privacy validator is shared because two real consumers need the same
 contract. No generic workflow framework or speculative strategy is introduced.
-Exact-source normal publication, CI and fresh review remain required.
+The normal publication of `abbcce07` subsequently passes all 28 Validate
+gates in 1171.7 seconds: API 6210/213, HTTP 2514/118 and Web 1655/124.
+Its native `39855401567` and timeline `39855401180` jobs pass; independent
+artifact audits remain separate work. Its performance qualification
+`39855403223` fails, so neither correctness nor diagnostic PASS admits release.
+
+### Layered finalization review and audit provenance (ER-68w-ac)
+
+Fresh review `5620999429` on exact `abbcce07` contains four relevant findings
+despite its "No open issues" headline. All four are addressed together.
+The following flow shows error ownership, not a new serving architecture:
+
+```text
+Client completes or fails
+  -> independently attempt status collection and timing receipt copy
+  -> preserve first client error; never admit failed evidence
+Round finalizes
+  -> stop observer and attempt resource receipt, even with a work error
+  -> preserve first round error; report secondary failures
+Privacy phase
+  -> require selected negative request and category in one actual record
+Block finalizes
+  -> collect both authorized profiles; exact owned cleanup; finalization receipt
+Campaign finalizes
+  -> attempt campaign receipt; preserve first error
+  -> always restore original environment, including absent variables
+```
+
+| Issue | Type / severity | Symptom and root cause | Correction and why it works | Detection / earliest gate |
+|---|---|---|---|---|
+| ER-68w | Evidence provenance / High | An ignored timeline audit helper hardcodes an older run/output and omits privacy proof from replay scratch. Reusing it overwrites a derived older report with a misleading run identity; stronger privacy validation exposes the missing input. Raw immutable artifacts are unchanged. | Require explicit output, derive run from the artifact directory, reject cross-run output before any write, copy privacy proof, and separately hash the current consumer. Reverify both original artifacts into correctly identified reports. A cross-run negative control exits 1 without changing the restored report hash. | Local retained-artifact replay / helper identity and complete-input negative controls. |
+| ER-68x | Failure evidence / Medium | Exit inspection or status-file writing throws before the available client receipt is copied; cleanup then removes its source. | Independently attempt status collection and receipt copy; preserve the first error and reject the round. Tests assert retained timing values after owned cleanup, not just file names. | Hosted review / injected inspection and writer failures in the actual round. |
+| ER-68y | Error precedence / Medium | Observer shutdown or resource-receipt writing masks an earlier client/deadline error before the block catches it. | Retain the first round ErrorRecord, attempt both finalization operations and warn explicitly about secondary failures. An observer failure on otherwise successful work also fails the round. | Hosted review / combined work-observer and work-writer controls. |
+| ER-68z | Assertion correctness / High | Request ID and category are searched independently across all console output; unrelated records can falsely satisfy the correlation gate. | Match the selected full request ID and top-level category in one JSON record, or its actual pretty-log header with the eight-character request prefix. Reject separate records and a misleading nested payload category; never export IDs or raw logs. | Hosted review / separate-record and nested-payload negative controls. |
+| ER-68aa | Finalization and environment / Medium | A final campaign writer failure masks pending work failure and skips restoration of generated credentials and settings. | Guard the write, preserve a pending campaign error, fail otherwise successful work on write failure, clear admission, and restore the original environment in an unconditional finally. Print success only after finalization succeeds. | Hosted review / actual campaign catch-finally controls with present and originally absent environment values. |
+| ER-68ab | Test registration / Low | A new campaign loop is initially nested inside the resource test callback, multiplying registrations and obscuring the intended population. | Move it to module scope and verify exactly 104 selected contracts before treating RED/GREEN as evidence. No production fix is inferred from a malformed test run. | First local test run / syntax and test-population preflight. |
+| ER-68ac | PowerShell fixture semantics / Low | Dot-sourcing an extracted bare rethrow in a separate script block produces ScriptHalted, unlike the lexical production catch. | Execute the original catch and finally together in one parsed try statement. This preserves actual rethrow semantics instead of changing production to satisfy an artificial harness. | First GREEN attempt / real catch-context execution. |
+
+Nine substantive new failing controls are confirmed RED before the runner
+correction; a tenth failure is the fixture-context issue ER-68ac, not evidence
+of a production defect. The additional JSON success control already passes. After the
+fixture-context correction, all **104 contracts PASS, zero FAIL/skip**:
+`qualification-layered-finalization-red.log` and
+`qualification-layered-finalization-green-final.log` under `test-results/`.
+The two fixture issues above are distinguished from production failures.
+Publication, exact-tip CI and fresh review remain required for this correction.
+No serving code, frozen image, quota, workload, admission limit or product
+version changes.
+
+The failure-precedence walk covers client -> round -> privacy -> block ->
+campaign, including evidence collection before source cleanup and errors in
+receipt writing. Self-improvement **applied**: test the original error, retained
+values, negative correlation and restored state rather than only failure exit.
+Design disposition **accepted**: the existing 396-line block coordinates the
+same bounded phases; no new responsibility or generic workflow framework is
+introduced. Private per-phase error state is simpler than a speculative
+strategy abstraction. The audit-helper fix and original-report restoration are
+retained in ignored evidence; this ledger makes their provenance issue durable.
+
+**Campaign reverse check:** run the corrected lexical fixture against an
+unmodified, temporary copy of exact `abbcce07` from Git. Both writer-failure
+cases fail for their original error/restoration defects; ordinary work failure
+passes (two RED, one PASS). The current three cases all pass. Logs:
+`qualification-campaign-parent-negative.log` and
+`qualification-campaign-context-green.log`. The working production file is
+never reverted or replaced, and temporary fixture files are removed.
+
+**Completeness update:** signal-frequency and causal-narration passes scan the
+entire available continuation through event 62,126. The native increment has
+311 matching records, not 311 incidents. Confirmed new issues map to ER-68w-ac;
+intentional RED controls, repeated quotations, normal CRLF warnings and
+workflow failures already retained above are not invented additional issues.
+This is not access to the deleted original transcript.
 
 The earlier `35b66b36` native artifact from `39849505885` independently
 verifies nine producer hashes, four receipts, all 17,628 spans and 16,000

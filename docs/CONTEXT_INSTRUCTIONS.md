@@ -9,6 +9,17 @@
 
 ## Active Delivery Process
 
+**Current review correction:** published `abbcce07` passes 28 ordinary Validate
+gates in 1171.7 seconds (API 6210/213, HTTP 2514/118, Web 1655/124).
+All four findings in review `5620999429` now have local fixes: independent
+client receipt retention, round first-error precedence, same-record negative
+console correlation, and unconditional environment restoration after campaign
+receipt-write failure. Nine substantive controls first fail; 104 focused contracts
+pass with zero skips. ER-68w-ac records these and the derived audit report
+identity correction. Protected publication/fresh CI/review remain required.
+Native/timeline on `abbcce07` pass; qualification `39855403223` fails.
+No serving, workload, quota, threshold, version or deployment change.
+
 **Latest consolidation:** review `5620551104` identifies buffered-log snapshot,
 missing partial privacy receipts and primary-work error masking. Local fixes
 use the authenticated drain endpoint, sanitized failure-first receipts and

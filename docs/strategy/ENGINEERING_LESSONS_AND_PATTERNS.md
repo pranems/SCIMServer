@@ -71,6 +71,23 @@ Preserve a primary work error through secondary capture, cleanup and receipt
 write failures; test combined failures and report when a receipt is not
 durable. See ER-68q-v in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
 
+Walk failure precedence through every layer once: client status/copy, round
+observer/resource receipt, privacy, block capture/cleanup and campaign receipt.
+An outer catch cannot preserve an error already replaced by an inner finally.
+Attempt independent evidence operations before deleting their source, retain
+the first ErrorRecord, and put environment restoration in an unconditional
+finally. Test combined failures and originally absent environment values.
+For correlation, match the selected ID and category in the same actual log
+record, not independent substrings across a capture or nested payload fields.
+Keep fixtures faithful to the real formatter and lexical catch semantics.
+See ER-68x-ac in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Derived audit reports need immutable-input identity too. Require explicit
+artifact/run/output alignment before writing, retain the original producer
+identity separately from the current replay-consumer hash, and include all
+guard inputs in replay scratch. A replay is not a new measurement. Verify a
+wrong-run negative control cannot overwrite an older report. See ER-68w.
+
 Resource measurements need the same failure contract as request timings.
 Persist every collected CPU, database, memory, RSS and OOM observation before
 rejecting a ceiling or deleting its owner. A missing later probe must leave

@@ -18,6 +18,7 @@ function load() {
 for (const scenario of [
   'buffered', 'functional-failure', 'flush-failure', 'secret-leak',
   'no-errors', 'missing-request', 'missing-category', 'invalid-row', 'functional-write-failure',
+  'split-records', 'json-buffered', 'json-split-records', 'json-unrelated-payload',
 ]) {
   test(`actual privacy phase drains buffered logs and retains sanitized failure evidence: ${scenario}`, () => {
     const runner = fs.readFileSync(path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1'), 'utf8');
@@ -84,7 +85,22 @@ for (const scenario of [
             $prefix = if ($scenario -eq 'missing-request') { '87654321' } else { '12345678' }
             $category = if ($scenario -eq 'missing-category') { 'other' } else { 'scim.group' }
             if ($scenario -eq 'secret-leak') { return $env:JWT_SECRET }
-            return "$prefix $category"
+            if ($scenario -eq 'split-records') {
+              return @("12:00:00.000 WARN other [$prefix] negative", '12:00:00.001 INFO scim.group [87654321] unrelated') -join [Environment]::NewLine
+            }
+            if ($scenario.StartsWith('json-')) {
+              $record = [ordered]@{ timestamp = '2026-10-22T12:00:00.000Z'; category = $category; requestId = $requestId }
+              if ($scenario -eq 'json-unrelated-payload') { $record.category = 'other'; $record.data = @{ category = 'scim.group' } }
+              if ($scenario -eq 'json-split-records') {
+                $record.category = 'other'
+                return @(
+                  (ConvertTo-Json -InputObject $record -Compress),
+                  '{"timestamp":"2026-10-22T12:00:00.001Z","category":"scim.group","requestId":"87654321-1234-4234-8234-123456789abc"}'
+                ) -join [Environment]::NewLine
+              }
+              return ConvertTo-Json -InputObject $record -Depth 4 -Compress
+            }
+            return "12:00:00.000 WARN $category [$prefix] synthetic"
           }
           throw 'Unexpected private log operation'
         }
@@ -98,7 +114,8 @@ for (const scenario of [
           }
           exit 0
         }
-        if (($scenario -eq 'buffered') -ne ($null -eq $failure)) { throw "Wrong privacy phase outcome: $failure" }
+        $success = $scenario -in @('buffered', 'json-buffered')
+        if ($success -ne ($null -eq $failure)) { throw "Wrong privacy phase outcome: $failure" }
         $json = Get-Content (Join-Path $directory 'privacy.json') -Raw
         $receipt = $json | ConvertFrom-Json
         foreach ($key in @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK')) {
@@ -110,7 +127,7 @@ for (const scenario of [
           if ($property -notin $allowed) { throw 'Undocumented privacy receipt field' }
         }
         foreach ($property in $receipt.correlation.PSObject.Properties.Name) {
-          if ($property -notin @('errorRows', 'requestIdPresent', 'categoryPresent')) {
+          if ($property -notin @('errorRows', 'requestIdPresent', 'categoryPresent', 'sameRecordPresent')) {
             throw 'Undocumented correlation receipt field'
           }
         }
@@ -122,18 +139,23 @@ for (const scenario of [
           'secret-leak' { 'secret-scan' }
           'invalid-row' { 'row-contract' }
           'buffered' { $null }
+          'json-buffered' { $null }
           default { 'correlation' }
         }
         if ($receipt.failureStage -cne $expectedStage -or
-            $receipt.passed -ne ($scenario -eq 'buffered') -or
-            $receipt.complete -ne ($scenario -eq 'buffered')) { throw 'Privacy failure stage/completion lost' }
+            $receipt.passed -ne $success -or
+            $receipt.complete -ne $success) { throw 'Privacy failure stage/completion lost' }
         $expectedAssertions = if ($scenario -eq 'functional-failure') { 5 } else { 66 }
         if ($receipt.contractAssertions -ne $expectedAssertions) { throw 'Completed functional count lost' }
-        if ($scenario -eq 'buffered' -and
+        if ($success -and
             (!$script:flushed -or $receipt.checkedRows -ne 200 -or $receipt.validatedRows -ne 200)) {
           throw 'Buffered negative records were not durably checked'
         }
         if ($scenario -eq 'invalid-row' -and $receipt.validatedRows -ne 199) { throw 'Partial row validation count lost' }
+        if ($scenario -in @('split-records', 'json-split-records', 'json-unrelated-payload')) {
+          if (!$receipt.correlation.requestIdPresent -or !$receipt.correlation.categoryPresent -or
+              $receipt.correlation.sameRecordPresent -ne $false) { throw 'Unrelated console records incorrectly prove negative correlation' }
+        }
         if ($scenario -in @('no-errors', 'missing-request', 'missing-category')) {
           if ($receipt.correlation.errorRows -ne $(if ($scenario -eq 'no-errors') { 0 } else { 1 }) -or
               $receipt.correlation.requestIdPresent -ne ($scenario -eq 'missing-category') -or
@@ -583,7 +605,8 @@ test('actual round orchestration copies a failed client receipt before rejecting
 });
 
 for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'missing-rss',
-  'cpu-unavailable', 'oom-unavailable', 'deadline-after-client']) {
+  'cpu-unavailable', 'oom-unavailable', 'deadline-after-client', 'status-inspection-failure',
+  'status-write-failure', 'client-observer-failure', 'resource-write-failure']) {
   test(`actual round preserves resource evidence through owned cleanup for ${scenario}`, () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-resource-receipt-'));
     const runner = path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1');
@@ -641,6 +664,7 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
         function Start-Sleep {}
         function Read-CpuCounters {
           $script:cpuReads++
+          if ($scenario -eq 'client-observer-failure') { Set-Variable observer @{ fixture = $true } -Scope 1 }
           if ($scenario -eq 'cpu-unavailable' -and $script:cpuReads -eq 2) { throw 'CPU counters unavailable in resource control.' }
           return @{ usage_usec = $script:cpuReads * 1000; nr_periods = $script:cpuReads * 20; nr_throttled = 1; throttled_usec = 100 }
         }
@@ -648,12 +672,30 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
           $script:sqlReads++
           return @{ calls = $script:sqlReads * 400; executionMs = $script:sqlReads * 25 }
         }
-        function docker { $global:LASTEXITCODE = 0 }
+        function Stop-CpuObserver { throw 'Synthetic observer shutdown failure.' }
+        function Set-Content {
+          param([Parameter(ValueFromPipeline)]$Value, [Parameter(Position=0)]$Path)
+          process {
+            if ($scenario -eq 'status-write-failure' -and $Path.EndsWith('-status.json')) {
+              throw 'Synthetic client status write failure.'
+            }
+            if ($scenario -eq 'resource-write-failure' -and $Path.EndsWith('-resources.json')) {
+              throw 'Synthetic resource write failure.'
+            }
+            Microsoft.PowerShell.Management\\Set-Content -Path $Path -Value $Value
+          }
+        }
+        function docker {
+          $global:LASTEXITCODE = if ($scenario -in @('client-observer-failure', 'resource-write-failure')) { 1 } else { 0 }
+        }
         function Invoke-Docker {
           switch ($args[0]) {
             'create' { return ('a' * 64) }
             'inspect' {
-              if ($args -contains '{{.State.ExitCode}}') { return '0' }
+              if ($args -contains '{{.State.ExitCode}}') {
+                if ($scenario -eq 'status-inspection-failure') { throw 'Synthetic client exit inspection failure.' }
+                return '0'
+              }
               if ($args -contains '{{.State.OOMKilled}}') {
                 if ($scenario -eq 'oom-unavailable') { return 'invalid' }
                 return $(if ($scenario -eq 'oom-killed') { 'true' } else { 'false' })
@@ -676,7 +718,7 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
               }
             }
             'rm' {
-              if (!(Test-Path (Join-Path $directory 'round-1-candidate-resources.json'))) {
+              if ($scenario -ne 'resource-write-failure' -and !(Test-Path (Join-Path $directory 'round-1-candidate-resources.json'))) {
                 throw 'Resource measurements missing before owned cleanup'
               }
               $script:removed += $args[-1]
@@ -692,7 +734,7 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
         }
         $failure = $null
         try { . ([scriptblock]::Create($loop.Extent.Text)) }
-        catch { $failure = $_.Exception.Message }
+        catch { $workFailure = $_; $failure = $_.Exception.Message }
         finally { . ([scriptblock]::Create($cleanup)) }
         $expected = switch ($scenario) {
           'success' { $null }
@@ -700,6 +742,10 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
           'cpu-unavailable' { 'CPU counters unavailable in resource control.' }
           'oom-unavailable' { 'Container OOM state unavailable.' }
           'deadline-after-client' { 'Work deadline reached in resource control.' }
+          'status-inspection-failure' { 'Synthetic client exit inspection failure.' }
+          'status-write-failure' { 'Synthetic client status write failure.' }
+          'client-observer-failure' { 'Failed/partial client receipt retained; no admission or later round.' }
+          'resource-write-failure' { 'Failed/partial client receipt retained; no admission or later round.' }
           default { 'Original memory/Node RSS acceptance ceiling exceeded.' }
         }
         if ($failure -cne $expected) { throw "Unexpected resource outcome: $failure" }
@@ -709,27 +755,98 @@ for (const scenario of ['success', 'memory-limit', 'rss-limit', 'oom-killed', 'm
         exit 0
       `], { encoding: 'utf8' });
       assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
-      const resource = JSON.parse(fs.readFileSync(path.join(directory, 'round-1-candidate-resources.json'), 'utf8'));
       const cleanup = JSON.parse(fs.readFileSync(path.join(directory, 'cleanup.json'), 'utf8'));
       assert.equal(cleanup.containersAbsent, true);
       assert.equal(cleanup.networksAbsent, true);
+      const receipt = JSON.parse(fs.readFileSync(path.join(directory, 'round-1-candidate.json'), 'utf8'));
+      assert.deepEqual(receipt.samples.add, [12.5], 'Client timings survive owned source cleanup');
+      if (scenario === 'resource-write-failure') {
+        assert.match(result.stdout, /Resource receipt write failed/);
+        assert.equal(fs.existsSync(path.join(directory, 'rounds.json')), false);
+        return;
+      }
+      const resource = JSON.parse(fs.readFileSync(path.join(directory, 'round-1-candidate-resources.json'), 'utf8'));
       assert.equal(resource.status, scenario === 'success' ? 'PASS' : 'FAIL');
-      const partialAfter = ['cpu-unavailable', 'deadline-after-client'].includes(scenario);
-      assert.equal(resource.complete, !['missing-rss', 'cpu-unavailable', 'oom-unavailable', 'deadline-after-client'].includes(scenario));
+      const clientFailure = ['status-inspection-failure', 'status-write-failure', 'client-observer-failure'].includes(scenario);
+      const partialAfter = clientFailure || ['cpu-unavailable', 'deadline-after-client'].includes(scenario);
+      assert.equal(resource.complete, !partialAfter && !['missing-rss', 'oom-unavailable'].includes(scenario));
       assert.equal(resource.cpuBefore.usage_usec, 1000);
       assert.equal(resource.cpuAfter?.usage_usec ?? null, partialAfter ? null : 2000);
       assert.equal(resource.databaseCalls, partialAfter ? null : 400);
       assert.equal(resource.databaseExecutionMs, partialAfter ? null : 25);
       assert.equal(resource.peakCgroupBytes, partialAfter ? null : scenario === 'memory-limit' ? 1073741824 : 200000000);
       assert.equal(resource.oomKilled, partialAfter || scenario === 'oom-unavailable' ? null : scenario === 'oom-killed');
-      assert.equal(resource.nodeRssBytes, ['missing-rss', 'cpu-unavailable', 'oom-unavailable', 'deadline-after-client'].includes(scenario) ? null :
+      assert.equal(resource.nodeRssBytes, partialAfter || ['missing-rss', 'oom-unavailable'].includes(scenario) ? null :
         scenario === 'rss-limit' ? 402653184 : 126976000);
-      assert.equal(resource.failureStage, scenario === 'success' ? null :
+      assert.equal(resource.failureStage, clientFailure ? 'client' : scenario === 'success' ? null :
         scenario === 'cpu-unavailable' ? 'cpu-after' : scenario === 'missing-rss' ? 'node-rss' :
           scenario === 'oom-unavailable' ? 'oom-state' : scenario === 'deadline-after-client' ? 'work-deadline' : 'acceptance-limits');
       assert.equal(fs.existsSync(path.join(directory, 'rounds.json')), scenario === 'success');
+      if (scenario === 'client-observer-failure') {
+        assert.equal(resource.observerStopFailed, true);
+        assert.match(result.stdout, /observer shutdown failed/);
+      }
     } finally {
       fs.rmSync(directory, { recursive: true });
     }
+
   });
 }
+
+    for (const scenario of ['work-and-write-failure', 'write-failure', 'work-failure']) {
+      test(`actual campaign restores environment and preserves first error for ${scenario}`, () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-campaign-finalization-'));
+        const runner = path.resolve(
+          __dirname,
+          '..',
+          'performance',
+          'run-membership-qualification.ps1',
+        );
+        try {
+          const result = spawnSync(
+            'pwsh',
+            [
+              '-NoProfile',
+              '-Command',
+              `
+            $ErrorActionPreference = 'Stop'
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile('${runner.replaceAll("'", "''")}', [ref]$null, [ref]$null)
+            $campaign = @($ast.EndBlock.Statements | Where-Object { $_ -is [System.Management.Automation.Language.TryStatementAst] })[-1]
+            if (!$campaign.CatchClauses -or !$campaign.Finally) { throw 'Missing actual campaign finalization' }
+            $scenario = '${scenario}'
+            $summary = [ordered]@{ Status = 'RUNNING'; AdmissionEligible = ($scenario -eq 'write-failure') }
+            $summaryPath = Join-Path '${directory.replaceAll("'", "''")}' 'campaign.json'
+            $campaignFailure = $null
+            $envNames = @('SCIM_TEST_RESTORE_PRESENT', 'SCIM_TEST_RESTORE_ABSENT')
+            $priorEnvironment = @{ SCIM_TEST_RESTORE_PRESENT = 'prior-value'; SCIM_TEST_RESTORE_ABSENT = $null }
+            foreach ($key in $envNames) { [Environment]::SetEnvironmentVariable($key, 'generated-fixture-value') }
+            function Set-Content {
+              param([Parameter(ValueFromPipeline)]$Value, [Parameter(Position=0)]$Path)
+              process {
+                if ($scenario -ne 'work-failure') { throw 'Synthetic campaign receipt write failure.' }
+                Microsoft.PowerShell.Management\\Set-Content -Path $Path -Value $Value
+              }
+            }
+            $control = 'try { if ($scenario -ne "write-failure") { throw "Primary campaign work failure." } } ' +
+              $campaign.CatchClauses[0].Extent.Text + ' finally ' + $campaign.Finally.Extent.Text
+            $failure = $null
+            try {
+              . ([scriptblock]::Create($control))
+            } catch { $failure = $_.Exception.Message }
+            $expected = if ($scenario -eq 'write-failure') { 'Synthetic campaign receipt write failure.' } else { 'Primary campaign work failure.' }
+            if ($failure -cne $expected) { throw "Campaign first-error precedence lost: $failure" }
+            if ([Environment]::GetEnvironmentVariable($envNames[0]) -cne 'prior-value' -or
+                $null -ne [Environment]::GetEnvironmentVariable($envNames[1])) { throw 'Environment not restored after final receipt failure' }
+            if ($summary.Status -cne 'FAIL: no deployment admission' -or $summary.AdmissionEligible -ne $false) {
+              throw 'Failed campaign retained success/admission state'
+            }
+          `,
+            ],
+            { encoding: 'utf8' },
+          );
+          assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
+        } finally {
+          fs.rmSync(directory, { recursive: true });
+        }
+      });
+    }

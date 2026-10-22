@@ -4,6 +4,18 @@
 
 ### Current master/performance reconciliation (2026-10-22)
 
+**Current review correction:** `abbcce07` is published through all 28 ordinary
+Validate gates (1171.7 seconds; API 6210/213, HTTP 2514/118, Web 1655/124).
+Review `5620999429` finds four more runner gaps. Local fixes independently
+retain client timing receipts, preserve round errors, require negative
+request/category correlation within one record, and always restore environment
+after campaign receipt failure. Nine substantive controls first fail; all 104 focused
+contracts now pass with zero skips. See ER-68w-ac, including the corrected
+ignored audit helper's run/output provenance and two test-fixture issues.
+This correction still requires protected publication and fresh exact-tip CI
+and review. Native/timeline on `abbcce07` pass; performance `39855403223`
+fails. No admission, merge, deployment or version bump.
+
 **Latest consolidation:** review `5620551104` on published `35b66b36` finds
 three relevant gaps. Local corrections explicitly drain buffered logs through
 the authenticated admin endpoint, retain sanitized partial privacy receipts,
@@ -53,6 +65,7 @@ Targeted lint/syntax and full ordinary protected publication pass on `84d11af7`.
 
 | Date | Summary |
 |---|---|
+| 2026-10-22 | Corrected all four findings in review 5620999429 with 104 focused PASS; retained nine substantive RED controls and separate fixture issues. Prior abbcce07 passes 28 ordinary gates but its Linux A/A performance control fails. Publication/review of the new correction remain required. |
 | 2026-10-22 | Published signed-clock/timezone corrections through 28 green gates on 84d11af7; fresh review exposes partial-file capture loss, corrected locally with 74 focused tests. Performance control still fails. |
 | 2026-10-22 | Native signed-clock correction passes 72 focused tests and exact retained-data replay; ordinary publication remains blocked by separately retained Web and nested-Jest startup/deadline failures. |
 
