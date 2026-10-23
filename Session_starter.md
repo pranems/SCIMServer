@@ -1,6 +1,29 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-22
+**Last verified:** 2026-10-23
+
+### Independent Hono remediation (2026-10-23)
+
+Branch `chore/regen-lockfile-hono-security-20261023` starts from fresh
+`origin/master` e1070ba28825afee46c953e1e2d5d518863303f2, not PR #251.
+Reserve 0.55.59 for exact Hono 4.13.11 (#248). The actual lock dependency
+regression is RED on 4.13.7; CI-only regeneration and patched-tree checks
+remain required. The preserved qualification branch stays at f6f03a52.
+Frozen 0.55.58 image presence is not new-candidate qualification.
+No original deleted transcript was restored. No merge or deployment.
+The unchanged 39875689201 A/A p99 failure (ratio 1.23928982, limit 1.10),
+customer migration receipt, operational dispositions, 403 cleanup verification
+and actual target-specific human visual observation remain holds.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
+
+- [x] ✅ COMPLETED: Verify handoff receipts, fresh base and actual locked RED.
+- [ ] Apply verified CI lockfiles, validate patched tree, complete hosted review.
+
+**Design disposition: accepted.** An exact transitive patch uses existing
+override/provenance seams; adding an application abstraction is speculative.
 
 ### Current master/performance reconciliation (2026-10-21)
 

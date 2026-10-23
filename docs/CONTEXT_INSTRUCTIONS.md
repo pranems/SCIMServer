@@ -1,13 +1,20 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.58
+> **Version**: 0.55.59
 > **Last Updated**: October 21, 2026
 > **Last verified:** 2026-10-22
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-23 dependency remediation:** 0.55.59 reserves an independent exact
+Hono 4.13.11 patch for #248, based on master e1070ba2. CI-only lockfiles,
+fresh dependency restoration and final hosted review remain required.
+Frozen 0.55.58 runtime-presence evidence is not new-candidate proof.
+Do not absorb #251 tooling, rerun performance or alter its failed admission,
+customer migration, operational, cleanup or human visual verification holds.
 
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
 selection and identifies a real shared-cache binding collision. The generic

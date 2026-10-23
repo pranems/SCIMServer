@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.58`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.59`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,23 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.59 Hono security dependency patch
+
+This pending patch pins transitive Hono to exactly 4.13.11 for
+[GHSA-5r4p-p66f-jhc7](https://github.com/advisories/GHSA-5r4p-p66f-jhc7)
+([issue #248](https://github.com/pranems/SCIMServer/issues/248)).
+The Medium advisory affects Hono >=4.12.4 and <4.13.11: `serveStatic` can
+decode a routed path again and bypass middleware protecting a static prefix.
+It is not traversal outside the configured root.
+
+The existing frozen 0.55.58 image demonstrably includes Hono 4.13.7 through
+Prisma tooling, despite `devOptional` lockfile classification. No direct
+application import was found, but that does not prove unreachability.
+The eligible patch uses the existing CI-only lockfile process; bootstrap
+checks against the old installation are not patch validation.
+There is no application/UI change, deployment, new image qualification or
+performance admission claim. Existing release holds remain unchanged.
 
 ### 0.55.58 correction, validated privately and awaiting reviewed merge
 

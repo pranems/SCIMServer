@@ -1,8 +1,8 @@
 # Prod -> Dev mirroring + synthetic shape-coverage fixtures
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.58`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.59`
 
-> **Version:** 0.55.58  -  **Date:** May 6, 2026
+> **Version:** 0.55.59  -  **Date:** May 6, 2026
 > **Scope:** dev-tooling, no API surface change
 > **Affects:** [api/src/scripts/mirror-prod-to-dev.ts](../api/src/scripts/mirror-prod-to-dev.ts), [api/src/scripts/seed-shape-coverage.ts](../api/src/scripts/seed-shape-coverage.ts), [scripts/mirror-prod-to-dev.ps1](../scripts/mirror-prod-to-dev.ps1)
 

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.59 Hono dependency security patch (#248)
+
+- Pin the API's transitive Hono override exactly to 4.13.11, the smallest
+  patched release for GHSA-5r4p-p66f-jhc7 / CVE-2026-111757 (Medium).
+  The patch was published 2026-09-29T06:15:49Z and became seven-day eligible
+  2026-10-06T06:15:49Z. No quarantine exception or registry change is needed.
+- Reserve 0.55.59 for the shipped dependency change; API and web product
+  versions move together. The existing public-registry CI workflow owns both
+  lockfiles. Bootstrap checks on the old installation do not prove the patch.
+  The actual locked dependency regression first fails on Hono 4.13.7.
+- The frozen 0.55.58 image contains Hono despite its `devOptional` lock flag.
+  This is runtime-presence evidence, not proof of exploitability or absence
+  of reachable vulnerable middleware. No application or UI behavior changes.
+  Final patched-tree validation and hosted review remain pending.
+- Existing performance admission failure, customer migration, operational
+  dispositions, cleanup verification and target-specific human visual
+  observation remain outstanding. No merge, deployment or performance rerun.
+
 ### 0.55.58 consolidation onto token-lifetime master
 
 - Address hosted review's shared-cache binding collision before release:

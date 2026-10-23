@@ -9,6 +9,32 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-23 Hono exact-patch remediation (#248)
+
+Hono 4.13.11 fixes the Medium GHSA-5r4p-p66f-jhc7 / CVE-2026-111757.
+Approved-proxy metadata records publication 2026-09-29T06:15:49Z and
+seven-day eligibility 2026-10-06T06:15:49Z. The client setting
+`min-release-age=undefined` does not establish absence of proxy quarantine.
+No registry/control change, waiver or local lockfile generation is authorized.
+Use the existing public-registry regeneration workflow, inspect its exact
+source tip and every changed entry, then restore with `npm ci` without
+rewriting lockfiles. Reject unrelated dependency churn.
+
+The frozen 0.55.58 image at digest
+`sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`
+contains Hono 4.13.7, @hono/node-server 1.19.15, @prisma/dev 0.24.3 and
+Prisma 7.8.0. Offline read-only package metadata inspection started no API
+or database. `devOptional` and absence of direct imports are not absence
+proof. This receipt belongs only to that frozen image, not a new candidate.
+
+The actual locked dependency assertion fails on 4.13.7 before the change.
+Bootstrap publication validates the old installation only; final dependency
+GREEN requires the CI artifact and a fresh installation. Product 0.55.59
+is reserved for this patch without absorbing #251 or altering its holds.
+**Self-improvement: applied.** Verify actual runtime contents rather than
+inferring them from dependency flags. **Design disposition: accepted.**
+The existing exact override and regeneration route need no new abstraction.
+
 ### 2026-10-21 Vite security prerequisite
 
 The unchanged 0.55.56 web lockfile reports a High Vite advisory through the
