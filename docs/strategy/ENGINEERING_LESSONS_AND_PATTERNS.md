@@ -1529,3 +1529,26 @@ Include the server's effective log level in live-fixture preflight: suppressing
 INFO output also suppresses ring-buffer evidence that an observability gate
 is meant to verify. Require authenticated readiness after every restart.
 See the [integration execution issues](../auth/EXECUTION_ISSUES_AND_RCA.md#current-master-lifetime-integration-preparation-2026-10-21).
+
+## Preserve safe failure identity through privacy rejection and fallback output
+
+2026-10-23: A privacy diagnostic first lost input provenance, then credential
+role. A later real-child negative test showed that even its minimal fallback
+receipt could copy private cleanup or inventory fields and fail a second time.
+Rejecting private data is necessary, but a rejection that loses its safe
+identity prevents the next bounded investigation from discriminating causes.
+
+Use a closed failure schema with a static reason, static input source, static
+credential role and applicable row index. Generate roles at the caller, never
+from credential hashes, lengths, substrings or surrounding context. Test every
+input, serialization, provenance and output-rejection branch. Scan console
+origins separately; administrative database/tool output is not automatically
+an application defect.
+
+A privacy-safe fallback must project fixed schema fields rather than recycle
+the rejected object, even for apparently harmless cleanup or inventory facts.
+Prove this with a real bounded child that injects a canary into those fields
+and requires a retained INVALID receipt with cause/source/kind and no canary.
+This safeguard is applied in the functional diagnostic and its focused test;
+the post-run correction is not attributed to earlier frozen execution.
+See the [source evidence, OS-13 through OS-18 and explicit attribution limits](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#attempt-2-closeout-credential-source-located-strict-result-invalid).

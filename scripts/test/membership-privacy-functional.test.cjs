@@ -89,3 +89,26 @@ test('functional report-output rejection keeps a minimal safe receipt through a 
   assert.deepEqual(report.failures[0].safeDetails, { reason: 'generated-credential-detected',
     source: 'report-output', credentialKind: 'scim-shared-secret' });
 });
+
+test('minimal privacy receipt never recycles private cleanup or inventory fields into a second rejection', () => {
+  const file = path.resolve(__dirname, '../performance/run-membership-privacy-functional.cjs');
+  const privacy = path.resolve(__dirname, '../performance/membership-privacy.cjs');
+  const child = spawnSync(process.execPath, ['-e', `
+    const {writeFunctionalReport}=require(${JSON.stringify(file)});
+    const {encodeSafeJson}=require(${JSON.stringify(privacy)});
+    const c=[{kind:'scim-shared-secret',value:'PRIVATE_CLEANUP_CANARY'}];
+    const report={family:c[0].value,run:c[0].value,status:'INVALID',elapsedMs:1,
+      cleanup:{verified:true,unexpected:c[0].value},remainingOwned:c[0].value,remainingNetworks:''};
+    writeFunctionalReport((name,data)=>process.stdout.write(encodeSafeJson(data,c)),report);
+  `], { encoding: 'utf8', timeout: 2000, maxBuffer: 4096 });
+  assert.equal(child.status, 0);
+  assert.equal(child.stderr, '');
+  assert.doesNotMatch(child.stdout, /PRIVATE_CLEANUP_CANARY|unexpected/);
+  const report = JSON.parse(child.stdout);
+  assert.equal(report.status, 'INVALID');
+  assert.equal(report.family, 'membership-privacy-functional');
+  assert.deepEqual(report.cleanup, { verified: true });
+  assert.equal(report.remainingOwned, 'unverified');
+  assert.equal(report.failures[0].safeDetails.source, 'report-output');
+  assert.equal(report.failures[0].safeDetails.credentialKind, 'scim-shared-secret');
+});

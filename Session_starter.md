@@ -12,24 +12,51 @@ with its declared fixture contract; this does not reconstruct the destroyed
 OS-07 row. Its earlier canary check had passed, so a raw generated credential
 is not established as that old mismatch.
 
-The distinct OS-11 functional failure still needs source/credential-kind
-attribution. A complete allowlisted failure schema now preserves every static
+The sole conditional attempt 2 localized the new rejection to `app-console`
+and `postgres-admin-password`. All four correlated Group rows had exact masks;
+the selected rows, PostgreSQL console and Docker tool console had no generated
+credential match. The result remains INVALID: seven authenticated requests,
+13 readiness probes, 224.078 seconds including cleanup. Both owned containers
+and the network were independently verified removed. Final app metadata
+capture failed; its underlying code was not retained, despite successful
+ownership-checked removal.
+
+Executed source is `fe63bd8df8e4d32036a3233078f8c59ccf184315`;
+attempt manifest SHA-256 is
+`8e53459fcf7090725243698ba2f1f79df41f0901f88cd0bb357ba8316aacdc11`.
+Release-associated legacy Prisma source emits the configured database URL.
+Existing fix `58967716`, already in current 0.55.60 source, removes that emitter;
+13 existing Prisma unit tests pass. No exact compiled legacy Prisma file,
+source revision image label or retained matching line proves unique line
+attribution. This does not reconstruct OS-07 or attempt 1's destroyed match.
+
+A complete allowlisted failure schema now preserves every static
 input source, credential role and applicable row index, including input,
 serialization and report-output rejection. Twenty-three focused tests and
 three unchanged lifecycle/admission selectors pass; seven changed code files
-pass syntax and scoped lint. The new source-grounded hypothesis separates
-application-container startup/migration output from Group rows, PostgreSQL
-container output and Docker tool diagnostics. No new container or runtime
-attempt has occurred in this source-only stage.
+passed syntax and scoped lint before execution. A post-run real-child RED
+exposed unchecked fields in the minimal fallback receipt. Fixed schema
+projection closes that further information-loss route; all 24 focused tests
+pass. This last correction is tested but unmeasured, not the source of attempt 2.
+All earlier manifests retain their hashes; frozen on-disk CRLF bytes remain
+authoritative, not raw Git-byte identity. Content-only freshness is not the
+full coupled gate. Evidence and indexed RCA: the observer/statement diagnostic
+report and `test-results/os07-functional-20261023/attempt2/`.
 
-One conditional attempt 2 is authorized only under its separate frozen
-manifest: seven authenticated requests, at most 15 readiness probes, five
-minutes total including two minutes reserved for cleanup. No performance
-cycles, replacement or further attempt is authorized. All earlier executed
+No further runtime attempt, performance retry, push, PR mutation, cloud change
+or release admission. A new timing comparison needs a separately authorized,
+justified privacy-compatible baseline. Original negative evidence and all
+release/deployment holds remain unchanged.
+
+The one conditional attempt 2 authorization has been consumed under its
+separate frozen manifest: seven authenticated requests, at most 15 readiness
+probes, five minutes total including two minutes reserved for cleanup.
+No performance cycles, replacement or further attempt is authorized. All earlier executed
 bytes, receipts, raw data and release/deployment holds remain unchanged.
 
 | Date | Summary |
 |---|---|
+| 2026-10-23 | Attempt 2 retained strict INVALID with app-console/PostgreSQL-administrative-password attribution, four exact masks, seven authenticated requests and verified owned removal. Existing current Prisma fix has 13 passing unit tests. Post-run fallback RED/GREEN closes a second receipt-loss route; 24 focused tests and two-file static checks pass. Content-only freshness passes 27 docs; no coupled gate or runtime retry claimed. |
 | 2026-10-23 | Established the frozen legacy persistence-contract mismatch, closed missing source/kind rejection paths with RED/GREEN and real-child proof, and implemented separately attributable console inputs for the sole conditional functional reproduction. |
 
 ### OS-07 functional follow-up (2026-10-23)

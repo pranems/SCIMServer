@@ -3,7 +3,108 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
-## Source-only policy review and complete failure telemetry
+## Attempt 2 closeout: credential source located, strict result INVALID
+
+**The sole conditional reproduction localized the new privacy rejection to
+application-container console output and the PostgreSQL administrative
+password role.** It did not fail the four correlated Group authorization
+checks: all four had exact masks. No further reproduction or performance
+experiment was run or is authorized by this result.
+
+| Observed fact | Result |
+|---|---|
+| Executed source commit | `fe63bd8df8e4d32036a3233078f8c59ccf184315` |
+| Frozen manifest SHA-256 | `8e53459fcf7090725243698ba2f1f79df41f0901f88cd0bb357ba8316aacdc11` |
+| Run identity | `950e3bc2253f49e483e51b4e377a2a42` |
+| Start / total elapsed | 2026-10-23T20:33:53.939Z / 224.078 seconds, within the five-minute cap including cleanup |
+| Actual application | Exact cached 0.55.20 baseline, 0.5 CPU and 1 GiB |
+| Persistence policy | Actual server setting `"false"` and stored endpoint setting false; preset setting absent |
+| Requests | Seven authenticated functional requests and 13 separate readiness probes, below their respective caps |
+| Correlated Group rows | Four expected method/route/status/request-ID/endpoint matches; all `authorization-redacted` |
+| Privacy rejection | `generated-credential-detected`, source `app-console`, kind `postgres-admin-password` |
+| Other scanned inputs | No generated-credential match in selected rows, PostgreSQL console or Docker tool console |
+| Outcome | **INVALID**, not privacy success, admission or release PASS |
+| Cleanup | Both exact owned containers and their network removed; post-removal inventory empty |
+| Final capture limitation | Application metadata capture failed before removal. Ownership-checked removal and independent absence verification succeeded. Its underlying capture error code was not retained. |
+
+The preregistered source review and hypothesis are retained in
+`test-results/os07-functional-20261023/source-review-2.json`. The immutable
+attempt lives under `test-results/os07-functional-20261023/attempt2/`, with
+`manifest.json`, `report.json`, six frozen executed inputs,
+`source-byte-proof.json`, `source-attribution.json` and `held-proof.json`.
+No raw private console, credential value, matching substring, context,
+credential hash or credential length was exported.
+
+### What the source evidence explains, and what it does not
+
+Release-associated 0.55.20 source at
+`6785200ff59ccbc12f62b795439fb245e1635480` contains a Prisma startup message
+that interpolates the configured database connection string. The exact
+copied compiled legacy logger sanitizes structured data but appends the
+message string directly to console output. Together, these facts are strongly
+consistent with the observed application-console administrative-password
+category. Existing fix `5896771677e3a67308160d2853c69349ad4188c3`
+removed that successful-startup emitter and made fallback diagnostics static.
+That fix is an ancestor of current 0.55.60 source.
+
+**Attribution limit:** the exact compiled legacy Prisma startup file was not
+in the retained source copy, the image metadata lacks a valid source-revision
+label, and the matching raw console line was deliberately not retained.
+Therefore this is not proof of a unique emitted line in the exact historical
+image. It neither reconstructs attempt 1's destroyed match nor identifies the
+destroyed OS-07 row. The newly established result is the safe source/kind
+category in attempt 2.
+
+Current repository Prisma source matches 0.55.60 master and does not contain
+the known emitter. Its existing 13-test unit suite passes. That is source and
+unit evidence, not another runtime privacy qualification of the current image.
+The immutable baseline cannot be historically patched, and strict privacy
+checks remain unchanged. A future timing comparison is blocked pending a
+separately authorized, independently justified privacy-compatible baseline.
+
+### Final validation and preservation
+
+| Exact command or check | Actual result |
+|---|---|
+| `node --test scripts\test\membership-statements.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-privacy-functional.test.cjs` | 23 passed before execution; 24 passed after the additional fallback regression below |
+| `node --test --test-name-pattern='deadline or first failure\|finalization attempts\|admission rejects' scripts\test\membership-history.test.cjs` | Three unchanged targeted tests passed before execution |
+| `node test-results\os07-functional-20261023\validate-attempt2.cjs` | Seven source/test files passed syntax and scoped ESLint before execution; this exclusive-output artifact was not overwritten |
+| `node test-results\os07-functional-20261023\validate-closeout.cjs` | Two post-run files passed syntax and scoped ESLint, zero errors; retained in `static-closeout-final.json` |
+| `node scripts\performance\run-membership-privacy-functional.cjs --functional-only test-results\os07-functional-20261023\attempt2` | Sole execution, exit 1 / INVALID with safe source/kind retained |
+| `npm --prefix api test -- --runInBand --runTestsByPath src/modules/prisma/prisma.service.spec.ts` | One suite, 13 tests passed; no new current-image runtime |
+| Four earlier manifest hashes | Phase 1, observer smoke, phase 2 and attempt 1 matched their previously retained hashes |
+| Available older frozen-input proof | All nine phase-two and five attempt-one `sourceHashes` entries matched their frozen files |
+| Six attempt-two frozen inputs | All matched manifest hashes. Raw Git bytes differ; all match after CRLF-to-LF normalization. Frozen on-disk bytes are authoritative. |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` | 27 documents passed content-only checks; `freshness-closeout-content.log`, not a full coupled gate |
+| `git diff --check` | Passed; whitespace evidence only, not runtime or admission evidence |
+
+After the run, an additional real bounded-child negative test exposed a
+fallback-receipt defect: the minimal writer copied unchecked family/run,
+cleanup and inventory fields from the rejected report. A private value there
+could reject the fallback too and prevent the safe receipt from being written.
+The correction uses a fixed family, projects only the proven cleanup boolean,
+and records nonempty inventories as `unverified` instead of copying strings.
+RED was actual child exit 1 versus expected 0; all 24 focused tests are GREEN
+after the fix. This correction is **tested but not used in attempt 2**;
+`fe63bd8d` and all six executed frozen files remain unchanged.
+
+Retained validation logs are under
+`test-results/os07-functional-20261023/`, including
+`red-recursive-receipt.log`, `green-recursive-receipt.log`,
+`regression-owned-finalization.log`, `static-attempt2-final.json`,
+`functional-attempt2.log` and `current-prisma-source-regression.log`.
+Documentation freshness checks using `-SkipCoupling` are content-only
+checks, not evidence that the full source-coupled freshness gate passed.
+
+RCA completeness is reconciled against retained command outputs and the
+current activity's actual failures. `VSCODE_TARGET_SESSION_LOG` is unavailable,
+so a full prior-session transcript reconciliation cannot be claimed.
+Destroyed private evidence was not reconstructed. No push, PR #251 mutation,
+remote CI, cloud operation, new image installation or deployment occurred.
+Original 0.55.58 negative admission evidence and all customer, migration,
+capacity, operational, cleanup-403 and visual holds remain unchanged.
+
+## Source-only policy review before attempt 2
 
 **The frozen phase-two fixture did not request masking.** It omitted both
 the server persistence environment variable and an endpoint persistence
@@ -83,6 +184,9 @@ This is not a repeated performance campaign.
 | OS-13 | Diagnostic evidence / High | The previous correction retained a row/console location but lost credential role; input and output assertions could bypass metadata entirely. One typed, allowlisted failure seam now covers real callers, all private inputs and final receipt writing. No secret-derived identifier or context is exported. | Focused RED observed missing `source`; complete input/output negative tests and bounded-child GREEN now prevent recurrence. |
 | OS-14 | Test/tooling / Low | An insertion matched an inner closing brace. The first name-filtered command executed no matching subtest and reported only a file-level success. A full small selector exposed the missing metadata. A later misplaced helper declaration failed module loading. Both were corrected using full function boundaries. | Whole-file selectors and `no-undef` catch these before execution; file-level success is not evidence that a named test ran. |
 | OS-15 | Static correctness / Low | A newly added throw inside `finally` violated `no-unsafe-finally`. The minimal-receipt writer was extracted into a small cohesive function, then proved in an actual bounded child. | Scoped ESLint caught it before any fixture; zero errors after the correction. |
+| OS-16 | Legacy privacy evidence / High | Attempt 2 proves an application-console match for the PostgreSQL administrative password role, while all four selected authorization fields are masked. A release-associated raw database-URL startup emitter is strongly consistent and was already removed in current source by `58967716`; exact emitted-line attribution remains unproven. The immutable baseline stays INVALID. | Complete static source/kind telemetry caught the new category during bounded functional proof. Existing current Prisma tests pass; no privacy waiver or historical image modification. |
+| OS-17 | Cleanup observability / Medium | Final application metadata capture failed; the existing finalizer retained only a boolean, so the original error code is unknown. Exact owned removal and independent absence checks succeeded. Final captures must not be described as uniformly successful. | Finalization receipt caught the capture failure, but an earlier safe error-category retention check could have preserved its cause. Follow-up owner: diagnostic maintainer; target 2026-10-24, separately authorized source-only cleanup-telemetry hardening. No retry in this scope. |
+| OS-18 | Diagnostic receipt / High | A post-run negative child proved unchecked cleanup/inventory/family fields could trigger a second rejection in the fallback itself. The fallback now projects a fixed schema with no unchecked strings. This correction was not used in attempt 2. | Actual child RED (`1 !== 0`) before correction; focused GREEN 24/24 afterward. This closes the newly found receipt-loss route without weakening privacy. |
 
 The source-only facts and exact command evidence are retained under
 `test-results/os07-functional-20261023/`: `source-review-2.json`,

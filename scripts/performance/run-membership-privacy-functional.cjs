@@ -35,9 +35,10 @@ function writeFunctionalReport(write, report) {
   catch (error) {
     if (error.code !== 'DIAGNOSTIC_PRIVACY') throw error;
     report.status = 'INVALID';
-    write('report.json', { family: report.family, run: report.run, status: 'INVALID', diagnosticOnly: true,
-      admissionEligible: false, elapsedMs: report.elapsedMs, cleanup: report.cleanup,
-      remainingOwned: report.remainingOwned, remainingNetworks: report.remainingNetworks,
+    write('report.json', { family: 'membership-privacy-functional', status: 'INVALID', diagnosticOnly: true,
+      admissionEligible: false, cleanup: { verified: report.cleanup?.verified === true },
+      remainingOwned: report.remainingOwned === '' ? '' : 'unverified',
+      remainingNetworks: report.remainingNetworks === '' ? '' : 'unverified',
       failures: [{ stage: 'report-output', code: error.code,
         safeDetails: validateSafeFailure(error.safeDetails),
         safeFindings: error.safeFindings.map(validateSafeFailure) }] });
