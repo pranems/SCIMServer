@@ -105,6 +105,13 @@ function safeCode(error) {
     ? error.code : 'REFERENCE_PREPARATION_FAILED';
 }
 
+function assertNoOnBuild(config) {
+  if (!Object.hasOwn(config, 'OnBuild')) return 'absent';
+  assert.ok(config.OnBuild === null || (Array.isArray(config.OnBuild) && config.OnBuild.length === 0),
+    'No inherited build instructions');
+  return config.OnBuild === null ? 'null' : 'empty-array';
+}
+
 function buildReference(sourceDirectory, outputDirectory) {
   const root = process.cwd();
   for (const directory of [sourceDirectory, outputDirectory]) {
@@ -160,7 +167,7 @@ function buildReference(sourceDirectory, outputDirectory) {
     const image = JSON.parse(docker(['image', 'inspect', parentImage]))[0];
     assert.equal(image.Id, originalProof.platformImageId);
     assert.equal(`${image.Os}/${image.Architecture}`, 'linux/amd64');
-    assert.equal(image.Config.OnBuild, null, 'No inherited build instructions');
+    report.onBuildDeclaration = assertNoOnBuild(image.Config);
     assert.equal(docker(['image', 'ls', '--quiet', '--no-trunc', tag]), '', 'Unique never-overwritten tag');
     report.platformImageId = image.Id;
     report.platform = 'linux/amd64';
@@ -280,7 +287,7 @@ function buildReference(sourceDirectory, outputDirectory) {
 }
 
 module.exports = { parentImage, target, originalHash, derivedHash, oldWarning, startupPrefix, newWarning,
-  patchStatements, patchOriginal, readArchive, verifyDistribution, buildReference };
+  patchStatements, patchOriginal, readArchive, verifyDistribution, assertNoOnBuild, buildReference };
 if (require.main === module) {
   const args = process.argv.slice(2);
   if (args.length !== 3 || args[0] !== '--build-derived-reference') {

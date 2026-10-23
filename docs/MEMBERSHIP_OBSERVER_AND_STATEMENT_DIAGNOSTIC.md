@@ -58,6 +58,7 @@ from this single authorized build.
 |---|---|---|---|
 | DR-01 | Tooling / Low | The installed `docker buildx inspect` rejected `--format`. Supported plain inspection established the existing running `docker` driver and BuildKit v0.33.1, without bootstrap or installation. | Capability probe before build; no unsupported flag is used in the recipe. |
 | DR-02 | Source-proof correctness / High | A tool-rendered startup literal contained a masking placeholder not present in the exact source. Synthetic fixtures passed, but the actual-source preflight failed `Exact reviewed statement count` with `0 !== 1`. The correction pins full compiled bytes plus the complete startup-statement source hash, then removes the exact in-memory statement; no credential-bearing source literal is copied into new tracked code. | Actual-source RED and seven-test GREEN, with zero skips when `DERIVED_REFERENCE_SOURCE` points to the retained extraction. A synthetic fixture alone is not exact-image proof. |
+| DR-03 | Image metadata compatibility / Medium | The first committed preparation stopped after 22.293 seconds because the image JSON omits optional `OnBuild`, while the guard required explicit null. The retained `build1/receipt.json` is INVALID. No build command, frozen build manifest, derived image or verification container was created. Explicit absence, null and an empty array now mean no declared inherited instruction; any present unknown value or nonempty array still rejects. | Source-only structural replay proved field omission. Targeted RED preceded the correction; eight builder tests, including the exact extracted source, then passed with zero skips. Two-file syntax/scoped lint also passed. This correction precedes the one actual build and does not reinterpret the failed preflight. |
 
 Self-improvement: **applied** actual extracted-source validation alongside
 synthetic drift, missing/duplicate statement, archive-framing, whole-distribution
@@ -74,6 +75,9 @@ installed. The tested builder will be committed before the sole build. A success
 source/build proof will still require an explicit later baseline-adoption
 decision and separately authorized runtime validation. It will not clear
 original negative performance/privacy evidence or any release/deployment hold.
+Source was first committed as `c26768ba`; the optional-field correction is
+committed separately before the one actual build. The first failed preflight
+is preserved verbatim, not overwritten or described as a build failure.
 
 ## Attempt 2 closeout: credential source located, strict result INVALID
 

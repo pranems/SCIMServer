@@ -93,3 +93,13 @@ test('derived evidence and local tags are rejected by unchanged normal admission
   protocol.baseline.image = 'scimserver-local:05520-privacy-reference-derived';
   assert.throws(() => validateProtocol(protocol));
 });
+
+test('optional image OnBuild omission is explicit absence, never a present unknown or inherited command', () => {
+  const t = tool();
+  assert.doesNotThrow(() => t.assertNoOnBuild({}), 'Absent optional image field must be supported');
+  assert.equal(t.assertNoOnBuild({}), 'absent');
+  assert.equal(t.assertNoOnBuild({ OnBuild: null }), 'null');
+  assert.equal(t.assertNoOnBuild({ OnBuild: [] }), 'empty-array');
+  for (const value of [['RUN forbidden'], false, '', {}, undefined])
+    assert.throws(() => t.assertNoOnBuild({ OnBuild: value }));
+});
