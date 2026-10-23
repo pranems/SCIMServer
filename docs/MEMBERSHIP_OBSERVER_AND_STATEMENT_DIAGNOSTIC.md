@@ -5,9 +5,11 @@
 
 ## Functional qualification of the DERIVED artifact (2026-10-23)
 
-The next authorized check is one functional run of the immutable local
-DERIVED image, not a production-baseline adoption, original-image retry or
-performance experiment. The explicit entry is
+One functional run of the immutable local DERIVED image was authorized,
+not production-baseline adoption, an original-image retry or a performance
+experiment. Its sole invocation stopped INVALID in metadata preflight,
+before fixture creation; functional privacy remains unqualified.
+The explicit entry is
 `--derived-reference-functional-only`; default, unknown and incomplete calls
 reject before Docker dispatch. The build manifest, successful receipt and
 original unstarted source proof must match their pinned byte hashes.
@@ -17,7 +19,10 @@ This reuses the completed whole-distribution proof without hashing it again.
 
 The fixed functional policy retains at most seven authenticated requests,
 15 readiness probes and five minutes including a 120-second cleanup
-reservation. A unique frozen manifest precedes owned fixture creation.
+reservation. Prospective corrected source writes an exclusive intent before
+metadata inspection and a full frozen manifest before owned fixture creation.
+The executed attempt did not reach either write; its missing preregistration
+is documented below, not retrospectively repaired.
 Server false is checked independently from stored endpoint false before
 four correlated Group requests. All four exact authorization masks remain
 mandatory. Selected rows and complete app, PostgreSQL and tool console inputs
@@ -165,6 +170,34 @@ Public-image metadata command arguments and outcomes are retained separately
 in `metadata-diagnosis.json`, `metadata-pg-diagnosis.json` and
 `metadata-pg-correction.json`; none starts a container or SQL connection.
 These successes do **not** replace the INVALID functional result.
+
+The tested, functionally unexecuted correction is committed locally as
+`462365dbe3c51614d658a6169411bcb6342dd4c5`, separate from executed
+`1ac355932a2625f0df15a2798b423964437f8519`.
+Post-run content-only freshness passed 27 documents using
+`pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling`;
+`freshness-postrun-content.log` retains its result. This is not the full
+coupled documentation gate.
+
+### Independent closeout preservation and cleanup
+
+`test-results/derived-functional-20261023/closeout-proof.json` records a
+read-only final check. The exact run has zero remaining owned containers
+and networks. The same three unrelated shared containers remain running,
+untouched. Original baseline, unchanged current candidate and local DERIVED
+image identities still match their immutable references. The three sealed
+build/source proof hashes, earlier retained manifest hashes and all seven
+post-run preserved executed inputs verify. No application distribution
+rehash, container startup, SQL, build or functional replacement was performed.
+The 90 local branches and ten stashes are preserved; local qualification
+remains `d25b6155bace7af2ec4ccb89f2eb0048e2db0c26` and its origin reference
+remains `f6f03a523b6370eccc63f1499c3c111dd5cdf200`.
+
+The actual INVALID receipt SHA-256 is
+`0d42ce93932add958e17a2a02a2ee7de6c815c8d506c26416468e6f177058ab7`.
+Its absence of a manifest remains explicit in the closeout proof.
+The artifact is stored locally but **functionally unqualified**; adoption,
+publication, performance and deployment remain held.
 
 Self-improvement disposition: **applied** role-specific optional-metadata
 tests, preregistration-before-preflight ordering and zero-allocation cleanup

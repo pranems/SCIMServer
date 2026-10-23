@@ -16,6 +16,10 @@ were preserved afterward with honest CRLF/Git normalization proof.
 Future source now writes intent before metadata preflight, keeps DERIVED app
 label checks strict and correctly handles zero-allocation cleanup evidence.
 Post-run correction: 31 focused tests and six-file syntax/scoped lint pass.
+Correction commit `462365db` is tested but functionally unexecuted.
+Independent closeout verifies zero owned containers/networks, the unchanged
+three shared containers, immutable image/proof identities, 90 branches and
+ten stashes. Content-only freshness passes 27 docs, not the coupled gate.
 The future statement fixture now requests and independently verifies false
 server/endpoint policies before all windows through a diagnostic-only IPC
 gate; its actual child failure test produces zero workload samples.
@@ -63,6 +67,7 @@ See the indexed observer/statement report and
 
 | Date | Summary |
 |---|---|
+| 2026-10-23 | Completed the sole DERIVED functional invocation as INVALID before allocation: zero HTTP/SQL. Committed tested metadata/intent/cleanup correction `462365db` without retry. Independent closeout preserves images, earlier proof, 90 branches, ten stashes and all shared containers. Artifact remains functionally unqualified; adoption/publication/performance held. |
 | 2026-10-23 | Confirmed the exact cached startup emitter, committed strict opt-in offline tooling, retained a failed preflight and completed the single DERIVED build with one-file whole-distribution proof and unstarted cleanup. Original images/evidence and admission holds remain unchanged. |
 
 ### Privacy source/kind investigation (2026-10-23)
