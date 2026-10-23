@@ -35,6 +35,14 @@ is reserved for this patch without absorbing #251 or altering its holds.
 inferring them from dependency flags. **Design disposition: accepted.**
 The existing exact override and regeneration route need no new abstraction.
 
+**Execution issue (Low, release-document coupling):** the first protected
+bootstrap push stopped at doc-content C13: the header freshness fixer updated
+the product header but not README's shields.io version badge (0.55.58 versus
+0.55.59). No branch was published. Updating the badge removes the actual
+mismatch. The independent doc-content gate caught it at the earliest static
+stage; run that existing gate after the freshness fixer on future bumps.
+No new abstraction or relaxed gate is needed.
+
 ### 2026-10-21 Vite security prerequisite
 
 The unchanged 0.55.56 web lockfile reports a High Vite advisory through the
