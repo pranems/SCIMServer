@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.60 web ip-address override security correction (#248)
+
+- Update the dormant web ip-address override from 10.7.1 to exact 10.7.4
+  for active Medium GHSA-rxp7-6hxx-x8q5 / CVE-2026-111997. The second
+  advisory record is a withdrawn duplicate, not a second flaw.
+- The actual lock has no ip-address package or dependency edge. Do not
+  claim installed patched parser or browser shipment from an override.
+  Preserve the graph and use only verified public-registry CI lockfiles.
+- Focused regression count: 21 -> 23, with RED 22 passed / one failed on
+  the old exact override. Bootstrap and final gate receipts are distinguished
+  in [the implementation report](docs/WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+  Other counts await this change's ordinary hook and authoritative CI.
+- Product API and web versions move together to 0.55.60. This is unmerged
+  source work, not deployment, performance acceptance or a release waiver.
+
 ### 0.55.59 Hono dependency security patch (#248)
 
 - Pin the API's transitive Hono override exactly to 4.13.11, the smallest

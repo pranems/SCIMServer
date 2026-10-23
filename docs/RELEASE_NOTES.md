@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.59`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.60`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,19 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.60 web dependency override correction
+
+This proposed patch changes only the web ip-address override to exact 10.7.4
+for [GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5),
+which fixes quadratic IPv6 zone-identifier parsing. The current dependency
+graph does not contain ip-address, so this is preventive override hygiene,
+not evidence of a vulnerable browser bundle or a newly installed parser.
+The patch is older than the seven-day quarantine minimum. The withdrawn
+duplicate GHSA-p3hm-x653-5rc6 is not another active flaw.
+See [scope and validation](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+No application, UI, API contract or deployment change is included.
+Existing performance and customer verification holds remain unchanged.
 
 ### 0.55.59 Hono security dependency patch
 

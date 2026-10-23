@@ -31,6 +31,45 @@ import {
 import fs from 'fs/promises';
 import { resolve } from 'node:path';
 
+describe('web ip-address security remediation (GHSA-rxp7-6hxx-x8q5)', () => {
+  const vulnerableRange = '<= 10.7.3';
+
+  it('recognizes the active advisory boundary and the minimal exact patch', () => {
+    expect(satisfiesGhsaRange('10.7.1', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('10.7.3', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('10.7.4', vulnerableRange)).toBe(false);
+    const advisory: PackageAdvisory = {
+      packageName: 'ip-address',
+      ghsaId: 'GHSA-rxp7-6hxx-x8q5',
+      cveId: 'CVE-2026-111997',
+      severity: 'medium',
+      summary: 'Address6 performs quadratic zone-identifier matching before its length limit',
+      vulnerableRanges: [vulnerableRange],
+      firstPatchedVersions: ['10.7.4'],
+    };
+    expect(evaluatePins({ 'ip-address': '10.7.1' }, [advisory])[0].recommendedVersion)
+      .toBe('10.7.4');
+    expect(evaluatePins({ 'ip-address': '10.7.4' }, [advisory])).toEqual([]);
+  });
+
+  it('pins the dormant web override exactly without introducing a dependency', async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../../web/package.json'), 'utf8'),
+    ) as { overrides: Record<string, string> };
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../../web/package-lock.json'), 'utf8'),
+    ) as { packages: Record<string, { dependencies?: Record<string, string> }> };
+    expect(manifest.overrides['ip-address']).toBe('10.7.4');
+    // This is an override-only correction, not a new parser dependency.
+    expect(Object.keys(lock.packages).filter(name =>
+      /(?:^|\/)node_modules\/ip-address$/.test(name),
+    )).toEqual([]);
+    expect(Object.values(lock.packages).filter(entry =>
+      Object.hasOwn(entry.dependencies ?? {}, 'ip-address'),
+    )).toEqual([]);
+  });
+});
+
 describe('Hono security remediation (GHSA-5r4p-p66f-jhc7)', () => {
   const vulnerableRange = '>= 4.12.4, < 4.13.11';
 
