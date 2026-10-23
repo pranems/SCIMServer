@@ -467,6 +467,7 @@ These are the definitive source files for key aspects of the system:
 # Current Group membership correction
 
 - [Minimal imported Group membership correctness and execution RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md)
+- [Unreleased local application-history diagnostic and execution RCA](MEMBERSHIP_HISTORY_DIAGNOSTIC.md)
 # Group reference preservation
 
 - [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

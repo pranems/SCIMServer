@@ -2,6 +2,34 @@
 
 **Last verified:** 2026-10-23
 
+### Unreleased local application-history diagnostic (2026-10-23)
+
+The user explicitly advanced the smaller diagnostic-first proposal to one
+bounded local implementation and experiment. Exclusive source branch:
+`feat/membership-history-diagnostic-20261023`, from ordinary merge `d25b6155`.
+The opt-in harness reuses the original checked workload and 66-outcome runtime
+contract, with boundary-only CPU/RSS observations and explicit process epochs.
+Eleven focused tests and seven admission regression selectors pass; source syntax
+and scoped native ESLint correctness checks pass. No dependency or version
+change was made.
+
+The fixed 16-round phase-one run is identified by
+`355b62c4ac404152b97957289ddea499`, using the 0.55.60 image and seed `20261023`.
+Its frozen manifest SHA-256 is
+`0663f9ffc2c36d4a22dcada5cd4644ef20bd53db6a5c16e4f9539adc72fb8066`.
+Actual outcome: **DIAGNOSTIC-COMPLETE, not release PASS** in 53.966 minutes
+including cleanup. All 16 rounds, 64,000 measured samples, 70,512 checked
+requests, four 66-outcome contracts and four 200-row private-log checks were
+retained. All 18 owned containers and one owned network were verified removed.
+Fresh/reused measured-window CPU means were 24.162/25.684 ms per complete
+cycle; block variation and 12.981-24.731-second observer pauses prevent causal
+or admission claims. Exact evidence is under
+`test-results/membership-history-20261023/phase1/`.
+See `docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md`.
+Phase two, publication, remote CI, PR #251 changes and deployment remain
+unauthorized. Diagnostic completion cannot clear the original admission
+failure or any customer, migration, cleanup, capacity or visual hold.
+
 ### Local qualification consolidation (2026-10-23)
 
 Ordinarily merge reviewed master `5bfff2dea1dec6f3e4b99c9a4cc0e6cb8e27388d`
@@ -14,8 +42,9 @@ scenarios, and unchanged 30-second child / 35-second parent deadlines.
 
 This is a local merge checkpoint only. PR #251's remote head and failed
 qualification remain unchanged. Frozen 0.55.58 image/protocol evidence is
-not replaced by the 0.55.60 publication. No push, remote CI, measurement,
-diagnostic campaign or deployment is authorized. All three performance
+not replaced by the 0.55.60 publication. At that consolidation checkpoint no
+push, remote CI, measurement, diagnostic campaign or deployment was authorized.
+The later local-only diagnostic authorization is recorded above. All three performance
 workflows also trigger on matching pull-request changes: a tracking push can
 launch admission and diagnostics through synchronize. Next-phase automation
 and prospective performance-admission design require explicit authorization;

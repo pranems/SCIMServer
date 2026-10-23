@@ -26,6 +26,32 @@ assert.ok(
   'SCIM_BENCH_TRACE must be absent or 1',
 );
 const tracing = process.env.SCIM_BENCH_TRACE === '1';
+assert.ok(
+  process.env.SCIM_BENCH_HISTORY === undefined ||
+    (process.env.SCIM_BENCH_HISTORY === '1' &&
+      process.env.SCIM_BENCH_HISTORY_OWNER === 'membership-history-diagnostic' &&
+      typeof process.send === 'function' && tracing),
+  'History diagnostics require the explicit IPC owner and trace mode',
+);
+const history = process.env.SCIM_BENCH_HISTORY === '1';
+async function boundary(name) {
+  if (!history) return;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      process.removeListener('message', reply);
+      reject(new Error('History boundary timeout'));
+    }, Math.max(1, Math.min(30000, deadline - Date.now())));
+    function reply(message) {
+      if (message.boundary !== name) return;
+      clearTimeout(timer);
+      process.removeListener('message', reply);
+      if (message.ok === true) resolve();
+      else reject(new Error('History boundary capture failed'));
+    }
+    process.on('message', reply);
+    process.send({ boundary: name });
+  });
+}
 const spans = [];
 let stage = 'version';
 let cycle = -1;
@@ -130,7 +156,12 @@ async function main() {
         displayName: `owned-${runId}`,
       })
     ).body;
+    await boundary('warmup-before');
     for (let index = 0; index < 1100; index++) {
+      if (index === 100) {
+        await boundary('warmup-after');
+        await boundary('measured-before');
+      }
       cycle = index;
       stage = 'add';
       const add = await request('PATCH', `${scoped}/Groups/${group.id}`, {
@@ -158,6 +189,7 @@ async function main() {
       if (index >= 100) samples.emptyRead.push(empty.ms);
       assert.equal((empty.body.members ?? []).length, 0);
     }
+    await boundary('measured-after');
     stage = 'finalVersion';
     assert.equal(
       (await request('GET', '/scim/admin/version')).body.version,
@@ -227,6 +259,7 @@ async function main() {
       );
       process.exitCode = 1;
     }
+    if (history && process.connected) process.disconnect();
   }
 }
 

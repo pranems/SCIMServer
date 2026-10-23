@@ -1,0 +1,267 @@
+# Local application-history diagnostic
+
+**Last verified:** 2026-10-23
+**Scope:** Unreleased local tooling, never release admission.
+
+## Executive summary
+
+**Actual local outcome: DIAGNOSTIC-COMPLETE, not release PASS.** All 16 rounds
+finished in 53.966 minutes including verified cleanup. They retain 64,000
+measured samples, 6,400 warmup spans and 70,512 checked workload requests.
+All four 66-outcome contracts and four 200-row private-log checks completed.
+
+The opt-in history harness implements the smaller diagnostic-first proposal.
+It preserves the old qualification protocol, evaluator, lifecycle runner and
+raw evidence. Its one authorized local experiment is recorded under
+`test-results/membership-history-20261023/`. A completed diagnostic would still
+not admit 0.55.60, replace the failed 0.55.58 control, or authorize deployment.
+The final local outcome and exact immutable input hash belong in that run's
+`phase1/report.json`, not in an admission receipt.
+
+The source branch starts from ordinary consolidation merge
+`d25b6155bace7af2ec4ccb89f2eb0048e2db0c26`. Publication and all remote operations
+remain on hold, including changes to PR #251 or its workflow triggers.
+
+### Unchanged admission and operational holds
+
+| Existing evidence or gate | Unchanged interpretation |
+|---|---|
+| Admission run `39875689201` | FAILED same-image p99 control: 40.650743 versus 50.378052 ms, ratio 1.23928982 above 1.10 |
+| Frozen 0.55.58 candidate | `f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82` |
+| Frozen baseline | `8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a` |
+| Earlier native/timeline evidence | Diagnostic only; cannot retroactively clear the failed run |
+| PR #251 | Unmerged, remote qualification head `f6f03a52`; no mutation or synchronization push |
+| Operational evidence | Customer data, migration, capacity, operational readiness, cleanup-403 and operator visual holds remain open |
+
+## Implemented request and observation flow
+
+```text
+Explicit --diagnostic-only invocation
+  -> exact local image and source identity preflight
+  -> owned PostgreSQL and read-only observer
+  -> immutable manifest before any workload
+  -> seeded fresh/reused blocks, two role application slots
+       -> restart scheduled role only in fresh mode
+       -> real benchmark child, original new-resource fixture
+       -> warmup-before / warmup-after boundary observations
+       -> measured-before / measured-after boundary observations
+       -> all original per-operation assertions and exact fixture cleanup
+  -> original 66-outcome runtime contract and private log checks
+  -> stop on first failure, never replace a block
+  -> attempt capture and deletion for every owned resource
+  -> verify exact labeled resource absence, retain complete or partial evidence
+```
+
+The diagram separates observations from workload requests. Boundary snapshots
+pause the child through an interprocess communication (IPC) handshake. They
+can change CPU quota phase, so this flow is deliberately ineligible for normal
+admission. The benchmark refuses history instrumentation without the explicit
+IPC owner and trace flag. The normal runner cannot dispatch this experiment,
+and the unchanged evaluator rejects diagnostic receipts.
+
+## Fixed local design
+
+| Dimension | Implemented value |
+|---|---|
+| Image | 0.55.60, immutable digest `316a645f021b5c9b833c295d94248e7df00ee37aa13d6d5614e55f9f04c83a4b` |
+| Source/publication | Master `5bfff2dea1dec6f3e4b99c9a4cc0e6cb8e27388d`, publication run `39989347764` |
+| Seed and interleaving | `20261023`: fresh BAAB, reused BAAB, fresh ABBA, reused ABBA |
+| Role meaning | A/A labels, identical images; not release A/B |
+| Work per round | 100 complete warmup cycles, 1,000 complete measured cycles, four operations per cycle |
+| Accounting | 4,407 checked workload requests per round, 64,000 measured samples over 16 rounds |
+| Limits | 0.5 CPU, 1 GiB per app; original 384 MiB RSS and OOM ceiling |
+| CPU policy | `50000 100000`, zero burst, reject finite ancestor quota |
+| Deadline | 60 minutes of phase-one work; cleanup still attempted afterwards |
+| Database lifetime | One unchanged PostgreSQL process; new equivalent role databases at each block |
+| Process lifetime | Fresh mode replaces the scheduled app before each visit; reused mode retains both role apps for its block |
+| Client | Explicitly identified native host Node child; not the earlier Linux client |
+| Exclusions | No new framework/dependencies, GC forcing, cache flushing, logging changes, extra SQL tracing, statistics reset or phase two |
+
+Fresh mode does not restart PostgreSQL or flush operating-system caches. All
+rounds keep the original resource creation/deletion path. Process and database
+epochs are explicit, and subtraction across process lifetimes is rejected.
+The two existing shared Docker containers were left running and unmodified.
+
+## Evidence and interpretation
+
+`preregistered-plan.json` freezes the intended inputs before allocation.
+`manifest.json` additionally freezes actual platform image identities,
+application distribution and fixture hashes, PostgreSQL identity, client
+executable hash and collector hashes before the first workload. Each round
+retains original timing arrays and all request spans. The block/role/visit
+receipt link connects each measured array entry to its operation and cycle.
+
+Each boundary preserves actual CPU counters, memory observations, process
+identity, quota/ancestor settings, UTC timestamps and Linux read intervals.
+The outer host read records its duration separately. Windows client
+monotonic time is not treated as the Linux observer clock. Only UTC/round
+boundaries relate these clocks; there is no per-request throttle attribution.
+Readiness probes and observer operations are not included in the 4,407
+workload requests.
+
+The original 66-outcome runtime contract is reused directly. Private log
+validation requires 200 rows, exact authorization redaction, valid identifiers,
+durations and statuses, and same-record categorized negative-path correlation.
+Raw logs and generated credentials are inspected only in memory, never
+persisted in the evidence. No database execution time is labeled CPU or
+network round-trip time.
+
+Two blocks per history on shared Windows/WSL scheduling cannot establish
+causal independence, a general false-positive rate or release confidence.
+Idle work, background work and unknown host interference remain limitations.
+Missing required identities or counters are failures, not zero-valued success.
+
+## Focused implementation validation
+
+| Evidence | Actual result |
+|---|---|
+| `red.log` | Six diagnostic behavior tests failed because the implementation did not exist; one admission-isolation test passed |
+| `red-privacy.log` | Privacy validation failed before its implementation; nine other focused tests passed |
+| `green.log` | Ten initial focused tests passed, including real bounded HTTP/IPC child success and capture-failure cleanup |
+| `green-final.log` | Eleven focused tests passed after strengthening the missing-owner negative control and adding the real default-mode child path |
+| `regression.log` | Seven unchanged admission/protocol/quantile selectors passed |
+| `lint-green.log` | Existing ESLint engine, native correctness rules: zero errors across changed CommonJS files |
+| Syntax | `node --check` on the three runtime files and test; PowerShell parser on the contract wrapper succeeded |
+
+No full suite, remote CI, deployment or phase-two experiment was run.
+
+## Actual phase-one findings
+
+The phase ran from **17:34:27.725 to 18:28:25.683 UTC on 2026-10-23**.
+Every raw receipt preserves all arrays and request spans. The executed input
+manifest SHA-256 is
+`0663f9ffc2c36d4a22dcada5cd4644ef20bd53db6a5c16e4f9539adc72fb8066`.
+Its exact source bytes are retained under `phase1/frozen-inputs/`; the old
+benchmark source is also retained separately as `frozen-original-benchmark.cjs`.
+No old receipt or frozen campaign was overwritten.
+
+| Frozen input | SHA-256 or exact identity |
+|---|---|
+| Diagnostic runner | `96d898fefee268c532f2bfb29609247191edc6ddb78eb9cc94332c238754166f` |
+| Diagnostic collector/policy | `ca3de383e50c75bbcab7eda547f6335ccf9d76b6ef882bcec7ec35deccaf1032` |
+| Instrumented original client | `54eaf3b011c49bf4b3969bfc516100d63e1657f88dd4a643fa2591a9d1ba2cb7` |
+| Unchanged admission protocol | `e55aa0ef47ffa10b26629b9e2a19d780aa55dd18e337826e0f4de91df8c68313` |
+| Actual image distribution | `39379de6bb7c417c75204ba26d603bf8f3d372d962fb9e4f2c41af315d7101d3` |
+| Actual image fixture/migrations | `5489e49f87e3591b73ff938db38cef08728c8410cad7e416247d73c15037aa10` |
+| Host client executable | Node v24.13.0, win32/x64; `d14ba95cdce1ef7dc9ad3ac74949ca5db38b27378ee30f30a23cf26f9e875a11` |
+| PostgreSQL | 17.11, Debian 17.11-1.pgdg13+2, immutable image recorded in manifest |
+
+### CPU windows and request tails
+
+These are descriptive observations, not independent release comparisons.
+CPU values are application-cgroup CPU counter deltas divided by the 1,000
+complete cycles in the measured window. They include background work and
+boundary effects; they are not isolated request CPU costs or SQL execution
+times.
+
+| History | Warmup CPU ms/cycle, mean | Measured CPU ms/cycle, mean | Throttled / total measured periods |
+|---|---:|---:|---:|
+| Fresh | 38.124 | 24.162 | 3,588 / 3,936 |
+| Reused | 41.418 | 25.684 | 3,933 / 4,223 |
+
+Each pooled operation below contains 8,000 measured samples per history.
+Quantiles use all raw samples with the unchanged nearest-rank rule.
+
+| Operation | Fresh p50 / p95 / p99 ms | Reused p50 / p95 / p99 ms |
+|---|---:|---:|
+| Add member | 12.194 / 47.213 / 86.680 | 11.796 / 54.104 / 104.070 |
+| Populated read | 5.540 / 13.955 / 53.625 | 5.152 / 18.952 / 77.066 |
+| Remove member | 10.986 / 45.296 / 90.206 | 10.566 / 49.774 / 104.480 |
+| Empty read | 5.394 / 15.991 / 60.016 | 4.999 / 18.027 / 62.695 |
+
+The block-level view is important: pooling alone would conceal substantial
+block variation.
+
+| Block | Mean measured CPU ms/cycle | Add p99 ms | Populated-read p99 ms | Remove p99 ms | Empty-read p99 ms |
+|---|---:|---:|---:|---:|---:|
+| Fresh BAAB | 25.612 | 90.538 | 57.973 | 91.736 | 69.970 |
+| Reused BAAB | 29.725 | 127.698 | 86.507 | 129.036 | 72.491 |
+| Fresh ABBA | 22.711 | 83.093 | 50.763 | 88.060 | 55.402 |
+| Reused ABBA | 21.644 | 83.133 | 62.093 | 91.404 | 54.668 |
+
+Repeated visits to each reused role had lower measured CPU deltas than its
+first visit, but tails did not uniformly improve. The reused BAAB block was
+materially slower than reused ABBA. This does not identify process history as
+the sole cause: PostgreSQL/OS cache history, shared scheduling and unknown
+background effects remain. It does not establish which SQL statements changed
+execution time. Phase two was neither configured nor run.
+
+### Instrumentation cost and cleanup
+
+The 64 boundary snapshots cost **12.981 to 24.731 seconds** at the host, with a
+**14.363-second median**. The longest inner Linux file-read interval was
+9.681 ms. Each outer snapshot includes two serial Docker CLI interactions and
+the IPC pause. That large observation cost is measured, not corrected away.
+It makes request-throttle attribution and admission interpretation especially
+inappropriate. Inherited image health probes also remained background work;
+their entire history was not enumerated as benchmark requests.
+
+Actual process identities confirm four distinct measured epochs in each fresh
+block and two retained role epochs in each reused block. PostgreSQL kept its
+same process start time across all blocks. Maximum observed Node high-water
+RSS was 227.031 MiB, below the original 384 MiB ceiling; all recorded app
+quotas, zero-burst checks, unbounded ancestor policy and OOM checks held.
+
+There were 17 explicit readiness checks and 64 phase-boundary reads, recorded
+separately from workload requests; initial process-policy reads are retained
+with each of the 16 initialization epochs. All 18 owned containers and the
+one owned network were removed and verified absent. The two unrelated
+pre-existing containers were not stopped, modified or reused.
+
+### Reproduction and evidence
+
+The exact executed workload command was:
+
+```powershell
+Set-Location 'C:\Users\v-prasrane\source\repos\SCIMServer-gallery-mapping-20261014'
+node scripts\performance\run-membership-history.cjs `
+  --diagnostic-only `
+  test-results\membership-history-20261023\phase1
+```
+
+That directory is immutable evidence, not a rerun destination. Future
+experiments need new authorization and a new directory. The implementation
+deliberately refuses overwriting an existing output directory.
+
+| Location under `test-results/membership-history-20261023/` | Contents |
+|---|---|
+| `phase1/manifest.json` and `phase1/frozen-inputs/` | Frozen identities, policy, schedule and exact executed source bytes |
+| `phase1/*-A.json`, `phase1/*-B.json` | Complete original timing arrays and request/cycle/operation spans |
+| `phase1/*-windows.json`, `phase1/*-summary.json` | Raw counter windows, epochs, read costs and linked round summaries |
+| `phase1/*-contract.json`, `phase1/*-privacy.json` | Four original contracts and sanitized private-log outcomes |
+| `phase1/report.json` | Final status, every round, actual identities, primary failures and exact owned cleanup |
+| `findings.json`, `findings.log`, `summarize.cjs` | Reproducible descriptive aggregation; no tail trimming |
+| `red.log`, `red-privacy.log`, `green-final.log`, `regression.log`, `lint-green.log` | Focused test-first and static evidence |
+
+## Execution issues and root-cause analysis
+
+| ID | Type / severity | Symptom and mechanism | Resolution and why it works | Detection / earliest detection |
+|---|---|---|---|---|
+| HD-01 | Local lint tooling / Low | Existing ESLint was installed, but `@eslint/js` was not resolvable from either the API package or ESLint's dependency scope. A convenience lint command failed before analyzing source. | Reused the installed ESLint engine with explicit native correctness rules and declared Node globals. No package installation, lockfile or quarantine change was needed. `lint-green.log` records zero errors. | Focused lint / checking the exact installed configuration before selecting a convenience preset |
+| HD-02 | Docker metadata tooling / Low | An initial manual image-inspect template assumed `.Config.Labels`; the cached image exposed no such key and Docker reported `map has no entry for key "Labels"`. | Used supported image ID, repository-digest, architecture and OS fields, then hashed the actual distribution and fixture. No image label or registry mutation was needed. | Read-only identity preflight / selecting only required supported fields |
+| HD-03 | Inspection tooling / Low | Early combined source reads exceeded the tool's inline output limit and were truncated. | Switched to smaller bounded source ranges and targeted field extraction; did not read or write temporary output paths. | Initial source inspection / limiting each evidence read before combining unrelated output |
+
+This ledger records confirmed problems as they occur. Expected test-first
+failures are validation evidence, not implementation incidents.
+The high host-side observer cost is an observed limitation, not a silently
+waived gate or an invitation to change the frozen run.
+
+**Provenance/completeness:** This bounded task's un-compacted tool outputs and
+retained RED/GREEN, lint, phase and findings logs were reconciled for real
+failures and diagnosed limitations. `VSCODE_TARGET_SESSION_LOG` was not exposed,
+so a full per-agent JSONL reconciliation could not be performed. No claim is
+made that this ledger reconstructs the parent session's historical issues.
+
+## Self-improvement and architecture disposition
+
+**Applied:** Permanent negative controls now cover process-epoch crossing,
+counter reset/missingness, role history, exact cycle/sample/request accounting,
+first-failure stop, capture-failure cleanup and diagnostic admission rejection.
+The real child test proves the request and cleanup outcomes rather than just
+the presence of an IPC message.
+
+**Design disposition: accepted.** The new runner is a bounded orchestration
+entry point; schedule, receipt validation, epoch checks, collection and cleanup
+policy are testable helpers. It adds no application dependency edge, strategy
+framework or speculative benchmark abstraction. The old evaluator and
+qualification runner remain separate, preserving the admission boundary.
