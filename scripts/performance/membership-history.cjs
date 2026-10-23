@@ -213,9 +213,18 @@ function collect(pid, containerId) {
     cpuBurst: requiredUnsigned(text('cpu.max.burst')), ancestors,
     rssBytes: kib('VmRSS'), highWaterRssBytes: kib('VmHWM'),
     memoryPeakBytes: requiredUnsigned(text('memory.peak')),
+    memoryMaxBytes: requiredUnsigned(text('memory.max')),
     oom: events.oom, oomKill: events.oom_kill,
     readEndUtc: new Date().toISOString(), readEndNs: process.hrtime.bigint().toString(),
   };
+  assert.equal(result.memoryMaxBytes, 1073741824, 'Actual cgroup memory limit changed');
+  const finalStat = fs.readFileSync(`${proc}/stat`, 'utf8');
+  assert.equal(finalStat.slice(finalStat.lastIndexOf(')') + 2).split(' ')[19], startTicks,
+    'Process lifetime changed during read');
+  assert.equal(fs.readFileSync(`${proc}/cgroup`, 'utf8').trim(), membership,
+    'Process cgroup changed during read');
+  result.readEndUtc = new Date().toISOString();
+  result.readEndNs = process.hrtime.bigint().toString();
   validateSnapshot(result);
   return result;
 }

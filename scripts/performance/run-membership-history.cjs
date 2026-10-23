@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { execFile, fork } = require('node:child_process');
+const { execFile, fork, spawn } = require('node:child_process');
+const { ObserverChannel } = require('./membership-observer.cjs');
 const { promisify } = require('node:util');
 const { setTimeout: delay } = require('node:timers/promises');
 const { schedule, runVisits, windowDelta, validateReceipt, validatePrivacy, finalizeOwned, sourceTip } = require('./membership-history.cjs');
@@ -45,6 +46,7 @@ async function main() {
   };
   let networkCreated = false;
   let observer;
+  let channel;
   let pg;
   let stage = 'identity-preflight';
   function checkDeadline() { assert.ok(Date.now() < deadline, 'Phase-one 60-minute work cap reached'); }
@@ -84,11 +86,7 @@ async function main() {
   async function capture(app) {
     const before = process.hrtime.bigint();
     const startUtc = new Date().toISOString();
-    const info = await inspect(app.id);
-    assert.equal(info.state.Running, true);
-    assert.equal(info.state.OOMKilled, false);
-    const value = JSON.parse(await docker(['exec', observer, 'node',
-      '/diagnostic/membership-history.cjs', '--collect', String(info.state.Pid), app.id]));
+    const value = await channel.request({ kind: 'snapshot', id: app.id });
     value.hostRead = { startUtc, endUtc: new Date().toISOString(),
       elapsedMs: Number(process.hrtime.bigint() - before) / 1e6 };
     assert.equal(value.epoch, app.epoch, 'Application restarted during a round');
@@ -123,8 +121,7 @@ async function main() {
     }
     assert.ok(ready, 'Owned application readiness exhausted');
     info = await inspect(id);
-    const initial = JSON.parse(await docker(['exec', observer, 'node',
-      '/diagnostic/membership-history.cjs', '--collect', String(info.state.Pid), id]));
+    const initial = await channel.request({ kind: 'bind', id, pid: String(info.state.Pid) });
     report.resourceEpochs.push({ id, block, role, database, imageId: info.image,
       nanoCpus: info.nanoCpus, memory: info.memory, epoch: initial.epoch, initial });
     return { id, url, epoch: initial.epoch };
@@ -190,6 +187,7 @@ async function main() {
     }
     const files = [
       'scripts/performance/run-membership-history.cjs', 'scripts/performance/membership-history.cjs',
+      'scripts/performance/membership-observer.cjs',
       'scripts/performance/benchmark-membership.cjs', 'scripts/performance/membership-cpu-trace.cjs',
       'scripts/performance/membership-protocol.json', 'scripts/performance/run-membership-qualification.ps1',
       'scripts/performance/assess-membership.cjs', 'scripts/performance/membership-history-contract.ps1',
@@ -226,6 +224,9 @@ async function main() {
       '--cgroupns', 'host', '--mount', 'type=bind,source=/sys/fs/cgroup,target=/host-cgroup,readonly',
       '--mount', `type=bind,source=${__dirname},target=/diagnostic,readonly`,
       '--entrypoint', 'node', image, '-e', 'setInterval(()=>{},3600000)']);
+    channel = new ObserverChannel(spawn('docker', ['--context', 'desktop-linux', 'exec', '-i',
+      observer, 'node', '/diagnostic/membership-observer.cjs', '--serve', run],
+    { cwd: root, env: environment, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }), run);
     pg = await allocate(['--name', `${prefix}-pg`, '--network', network, '--network-alias', 'database',
       '--mount', 'type=tmpfs,destination=/var/lib/postgresql/data',
       '--env', 'POSTGRES_USER=scim', '--env', 'POSTGRES_PASSWORD',
@@ -304,6 +305,11 @@ async function main() {
     process.exitCode = 1;
     console.error(`Diagnostic INVALID at ${stage}: ${error.message}`);
   } finally {
+    if (channel) report.observerClose = await channel.close();
+    if (channel && (channel.failure || report.observerClose.code !== 0)) {
+      report.status = 'INVALID';
+      process.exitCode = 1;
+    }
     try {
       const owned = await docker(['ps', '-aq', '--no-trunc', '--filter', `label=scimserver.run=${run}`], true);
       for (const id of owned.split('\n').filter(Boolean)) {

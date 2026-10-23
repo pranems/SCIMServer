@@ -2,6 +2,17 @@
 
 **Last verified:** 2026-10-23
 
+### Low-disturbance observer correction (2026-10-23)
+
+The user authorized one fixed 32-snapshot, three-minute observer-only smoke
+and, only if it passes, one new eight-round 0.55.20-versus-0.55.60 statement
+diagnostic with a 45-minute cap. The prior 16-round experiment must not repeat.
+One persistent read-only observer stream replaces serial Docker CLI boundary
+launches. Nineteen focused real-child/history tests and seven unchanged
+admission selectors pass after RED/GREEN; scoped lint and syntax are clean.
+Actual smoke and conditional statement outcomes remain pending, not PASS.
+See `docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md`.
+
 ### Unreleased local application-history diagnostic (2026-10-23)
 
 The user explicitly advanced the smaller diagnostic-first proposal to one
@@ -29,8 +40,9 @@ See `docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md`.
 The executed implementation is preserved in local commit `8771256b`; a subsequent
 test-first raw-input/source-ancestry guard correction is tested but unmeasured.
 Its hashes are recorded separately; it did not produce the frozen run receipts.
-Phase two, publication, remote CI, PR #251 changes and deployment remain
-unauthorized. Diagnostic completion cannot clear the original admission
+At that earlier boundary phase two remained unauthorized; the newer conditional
+local authorization above supersedes only that restriction. Publication, remote
+CI, PR #251 changes and deployment remain unauthorized. Diagnostic completion cannot clear the original admission
 failure or any customer, migration, cleanup, capacity or visual hold.
 
 ### Local qualification consolidation (2026-10-23)
