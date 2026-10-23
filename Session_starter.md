@@ -16,10 +16,33 @@ RED/GREEN after a displayed masking placeholder was found not to be source.
 
 An explicit offline builder prepares a uniquely named, labeled DERIVED local
 reference, not an approved replacement for the immutable 0.55.20 baseline.
-Its sole five-minute build and whole-distribution/unstarted verification are
-pending after source commit. No application, SQL or performance run is allowed.
+The sole actual build and unstarted whole-distribution verification completed
+in 150.417 seconds including cleanup, from committed `b7fdb9c6`.
+Local deliverable:
+`scimserver-local:0.55.20-privacy-reference-derived-1b39d0d7-86f`,
+image ID `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`.
+All 13,678 application entries were compared; only the approved compiled
+logging file changed, with unchanged mode/ownership and runtime configuration
+apart from explicit DERIVED labels. Package-declared version stays `0.55.20`;
+no version endpoint was invoked.
+Both source containers were removed without ever starting.
+
+An earlier INVALID preparation stopped before dispatching any build because
+optional `OnBuild` was omitted, not null. Its receipt remains in `build1/`.
+Targeted RED/GREEN corrected that metadata contract; eight builder tests and
+two-file static checks pass after correction, following the earlier 31-test
+builder/privacy run. The actual build's manifest SHA-256 is
+`100490fd58eec02c9fec29169a6d25882a475920fdc8a136d8c08a5ab9a2fd54`.
+Frozen on-disk source and Git bytes differ by CRLF normalization; the manifest
+records both. This is source/build proof only, not runtime privacy or
+performance qualification. Explicit baseline adoption and separate runtime
+authorization remain pending. No application, SQL or performance run occurred.
 See the indexed observer/statement report and
 `test-results/derived-reference-20261023/`.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Confirmed the exact cached startup emitter, committed strict opt-in offline tooling, retained a failed preflight and completed the single DERIVED build with one-file whole-distribution proof and unstarted cleanup. Original images/evidence and admission holds remain unchanged. |
 
 ### Privacy source/kind investigation (2026-10-23)
 

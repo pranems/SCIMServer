@@ -22,8 +22,8 @@ succeeded. Evidence is retained in
 `test-results/derived-reference-20261023/source/`.
 
 An explicit-opt-in local builder,
-`scripts/performance/build-membership-privacy-reference.cjs`, is being prepared
-for the separately named **DERIVED** privacy reference. It does not modify
+`scripts/performance/build-membership-privacy-reference.cjs`, produced
+the separately named **DERIVED** privacy reference. It does not modify
 the frozen baseline protocol, existing images, application-reported version,
 admission logic, request paths, SQL, dependencies, fixtures or resource limits.
 The only intended content change is removal of the known successful-startup
@@ -67,17 +67,115 @@ Design/architecture disposition: **accepted** one cohesive opt-in source/build
 tool using native Node and Docker; no generic patch engine or framework seam.
 The existing OS-17 capture-observability follow-up remains separate.
 
-**Before-build status:** source confirmed and owned extraction cleaned up.
+### Actual local artifact and proof
+
+**Status: DERIVED_BUILD_VERIFIED, source/build proof only.** The one actual
+Docker build and unstarted verification finished in 150.417 seconds, including
+owned verification-container cleanup, below the fixed five-minute limit.
+The earlier 22.293-second INVALID preflight dispatched zero builds; both its
+receipt and the later build receipt are preserved in different directories.
+
+| Identity or proof | Actual result |
+|---|---|
+| Local named deliverable | `scimserver-local:0.55.20-privacy-reference-derived-1b39d0d7-86f` |
+| Local image ID / emitted manifest digest | `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4` |
+| Emitted image config digest | `sha256:2c54358449ffe03dec98400e27e649473843068c8511e350a353e5d7fc71da91` |
+| Exact cached parent reference | `ghcr.io/pranems/scimserver@sha256:8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a` |
+| Observed parent platform image ID | `sha256:8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a`, `linux/amd64` |
+| Executed builder source commit | `b7fdb9c6afa576057abcc38731cc4f271fb74e41` |
+| Frozen manifest SHA-256 | `100490fd58eec02c9fec29169a6d25882a475920fdc8a136d8c08a5ab9a2fd54` |
+| Receipt SHA-256 | `b0fd28138a4f622927d5816ea8180e7edb87a792be5e39b0e58b6a5596d03a9d` |
+| Dockerfile recipe SHA-256 | `bea96a0fe7fd8766a33476c741f9aad83b92de4d9a8d1f3faf23966066bd0cab` |
+| Application distribution | All 13,678 entries compared: 12,011 regular files, 11 symlinks and 1,656 directories. Exactly one regular-file content/size delta, the pinned Prisma logging file; all other entries and compared metadata identical. |
+| Approved compiled delta | Original 4,020 bytes / hash `00ea9943...`; derived 3,848 bytes / hash `f558ea53...`, matching the full pinned hashes above |
+| File metadata | Original and derived mode `0644`, UID/GID `1001:1001`; symlink targets and all non-target file hashes unchanged |
+| Inherited runtime | Parent filesystem layers identical, exactly one added COPY layer, all nonlabel image runtime configuration identical |
+| Version and labels | Package-declared `0.55.20` retained; new image labels explicitly disclose DERIVED, parent, source commit, no admission eligibility and no runtime qualification. No version endpoint was invoked. |
+| Deterministic controls | Fixed copied-file/image creation epoch observed; no second build was performed, so repeated-build reproducibility is not empirically established |
+| Tools | Host Node v24.13.0; Docker 29.8.2; buildx v0.37.2; existing Docker-driver BuildKit v0.33.1 |
+| Image-declared Node | `NODE_VERSION=24.20.0`; read from cached image metadata, not asserted as a newly executed binary version |
+| Cleanup | Original source and derived verification containers both removed, with independent empty owner-label inventory. No application, PostgreSQL, health-check or entrypoint process started. |
+
+The authoritative executed input is the frozen on-disk builder file:
+SHA-256 `1d72a8dfd9404c7d500f577d78e715228b0a08a1d689857b7ef80b5e300c09ec`.
+The committed Git blob has SHA-256
+`60a9a22f1ba8f3d41f0c6198c0893adf9e83913b7c41f53bfe5f6d4da8412532`.
+They differ as raw bytes and match after CRLF-to-LF normalization; raw-byte
+identity is not claimed.
+
+Actual provenance command, not permission to rerun it:
+
+```powershell
+node scripts\performance\build-membership-privacy-reference.cjs `
+  --build-derived-reference `
+  test-results\derived-reference-20261023\source `
+  test-results\derived-reference-20261023\offline-build
+```
+
+That output directory is exclusive and already exists. The build log records
+a cached parent, a 3.88 kB context and one COPY step; there are no RUN,
+package-install or downloaded-layer steps. The exact Docker arguments,
+`--pull=false`, `--network=none`, fixed epoch and source/recipe hashes were
+frozen in `offline-build/manifest.json` before the build. No frontend was
+downloaded. Packet-level daemon network activity was not independently
+instrumented; `--network=none` governs build-step networking, not a claim that
+packet capture proved the daemon made no metadata lookup.
+
+Evidence root: `test-results/derived-reference-20261023/`.
+The successful `offline-build/` directory holds `manifest.json`, `receipt.json`,
+`build.log`, `image-id.txt`, the frozen executed builder, exact Dockerfile and
+corrected compiled input, both complete distribution manifests, and the
+unstarted derived application archive. The separate `source/` directory holds
+the original exact source, full archive, unstarted identity proof and exact
+extraction commands. The named local image remains as the requested build
+deliverable, not a deployment.
+`closeout-proof.json` independently seals the source-extraction script/proof,
+frozen builder, exact recipe, both application archives and compiled input;
+all checks match. It also records unchanged original 0.55.20 and 0.55.60 image
+identities, four unchanged earlier manifest hashes, zero owned source
+containers and exactly one build command across both preparations.
+Local qualification `d25b6155` and origin qualification `f6f03a52` remain
+unchanged; all 90 local branches and ten stashes are preserved.
+
+### Validation, limits and pending decision
+
 All 31 focused builder/privacy tests passed, including seven builder tests
 and the actual extracted source with zero skips. Two changed code files passed
 native syntax and scoped ESLint using the existing engine; no dependency was
-installed. The tested builder will be committed before the sole build. A successful
-source/build proof will still require an explicit later baseline-adoption
-decision and separately authorized runtime validation. It will not clear
-original negative performance/privacy evidence or any release/deployment hold.
+installed. After the optional image-field correction, eight builder tests
+again passed with zero skips, plus fresh syntax/scoped lint. The 24 unchanged
+privacy tests retain their earlier GREEN result, not an invented new run.
+
+| Exact validation command | Result and retained output |
+|---|---|
+| `node --test scripts\test\membership-privacy-reference.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-privacy-functional.test.cjs scripts\test\membership-statements.test.cjs` with `DERIVED_REFERENCE_SOURCE=test-results\derived-reference-20261023\source` | 31 passed / zero skipped, `green-consolidated.log` |
+| `node --test scripts\test\membership-privacy-reference.test.cjs` with the same source setting | Eight passed / zero skipped after correction, `green-optional-image-config.log` |
+| `node --check scripts\performance\build-membership-privacy-reference.cjs` and `node --check scripts\test\membership-privacy-reference.test.cjs` | Both passed after correction |
+| `node test-results\derived-reference-20261023\validate.cjs` using the existing ESLint engine with seven explicit correctness rules | Two files, zero errors; `static.json` and `static-correction.json`. This is the retained invocation, not permission to overwrite its exclusive output or rerun; scoped correctness lint, not the unavailable normal configuration's full gate. |
+| Sole offline build command above | Exit 0 / DERIVED_BUILD_VERIFIED; `offline-build-command.log` |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` | Passed, 27 documents; `freshness-sourcebuild-content.log`. Content-only, not the full coupled gate. |
+| `git diff --check` | Passed. Whitespace check only; not runtime or admission qualification. |
+
 Source was first committed as `c26768ba`; the optional-field correction is
-committed separately before the one actual build. The first failed preflight
+committed as `b7fdb9c6` before the one actual build. The first failed preflight
 is preserved verbatim, not overwritten or described as a build failure.
+
+**Pending explicit decision:** whether this separately identified derivative
+may become a prospective diagnostic reference. Neither this build nor the
+unavailable user's earlier design choice grants that approval. Runtime
+privacy, functional behavior and performance have not been measured on it.
+Removing startup logging changes startup work and may affect initial process
+history, so request-path byte preservation is not proof of performance
+equivalence. Source maps remain original, and file timestamps are excluded
+from distribution comparison. The original 0.55.20 image and receipts, negative
+0.55.58 admission result, unchanged 0.55.60 candidate, PR #251 and all remaining
+release/deployment holds retain their prior meaning.
+
+RCA covers retained commands and failures DR-01 through DR-03 from this
+source/build activity. A full earlier-session transcript is not available
+through `VSCODE_TARGET_SESSION_LOG`; no full-history reconciliation is claimed.
+OS-17 remains separate. No runtime probe, SQL request, performance campaign,
+workflow, push, PR mutation, cloud change or deployment was performed.
 
 ## Attempt 2 closeout: credential source located, strict result INVALID
 
