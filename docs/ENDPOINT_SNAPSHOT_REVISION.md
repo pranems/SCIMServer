@@ -1,11 +1,1247 @@
 # Compact database-owned endpoint snapshot revisions
 
-**Last verified:** 2026-10-20
+**Last verified:** 2026-10-22
 
 **Status:** Implemented and tested locally, not released or deployed.
 Performance admission and the independent release gates remain open.
 
 ## 1. Executive summary
+
+### Prospective Linux performance qualification
+
+**2026-10-22 checkpoint:** PR #250 is merged at `e1070ba2`. Its current
+immutable 0.55.58 image starts with `f57b765a`. The current correctness matrix
+passes, but deployment remains blocked by performance. In the retained
+Windows/Docker BAAB run, add p99 increases 10.22% and empty-read p99 increases
+25.98% over actual customer 0.55.20. Opposite order passes all twelve limits.
+A separate identical-current-image control flags eight of twelve comparisons.
+This shows that a code difference is unnecessary for these flags in that
+allocation, not that the candidate is safe or that the gate may be waived.
+
+The user requests autonomous implementation of the next step. A separate
+tooling-only change moves a **prospective** qualification to the existing
+public GitHub Actions Linux-runner service. No paid host is provisioned and
+no serving code, migration, dependency or release version changes. The
+earlier proposed 128-round, two-history-stratum confidence-bound campaign is
+not adopted: its cost and statistical decision properties were not justified.
+
+The following figure shows the fixed fail-stop flow. Every block has four
+rounds; A is the pseudo-baseline and B the pseudo-candidate.
+
+```text
+Pinned images + source hashes + host identity, before timings
+                         |
+Same current image: BAAB, then ABBA
+  Each block: both directions of all twelve point ratios within 10%
+                         |
+                  Both controls PASS?
+                   /             \
+                 no              yes
+                  |               |
+        retain FAIL and stop       Actual 0.55.20 vs 0.55.58: BAAB, then ABBA
+                                  Each block: all twelve original +10% ceilings
+                                             |
+                                  retain every result and exact cleanup
+                                             |
+                                  remaining independent deployment gates
+```
+
+| Property | Retained behavior / explicit decision |
+|---|---|
+| Manifest | [membership-protocol.json](../scripts/performance/membership-protocol.json) freezes four blocks before execution |
+| Workload | Add member, read exact populated membership, remove member, read exact empty membership; 100 warmup plus 1,000 measured complete cycles per round |
+| Samples | Four operations x 1,000 x four rounds = 16,000 measurements/block; two visits yield 2,000 samples per operation/role |
+| Estimator | Original nearest-rank p50/p95/p99 over all 2,000 raw values, not rounded summaries, selected repeats or cross-block pooling |
+| Original ceilings | All twelve candidate/baseline ratios at most 1.10 in each A/B block; a single failure stops the campaign |
+| A/A qualification | Additionally require all twelve ratios at least 1/1.10 in each control; failure prevents either A/B block |
+| Allocation | App containers remain 0.5 CPU / 1 GiB, CPU quota/period 50,000/100,000 microseconds, original Node RSS ceiling 384 MiB; actual settings checked |
+| History | Fresh app/PG processes per block, role app/database reused on its second visit within that block; no additional history stratum |
+| Client identity | Same immutable candidate image's Node runtime drives both roles through host networking; this is a declared environment change from the Windows-host client |
+| Runtime controls | Original 4,407 requests/round, two version checks and exact fixture absence; 66 functional and 200 private logging/correlation checks per completed block |
+| Safety | Private labelled Docker network/databases; generated ephemeral credentials; no raw private logs exported; ownership-checked exact-ID cleanup and absence readback |
+| Budget | At most sixteen rounds; rough historical extrapolation about 43 minutes before setup, not a measured Linux duration; 60-minute work deadline, 65-minute qualification step, 75-minute job cap, no automatic retries |
+| Workflow authority | [performance-qualification.yml](../.github/workflows/performance-qualification.yml) has contents-read permission only, no Azure credentials or deploy command |
+| Evidence | Every completed/failed block, raw timings, source/image identities, cgroup counters, privacy and cleanup receipts retained as a 14-day Actions artifact |
+| Scope limit | Two passing controls do not quantify false-failure probability or establish actual-customer concurrency/capacity; a runner VM can share physical hardware |
+| Original failure | Remains FAIL/unresolved historically; a later valid prospective result is separate evidence, never a retrospective PASS |
+
+**Worked decision example:** if A/A empty-read p99 is 60 ms versus 80 ms,
+the ratio is 0.75, below 1/1.10, so the environment is not qualified and
+neither old/current comparison starts. If both controls pass but the first
+A/B add p99 is 98 ms versus 88 ms, 98/88 = 1.1136 exceeds 1.10; retain
+the failure and do not run the second A/B block hoping for a better result.
+Only all four passing blocks satisfy this bounded prospective protocol.
+
+**Tests and execution RCA (ER-62).** Eleven focused Node contracts pass, after
+the initial missing-evaluator RED. They exercise exact numerical outcomes,
+tail-only failure, raw unrounded limits, complete sample/image/quota validation,
+parser validity and the actual extracted PowerShell orchestration. Injecting
+failure at each of its four positions proves no later block or retry runs.
+Two real local HTTP client controls verify the full 4,407-request lifecycle,
+1,000 retained samples per operation, and exact fixture deletion even when
+incorrect membership readback deliberately fails the client.
+A local parser check caught `$role:` interpolation before execution; the
+permanent parser test reproduced the exact error before `${role}:` fixed it.
+Type: tooling/shell; severity: Low; detection and earliest possible stage:
+local parser, zero stage escape. Why it works: explicit braces delimit the
+variable before the punctuation. Prevention is now executed by the workflow
+before Docker resources are allocated. No Linux benchmark PASS is claimed at
+this authoring checkpoint.
+
+The local YAML check initially requested an absent optional `yaml` package.
+It then reused the already installed `js-yaml` dependency to parse the actual
+workflow and verify read-only permissions, PR triggering and the 75-minute
+cap. No installation or lockfile change was needed. Type: tooling; severity:
+Low; detected at the first local workflow check, with no stage escape.
+Prevention: resolve an existing parser rather than adding a dependency for
+a one-off validation. Both failed and successful commands remain in the
+available continuation transcript; no deleted predecessor transcript is claimed.
+
+**Self-improvement applied:** the previously private benchmark now has a
+versioned manifest, executable percentile/fail-stop/parser guards, immutable
+dependencies and independently retained failure evidence. The unchanged
+existing application suites remain independent; do not rerun them manually
+immediately before the required hook owns that same run.
+
+**Design/architecture disposition: accepted.** The small client measures
+HTTP, the evaluator validates data and computes comparisons, and the runner
+owns resources/order. These are distinct existing responsibilities, not a
+new general framework or production dependency. Extra history strata, eight
+blocks per phase and an unvalidated confidence formula are deliberately
+excluded. Statistical repeatability beyond these controls and actual customer
+capacity remain explicit limits, not silent success-shaped fallbacks.
+
+### Linux initialization readiness correction (ER-63)
+
+The first Linux qualification run `39778828864`, source `33c93e4e`, fails
+before its first measured round. PostgreSQL reports no socket immediately
+after the default `pg_isready` probe accepted readiness. The retained campaign
+has zero completed blocks and independently verified container/network absence.
+This is a failed setup receipt, not a performance sample or admission result.
+
+Inspection of the **actual pinned PostgreSQL image's** entrypoint confirms
+that its temporary initialization server starts with `listen_addresses=''`.
+It accepts Unix-socket probes, then stops before the final server starts.
+That makes a default socket probe a false readiness signal during first boot.
+The runner now probes `--host=127.0.0.1`: the socket-only temporary server
+cannot satisfy it. No arbitrary startup sleep, changed app quota, workload,
+sample count, threshold or retry loop is introduced.
+
+Two new tests execute the actual extracted readiness loop with a socket-ready
+but TCP-unready initialization phase. Both reproduce RED before the fix;
+GREEN waits through that phase and proceeds only on the final TCP probe.
+The unavailable-TCP control exhausts the existing bounded attempts and stays
+unready. Focused contracts increase from 11 to **13 PASS**.
+
+| RCA field | Disposition |
+|---|---|
+| Type / severity | Container initialization / Medium: first real Linux execution blocked before timings |
+| Detection | Linux workflow startup; earliest possible gate was an extracted-loop unit control, now added |
+| Escape | Unit/parser tests missed initialization-server semantics; no defect reached deployment |
+| Why the fix works | TCP distinguishes the final listener from the official image's socket-only bootstrap process |
+| Prevention | Both actual-loop controls run before Docker allocation in every qualification workflow |
+| Evidence preserved | Original failed run/artifact, zero completed blocks and successful exact-owned cleanup |
+| Next result | Corrected-source protected publication and Linux execution remain independent, not yet claimed |
+
+Documentation editing also hit two low-severity partial-patch frictions:
+final lessons/infra-file hunks used non-matching context. The patch tool
+explicitly preserved earlier successful files. Only failed hunks were retried
+against inspected anchors, without repeating successful edits. Detection and
+earliest possible stage were both editing feedback, with no stage escape.
+This is not a runtime failure and did not cause a benchmark rerun.
+
+### Hosted qualification review: failed evidence and deadline guards (ER-64/ER-65)
+
+Review `5614222330` on `33c93e4e` reports three relevant findings, not merely
+the startup failure. The TCP correction above addresses one. The other two
+are corrected together, with permanent controls:
+
+| Finding | Earlier behavior and consequence | Correction / proof |
+|---|---|---|
+| ER-64: failed-round evidence lost | Client wrote only after successful round/cleanup; runner rejected failed exit before copying and then deleted the container. The old corrupt-read test wrongly expected no output, conflating a failed receipt with a success receipt. | Always save an explicitly complete PASS or incomplete FAIL receipt on controlled outcomes. Capture each received measurement before readback validation; retain sanitized failure stage/kind and cleanup outcome. Copy it before rejecting failed exit. Tests fail after two measured cycles and retain ten values, preserve all 4,000 measurements on cleanup failure, and execute the actual runner's copy-before-rejection path. |
+| ER-65: no upload headroom | A 75-minute qualification could exhaust the whole job; `always()` cannot guarantee a later upload after job termination. | Cooperative 60-minute work deadline in runner/client; cleanup requests retain their own bounded 30-second transport limits. A 65-minute step limit leaves headroom before the unchanged 75-minute job limit. Checkout, tests and upload have 2/3/4-minute caps. Extracted deadline and real expired-client tests prove rejection, not admission of a partial campaign. |
+
+The evaluator now rejects any row not explicitly `status: PASS` and
+`complete: true`, even if someone supplies a failed row with full-length
+arrays. Partial values are evidence only: never included in percentiles,
+pooled into a later run, or used to resume the failed block. Receipts contain
+no token, payload, raw assertion text or response body. They identify a bounded
+failure category and operation. Persistence is outside the measured request
+window: keep values in memory and save on controlled completion/failure rather
+than adding per-request disk writes that would perturb quota behavior.
+Unexpected host loss or hard process termination still cannot guarantee
+unsaved in-memory values; missing evidence fails admission.
+
+Both issues are **Medium**, type measurement tooling/test correctness.
+Hosted review caught them; unit behavior/operational-budget controls were the
+earliest possible gates, now added. Focused tests increase **13 -> 17 PASS**.
+The next TCP-only protected push was deliberately stopped, with its commit
+`216d3961` preserved, to batch all findings before one complete new hook run.
+Its partial execution is not reported as a passing push.
+
+Two Low tooling/test-harness frictions were also closed locally. The deadline
+test was initially nested inside an HTTP test's successful path, so the RED
+test count exposed its missing registration; it is now a top-level test.
+Two negative PowerShell fixtures then retained failure status after catching
+the expected exception, despite blank error streams. They now explicitly
+exit successfully only after verifying the exact expected throw and required
+outcomes. Unexpected throws still fail. The complete named 17-test GREEN
+receipt verifies that neither correction silently removed a control.
+
+**Self-improvement applied:** distinguish failed evidence from success
+receipts, test post-measurement failures, assert copy-before-delete ordering
+and reserve evidence-export time outside the operational work budget.
+**Design disposition: accepted:** the existing client/evaluator/runner seams
+remain cohesive. No production policy, resource quota, sample threshold,
+additional history stratum or general scheduling framework is added.
+Corrected-source publication, review and Linux execution remain separate.
+
+### Linux control result and resource-failure retention (ER-66)
+
+**The Linux host is available, but performance admission is still blocked.**
+Source `23d23220` passes all 28 protected Validate gates in 997 seconds.
+Run `39784232793` then completes the first A/A BAAB block: four successful
+rounds, 17,628 checked requests and 16,000 retained timings. Both roles use
+the **same 0.55.58 image**, not different product versions. Recomputing the
+assessment from all raw samples reproduces its five failed control limits:
+
+| Operation | Percentile | Pseudo-baseline ms | Pseudo-candidate ms | Difference |
+|---|---:|---:|---:|---:|
+| Populated read | p50 | 1.665015 | 1.833981 | +10.15% |
+| Populated read | p99 | 46.506172 | 41.384983 | -11.01% |
+| Remove member | p95 | 38.207279 | 42.583400 | +11.45% |
+| Empty read | p50 | 1.603564 | 1.773389 | +10.59% |
+| Empty read | p99 | 48.794521 | 42.834387 | -12.21% |
+
+Three exceed the original directional +10% ceiling. Two are faster, but
+outside the A/A reciprocal lower bound of 1/1.10. Those faster results also
+fail calibration; they are not product regressions. The second control and
+both actual 0.55.20/current comparisons correctly **do not run**. Functional
+checks (66), private-log checks (200) and exact owned-resource absence pass.
+All four rounds meet the original memory/RSS limits, with no OOM termination.
+This is a measurement-control failure, not another PostgreSQL setup failure.
+It establishes neither a version regression nor candidate safety.
+
+The retained resource counters also show substantial execution-history
+differences even though each round has the same warmup and measured workload:
+
+| Round / role | Process visit | Node CPU seconds, full counter window | SQL calls | Recorded CPU periods throttled / total |
+|---|---|---:|---:|---:|
+| 1 / pseudo-candidate | First | 15.840051 | 25,591 | 316 / 323 |
+| 2 / pseudo-baseline | First | 14.867627 | 25,593 | 297 / 302 |
+| 3 / pseudo-baseline | Second | 11.182160 | 25,590 | 223 / 228 |
+| 4 / pseudo-candidate | Second | 11.765579 | 25,590 | 235 / 241 |
+
+CPU counters cover the broader lifecycle and settle window, not just timed
+requests. These ratios are fractions of recorded scheduler periods, not
+percentages of requests or time spent throttled. Both roles use less CPU on
+their second visit; SQL statement counts barely change. Descriptive first/last
+250-sample read medians also fall within each round. None of those slices
+replaces the full-sample decision. Startup, runtime optimization, database
+warming and scheduling remain hypotheses: this receipt has no profile that
+separates them. Moving from Windows to Linux alone did not remove the issue.
+Do not change application logic, enlarge quotas, select favorable repeats,
+increase sample counts without a justified plan, or silently redefine admission.
+The next measurement design must address process history and decision
+repeatability prospectively, with separately reviewed calibration and cost.
+
+**One additional relevant review finding is corrected (ER-66).** Hosted
+review `5614795378`, on exact source `23d23220`, confirms the original three
+corrections but identifies a previously missed failure-evidence path:
+
+| RCA field | Evidence / correction |
+|---|---|
+| Type / severity | Measurement tooling and test correctness / Medium |
+| Symptom | Memory/RSS acceptance throws before `rounds.json` is saved; `finally` then deletes the app and its unsaved CPU, SQL, peak-memory, RSS and OOM observations |
+| Root cause | Successful admission was also the only persistence path for resource measurements, although client timings already had a separate failure receipt |
+| Fix | Save `round-<n>-<role>-resources.json` in a resource-collection `finally`, before owned cleanup; retain explicit FAIL status, collection completeness, the failed stage and every measurement collected so far |
+| Why it works | Limit rejection and missing-probe errors propagate unchanged, but destroying the container no longer destroys observations already returned; failed resources never enter admitted `rounds.json` |
+| Prevention | Eight actual-round/actual-cleanup controls cover success, exact 1 GiB memory limit, exact 384 MiB RSS limit, OOM, missing RSS/CPU/OOM observations and deadline expiry after the client; assert receipt existence before removal, exact field values after cleanup, no admitted failed row and no later round |
+| Detection / earliest gate | Fresh hosted review / local failure-path contract; one review-stage escape, now closed by executable controls |
+| RED / GREEN | Six missing-resource-receipt assertions fail before the runner fix; the complete focused suite increases 17 -> 26 PASS after extending failure coverage and testing actual A/A and A/B role selection |
+
+The resource receipt begins before the first counter probe, so a failed
+client or later deadline also retains already collected before-counters.
+Missing observations remain explicit nulls in a partial FAIL receipt, never
+fabricated zeros. A separate control executes the actual runner's image,
+version and BAAB/ABBA selection for all four blocks, then validates their
+synthetic receipts through the real evaluator. This closes branch-selection
+coverage without pretending the unexecuted old/current Linux blocks ran.
+
+A Low fixture issue appeared in the first GREEN attempt: PowerShell's
+case-insensitive `[switch]$Network` parameter hid the outer `$network` name
+inside the mock ownership check. This caused an unexpected ownership error,
+not a product failure. The fixture now uses a distinct `$networkName`, leaving
+the real ownership guard unchanged. The eight controls all execute actual
+cleanup and verify its absence receipt; no mock failure is relabelled GREEN.
+Detection and earliest possible gate are the same focused run, with no escape.
+
+The standing commit-message prompt path was also checked, but this worktree
+has neither that file nor its `.github/prompts` directory. This is Low
+documentation/tool-discovery friction, detected at commit preparation.
+The normal descriptive commit and required coauthor trailer remain applicable;
+do not claim that an absent prompt ran or create a substitute workflow here.
+
+**Self-improvement applied:** failure receipts must include resource
+observations as well as timings, and tests must assert survival through
+actual teardown, not just the presence of a write statement.
+**Design/architecture disposition: accepted.** A small local `try/finally`
+extends the existing resource owner; no production abstraction, new dependency
+or admission-policy change is warranted. The receipt-only fix does not repair
+the measured A/A instability and is not a reason to repeat unchanged timing
+experiments until one happens to pass. Both unexecuted A/B paths remain
+explicitly unverified by Linux execution.
+
+### Diagnostic-only request and CPU timeline (ER-67)
+
+**Published execution follow-up:** exact source `a7e51d10` passes all 28
+protected gates. Linux diagnostic `39799891906` retains 17,628 spans and
+44,489 CPU observations. Of 168 p99-tail spans, 142 (84.52%) contain an
+interior throttling-counter increase. This establishes temporal association,
+not causal per-request delay. The independent untraced qualification
+`39799892493` still fails three same-image limits: populated-read p95
+-74.04%, remove p95 +13.69%, and empty-read p95 -68.24%. Faster controls
+outside the reciprocal floor also fail. The two jobs use different CPU
+models, so their timing difference cannot measure profiler overhead.
+All functional, private-log and exact-cleanup checks pass. Fresh review
+`5616280374` reports no open code finding; release admission remains blocked.
+
+**Recommendation: measure the unresolved scheduling hypothesis before changing
+application code or release limits.** Corrected source `117d5b1e` passed all
+28 protected Validate gates. Fresh review `5615359957` reported no remaining
+code finding. Its automatic Linux run `39790526704` still failed the first
+same-image control: add p99 was 79.200360 versus 70.747433 ms (+11.9480%);
+remove p99 was 77.481641 versus 67.455442 ms (+14.8634%). Every other comparison
+passed. All four new resource receipts match the raw rows; assessment
+recomputation, 66 functional checks, 200 logging checks and exact cleanup pass.
+The second control and both actual old/current blocks did not run.
+
+This second Linux result again compares **identical 0.55.58 images**.
+It cannot identify a version regression. CPU usage across its four broader
+counter windows was 14.826410, 14.761272, 12.235910 and 12.214127 seconds;
+SQL calls were 25,591, 25,593, 25,590 and 25,593. Lower CPU on second visits
+with almost unchanged statement counts is observed. Runtime optimization,
+database warming, logging, background work and quota scheduling remain
+possible explanations, not established causes.
+
+The new diagnostic preserves the original workload, immutable image and
+0.5 CPU / 1 GiB allocation. It executes **one** four-round current/current
+BAAB block, not a new admission campaign. It adds the following evidence:
+
+| Component | Observation / transformation | Safeguard and cost |
+|---|---|---|
+| HTTP client | In-memory monotonic start/end timestamps, original elapsed milliseconds, operation, cycle, phase and success for every request | No bodies, URLs, resource IDs or credentials; tracing is opt-in and can perturb client timing |
+| Owned host observer | Exact app PID identifies its own cgroup; read `cpu.stat` approximately every 2 ms, preserving each read's start/end | Reject another container or a root-only namespace; observer runs outside app quota but still uses shared-host CPU |
+| Analyzer | Match all 4,000 measured spans per round exactly to the original sample arrays; check clock kind, full coverage, monotonic counters and observer cost | Missing coverage, wrong clock or missing cost fails analysis; every raw sample remains retained |
+| Association | Subtract counters only between two read windows wholly inside a request span | Fewer than two interior observations means unknown/null, never a fabricated zero |
+| Output | Eight role/operation summaries with unchanged 2,000 samples each, p50/p95/p99 and counts of tail spans by association | Always `admissionEligible: false`; this output cannot replace the original twelve-comparison release decision |
+
+The following flow separates the observed request from the app-wide counter.
+Both clocks use Linux monotonic time on the same host; the analyzer checks
+their recorded kind and range rather than joining unrelated wall clocks.
+
+```text
+One serial synthetic HTTP request
+  client: start -> fetch -> read and parse body -> end
+               | same Linux host monotonic timeline |
+  host:    [read A] ... [read B] ... [read C]
+               |                 |
+               +-- only fully interior reads --+
+                                  |
+                  whole app cgroup counter difference
+                                  |
+             temporal association, not causal request delay
+
+Complete four-round diagnostic
+  raw spans + CPU reads + original samples + resource/privacy/cleanup receipts
+                                  |
+                  diagnostic analyzer, never admission evaluator
+                                  |
+                diagnostic-only summary and retained unknowns
+```
+
+**Worked example:** suppose a request spans 9-31 ms and complete counter reads
+finish at 10, 20 and 30 ms. An increase in `nr_throttled` between the first
+and last interior reads establishes an app-group counter increase inside
+that span. It does **not** establish how long that request itself was delayed:
+background work shares the group. A 21-29 ms request with only one interior
+read is classified as insufficient evidence. Neither example is a measured
+result from the new Linux diagnostic.
+
+The [diagnostic workflow](../.github/workflows/membership-cpu-diagnostic.yml)
+has read-only repository permission, no cloud credentials and the same
+concurrency group as qualification. Its cooperative work budget is 15 minutes,
+step cap 20 minutes and job cap 30 minutes; checkout/tests/upload have
+2/3/4-minute caps. One observer is owned and stopped per round before app
+cleanup. Its absolute Node executable receives no inherited Linux environment.
+Windows helper tests allow only `SystemRoot`, which Node requires for
+cryptographic startup, not application secrets or Node options.
+Complete and partial evidence is retained for 14 days. A forced process or
+host termination can still lose the current in-memory buffer; absent data
+cannot become analysis success.
+
+| RCA field | Evidence / correction |
+|---|---|
+| Type / severity | Measurement assurance / Medium |
+| Symptom | Broad CPU totals cannot associate individual long requests with scheduler-counter activity; a superficially complete diagnostic could omit clock identity or observer cost |
+| Root cause | Lifecycle counters are coarser than request spans; initial analyzer validation checked sample mapping and coverage but not both additional provenance fields |
+| Fix / why | Keep request spans and bounded external counter observations; reject mismatched clock identity and absent cost before output, explicitly retain deadline/counter failure stages |
+| RED / GREEN | Initial implementation RED: 34 tests, 25 PASS / 9 FAIL. Initial implementation GREEN: 34 PASS; integration coverage: 40 PASS. Additional assurance RED reproduces wrong-clock/missing-cost admission and missing failure stages; final combined run: 44 PASS, zero skips (28 existing/client and 16 CPU) |
+| Prevention | Actual analyzer CLI negative controls, real monitor success/failure/deadline controls, actual PowerShell child lifecycle, actual diagnostic-first-block-only execution and rejection of diagnostic-marked clients by normal qualification |
+| Detection / earliest gate | Focused tests / focused tests; no review or live escape |
+
+### Native function-profile capture assurance (ER-68)
+
+**Current status: local diagnostic implementation, not published or release
+admission.** Native function observations can identify candidate code paths
+behind the broader CPU totals. They do not turn wall-clock profiler gaps
+into CPU time. Retain unweighted exclusive sample counts, including idle
+observations, and compare source locations rather than only function names.
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Prevention and detection-stage escape |
+|---|---|---|---|---|
+| ER-68a | Evidence retention / Low | The first synthetic capability probe cannot copy a profile after container stop because its output was on a tmpfs mount, which disappears at stop. | Use the app container's ordinary writable overlay and copy before removal. The actual collector now succeeds on both frozen images without a new persistent mount or permission workaround. | Real frozen-image collector probe verifies profile and metadata after stop. Capability probe detects the fault; earliest useful gate is the same probe. |
+| ER-68b | Lifecycle assurance / Medium | A failed app may already be stopped, so sending its flush signal first prevents collection of the profile it already wrote. | Inspect initial state, skip the signal for an exited process, copy evidence and only then reject its nonzero exit. Preserve an explicit partial capture receipt in `finally`. | Focused already-stopped scenario is confirmed RED, then GREEN. This closes the gap before runner integration. |
+| ER-68c | Ownership boundary / Medium | Generic benchmark ownership alone does not authorize sending the profiler's exit signal to an ordinary app. The new negative test reproduces a signal reaching a non-profiler container. | Require both existing exact-run ownership and `scimserver.profile=native-function` before signalling. Missing-marker RED becomes GREEN with the exact rejection message, not an unrelated mock failure. | Actual collector negative controls verify no signal without opt-in; all 13 native tests pass. Earliest useful gate and detecting gate are the focused collector test. |
+
+The actual collector, bootstrap and strict parser are also exercised against
+both immutable images in network-disabled synthetic Node containers. Baseline
+runtime is **v24.20.0** and current runtime is **v24.22.1**. Both exit zero,
+retain complete non-admitting capture receipts and have bootstrap clocks
+within their native profile ranges; the parser counts 20,905 and 20,805
+samples respectively. These are capability observations, **not SCIM application
+comparisons**. Exact-owned container absence is verified after removal.
+
+**Test/gate self-improvement: applied.** Preserve already-exited evidence and
+test the explicit profiler authorization marker before integration.
+**Design/architecture disposition: accepted.** Keep profiling in opt-in
+benchmark helpers, separate from application runtime and release evaluation.
+No product change, dependency, policy relaxation or version bump is justified.
+
+**Integrated local mode:** the new read-only workflow selects only the original
+old/current BAAB schedule. It preserves the pinned protocol and each app's
+first/second visit, profiles only `exec node ... dist/main.js`, and keeps
+migrations and ordinary qualification uninstrumented. App output stays in the
+writable container overlay. Both profile captures are attempted before exact
+cleanup, even if one fails. Each capture retains explicit completion, work
+status, exit and container identity. The analysis requires the original role
+images, actual bundled Node identities, all four complete diagnostic rows,
+all 17,628 ordered request spans, every original measured timing, successful
+privacy checks and cleanup readback. It never calls the admission evaluator.
+
+```text
+Frozen old image + private baseline database
+  migration, without profiler
+    -> opted-in app Node + native profiler
+       -> first baseline visit -> same live process -> second baseline visit
+
+Frozen current image + private candidate database
+  migration, without profiler
+    -> opted-in app Node + native profiler
+       -> first candidate visit -> same live process -> second candidate visit
+
+Original BAAB order and quotas
+  -> raw clients, timings and resource receipts
+  -> candidate-only functional/private-log checks
+  -> collect baseline profile, then candidate profile, even on capture failure
+  -> exact-owned container/network removal and absence check
+  -> validate immutable identities, profile clocks and every original timing
+  -> diagnostic function/module observations, never release admission
+```
+
+**Worked example, illustrative:** a validation function observed twice and an
+idle frame once contribute two and one unweighted samples. A 50 ms gap before
+one observation does not assign that function 50 ms of CPU: the process may
+have been suspended by its quota. Real profiles also cover startup, idle,
+background work and the candidate-only privacy checks, so lifetime sample
+differences cannot establish a measured-request-only version regression.
+Different bundled Node versions are another explicit confounder.
+
+The initial analyzer/selection RED and independent-capture RED are retained.
+The first combined run passes 65/66 cases: the intended clock-coverage negative
+fixture mistakenly still fits within its profile window. Move its synthetic
+round clocks beyond that window rather than weakening the assertion.
+Final focused result is **68 PASS, zero failures/skips**, including CLI
+negative controls and actual runner selection/launch/finally execution.
+This is a local implementation result; exact-source Linux application
+profiles, publication and fresh review are still required.
+
+**RCA follow-up:** ER-68d, test correctness / Low. The initial negative fixture
+did not reproduce its stated missing-clock-coverage condition. The focused
+suite catches its unexpected success; the corrected fixture spans multiple
+visits beyond the truncated profile and fails for missing coverage. Detecting
+and earliest useful gate are the same focused analyzer test.
+
+**Design/architecture disposition: accepted.** The existing orchestration file
+already exceeds 400 lines; native parsing/capture stay in dedicated helpers,
+and shared raw-round validation is extracted from the timeline analyzer rather
+than duplicated. This adds one finite diagnostic mode, not a general policy
+language or a new production strategy hierarchy. Broader runner decomposition
+is not required for this coherent diagnostic outcome.
+
+**Provenance / completeness:** reconcile this increment against the complete
+available recovered continuation through record 58,275 (about 308 MB), using
+separate error-signal and causal-narration passes. The native increment has
+93 relevant matching records, not 93 distinct incidents. Confirmed problems
+map to ER-68a-d; absent-implementation REDs, expected negative-control errors,
+source-read echoes and repeated receipts are dismissed as non-incidents.
+The earlier template/CSPRNG issues remain ER-67. This scan does not restore
+or claim access to the deleted original UI transcript.
+
+**ER-68e, validation environment / Medium:** protected publication of
+`8f4e1697` is blocked after 27 passing gates. Web Vitest reports 1,653 passing
+assertions in 123 files, but one fork worker never completes its startup
+handshake for the endpoint-context selector file. This is **not** a 1,655-test
+PASS and no assertion failure is reported. The omitted file's two tests pass
+when run alone with the unchanged standard runner. The observed mechanism is
+worker-startup timeout; resource pressure is a hypothesis, not a proven cause.
+The original failed 1,220.9-second hook remains retained. The gate correctly
+blocks partial execution, and its definition now documents that requirement.
+No timeout, worker count, test, exit condition or application code is changed.
+One normal protected publication attempt can establish whether the transient
+recurs; an isolated PASS alone cannot satisfy the complete gate.
+Detecting and earliest useful stage are both the protected full Web gate.
+Track recurring worker-startup reliability separately rather than silently
+increasing deadlines or declaring missing files passed.
+
+**Protected publication follow-up:** the unchanged complete Web gate passes
+1,655 assertions in all 124 files on the next normal protected attempt.
+Tip `5c60e41c` passes all 28 Validate gates in 991.4 seconds and is verified
+clean and published. The first failure is retained, not relabeled successful.
+No underlying worker-startup cause is claimed fixed.
+
+**ER-68f, workflow scheduling / Medium:** native run `39816471809` is canceled
+before any job or measurement. Three workflows share a concurrency group,
+but `cancel-in-progress: false` protects the running workflow, not every
+pending workflow: the default single pending slot replaces the earlier waiter.
+The [current GitHub documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+explicitly supports `queue: max`, retaining up to 100 waiters without adding
+active concurrency. Apply it to **all three participants**, so a default-mode
+arrival cannot continue replacing existing queued work. A focused RED checks
+each workflow's real configuration before the correction. This changes no
+measurement, sample, quota, timeout or admission threshold. Queue saturation
+remains explicit, and canceled-before-start is not a timing failure or a PASS.
+The detecting stage is GitHub scheduling; earliest local prevention is the
+new all-participant configuration contract. Exact-source GitHub acceptance
+and native execution are required before claiming the correction verified
+on the service.
+
+**Local correction GREEN:** all 68 focused contracts pass, including the
+three-participant queue guard. YAML parsing independently verifies every
+participant has `queue: max` and `cancel-in-progress: false`. This is local
+configuration evidence, not proof of GitHub scheduler acceptance.
+
+**Fresh review `5617819970`: both findings accepted.** Its queue finding
+matches ER-68f and the local correction. Its second finding exposes native
+source hashes nested under the mutually exclusive timeline flag: profile-only
+execution can never reach that branch. Move it to a sibling guard.
+Three actual-mode tests execute the provenance block and compare every
+emitted key and SHA-256 value against the files' real bytes: ordinary mode
+has five, timeline mode seven and profile mode nine sources. With the test
+fixture's automatic script-path bindings preserved, profile-only is confirmed
+RED for missing instrumentation while the other two modes pass.
+After correction, all **71 focused contracts PASS**, zero failures/skips.
+
+**ER-68g, source provenance / Medium:** generic numerical/parser/selection
+tests did not execute the hash-emission surface. Hosted review catches its
+unreachable native branch before first native application execution.
+The earliest useful gate was the now-added actual three-mode provenance test.
+The initial extracted-block fixture also loses PowerShell's automatic
+`PSCommandPath`/`PSScriptRoot` bindings and fails before the intended assertion;
+bind only those path variables to the real source locations while retaining
+the branch and hash logic. The corrected RED verifies the real defect.
+The in-progress queue-only protected push is stopped to batch this review
+correction; its retained commit is not claimed as a passing publication.
+No hooks, source hashes or failed evidence are bypassed.
+
+**ER-68h, native-format consumer / Medium:** actual Linux run
+[`39822577851`](https://github.com/pranems/SCIMServer/actions/runs/39822577851),
+producer `30fbea59`, completes all four original BAAB rounds and both native
+captures, but analysis rejects the baseline's two `-2` microsecond timestamp
+steps. Both captures have exit zero, complete receipts and exact-owned cleanup.
+The failure is the consumer's blanket nonnegative-delta assumption, not missing
+profiling capability. The source of the producer's two reordered observations
+is not established.
+
+Chrome DevTools' official
+[CPU profile consumer](https://github.com/ChromeDevTools/devtools-frontend/blob/main/front_end/models/cpu_profile/CPUProfileDataModel.ts)
+reconstructs cumulative timestamps and sorts matching sample/timestamp pairs.
+Our diagnostic needs only unweighted counts, so it preserves every original
+sample without sorting, discarding or assigning time weights. Accept signed
+safe-integer steps only when **every cumulative timestamp** stays inside the
+profile window. Report negative-step count and maximum backward step explicitly.
+Reject an intermediate underflow or overflow even if the final sum returns
+inside the window.
+
+| Retained producer evidence | 0.55.20 baseline | 0.55.58 candidate |
+|---|---:|---:|
+| Bundled Node runtime | v24.20.0 | v24.22.1 |
+| Unweighted native observations | 117,538 | 112,285 |
+| Whole-process profile duration, seconds | 162.582195 | 153.987114 |
+| Backward timestamp steps | 2 | 0 |
+| Largest backward step, microseconds | 2 | 0 |
+
+These durations include startup, idle time and different process histories;
+they are not request CPU time or an old/current latency comparison.
+The new signed-clock and causal-CLI-error tests first fail with the actual
+rejection and missing error text. Correcting the consumer produces **72/72
+focused PASS**, zero skips/failures. Malformed and out-of-window data still fail.
+CLI failure now includes a bounded first-line validation reason, rather than
+only `ERR_ASSERTION`, so an operator can identify the rejecting guard.
+
+Separate reanalysis verifies all nine producer source hashes against the exact
+Linux checkout bytes, four client/resource receipts, all 17,628 request spans,
+all 16,000 measured timings, privacy and cleanup. Exact analyzer recomputation
+matches the derived output. The derived audit records the corrected consumer's
+own SHA-256 separately. **The original campaign remains FAIL**, with its raw
+inputs unchanged; corrected-consumer replay is not a retrospective successful
+CI run or deployment admission. New-source protected publication and actual
+Linux execution remain required.
+
+Detection-stage escape: the real Linux application execution catches a format
+assumption that synthetic capability probes and nonnegative parser fixtures
+could not challenge. The earliest useful gate is the now-added producer-format
+fixture, including an intermediate overflow whose final sum is valid.
+Design disposition: **accepted**; keep timestamp validation inside the existing
+cohesive native parser, with no new strategy or speculative abstraction.
+
+**ER-68i, research verification / Low:** a search synthesis incorrectly claims
+the official viewer assumes monotonic sample timestamps. Direct inspection of
+the primary source contradicts it. The correction above follows the source,
+not the synthesis. Primary-source inspection catches this before implementation;
+the earliest useful check is that same inspection. Prevention: verify a tool's
+actual producer/consumer handling before turning a generated interpretation
+into an input-format rejection rule.
+
+**ER-68j, validation environment / Low:** the first protected publication of
+signed-clock correction `58f06800` stops after 25 passing gates: Prisma
+generation cannot resolve `DATABASE_URL` in the new shell. Migration lint and
+Web tests do not run, so this is not a complete validation PASS.
+Prisma's `env()` throws during configuration loading before the apparent
+nullish fallback can apply, even though client generation needs no database.
+An explicit synthetic code-generation-only URL targeting loopback port 1
+makes the unchanged `npx --no-install prisma generate` command pass.
+No production connection string, dependency install, migration or fallback
+in serving code is involved. Document the inherited-environment prerequisite
+at the existing gate definition, keep the failed log and retry the normal
+full Validate hook. Detection and earliest useful gate are configuration
+loading for that exact generator command; this was caller setup, not a new
+application defect. No hook is skipped.
+
+**ER-68e recurrence, still unresolved:** the next normal Validate push on
+`9378e765` passes 27 gates, then Web reports four fork-startup errors.
+Only 120 files / 1,608 tests execute. The omitted files are
+`useResizableColumns.test.tsx`, `useSSE.test.ts`,
+`SettingsJsonExport.test.tsx` and `JwtDecodeButton.test.tsx`.
+Their 47 tests pass unchanged in focused three-file and one-file runs.
+Do not combine those results into a complete full-suite PASS.
+No stale Vitest/Jest workers are observed afterwards. The post-run host has
+16 logical processors and approximately 25 GiB free; this does not measure
+peak pressure at the failure. Keep publication blocked without raising
+timeouts, reducing workers or excluding files. The startup root cause
+remains unproven.
+
+The corrected scratch observer subsequently completes all 124 worker
+handshakes and 1,655 tests. Observed startup p50/p95/maximum are
+14.120/15.832/17.476 seconds; maximum fork-to-preload delay is 0.874 seconds.
+Observed free memory never falls below 14.525 GiB, but this describes the
+instrumented successful run, not the previous failures. It does not reproduce
+or establish the cause of the 60-second ordinary-startup deadline failure.
+Keep the intermittent issue open. Only a complete ordinary protected hook
+can authorize publication; no instrumented result substitutes for it.
+
+**ER-68k, diagnostic observer effect / Medium:** the first scratch startup
+observer adds a child `message` listener before Vitest's own listener.
+Node drains queued interprocess messages when a message listener appears,
+so the observer can consume the initial request before the real handler
+exists and create the timeout it is meant to investigate. Stop that
+instrumented run and retain it as invalid partial diagnostic evidence.
+This does not explain the earlier uninstrumented gate failures.
+
+A bounded delayed-listener control proves the mechanism: baseline delivers
+the queued request, the first observer loses it (RED), and the corrected
+observer delivers it (GREEN). The correction observes existing emission and
+outbound send paths without registering an IPC listener. No timeout, pool,
+worker count or test changes. Validate the observer before another diagnostic;
+even a complete instrumented run cannot replace a passing protected gate.
+The detecting gate is inspection during the first diagnostic; the earliest
+useful gate is this now-added observer contract. Design disposition:
+**accepted**; keep the probe scratch-only, with no serving dependency or
+production instrumentation.
+
+**ER-68l, nested test-process deadline / Medium:** ordinary protected attempt
+three on `8d86bbfd` fails API unit validation before HTTP, generation, migration
+lint or Web run. One of 6,210 assertions fails: the real non-UTC timestamp
+probe in `endpoint-cache-freshness.spec.ts` spawns another complete Jest
+process, which exceeds its unchanged 30,000 ms bound after 30,103 ms
+(`status=null`, `signal=SIGTERM`, `ETIMEDOUT`). The other 6,209 assertions and
+212 suites pass; that is not a complete unit PASS or a timestamp-value failure.
+
+The exact isolated parent case passes with the same nested child/deadline
+in 18.54 seconds; the other 20 cases are intentionally outside that selector.
+This does not prove the full-run issue is resolved. The deadline is observed;
+the startup/execution phase causing the delay remains unproven. Do not raise
+timeouts, exclude the case or keep repeating the complete suite until green.
+Preserve all three blocked publication logs. The detecting gate is the full
+unit run; isolated success alone cannot expose full-load timing effects.
+**Scheduled follow-up:** continuation owner, target 2026-10-23, task
+`endpoint-timezone-child-deadline-20261022`; capture the child's actual startup
+and execution phases under the ordinary unit gate. The separate Web startup
+task stays open with the same owner/target. Design disposition: **accepted**;
+no speculative test-runner or serving refactor is justified by these timings.
+
+**ER-68l implementation follow-up:** inspection identifies unnecessary nested
+framework startup: the real-timezone assertion launches another complete Jest
+runner and Nest testing module inside the 30-second process bound.
+Replace only that harness with a fresh Node process using the existing
+`ts-node/register/transpile-only` loader and a small source fixture.
+The fixture calls the actual `EndpointService.getEndpoint` path with the real
+lifecycle repository and a mocked timezone-free PostgreSQL snapshot. It does
+not duplicate the date conversion, load a stale build or connect to a database.
+The ordinary parent suite still tests Nest wiring and warmed-cache behavior.
+
+The parent validates the complete structured receipt: real UTC-5 January
+offset, exactly one snapshot read, both returned UTC timestamps and the
+standalone runner identity. The original nested runner first fails that
+receipt assertion (RED); all 21 freshness tests then pass with the new harness.
+A production negative control temporarily removes UTC interpretation and
+produces `05:00:00Z` instead of `00:00:00Z` for **both** fields (RED).
+Restore the production line exactly and all 21 cases pass again.
+The direct child command completes in 2,720.8 ms in one retained observation;
+this is not a runtime benchmark or a full-load guarantee.
+
+Neither the 30-second child bound nor 35-second parent bound changes.
+There are no retries, exclusions, worker/pool changes or serving-code changes.
+Targeted ESLint and fixture syntax pass. Full ordinary protected validation
+is still required. This removes redundant harness work without claiming the
+earlier OS/framework delay phase or the separate Web-startup cause is proven.
+Design disposition: **applied**; use a standalone fixture and the existing
+production seam, not a new runtime abstraction or a larger deadline.
+
+**ER-68l full ordinary validation:** normal Validate-protected publication
+of `84d11af7` passes all 28 gates in 1104 seconds, exit 0. API units:
+6210 tests / 213 suites; HTTP: 2514 / 118 with 42 existing backend-specific
+skips and two log suites skipped; Web: 1655 / 124. Local and remote tips
+match, with a clean worktree. This closes the timezone harness requirement,
+not the unproven root cause of the separate intermittent Web startup failures.
+Evidence: `test-results/timezone-standalone-protected-push.log`.
+
+**ER-68m, partial diagnostic file loss / Medium:** fresh exact-tip review
+`5619805016` identifies that `Save-NativeProfile` copies the CPU profile and
+metadata sequentially. A failed profile copy throws before attempting
+available metadata; the caller then cleans up the container. Role-level
+independence does not preserve files within the failed role.
+The correction attempts both files independently and then propagates the
+first error with its original failure stage. `filesCollected` remains false
+and `captureStatus` remains FAIL unless both copies succeed.
+
+| Control | Retained evidence | Required outcome |
+|---|---|---|
+| Profile missing, metadata available | Metadata file | FAIL, `copy-profile`, original error |
+| Metadata missing, profile available | CPU profile | FAIL, `copy-metadata`, original error |
+| Both unavailable | Explicit failure receipt; both attempts made | FAIL, first profile error |
+
+The actual PowerShell collector is RED in two controls before the fix,
+including the new missing-profile/available-metadata case. After correction,
+all 74 focused workflow contracts pass, zero failures/skips (previously 72).
+Logs: `native-copy-independence-red.log` and
+`native-copy-independence-complete-green.log` under `test-results/`.
+Detected at fresh hosted review; earliest possible gate is the collector's
+local asymmetric-copy test. Escape: the previous copy-failure fixture rejected
+both files and did not assert the second copy attempt or retained metadata.
+Self-improvement **applied**: exercise both asymmetric failures and assert real
+file retention, first error/stage and continued non-admission.
+Design disposition **applied**: two guarded copies in the existing small
+collector, no new abstraction. No serving code, quota or admission change.
+
+**ER-68n, focused-selector friction / Low:** an initial local command used
+`membership-cpu-timeline.test.cjs` instead of the existing
+`membership-cpu-trace.test.cjs`. Node exited 0 with only 58 tests.
+The population check caught this before consolidation; 58 was not reported
+as the complete workflow suite. Rerun the exact workflow's three paths after
+checking every path exists: all 74 pass. Prevention **applied** in the local
+validation command: explicit path-existence checks and expected suite count.
+Detection and earliest possible stage are the local selector preflight.
+
+**Latest untraced control:** exact `84d11af7` run `39840296611` fails first
+A/A BAAB: populated-read p99 44.791171 / 49.299555 ms, ratio 1.10065341;
+empty-read p99 55.203017 / 41.245304 ms, ratio 0.74715670. Both labels use the
+same frozen image. Later blocks stop; faster disagreement is still failure.
+Original artifact retained under `test-results/linux-qualification-39840296611/`.
+This is not evidence of a candidate regression or release safety.
+
+**Updated completeness note:** reconciled the full available continuation
+through event record 61,543 using signal-frequency and causal-narration passes.
+Confirmed native issues map to ER-68a-v; intentional TDD failures, expected
+negative controls, repeated quoted receipts and prior ER-67 findings are not
+counted as new incidents. This is the reconstructed continuation only, not
+the deleted original session.
+
+**ER-68q, buffered-log snapshot race / Medium:** fresh review `5620551104`
+on published `35b66b36` identifies that the privacy phase sleeps two seconds
+but the request-log flush interval defaults to three seconds. The current
+source confirms both that interval and the existing authenticated
+`POST /scim/admin/logs/flush` endpoint, which awaits `flushPending` rather
+than returning while another flush is active.
+Replace the sleep with that explicit drain, outside all four measured
+request windows, with a 30-second HTTP timeout. No measured sample, request
+workload, percentile, quota or admission limit changes.
+The actual phase control leaves negative records buffered until that request
+arrives: old code fails correlation; corrected code passes all 66 functional
+assertions and validates 200 durable rows. This proves the snapshot race,
+but not which predicate caused the earlier ER-68p artifact's failure: raw
+logs were intentionally not exported there. `35b66b36` native execution
+`39849505885` passes without this correction, which does not close the race.
+Detected at hosted review; earliest possible gate is the buffered-row phase
+fixture. Prevention **applied**: explicit authenticated drain, not a longer
+sleep or a favorable retry.
+
+**ER-68r, missing partial privacy evidence / Medium:** the original phase
+writes `privacy.json` only on success. An earlier failure deletes the source
+containers without preserving assertion counts or distinguishing zero error
+rows, absent request-ID correlation and missing category. Wrap the phase
+in a failure-first receipt and a `finally` writer. Record completed functional
+assertions, observed/validated row counts, a bounded stage name and independent
+correlation counts/booleans. Unobserved correlation values stay null.
+No request IDs, raw logs, credentials, bodies or exception text are serialized.
+The success fields used by existing consumers remain authoritative.
+
+| Failure stage | Retained evidence |
+|---|---|
+| Functional assertion | Completed count, FAIL, `functional` |
+| Authenticated drain | 66 assertions, FAIL, `log-flush` |
+| Credential scan | FAIL, `secret-scan`, no raw leaked credential |
+| Correlation | Observed row/error counts and separate ID/category booleans |
+| Row validation | Observed count and only successfully validated row count |
+
+Actual phase controls cover every row in the table, a buffered success,
+and each independent correlation failure. They clear their source app/DB
+references before reading the retained receipt, enforce output-key allowlists
+and verify all five generated credentials stay absent.
+Detected at hosted review; earliest possible gate is this actual-phase
+failure fixture. Prevention **applied**: failure-first, sanitized receipts.
+
+**ER-68s, secondary finalization masks primary work error / Medium:**
+a throw from the capture `finally` replaces a preceding round/privacy error
+in the campaign receipt. Preserve the work ErrorRecord in the existing block
+catch, rethrow it, then treat capture and cleanup failures as secondary when
+work already failed. Without a prior work failure, capture/cleanup still
+throws and cannot look successful. Always attempt both captured roles before
+owned removal. A sanitized `finalization.json` records primary-work failure,
+failed capture roles, cleanup completion and the finalization stage.
+Actual controls combine work-only, capture-only, work-plus-capture and
+work-plus-cleanup failures; the retained primary message is asserted.
+Detected at hosted review; earliest possible gate is the combined-failure
+control. Prevention **applied**: test error precedence, not just FAIL status.
+
+**ER-68t, timeline analyzer misses privacy guard / Medium:** while wiring
+failed privacy receipts, actual CLI controls show that native analysis rejects
+them but timeline analysis accepts missing or failed privacy evidence.
+Both negative cases are RED before correction. Extract the native consumer's
+existing four privacy assertions into the already-shared trace module and
+apply them to both analyzers. No new file, schema default or admission path.
+Add explicit missing/failed timeline and failed native controls.
+Detected locally during review implementation; earliest possible gate is
+the same CLI fixture. Prevention **applied**: both consumers enforce the
+shared privacy proof rather than relying only on orchestrator control flow.
+
+**ER-68u, formatter lookup / Low:** root `npx --no-install prettier` reports
+a missing package and exits before tests. Use the already installed API
+Prettier binary directly; no install, dependency or lockfile change.
+Detected and corrected at the command preflight; no test PASS was inferred
+from the failed combined command.
+
+**ER-68v, receipt-write failure masks primary error / Medium:** new negative
+controls make privacy/finalization receipt writes fail while work has already
+failed. Both initially replace the primary error (RED). Guard those writes:
+preserve an existing privacy/work/finalization failure, explicitly warn that
+the receipt could not be written, and still throw a write failure when there
+was no earlier failure. Do not claim durable evidence when writing fails.
+Both controls then pass. Detected locally before publication; earliest
+possible gate is the same injected-write-failure control.
+
+**Consolidated assurance:** all 93 focused contracts pass, zero failures/skips,
+after the original 12 review controls, two analyzer failures and two write
+precedence controls were confirmed RED. Logs under `test-results/`:
+`qualification-finalization-review-red.log`,
+`qualification-privacy-analysis-red.log`, `qualification-receipt-write-red.log`
+and `qualification-finalization-review-allowlist-green.log`.
+Self-improvement **applied**: actual buffered-state, partial-receipt, both
+consumer and combined-failure tests close the previously blind assertions.
+Design disposition **accepted**: keep the existing campaign coordinator and
+its measurement/privacy/finalization phases; receipts add no serving concern.
+The privacy validator is shared because two real consumers need the same
+contract. No generic workflow framework or speculative strategy is introduced.
+The normal publication of `abbcce07` subsequently passes all 28 Validate
+gates in 1171.7 seconds: API 6210/213, HTTP 2514/118 and Web 1655/124.
+Its native `39855401567` and timeline `39855401180` jobs pass; independent
+artifact audits remain separate work. Its performance qualification
+`39855403223` fails, so neither correctness nor diagnostic PASS admits release.
+
+### Layered finalization review and audit provenance (ER-68w-ac)
+
+Fresh review `5620999429` on exact `abbcce07` contains four relevant findings
+despite its "No open issues" headline. All four are addressed together.
+The following flow shows error ownership, not a new serving architecture:
+
+```text
+Client completes or fails
+  -> independently attempt status collection and timing receipt copy
+  -> preserve first client error; never admit failed evidence
+Round finalizes
+  -> stop observer and attempt resource receipt, even with a work error
+  -> preserve first round error; report secondary failures
+Privacy phase
+  -> require selected negative request and category in one actual record
+Block finalizes
+  -> collect both authorized profiles; exact owned cleanup; finalization receipt
+Campaign finalizes
+  -> attempt campaign receipt; preserve first error
+  -> always restore original environment, including absent variables
+```
+
+| Issue | Type / severity | Symptom and root cause | Correction and why it works | Detection / earliest gate |
+|---|---|---|---|---|
+| ER-68w | Evidence provenance / High | An ignored timeline audit helper hardcodes an older run/output and omits privacy proof from replay scratch. Reusing it overwrites a derived older report with a misleading run identity; stronger privacy validation exposes the missing input. Raw immutable artifacts are unchanged. | Require explicit output, derive run from the artifact directory, reject cross-run output before any write, copy privacy proof, and separately hash the current consumer. Reverify both original artifacts into correctly identified reports. A cross-run negative control exits 1 without changing the restored report hash. | Local retained-artifact replay / helper identity and complete-input negative controls. |
+| ER-68x | Failure evidence / Medium | Exit inspection or status-file writing throws before the available client receipt is copied; cleanup then removes its source. | Independently attempt status collection and receipt copy; preserve the first error and reject the round. Tests assert retained timing values after owned cleanup, not just file names. | Hosted review / injected inspection and writer failures in the actual round. |
+| ER-68y | Error precedence / Medium | Observer shutdown or resource-receipt writing masks an earlier client/deadline error before the block catches it. | Retain the first round ErrorRecord, attempt both finalization operations and warn explicitly about secondary failures. An observer failure on otherwise successful work also fails the round. | Hosted review / combined work-observer and work-writer controls. |
+| ER-68z | Assertion correctness / High | Request ID and category are searched independently across all console output; unrelated records can falsely satisfy the correlation gate. | Match the selected full request ID and top-level category in one JSON record, or its actual pretty-log header with the eight-character request prefix. Reject separate records and a misleading nested payload category; never export IDs or raw logs. | Hosted review / separate-record and nested-payload negative controls. |
+| ER-68aa | Finalization and environment / Medium | A final campaign writer failure masks pending work failure and skips restoration of generated credentials and settings. | Guard the write, preserve a pending campaign error, fail otherwise successful work on write failure, clear admission, and restore the original environment in an unconditional finally. Print success only after finalization succeeds. | Hosted review / actual campaign catch-finally controls with present and originally absent environment values. |
+| ER-68ab | Test registration / Low | A new campaign loop is initially nested inside the resource test callback, multiplying registrations and obscuring the intended population. | Move it to module scope and verify exactly 104 selected contracts before treating RED/GREEN as evidence. No production fix is inferred from a malformed test run. | First local test run / syntax and test-population preflight. |
+| ER-68ac | PowerShell fixture semantics / Low | Dot-sourcing an extracted bare rethrow in a separate script block produces ScriptHalted, unlike the lexical production catch. | Execute the original catch and finally together in one parsed try statement. This preserves actual rethrow semantics instead of changing production to satisfy an artificial harness. | First GREEN attempt / real catch-context execution. |
+
+Nine substantive new failing controls are confirmed RED before the runner
+correction; a tenth failure is the fixture-context issue ER-68ac, not evidence
+of a production defect. The additional JSON success control already passes. After the
+fixture-context correction, all **104 contracts PASS, zero FAIL/skip**:
+`qualification-layered-finalization-red.log` and
+`qualification-layered-finalization-green-final.log` under `test-results/`.
+The two fixture issues above are distinguished from production failures.
+Publication, exact-tip CI and fresh review remain required for this correction.
+No serving code, frozen image, quota, workload, admission limit or product
+version changes.
+
+The failure-precedence walk covers client -> round -> privacy -> block ->
+campaign, including evidence collection before source cleanup and errors in
+receipt writing. Self-improvement **applied**: test the original error, retained
+values, negative correlation and restored state rather than only failure exit.
+Design disposition **accepted**: the existing 396-line block coordinates the
+same bounded phases; no new responsibility or generic workflow framework is
+introduced. Private per-phase error state is simpler than a speculative
+strategy abstraction. The audit-helper fix and original-report restoration are
+retained in ignored evidence; this ledger makes their provenance issue durable.
+
+**Campaign reverse check:** run the corrected lexical fixture against an
+unmodified, temporary copy of exact `abbcce07` from Git. Both writer-failure
+cases fail for their original error/restoration defects; ordinary work failure
+passes (two RED, one PASS). The current three cases all pass. Logs:
+`qualification-campaign-parent-negative.log` and
+`qualification-campaign-context-green.log`. The working production file is
+never reverted or replaced, and temporary fixture files are removed.
+
+**Completeness update:** signal-frequency and causal-narration passes scan the
+entire available continuation through event 62,126. The native increment has
+311 matching records, not 311 incidents. Confirmed new issues map to ER-68w-ac;
+intentional RED controls, repeated quotations, normal CRLF warnings and
+workflow failures already retained above are not invented additional issues.
+This is not access to the deleted original transcript.
+
+### PATCH-category correlation correction (ER-68ah-ai)
+
+**Executive summary:** published `6febc534` passes all 28 ordinary Validate
+gates in 1184.5 seconds and fixes the prior Linux pre-allocation failures.
+Its new qualification `39866153855` and native `39866153894` pass contracts
+and complete all four rounds, then fail the same-record console guard.
+This is a privacy-check implementation error, not a latency-limit result.
+Fresh exact-tip review `5621836110` independently identifies the same cause.
+The original performance-admission hold remains unresolved.
+
+**ER-68ah, production-fixture mismatch / Medium.** The selected seven
+negative requests are Group PATCHes. The service logs their operation under
+`LogCategory.SCIM_PATCH`, whose value is `scim.patch`, rather than the
+general `scim.group` category used by other Group operations. The earlier
+fixtures invented `scim.group` negative records, so local and Linux contracts
+passed while correctly categorized real PATCH requests failed correlation.
+The retained failure receipt distinguishes the predicates: seven errors,
+request ID present, general Group category present, same-record match absent.
+
+An isolated, loopback-only probe runs the unchanged frozen `0.55.58` image,
+private PostgreSQL and the actual 66-outcome membership contract. It exports
+only category counts and booleans, never raw logs, IDs or credentials.
+The selected request is PATCH: one `scim.patch` record, zero `scim.group`
+records, one `http` record and two `auth` records. All exact-owned probe
+containers and its network are removed. This is a Windows/Docker diagnostic,
+not a Linux qualification, benchmark rerun or release admission.
+
+```text
+Real negative Group PATCH
+  -> patchGroupForEndpoint
+  -> logger.info(SCIM_PATCH, "Patch group")
+  -> console category scim.patch + selected request ID
+  -> old guard expects scim.group in that same record: false rejection
+  -> corrected JSON/pretty guards require scim.patch + that same ID
+```
+
+Correct all three category predicates, retaining same-record identity,
+top-level JSON matching, secret scans, redaction and fail-closed receipts.
+Make the pretty/JSON fixtures production-shaped, reject otherwise correctly
+correlated `scim.group` records, and add a source-to-fixture category guard.
+Ten privacy controls fail before the production correction, including both
+valid PATCH shapes rejected and both wrong-category shapes accepted.
+After correction: **110 focused contracts PASS, zero failures/skips**, and
+**16 selected bridge checks PASS**: 15 actual Linux PowerShell privacy
+cases with mocked Docker/IO and one Node producer-category mapping guard.
+Logs: `qualification-patch-category-red.log`,
+`qualification-patch-category-green.log`,
+`qualification-patch-category-linux-green.log` and
+`negative-log-category-probe-direct-curl.log`.
+The corrected actual PowerShell correlation phase also passes against a
+fresh isolated frozen-image contract, with `actualCorrectedGuardPassed:true`,
+66 assertions and exact resource cleanup. Log:
+`negative-log-category-probe-fixed-guard-green.log`.
+Normal protected publication, fresh review and new-source Linux evidence
+remain required. The old ER-68p failure predicate remains unknown; this
+newly observed, independently reproduced cause does not explain it retroactively.
+
+Detection: exact-source CI after measurement and fresh review. Earliest
+possible gate: the production-category fixture guard and bounded contract
+probe before publication. Prevention **applied** through permanent
+production-shaped fixtures, wrong-domain negative controls and the
+source-to-fixture mapping check. Design disposition **accepted**: correct
+three literals in the existing bounded phase; a category strategy/framework
+would be speculative for this one fixed PATCH contract.
+
+**ER-68ai, diagnostic harness / Low.** The first Windows-only probe wraps
+native curl in a PowerShell function to translate `/dev/null` to `NUL`.
+The app is healthy, but redirecting a function's text output adds CRLF:
+the retained health file is bytes `32-30-30-0D-0A`, length 5, not exact `200`.
+Readiness therefore fails and exact-owned resources are removed; this is
+not an application failure. An exit-status-scope hypothesis is disproved by
+a direct control and is not accepted as the cause. Keep curl directly in
+the temporary setup script and translate only the sink path. Its health
+file is bytes `32-30-30`, length 3; the corrected probe completes all 66
+outcomes and produces the sanitized counts above. Production Linux setup
+and its readiness assertion are unchanged.
+Detection and earliest gate: this probe's own readiness/expected-result
+assertions. Prevention: adapters must preserve both native status and output
+bytes; require the expected result and cleanup, not only a launch or process
+return. Compare actual bytes before attributing a healthy-service probe failure.
+
+**Completeness update:** reconcile the full available continuation through
+event 63,453 using the existing signal-frequency and causal-narration passes.
+The native increment has 364 matching records, not 364 incidents. ER-68ah-ai
+maps the new production-category and probe-output issues. Original failed
+artifacts stay failed; expected RED controls, search misses and the disproved
+exit-status hypothesis are not additional application incidents.
+The ignored timeline auditor now distinguishes exact-source legacy correlation
+from the new required same-record field; seven positive/negative controls pass
+without changing original artifacts. No deleted transcript is claimed.
+
+### Linux restoration and leaf capture-status writer (ER-68ad-ag)
+
+`6a710734` publishes normally: all 28 Validate gates PASS in 1229.7 seconds,
+API 6210/213, HTTP 2514/118 and complete Web 1655/124. Fresh review
+`5621417287` identifies one additional relevant leaf-finalizer defect.
+The new Linux qualification, timeline and native jobs all fail three campaign
+contracts **before allocating benchmark resources**. Their missing-artifact
+upload errors are cascades, not additional performance failures. The previous
+`abbcce07` benchmark artifacts remain unchanged.
+
+**ER-68ad, runtime/platform semantics / Medium.** Windows PowerShell 7.4.21
+on .NET 8.0.32 deletes a variable when its value binds as empty text. A controlled,
+network-disabled official Linux PowerShell 7.5.0 / .NET 9.0.1 container
+reproduces the hosted failure: ordinary `$null` binds to a string parameter as
+empty text, leaving the variable present with an empty value. A real .NET
+null, passed using `[NullString]::Value`, removes it. The exact hosted patch
+version was not captured; the controlled runtime proves the changed mechanism,
+not that it is the identical hosted build.
+
+```text
+Originally absent variable
+  Old restoration: PowerShell $null -> empty string -> present but empty
+  Corrected restoration: NullString.Value -> .NET null -> absent
+
+Originally present empty variable
+  Corrected restoration: original empty string -> still present and empty
+```
+
+The [official .NET 9 compatibility note](https://learn.microsoft.com/en-us/dotnet/core/compatibility/core-libraries/9.0/empty-env-variable)
+documents the distinction; [PowerShell/PowerShell#24637](https://github.com/PowerShell/PowerShell/issues/24637)
+documents the string-binding issue. The actual null/typed-null probe records
+`present:true/isNull:false` versus `present:false/isNull:true`.
+Use typed null only for an originally absent value; preserve existing values,
+including a real empty string. All three actual campaign controls are RED on
+Linux before correction and GREEN afterwards. Extend them to assert original
+empty-state identity, not merely that generated text disappeared.
+Detection: hosted pre-allocation contracts; earliest possible gate: local
+Linux-runtime smoke before the complete protected hook. Prevention **applied**:
+cross-runtime smoke, a measured null-binding probe, and a standing restoration
+rule. The Docker reproduction image is pinned at digest `042240d57ec9...`;
+it is a test runtime, not a new application/base image or deployment.
+
+**ER-68ae, leaf error precedence / Medium.** Review `5621417287`, comment
+`4354001080`, finds that `Save-NativeProfile` still lets its own status writer
+replace an ownership/lifecycle/copy/exit error. The earlier precedence walk
+covered the caller's finalization but missed this leaf `finally`.
+Save the first outer ErrorRecord before attempting its status receipt.
+Explicitly warn if that secondary writer fails, retain the original error,
+and still throw a writer-only failure. Actual ownership-plus-write and
+failed-exit-plus-write controls are RED first; the writer-only case already
+fails correctly and remains a positive guard. They verify both retained file
+contents after source cleanup and no unauthorized signal/copy.
+Detection: fresh hosted review; earliest gate: combined leaf-writer controls.
+Prevention **applied**: three permanent controls and the existing diagnostic
+retention rule tightened explicitly to cover leaf status writers.
+
+**ER-68af, Linux probe harness / Low.** An initial line-oriented stdin probe
+returns no final JSON despite exit 0, which is not accepted as proof. Execute
+the entire script using an encoded command, matching the real full-script
+fixture semantics. Repeat all three Linux RED cases with that exact harness,
+then six campaign/capture controls GREEN after correction. Runtime-generated
+fixtures use read-only source mounts, no network, generated synthetic values
+and `--rm`; exact-run readback proves no fixture containers remain.
+Detection and earliest gate: require the expected probe result/test population,
+not only a process exit code.
+
+**ER-68ag, bounded lookup/patch friction / Low.** A guessed plural Microsoft
+documentation URL returns 404; search finds and fetches the official singular
+page above. A guessed artifact block name and an oversized source range fail
+read-only; the protocol's actual `ab-baab` block and bounded evaluator lines
+are then used. One mixed private-state/report patch partially applies before
+an unmatched report hunk; inspect only that report context and apply only the
+remaining edit. No source or immutable artifact is reverted, no failed lookup
+is treated as evidence, and the original report correction remains recorded.
+Prevention: use manifest/producer identities and inspect partial-application
+results rather than repeating the whole patch.
+
+Current focused assurance: **107 PASS, zero FAIL/skip**, plus **six real
+Linux campaign/capture controls PASS**. These execute the actual PowerShell
+functions with injected Docker/IO failures, not SCIM benchmarks or real
+application profile collection. Logs:
+`qualification-linux-environment-encoded-red.log`,
+`qualification-native-status-writer-red.log`,
+`qualification-linux-null-binding-encoded-proof.log`,
+`qualification-linux-and-native-finalization-green.log` and
+`qualification-linux-finalization-six-green.log`.
+Normal protected publication, fresh new-source CI and review remain required.
+No original performance failure is cleared and no serving/image/workload/
+quota/limit/version changes. Self-improvement **applied** through the tests
+and tightened rules above. Design disposition **accepted**: the collector
+remains one small authorized-capture function; the coordinator gains no
+responsibility, interface or speculative abstraction.
+
+**Completeness update:** reconcile the entire available continuation through
+event 62,741 using signal-frequency and causal-narration passes. The native
+increment contains 344 matching records, not 344 incidents. ER-68ad-ag maps the
+new confirmed runtime, review and tooling issues; missing benchmark-artifact
+uploads are cascades of the contract failure, and intentional negative
+controls are not new production incidents. No deleted original transcript
+is claimed.
+
+The earlier `35b66b36` native artifact from `39849505885` independently
+verifies nine producer hashes, four receipts, all 17,628 spans and 16,000
+timings, profile identity/windows, privacy, cleanup and exact recomputation.
+Audit: `test-results/membership-native-39849505885-audit.json`.
+This does not validate the new log-drain/receipt correction before its own
+publication and exact-source run, nor explain the old correlation predicate.
+
+**ER-68o, authorized shutdown-path evidence loss / Medium:** fresh review
+`5620142839` on published `e312a92f` identifies failures before the copy
+section. Signal/exit races, a rejected signal, a polling inspection error
+or the bounded shutdown timeout all throw before either file is attempted.
+The previous file-copy correction did not cover these earlier lifecycle edges.
+Its normal publication nevertheless passes all 28 Validate gates in 1092
+seconds (API 6210/213, HTTP 2514/118, Web 1655/124); that remains valid
+evidence for what its assertions actually checked, not this missed behavior.
+
+After ownership and profiler opt-in succeed, capture the first lifecycle
+failure instead of bypassing collection. A failed signal triggers one
+bounded reinspection; a secondary inspection failure is explicitly recorded.
+Attempt both files independently, then propagate the original error/stage.
+An unknown exit stays null, and copied partial files do not make capture
+COMPLETE or `filesCollected` true. Authorization failures still prevent copies.
+
+| Failure edge | Required preserved outcome |
+|---|---|
+| Inspect says running, process exits before signal | Re-inspect once, retain available profile and metadata, preserve signal failure and observed exit |
+| Signal rejected while still running | Keep available bootstrap metadata, preserve signal error, unknown exit |
+| Signal and reinspection both fail | Preserve first signal error, record `reinspectionFailed`, retain metadata |
+| Polling inspection fails | Preserve shutdown-stage inspection error and available metadata |
+| Shutdown budget expires | Keep exactly 100 polling waits and original timeout, retain available metadata |
+
+All five actual-collector lifecycle cases are RED before correction; all 77
+focused workflow contracts then pass, zero failures/skips. The source-file
+store is cleared before assertions, proving retained contents survive
+simulated source-container cleanup. Existing caller-finally tests separately
+verify both roles are attempted before exact-owned removal.
+Evidence: `test-results/native-lifecycle-evidence-red.log` and
+`test-results/native-lifecycle-evidence-green.log`.
+Detected at hosted review; earliest possible detection is the local lifecycle
+test. Escape: earlier signal/timeout tests asserted only FAIL status, not
+available artifact contents or collection after these errors.
+Self-improvement **applied**: expand the actual failure-path matrix, extend
+the central pattern and promote the repeated retention contract to the
+repository's standing conventions.
+Design disposition **applied**: keep the cohesive collector and existing
+ownership boundary, with bounded reinspection and explicit first-error
+propagation; no generic lifecycle framework or runtime abstraction.
+
+**ER-68p, exact-source Linux negative-log correlation / Medium, open:**
+native `39844751546` on `e312a92f` fails with
+`Negative-path categorized console correlation missing.` Both raw captures
+are retained with `workComplete:false`, successful file collection and
+explicit no-admission campaign failure. This is a separate failure from the
+reviewed collector edge. Do not relabel it as profile collection or retry
+unchanged until green. Owner: continuation; target: 2026-10-23.
+Raw private and console logs are intentionally not exported, so the artifact
+does not identify which correlation predicate failed. Next action: inspect
+the verification path and add a privacy-safe failure summary of counts and
+predicate outcomes before cleanup if needed, then test that contract locally.
+Distinguish absent logging, bounded-tail selection and delayed observation
+from evidence, not speculation. Preserve the privacy/correlation checks.
+Detected by the real Linux negative-path gate; earlier possible detection is
+a deterministic local correlation fixture once the mechanism is identified.
+Artifact: `test-results/linux-native-39844751546/`.
+
+**Successful new-source native execution:** run `39840296709` on exact
+`84d11af7` completes with the corrected signed-clock consumer. Independent
+artifact verification confirms nine Linux checkout source hashes, four
+resource/client receipts, all 17,628 spans and 16,000 measured timings,
+profile windows/runtime identity, privacy, exact cleanup and analyzer
+recomputation. Baseline Node v24.20.0 has 128,084 observations over 177.710773
+seconds; candidate v24.22.1 has 123,153 over 168.344829 seconds.
+These are whole-process diagnostic observations, not CPU seconds or admission.
+The original failed run remains failed. This execution precedes ER-68m's
+additional capture-failure correction; that correction still needs its own
+publication and exact-source validation.
+Audit: `test-results/membership-native-39840296709-audit.json`.
+
+Two Low execution frictions were also caught locally. A raw PowerShell
+continuation backtick inside a JavaScript template caused a parser error;
+use PowerShell parameter splatting in the fixture, so interpreter delimiters
+cannot collide. The real Windows helper test then exposed Node exit 134,
+`ncrypto::CSPRNG(nullptr, 0)`, after clearing the entire environment. An
+allowlist containing only Windows `SystemRoot` restores cryptographic startup;
+the lifecycle test verifies no other parent variables reach the observer.
+Both were fixed and confirmed by the real child lifecycle control, not skipped.
+Detection and earliest possible gate are the same local parse/lifecycle tests.
+
+**Next:** publish normally, execute this diagnostic once on its exact Linux
+source, verify its full artifact, and use the result to select a justified
+prospective calibration correction. Do not enlarge quotas, discard samples,
+repeat unchanged measurements until favorable or claim a causal profile from
+counter correlation alone. Publication, Linux execution, fresh review,
+performance admission and all downstream deployment gates remain distinct.
+
+**Self-improvement: applied.** Assert clock provenance, unknown coverage and
+observer cost as outcomes; execute actual child lifecycle and admission
+isolation rather than checking that configuration text exists.
+**Design/architecture disposition: accepted.** The client records spans, the
+small observer owns counter collection, and the analyzer owns interpretation.
+Production code and the admission evaluator's numerical policy are unchanged;
+a profiler framework or new configurable admission strategy is not justified.
+
+### Earlier implementation checkpoint (historical)
 
 **Current result:** the latest immutable local candidate passes eleven of
 twelve full half-CPU latency limits; empty Group GET p99 still fails by

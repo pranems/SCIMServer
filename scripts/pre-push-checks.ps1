@@ -359,6 +359,8 @@ Invoke-Gate -Name 'docs: RFC corpus current + intact' -WorkingDir $repoRoot -Act
 # database, no Docker and no network - it stays deterministic and works offline.
 
 Invoke-Gate -Name 'api: unit tests (jest)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
+    # A real-timezone child deadline is not a failed timestamp assertion.
+    # Retain its elapsed/status/signal evidence; a focused pass is not this gate.
     npm test 2>&1 | Out-Host
 }
 
@@ -389,6 +391,9 @@ Invoke-Gate -Name 'api: e2e tests (inmemory, maxWorkers=2)' -WorkingDir (Join-Pa
 
 if ($Mode -in @('Validate', 'Full')) {
 
+    # Prisma's env('DATABASE_URL') throws during config load, even for codegen.
+    # Supply an explicit codegen-only URL in the caller when no DB is needed;
+    # a missing configuration must still block this gate.
     Invoke-Gate -Name 'api: prisma generate' -WorkingDir (Join-Path $repoRoot 'api') -Action {
         npx prisma generate 2>&1 | Out-Host
     }
@@ -398,6 +403,9 @@ if ($Mode -in @('Validate', 'Full')) {
     }
 
     Invoke-Gate -Name 'web: vitest' -WorkingDir (Join-Path $repoRoot 'web') -Action {
+        # A worker-startup error leaves files unexecuted even when every reported
+        # assertion passes. Preserve npm's failure exit; never admit partial counts.
+        # Focused or instrumented results do not replace a complete ordinary run.
         npm test 2>&1 | Out-Host
     }
 }

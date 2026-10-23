@@ -1,11 +1,88 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.54`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-22 - **Repo version at capture:** `api/package.json` = `0.55.54`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
 
 ---
+
+## Prospective performance qualification runner (2026-10-22 source change)
+
+[performance-qualification.yml](../.github/workflows/performance-qualification.yml)
+uses the repository's existing public GitHub Actions service with an
+`ubuntu-24.04` runner. It provisions no Azure resource or new paid host, grants
+only `contents: read`, serializes qualification campaigns and permits no
+deployment or package publication. A 60-minute cooperative work deadline,
+65-minute qualification-step cap and 75-minute job cap reserve time for
+cleanup/upload. Checkout, contracts and upload have 2/3/4-minute caps.
+Completed/failed evidence is retained for 14 days. The workflow starts on
+relevant pull requests or explicit dispatch, not every application change.
+
+The [fixed manifest](../scripts/performance/membership-protocol.json) pins
+actual application/PostgreSQL images and the original app resource limits.
+Separate owned app/database processes are created per four-round block;
+each role's app/database is reused for its second visit, preserving the
+existing within-block history. Two A/A blocks must pass before the two A/B
+blocks. This tests a fresh Linux execution environment, not the deployed
+Azure estate. Windows-hosted Docker is explicitly rejected for this lane.
+Failure stops later blocks and cannot authorize a deployment.
+
+Controlled client failures retain explicit partial FAIL receipts before
+container removal; these are never admitted. Disk persistence is outside
+the measured request window. Unexpected host loss or forced termination can
+still lose unflushed current-round memory; missing evidence is a failure,
+not permission to resume, retry automatically or infer a benchmark PASS.
+
+Only synthetic, labelled, exact-cleanup fixtures are used. No Azure
+credentials, gallery provisioning jobs or customer data are supplied.
+The public-runner path avoids provisioning new paid capacity; runner
+availability and noise still require the actual controls to pass. A shared
+physical host is possible even with an isolated runner VM. This source change
+does not itself prove qualification, update the live-estate inventory below,
+or replace remaining migration/live/browser/customer gates.
+
+The source-only [membership-cpu-diagnostic.yml](../.github/workflows/membership-cpu-diagnostic.yml)
+adds a separate diagnostic job on the same existing runner service and
+concurrency group. It runs one four-round same-image BAAB block with the
+original quota and workload, recording request spans and exact-owned cgroup
+CPU counter reads. It never calls the release evaluator or creates admission:
+both rows and results are explicitly diagnostic-only. Cooperative work is
+bounded to 15 minutes inside a 20-minute step and 30-minute job, with
+2/3/4-minute checkout/test/upload caps and 14-day complete/partial retention.
+The observer receives no inherited Linux environment, runs outside app quota
+and is stopped before app cleanup. Its CPU cost and sampling gaps are retained;
+shared-host perturbation and insufficient short-request sampling remain
+limitations. It has `contents: read` only and no cloud or deployment authority.
+See [ER-67](ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
+
+The source-only [membership-function-diagnostic.yml](../.github/workflows/membership-function-diagnostic.yml)
+uses the same read-only authority, concurrency group, public Linux service,
+15-minute cooperative budget, 20-minute step, 30-minute job and 14-day artifact
+retention. It selects one frozen old/current BAAB block, bypassing admission
+controls only because it cannot produce admission. Both application processes
+retain their first/second visits. Native profiling is applied only to the app
+Node command, not migrations or ordinary qualification; no inspector port,
+cloud credential, customer data, new host or quota increase is introduced.
+An explicit readonly bootstrap mount, environment opt-in and exact-owned
+profiler label authorize the diagnostic exit signal. Output uses the ordinary
+container writable layer, copied before removal rather than a disappearing
+tmpfs. Both role captures are attempted even if one fails, and partial receipts
+remain failures. Profiles include startup/idle/privacy work, and sample gaps
+are not CPU time. Linux execution of this new mode is not yet claimed.
+See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
+All three participants explicitly use `queue: max` with
+`cancel-in-progress: false`. GitHub's default retains only one pending run
+and replaces it when a third arrives; that canceled the first native run
+before any job or measurement. The documented max queue retains up to 100
+pending runs while still allowing only one active benchmark. Queue saturation
+can still cancel additional arrivals and must not look like measured success.
+See [GitHub's concurrency queue documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
+This header's 2026-10-22 verification covers the source workflows above.
+The estate snapshots below retain their original capture dates; no fresh
+Azure inventory or serving change is claimed by this diagnostic work.
 
 ## 0.55.56 candidate startup-output hardening
 

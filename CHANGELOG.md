@@ -7,6 +7,173 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Prospective Linux performance qualification (tooling only)
+
+- Fix review `5621836110` and the new exact-source Linux privacy failure:
+  Group PATCH records use `scim.patch`, not `scim.group`. Preserve same-record
+  request identity and every privacy safeguard; correct JSON, pretty and
+  receipt predicates. An isolated frozen-image 66-outcome probe verifies the
+  actual category without exporting logs/IDs. Production-shaped fixtures,
+  wrong-domain negatives and a producer-mapping guard increase focused
+  contracts 107 -> 110 PASS; 15 actual Linux privacy cases and one producer
+  guard PASS after ten RED. The actual corrected guard also passes the
+  isolated frozen-image 66-outcome contract with exact cleanup.
+  Record ER-68ah-ai. Prior `6febc534` publication passes 28 normal gates in
+  1184.5 seconds; its post-round correlation FAIL remains retained.
+  No new latency/admission result, serving change or product bump.
+- Fix Linux environment restoration exposed by exact `6a710734` CI before
+  benchmark allocation: use a real .NET null for originally absent variables
+  while preserving present empty values. Reproduce three RED controls on
+  official Linux PowerShell 7.5.0/.NET 9.0.1, then six Linux controls PASS.
+  Address review `5621417287`: a leaf capture-status writer cannot replace
+  an earlier ownership/capture error; writer-only failure still throws.
+  Two combined controls first fail; focused contracts increase 104 -> 107 PASS.
+  Tighten the standing rules and record ER-68ad-ag. Prior normal publication
+  passes 28 gates in 1229.7 seconds; its Linux contract FAIL is retained,
+  not described as a new performance run. No product or admission change.
+- Address all four findings in review `5620999429`: independently retrieve
+  client timing receipts despite status failures, preserve original round
+  errors through observer/resource finalization, correlate the selected
+  negative request and category in one actual console record, and restore
+  environment values even when the campaign receipt cannot be written.
+  Failed finalization never grants admission or prints success.
+  Focused contracts increase 93 -> 104 PASS after nine substantive RED controls.
+  Prior `abbcce07` publication passes 28 Validate gates in 1171.7 seconds;
+  its Linux performance control still fails. Record derived audit-report
+  provenance repair and fixture lessons in ER-68w-ac. No product bump.
+- Address all three findings in review `5620551104`: explicitly drain buffered
+  request logs through the existing authenticated admin endpoint before
+  snapshotting, persist sanitized partial privacy receipts, and preserve a
+  primary work error when capture/cleanup also fails. Keep both role captures,
+  exact cleanup and all privacy/correlation checks. Both diagnostic analyzers
+  now share the existing privacy guard. Add buffered-state, partial-evidence,
+  analyzer and receipt-write precedence controls: 77 -> 93 focused PASS.
+  Prior `35b66b36` publication passes 28 normal gates in 1248.5 seconds.
+  No serving change, product bump or performance-limit change.
+- Address review `5620142839`: preserve authorized diagnostic files even after
+  a signal/exit race, failed state inspection or shutdown timeout. Re-inspect
+  once after a failed signal, retain the original error/stage, explicitly
+  record a secondary inspection failure and never promote partial capture.
+  Five lifecycle controls first fail; all 77 focused contracts then pass
+  (74 -> 77). Retained contents survive simulated source-container cleanup.
+  Prior `e312a92f` publication passes all 28 normal gates in 1092 seconds.
+- Address review `5619805016`: independently attempt CPU-profile and bootstrap
+  metadata copies before cleanup, propagate the first copy error and require
+  both files before marking capture complete. Missing-profile/available-metadata,
+  missing-metadata/available-profile and both-copy-failure controls verify
+  actual retained files and failure stages. Focused contracts: 72 -> 74 PASS.
+  Prior signed-clock/timezone publication `84d11af7` passes all 28 normal gates:
+  API 6210/213, HTTP 2514/118, Web 1655/124. No product version change.
+- Address both findings in fresh review `5617819970`: preserve every queued
+  workflow and emit the four native instrumentation hashes outside the
+  mutually exclusive timeline branch. Actual three-mode key/value checks
+  require 5/7/9 exact source hashes; focused contracts increase 68 -> 71 PASS.
+  The queue-only partial hook is stopped to consolidate the newly confirmed
+  provenance correction, not counted as passing.
+- Correct shared workflow scheduling: `cancel-in-progress: false` alone allows
+  only one pending run and canceled the native lane before any job. Apply
+  GitHub's documented `queue: max` to all three participants, preserving one
+  active benchmark and up to 100 waiters. Add an all-participant RED/GREEN
+  guard; no timing/admission rule changes. Retain the failed Web worker-startup
+  push separately from the subsequent 28-gate PASS on `5c60e41c`.
+- Add an explicitly non-admitting native function diagnostic for one frozen
+  0.55.20/0.55.58 BAAB block. Preserve original resource limits, workload and
+  first/second process visits. Profile only the application Node process,
+  not migrations, and retain both profiles before exact-owned cleanup even
+  if the first capture fails. Ordinary qualification remains uninstrumented.
+- Actual Linux profiles expose two baseline `-2` microsecond timestamp steps.
+  Replace the consumer's unsupported monotonic-step assumption with per-step
+  cumulative-window validation; preserve every unweighted observation and
+  report reordering explicitly. Add useful bounded CLI validation reasons.
+  Focused tests: 71 -> 72 PASS. Separate exact replay verifies nine producer
+  hashes, 17,628 spans and 16,000 timings without relabeling the failed campaign.
+- Remove redundant nested Jest startup from the real non-UTC endpoint timestamp
+  regression. A standalone Node fixture calls the production service and checks
+  exact timezone/read-count/timestamp receipt values. All 21 freshness tests
+  pass; reversing the production UTC interpretation still fails both fields.
+  Keep the original 30-second child and 35-second parent limits, all assertions
+  and ordinary protected validation. No serving-code or version change.
+- Focused contracts increase 44 -> 68 PASS, zero failures/skips. New coverage
+  includes actual analyzer CLI failures, immutable role/runtime identity,
+  all 17,628 request spans and 16,000 timings, explicit profiler authorization,
+  stopped/nonzero-exit evidence retention, independent capture failures,
+  actual mode selection and migration/app launch separation. Two real frozen
+  images also pass network-disabled collector/bootstrap capability probes.
+  These synthetic probes are not application-performance results.
+- Exact-source Linux native execution and its fresh review remain pending
+  at this local implementation checkpoint. Native samples are unweighted
+  observations, not CPU microseconds; whole-process startup/idle/privacy
+  work and different bundled Node versions limit causal interpretation.
+  Do not change admission thresholds or bump the product for tooling alone.
+- Add a read-only-permission workflow on existing public GitHub Actions Linux
+  runners, using pinned current 0.55.58, customer-baseline 0.55.20 and PostgreSQL
+  images. No serving artifact, dependency, database schema or product-version
+  change is made; 0.55.58 remains the candidate version.
+- Preregister two opposite-order same-image controls before either old/current
+  comparison. Fail immediately without retries or discarded samples. Preserve
+  0.5 CPU / 1 GiB, 100 warmup and 1,000 measured lifecycle cycles per round,
+  2,000 samples per operation/role/block and all twelve +10% point ceilings.
+- Retain all raw timings, immutable/source identities, cgroup counters,
+  66 functional checks, 200 privacy/correlation checks and exact-ID cleanup.
+  Same-image checks additionally require reciprocal 10% agreement. The bounded
+  protocol does not estimate a false-failure probability or prove customer
+  capacity. Existing failed Windows admission remains a failed receipt.
+- New focused Node contracts: 0 -> 11 passing, including actual PowerShell
+  orchestration failure controls, unrounded p99 and changed-budget rejection.
+  RED receipts include missing evaluator and a caught PowerShell interpolation
+  parser error. Real HTTP client controls verify 4,407 requests, complete
+  sample arrays and fixture deletion after corrupt readback. CI benchmark
+  execution and deployment are not claimed here.
+- Initial protected publication at `33c93e4e` passes 28 Validate gates:
+  6,210 API units, 2,514 hook HTTP plus 42 genuine exclusions/two excluded
+  log suites, 1,655 Web tests. First Linux run `39778828864` fails before
+  timings when Unix-socket readiness accepts the temporary PostgreSQL
+  initialization server. Require final TCP readiness instead, with actual
+  pinned-image confirmation and two permanent RED/GREEN loop controls.
+  Focused contracts increase 11 -> 13 PASS; original failed artifact and
+  successful exact-owned cleanup are retained. No timing limit is changed.
+- Address all three findings in hosted review `5614222330`: in addition to
+  final TCP readiness, retain explicit partial failed receipts before client
+  removal and reject them from admission. Reserve cleanup/upload with a
+  60-minute cooperative work deadline, 65-minute step and 75-minute job.
+  Focused tests increase 13 -> 17 PASS, including post-measurement readback
+  failure, all-sample retention on cleanup failure, actual copy-before-reject
+  orchestration and expired-deadline rejection. The partial `216d3961` push
+  was stopped to batch review fixes; it is not a passing publication.
+- Corrected `23d23220` publication passes all 28 Validate gates in 997 seconds.
+  Linux run `39784232793` completes four same-image rounds but fails five
+  control limits. Retain all 16,000 timings, functional/privacy proof and exact
+  cleanup; neither old/current comparison runs. Moving hosts alone does not
+  establish repeatability or candidate safety.
+- Address the additional relevant finding in fresh review `5614795378`:
+  preserve collected resource measurements, explicit failure stage and
+  completeness before limit rejection or cleanup, even when a later probe
+  fails. Resource-retention RED/GREEN controls increase focused contracts
+  17 -> 26 PASS: eight actual-round/cleanup cases cover success, exact
+  memory/RSS ceilings, OOM, absent RSS/CPU/OOM observations and deadline expiry.
+  Actual A/A/A-B identity/order selection is also tested without claiming
+  those unexecuted measurements ran. Failed rows remain excluded; no quota, sample count,
+  timing policy, product version or immutable serving image is changed.
+- Resource-retention source `117d5b1e` passes all 28 protected gates; fresh
+  review reports no remaining code finding. Its Linux run `39790526704`
+  still fails same-image add/remove p99 (+11.9480% / +14.8634%); all resource,
+  functional, logging and cleanup receipts pass. Neither old/current block
+  runs, and the failed control remains failed.
+- Add a bounded diagnostic-only request/CPU timeline, one same-image BAAB
+  block on the existing Linux runner. Preserve original images, quota,
+  samples and ceilings. Retain monotonic spans and exact-owned app cgroup
+  reads, observer cost/gaps and insufficient-coverage classifications.
+  Diagnostic receipts are explicitly rejected by normal qualification.
+  No causal request-delay or release-admission claim is made.
+- Initial trace RED is 25 PASS / 9 FAIL; implementation and integration reach
+  34 then 40 PASS. Additional assurance RED covers missing clock/cost validation
+  and failure-stage reporting; all 44 combined contracts pass after corrections
+  (28 existing/client plus 16 CPU),
+  including actual observer subprocess success/failure/deadline and actual
+  diagnostic control flow. Windows helper startup allows only `SystemRoot`;
+  Linux inherits no environment. Product remains 0.55.58 with no dependency,
+  lockfile, serving or cloud change. Linux diagnostic execution is pending.
+
 ### 0.55.58 consolidation onto token-lifetime master
 
 - Address hosted review's shared-cache binding collision before release:

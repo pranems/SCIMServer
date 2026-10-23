@@ -2,12 +2,181 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.58
-> **Last Updated**: October 21, 2026
+> **Last Updated**: October 22, 2026
 > **Last verified:** 2026-10-22
 
 ---
 
 ## Active Delivery Process
+
+**Current PATCH-correlation correction:** published `6febc534` passes 28
+ordinary gates in 1184.5 seconds. Exact Linux qualification/native complete
+four rounds, then reject correctly categorized Group PATCH logs.
+Review `5621836110` and an isolated frozen-image contract probe confirm
+`scim.patch`, not `scim.group`, is the actual producer category.
+Three corrected predicates plus source-shaped/wrong-domain guards now pass
+110 focused contracts, 15 actual Linux privacy cases and one producer-mapping
+guard after ten RED. The actual corrected guard also passes an isolated
+frozen-image 66-outcome contract with exact cleanup.
+See ER-68ah-ai; protected publication/fresh CI/review remain required.
+No performance admission, product bump or deployment.
+
+**Current Linux/review follow-up:** `6a710734` passes all 28 ordinary gates in
+1229.7 seconds, then its Linux workflows fail three campaign contracts before
+benchmark allocation. An official Linux 7.5.0/.NET 9.0.1 reproduction proves
+ordinary null binds as empty text; typed null restores absence and preserves
+original empty values. Review `5621417287` adds leaf capture-status writer
+precedence. Both local corrections pass 107 focused contracts and six actual
+Linux controls after RED. See ER-68ad-ag. Protected publication, fresh CI and
+review remain required; all original admission/deployment holds remain.
+
+**Current review correction:** published `abbcce07` passes 28 ordinary Validate
+gates in 1171.7 seconds (API 6210/213, HTTP 2514/118, Web 1655/124).
+All four findings in review `5620999429` now have local fixes: independent
+client receipt retention, round first-error precedence, same-record negative
+console correlation, and unconditional environment restoration after campaign
+receipt-write failure. Nine substantive controls first fail; 104 focused contracts
+pass with zero skips. ER-68w-ac records these and the derived audit report
+identity correction. Protected publication/fresh CI/review remain required.
+Native/timeline on `abbcce07` pass; qualification `39855403223` fails.
+No serving, workload, quota, threshold, version or deployment change.
+
+**Latest consolidation:** review `5620551104` identifies buffered-log snapshot,
+missing partial privacy receipts and primary-work error masking. Local fixes
+use the authenticated drain endpoint, sanitized failure-first receipts and
+explicit first-error precedence. Both analyzers enforce shared privacy proof.
+All 93 focused contracts pass after actual RED controls, including receipt
+write failure. Publication/fresh exact-tip review/CI remain required.
+No serving, workload, quota or threshold change. See ER-68q-v.
+
+**Latest review follow-up:** published `e312a92f` passes all 28 normal gates
+in 1092 seconds. Review `5620142839` exposes signal/shutdown errors skipping
+authorized file collection. Five collector cases first fail; the local
+correction passes all 77 focused contracts, preserves original errors,
+bounded reinspection and incomplete FAIL status. Its publication is pending.
+Native `39844751546` separately fails negative-log console correlation,
+retaining both incomplete-work profiles. Investigate ER-68p without weakening
+privacy/correlation checks. No merge, admission or deployment is claimed.
+
+**Current publication/review checkpoint, 2026-10-22:** exact `84d11af7`
+is published through all 28 ordinary Validate gates in 1104 seconds.
+API units 6210/213, HTTP 2514/118 (42 existing backend-specific skips), Web
+1655/124 PASS. The three prior failed attempts remain retained. Fresh review
+`5619805016` finds metadata loss when profile copying fails; the local
+RED-first correction independently attempts both files, preserves the first
+error and keeps incomplete capture failed. All 74 focused contracts pass;
+normal publication of that follow-up remains required. Exact-tip qualification
+`39840296611` fails first-control populated-read p99 (1.10065341 ratio) and
+empty-read p99 (0.74715670 ratio). No performance admission, merge, deployment,
+serving change or version bump. Master stays `e1070ba2`; see ER-68e/h-n.
+
+Native run `39840296709` on `84d11af7` succeeds and independently verifies
+nine source hashes, four receipts, 17,628 spans, 16,000 timings, profile
+identity, privacy, cleanup and exact recomputation. Diagnostic only;
+the capture-copy follow-up still needs its own exact-source publication.
+
+**Timezone harness follow-up:** replace redundant nested Jest startup with
+a fresh Node/ts-node fixture calling actual `EndpointService.getEndpoint`.
+Validate a full receipt proving non-UTC offset, one snapshot read and both
+returned UTC fields. Receipt RED, all 21 freshness cases GREEN, actual
+production UTC negative control RED and restored 21-case GREEN are retained.
+Targeted lint/syntax pass. No serving change or 30/35-second deadline increase.
+Full ordinary protected publication passes on `84d11af7`; Web cause stays open.
+
+**Latest actual native execution, 2026-10-22:** `30fbea59` is published through
+28 passing gates and fresh review `5618294791` has no open code issues.
+Both preceding review findings are resolved. Actual Linux `39822577851`
+completes both profile captures, then rejects two baseline `-2` microsecond
+steps. RED-first signed cumulative-clock validation now passes 72 focused
+contracts. Separate replay verifies nine producer hashes, four resource/client
+receipts, 17,628 request spans and 16,000 timings while retaining the original
+campaign FAIL and the corrected consumer hash. New-source publication/CI is
+pending. Qualification `39822577951` independently fails first-control add p99
+and empty-read p99; performance admission and deployment remain held.
+See ER-68h/i in the linked ledger below. Product stays 0.55.58.
+
+**Latest local 2026-10-22 diagnostic:** one explicit native-profile mode selects
+only the frozen old/current BAAB block, never the admission evaluator.
+Application-only native flags exclude migration and ordinary qualification.
+Both role captures are attempted before exact cleanup; already-exited
+evidence survives and missing profiler authorization prevents an exit signal.
+All 68 focused contracts pass. Network-disabled real-image capability
+probes pass on Node v24.20.0/v24.22.1, not application benchmarks.
+Linux execution/publication/fresh review of this new mode remain pending.
+Published `a7e51d10` already passes 28 gates and review `5616280374` has no
+open code finding. Its timeline is verified, but untraced same-image
+qualification still fails three limits. Master remains `e1070ba2`; no merge,
+deployment, admission waiver or product-version bump is claimed.
+See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
+Published `5c60e41c` retains native implementation `8f4e1697` and passes
+all 28 Validate gates. A prior worker-startup failure correctly blocked
+partial Web execution; unchanged complete tests subsequently pass 1,655/124.
+Native CI run `39816471809` is canceled before any job: default concurrency
+retains only one pending run. Apply documented `queue: max` to all three
+shared-group workflows, retaining single active execution and up to 100
+waiters. Local configuration guards precede service acceptance; no measurement
+or admission rule is changed. Fresh native execution/review remains required.
+
+Fresh review `5617819970` accepts neither scheduling loss nor missing native
+instrumentation hashes. Queue correction is already local; fix the native
+hash branch nested inside the mutually exclusive timeline mode. Actual
+three-mode provenance tests require exact 5/7/9 source hashes. Final focused
+result is 71 PASS. Preserve `f7a140d8` and the stopped partial queue-only hook;
+batch both review corrections into the next complete protected publication.
+
+**2026-10-22 current merged checkpoint:** PR #250 merged at `e1070ba2` after
+the final `5b3136d1` review and exact-tip CI. Immutable 0.55.58 image digest:
+`sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.
+Full current matrix passes 6,210 units per backend, 2,612 PostgreSQL HTTP,
+2,570 InMemory HTTP plus 42 genuine exclusions, and 1,655 Web unit/coverage
+cases. Performance, not correctness, blocks the remaining deployment stages.
+BAAB fails two original ceilings; opposite order passes; an identical-image
+control flags eight of twelve metrics. This does not establish candidate safety.
+
+The autonomous continuation implements a separate harness-only prospective
+Linux qualification on existing public Actions runners, without provisioning
+paid capacity: two opposite-order A/A blocks must pass before two opposite-order
+A/B blocks can run. Initial source `33c93e4e` passes 28 normal Validate gates
+and opens PR #251. Linux run `39778828864` fails before timings: default socket
+readiness accepts the official PostgreSQL bootstrap server before it restarts.
+Pinned-image inspection verifies a socket-only temporary listener. The final
+TCP readiness fix has two permanent actual-loop RED/GREEN controls; 13 focused
+tests pass. Corrected publication/review/Linux admission remain unproved.
+The completed hosted review additionally finds discarded failed samples and
+no artifact-upload headroom. These are corrected with explicit retained FAIL
+receipts, copy-before-rejection and partial-admission rejection; 60-minute
+cooperative work deadline, 65-minute step and unchanged 75-minute job cap.
+Seventeen focused contracts pass. The `216d3961` hook is deliberately stopped
+to batch all review corrections; no partial-hook PASS is claimed.
+The full `23d23220` push subsequently passes all 28 gates in 997 seconds and
+the three initial review threads are resolved. Linux run `39784232793`
+completes its first same-image block: five of twelve calibration limits fail,
+with all 16,000 timings, 66 functional/200 log checks and exact cleanup retained.
+No later control or old/current block runs; neither candidate regression nor
+safety follows from comparing identical images. Fresh review `5614795378`
+confirms the first three fixes but finds a missed resource-failure receipt.
+The runner now saves collected CPU/SQL/memory/RSS/OOM observations in `finally`
+before rejection/cleanup. Six initial resource controls reproduce RED; eight
+actual failure/cleanup cases and A/A/A-B role selection bring focused tests
+to 26 PASS. Source `117d5b1e` then passes all 28 protected Validate gates;
+fresh review `5615359957` reports no open code finding. Its Linux run
+`39790526704` fails same-image add/remove p99 (+11.9480% / +14.8634%),
+retaining matching resource receipts and exact cleanup. Seven other exact-tip
+checks pass. Qualification remains failed.
+
+The next bounded source change records one diagnostic-only BAAB block:
+monotonic request spans and owned app cgroup observations, with observer
+cost/gaps and unknown coverage retained. It never invokes the release
+evaluator. All 44 combined contracts pass after RED, covering real subprocess
+lifecycle, explicit failure stages, clock/cost provenance and actual
+diagnostic isolation (16 CPU and 28 existing/client contracts).
+Publication, Linux execution and exact-source interpretation remain next.
+The 0.5 CPU / 1 GiB allocation, 100 warmup cycles, 1,000 measured cycles per
+round and twelve +10% ceilings remain unchanged. No serving/dependency/version
+change; dev's last retained serving checkpoint is 0.55.56, not a fresh cloud
+inventory. Earlier failed receipts remain failed.
+See [protocol and limitations](ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
 selection and identifies a real shared-cache binding collision. The generic

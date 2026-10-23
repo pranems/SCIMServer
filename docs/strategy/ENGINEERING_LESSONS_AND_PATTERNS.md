@@ -16,6 +16,184 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Performance admission needs a prospective environment control
+
+Container readiness must identify the final service, not a bootstrap process.
+The official PostgreSQL image's temporary initialization server accepts
+Unix-socket connections before restarting. Probe its final TCP listener,
+not the default socket, and keep an actual-loop control where the socket is
+ready but TCP is not. See [ER-63](../ENDPOINT_SNAPSHOT_REVISION.md#linux-initialization-readiness-correction-er-63).
+
+Identical application images can cross regression limits when their execution
+environment is unstable. Keep the original failed receipt; do not choose a
+favorable opposite-order denominator or pool later observations to rewrite it.
+Before a new admission, freeze workload, image identities, limits, complete
+sample counts, order and stop rules. Run same-image controls first on the
+prospective environment and stop if they fail. Passing a small number of
+controls does not quantify a false-failure rate. More rounds, new history
+strata and confidence formulas are not free assurance: justify their decision
+properties and runtime before adopting them. The narrow Linux qualification
+reuses the original lifecycle instead of building a new measurement framework.
+See [protocol and RCA](../ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
+### Failure evidence needs its own completion budget and contract
+
+A failed measurement is not the same thing as an absent receipt. Preserve
+explicit partial failure data, exclude it from admission and test a failure
+after samples have actually been collected. Retrieve the receipt before
+destroying its owner. Likewise, `always()` cannot run after a job has already
+exhausted its total deadline: reserve cleanup and upload time outside the work
+budget. Test that work stops, not merely that timeout fields exist.
+See [ER-64/ER-65](../ENDPOINT_SNAPSHOT_REVISION.md#hosted-qualification-review-failed-evidence-and-deadline-guards-er-64er-65).
+
+Independence must extend to files within a capture, not only separate roles.
+If a CPU profile is missing, still attempt its available bootstrap metadata
+before deleting the container. Propagate the first error, keep capture failed
+unless both copies succeed, and test both asymmetric failures plus both
+failures. Assert retained file contents and failure stages, not just a receipt.
+See ER-68m in the [native diagnostic ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Cover the whole authorized lifecycle, not only copying: signal/exit races,
+polling inspection failures and shutdown timeout must still reach independent
+file collection. Re-inspect once after a failed signal, keep unknown exit
+status unknown, and preserve the original lifecycle error even if collection
+or reinspection also fails. Never collect from an unauthorized owner.
+ER-68o closes this second escape and promotes the contract to a standing
+rule; tests discard their source store before checking retained contents.
+
+Persistence readiness is not elapsed time. When logs are buffered, use the
+existing explicit drain endpoint before a privacy snapshot outside the
+measured window, rather than sleeping less than the configured flush interval.
+Write a sanitized failure-first receipt for functional/privacy checks,
+retaining counts and independent predicates, never raw log or credential
+values. Both diagnostic consumers must reject failed/missing privacy proof.
+Preserve a primary work error through secondary capture, cleanup and receipt
+write failures; test combined failures and report when a receipt is not
+durable. See ER-68q-v in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Walk failure precedence through every layer once: client status/copy, round
+observer/resource receipt, privacy, block capture/cleanup and campaign receipt.
+An outer catch cannot preserve an error already replaced by an inner finally.
+Attempt independent evidence operations before deleting their source, retain
+the first ErrorRecord, and put environment restoration in an unconditional
+finally. Test combined failures and originally absent environment values.
+For correlation, match the selected ID and category in the same actual log
+record, not independent substrings across a capture or nested payload fields.
+Keep fixtures faithful to the real formatter and lexical catch semantics.
+See ER-68x-ac in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Derived audit reports need immutable-input identity too. Require explicit
+artifact/run/output alignment before writing, retain the original producer
+identity separately from the current replay-consumer hash, and include all
+guard inputs in replay scratch. A replay is not a new measurement. Verify a
+wrong-run negative control cannot overwrite an older report. See ER-68w.
+
+The first-error walk includes leaf collectors' status writers. Protecting a
+caller cannot recover an error its callee's finally already replaced.
+Exercise ownership/capture plus writer failure and writer-only failure.
+PowerShell restoration also needs a runtime-family check: .NET 9 distinguishes
+empty values from deletion, while PowerShell can bind ordinary `$null` as
+empty text. Use `[NullString]::Value` for originally absent values and preserve
+real empty values separately. A Windows-only PASS does not prove Linux state
+restoration. Actual container controls close ER-68ad/ae; both conventions are
+promoted to the standing rules rather than left as advisory prose.
+
+Formatter fidelity is not domain fidelity. A syntactically real log line can
+still use the wrong category: Group PATCH operations emit `scim.patch`, not
+the general `scim.group` category. Derive the expected operation/category
+relationship from its producer and keep a source-to-fixture guard plus
+wrong-domain negative controls. Before a costly benchmark, a bounded actual
+contract probe can verify the selected failed request's sanitized category
+counts without exporting raw logs or IDs. This closes ER-68ah; it does not
+retroactively explain an older failure whose predicates were not retained.
+
+Resource measurements need the same failure contract as request timings.
+Persist every collected CPU, database, memory, RSS and OOM observation before
+rejecting a ceiling or deleting its owner. A missing later probe must leave
+earlier observations marked partial, not silently absent. Test the actual
+failure and teardown paths, including exact-boundary failures, and verify
+the values still exist after cleanup. Moving to a different host is not a
+repeatability fix unless its same-image controls pass. See
+[ER-66 and the failed Linux control](../ENDPOINT_SNAPSHOT_REVISION.md#linux-control-result-and-resource-failure-retention-er-66).
+
+### Diagnostic observations must not become admission or causal claims
+
+Retain request spans and independent counter read windows on the same
+verified monotonic clock, including observer cost, gaps and explicit unknown
+coverage. An app-wide counter increasing inside a request does not measure
+that request's lost time. Two read windows must be wholly interior before
+computing a difference; insufficient observations stay unknown, not zero.
+Reject diagnostic-marked receipts from normal admission even when complete,
+and execute the actual mode-selection branch to prove it cannot reach the
+release evaluator or later comparison blocks.
+
+Test real subprocess startup and shutdown, not only mocked lifecycle calls.
+Clearing inherited secrets is desirable, but Windows Node cryptographic
+startup still needs `SystemRoot`; allow that one OS value rather than
+restoring the parent environment or skipping the test. Parameter splatting
+also avoids raw PowerShell backticks colliding with JavaScript template
+delimiters in cross-interpreter fixtures.
+See [ER-67](../ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
+
+Native profiler samples are observations, not measured CPU microseconds.
+Wall-clock sample gaps can include scheduler suspension and must not be used
+as function CPU weights. Retain full function/source identities and idle
+samples; disclose whole-process lifetime, runtime-version and order effects.
+Match every raw request span to the original timing arrays and native clock
+range before publishing a comparative diagnostic.
+
+A generic resource owner label does not authorize a profiler-specific exit
+signal: require an explicit profiler marker as well. If the process already
+exited, collect what it wrote before rejecting its exit code. Store output
+where it survives stop, then collect all independent role receipts before
+removal even when the first capture fails. Prove these lifecycle behaviors
+with actual collector paths and frozen-image capability probes.
+See [ER-68](../ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
+GitHub's `cancel-in-progress: false` is not a queue-all guarantee: by default
+only one pending workflow survives per concurrency group. When three or more
+independent required lanes share a group, use the documented `queue: max`
+on every participant and test the complete participant set. It preserves
+single active execution while retaining up to 100 pending runs; saturation
+still needs explicit failure reporting. Distinguish canceled-before-start
+from a failed measurement, and never repair scheduling loss by admitting
+unexecuted evidence.
+
+Validate mode-specific provenance by executing each real mode's hash-emission
+block and checking both keys and actual bytes. A hash branch nested under an
+incompatible mode can be unreachable while parser and workload tests all pass.
+When extracting PowerShell blocks for focused execution, preserve automatic
+script-path bindings explicitly without replacing the production branching
+or hash logic. See ER-68g in the same ledger.
+
+Do not infer timestamp ordering from an interval field's name. Real native
+profiles can contain signed steps; reconstruct and validate every cumulative
+timestamp against the original profile window, retain every observation and
+report reordering explicitly. Unweighted counts need no sorting or conversion
+of gaps into CPU time. A final in-range sum cannot prove intermediate bounds.
+Verify the official consumer's handling rather than trusting a search
+synthesis. Keep producer commit/hashes distinct from a corrected replay
+consumer's hash, and never relabel an original failed campaign as successful.
+See ER-68h/i in the same ledger.
+
+Observing IPC can change delivery semantics. Node buffers ordinary child
+messages until a message listener exists; an early diagnostic listener can
+drain the queue before the real consumer is installed. Test an observer
+against delayed-consumer delivery before using its output to diagnose a
+startup failure. Avoid installing competing IPC listeners, preserve call
+and return behavior, and keep instrumented runs separate from gate admission.
+See ER-68k in the same ledger.
+
+A real-process timezone regression need not launch a second complete test
+framework. Use a bounded fresh Node process with the established source loader,
+the actual production entry point and mocked external I/O. Assert a complete
+receipt proving the process timezone, production read count and returned values.
+Retain ordinary dependency-injection coverage separately. Before accepting the
+cheaper harness, reverse the relevant production behavior and confirm that the
+new assertion fails for the original defect; restore it before any gate run.
+Keep deadlines unchanged and distinguish isolated timings from full-load proof.
+See ER-68l in the same ledger.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a
