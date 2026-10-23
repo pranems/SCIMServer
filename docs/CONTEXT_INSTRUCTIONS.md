@@ -9,6 +9,15 @@
 
 ## Active Delivery Process
 
+**2026-10-23 test-harness prerequisite:** a separate master-based branch ports
+only the real-leaf timezone tests from reviewed `84d11af7`, with runtime
+entrypoint/loader receipt checks. Original 30-second child/35-second parent
+limits remain. All 21 focused cases pass; former nested launcher and actual
+UTC-conversion negative controls fail as expected, with production restored.
+No product bump, Hono/lockfile change or performance-tooling import.
+The Hono branch stays preserved at e18d32c0 until this prerequisite is reviewed
+and normally merged. No merge, deployment or new performance admission.
+
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
 selection and identifies a real shared-cache binding collision. The generic
 service now keys by full ResourceType binding, separately from builtin keys.

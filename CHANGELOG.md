@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Test-only prerequisite: standalone non-UTC freshness probe
+
+- Backport only the two relevant test-file changes from reviewed
+  `84d11af7658d91c3d3392831a088b89f54279b1d`. Replace redundant nested Jest
+  startup with a real Node leaf loading actual TypeScript source. Preserve
+  the 30-second child and 35-second parent deadlines and all 21 cases.
+- Require runtime entrypoint/loader identity, New York January offset 300,
+  exactly one snapshot read and both UTC timestamps. The retained full-hook
+  30,119ms ETIMEDOUT is the observed RED, not a timestamp assertion failure.
+  Reinstating the former launcher fails the receipt assertion even when the
+  child exits normally; removing actual production UTC interpretation fails
+  both timestamp values (05:00Z instead of 00:00Z). Production source is restored
+  byte-identically. Focused freshness: 21 -> 21 PASS; targeted ESLint and
+  fixture syntax PASS. Full protected-gate and exact-tip review evidence belong
+  to the prerequisite PR, not the old isolated PASS.
+- No product/version/lockfile, application/UI, performance runner, quota or
+  admission change. The preserved Hono branch remains blocked until this
+  separate prerequisite is reviewed and normally merged.
+
 ### 0.55.58 consolidation onto token-lifetime master
 
 - Address hosted review's shared-cache binding collision before release:

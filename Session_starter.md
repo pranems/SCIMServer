@@ -1,6 +1,32 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-22
+**Last verified:** 2026-10-23
+
+### Separate timezone-harness prerequisite (2026-10-23)
+
+Branch `test/timezone-leaf-prerequisite-20261023` starts from verified master
+`e1070ba28825afee46c953e1e2d5d518863303f2`. Backport only the two test files
+from `84d11af7`, plus direct runtime launcher receipts and narrow documentation.
+All 21 focused freshness cases pass with the original 30-second child and
+35-second parent limits. Negative controls reject the actual former nested
+launcher and an actual UTC-conversion defect; production source is restored.
+No product bump (still 0.55.58), Hono, lockfile or performance-tooling change.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Isolate the reviewed standalone timezone harness as a prerequisite; focused GREEN and two discriminating negative controls retained. |
+
+- [x] ✅ COMPLETED: Confirm actual full-hook spawn-timeout RED and focused
+  real-leaf outcome/launcher controls, without relaxing deadlines.
+- [ ] Publish via ordinary hook, exact-tip CI and hosted review; do not merge.
+
+Preserve Hono branch `chore/regen-lockfile-hono-security-20261023` at
+`e18d32c04855e8acf88c8a3e02c9ec7b447cfb21` and qualification branch at
+`f6f03a523b6370eccc63f1499c3c111dd5cdf200`. Their evidence and release holds
+remain unchanged. The 39875689201 p99 failure is not rerun or waived.
+**Design disposition: accepted.** A small test-only real-source fixture needs
+no application abstraction. **Self-improvement: applied.** Require the child
+to report its actual entrypoint and loader, not just return a success exit.
 
 ### Current master/performance reconciliation (2026-10-21)
 
