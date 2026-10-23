@@ -150,10 +150,25 @@ async function main() {
     return id;
   }
   try {
+    const files = ['run-membership-privacy-functional.cjs', 'membership-statements.cjs', 'membership-privacy.cjs',
+      'membership-statement-fixture.cjs', 'membership-history.cjs', 'membership-protocol.json',
+      'membership-derived-functional.cjs'];
+    const sourceCommit = await sourceTip(root);
+    if (derived) assert.equal((await exec('git', ['status', '--porcelain'], { cwd: root })).stdout.trim(), '',
+      'Derived functional source must be committed and clean');
+    const hypothesis = derived
+      ? 'The sole approved logging backport should remove the known startup credential emission. With independently verified false server and endpoint persistence, all four correlated Group rows must retain exact masks and every generated credential must be absent from selected rows and separately collected app, PG and tool consoles. This qualifies only this immutable DERIVED artifact, not the production baseline or performance.'
+      : 'With explicit false persistence, four known authorized Group rows remain masked. A generated-credential match may originate in application-container startup/migration output rather than Group authorization fields. Separate selected-row, application-container, PG-container and tool inputs plus static credential roles discriminate this; no specific emitter is presumed.';
+    write('intent.json', { ...report, status: 'PREREGISTERED_BEFORE_PREFLIGHT', sourceTip: sourceCommit,
+      hypothesis, ownerNames: names, network, requestedImages: { app: appImage, pg: protocol.postgres },
+      policy: { ...functionalPolicy, requestedServerPersistRequestSecrets: false,
+        requestedEndpointPersistRequestSecrets: false, expectedAuthorizedRows: 4, performanceCycles: 0 },
+      sourceHashes: Object.fromEntries(files.map(file => [file, digest(fs.readFileSync(path.join(__dirname, file)))])) });
     const images = {};
     for (const [role, image] of Object.entries({ app: appImage, pg: protocol.postgres })) {
+      stage = role === 'app' ? 'app-image-preflight' : 'pg-image-preflight';
       const row = JSON.parse(await docker(['image', 'inspect', '--format',
-        '{"id":{{json .Id}},"digests":{{json .RepoDigests}},"os":{{json .Os}},"architecture":{{json .Architecture}},"labels":{{json .Config.Labels}}}', image]));
+        derivedTool.imageMetadataFormat(role, derived), image]));
       if (derived && role === 'app') derivedTool.verifyDerivedImage(row, buildProof);
       else assert.ok(row.digests.includes(image));
       assert.equal(row.os, 'linux');
@@ -162,18 +177,12 @@ async function main() {
     const routes = ['endpoint-create', 'endpoint-policy', 'group-create', 'group-patch',
       'group-missing-read', 'group-missing-patch', 'flush'];
     const requestIds = Object.fromEntries(routes.map(route => [route, crypto.randomUUID()]));
-    const files = ['run-membership-privacy-functional.cjs', 'membership-statements.cjs', 'membership-privacy.cjs',
-      'membership-statement-fixture.cjs', 'membership-history.cjs', 'membership-protocol.json',
-      'membership-derived-functional.cjs'];
     const inspected = {};
     const legacyRoot = path.join(root, 'test-results/os07-functional-20261023/legacy-source');
     for (const file of ['logging/logging.service.js', 'logging/request-logging.interceptor.js',
       'filters/scim-exception.filter.js', 'endpoint-config.interface.js', 'dto/update-endpoint.dto.d.ts',
       'endpoint-profile/presets/rfc-standard.json', 'logging/scim-logger.service.js'])
       inspected[file] = digest(fs.readFileSync(path.join(legacyRoot, file)));
-    const sourceCommit = await sourceTip(root);
-    if (derived) assert.equal((await exec('git', ['status', '--porcelain'], { cwd: root })).stdout.trim(), '',
-      'Derived functional source must be committed and clean');
     const sourceByteIdentity = {};
     for (const file of files) {
       const disk = fs.readFileSync(path.join(__dirname, file));
@@ -197,9 +206,7 @@ async function main() {
         profilePreset: 'rfc-standard', appCpu: 0.5, appMemory: 1073741824,
         wallCapMs: 300000, cleanupReservationMs: 120000, flushDeadlineMs: 10000,
         performanceCycles: 0, statisticsExtension: false, rawPrivateExport: false },
-      hypothesis: derived
-        ? 'The sole approved logging backport should remove the known startup credential emission. With independently verified false server and endpoint persistence, all four correlated Group rows must retain exact masks and every generated credential must be absent from selected rows and separately collected app, PG and tool consoles. This qualifies only this immutable DERIVED artifact, not the production baseline or performance.'
-        : 'With explicit false persistence, four known authorized Group rows remain masked. A generated-credential match may originate in application-container startup/migration output rather than Group authorization fields. Separate selected-row, application-container, PG-container and tool inputs plus static credential roles discriminate this; no specific emitter is presumed.',
+      hypothesis,
       expectedCategories: ['All four masks remain mandatory', 'Any generated-credential match is INVALID',
         'Report every matching static source/kind and row index where applicable; never private text'],
       consoleProvenance: 'Docker logs --timestamps prefix identifies container records, not a particular application emitter. Unframed output and all non-log command output are tool-console. No console text is exported.',
@@ -380,7 +387,7 @@ async function main() {
         safeFindings: error.safeFindings.map(validateSafeFailure) });
     }
     report.elapsedMs = Date.now() - started;
-    if (derived && !derivedTool.completeOwnedCleanup(report.cleanup))
+    if (derived && !derivedTool.completeOwnedCleanup(report.cleanup, allocated.length))
       report.failures.push({ stage: 'derived-cleanup-evidence', code: 'INCOMPLETE_CLEANUP_PROOF' });
     if (!report.cleanup.verified || report.remainingOwned !== '' || report.remainingNetworks !== '' ||
       report.elapsedMs > 300000 || report.failures.length) {

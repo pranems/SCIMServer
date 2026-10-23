@@ -2,16 +2,25 @@
 
 **Last verified:** 2026-10-23
 
-### DERIVED functional qualification preparation (2026-10-23)
+### DERIVED functional qualification: INVALID preflight (2026-10-23)
 
-Explicit immutable-image/proof-bound functional validation is implemented,
-not yet executed. Initial focused RED is retained; 80 focused tests passed,
-then five final targeted tests after a lint-caught port-scope correction.
-Six-file syntax/scoped lint passed without dependency changes.
+Executed source `1ac35593` stopped INVALID after 27.828 seconds, before any
+container allocation, readiness probe, authenticated request or SQL. Run
+`8032f52ecc0546b780b49421da6df9b5` hit a Docker metadata defect: the template
+requested optional PG image labels that are absent. Read-only metadata
+reproduction confirmed that defect; role-specific corrected metadata succeeds.
+There was no functional retry, original-image startup or candidate startup.
+The full manifest was not written because it followed preflight; this is an
+explicit preregistration gap, not backdated evidence. Executed on-disk bytes
+were preserved afterward with honest CRLF/Git normalization proof.
+Future source now writes intent before metadata preflight, keeps DERIVED app
+label checks strict and correctly handles zero-allocation cleanup evidence.
+Post-run correction: 31 focused tests and six-file syntax/scoped lint pass.
 The future statement fixture now requests and independently verifies false
 server/endpoint policies before all windows through a diagnostic-only IPC
 gate; its actual child failure test produces zero workload samples.
-No statement diagnostic or baseline adoption is authorized. See the current
+The artifact remains functionally unqualified. No further functional run,
+statement diagnostic, baseline adoption or publication is authorized. See the current
 indexed observer/statement report and `test-results/derived-functional-20261023/`.
 
 ### Offline derived-reference preparation (2026-10-23)

@@ -108,6 +108,19 @@ test('derived qualification cannot pass on verified removal with failed final ca
     assert.equal(tool.completeOwnedCleanup(changed), false);
   }
   assert.equal(tool.completeOwnedCleanup({ verified: true, rows: [] }), false);
+  assert.equal(tool.completeOwnedCleanup({ verified: true, rows: [] }, 0), true);
+});
+test('only DERIVED app metadata requires labels; PG optional labels must not be queried', () => {
+  const tool = implementation();
+  assert.equal(typeof tool.imageMetadataFormat, 'function');
+  assert.match(tool.imageMetadataFormat('app', true), /\.Config\.Labels/);
+  for (const pair of [['pg', true], ['pg', false], ['app', false]])
+    assert.doesNotMatch(tool.imageMetadataFormat(...pair), /\.Config\.Labels/);
+  assert.throws(() => tool.imageMetadataFormat('unknown', true));
+  const source = fs.readFileSync(path.join(root, 'scripts/performance/run-membership-privacy-functional.cjs'), 'utf8');
+  assert.ok(source.indexOf("write('intent.json'") > 0);
+  assert.ok(source.indexOf("write('intent.json'") < source.indexOf('const images = {}'),
+    'Intent must be sealed even when metadata preflight fails');
 });
 test('real bounded workload child stops before Group requests when fixture policy is rejected', async () => {
   const routes = [];

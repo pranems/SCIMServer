@@ -68,7 +68,8 @@ pre-window IPC failure test. Design/architecture disposition: **accepted**:
 shared two-policy checks live in the existing statement privacy module, with
 two actual callers; the statement runner does not depend on DERIVED build
 identity tooling. No speculative framework or shared cleanup refactor.
-The functional execution result is pending the committed-source preflight.
+The sole functional invocation stopped INVALID during metadata preflight;
+the actual result and tested-but-unexecuted source correction follow.
 
 Reproducible validation commands and retained results:
 
@@ -78,6 +79,7 @@ Reproducible validation commands and retained results:
 | `node --test scripts\test\membership-derived-functional.test.cjs scripts\test\membership-privacy-functional.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-statements.test.cjs scripts\test\membership-performance.test.cjs` | 80 passed, zero skips before the final narrow guards; `green-focused.log` |
 | `node --test scripts\test\membership-derived-functional.test.cjs scripts\test\membership-privacy-functional.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-statements.test.cjs` | Final 30 passed, zero skips; `green-source-final.log` |
 | `node test-results\derived-functional-20261023\validate.cjs static-source-final.json` | Six syntax checks and scoped seven-rule ESLint: zero errors. This is the retained exclusive-output invocation, not the unavailable full normal lint configuration. |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` | Before execution, passed 27 documents; `freshness-source-content.log`. Content-only, not the full coupled gate. |
 
 The `--test-name-pattern` RED invocations and exact safe assertion stacks
 are retained in `red-private-structure.log` and `red-cleanup-proof.log`.
@@ -85,6 +87,92 @@ No full suite was duplicated. Full-transcript reconciliation is unavailable
 because no debug-log location is exposed; this new issue list is reconciled
 against the retained commands and outputs of this bounded activity, not
 claimed complete for earlier sessions.
+
+### Sole actual invocation: INVALID before fixture creation
+
+Executed committed source: `1ac355932a2625f0df15a2798b423964437f8519`.
+Run ID: `8032f52ecc0546b780b49421da6df9b5`.
+The command was:
+
+```powershell
+node scripts\performance\run-membership-privacy-functional.cjs `
+  --derived-reference-functional-only `
+  test-results\derived-functional-20261023\attempt1
+```
+
+It exited 1 after **27,828 ms**, with zero authenticated requests, zero
+readiness probes, zero app/PostgreSQL containers allocated, zero SQL and no
+performance samples. The safe receipt records `preflight / OWNED_DOCKER`.
+The two-resource completion safeguard also emitted
+`derived-cleanup-evidence / INCOMPLETE_CLEANUP_PROOF` because the allocated
+set was empty. That second finding is not evidence of leaked resources.
+Both independent owner inventories were empty and no network was created.
+The derived artifact has **not** received functional privacy qualification.
+No original or candidate app started, and no replacement run was attempted.
+
+**The requested preregistration was not fully achieved.** The implementation
+placed its full `manifest.json` write after image metadata inspection, so
+that file and its frozen-input directory do not exist for this attempt.
+The hypothesis, fixed limits and immutable image/proof binding were in the
+pre-run source commit, but that is not a substitute for the requested
+on-disk preregistration. No manifest has been backdated or reconstructed as
+though it existed before execution.
+Before correcting source, unchanged executed bytes were copied into
+`attempt1/postrun-executed-source/` and sealed in
+`attempt1/postrun-source-proof.json`, explicitly marked captured after the
+run and not preregistered. For the executed runner, on-disk SHA-256 is
+`6fa2208b59f6554de0ed0042c262fe94cf2234db78444a82dcde0ce723813a36`;
+Git-normalized SHA-256 is
+`60291a6e677e4e79174420e314b68c3e8552dbb25c80bba5e2509c44aec3ce23`.
+Raw bytes differ; all seven retained inputs match after CRLF normalization.
+
+### Actual failure diagnosis and prospective correction
+
+Read-only metadata diagnosis, not another functional fixture, established:
+
+1. The exact DERIVED image ID resolves with the expected labels, parent,
+   platform and digest. The local artifact is present and unchanged.
+2. The newly extended metadata template asked **both** images for
+   `.Config.Labels`. The exact cached PostgreSQL image omits that optional
+   key. Replaying that metadata-only command returns
+   `map has no entry for key "Labels"`.
+3. Role-specific formatting retains mandatory labels for the DERIVED app
+   but does not request optional PostgreSQL labels. A single metadata-only
+   correction check on the same cached PG image returns exit 0, its exact
+   pinned ID/digest and `linux/amd64`.
+
+The original Docker stderr was withheld by the existing generic wrapper and
+was not recovered. The deterministic source-level PG formatting defect is
+confirmed by the later metadata-only reproduction; this is not a claimed
+reconstruction of the destroyed original stderr. There is no evidence here
+of an application compatibility or application privacy failure.
+
+| Issue | Root cause, fix and prevention | Detection / escape |
+|---|---|---|
+| DF-06, harness compatibility / Medium | A DERIVED-label requirement was mistakenly imposed on the PG image metadata query. Real PG metadata inspection rejected an omitted optional key. RED/GREEN now tests role-specific formatting, keeps all DERIVED app labels mandatory and verifies the corrected PG-only command succeeds. | Functional preflight caught it; an image-role capability check could have caught it before the sole invocation. No app or data-plane escape. |
+| DF-07, evidence ordering / Medium | The full frozen manifest was written only after metadata preflight, losing the on-disk preregistration when that preflight failed. A new exclusive `intent.json` is now written before any Docker metadata command, including source commit/input hashes, immutable requested images, hypothesis and fixed limits; the full resolved manifest still precedes fixture creation. Static ordering regression added. This correction has not been functionally executed. | Discovered while inspecting the failed attempt; earliest gate was source-ordering review. The missing historical manifest stays missing. |
+| DF-08, tooling / Low | An inline Node diagnostic hit PowerShell string-escape parsing (`Invalid string escape`) before calling Docker. Moving the public-image-only command into a retained native Node script removed shell interpolation. It did not allocate a resource or repeat functional requests. | Immediate syntax error; earliest possible stage |
+| DF-09, result classification / Low | The new cleanup completeness guard assumed two allocations even after an early zero-allocation failure. It now checks the actual allocated count; a fully completed run still necessarily has two owned resources. Negative control distinguishes empty verified cleanup from incomplete final capture. The old receipt remains INVALID with both original findings. | Safe-receipt review after preflight; could have been caught by a zero-allocation failure test |
+
+After these prospective corrections, the same four-file focused selection
+passed **31 tests, zero skips**, and six-file syntax/scoped correctness lint
+passed with zero errors. Exact outputs are
+`green-postrun-correction.log` and `static-postrun-correction.json`.
+The post-run static command was
+`node test-results\derived-functional-20261023\validate.cjs static-postrun-correction.json`.
+The source tests used the four-file command above.
+Public-image metadata command arguments and outcomes are retained separately
+in `metadata-diagnosis.json`, `metadata-pg-diagnosis.json` and
+`metadata-pg-correction.json`; none starts a container or SQL connection.
+These successes do **not** replace the INVALID functional result.
+
+Self-improvement disposition: **applied** role-specific optional-metadata
+tests, preregistration-before-preflight ordering and zero-allocation cleanup
+tests. Design disposition: **accepted**, narrow opt-in helper changes only;
+no default/admission image switch, generic cleanup refactor or new framework.
+Next engineering action is a separately authorized new bounded functional
+check of the corrected source. There is no authorization here for another
+attempt, baseline adoption, statement execution, performance or publication.
 
 ## Offline DERIVED reference preparation, not baseline adoption
 

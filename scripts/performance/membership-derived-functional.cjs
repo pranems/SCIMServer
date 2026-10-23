@@ -80,9 +80,15 @@ function validateFunctionalPrivacy(rows, consoles, canaries) {
   assertCanariesAbsent(inputs, canaries);
   return validateLegacyPrivacy(rows, consoles['app-console'], canaries, 4);
 }
-function completeOwnedCleanup(cleanup) {
-  return cleanup?.verified === true && Array.isArray(cleanup.rows) && cleanup.rows.length === 2 &&
+function completeOwnedCleanup(cleanup, expected = 2) {
+  assert.ok(Number.isSafeInteger(expected) && expected >= 0 && expected <= 2);
+  return cleanup?.verified === true && Array.isArray(cleanup.rows) && cleanup.rows.length === expected &&
     cleanup.rows.every(row => row.capture === true && row.removed === true && row.verified === true);
 }
+function imageMetadataFormat(role, derived) {
+  assert.ok(['app', 'pg'].includes(role) && typeof derived === 'boolean');
+  return '{"id":{{json .Id}},"digests":{{json .RepoDigests}},"os":{{json .Os}},"architecture":{{json .Architecture}}' +
+    (role === 'app' && derived ? ',"labels":{{json .Config.Labels}}}' : '}');
+}
 module.exports = { validateBuildProof, loadBuildProof, verifyDerivedImage, validateFunctionalPrivacy,
-  maskPolicyPatch, verifyMaskPolicy, completeOwnedCleanup, imageId };
+  maskPolicyPatch, verifyMaskPolicy, completeOwnedCleanup, imageMetadataFormat, imageId };
