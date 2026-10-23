@@ -3,6 +3,108 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## DF-13: one corrected-lifecycle DERIVED functional qualification (2026-10-23)
+
+**Result: DERIVED_FUNCTIONAL_QUALIFIED, this immutable local artifact only.**
+One newly authorized invocation completed in **199,619 ms**, with all privacy
+and finalization checks passing inside the unchanged 300,000 ms cap. It
+used committed source `4a5e67246abbb5b459133fc7825efee67af68321`, including
+the OS-17 lifecycle correction and OS-18 tested child closure. No source
+code changed, suite/smoke/build was rerun, or second invocation occurred.
+The original attempt2 receipt remains INVALID. This observation does not
+adopt a reference baseline, qualify actual production 0.55.20, establish a
+performance result, or authorize publication/admission/deployment.
+
+Evidence root:
+`test-results/derived-functional-continuation-20261023/attempt3-20261023T230634807Z/`.
+The exclusive authorization intent was frozen at
+`2026-10-23T23:06:34.808Z`, before any Docker command. Ownership/shared
+inventory followed; the runner then exclusively preregistered its own
+intent before metadata inspection and validated the full resolved manifest
+and seven frozen inputs before allocation.
+
+| Check | Actual result |
+|---|---|
+| Run | `3e8ed8c290174d53bc2b361044284ce7`, started `2026-10-23T23:07:13.363Z`; absolute deadline `2026-10-23T23:12:13.363Z` |
+| Immutable app | `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`; actual container image equals requested image ID and pinned build/source proof |
+| Original parent, unchanged | `ghcr.io/pranems/scimserver@sha256:8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a`; no original or candidate app started |
+| Fixture | One new owned PostgreSQL 17.11, pinned `postgres@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3`, and one DERIVED app |
+| App settings | Actual CPU 500,000,000 NanoCPUs (0.5 CPU), memory 1,073,741,824 bytes; initial OOM false; reported product version remains 0.55.20 and is explicitly DERIVED |
+| Requests | Seven authenticated requests; seven readiness probes, final health status 200; no measured cycles or replacement |
+| Policies | Server environment independently read as `"false"`; stored endpoint profile independently read as `false` after explicit patch; preset initially omitted the override |
+| Correlated Group rows | POST 201, PATCH 200, missing GET 404 and missing PATCH 404; four exact request-ID/endpoint/method/route/status matches, authorization present and exactly redacted |
+| Credential absence | All five generated roles checked strictly: PostgreSQL administrator password, SCIM shared secret, JWT signing secret, OAuth client secret and credential encryption key |
+| Complete private inputs | Selected rows, application console, PostgreSQL console and tool console separately collected/scanned; raw values stayed in memory; final accumulated tool output also scanned |
+| Final captures | App PASS and PostgreSQL PASS, independently required; neither waived |
+| Removal and absence | Both full-ID-owned resources removed and independently verified absent; owned network removed; final run-filtered container/network inventories empty |
+| Failure metadata | `failures: []`, `actionFailures: []`; no failure category was discarded or substituted |
+| Budget | 120,000 ms cleanup reservation unchanged; native maximum 30,000 ms always clamped to remaining absolute deadline; total 199,619 ms, no cap extension or out-of-cap recovery |
+
+The seven authenticated statuses were: endpoint creation 201, endpoint
+policy patch 200, the four Group statuses above, and flush 204. The strict
+runner's original status is `DERIVED-FUNCTIONAL-PRIVACY-QUALIFIED`; the
+separate sealed qualification receipt names the authorized result
+`DERIVED_FUNCTIONAL_QUALIFIED` without rewriting that raw receipt.
+Image labels and the original build receipt remain unchanged, including
+their original pre-qualification `runtime-qualified: false` declaration.
+
+### Exact execution, preservation and limitations
+
+```powershell
+node scripts\performance\run-membership-privacy-functional.cjs `
+  --derived-reference-functional-only `
+  test-results\derived-functional-continuation-20261023\attempt3-20261023T230634807Z\functional
+
+node test-results\derived-functional-continuation-20261023\attempt3-20261023T230634807Z\seal.cjs
+```
+
+The sole functional command exited **0**. The independent seal exited **0**:
+it verified all seven new frozen inputs/current source hashes, original
+OS-17 source and admission/fixture files, four historical artifacts, seven
+attempt2 frozen inputs, both old failed aggregate logs and the corrected
+66/66 aggregate without rerunning them. All 90 branches and ten stashes
+remain, with qualification branch still `d25b6155`. Disk CRLF and Git LF
+hashes remain separately recorded; normalized equality is not raw equality.
+
+| Immutable attempt3 evidence | SHA-256 |
+|---|---|
+| Authorization intent | `bb3f9131477dfb45da78da0817f411ccdf13b6e686495e18461154f5612ebf5a` |
+| Runner intent | `3323ec9ed9889c4acdfcf5f576a79cd84c12c384b58e02aeec600618c3c61404` |
+| Resolved manifest | `ef7e94745e0495689fbb7a9095daf7c3244d095152b44d150f915832bd2bccf5` |
+| Original runner report | `569bdc66259f00ed8b404405c97630a3c6d5f074366b89608e84f3613a410866` |
+| Sealed qualification receipt | `cf6b36d17d0f754ae7c57d02d5fc0db801b074c8e80cb90005f0cf1e7d936210` |
+
+Post-run inventory independently found no owned containers/networks and
+the same three shared full container IDs still running, prefixes
+`6e679124468a`, `b9172b8deae2` and `f138ac5af4b3`. No mutation command
+targeted them. Initial process-name/command-pattern screening reported
+nonowned matches but no owned heavy worker; these matches are not proof
+that every process was actually busy. This remains a shared Windows/WSL
+host, not a dedicated-host performance observation.
+
+Successful individual lifecycle action durations were not recorded by the
+existing runner; only total elapsed and successful action flags are
+available here. Safe failed-action durations/categories would have been
+retained if an action failed. Do not infer a duration for each successful
+capture/removal, reconstruct the old native error, or claim this run proves
+which historical command exceeded ten seconds. Current strict outcomes
+passed; the original inner error is still unknown.
+
+**RCA/self-improvement disposition:** no new runtime failure occurred.
+Existing safe-cause retention, mandatory independent final captures and
+absence checks were exercised rather than weakened; no additional rule or
+speculative timing instrumentation was introduced. **Architecture:
+accepted**, no production or harness change was needed. This receipt closes
+only local DERIVED functional qualification. Explicit baseline adoption,
+publication, any statement/performance experiment, PR #251, push/CI/cloud
+and deployment remain on hold. Documentation validation
+`pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling`
+passed for 27 documents (`freshness-content.log`), content-only, not a full
+coupled gate. `git diff --check` passed. Earlier missing-path/tool-output
+friction did not dispatch a workload;
+no raw private output was saved. No full original transcript reconciliation
+is claimed because the transcript pointer remains unavailable.
+
 ## OS-18: corrected child-boundary aggregate (2026-10-23)
 
 **Applicable gate: PASS, 66 tests, zero failures, zero skips.** Exactly one

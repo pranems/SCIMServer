@@ -2,6 +2,24 @@
 
 **Last verified:** 2026-10-23
 
+### DF-13: local DERIVED artifact functionally qualified (2026-10-23)
+
+One new authorized invocation from clean `4a5e6724` passed all strict
+privacy/finalization checks: **199,619 ms**, seven authenticated requests,
+seven readiness probes, independently false server/endpoint policies,
+four correlated exact masks and all five credential-role absence checks.
+Both final captures, full-ID-owned removals, absence checks and network
+cleanup passed within the unchanged 300-second cap/120-second reservation.
+Sealed result: **DERIVED_FUNCTIONAL_QUALIFIED**, immutable local image
+`sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`
+only. Original attempt2 remains INVALID; original images/build labels and
+all frozen evidence remain unchanged. Independent post-run inventory found
+zero owned resources and the same three shared containers running.
+No rebuild, suite rerun, original/candidate startup, timing, remote action,
+baseline adoption or deployment occurred. See DF-13 in the indexed
+[observer/statement report](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+for immutable receipt hashes, exact commands and remaining holds.
+
 ### OS-18 child-boundary correction (2026-10-23)
 
 The applicable corrected seven-file serial aggregate now passes **66/66,
