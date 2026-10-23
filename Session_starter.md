@@ -2,6 +2,25 @@
 
 **Last verified:** 2026-10-23
 
+### Independent web ip-address override remediation (2026-10-23)
+
+Reserve 0.55.60 from verified master `cddeb5a569b3997000fc3c3bb38349357d83e2ed`
+for exact web override 10.7.4, the minimal aged patch for issue #248.
+The actual current web lock has no ip-address entry or dependency edge, and
+the installed tree has no matching package. This corrects a dormant override,
+not a demonstrated shipped parser. The regression first failed with expected
+10.7.4 versus actual 10.7.1 (22 passed, one failed). CI-only lockfiles and
+final protected publication/review remain pending. Sanctioned CI run
+39980968858 succeeded at d6e95717; artifact 12513751137 changes zero packages,
+only synchronized version metadata. Web `npm ci` preserves the lock hash
+and confirms no installed parser. Actual pin/graph GREEN is 23/23; scanner
+reports API 26 pins and web 8 pins, zero findings and zero unchecked.
+Bootstrap Fast passed 25/25 (6,214 units, 2,514 HTTP tests, 42 existing skips).
+See [the implementation receipt](docs/WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+No merge or deployment is authorized here. PR #251's retained performance
+failure and customer-data, capacity, cleanup and operator verification holds
+remain unchanged; published 0.55.59 is not deployment acceptance.
+
 ### Independent Hono remediation (2026-10-23)
 
 Branch `chore/regen-lockfile-hono-security-20261023` starts from fresh

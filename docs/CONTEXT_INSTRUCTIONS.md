@@ -1,13 +1,20 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.59
+> **Version**: 0.55.60
 > **Last Updated**: October 21, 2026
 > **Last verified:** 2026-10-23
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-23 next independent remediation:** proposed 0.55.60 updates the
+dormant web ip-address override to exact 10.7.4 from master cddeb5a5.
+No actual web lock dependency exists; do not invent an installed parser.
+[Scope and evidence](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md) distinguishes
+bootstrap manifest proof from final CI artifact and installed inventory.
+Stop at a reviewed unmerged PR. All #251 and customer verification holds remain.
 
 **2026-10-23 dependency remediation:** 0.55.59 reserves an independent exact
 Hono 4.13.11 patch for #248, based on master e1070ba2. CI-only lockfiles,

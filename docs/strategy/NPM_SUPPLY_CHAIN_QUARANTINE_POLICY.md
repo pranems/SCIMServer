@@ -9,6 +9,19 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-23 web ip-address exact override correction (#248)
+
+The next independent proposed patch, 0.55.60, updates the web override to
+exact 10.7.4. Approved-proxy metadata records publication
+2026-10-11T19:34:42Z and seven-day eligibility 2026-10-18T19:34:42Z.
+No quarantine exception or registry/control change is needed. The actual
+web lock and installed tree contain no ip-address dependency: this is
+dormant override hygiene, not a newly installed patched parser.
+Use the existing public-registry CI workflow and reject unrelated package
+churn. See [scope and receipts](../WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+Self-improvement is applied through a real pin/graph regression.
+Design disposition is accepted: no new application abstraction is justified.
+
 ### 2026-10-23 Hono exact-patch remediation (#248)
 
 Hono 4.13.11 fixes the Medium GHSA-5r4p-p66f-jhc7 / CVE-2026-111757.
