@@ -6,10 +6,11 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { setTimeout: delay } = require('node:timers/promises');
 const { client } = require('./membership-statement-fixture.cjs');
-const { finalizeOwned, sourceTip } = require('./membership-history.cjs');
+const { finalizeOwned, sourceTip, commandTimeout, requireOwnedContainer,
+  dockerOperation, requireEmptyInventory } = require('./membership-history.cjs');
 const { validateLegacyPrivacy, classifyLegacyHeaders } = require('./membership-statements.cjs');
 const { fail, credentialCanaries, assertCanariesAbsent, encodeSafeJson,
-  validateSafeFailure } = require('./membership-privacy.cjs');
+  validateSafeFailure, lifecycleFailure, projectLifecycleFailures } = require('./membership-privacy.cjs');
 const protocol = require('./membership-protocol.json');
 const derivedTool = require('./membership-derived-functional.cjs');
 const exec = promisify(execFile);
@@ -42,6 +43,7 @@ function writeFunctionalReport(write, report) {
       admissionEligible: false, cleanup: { verified: report.cleanup?.verified === true },
       remainingOwned: report.remainingOwned === '' ? '' : 'unverified',
       remainingNetworks: report.remainingNetworks === '' ? '' : 'unverified',
+      actionFailures: projectLifecycleFailures(report.actionFailures),
       failures: [{ stage: 'report-output', code: error.code,
         safeDetails: validateSafeFailure(error.safeDetails),
         safeFindings: error.safeFindings.map(validateSafeFailure) }] });
@@ -102,7 +104,8 @@ async function main() {
     ...(derived ? { derivedReference: true, baselineAdoptionApproved: false, performanceQualified: false,
       buildProof, artifactPrivacyQualified: false } : {}),
     run, status: 'INCOMPLETE', startedAtUtc: new Date(started).toISOString(),
-    deadlineUtc: new Date(deadline).toISOString(), requests: [], readiness: [], failures: [] };
+    deadlineUtc: new Date(deadline).toISOString(), requests: [], readiness: [], failures: [],
+    actionFailures: [] };
   const write = (name, data) => {
     const bytes = encodeSafeJson(data, canaries);
     fs.writeFileSync(path.join(directory, name), bytes, { flag: 'wx' });
@@ -111,15 +114,15 @@ async function main() {
   let networkCreated = false;
   let stage = 'preflight';
   const allocated = [];
+  const ownedIds = new Map();
   const check = () => assert.ok(Date.now() < workDeadline, 'Functional work cap; cleanup reserved');
   async function docker(args, cleanup = false, logs = false) {
-    if (!cleanup) check();
-    const remaining = (cleanup ? deadline : workDeadline) - Date.now();
-    assert.ok(remaining > 0, 'Functional total cap');
+    const commandStarted = Date.now();
     try {
+      const timeout = commandTimeout(workDeadline, deadline, cleanup, 30000);
       const result = await exec('docker', ['--context', 'desktop-linux', ...args], {
         cwd: root, env: environment, windowsHide: true, maxBuffer: 2 * 1024 * 1024,
-        timeout: Math.min(cleanup ? 10000 : 30000, remaining),
+        timeout,
       });
       if (logs) {
         const separated = splitDockerLogOutput(result);
@@ -133,20 +136,22 @@ async function main() {
         '\n' + (typeof error.stderr === 'string' ? error.stderr : '');
       const safe = new Error('Owned functional Docker operation failed; private output withheld');
       safe.code = ['ENOENT', 'ETIMEDOUT'].includes(error.code) ? error.code : 'OWNED_DOCKER';
+      safe.actionFailure = lifecycleFailure(error, { operation: 'command', role: 'owned-container',
+        stage: 'docker-command', phase: cleanup ? 'cleanup' : 'work',
+        command: dockerOperation(args), durationMs: Date.now() - commandStarted });
       throw safe;
     }
   }
   async function inspect(name, cleanup = false) {
     const row = JSON.parse(await docker(['inspect', '--format',
       '{"id":{{json .Id}},"image":{{json .Image}},"labels":{{json .Config.Labels}},"pid":{{json .State.Pid}},"running":{{json .State.Running}},"oom":{{json .State.OOMKilled}},"started":{{json .State.StartedAt}},"cpu":{{json .HostConfig.NanoCpus}},"memory":{{json .HostConfig.Memory}}}', name], cleanup));
-    assert.equal(row.labels['scimserver.owner'], owner);
-    assert.equal(row.labels['scimserver.run'], run);
-    return row;
+    return requireOwnedContainer(row, ownedIds.get(name) ?? name, owner, run);
   }
   async function allocate(name, args) {
     allocated.push(name);
     const id = await docker(['run', '-d', '--pull=never', '--name', name, ...labels, ...args]);
     assert.match(id, /^[a-f0-9]{64}$/);
+    ownedIds.set(name, id);
     return id;
   }
   try {
@@ -360,34 +365,62 @@ async function main() {
     report.status = derived ? 'DERIVED-FUNCTIONAL-PRIVACY-QUALIFIED' : 'FUNCTIONAL-COMPLETE';
   } catch (error) {
     report.status = 'INVALID';
+    if (error.actionFailure) report.actionFailures.push(lifecycleFailure(error, error.actionFailure));
     report.failures.push({ stage, code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : error.name,
       ...(error.code === 'DIAGNOSTIC_PRIVACY' ? { safeDetails: validateSafeFailure(error.safeDetails),
         safeFindings: error.safeFindings.map(validateSafeFailure) } : {}) });
     process.exitCode = 1;
   } finally {
     if (connection) {
+      const closeStarted = Date.now();
       try { await connection.end(); }
-      catch { report.failures.push({ stage: 'close-client', code: 'CLIENT_CLOSE' }); }
+      catch (error) {
+        report.failures.push({ stage: 'close-client', code: 'CLIENT_CLOSE' });
+        report.actionFailures.push(lifecycleFailure(error, { operation: 'close-client', role: 'client',
+          stage: 'finalization', phase: 'cleanup', durationMs: Date.now() - closeStarted }));
+      }
     }
     report.cleanup = await finalizeOwned(allocated, {
+      role: name => name === names[0] ? 'pg' : 'app',
+      failures: report.actionFailures,
       capture: name => inspect(name, true),
-      remove: async name => { await inspect(name, true); await docker(['rm', '-f', name], true); },
+      remove: async name => {
+        const actual = await inspect(name, true);
+        await docker(['rm', '-f', actual.id], true);
+      },
       verify: async name => !(await docker(['ps', '-a', '--filter', `name=^/${name}$`, '--format', '{{.ID}}'], true)),
     });
     if (networkCreated) {
+      let operation = 'network-inspect';
+      const networkStarted = Date.now();
       try {
-        const actual = JSON.parse(await docker(['network', 'inspect', '--format', '{{json .Labels}}', network], true));
-        assert.equal(actual['scimserver.owner'], owner);
-        assert.equal(actual['scimserver.run'], run);
-        await docker(['network', 'rm', network], true);
-      } catch { report.failures.push({ stage: 'cleanup-network', code: 'NETWORK_CLEANUP' }); }
+        const actual = JSON.parse(await docker(['network', 'inspect', '--format',
+          '{"id":{{json .Id}},"labels":{{json .Labels}}}', network], true));
+        requireOwnedContainer(actual, network, owner, run);
+        operation = 'network-remove';
+        await docker(['network', 'rm', actual.id], true);
+      } catch (error) {
+        report.failures.push({ stage: 'cleanup-network', code: 'NETWORK_CLEANUP' });
+        report.actionFailures.push(lifecycleFailure(error, { operation, role: 'network',
+          stage: 'finalization', phase: 'cleanup', durationMs: Date.now() - networkStarted }));
+      }
     }
-    try {
-      report.remainingOwned = await docker(['ps', '-a', '--filter', `label=scimserver.run=${run}`,
-        '--format', '{{.ID}}'], true);
-      report.remainingNetworks = await docker(['network', 'ls', '--filter', `label=scimserver.run=${run}`,
-        '--format', '{{.ID}}'], true);
-    } catch { report.failures.push({ stage: 'cleanup-inventory', code: 'INVENTORY' }); }
+    for (const [field, args, operation, role] of [
+      ['remainingOwned', ['ps', '-a', '--filter', `label=scimserver.run=${run}`, '--format', '{{.ID}}'],
+        'inventory', 'owned-container'],
+      ['remainingNetworks', ['network', 'ls', '--filter', `label=scimserver.run=${run}`, '--format', '{{.ID}}'],
+        'network-verify', 'network'],
+    ]) {
+      const inventoryStarted = Date.now();
+      try {
+        report[field] = await docker(args, true);
+        requireEmptyInventory(report[field]);
+      } catch (error) {
+        report.failures.push({ stage: 'cleanup-inventory', code: 'INVENTORY' });
+        report.actionFailures.push(lifecycleFailure(error, { operation, role,
+          stage: 'finalization', phase: 'cleanup', durationMs: Date.now() - inventoryStarted }));
+      }
+    }
     try { assertCanariesAbsent([{ source: 'tool-console', text: toolConsole }], canaries); }
     catch (error) {
       report.failures.push({ stage: 'tool-output-privacy', code: 'DIAGNOSTIC_PRIVACY',
@@ -397,8 +430,9 @@ async function main() {
     report.elapsedMs = Date.now() - started;
     if (derived && !derivedTool.completeOwnedCleanup(report.cleanup, allocated.length))
       report.failures.push({ stage: 'derived-cleanup-evidence', code: 'INCOMPLETE_CLEANUP_PROOF' });
-    if (!report.cleanup.verified || report.remainingOwned !== '' || report.remainingNetworks !== '' ||
-      report.elapsedMs > 300000 || report.failures.length) {
+    if (!report.cleanup.verified || report.cleanup.rows.some(row => !row.capture || !row.removed) ||
+      report.remainingOwned !== '' || report.remainingNetworks !== '' ||
+      report.elapsedMs > 300000 || report.failures.length || report.actionFailures.length) {
       report.status = 'INVALID';
       process.exitCode = 1;
     }

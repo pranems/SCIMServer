@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { parseCounters } = require('./membership-cpu-trace.cjs');
+const { lifecycleFailure } = require('./membership-privacy.cjs');
 
 const operations = ['add', 'populatedRead', 'remove', 'emptyRead'];
 const cpuKeys = ['usage_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
@@ -112,19 +113,75 @@ function validateReceipt(row, expectedVersion = '0.55.60') {
   assert.equal(row.spans.length, 4407);
 }
 
+function commandTimeout(workDeadline, deadline, cleanup, maximumMs) {
+  assert.ok(Number.isSafeInteger(workDeadline) && Number.isSafeInteger(deadline) &&
+    Number.isSafeInteger(maximumMs) && maximumMs > 0);
+  const remaining = Math.min(deadline, cleanup ? deadline : workDeadline) - Date.now();
+  if (remaining <= 0) {
+    const error = new Error('Diagnostic command deadline exhausted');
+    error.code = 'LIFECYCLE_DEADLINE';
+    error.actionFailure = lifecycleFailure(error, {
+      operation: 'command', role: 'owned-container', stage: 'docker-command',
+      phase: cleanup ? 'cleanup' : 'work', durationMs: 0,
+    });
+    throw error;
+  }
+  return Math.min(maximumMs, remaining);
+}
+
+function requireOwnedContainer(row, id, owner, run) {
+  if (!row || !/^[a-f0-9]{64}$/.test(row.id) ||
+      (/^[a-f0-9]{64}$/.test(id) && row.id !== id) ||
+      row.labels?.['scimserver.owner'] !== owner || row.labels?.['scimserver.run'] !== run) {
+    const error = new Error('Diagnostic full-ID ownership verification failed');
+    error.code = 'LIFECYCLE_OWNER';
+    throw error;
+  }
+  return row;
+}
+
+function dockerOperation(args) {
+  if (args[0] === 'network' && ['inspect', 'rm', 'ls'].includes(args[1])) return `network-${args[1]}`;
+  if (args[0] === 'image' && args[1] === 'inspect') return 'image-inspect';
+  return ['inspect', 'rm', 'ps', 'logs', 'run'].includes(args[0]) ? args[0] : 'other';
+}
+
+function requireEmptyInventory(value) {
+  if (value !== '') {
+    const error = new Error('Owned inventory absence not verified');
+    error.code = 'LIFECYCLE_STILL_PRESENT';
+    throw error;
+  }
+  return value;
+}
+
 async function finalizeOwned(resources, actions) {
   const rows = [];
+  const failures = [];
   for (const id of [...resources].reverse()) {
     const row = { id, capture: false, removed: false, verified: false };
-    try { await actions.capture(id); row.capture = true; }
-    catch { row.captureError = true; }
-    try { await actions.remove(id); row.removed = true; }
-    catch { row.removeError = true; }
-    try { row.verified = await actions.verify(id); }
-    catch { row.verifyError = true; }
+    for (const [operation, field] of [['capture', 'capture'], ['remove', 'removed'], ['verify', 'verified']]) {
+      const started = Date.now();
+      try {
+        const result = await actions[operation](id);
+        if (operation === 'verify' && result !== true) {
+          const error = new Error('Owned resource absence not verified');
+          error.code = 'LIFECYCLE_STILL_PRESENT';
+          throw error;
+        }
+        row[field] = true;
+      } catch (error) {
+        row[`${operation}Error`] = true;
+        const failure = lifecycleFailure(error, { operation, role: actions.role?.(id) ?? 'owned-container',
+          stage: 'finalization', phase: 'cleanup', durationMs: Date.now() - started });
+        (row.failures ??= []).push(failure);
+        failures.push(failure);
+        actions.failures?.push(failure);
+      }
+    }
     rows.push(row);
   }
-  return { rows, verified: rows.every(r => r.verified) };
+  return { rows, verified: rows.every(r => r.verified), ...(failures.length ? { failures } : {}) };
 }
 
 function validatePrivacy(rows, consoleLog, secrets) {
@@ -230,7 +287,9 @@ function collect(pid, containerId) {
   return result;
 }
 
-module.exports = { schedule, runVisits, windowDelta, validateSnapshot, validateReceipt, validatePrivacy, finalizeOwned, collect, requiredUnsigned, sourceTip };
+module.exports = { schedule, runVisits, windowDelta, validateSnapshot, validateReceipt, validatePrivacy,
+  finalizeOwned, commandTimeout, requireOwnedContainer, dockerOperation, requireEmptyInventory,
+  collect, requiredUnsigned, sourceTip };
 if (require.main === module) {
   assert.equal(process.argv[2], '--collect', 'Explicit collector invocation required');
   process.stdout.write(JSON.stringify(collect(process.argv[3], process.argv[4])));

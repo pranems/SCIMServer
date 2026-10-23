@@ -16,6 +16,29 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Finalization must preserve safe causes and the actual budget phase
+
+OS-17 / DF-12 demonstrated two different evidence losses: a native wrapper
+discarded exit/signal metadata, then a finalizer discarded even the generic
+failure behind booleans. A successful absence query cannot repair a failed
+final capture or prove that a removal command succeeded. Keep those claims
+separate and retain ordered, closed action causes through every fallback
+serializer. Never retain raw native stderr, arguments or nested exceptions.
+
+Budget selection and timeout size are also separate facts. Source inspection
+proved that functional cleanup already used the correct outer deadline;
+its shorter per-command timeout was a different defect. Real fake-CLI
+subprocess tests must discriminate both. A validated inner `work` deadline
+failure must not be relabeled `cleanup` merely because the finalizer caught
+it there. Unavailable durations remain unavailable, not invented zeroes.
+No post-incident observation reconstructs an unretained historical error.
+
+Applied safeguards are in `scripts/test/membership-lifecycle.test.cjs`.
+The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+records exact RED/GREEN results and the still-unqualified runtime outcome.
+The correction reuses existing finalizer/privacy modules rather than adding
+a lifecycle framework. Normal admission and frozen evidence remain separate.
+
 ### Performance admission needs a prospective environment control
 
 Container readiness must identify the final service, not a bootstrap process.

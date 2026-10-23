@@ -3,6 +3,196 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## OS-17 / DF-12 source-only correction (2026-10-23)
+
+**Result: implemented and locally tested, not runtime-qualified.** The
+executed functional runner did not inherit its work deadline or an aborted
+HTTP signal into cleanup. It did impose a shorter native-command timeout
+on cleanup, and both its wrapper and shared finalizer destroyed the native
+failure category. The corrected source retains closed, safe action causes
+and uses the existing 30-second functional command maximum within the
+unchanged absolute five-minute deadline. No Docker process, container,
+application, SQL probe, build, remote operation or performance experiment
+was dispatched during this correction.
+
+The original attempt2 receipt is still **INVALID**, the DERIVED artifact is
+still unqualified, and adoption of a different reference is not approved.
+This source correction does not repair or reconstruct old private evidence.
+
+### Executed flow and limits of the historical evidence
+
+The inspected source is the retained seven-file snapshot from executed
+`e0d884b97bf74d629da717d4678c96a6240fcdd5`, not a substitution of current
+helpers into an old run.
+
+| Boundary | Retained or derived time | What it proves |
+|---|---|---|
+| Start | `2026-10-23T21:57:42.131Z` | Retained receipt timestamp |
+| Work cutoff | `2026-10-23T22:00:42.131Z` | Source: start + 300 seconds minus 120 seconds reserved cleanup |
+| Original report | Start + 228,079 ms | Retained elapsed time; app final capture and both removals failed before the outer deadline |
+| Absolute deadline | `2026-10-23T22:02:42.131Z` | Retained receipt deadline; not extended |
+| Independent safety recovery | Start + 350,556 ms | Separate recovery exceeded the original cap and cannot qualify the receipt |
+| Individual original cleanup calls | Not retained | No original command duration, native code, signal or cleanup-entry timestamp can be reconstructed |
+
+The actual control flow was:
+
+```text
+Work failure or completion
+  -> close owned PG client
+  -> app: inspect/capture -> inspect ownership -> remove -> query absence
+  -> PG:  inspect/capture -> inspect ownership -> remove -> query absence
+  -> inspect network ownership -> remove network
+  -> query remaining owned containers -> query remaining owned networks
+  -> strict tool-console canary scan
+  -> enforce final evidence and absolute elapsed cap -> write receipt
+```
+
+Each Docker call in this functional finalizer used `cleanup=true`.
+That branch selected `deadline`, not `workDeadline`, and did not call the
+work guard. The HTTP `AbortSignal.timeout(...)` instances were local to
+their individual fetch calls; none was supplied to Docker execution.
+There is consequently **no source proof of an inherited work-deadline or
+abort-state bug in this executed runner**.
+
+There are twelve CLI invocations on the healthy two-container cleanup path:
+four per container, two for the network, and two final inventories. At the
+old ten-second per-call maximum, their sum alone could consume the entire
+120-second reservation, before client close or JavaScript overhead.
+This is a source-level budget-headroom limitation, not a measurement of
+which historical command failed or proof that round-trip count caused it.
+The separate recovery's 10.926-second metadata read is consistent with a
+too-short command limit, but is not the swallowed original error.
+No speculative batching was introduced: all fresh ownership reads and
+independent absence queries remain. Any later round-trip optimization needs
+its own evidence and ownership analysis.
+
+### What changed, and what did not
+
+| Concern | Corrected behavior |
+|---|---|
+| Functional native timeout | Both work and cleanup use the existing 30,000 ms command maximum, clamped to the correct remaining deadline. Work still stops at the original 180-second work boundary; cleanup never inherits that boundary. |
+| Absolute limits | Shared timeout computation rejects an exhausted budget before native dispatch. History, statement and observer-smoke cleanup commands are now also clamped to their existing absolute deadlines rather than receiving an independent unbounded sequence of per-call allowances. Their configured command maxima are otherwise unchanged. |
+| Native evidence | Wrappers retain only a validated operation, role, stage, category, budget phase, finite exit code, allowlisted signal, duration when available, and static command category. A killed child is reported as `terminated`, not guessed to be a timeout. |
+| Actual budget phase | Projection preserves a validated underlying budget phase. A cleanup caller cannot relabel an underlying `work` deadline rejection as `cleanup`. |
+| Action continuation | Capture, remove and absence verification are independently attempted for every known owned resource. Ordered `actionFailures` retain the first lifecycle cause; each resource row also retains its action failures. |
+| Absence versus capture | False absence is explicitly `still-present`. Verified absence is not successful capture or removal, and any failed lifecycle action invalidates diagnostic completion. |
+| Ownership | Full returned IDs and owner/run labels are checked; a known allocated full ID must match. Functional removal uses the freshly verified full ID, not a reusable name. Network removal likewise uses its verified full ID. |
+| Network versus container | Network inspection, removal, absence and container inventory retain distinct static operations instead of being only generic booleans. |
+| Privacy fallback | Closed lifecycle failures survive minimal receipt projection in order. Extra/private fields are never copied. Invalid action metadata produces a static `invalid-metadata` cause instead of recursively rejecting the privacy receipt. |
+| Unavailable facts | Unknown durations are `null`, not fabricated zero-duration measurements. No raw message, stderr, arguments, connection string, arbitrary nested cause, credential hash, length or surrounding private context is retained. |
+
+The shared finalizer's `verified` field continues to mean absence only.
+The callers explicitly require capture and removal too; its meaning has
+not been silently widened to claim complete final evidence.
+The same safe-cause wiring is present in all four active local diagnostic
+runners, including the observer smoke runner. Its prior 32-read evidence
+was not rerun or reinterpreted.
+
+The benchmark request path, SQL, fixture, client configuration, image pins,
+sample counts, quantiles, resources, CPU policy, admission runner and
+production versions are unchanged. No new framework, dependency, command-line
+configuration flag or automatic replacement attempt was added. Any future
+diagnostic must freeze the new source bytes; old frozen receipts describe
+only their original source.
+
+### Executable evidence and exact validation
+
+Evidence is retained under
+`test-results/os17-source-finalization-20261023/`.
+
+| Check | Actual result |
+|---|---|
+| `node --test --test-reporter=tap scripts\test\membership-lifecycle.test.cjs` before implementation | RED: 7 executed, 7 failed. The real failing capture/hanging-removal path reproduced boolean-only information loss. `red.log` |
+| Same initial seven cases after implementation | GREEN: 7 executed, 7 passed, zero skips. `green-initial.log` |
+| `$env:OS17_FROZEN_RED='1'; node --test --test-reporter=tap --test-name-pattern='actual functional cleanup wrapper' scripts\test\membership-lifecycle.test.cjs` | RED: exactly 1 executed, 1 failed, zero skips. The exact frozen Docker-wrapper body ran against a real 11-second Node metadata fixture and failed at its old ten-second native timeout. `red-frozen-wrapper.log` |
+| Current-wrapper version of that same real-child test | GREEN in focused coverage: slow metadata completed inside remaining cleanup time. A separate real failing native child retained network-removal exit 9; its synthetic private stderr still triggered strict tool-console canary rejection. |
+| `node --test --test-reporter=tap --test-name-pattern='actual failing budget phase' scripts\test\membership-lifecycle.test.cjs` before phase-projection correction | RED: exactly 1 executed, 1 failed, zero skips. `red-phase-projection.log` |
+| Seven-file focused regression, default test concurrency | 55/62 passed; seven bounded-child assertions failed. Retained as `green-focused.log`, despite its filename. Not a green gate. |
+| Same seven files with `--test-concurrency=1` | 58/62 passed; four existing child timeout assertions failed. All eight then-existing new lifecycle cases passed. `green-serial-focused.log` is not a wholly green run. |
+| Four failed existing cases isolated with unchanged source and time limits | 4 executed, 4 passed, zero skips. `focused-failure-triage.log`. This is a classified rerun of distinct failures, not an assertion that a clean 62-case run occurred. |
+| Final phase/projection selector, command below | GREEN: exactly 3 executed, 3 passed, zero skips. `green-phase-and-projection.log`. Nine unique new lifecycle cases are covered across the focused runs; no full-suite rerun was added for this one-line projection correction. |
+| Seven changed CJS files | Syntax and the existing seven-rule scoped ESLint harness passed, zero findings. Full configured ESLint was not restored or claimed. |
+| `node test-results\os17-source-finalization-20261023\validate.cjs static-final.json` | Seven syntax checks and seven-rule scoped lint passed with zero findings. |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` | PASS for 27 docs. This is a **content-only** check, not the full coupled freshness gate. |
+
+The seven-file command was:
+
+```powershell
+node --test --test-concurrency=1 --test-reporter=tap `
+  scripts\test\membership-lifecycle.test.cjs `
+  scripts\test\membership-history.test.cjs `
+  scripts\test\membership-privacy.test.cjs `
+  scripts\test\membership-privacy-functional.test.cjs `
+  scripts\test\membership-derived-functional.test.cjs `
+  scripts\test\membership-observer.test.cjs `
+  scripts\test\membership-statements.test.cjs
+```
+
+The isolated existing-failure command was:
+
+```powershell
+node --test --test-concurrency=1 --test-reporter=tap `
+  --test-name-pattern='missing counter fields|functional report-output|^minimal privacy receipt|new family is rejected' `
+  scripts\test\membership-observer.test.cjs `
+  scripts\test\membership-privacy-functional.test.cjs `
+  scripts\test\membership-statements.test.cjs
+```
+
+The final phase/projection command was:
+
+```powershell
+node --test --test-reporter=tap `
+  --test-name-pattern='closed lifecycle|actual failing budget phase|privacy fallback' `
+  scripts\test\membership-lifecycle.test.cjs
+```
+
+The new controls cover real slow, hanging and failing subprocesses, cleanup
+after work exhaustion, successful cleanup while budget remains, refusal
+after absolute expiry, nonowned/full-ID mismatch, distinct capture/removal/
+absence/network causes, secret-bearing exceptions, ordered fallback
+projection, and actual default/admission rejection through existing tests.
+All Docker-looking calls in test fixtures are intercepted; the only
+executed native fixture is Node. No real Docker fallback is allowed.
+
+### RCA, escape analysis and remaining holds
+
+| Issue | Root cause and resolution | Detection and earliest useful check |
+|---|---|---|
+| OS-17 / DF-12, evidence loss, High | Native wrappers replaced native failures with generic errors; the shared finalizer then reduced them to booleans. Closed cause metadata, per-action ordered retention and safe fallback projection are now applied. The actual historical inner code remains unknown. | Runtime finalization exposed the gap; a real failed native-child finalizer test could have caught it before any container run. |
+| OS-17, timeout asymmetry, Medium | Cleanup selected the right absolute deadline but imposed a ten-second maximum versus thirty seconds for work. The exact frozen-wrapper counterexample proves that an otherwise timely 11-second metadata operation was rejected. Corrected functional source uses the existing thirty-second maximum within the unchanged outer cap. | Source inspection plus frozen-body native-child RED/GREEN; not a reconstruction of the actual failed metadata call. |
+| OS-17, cause projection, Medium | Initial new projection overwrote a validated underlying budget phase with caller intent. A targeted assertion failed before correction; projection now retains the underlying phase. | New focused test during source correction, before runtime. |
+| OS-17 validation friction, Low | Parallel coverage and later serial coverage encountered existing short child time bounds. Four remaining failures passed in isolation at unchanged limits/source. Timing variability is observed; no particular shared host process or Windows mechanism is proven responsible. No application or performance retry occurred. | Focused regression; explicit test counts prevented a timed-out/no-result child from being counted as passing. |
+| OS-17 static gate, Low | An explicitly caught throw inside finalization still violated `no-unsafe-finally`. Reused a small absence guard across actual inventory callers; the seven-rule scoped gate now passes. | Static gate, before commit or runtime. |
+
+**Self-improvement: applied.** The new executable regressions assert actual
+safe causes and budget phases, not merely that cleanup was attempted.
+The safe schema rejects arbitrary exception fields and distinguishes final
+capture, native removal, and absence verification. The central engineering
+ledger records the pattern.
+
+**Design/architecture disposition: accepted.** This is one cohesive
+diagnostic-finalization correction using the existing finalizer and privacy
+module. Closed metadata and pure budget/ownership guards are shared by real
+callers; no pluggable lifecycle framework or speculative policy seam was
+introduced. The functional orchestrator remains a large existing file;
+splitting it during this forensic correction would add unrelated risk.
+
+**Provenance/completeness:** this RCA was reconciled against the retained
+frozen inputs, original safe receipt, recovery receipt and every local
+RED/GREEN/static output produced for this source-only correction. No full
+original conversation transcript is available through a session-log
+pointer; this is not a claim of reconstructing destroyed native/private
+evidence. Host-specific attribution and speculative inherited-abort
+explanations are explicitly not established.
+
+The next bounded engineering action is review of these source changes and
+their preserved failure evidence. Any future functional invocation requires
+separate authorization and fresh preregistration. Nothing here approves
+reference adoption, artifact qualification, publication, PR #251, performance
+admission, customer-data/migration/capacity checks, cloud deployment or
+production promotion. No new live cleanup verification is claimed; the
+previous exact-owner recovery remains the last verified inventory.
+
 ## Corrected-source functional continuation (2026-10-23)
 
 **Outcome: INVALID.** Strict privacy subchecks passed, but final capture and
@@ -108,7 +298,7 @@ measurements or performance evidence.
 
 | Issue | Evidence, disposition and prevention | Detection / escape |
 |---|---|---|
-| DF-12, finalization / Medium | Actual privacy checks passed but strict app final capture and both removals failed. Exact owned recovery removed the two containers/network and independently verified absence at 350,556 ms, beyond the original cap. Original receipt stays INVALID. OS-17 safe per-action cause retention and bounded lifecycle-command handling are **scheduled**, not fixed or waived here. Owner: diagnostic-harness maintainer; target: 2026-10-24, before proposing another functional invocation. Keep both final captures, owner checks and the five-minute cap. | Actual finalization, after successful privacy checks; executable slow/failing lifecycle-child coverage could expose the missing cause/budget interaction earlier |
+| DF-12, finalization / Medium | Actual privacy checks passed but strict app final capture and both removals failed. Exact owned recovery removed the two containers/network and independently verified absence at 350,556 ms, beyond the original cap. Original receipt stays INVALID. OS-17 cause retention and bounded commands were scheduled at this closeout; the new source-only correction above now applies that follow-up without qualifying or rerunning the artifact. Keep both final captures, owner checks and the five-minute cap. | Actual finalization, after successful privacy checks; executable slow/failing lifecycle-child coverage could expose the missing cause/budget interaction earlier |
 | DF-13, closeout checking / Low | The first independent inventory assertion compared all containers, including five unrelated stopped IDs, against a preflight that recorded only running containers. It failed without mutation. Corrected comparison uses the same running scope, while separate all-state exact-run queries still require zero owned resources. Preflight did not record the stopped IDs, so their creation time is unknown; none was touched. | Independent preservation check; corrected scope verifies the original three running containers and empty owned inventories |
 | DF-14, tooling / Low | Initial combined reads exceeded display limits, and one later bounded read requested lines beyond EOF. No generated temporary-output file was opened; narrower original-file reads and an exact source lookup recovered the needed context. No runtime or source behavior changed. | Immediate tool feedback; no application escape |
 | DF-15, test portability / Medium | The new child tests depend on ignored local immutable build evidence and would fail rather than report unavailable evidence on a fresh checkout. Test-first availability handling now explicitly skips those three cases when the proof is absent, matching the existing retained-proof test convention. A bounded isolated availability probe proves three skips; with actual local proof, all three real tests still execute and pass. No local runtime requirement or guard was weakened. | Post-run test review before commit; no remote invocation |

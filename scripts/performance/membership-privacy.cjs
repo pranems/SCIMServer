@@ -107,5 +107,73 @@ function encodeSafeJson(value, canaries) {
   return text;
 }
 
+const lifecycleOperations = ['command', 'capture', 'remove', 'verify', 'discovery', 'inventory',
+  'close-client', 'close-channel', 'network-inspect', 'network-remove', 'network-verify'];
+const lifecycleRoles = ['app', 'pg', 'observer', 'owned-container', 'network', 'client'];
+const lifecycleCategories = ['unexpected', 'exit', 'terminated', 'timeout', 'spawn',
+  'deadline', 'ownership', 'assertion', 'aborted', 'still-present', 'invalid-metadata'];
+const lifecycleSignals = ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT'];
+const lifecycleCommands = ['unspecified', 'inspect', 'rm', 'ps', 'network-inspect',
+  'network-rm', 'network-ls', 'logs', 'run', 'image-inspect', 'other'];
+
+function validateLifecycleFailure(row) {
+  const fields = ['operation', 'role', 'stage', 'category', 'phase', 'exitCode', 'signal',
+    'durationMs', 'command'];
+  if (!row || Object.keys(row).length !== fields.length ||
+      Object.keys(row).some(key => !fields.includes(key)) ||
+      !lifecycleOperations.includes(row.operation) || !lifecycleRoles.includes(row.role) ||
+      !['finalization', 'docker-command'].includes(row.stage) ||
+      !lifecycleCategories.includes(row.category) || !['work', 'cleanup'].includes(row.phase) ||
+      !(row.exitCode === null || (Number.isInteger(row.exitCode) && row.exitCode >= 0 && row.exitCode <= 255)) ||
+      !(row.signal === null || lifecycleSignals.includes(row.signal)) ||
+      !(row.durationMs === null || (Number.isSafeInteger(row.durationMs) && row.durationMs >= 0)) ||
+      !lifecycleCommands.includes(row.command))
+    throw new Error('Invalid safe lifecycle failure metadata');
+  return row;
+}
+
+function lifecycleFailure(error, context) {
+  let inner;
+  try { inner = validateLifecycleFailure(error?.actionFailure); }
+  catch { /* Unvalidated error metadata is never a source of report fields. */ }
+  const code = error?.code;
+  let category = inner?.category ?? 'unexpected';
+  if (!inner) {
+    if (Number.isInteger(code) && code >= 0 && code <= 255) category = 'exit';
+    else if (code === 'ETIMEDOUT') category = 'timeout';
+    else if (code === 'LIFECYCLE_DEADLINE') category = 'deadline';
+    else if (code === 'LIFECYCLE_OWNER') category = 'ownership';
+    else if (code === 'LIFECYCLE_STILL_PRESENT') category = 'still-present';
+    else if (code === 'LIFECYCLE_METADATA') category = 'invalid-metadata';
+    else if (code === 'ERR_ASSERTION') category = 'assertion';
+    else if (code === 'ABORT_ERR') category = 'aborted';
+    else if (['ENOENT', 'EACCES', 'EPERM'].includes(code)) category = 'spawn';
+    else if (error?.killed === true || lifecycleSignals.includes(error?.signal)) category = 'terminated';
+  }
+  return validateLifecycleFailure({
+    operation: lifecycleOperations.includes(context.operation) ? context.operation : 'command',
+    role: lifecycleRoles.includes(context.role) ? context.role : 'owned-container',
+    stage: ['finalization', 'docker-command'].includes(context.stage) ? context.stage : 'finalization',
+    category, phase: inner?.phase ?? (context.phase === 'work' ? 'work' : 'cleanup'),
+    exitCode: inner?.exitCode ?? (Number.isInteger(code) && code >= 0 && code <= 255 ? code : null),
+    signal: inner?.signal ?? (lifecycleSignals.includes(error?.signal) ? error.signal : null),
+    durationMs: Number.isSafeInteger(context.durationMs) && context.durationMs >= 0
+      ? context.durationMs : inner?.durationMs ?? null,
+    command: lifecycleCommands.includes(context.command) ? context.command : inner?.command ?? 'unspecified',
+  });
+}
+
+function projectLifecycleFailures(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map(row => {
+    try { return { ...validateLifecycleFailure(row) }; }
+    catch {
+      return lifecycleFailure({ code: 'LIFECYCLE_METADATA' }, { operation: 'command', role: 'owned-container',
+        stage: 'finalization', phase: 'cleanup' });
+    }
+  });
+}
+
 module.exports = { sources, credentialKinds, reasons, validateSafeFailure, privacyFailure,
-  fail, validateCanaries, credentialCanaries, assertCanariesAbsent, encodeSafeJson };
+  fail, validateCanaries, credentialCanaries, assertCanariesAbsent, encodeSafeJson,
+  validateLifecycleFailure, lifecycleFailure, projectLifecycleFailures };

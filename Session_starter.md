@@ -2,6 +2,25 @@
 
 **Last verified:** 2026-10-23
 
+### OS-17 / DF-12 source-only finalization correction (2026-10-23)
+
+Implemented safe per-action cause retention and strict fallback projection.
+Exact executed source already separated work and cleanup deadlines; no
+inherited abort-state bug was found. A real 11-second Node metadata fixture
+fails through the exact frozen ten-second wrapper, while corrected source
+uses the existing thirty-second maximum within the unchanged five-minute
+absolute cap. Full-ID owner checks and independent final capture/removal/
+absence requirements remain strict; all four diagnostic callers retain
+closed native/action metadata. No Docker dispatch, app/SQL, build, remote
+operation or performance rerun occurred.
+
+Original attempt2 remains INVALID and the DERIVED artifact unqualified.
+The historical inner error is still unavailable; this is a tested source
+correction, not reconstructed runtime proof. The indexed observer/statement
+report records RED/GREEN counts, existing bounded-child timeout failures and
+their unchanged-limit isolated passes, source preservation and remaining
+adoption/publication/performance holds. OS-17 is no longer merely scheduled.
+
 ### Corrected-source DERIVED continuation: INVALID finalization (2026-10-23)
 
 One new attempt2 is authorized after the optional-PG-label fix; attempt1
@@ -26,8 +45,9 @@ Independent inventories verify zero owned resources and the same three
 shared running containers. The original inner cleanup error is unavailable
 through OS-17's boolean-only finalizer; later metadata inspection took
 10.926 seconds against the original ten-second command limit, consistent
-with but not proving a timeout. Safe-cause/bounded-finalization follow-up
-is scheduled before any next invocation. Artifact remains unqualified.
+with but not proving a timeout. The source-only safe-cause/bounded-command
+correction above supersedes the scheduled follow-up; there has been no new
+functional invocation. Artifact remains unqualified.
 Actual frozen manifest/receipt and recovery hashes are in
 `test-results/derived-functional-continuation-20261023/closeout-proof.json`.
 
