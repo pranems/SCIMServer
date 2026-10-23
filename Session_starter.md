@@ -10,7 +10,12 @@ The actual current web lock has no ip-address entry or dependency edge, and
 the installed tree has no matching package. This corrects a dormant override,
 not a demonstrated shipped parser. The regression first failed with expected
 10.7.4 versus actual 10.7.1 (22 passed, one failed). CI-only lockfiles and
-final protected publication/review are still pending at bootstrap.
+final protected publication/review remain pending. Sanctioned CI run
+39980968858 succeeded at d6e95717; artifact 12513751137 changes zero packages,
+only synchronized version metadata. Web `npm ci` preserves the lock hash
+and confirms no installed parser. Actual pin/graph GREEN is 23/23; scanner
+reports API 26 pins and web 8 pins, zero findings and zero unchecked.
+Bootstrap Fast passed 25/25 (6,214 units, 2,514 HTTP tests, 42 existing skips).
 See [the implementation receipt](docs/WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
 No merge or deployment is authorized here. PR #251's retained performance
 failure and customer-data, capacity, cleanup and operator verification holds

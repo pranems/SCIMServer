@@ -1,7 +1,7 @@
 # Web ip-address override security correction
 
 **Last verified:** 2026-10-23
-**Status:** Bootstrap implementation; unmerged, not deployed.
+**Status:** CI lockfiles verified and restored; final protected push and hosted review pending. Unmerged, not deployed.
 
 ## Executive summary
 
@@ -42,6 +42,32 @@ reachability or patched installed code.
 5. Require exact-tip hosted CI and Copilot review. Stop at a reviewed,
    unmerged PR; no merge, deployment or benchmark retry is authorized.
 
+### Verified regeneration and restored inventory
+
+| Check | Result |
+|---|---|
+| Sanctioned run | [39980968858](https://github.com/pranems/SCIMServer/actions/runs/39980968858), SUCCESS, exact bootstrap source `d6e95717591aed8c8b3a09f1e429ebe44b51f7fb` |
+| Authenticated artifact | `regenerated-lockfiles`, ID `12513751137`; downloaded ZIP SHA-256 `714cc0d18f35dcb1c61e600b17843f5765d79b721532681c782c17f7da093b15` matches GitHub digest |
+| All package changes | Zero. Both locks change only top-level and root-package version metadata from 0.55.59 to 0.55.60; every non-root package entry is byte-equivalent as parsed |
+| Provenance | All 684 API and 395 web non-root entries checked for public registry URLs and sha512; CI publish-age report checked at 2026-10-23T15:45:22.541Z has zero package rows, correctly reflecting zero changed packages |
+| API lock SHA-256 | `ba189af63651aab01697d4e9ec2ed4ca68643ef89c2c256147bef94b6f02b3db` |
+| Web lock SHA-256 | `38022ee29a31f483602e4fbb8c0cb103a391832b8dfaea603a82ec9a3405940f` |
+| Restore | `npm ci --no-audit --no-fund` in web: PASS; web lock hash unchanged before/after |
+| Installed and locked parser | Exact manifest override 10.7.4; zero locked occurrences and no installed `web/node_modules/ip-address/package.json`. No patched parser is installed because none is required |
+| Final focused GREEN | `npm test -- --runInBand --runTestsByPath src/scripts/check-dependency-pins.spec.ts` in API: 23/23 PASS after artifact import and web restore |
+| Scanner | `npm run check:pins` in API: API 26 pins / zero findings, web 8 pins / zero findings; unchecked zero |
+| Web npm audit | Three Moderate affected packages (`vitest`, `@vitest/mocker`, `@vitest/coverage-v8`), zero High/Critical. Existing Vitest advisories are separate from ip-address and outside this minimal pin scope; no full-audit-clean claim |
+| Bootstrap protected push | Ordinary Fast hook at bootstrap source: 25/25 PASS, 619.4 seconds; units 6,214/213 suites, HTTP 2,514/118 suites with 42 tests and two suites skipped for existing backend exclusions |
+
+Receipts are retained under `test-results/ip-address-security-20261023/`,
+including `regen-run.json`, `regen-artifacts.json`, `lock-comparison.json`,
+`artifact/publish-ages.json`, `web-ci.log`, `green-final.log`,
+`pin-report.log`, `web-audit.json` and `bootstrap-push.log`.
+Bootstrap units increased by the two new regressions (6,212 -> 6,214).
+No API dependency graph changed, so an unnecessary API reinstall is avoided.
+The final Validate hook owns the web tests and production build; it is not
+replaced by these focused receipts.
+
 ## Execution issues, self-improvement and design
 
 **Observation, not an error:** the initial installed dependency lookup returned
@@ -49,6 +75,12 @@ no match. Reading the actual locks confirmed that this is a dormant override,
 not an installation failure. A synthetic requirement to install ip-address
 would add an unrelated dependency and misrepresent the security outcome.
 Detection: pre-change dependency inventory, the earliest applicable stage.
+
+**Low, tooling friction:** an inline Node command containing nested escaped
+quotes failed before writing anything. A PowerShell single-quoted here-string
+passed the same bounded inventory script without cross-shell quote rewriting.
+The immediate shell error caught it before source changes; no dependency
+absence conclusion relies on that failed invocation.
 
 **Self-improvement: applied.** A permanent regression checks the exact pin and
 the deliberate absence of parser entries and incoming edges. Scanner rows

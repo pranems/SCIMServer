@@ -18,7 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Focused regression count: 21 -> 23, with RED 22 passed / one failed on
   the old exact override. Bootstrap and final gate receipts are distinguished
   in [the implementation report](docs/WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
-  Other counts await this change's ordinary hook and authoritative CI.
+  GREEN is 23/23. Bootstrap ordinary hook: API units 6,212 -> 6,214,
+  HTTP unchanged 2,514 passed / 42 existing skips; final web counts and
+  exact-tip CI remain pending. Sanctioned run 39980968858 changes zero
+  packages and only synchronized version metadata in both locks.
 - Product API and web versions move together to 0.55.60. This is unmerged
   source work, not deployment, performance acceptance or a release waiver.
 
