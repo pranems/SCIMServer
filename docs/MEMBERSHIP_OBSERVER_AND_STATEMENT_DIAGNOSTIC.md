@@ -3,6 +3,60 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## OS-07 bounded functional follow-up
+
+This follow-up does not repeat a timing experiment. Tested source will run
+once on a new owned fixture, without replacing the original unknown private
+row or any frozen receipt.
+
+Exact cached 0.55.20 source confirms that `resolvePersistSecrets` inherits
+`PERSIST_REQUEST_SECRETS`, defaulting to true, unless endpoint settings override
+it. The interceptor copies request headers, the exception filter uses captured
+headers or a request-header fallback, and `stringifyValue` serializes stored
+headers with `JSON.stringify`. None identifies the destroyed OS-07 row.
+The executed phase-two SQL selected the latest 200 Group PATCH/error rows
+without correlating their request IDs to the workload.
+
+The single functional fixture explicitly disables server and endpoint secret
+persistence. Seven generated-authenticated requests are preregistered:
+endpoint creation and policy update, Group creation and update, missing-Group
+GET and PATCH, and one flush. Four exact authorized Group rows must match
+endpoint, request ID, method, route and expected status. Omission, duplicates,
+foreign rows and missing masks fail. Readiness is counted separately.
+The cap is five minutes including a two-minute cleanup reservation, with a
+ten-second bounded SQL flush wait. There are no timing cycles.
+
+The shared privacy validator accepts an explicit required count for this
+four-row proof. Its existing default remains exactly 200 and every selected
+row still requires the exact `[REDACTED]` authorization value.
+Generated-credential absence is checked privately in rows and both console
+streams. No raw header value, connection string, payload or credential is
+written.
+
+Before execution, 13 focused tests passed, including actual bounded child
+default rejection, admission rejection, privacy negative canaries, exact
+provenance/count rejection and successful empty flush responses. Four files
+passed native syntax and scoped ESLint correctness checks. RED evidence and
+the forthcoming frozen manifest belong under
+`test-results/os07-functional-20261023/`, separate from all previous runs.
+
+Execution issues confirmed during preparation:
+
+- **OS-09, source inspection / Low:** an assumed controller filename was absent
+  from the cached image. The unstarted source container was still removed.
+  Already copied exact logging/filter/config/DTO source supplies the relevant
+  contract; no historical application was modified.
+- **OS-10, test selection / Medium:** an initially nested test was not selected
+  by its standalone name, producing only a file-level green result. Moving it
+  to top level exposed the expected row-count assertion RED. Named assertion
+  evidence, not a file-only green, is required. The subsequent 13-test run
+  includes the actual named regression.
+
+Self-improvement is **applied** through exact known-request provenance and
+negative canaries. The design disposition is **accepted**: one cohesive,
+opt-in functional fixture reuses the existing client, strict privacy classifier
+and cleanup finalizer. No new framework or speculative abstraction is needed.
+
 ## Executive summary
 
 The previous boundary collector paused the workload for 12.981-24.731 seconds

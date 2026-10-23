@@ -120,7 +120,19 @@ function summarizeStatements(statements) {
     .sort((a, b) => b.execMs - a.execMs);
 }
 
-function validateLegacyPrivacy(rows, consoleLog, secrets) {
+function classifyLegacyHeaders(raw) {
+  let headers;
+  try { headers = JSON.parse(raw); }
+  catch { return { reason: 'headers-not-json' }; }
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers))
+    return { reason: 'headers-not-object' };
+  const authorizationPresent = Object.hasOwn(headers, 'authorization');
+  if (!authorizationPresent) return { reason: 'authorization-missing', authorizationPresent };
+  return { reason: headers.authorization === '[REDACTED]' ? 'authorization-redacted'
+    : 'authorization-mask-mismatch', authorizationPresent };
+}
+
+function validateLegacyPrivacy(rows, consoleLog, secrets, requiredRows = 200) {
   assert.ok(Array.isArray(secrets) && secrets.length > 0, 'Required generated-credential canaries');
   assert.equal(typeof consoleLog, 'string', 'Required private console sample');
   const fail = safeDetails => {
@@ -129,7 +141,9 @@ function validateLegacyPrivacy(rows, consoleLog, secrets) {
     error.safeDetails = safeDetails;
     throw error;
   };
-  assert.ok(Array.isArray(rows) && rows.length === 200, 'Original legacy private log sample');
+  assert.ok(Number.isSafeInteger(requiredRows) && requiredRows > 0 && requiredRows <= 200,
+    'Required private row count');
+  assert.ok(Array.isArray(rows) && rows.length === requiredRows, 'Original legacy private log sample');
   const encoded = JSON.stringify(rows);
   for (const secret of secrets) {
     assert.ok(typeof secret === 'string' && secret.length > 0);
@@ -137,16 +151,10 @@ function validateLegacyPrivacy(rows, consoleLog, secrets) {
       fail({ reason: 'generated-credential-detected' });
   }
   for (const [rowIndex, row] of rows.entries()) {
-    let headers;
-    try { headers = JSON.parse(row.requestHeaders); }
-    catch { fail({ reason: 'headers-not-json', rowIndex }); }
-    if (!headers || typeof headers !== 'object' || Array.isArray(headers))
-      fail({ reason: 'headers-not-object', rowIndex });
-    const authorizationPresent = Object.hasOwn(headers, 'authorization');
-    if (!authorizationPresent)
-      fail({ reason: 'authorization-missing', rowIndex, authorizationPresent });
-    if (headers.authorization !== '[REDACTED]')
-      fail({ reason: 'authorization-mask-mismatch', rowIndex, authorizationPresent });
+    const result = classifyLegacyHeaders(row.requestHeaders);
+    if (result.reason !== 'authorization-redacted')
+      fail({ reason: result.reason, rowIndex,
+        ...(result.authorizationPresent === undefined ? {} : { authorizationPresent: result.authorizationPresent }) });
   }
   return { diagnosticOnly: true, complete: true, validatedRows: rows.length,
     contract: 'Legacy redaction only; no current-only error categorization assertion',
@@ -200,4 +208,4 @@ FROM public.pg_stat_statements_info info CROSS JOIN observer`;
 }
 
 module.exports = { counterColumns, validatePgSnapshot, statementDelta, snapshotSql, summarizeStatements,
-  validateLegacyPrivacy };
+  validateLegacyPrivacy, classifyLegacyHeaders };

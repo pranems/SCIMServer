@@ -138,3 +138,26 @@ test('legacy privacy retains strict redaction and exports a safe failure categor
     return true;
   });
 });
+
+test('small functional privacy sample remains explicitly counted and strictly masked', () => {
+  const { validateLegacyPrivacy, classifyLegacyHeaders } = require('../performance/membership-statements.cjs');
+  const rows = Array.from({ length: 4 }, () => ({
+    requestHeaders: '{"authorization":"[REDACTED]"}',
+  }));
+  assert.equal(validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 4).validatedRows, 4);
+  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']), /Original legacy private log sample/);
+  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 0), /Required private row count/);
+  for (const [raw, reason] of [
+    ['{}', 'authorization-missing'],
+    ['"{\\"authorization\\":\\"PRIVATE_CANARY\\"}"', 'headers-not-object'],
+    ['{"authorization":"PRIVATE_CANARY"}', 'authorization-mask-mismatch'],
+    ['not-json-PRIVATE_CANARY', 'headers-not-json'],
+  ]) {
+    const result = classifyLegacyHeaders(raw);
+    assert.equal(result.reason, reason);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_CANARY'));
+  }
+  rows[0].requestHeaders = '{}';
+  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 4),
+    error => error.safeDetails.reason === 'authorization-missing');
+});
