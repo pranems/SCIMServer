@@ -17,6 +17,10 @@ The historical inner cleanup error remains unknown; the 30-second command
 maximum is clamped to the original five-minute deadline, not a cap extension.
 See the indexed [OS-18 RCA](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md).
 DERIVED runtime qualification, adoption and performance holds remain.
+Test/RCA commit: `c306c1e2`. Preservation proof confirms unchanged OS-17
+source, admission/fixture files, original frozen inputs and historical
+receipts; current tested CRLF bytes and normalized Git hashes are distinct.
+All 90 branches and ten stashes remain. No runtime inventory was refreshed.
 
 ### OS-17 / DF-12 source-only finalization correction (2026-10-23)
 

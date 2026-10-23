@@ -186,6 +186,46 @@ No additional functional invocation is authorized by this result. Baseline
 adoption, publication, performance qualification, PR #251, CI/cloud and
 deployment holds remain unchanged.
 
+### Committed identity and preserved evidence
+
+The coherent test correction, gate result and RCA are committed as
+`c306c1e2ec1713f6a2b6821b980be8703028fa12`. Source-only preservation command:
+
+```powershell
+node test-results\os18-child-boundaries-20261023\preserve.cjs
+```
+
+It passed. Its exclusive `preservation.json` has SHA-256
+`5a18a7a3c71d0b99b8f51abff8808d3a401d951c57b9188b9239c7258ab820b2`.
+It records the five tested file hashes separately for disk CRLF and Git LF;
+all five match after newline normalization and none is claimed raw-equal.
+The corrected aggregate log has SHA-256
+`78e7042a5b9779f9a17ec1098dcbe4f0c8f3a2338910bcc5f69f1f2aae5ae72b`.
+
+The preservation check also passed for all seven OS-17 tested source inputs
+(including the unchanged lifecycle spec), six admission/fixture/proof
+files, seven original frozen inputs and four immutable historical
+intent/manifest/receipt/recovery artifacts. Local qualification still points
+to `d25b6155bace7af2ec4ccb89f2eb0048e2db0c26`; 90 branches and ten stashes
+remain. No history rewriting or remote operation occurred.
+
+| Retained old FAILED aggregate | SHA-256 |
+|---|---|
+| `green-focused.log`, 55/62, seven failures | `08fb80b1eaebb49e9ac5b8717b27181a33bc0d857e7a3138faad1e6f9d760455` |
+| `green-serial-focused.log`, 58/62, four failures | `7eeeca22ef03a0fce08331d54b783171c07af06d33077081d3acd13b7a38b57c` |
+
+**Provenance/completeness:** this RCA reconciles the four retained causal
+stacks, inspected test/fixture source, structural RED, two focused GREEN
+selections, the sole corrected aggregate, static/freshness output and the
+current source-only command history. One log-extraction PowerShell command
+had a quoting parser error before execution; stdin script input corrected
+that tooling friction. No validation or workload ran from the rejected
+command. `VSCODE_TARGET_SESSION_LOG` is unavailable, so no full original
+transcript reconciliation or recovery of destroyed inner errors is claimed.
+The final documentation check is recorded separately as
+`freshness-closeout-content.log`, using the same `-SkipCoupling` content-only
+command, not a full coupled freshness gate.
+
 ## OS-17 / DF-12 source-only correction (2026-10-23)
 
 **Result: implemented and locally tested, not runtime-qualified.** The
