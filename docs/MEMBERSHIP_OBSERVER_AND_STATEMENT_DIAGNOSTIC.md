@@ -5,9 +5,12 @@
 
 ## OS-07 bounded functional follow-up
 
-This follow-up does not repeat a timing experiment. Tested source will run
-once on a new owned fixture, without replacing the original unknown private
-row or any frozen receipt.
+**Outcome: INVALID and inconclusive for OS-07.** The single functional run
+completed seven authenticated requests and verified cleanup in 182.033 seconds.
+All four known authorized Group rows had object-shaped serialized headers with
+the exact mask. However, generated-credential absence failed on private input.
+No retry ran. This neither reproduces the old mask mismatch nor establishes
+an application defect; no original private evidence has been reconstructed.
 
 Exact cached 0.55.20 source confirms that `resolvePersistSecrets` inherits
 `PERSIST_REQUEST_SECRETS`, defaulting to true, unless endpoint settings override
@@ -17,8 +20,8 @@ headers with `JSON.stringify`. None identifies the destroyed OS-07 row.
 The executed phase-two SQL selected the latest 200 Group PATCH/error rows
 without correlating their request IDs to the workload.
 
-The single functional fixture explicitly disables server and endpoint secret
-persistence. Seven generated-authenticated requests are preregistered:
+The single functional fixture explicitly disabled server and endpoint secret
+persistence. Seven generated-authenticated requests were preregistered:
 endpoint creation and policy update, Group creation and update, missing-Group
 GET and PATCH, and one flush. Four exact authorized Group rows must match
 endpoint, request ID, method, route and expected status. Omission, duplicates,
@@ -37,25 +40,127 @@ Before execution, 13 focused tests passed, including actual bounded child
 default rejection, admission rejection, privacy negative canaries, exact
 provenance/count rejection and successful empty flush responses. Four files
 passed native syntax and scoped ESLint correctness checks. RED evidence and
-the forthcoming frozen manifest belong under
+the frozen manifest belong under
 `test-results/os07-functional-20261023/`, separate from all previous runs.
+
+### Actual functional observations and their limits
+
+Run `03050f4d33d740a398deff7d0eb419ba` started at
+`2026-10-23T20:05:01.542Z` from committed source
+`ec745e7a387bcb2b969bcfa3ba7bc264ed076aa5`.
+The exact cached baseline digest ends `8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a`;
+the exact cached PG17.11 digest ends
+`2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3`.
+Requested digests and actual platform image IDs matched.
+The application reported 0.55.20 and `PERSIST_REQUEST_SECRETS=false`;
+the endpoint's stored setting was independently read as false.
+The unmodified `rfc-standard` preset had no value for this setting in the
+new fixture. That absence is not proof of the old run's effective policy.
+Actual application limits were 0.5 CPU and 1 GiB, with no observed OOM flag.
+
+| Known authorized route | Method | Observed status | Endpoint/request/method/route/status proof | Header classification | Old SQL predicate |
+|---|---|---:|---|---|---|
+| Group creation | POST | 201 | Matched | Authorization present, exact mask | Excluded |
+| Existing Group update | PATCH | 200 | Matched | Authorization present, exact mask | Included |
+| Missing Group read | GET | 404 | Matched | Authorization present, exact mask | Included |
+| Missing Group update | PATCH | 404 | Matched | Authorization present, exact mask | Included |
+
+The other authenticated requests were endpoint creation (201), endpoint
+policy update (200), and flush (204). Fifteen unauthenticated health readiness
+attempts were recorded separately. They were not eligible for the selected
+four-row cohort. Three of these four rows satisfy the old Group PATCH/error
+SQL predicate. This proves that particular new cohort's provenance and mask
+shape, not the provenance of the old 200 rows.
+
+The strict privacy check then rejected a generated credential match in either
+the private selected rows or combined application console streams. Its executed
+failure classification did not retain which input matched. The header
+classifications do not prove that other private fields or console output were
+safe. No raw value was saved, and neither source nor credential kind can now be
+recovered from this receipt. **There is no overall privacy PASS.**
+
+Both owned application/database containers and their network were removed.
+Capture, removal and post-removal verification succeeded for each container;
+the final run-label container and network inventories were empty.
+The two unstarted source-inspection containers were also removed.
+The three pre-existing shared containers were untouched.
+
+The manifest hash is
+`6ca5d02cc4875a4935e5eecbb527b3910375e41fd5380bc72e3372242645d52e`.
+All five frozen inputs match their manifest hashes. None matches its Git blob
+byte-for-byte; all five match after CRLF-to-LF normalization.
+The frozen on-disk bytes, not a reconstructed Git checkout, identify this run.
+`attempt1/source-byte-proof.json` records both comparisons.
+
+### Validation and retained evidence
+
+| Exact command | Result |
+|---|---|
+| `node --test --test-name-pattern='small functional privacy sample' scripts\test\membership-statements.test.cjs` | Confirmed RED on exact row count, after correcting test discovery |
+| `node --test scripts\test\membership-privacy-functional.test.cjs` | Confirmed RED on accepting duplicate/foreign rows; later GREEN |
+| `node --test --test-name-pattern='legacy flush' scripts\test\membership-privacy-functional.test.cjs` | RED on absent successful-empty decoder; later GREEN |
+| `node --test scripts\test\membership-statements.test.cjs scripts\test\membership-privacy-functional.test.cjs` | 13 tests GREEN before execution; 14 GREEN after the unmeasured metadata correction |
+| `node scripts\performance\run-membership-privacy-functional.cjs --functional-only test-results\os07-functional-20261023\attempt1` | INVALID, exit 1; seven authenticated requests, no replacement, cleanup verified |
+| `node --test --test-name-pattern='generated-credential rejection retains' scripts\test\membership-statements.test.cjs` | Post-run RED on missing row-versus-console provenance; later GREEN |
+| `node test-results\os07-functional-20261023\validate-final.cjs` | Four files passed native `node --check` and scoped ESLint correctness rules; zero lint errors |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` | 27 manifest documents passed content-only currency/link checks; source coupling was explicitly skipped, so this is not the full coupled gate |
+| `git diff --check` | Passed |
+
+The evidence directory holds separate RED/GREEN logs, frozen inputs,
+`functional-run.log`, the manifest, and the privacy-safe `report.json`.
+No phase-one/phase-two receipt, raw sample or executed source was changed.
+The diagnostic document remains indexed in `docs/INDEX.md`. The freshness
+result above covers the manifest's 27 documents, not an invented full-project
+documentation gate.
 
 Execution issues confirmed during preparation:
 
 - **OS-09, source inspection / Low:** an assumed controller filename was absent
   from the cached image. The unstarted source container was still removed.
   Already copied exact logging/filter/config/DTO source supplies the relevant
-  contract; no historical application was modified.
+  contract; no historical application was modified. Oversized tool output was
+  reissued as bounded original-source reads; automatically generated temporary
+  output files were never opened. A mismatched document-heading patch was
+  corrected after reading the actual heading. These were preparation-time
+  tooling failures, with no runtime escape or waived result.
 - **OS-10, test selection / Medium:** an initially nested test was not selected
   by its standalone name, producing only a file-level green result. Moving it
   to top level exposed the expected row-count assertion RED. Named assertion
   evidence, not a file-only green, is required. The subsequent 13-test run
   includes the actual named regression.
+- **OS-11, functional privacy rejection / unresolved severity:** all four
+  selected authorization fields had the mask, but the broader canary check
+  rejected private input. The underlying mechanism is unresolved, not an
+  established application defect. Resolution: retain INVALID and stop. The
+  functional privacy check was the first applicable runtime detector.
+- **OS-12, failure provenance / Medium:** the executed canary classifier
+  intentionally suppressed values but also omitted whether rows or console
+  matched. That omission was detected when reviewing this stopped run; the
+  earliest possible detector was a negative-canary unit test before execution.
+  A focused assertion first failed, then passed after retaining only static
+  `rows`/`console` locations. This correction is tested but unmeasured. It does
+  not add missing facts to `attempt1/report.json`.
+
+This follow-up ledger is reconciled against the retained source-inspection,
+RED/GREEN, static-check and single functional-run records available for this
+turn. It does not claim reconciliation against a full historical session
+transcript, and it does not reconstruct any discarded private input.
 
 Self-improvement is **applied** through exact known-request provenance and
 negative canaries. The design disposition is **accepted**: one cohesive,
 opt-in functional fixture reuses the existing client, strict privacy classifier
 and cleanup finalizer. No new framework or speculative abstraction is needed.
+
+### Remaining work is blocked on a new bounded authorization
+
+OS-07 remains unresolved. Before any further runtime diagnosis, explicitly
+authorize a new functional scope that uses the tested canary-location metadata.
+If it identifies console input, inspect the exact legacy startup/logging source;
+if it identifies rows, inspect only safe request provenance and structural
+fields privately. Do not relax the mask or generated-secret checks. No new
+performance experiment, admission retry or deployment is authorized by this
+result. All earlier publication, customer-data, operational and release holds
+remain unchanged.
 
 ## Executive summary
 

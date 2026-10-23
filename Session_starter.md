@@ -2,6 +2,31 @@
 
 **Last verified:** 2026-10-23
 
+### OS-07 functional follow-up (2026-10-23)
+
+One separately preregistered functional attempt ran from local source
+`ec745e7a`, without repeating any performance experiment. It finished INVALID
+in 182.033 seconds after seven authenticated requests and 15 separate health
+readiness attempts. All four exactly correlated authorized Group rows had
+the `[REDACTED]` mask; the broader generated-credential-absence check rejected
+private input. Its executed classifier did not retain rows-versus-console
+provenance, so neither that input nor the original OS-07 row is reconstructed.
+OS-07 remains unresolved; no legacy application defect is established.
+Both new containers and their network, plus both unstarted source-inspection
+containers, were removed. Shared containers were untouched.
+
+The frozen manifest is
+`6ca5d02cc4875a4935e5eecbb527b3910375e41fd5380bc72e3372242645d52e`.
+Five frozen files match their manifest hashes and Git after newline
+normalization, but zero match raw Git bytes. A subsequent row/console-only
+canary-location correction passes 14 focused tests and is unmeasured.
+No runtime retry is authorized. See the indexed observer/statement diagnostic
+document and `test-results/os07-functional-20261023/`.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Completed the one bounded OS-07 functional attempt, retained INVALID and safe mask/provenance observations, verified owned cleanup, and closed a failure-metadata gap with an unmeasured RED/GREEN correction. |
+
 ### Low-disturbance observer correction (2026-10-23)
 
 The user authorized one fixed 32-snapshot, three-minute observer-only smoke

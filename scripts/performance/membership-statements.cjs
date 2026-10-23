@@ -147,8 +147,10 @@ function validateLegacyPrivacy(rows, consoleLog, secrets, requiredRows = 200) {
   const encoded = JSON.stringify(rows);
   for (const secret of secrets) {
     assert.ok(typeof secret === 'string' && secret.length > 0);
-    if (encoded.includes(secret) || consoleLog.includes(secret))
-      fail({ reason: 'generated-credential-detected' });
+    const locations = [];
+    if (encoded.includes(secret)) locations.push('rows');
+    if (consoleLog.includes(secret)) locations.push('console');
+    if (locations.length) fail({ reason: 'generated-credential-detected', locations });
   }
   for (const [rowIndex, row] of rows.entries()) {
     const result = classifyLegacyHeaders(row.requestHeaders);

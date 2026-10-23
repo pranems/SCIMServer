@@ -161,3 +161,19 @@ test('small functional privacy sample remains explicitly counted and strictly ma
   assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 4),
     error => error.safeDetails.reason === 'authorization-missing');
 });
+
+test('generated-credential rejection retains only static row-versus-console provenance', () => {
+  const { validateLegacyPrivacy } = require('../performance/membership-statements.cjs');
+  for (const [raw, consoleLog, locations] of [
+    ['{"authorization":"PRIVATE_CANARY"}', '', ['rows']],
+    ['{"authorization":"[REDACTED]"}', 'PRIVATE_CANARY', ['console']],
+    ['{"authorization":"PRIVATE_CANARY"}', 'PRIVATE_CANARY', ['rows', 'console']],
+  ]) {
+    assert.throws(() => validateLegacyPrivacy([{ requestHeaders: raw }], consoleLog, ['PRIVATE_CANARY'], 1),
+      error => {
+        assert.deepEqual(error.safeDetails, { reason: 'generated-credential-detected', locations });
+        assert.ok(!JSON.stringify(error).includes('PRIVATE_CANARY'));
+        return true;
+      });
+  }
+});
