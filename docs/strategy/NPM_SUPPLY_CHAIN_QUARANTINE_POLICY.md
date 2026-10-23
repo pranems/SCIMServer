@@ -43,6 +43,19 @@ mismatch. The independent doc-content gate caught it at the earliest static
 stage; run that existing gate after the freshness fixer on future bumps.
 No new abstraction or relaxed gate is needed.
 
+**Execution issue (Medium, shared-host environment):** the next normal Fast
+push passed 24 gates but its unchanged InMemory HTTP suite hit
+`connect ENOBUFS 127.0.0.1` in profile-combinations' custom SPC discovery test.
+The result was 2,513 passed, one failed and 42 genuine backend skips.
+No patched dependencies had been installed. A serialized focused rerun of
+that unchanged file passed all 57 tests; a read-only socket snapshot showed
+813 TIME_WAIT connections. This supports transient host socket pressure,
+not a demonstrated application defect. No other process was stopped and
+no host network setting, assertion, exclusion or timeout was changed.
+The original failure remains retained; a fresh ordinary hook is required
+before publication. The transport-level failure was detected by the first
+applicable HTTP gate; the focused rerun is not a substitute for that gate.
+
 ### 2026-10-21 Vite security prerequisite
 
 The unchanged 0.55.56 web lockfile reports a High Vite advisory through the
