@@ -5,6 +5,67 @@
 **Status:** Implemented and tested locally, not released or deployed.
 Performance admission and the independent release gates remain open.
 
+## Test-harness prerequisite: real non-UTC leaf (2026-10-23)
+
+This section changes only test execution, not endpoint behavior or any frozen
+performance result below. The master-based Hono remediation encountered the
+same nested-Jest startup problem corrected on the preserved qualification
+branch. Isolate the two test-file changes from
+`84d11af7658d91c3d3392831a088b89f54279b1d` as a separate prerequisite.
+No checkpoint053 Linux/finalization code, dependency pin, version or lockfile
+belongs in this rollback unit.
+
+### Failure and root cause
+
+The actual normal Fast hook retained at
+`test-results/hono-security-20261023/bootstrap-push-final.log` reports 6,209
+unit PASS and one FAIL. `endpoint-cache-freshness.spec.ts`'s
+`checks PostgreSQL timestamp hydration in a real non-UTC Node process` throws
+at line 213 after `spawnSync` at line 203 reaches its 30,000ms deadline:
+30,119ms, null exit status, SIGTERM, ETIMEDOUT. That is a child-startup/execution
+deadline failure, not a failed timestamp-value assertion. A prior isolated
+pass does not clear that protected-gate failure.
+
+The former parent launches another complete Jest runner to select one test.
+The correction launches Node with the existing
+`ts-node/register/transpile-only` loader and a small leaf fixture calling the
+actual `EndpointService.getEndpoint` source and lifecycle repository. Only
+external SQL snapshot I/O and logger methods are stubbed; no conversion logic
+is copied and no database is opened. The receipt proves the actual Node
+entrypoint/loader, real January New York offset (300 minutes), exactly one
+snapshot read and both timestamps at `2026-01-01T00:00:00.000Z`.
+The child deadline stays 30 seconds and the parent test stays 35 seconds.
+
+### Focused proof and escape analysis
+
+| Check | Actual result | Claim and limit |
+|---|---|---|
+| Retained ordinary full-hook failure | ETIMEDOUT at 30,119ms | Observed RED; not fabricated timestamp failure |
+| Former nested launcher reinstated, real child | FAIL on missing leaf receipt, child exited normally | Rejects the old design without manufactured load or a deadline change |
+| Actual production UTC interpretation temporarily removed | FAIL, both fields 05:00Z instead of 00:00Z | Real leaf retains timestamp correctness assurance; production restored exactly |
+| Complete focused freshness file after restoration | 21/21 PASS, 4.423s | Same case count and original deadlines |
+| Fixture syntax and targeted ESLint | PASS | Existing tooling, no dependencies added |
+
+The two negative-control edits are not committed. Runtime entrypoint and
+loader assertions remain permanent in the parent; the leaf additionally
+asserts that it is the direct executable module.
+Focused logs are retained in `test-results/timezone-prerequisite-20261023/`.
+The exact-tip ordinary hook, CI and hosted review are reported in the
+prerequisite PR; focused results alone do not qualify protected publication.
+
+**RCA classification:** Medium, test harness. The first unit gate detects the
+deadline failure before publication. The earlier direct-child PASS could not
+detect redundant parent/child Jest startup, so the escape was from overly
+narrow execution evidence, not a missing timestamp assertion.
+**Self-improvement: applied.** Test both the actual real-source outcome and
+the execution topology by requiring runtime leaf identity.
+**Design disposition: accepted.** Keep the small test fixture cohesive; no
+production seam or new generic process framework is justified.
+**Provenance:** reconciled against the retained full-hook log and this fresh
+continuation's actual focused GREEN/negative-control logs. The old isolated
+PASS is retained as an observation, not substituted for the hook failure.
+No deleted transcript was restored or reconstructed.
+
 ## 1. Executive summary
 
 **Current result:** the latest immutable local candidate passes eleven of
