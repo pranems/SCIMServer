@@ -3,7 +3,7 @@
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.59
 > **Last Updated**: October 21, 2026
-> **Last verified:** 2026-10-22
+> **Last verified:** 2026-10-23
 
 ---
 
@@ -12,14 +12,29 @@
 **2026-10-23 dependency remediation:** 0.55.59 reserves an independent exact
 Hono 4.13.11 patch for #248, based on master e1070ba2. CI-only lockfiles,
 fresh dependency restoration and final hosted review remain required.
-Bootstrap publication is blocked: three ordinary Fast attempts published
+Historical bootstrap publication was blocked: three ordinary Fast attempts published
 nothing. The final attempt fails the unchanged non-UTC nested Node/Jest
 timestamp probe at its existing 30-second limit (ETIMEDOUT, 6,209 units pass).
-Do not import #251 tooling or bypass the hook to continue. No regenerated
+Prerequisite #252 is now normally merged at `fc962a65`, with authoritative
+merged-source CI 39962553306 and CodeQL 39962437032 PASS. Its immutable
+test-image digest is `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+This is not patched-Hono proof. Ordinarily merge master into the preserved
+Hono branch; do not import other #251 tooling or bypass hooks. No regenerated
 artifact, installed patch, PR, exact-tip CI or hosted review exists.
 Frozen 0.55.58 runtime-presence evidence is not new-candidate proof.
 Do not absorb #251 tooling, rerun performance or alter its failed admission,
 customer migration, operational, cleanup or human visual verification holds.
+
+**2026-10-23 test-harness prerequisite:** a separate master-based branch ports
+only the real-leaf timezone tests from reviewed `84d11af7`, with runtime
+entrypoint/loader receipt checks. Original 30-second child/35-second parent
+limits remain. All 21 focused cases pass; former nested launcher and actual
+UTC-conversion negative controls fail as expected, with production restored.
+No product bump, Hono/lockfile change or performance-tooling import.
+The Hono branch's four original commits through e18d32c0 stay preserved.
+Hosted review 5628884972 recommends approval with no findings but remains
+COMMENTED, not human GitHub approval. Only #252 is normally merged; no Hono
+merge, deployment or new performance admission is authorized.
 
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
 selection and identifies a real shared-cache binding collision. The generic

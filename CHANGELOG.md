@@ -21,16 +21,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is runtime-presence evidence, not proof of exploitability or absence
   of reachable vulnerable middleware. No application or UI behavior changes.
   Final patched-tree validation and hosted review remain pending.
-- Publication is concretely blocked before CI-only regeneration. Three normal
+- Historical bootstrap publication was blocked before CI-only regeneration. Three normal
   Fast pushes publish nothing: C13 README badge mismatch (fixed), an unchanged
   HTTP `ENOBUFS` failure (57/57 focused rerun), then the unchanged nested
   non-UTC Node/Jest timestamp probe's 30,119ms `ETIMEDOUT` (6,209/6,210 units).
   The last attempt passes all 23 preceding static gates. Both lockfiles remain
   unchanged from master, Hono remains installed/locked at 4.13.7, and no
-  patched GREEN, PR, exact-tip CI or review is claimed.
+  patched GREEN, PR, exact-tip CI or review was claimed at that checkpoint.
+- The separate prerequisite #252 is now normally merged at `fc962a65`, after
+  exact-tip checks and hosted review 5628884972 (COMMENTED, no findings;
+  not human GitHub approval). Its authoritative merged-source CI run
+  39962553306 passes, with test-image digest
+  `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+  Merge master ordinarily into this preserved four-commit Hono branch before
+  retrying its protected bootstrap. This old-dependency image is not Hono proof.
 - Existing performance admission failure, customer migration, operational
   dispositions, cleanup verification and target-specific human visual
-  observation remain outstanding. No merge, deployment or performance rerun.
+  observation remain outstanding. No Hono merge, deployment or performance rerun.
+
+### Test-only prerequisite: standalone non-UTC freshness probe
+
+- Backport only the two relevant test-file changes from reviewed
+  `84d11af7658d91c3d3392831a088b89f54279b1d`. Replace redundant nested Jest
+  startup with a real Node leaf loading actual TypeScript source. Preserve
+  the 30-second child and 35-second parent deadlines and all 21 cases.
+- Require runtime entrypoint/loader identity, New York January offset 300,
+  exactly one snapshot read and both UTC timestamps. The retained full-hook
+  30,119ms ETIMEDOUT is the observed RED, not a timestamp assertion failure.
+  Reinstating the former launcher fails the receipt assertion even when the
+  child exits normally; removing actual production UTC interpretation fails
+  both timestamp values (05:00Z instead of 00:00Z). Production source is restored
+  byte-identically. Focused freshness: 21 -> 21 PASS; targeted ESLint and
+  fixture syntax PASS. Full protected-gate and exact-tip review evidence belong
+  to the prerequisite PR, not the old isolated PASS.
+- No product/version/lockfile, application/UI, performance runner, quota or
+  admission change in #252. Its normal merge and merged-source checks are
+  recorded above; only that prerequisite is merged, not #251 or this Hono patch.
 
 ### 0.55.58 consolidation onto token-lifetime master
 

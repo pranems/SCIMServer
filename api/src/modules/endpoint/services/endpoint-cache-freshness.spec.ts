@@ -190,9 +190,6 @@ describe('Persistent endpoint cache freshness', () => {
   });
 
   it('preserves Prisma UTC timestamp semantics for timezone-free PostgreSQL JSON', async () => {
-    if (process.env.SCIM_ENDPOINT_TIMEZONE_PROBE === '1') {
-      expect(new Date(2026, 0, 1).getTimezoneOffset()).toBe(300);
-    }
     const result = await service.getEndpoint(id);
     expect(result.createdAt).toBe(endpoint().createdAt.toISOString());
     expect(result.updatedAt).toBe(endpoint().updatedAt.toISOString());
@@ -201,11 +198,10 @@ describe('Persistent endpoint cache freshness', () => {
   it('checks PostgreSQL timestamp hydration in a real non-UTC Node process', () => {
     const startedAt = Date.now();
     const result = spawnSync(process.execPath, [
-      require.resolve('jest/bin/jest'),
-      '--runInBand', '--runTestsByPath', __filename,
-      '--testNamePattern', 'preserves Prisma UTC timestamp semantics',
+      '--require', require.resolve('ts-node/register/transpile-only'),
+      require.resolve('../../../../test/fixtures/endpoint-timezone-probe.cjs'),
     ], {
-      env: { ...process.env, TZ: 'America/New_York', SCIM_ENDPOINT_TIMEZONE_PROBE: '1' },
+      env: { ...process.env, TZ: 'America/New_York', PERSISTENCE_BACKEND: 'prisma' },
       encoding: 'utf8',
       timeout: 30_000,
     });
@@ -220,6 +216,16 @@ describe('Persistent endpoint cache freshness', () => {
     if (result.status !== 0) {
       throw new Error(`Non-UTC timestamp regression failed:\n${result.stdout}\n${result.stderr}`);
     }
+    expect(result.stdout).toContain('"runner":"standalone-production-path"');
+    expect(JSON.parse(result.stdout)).toEqual({
+      runner: 'standalone-production-path',
+      entrypoint: require.resolve('../../../../test/fixtures/endpoint-timezone-probe.cjs'),
+      execArgv: ['--require', require.resolve('ts-node/register/transpile-only')],
+      timezoneOffset: 300,
+      snapshotReads: 1,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
   }, 35_000);
 
   it('preserves an explicit timestamp offset without appending another timezone', async () => {

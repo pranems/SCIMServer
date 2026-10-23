@@ -29,6 +29,18 @@ and an old digest's receipt does not qualify a new candidate. Pair a minimal
 exact override with a regression over every actual locked occurrence, then
 check the restored installation after CI-only regeneration.
 
+### A real-timezone regression should launch one real leaf, not another suite
+
+A real child process is necessary to test Node's non-UTC date interpretation;
+a second full Jest startup is not. The unchanged 30-second nested-run deadline
+failed again when a separate branch started from master without the reviewed
+fixture correction. Preserve the real subprocess and both existing deadlines,
+but load the actual TypeScript path through a small leaf using existing tooling.
+Require a runtime receipt for entrypoint, loader, timezone offset, read count
+and timestamps. A successful exit or isolated PASS cannot prove that topology.
+Reinstate the old launcher as a negative control and ensure it fails even when
+its child succeeds. Keep production code byte-identical after mutation checks.
+
 ### Request variants and rolling windows need semantic assertions
 
 A successful response cannot prove which request headers were sent. When a

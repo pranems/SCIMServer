@@ -6,11 +6,13 @@
 
 Branch `chore/regen-lockfile-hono-security-20261023` starts from fresh
 `origin/master` e1070ba28825afee46c953e1e2d5d518863303f2, not PR #251.
+It now ordinarily incorporates prerequisite merge `fc962a65` / #252. Fresh
+master remains 0.55.58, so the reserved next patch 0.55.59 is still correct.
 Reserve 0.55.59 for exact Hono 4.13.11 (#248). The actual lock dependency
 regression is RED on 4.13.7; CI-only regeneration and patched-tree checks
 remain required. The preserved qualification branch stays at f6f03a52.
 Frozen 0.55.58 image presence is not new-candidate qualification.
-No original deleted transcript was restored. No merge or deployment.
+No original deleted transcript was restored. No Hono merge or deployment.
 The unchanged 39875689201 A/A p99 failure (ratio 1.23928982, limit 1.10),
 customer migration receipt, operational dispositions, 403 cleanup verification
 and actual target-specific human visual observation remain holds.
@@ -18,25 +20,61 @@ and actual target-specific human visual observation remain holds.
 | Date | Summary |
 |---|---|
 | 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
+| 2026-10-23 | Normally merge prerequisite #252 and verify its authoritative merged-source CI/artifact, then preserve both contexts in the ordinary Hono/master merge. |
 
 - [x] ✅ COMPLETED: Verify handoff receipts, fresh base and actual locked RED.
-- [ ] BLOCKED: Publish bootstrap through ordinary hooks, then apply verified
+- [x] ✅ COMPLETED: Normally merge reviewed prerequisite #252, verify merged
+  source CI and ordinarily incorporate master without rewriting Hono history.
+- [ ] Publish bootstrap through ordinary hooks, then apply verified
   CI lockfiles, validate patched tree and complete hosted review.
 
-**Concrete publication blocker:** three ordinary Fast pushes published
+**Historical publication blockers:** three ordinary Fast pushes published
 nothing. The first caught a stale README version badge (fixed). The second
 passed 24 gates but failed one unchanged HTTP test with `ENOBUFS`; its focused
 rerun passed 57/57. The third passed 23 static gates but failed the unchanged
 `endpoint-cache-freshness.spec.ts` non-UTC nested Node/Jest probe at 30,119ms,
-`ETIMEDOUT` (6,209 passed, one failed). That baseline tooling issue must not
-be imported from #251 into this dependency change. No hook bypass, timeout
+`ETIMEDOUT` (6,209 passed, one failed). That baseline tooling issue was
+isolated in prerequisite #252, not imported as unrelated #251 tooling.
+No hook bypass, timeout
 change or favorable retry is claimed as GREEN. No remote branch, regeneration
-run, artifact, patched installation or PR exists. API/web lockfiles remain
+run, artifact, patched installation or Hono PR exists yet. API/web lockfiles remain
 byte-identical to master; the real dependency assertion remains RED.
 Retained local evidence: `test-results/hono-security-20261023/`.
 
 **Design disposition: accepted.** An exact transitive patch uses existing
 override/provenance seams; adding an application abstraction is speculative.
+
+### Separate timezone-harness prerequisite (2026-10-23)
+
+Branch `test/timezone-leaf-prerequisite-20261023` starts from verified master
+`e1070ba28825afee46c953e1e2d5d518863303f2`. Backport only the two test files
+from `84d11af7`, plus direct runtime launcher receipts and narrow documentation.
+All 21 focused freshness cases pass with the original 30-second child and
+35-second parent limits. Negative controls reject the actual former nested
+launcher and an actual UTC-conversion defect; production source is restored.
+No product bump (still 0.55.58), Hono, lockfile or performance-tooling change.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Isolate the reviewed standalone timezone harness as a prerequisite; focused GREEN and two discriminating negative controls retained. |
+
+- [x] ✅ COMPLETED: Confirm actual full-hook spawn-timeout RED and focused
+  real-leaf outcome/launcher controls, without relaxing deadlines.
+- [x] ✅ COMPLETED: Ordinary protected push passes all 25 gates; exact-tip
+  CI and hosted review 5628884972 report no findings at `5a42eb09`.
+- [x] ✅ COMPLETED: Operator-authorized normal merge #252 at `fc962a65`;
+  authoritative merged-source Build Test Image 39962553306 and CodeQL
+  39962437032 PASS. The bot review is COMMENTED, not human GitHub approval.
+  Immutable test image:
+  `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+
+Preserve Hono branch `chore/regen-lockfile-hono-security-20261023` at
+`e18d32c04855e8acf88c8a3e02c9ec7b447cfb21` and qualification branch at
+`f6f03a523b6370eccc63f1499c3c111dd5cdf200`. Their evidence and release holds
+remain unchanged. The 39875689201 p99 failure is not rerun or waived.
+**Design disposition: accepted.** A small test-only real-source fixture needs
+no application abstraction. **Self-improvement: applied.** Require the child
+to report its actual entrypoint and loader, not just return a success exit.
 
 ### Current master/performance reconciliation (2026-10-21)
 
