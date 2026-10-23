@@ -4,6 +4,25 @@ const { parseCounters } = require('./membership-cpu-trace.cjs');
 const operations = ['add', 'populatedRead', 'remove', 'emptyRead'];
 const cpuKeys = ['usage_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
 
+function requiredUnsigned(value) {
+  assert.equal(typeof value, 'string', 'Required raw unsigned counter');
+  assert.match(value, /^\d+$/, 'Malformed raw unsigned counter');
+  const number = Number(value);
+  assert.ok(Number.isSafeInteger(number), 'Unsafe raw unsigned counter');
+  return number;
+}
+
+async function sourceTip(root, parent = 'd25b6155bace7af2ec4ccb89f2eb0048e2db0c26') {
+  const { promisify } = require('node:util');
+  const exec = promisify(require('node:child_process').execFile);
+  assert.match(parent, /^[a-f0-9]{40}$/);
+  const options = { cwd: root, timeout: 10000, windowsHide: true };
+  await exec('git', ['merge-base', '--is-ancestor', parent, 'HEAD'], options);
+  const tip = (await exec('git', ['rev-parse', 'HEAD'], options)).stdout.trim();
+  assert.match(tip, /^[a-f0-9]{40}$/);
+  return tip;
+}
+
 function schedule(seed) {
   assert.ok(Number.isSafeInteger(seed) && seed >= 0, 'Explicit schedule seed');
   const orders = seed % 2 ? ['BAAB', 'ABBA'] : ['ABBA', 'BAAB'];
@@ -26,12 +45,14 @@ function validateSnapshot(row) {
   assert.ok(row.epoch.length > 0);
   assert.ok(Number.isFinite(Date.parse(row.readStartUtc)));
   assert.ok(Date.parse(row.readEndUtc) >= Date.parse(row.readStartUtc));
+  assert.match(row.readStartNs, /^\d+$/, 'Required monotonic start');
+  assert.match(row.readEndNs, /^\d+$/, 'Required monotonic end');
   assert.ok(BigInt(row.readEndNs) > BigInt(row.readStartNs));
   for (const key of cpuKeys)
     assert.ok(Number.isSafeInteger(row.cpu[key]) && row.cpu[key] >= 0, `Missing CPU ${key}`);
   for (const key of ['rssBytes', 'highWaterRssBytes', 'memoryPeakBytes', 'oom', 'oomKill'])
     assert.ok(Number.isSafeInteger(row[key]) && row[key] >= 0, `Missing memory ${key}`);
-  assert.ok(row.rssBytes > 0 && row.highWaterRssBytes > 0);
+  assert.ok(row.rssBytes > 0 && row.highWaterRssBytes > 0 && row.memoryPeakBytes > 0);
   assert.ok(row.highWaterRssBytes < 402653184, 'Original 384 MiB Node RSS ceiling');
   assert.ok(row.memoryPeakBytes < 1073741824, 'Original cgroup memory ceiling');
   assert.equal(row.oom, 0, 'OOM event');
@@ -39,8 +60,14 @@ function validateSnapshot(row) {
   assert.equal(row.cpuMax, '50000 100000', 'Original CPU quota/period');
   assert.equal(row.cpuBurst, 0, 'No CPU burst');
   assert.ok(Array.isArray(row.ancestors) && row.ancestors.length > 0, 'Ancestor policy unavailable');
+  assert.equal(row.ancestors.at(-1).root, true, 'Complete root ancestry required');
+  assert.equal(row.ancestors.at(-1).path, '/');
+  assert.equal(row.ancestors.filter(ancestor => ancestor.root).length, 1);
   for (const ancestor of row.ancestors) {
-    if (ancestor.root && ancestor.cpuMax === null) continue;
+    if (ancestor.root && ancestor.cpuMax === null) {
+      assert.equal(ancestor.cpuBurst, null);
+      continue;
+    }
     assert.match(ancestor.cpuMax, /^max \d+$/, 'Finite ancestor CPU quota');
     assert.equal(ancestor.cpuBurst, 0, 'Ancestor CPU burst');
   }
@@ -156,7 +183,7 @@ function collect(pid, containerId) {
     ancestors.push({
       path: path.relative(root, parent) || '/', root: rootNode,
       cpuMax: rootNode && !fs.existsSync(maxPath) ? null : fs.readFileSync(maxPath, 'utf8').trim(),
-      cpuBurst: rootNode && !fs.existsSync(burstPath) ? null : Number(fs.readFileSync(burstPath, 'utf8').trim()),
+      cpuBurst: rootNode && !fs.existsSync(burstPath) ? null : requiredUnsigned(fs.readFileSync(burstPath, 'utf8').trim()),
     });
     if (rootNode) break;
   }
@@ -164,26 +191,36 @@ function collect(pid, containerId) {
   const kib = key => {
     const hit = status.match(new RegExp(`^${key}:\\s+(\\d+)\\s+kB$`, 'm'));
     assert.ok(hit, `Missing ${key}`);
-    return Number(hit[1]) * 1024;
+    const bytes = requiredUnsigned(hit[1]) * 1024;
+    assert.ok(Number.isSafeInteger(bytes));
+    return bytes;
   };
   const stat = fs.readFileSync(`${proc}/stat`, 'utf8');
   const startTicks = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-  const events = Object.fromEntries(text('memory.events').split('\n').map(s => s.split(/\s+/)));
+  assert.ok(requiredUnsigned(startTicks) > 0, 'Required process lifetime');
+  const events = {};
+  for (const line of text('memory.events').split('\n')) {
+    const fields = line.split(/\s+/);
+    assert.equal(fields.length, 2);
+    assert.ok(!Object.hasOwn(events, fields[0]), 'Duplicate memory counter');
+    events[fields[0]] = requiredUnsigned(fields[1]);
+  }
+  const cpuStatRaw = text('cpu.stat');
   const result = {
     epoch: `${containerId}:${pid}:${startTicks}`, pid: Number(pid), startTicks,
-    readStartUtc, readStartNs, cpu: parseCounters(text('cpu.stat')),
-    cpuStatRaw: text('cpu.stat'), cpuMax: text('cpu.max'),
-    cpuBurst: Number(text('cpu.max.burst')), ancestors,
+    readStartUtc, readStartNs, cpu: parseCounters(cpuStatRaw),
+    cpuStatRaw, cpuMax: text('cpu.max'),
+    cpuBurst: requiredUnsigned(text('cpu.max.burst')), ancestors,
     rssBytes: kib('VmRSS'), highWaterRssBytes: kib('VmHWM'),
-    memoryPeakBytes: Number(text('memory.peak')),
-    oom: Number(events.oom), oomKill: Number(events.oom_kill),
+    memoryPeakBytes: requiredUnsigned(text('memory.peak')),
+    oom: events.oom, oomKill: events.oom_kill,
     readEndUtc: new Date().toISOString(), readEndNs: process.hrtime.bigint().toString(),
   };
   validateSnapshot(result);
   return result;
 }
 
-module.exports = { schedule, runVisits, windowDelta, validateSnapshot, validateReceipt, validatePrivacy, finalizeOwned, collect };
+module.exports = { schedule, runVisits, windowDelta, validateSnapshot, validateReceipt, validatePrivacy, finalizeOwned, collect, requiredUnsigned, sourceTip };
 if (require.main === module) {
   assert.equal(process.argv[2], '--collect', 'Explicit collector invocation required');
   process.stdout.write(JSON.stringify(collect(process.argv[3], process.argv[4])));

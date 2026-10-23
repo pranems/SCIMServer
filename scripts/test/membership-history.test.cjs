@@ -89,6 +89,26 @@ test('counter windows reject reset, epoch crossing, missingness and RSS/OOM brea
   ]) assert.throws(() => windowDelta(a, { ...b, ...bad }));
 });
 
+test('strict raw counter parsing never coerces empty or malformed signals to zero', () => {
+  const { requiredUnsigned, windowDelta } = implementation();
+  assert.equal(requiredUnsigned('0'), 0);
+  assert.equal(requiredUnsigned('42'), 42);
+  for (const value of ['', ' ', '-1', 'NaN', '1.5', undefined, '9007199254740992'])
+    assert.throws(() => requiredUnsigned(value));
+  assert.throws(() => windowDelta(snapshot({ readStartNs: '' }),
+    snapshot({ readStartNs: '3', readEndNs: '4' })));
+  assert.throws(() => windowDelta(snapshot({ ancestors: [
+    { path: 'docker', cpuMax: 'max 100000', cpuBurst: 0 },
+  ] }), snapshot({ readStartNs: '3', readEndNs: '4' })));
+});
+
+test('source identity preflight accepts committed descendants and rejects unknown ancestry', async () => {
+  const { sourceTip } = implementation();
+  const root = path.resolve(__dirname, '../..');
+  assert.match(await sourceTip(root), /^[a-f0-9]{40}$/);
+  await assert.rejects(sourceTip(root, '0'.repeat(40)));
+});
+
 test('finalization attempts capture and cleanup for every owned resource', async () => {
   const { finalizeOwned } = implementation();
   const attempted = [];

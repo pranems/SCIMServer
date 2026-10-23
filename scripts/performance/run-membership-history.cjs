@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const { execFile, fork } = require('node:child_process');
 const { promisify } = require('node:util');
 const { setTimeout: delay } = require('node:timers/promises');
-const { schedule, runVisits, windowDelta, validateReceipt, validatePrivacy, finalizeOwned } = require('./membership-history.cjs');
+const { schedule, runVisits, windowDelta, validateReceipt, validatePrivacy, finalizeOwned, sourceTip } = require('./membership-history.cjs');
 
 const exec = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
@@ -180,8 +180,7 @@ async function main() {
     console.log(`${block.name} visit ${visit} ${role}: 4407 checked requests, diagnostic only`);
   }
   try {
-    assert.equal((await exec('git', ['rev-parse', 'HEAD'], { cwd: root })).stdout.trim(),
-      'd25b6155bace7af2ec4ccb89f2eb0048e2db0c26', 'Expected consolidated starting source');
+    const actualSourceTip = await sourceTip(root);
     const identities = {};
     for (const [name, ref] of Object.entries({ app: image, postgres: protocol.postgres })) {
       identities[name] = JSON.parse(await docker(['image', 'inspect', '--format',
@@ -201,6 +200,7 @@ async function main() {
       purpose: owner, diagnosticOnly: true, admissionEligible: false, run, seed, blocks: schedule(seed),
       version: '0.55.60', image, postgres: protocol.postgres, identities,
       sourceParent: 'd25b6155bace7af2ec4ccb89f2eb0048e2db0c26',
+      sourceTip: actualSourceTip,
       appSource: '5bfff2dea1dec6f3e4b99c9a4cc0e6cb8e27388d', publicationRun: '39989347764',
       hashes: Object.fromEntries(files.map(file => [file, fileHash(path.join(root, file))])),
       client: { version: process.version, platform: process.platform, architecture: process.arch,

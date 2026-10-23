@@ -9,7 +9,7 @@ bounded local implementation and experiment. Exclusive source branch:
 `feat/membership-history-diagnostic-20261023`, from ordinary merge `d25b6155`.
 The opt-in harness reuses the original checked workload and 66-outcome runtime
 contract, with boundary-only CPU/RSS observations and explicit process epochs.
-Eleven focused tests and seven admission regression selectors pass; source syntax
+Thirteen focused tests and seven admission regression selectors pass; source syntax
 and scoped native ESLint correctness checks pass. No dependency or version
 change was made.
 
@@ -26,6 +26,9 @@ cycle; block variation and 12.981-24.731-second observer pauses prevent causal
 or admission claims. Exact evidence is under
 `test-results/membership-history-20261023/phase1/`.
 See `docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md`.
+The executed implementation is preserved in local commit `8771256b`; a subsequent
+test-first raw-input/source-ancestry guard correction is tested but unmeasured.
+Its hashes are recorded separately; it did not produce the frozen run receipts.
 Phase two, publication, remote CI, PR #251 changes and deployment remain
 unauthorized. Diagnostic completion cannot clear the original admission
 failure or any customer, migration, cleanup, capacity or visual hold.

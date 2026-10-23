@@ -122,8 +122,33 @@ Missing required identities or counters are failures, not zero-valued success.
 | `regression.log` | Seven unchanged admission/protocol/quantile selectors passed |
 | `lint-green.log` | Existing ESLint engine, native correctness rules: zero errors across changed CommonJS files |
 | Syntax | `node --check` on the three runtime files and test; PowerShell parser on the contract wrapper succeeded |
+| `red-input-guards.log` / `green-input-guards.log` | Two new guard tests failed first; the complete corrected focused suite passed 13 tests |
+| `lint-input-guards.log` / `freshness-final.log` | Corrected-source native ESLint: zero errors; document freshness: 27 documents passed |
+| `post-guard-replay.json` | All 80 retained app snapshots and 32 CPU windows satisfy corrected guards; all ten frozen input hashes remain intact |
 
 No full suite, remote CI, deployment or phase-two experiment was run.
+
+The focused test and static commands were run from the exclusive worktree:
+
+```powershell
+node --test scripts\test\membership-history.test.cjs
+node --test `
+  --test-name-pattern='identical samples|tail-only regression|A/A requires|nearest-rank|incomplete, reordered|unknown order|preregistered protocol' `
+  scripts\test\membership-performance.test.cjs
+node --check scripts\performance\membership-history.cjs
+node --check scripts\performance\run-membership-history.cjs
+node --check scripts\performance\benchmark-membership.cjs
+node --check scripts\test\membership-history.test.cjs
+pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling
+git diff --check
+```
+
+The scoped lint used the existing `api/node_modules/eslint` engine, not a
+new dependency: CommonJS Node globals with `no-unused-vars`, `no-undef`,
+`no-unreachable`, `no-dupe-args`, `no-constant-condition`, `no-unsafe-finally`,
+`valid-typeof` and `constructor-super`, all at error severity. PowerShell
+syntax was checked with `System.Management.Automation.Language.Parser.ParseFile`;
+neither command reported errors.
 
 ## Actual phase-one findings
 
@@ -240,17 +265,23 @@ deliberately refuses overwriting an existing output directory.
 | HD-01 | Local lint tooling / Low | Existing ESLint was installed, but `@eslint/js` was not resolvable from either the API package or ESLint's dependency scope. A convenience lint command failed before analyzing source. | Reused the installed ESLint engine with explicit native correctness rules and declared Node globals. No package installation, lockfile or quarantine change was needed. `lint-green.log` records zero errors. | Focused lint / checking the exact installed configuration before selecting a convenience preset |
 | HD-02 | Docker metadata tooling / Low | An initial manual image-inspect template assumed `.Config.Labels`; the cached image exposed no such key and Docker reported `map has no entry for key "Labels"`. | Used supported image ID, repository-digest, architecture and OS fields, then hashed the actual distribution and fixture. No image label or registry mutation was needed. | Read-only identity preflight / selecting only required supported fields |
 | HD-03 | Inspection tooling / Low | Early combined source reads exceeded the tool's inline output limit and were truncated. | Switched to smaller bounded source ranges and targeted field extraction; did not read or write temporary output paths. | Initial source inspection / limiting each evidence read before combining unrelated output |
+| HD-04 | Input missingness / High | Post-experiment review found raw `Number('')` could coerce an empty required burst or memory signal to zero, and an empty monotonic start could become `0n`. This was a latent false-success path, not an observed run failure. | Added strict unsigned parsing, nonempty clocks, positive memory peaks and complete root-ancestry guards. Two new RED controls preceded implementation; all 13 focused tests then passed. The collector also parses its retained CPU text from the same single read. | Post-experiment source consolidation / focused negative controls before the workload |
+| HD-05 | Source identity / Medium | The executed overlay correctly required HEAD `d25b6155`, but that exact-tip check would reject the harness after its own ordinary local commit. | A bounded read-only real Git check now requires that starting merge as an ancestor and records actual HEAD alongside source hashes. A real Git test accepts committed descendants and rejects unknown ancestry. No branch or history mutation is involved. | Local commit consolidation / testing the committed-source path before the workload |
+| HD-06 | Evidence checker tooling / Low | The first post-run byte-proof helper attempted `git show` on the ignored publication closeout and failed because that provenance input is not a Git blob. | Classify tracked source and ignored provenance explicitly; verify every frozen copy against its manifest hash, and compare only tracked files to Git. | Post-run preservation proof / checking input storage class before blob lookup |
+| HD-07 | Evidence checker tooling / Low | An expanded snapshot replay treated final Docker inspection records as initial counter snapshots and failed with `Cannot read properties of undefined (reading 'epoch')`. | Explicitly distinguish and validate the two receipt shapes; replay all 64 boundary plus 16 initial snapshots. Unknown record shapes still fail. No workload or original receipt changed. | Expanded post-run replay / inspecting the heterogeneous epoch-record schema first |
 
-This ledger records confirmed problems as they occur. Expected test-first
+This ledger records confirmed problems and their resolutions. Expected test-first
 failures are validation evidence, not implementation incidents.
 The high host-side observer cost is an observed limitation, not a silently
 waived gate or an invitation to change the frozen run.
 
-**Provenance/completeness:** This bounded task's un-compacted tool outputs and
-retained RED/GREEN, lint, phase and findings logs were reconciled for real
-failures and diagnosed limitations. `VSCODE_TARGET_SESSION_LOG` was not exposed,
-so a full per-agent JSONL reconciliation could not be performed. No claim is
-made that this ledger reconstructs the parent session's historical issues.
+**Provenance/completeness:** Available tool outputs, the bounded handoff summary
+and retained RED/GREEN, lint, phase and findings logs were reconciled for known
+failures and diagnosed limitations. Earlier context was summarized and
+`VSCODE_TARGET_SESSION_LOG` was not exposed, so a full per-agent JSONL
+reconciliation could not be performed. This is an explicit completeness limit,
+not a claim that every earlier transcript event or parent-session issue was
+reconstructed.
 
 ## Self-improvement and architecture disposition
 
@@ -265,3 +296,45 @@ entry point; schedule, receipt validation, epoch checks, collection and cleanup
 policy are testable helpers. It adds no application dependency edge, strategy
 framework or speculative benchmark abstraction. The old evaluator and
 qualification runner remain separate, preserving the admission boundary.
+
+## Local source preservation and unmeasured guard correction
+
+Commit `8771256b33ca040c4f43a247150a015d6a966ae2` preserves the executed
+implementation and actual-results documentation. The subsequent HD-04/HD-05
+correction is locally tested, **not remeasured**. It does not produce or replace
+the phase-one receipts, change their frozen manifest, or authorize another run.
+
+The executed source hashes above and exact `phase1/frozen-inputs/` copies remain
+authoritative for the experiment. After the guard correction, raw working-file
+SHA-256 values are:
+
+| Unmeasured corrected input | SHA-256 |
+|---|---|
+| `membership-history.cjs` | `894d7a4273871acfd28b938bcddaa7f2774afc1606627d396294292a01d377d9` |
+| `run-membership-history.cjs` | `42084dc37e418d1ac627f71a5bcb6c3882a9c59d1a3447084507e1d25ecc8cd1` |
+
+The corrected focused suite has 13 passing tests. `red-input-guards.log` and
+`green-input-guards.log` retain the additional test-first evidence. This
+self-improvement is **applied**; the design disposition remains **accepted**:
+small concrete input guards and a read-only identity helper, without a new
+framework or application dependency.
+
+### Raw bytes versus Git bytes
+
+With `core.autocrlf=true`, all nine tracked executed inputs were raw CRLF files,
+while Git stores LF-normalized blobs. Their raw hashes therefore **do not equal**
+the corresponding commit-blob hashes. A read-only proof confirms that every
+tracked frozen input equals commit `8771256b` after CRLF-to-LF normalization;
+the tenth input is ignored publication provenance, not a Git source blob.
+Do not substitute a Git blob hash for an executed-file hash.
+
+The exact raw copies remain under `phase1/frozen-inputs/`. Reproduce the
+preservation and strict-guard replay without issuing any workload requests:
+
+```powershell
+node test-results\membership-history-20261023\verify-inputs.cjs
+```
+
+`post-guard-replay.json` records both hash domains and the 80-snapshot,
+32-window replay. It is a source-preservation and compatibility check,
+not another experiment or new admission evidence.
