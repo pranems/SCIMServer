@@ -9,6 +9,150 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-23 web ip-address exact override correction (#248)
+
+The next independent proposed patch, 0.55.60, updates the web override to
+exact 10.7.4. Approved-proxy metadata records publication
+2026-10-11T19:34:42Z and seven-day eligibility 2026-10-18T19:34:42Z.
+No quarantine exception or registry/control change is needed. The actual
+web lock and installed tree contain no ip-address dependency: this is
+dormant override hygiene, not a newly installed patched parser.
+Use the existing public-registry CI workflow and reject unrelated package
+churn. See [scope and receipts](../WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+Self-improvement is applied through a real pin/graph regression.
+Design disposition is accepted: no new application abstraction is justified.
+
+### 2026-10-23 Hono exact-patch remediation (#248)
+
+Hono 4.13.11 fixes the Medium GHSA-5r4p-p66f-jhc7 / CVE-2026-111757.
+Approved-proxy metadata records publication 2026-09-29T06:15:49Z and
+seven-day eligibility 2026-10-06T06:15:49Z. The client setting
+`min-release-age=undefined` does not establish absence of proxy quarantine.
+No registry/control change, waiver or local lockfile generation is authorized.
+Use the existing public-registry regeneration workflow, inspect its exact
+source tip and every changed entry, then restore with `npm ci` without
+rewriting lockfiles. Reject unrelated dependency churn.
+
+The frozen 0.55.58 image at digest
+`sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`
+contains Hono 4.13.7, @hono/node-server 1.19.15, @prisma/dev 0.24.3 and
+Prisma 7.8.0. Offline read-only package metadata inspection started no API
+or database. `devOptional` and absence of direct imports are not absence
+proof. This receipt belongs only to that frozen image, not a new candidate.
+
+The actual locked dependency assertion fails on 4.13.7 before the change.
+Bootstrap publication validates the old installation only; final dependency
+GREEN requires the CI artifact and a fresh installation. Product 0.55.59
+is reserved for this patch without absorbing #251 or altering its holds.
+**Self-improvement: applied.** Verify actual runtime contents rather than
+inferring them from dependency flags. **Design disposition: accepted.**
+The existing exact override and regeneration route need no new abstraction.
+
+**Execution issue (Low, release-document coupling):** the first protected
+bootstrap push stopped at doc-content C13: the header freshness fixer updated
+the product header but not README's shields.io version badge (0.55.58 versus
+0.55.59). No branch was published. Updating the badge removes the actual
+mismatch. The independent doc-content gate caught it at the earliest static
+stage; run that existing gate after the freshness fixer on future bumps.
+No new abstraction or relaxed gate is needed.
+
+**Execution issue (Medium, shared-host environment):** the next normal Fast
+push passed 24 gates but its unchanged InMemory HTTP suite hit
+`connect ENOBUFS 127.0.0.1` in profile-combinations' custom SPC discovery test.
+The result was 2,513 passed, one failed and 42 genuine backend skips.
+No patched dependencies had been installed. A serialized focused rerun of
+that unchanged file passed all 57 tests; a read-only socket snapshot showed
+813 TIME_WAIT connections. This supports transient host socket pressure,
+not a demonstrated application defect. No other process was stopped and
+no host network setting, assertion, exclusion or timeout was changed.
+The original failure remains retained; a fresh ordinary hook is required
+before publication. The transport-level failure was detected by the first
+applicable HTTP gate; the focused rerun is not a substitute for that gate.
+
+**Historical blocker (Medium, baseline test harness):** the third ordinary Fast
+push passes all 23 static gates, then fails
+`endpoint-cache-freshness.spec.ts`'s real non-UTC child probe:
+`spawnSync node.exe ETIMEDOUT`, 30,119ms, null status, SIGTERM. Units report
+6,209 passed and one failed across 213 suites; no HTTP gate runs after that
+failure. This is the unchanged nested Node/Jest harness on master, not an
+installed Hono change. The earlier attempt passed all 6,210 units, so that
+pass is retained but is not substituted for the current failure.
+The failure is detected by the first unit gate; importing #251 tooling,
+increasing a timeout, bypassing a hook or retrying until a favorable pass
+would have crossed the then-authorized remediation scope. Execution stopped
+with that blocker. At that checkpoint no branch or regeneration workflow was
+published, both tracked lockfiles were unchanged, and no patched dependency
+GREEN or reviewed Hono PR existed.
+
+**Authorized prerequisite resolution:** #252 isolates the two relevant test
+files from reviewed `84d11af7`; no other #251 tooling or checkpoint053
+Linux/finalization changes enter the dependency branch. Normal merge
+`fc962a65e03b2a0cb1ad86b96b88c473d6d07b7d` follows exact-tip checks and
+hosted review 5628884972, which is COMMENTED with approval recommended and
+no findings, not human GitHub approval. Authoritative merged-source
+Build Test Image 39962553306 and CodeQL 39962437032 pass. Its immutable
+test-image digest is
+`sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+The 30-second child and 35-second parent deadlines are unchanged. Actual
+former-launcher and UTC-conversion negative controls discriminate the fix.
+This is the earliest unit-level correction of the harness escape, not a
+favorable retry or relaxation of the retained failed full-hook receipt.
+
+The ordinary Hono/master merge `62bf4d1e` preserves all four original Hono
+commits. Four documentation-prepend conflicts were resolved by preserving
+both contexts, not taking either side wholesale. The subsequent normal Fast
+bootstrap passes 25/25 gates in 783.4 seconds, including 6,210 units and 2,514
+HTTP tests with 42 existing backend skips. This still uses old dependencies.
+
+**Verified CI artifact and private dependency GREEN:**
+
+| Claim | Observed evidence |
+|---|---|
+| Exact source and existing route | Regenerate lockfile run `39965730441`, push source `62bf4d1e13781653e3619215240ddd1865a1166c`, unchanged workflow, API+web selection |
+| Authenticated artifact | ID `12506119257`, ZIP SHA-256 `f2e318928b7aa6e672983ba1acb492bcbd8a73066db5a50355b06e9521b6bf58`; downloaded bytes match GitHub's digest |
+| Entire lockfile comparison | Hono 4.13.7 -> 4.13.11 is the only changed package. Both workspaces change only intended 0.55.58 -> 0.55.59 version metadata otherwise. No root artifact or unrelated web package churn is imported. |
+| Provenance and age | All 684 API and 395 web package entries retain public URLs and sha512. The only age-report row is Hono, published 2026-09-29T06:15:49.676Z, age 24.321723 days at 2026-10-23T13:59:06.549Z. |
+| Independent metadata | Approved-proxy Hono dist integrity matches the CI-generated sha512. Its proxy tarball URL is not copied into either lockfile; no registry setting is changed. |
+| API lockfile | SHA-256 `ee7c44126acd1ef5949320f5c181c5e1291794cb41920f6c1324ab3689f7b4fc`, byte-identical before and after approved-registry `npm ci --no-audit --no-fund` |
+| Web lockfile | SHA-256 `047012e291c72a6c5d7f4a8dc6a5c2e1185152c131ad14e3cd9e96f5928e0d9e`; package graph unchanged, version metadata only, so no unnecessary local web restore |
+| Actual installed routes | `prisma@7.8.0 -> @prisma/dev@0.24.3 -> hono@4.13.11`, also through `@hono/node-server@1.19.15`; `npm ls` exits 0 |
+| Permanent actual-lock RED/GREEN | Pin checker adds two cases (19 -> 21), including every actual locked Hono occurrence, exact override/provenance and advisory boundary. Real pre-artifact failure receives 4.13.7 versus expected 4.13.11; after restoration all 21 pin plus 21 inherited freshness cases pass (42 total). |
+| Audit | API `npm audit --json` exits 0 with zero vulnerabilities; unchanged web audit exits 1 with three Moderate affected packages, zero High/Critical, described below. |
+
+Full protected publication and exact-tip hosted CI/review are independent
+remaining claims at this authoring checkpoint. Whole-unit expectation is
+6,210 -> 6,212; focused GREEN does not certify that total. No old or new image
+inventory is relabeled as deployed patched-Hono proof, and no performance
+admission is retried.
+
+**Separate web triage (Medium, existing dependency advisory):** the fresh web
+audit reports `@vitest/mocker`, `vitest` and `@vitest/coverage-v8` as Moderate
+affected packages through
+[GHSA-qxg6-89mg-rqv8](https://github.com/advisories/GHSA-qxg6-89mg-rqv8) and
+[GHSA-xp26-3454-mjgp](https://github.com/advisories/GHSA-xp26-3454-mjgp).
+The entire web package map is unchanged from the exact bootstrap baseline,
+so these are not introduced by the Hono patch. The proposed 4.1.12 toolchain
+fix needs its own approved-proxy age check and bounded rollback unit; no
+eligibility or runtime-unreachability claim is inferred here.
+Owner: repository maintainer. Target: 2026-10-30 for separate eligibility and
+exposure triage. The audit detects them at the earliest dependency-check
+stage; there are zero High/Critical blockers and no waiver is applied.
+Retain the nonzero web audit exit rather than reporting all audits clean.
+
+**Evidence completeness:** the original three execution issues and this
+continuation's merge/artifact/install/audit outcomes were reconciled against
+the actual retained command logs in this fresh continuation, not a restored
+or reconstructed deleted transcript. Expected HTTP error-path log messages
+were not counted as test failures; only the Jest failing-test summaries and
+gate exits above are causal. **Design disposition: accepted.** The dependency
+patch remains cohesive; the directly coupled harness correction was separately
+reviewed and merged, not mixed with unrelated tooling. The two compact
+dependency tests use existing checker/lockfile seams and need no application
+abstraction. **Self-improvement: applied.** Preserve a
+blocked bootstrap as blocked; never infer patched-tree assurance from static
+success or a previous run's test pass. Keep the permanent actual-lock guard,
+the authenticated full-artifact comparison and actual installed-tree receipt.
+
 ### 2026-10-21 Vite security prerequisite
 
 The unchanged 0.55.56 web lockfile reports a High Vite advisory through the

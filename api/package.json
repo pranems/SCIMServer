@@ -1,6 +1,6 @@
 {
   "name": "scimserver-api",
-  "version": "0.55.58",
+  "version": "0.55.60",
   "description": "SCIMServer backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",
@@ -85,7 +85,7 @@
     "defu": "6.1.5",
     "effect": "3.20.0",
     "fast-uri": "4.1.5",
-    "hono": "4.13.7",
+    "hono": "4.13.11",
     "multer": "2.4.0",
     "deepmerge-ts": "8.0.0",
     "mysql2": "3.23.1",

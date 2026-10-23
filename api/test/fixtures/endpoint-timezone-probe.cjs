@@ -5,6 +5,7 @@ const {
 } = require('../../src/infrastructure/repositories/prisma/prisma-endpoint-lifecycle.repository.ts');
 
 async function main() {
+  assert.equal(require.main, module);
   assert.equal(process.env.PERSISTENCE_BACKEND, 'prisma');
   const timezoneOffset = new Date(2026, 0, 1).getTimezoneOffset();
   assert.equal(timezoneOffset, 300);
@@ -49,6 +50,8 @@ async function main() {
   process.stdout.write(
     JSON.stringify({
       runner: 'standalone-production-path',
+      entrypoint: process.argv[1],
+      execArgv: process.execArgv,
       timezoneOffset,
       snapshotReads,
       createdAt: endpoint.createdAt,

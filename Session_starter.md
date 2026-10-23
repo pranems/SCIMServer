@@ -1,6 +1,135 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-22
+**Last verified:** 2026-10-23
+
+### Local qualification consolidation (2026-10-23)
+
+Ordinarily merge reviewed master `5bfff2dea1dec6f3e4b99c9a4cc0e6cb8e27388d`
+into preserved qualification head `f6f03a523b6370eccc63f1499c3c111dd5cdf200`.
+Current product metadata is 0.55.60, with Hono 4.13.11 and dormant web
+ip-address override 10.7.4 imported intact from master. PRs #252, #253 and
+#254 are merged; the earlier remediation notes below are historical.
+Keep master's real-source leaf and runtime identity assertions, all existing
+scenarios, and unchanged 30-second child / 35-second parent deadlines.
+
+This is a local merge checkpoint only. PR #251's remote head and failed
+qualification remain unchanged. Frozen 0.55.58 image/protocol evidence is
+not replaced by the 0.55.60 publication. No push, remote CI, measurement,
+diagnostic campaign or deployment is authorized. All three performance
+workflows also trigger on matching pull-request changes: a tracking push can
+launch admission and diagnostics through synchronize. Next-phase automation
+and prospective performance-admission design require explicit authorization;
+do not change triggers, resources, thresholds or frozen inputs to bypass it.
+Focused commands, hashes, conflict dispositions and preservation evidence
+are retained in `test-results/qualification-consolidation-20261023/`.
+
+### Independent web ip-address override remediation (2026-10-23)
+
+Reserve 0.55.60 from verified master `cddeb5a569b3997000fc3c3bb38349357d83e2ed`
+for exact web override 10.7.4, the minimal aged patch for issue #248.
+The actual current web lock has no ip-address entry or dependency edge, and
+the installed tree has no matching package. This corrects a dormant override,
+not a demonstrated shipped parser. The regression first failed with expected
+10.7.4 versus actual 10.7.1 (22 passed, one failed). CI-only lockfiles and
+final protected publication/review remain pending. Sanctioned CI run
+39980968858 succeeded at d6e95717; artifact 12513751137 changes zero packages,
+only synchronized version metadata. Web `npm ci` preserves the lock hash
+and confirms no installed parser. Actual pin/graph GREEN is 23/23; scanner
+reports API 26 pins and web 8 pins, zero findings and zero unchecked.
+Bootstrap Fast passed 25/25 (6,214 units, 2,514 HTTP tests, 42 existing skips).
+See [the implementation receipt](docs/WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+No merge or deployment is authorized here. PR #251's retained performance
+failure and customer-data, capacity, cleanup and operator verification holds
+remain unchanged; published 0.55.59 is not deployment acceptance.
+
+### Independent Hono remediation (2026-10-23)
+
+Branch `chore/regen-lockfile-hono-security-20261023` starts from fresh
+`origin/master` e1070ba28825afee46c953e1e2d5d518863303f2, not PR #251.
+It now ordinarily incorporates prerequisite merge `fc962a65` / #252. Fresh
+master remains 0.55.58, so the reserved next patch 0.55.59 is still correct.
+Reserve 0.55.59 for exact Hono 4.13.11 (#248). The actual lock dependency
+regression was RED on 4.13.7. CI-only regeneration and a private restored
+installation now prove exact Hono 4.13.11; final publication/review remain
+required. The preserved qualification branch stays at f6f03a52.
+Frozen 0.55.58 image presence is not new-candidate qualification.
+No original deleted transcript was restored. No Hono merge or deployment.
+The unchanged 39875689201 A/A p99 failure (ratio 1.23928982, limit 1.10),
+customer migration receipt, operational dispositions, 403 cleanup verification
+and actual target-specific human visual observation remain holds.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
+| 2026-10-23 | Normally merge prerequisite #252 and verify its authoritative merged-source CI/artifact, then preserve both contexts in the ordinary Hono/master merge. |
+| 2026-10-23 | Protected bootstrap 25/25 PASS; authenticate minimal CI artifact 12506119257/run 39965730441 and prove actual installed+locked Hono 4.13.11 with 42 focused tests. |
+
+- [x] ✅ COMPLETED: Verify handoff receipts, fresh base and actual locked RED.
+- [x] ✅ COMPLETED: Normally merge reviewed prerequisite #252, verify merged
+  source CI and ordinarily incorporate master without rewriting Hono history.
+- [x] ✅ COMPLETED: Publish bootstrap through ordinary hooks, 25/25 PASS
+  (783.4 seconds); CI-only regeneration at exact source `62bf4d1e`.
+- [x] ✅ COMPLETED: Verify downloaded ZIP, all lock entries/ages and minimal
+  diff, apply only intended locks, restore via approved-registry `npm ci`
+  without lock rewrites, prove actual installed/locked Hono 4.13.11.
+- [x] ✅ COMPLETED: Permanent actual-lock guard RED then GREEN; pin checker
+  19 -> 21 cases, plus 21 inherited freshness cases, 42/42 PASS.
+- [ ] Final patched-tree protected push, exact-tip CI and hosted Hono review.
+
+**Historical publication blockers:** three ordinary Fast pushes published
+nothing. The first caught a stale README version badge (fixed). The second
+passed 24 gates but failed one unchanged HTTP test with `ENOBUFS`; its focused
+rerun passed 57/57. The third passed 23 static gates but failed the unchanged
+`endpoint-cache-freshness.spec.ts` non-UTC nested Node/Jest probe at 30,119ms,
+`ETIMEDOUT` (6,209 passed, one failed). That baseline tooling issue was
+isolated in prerequisite #252, not imported as unrelated #251 tooling.
+No hook bypass, timeout
+change or favorable retry is claimed as the historical GREEN. The separate
+prerequisite and ordinary merge now unblock publication, as recorded above.
+Retained local evidence: `test-results/hono-security-20261023/`.
+
+**Current dependency receipts:** artifact run `39965730441` / ID `12506119257`,
+ZIP SHA-256 `f2e318928b7aa6e672983ba1acb492bcbd8a73066db5a50355b06e9521b6bf58`.
+Only Hono changes; web package entries are unchanged, with version metadata
+only. API lock SHA-256 `ee7c44126acd1ef5949320f5c181c5e1291794cb41920f6c1324ab3689f7b4fc`.
+Fresh API audit is zero; web audit exits 1 with three unchanged Moderate
+Vitest packages (zero High/Critical), tracked separately in the policy.
+This is private dependency proof, not deployment or new performance admission.
+
+**Design disposition: accepted.** An exact transitive patch uses existing
+override/provenance seams; adding an application abstraction is speculative.
+
+### Separate timezone-harness prerequisite (2026-10-23)
+
+Branch `test/timezone-leaf-prerequisite-20261023` starts from verified master
+`e1070ba28825afee46c953e1e2d5d518863303f2`. Backport only the two test files
+from `84d11af7`, plus direct runtime launcher receipts and narrow documentation.
+All 21 focused freshness cases pass with the original 30-second child and
+35-second parent limits. Negative controls reject the actual former nested
+launcher and an actual UTC-conversion defect; production source is restored.
+No product bump (still 0.55.58), Hono, lockfile or performance-tooling change.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Isolate the reviewed standalone timezone harness as a prerequisite; focused GREEN and two discriminating negative controls retained. |
+
+- [x] ✅ COMPLETED: Confirm actual full-hook spawn-timeout RED and focused
+  real-leaf outcome/launcher controls, without relaxing deadlines.
+- [x] ✅ COMPLETED: Ordinary protected push passes all 25 gates; exact-tip
+  CI and hosted review 5628884972 report no findings at `5a42eb09`.
+- [x] ✅ COMPLETED: Operator-authorized normal merge #252 at `fc962a65`;
+  authoritative merged-source Build Test Image 39962553306 and CodeQL
+  39962437032 PASS. The bot review is COMMENTED, not human GitHub approval.
+  Immutable test image:
+  `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+
+Preserve Hono branch `chore/regen-lockfile-hono-security-20261023` at
+`e18d32c04855e8acf88c8a3e02c9ec7b447cfb21` and qualification branch at
+`f6f03a523b6370eccc63f1499c3c111dd5cdf200`. Their evidence and release holds
+remain unchanged. The 39875689201 p99 failure is not rerun or waived.
+**Design disposition: accepted.** A small test-only real-source fixture needs
+no application abstraction. **Self-improvement: applied.** Require the child
+to report its actual entrypoint and loader, not just return a success exit.
 
 ### Current master/performance reconciliation (2026-10-22)
 

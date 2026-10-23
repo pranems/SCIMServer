@@ -219,6 +219,8 @@ describe('Persistent endpoint cache freshness', () => {
     expect(result.stdout).toContain('"runner":"standalone-production-path"');
     expect(JSON.parse(result.stdout)).toEqual({
       runner: 'standalone-production-path',
+      entrypoint: require.resolve('../../../../test/fixtures/endpoint-timezone-probe.cjs'),
+      execArgv: ['--require', require.resolve('ts-node/register/transpile-only')],
       timezoneOffset: 300,
       snapshotReads: 1,
       createdAt: '2026-01-01T00:00:00.000Z',

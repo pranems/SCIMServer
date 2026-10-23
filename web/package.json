@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.55.58",
+  "version": "0.55.60",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -49,7 +49,7 @@
     "vitest": "4.1.11"
   },
   "overrides": {
-    "ip-address": "10.7.1",
+    "ip-address": "10.7.4",
     "nanoid@^3.0.0": "3.3.18",
     "nanoid@^5.0.0": "5.1.16",
     "postcss": "8.5.23",

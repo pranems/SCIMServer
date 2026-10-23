@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.58`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.60`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,53 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.60 web dependency override correction
+
+This proposed patch changes only the web ip-address override to exact 10.7.4
+for [GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5),
+which fixes quadratic IPv6 zone-identifier parsing. The current dependency
+graph does not contain ip-address, so this is preventive override hygiene,
+not evidence of a vulnerable browser bundle or a newly installed parser.
+The patch is older than the seven-day quarantine minimum. The withdrawn
+duplicate GHSA-p3hm-x653-5rc6 is not another active flaw.
+See [scope and validation](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+No application, UI, API contract or deployment change is included.
+Existing performance and customer verification holds remain unchanged.
+
+### 0.55.59 Hono security dependency patch
+
+This pending patch pins transitive Hono to exactly 4.13.11 for
+[GHSA-5r4p-p66f-jhc7](https://github.com/advisories/GHSA-5r4p-p66f-jhc7)
+([issue #248](https://github.com/pranems/SCIMServer/issues/248)).
+The Medium advisory affects Hono >=4.12.4 and <4.13.11: `serveStatic` can
+decode a routed path again and bypass middleware protecting a static prefix.
+It is not traversal outside the configured root.
+
+The existing frozen 0.55.58 image demonstrably includes Hono 4.13.7 through
+Prisma tooling, despite `devOptional` lockfile classification. No direct
+application import was found, but that does not prove unreachability.
+The eligible patch uses the existing CI-only lockfile process; bootstrap
+checks against the old installation are not patch validation.
+There is no application/UI change, deployment, new image qualification or
+performance admission claim. Existing release holds remain unchanged.
+The historical non-UTC nested-Jest timeout was corrected in separate,
+normally merged prerequisite #252 without changing either deadline. The
+Hono branch preserves all four original commits and merges master normally.
+Its protected bootstrap passes, then exact-source CI regeneration
+`39965730441` produces only the Hono patch and coordinated version metadata,
+with public-registry URLs, sha512 and a verified publication age over 24 days.
+The actual restored private dependency tree and lockfile both contain 4.13.11;
+42 focused pin/freshness tests pass. This is not a deployed release or new
+performance qualification. Final protected publication, exact-tip CI and
+hosted Hono review remain separate checks.
+
+Fresh API dependency audit reports zero vulnerabilities. The unchanged web
+dependency graph reports three Moderate affected Vitest packages, zero
+High/Critical, from GHSA-qxg6-89mg-rqv8 and GHSA-xp26-3454-mjgp. This patch
+does not silently upgrade that unrelated toolchain or claim its audit is
+clean; separate triage is tracked in the
+[supply-chain policy](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md).
 
 ### 0.55.58 correction, validated privately and awaiting reviewed merge
 

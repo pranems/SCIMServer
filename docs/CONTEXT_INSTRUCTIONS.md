@@ -1,13 +1,29 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.58
-> **Last Updated**: October 22, 2026
-> **Last verified:** 2026-10-22
+> **Version**: 0.55.60
+> **Last Updated**: October 23, 2026
+> **Last verified:** 2026-10-23
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-23 local consolidation:** reviewed master `5bfff2de`, product
+0.55.60, is reconciled into the preserved local qualification branch through
+an ordinary merge. Keep the original 20 commits and historical narrative,
+master's CI-generated locks and strengthened real-source timezone leaf.
+The older dependency remediation entries below describe earlier checkpoints;
+PRs #252, #253 and #254 are now merged, not pending.
+The 0.55.58 qualification failure remains authoritative: populated-read p99
+40.650743 versus 50.378052 ms, ratio 1.23928982 above unchanged 1.10.
+The 0.55.60 publication is not performance acceptance or a replacement input.
+Stop locally: no push, remote CI, measurement, diagnostics or deployment.
+All three performance workflows have pull-request triggers, so pushing #251
+can launch admission and diagnostic campaigns. Preserve the automation hold
+until explicit next-phase authorization; do not alter triggers or evidence.
+Focused verification and preservation receipts live in the ignored
+`test-results/qualification-consolidation-20261023/` directory.
 
 **Current PATCH-correlation correction:** published `6febc534` passes 28
 ordinary gates in 1184.5 seconds. Exact Linux qualification/native complete
@@ -177,6 +193,50 @@ round and twelve +10% ceilings remain unchanged. No serving/dependency/version
 change; dev's last retained serving checkpoint is 0.55.56, not a fresh cloud
 inventory. Earlier failed receipts remain failed.
 See [protocol and limitations](ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
+**2026-10-23 next independent remediation:** proposed 0.55.60 updates the
+dormant web ip-address override to exact 10.7.4 from master cddeb5a5.
+No actual web lock dependency exists; do not invent an installed parser.
+[Scope and evidence](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md) distinguishes
+bootstrap manifest proof from final CI artifact and installed inventory.
+Stop at a reviewed unmerged PR. All #251 and customer verification holds remain.
+
+**2026-10-23 dependency remediation:** 0.55.59 reserves an independent exact
+Hono 4.13.11 patch for #248, based on master e1070ba2. CI-only lockfiles,
+final protected publication and hosted review remain required.
+Historical bootstrap publication was blocked: three ordinary Fast attempts published
+nothing. The final attempt fails the unchanged non-UTC nested Node/Jest
+timestamp probe at its existing 30-second limit (ETIMEDOUT, 6,209 units pass).
+Prerequisite #252 is now normally merged at `fc962a65`, with authoritative
+merged-source CI 39962553306 and CodeQL 39962437032 PASS. Its immutable
+test-image digest is `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+This is not patched-Hono proof. Ordinarily merge master into the preserved
+Hono branch; do not import other #251 tooling or bypass hooks. Ordinary merge
+`62bf4d1e` preserves all four Hono commits. Its protected bootstrap passes
+25/25 gates (6,210 units; 2,514 HTTP passes plus 42 backend skips), but those
+old-installation checks are not patched proof.
+CI-only regeneration 39965730441 / artifact 12506119257 is authenticated:
+only Hono 4.13.7 -> 4.13.11 plus 0.55.59 API/web metadata changes, public URLs,
+sha512 and a 24.3217-day publication age. Approved-registry `npm ci` preserves
+the lockfile and actual installed routes now contain 4.13.11.
+The permanent actual-lock guard was RED on 4.13.7 and is now GREEN; 21 pin
+and 21 inherited freshness cases pass. Final full patched gates/PR review
+are separate receipts. API audit is zero; unchanged web Vitest packages
+have three Moderate audit findings (zero High/Critical), not a clean audit.
+Frozen 0.55.58 runtime-presence evidence is not new-candidate proof.
+Do not absorb #251 tooling, rerun performance or alter its failed admission,
+customer migration, operational, cleanup or human visual verification holds.
+
+**2026-10-23 test-harness prerequisite:** a separate master-based branch ports
+only the real-leaf timezone tests from reviewed `84d11af7`, with runtime
+entrypoint/loader receipt checks. Original 30-second child/35-second parent
+limits remain. All 21 focused cases pass; former nested launcher and actual
+UTC-conversion negative controls fail as expected, with production restored.
+No product bump, Hono/lockfile change or performance-tooling import.
+The Hono branch's four original commits through e18d32c0 stay preserved.
+Hosted review 5628884972 recommends approval with no findings but remains
+COMMENTED, not human GitHub approval. Only #252 is normally merged; no Hono
+merge, deployment or new performance admission is authorized.
 
 **2026-10-22 review follow-up:** hosted Copilot review succeeds after billing
 selection and identifies a real shared-cache binding collision. The generic

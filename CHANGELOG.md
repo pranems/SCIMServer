@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Local qualification branch reconciliation (no product bump)
+
+- Ordinarily merge reviewed master `5bfff2de` (0.55.60) into preserved
+  qualification head `f6f03a52`, retaining every constituent commit.
+  Preserve master's manifests and CI-generated locks without regeneration.
+- Resolve the overlapping real-source non-UTC test harness with master's
+  stronger runtime identity assertions, unchanged scenarios and unchanged
+  30-second child / 35-second parent deadlines. Preserve both historical
+  documentation narratives, with current context explicitly distinguished.
+- This is local consolidation, not a performance fix or release admission.
+  Frozen inputs and the original failed qualification remain unchanged.
+  No push, remote CI, measurement, diagnostics or deployment follows.
+  Focused validation receipts are retained under
+  `test-results/qualification-consolidation-20261023/`.
+
 ### Prospective Linux performance qualification (tooling only)
 
 - Fix review `5621836110` and the new exact-source Linux privacy failure:
@@ -173,6 +188,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic control flow. Windows helper startup allows only `SystemRoot`;
   Linux inherits no environment. Product remains 0.55.58 with no dependency,
   lockfile, serving or cloud change. Linux diagnostic execution is pending.
+
+### 0.55.60 web ip-address override security correction (#248)
+
+- Update the dormant web ip-address override from 10.7.1 to exact 10.7.4
+  for active Medium GHSA-rxp7-6hxx-x8q5 / CVE-2026-111997. The second
+  advisory record is a withdrawn duplicate, not a second flaw.
+- The actual lock has no ip-address package or dependency edge. Do not
+  claim installed patched parser or browser shipment from an override.
+  Preserve the graph and use only verified public-registry CI lockfiles.
+- Focused regression count: 21 -> 23, with RED 22 passed / one failed on
+  the old exact override. Bootstrap and final gate receipts are distinguished
+  in [the implementation report](docs/WEB_IP_ADDRESS_SECURITY_REMEDIATION.md).
+  GREEN is 23/23. Bootstrap ordinary hook: API units 6,212 -> 6,214,
+  HTTP unchanged 2,514 passed / 42 existing skips; final web counts and
+  exact-tip CI remain pending. Sanctioned run 39980968858 changes zero
+  packages and only synchronized version metadata in both locks.
+- Product API and web versions move together to 0.55.60. This is unmerged
+  source work, not deployment, performance acceptance or a release waiver.
+
+### 0.55.59 Hono dependency security patch (#248)
+
+- Pin the API's transitive Hono override exactly to 4.13.11, the smallest
+  patched release for GHSA-5r4p-p66f-jhc7 / CVE-2026-111757 (Medium).
+  The patch was published 2026-09-29T06:15:49Z and became seven-day eligible
+  2026-10-06T06:15:49Z. No quarantine exception or registry change is needed.
+- Reserve 0.55.59 for the shipped dependency change; API and web product
+  versions move together. The existing public-registry CI workflow owns both
+  lockfiles. Bootstrap checks on the old installation do not prove the patch.
+  The actual locked dependency regression first fails on Hono 4.13.7.
+- The frozen 0.55.58 image contains Hono despite its `devOptional` lock flag.
+  This is runtime-presence evidence, not proof of exploitability or absence
+  of reachable vulnerable middleware. No application or UI behavior changes.
+  The restored private installation now proves Hono 4.13.11 in both actual
+  Prisma dependency routes. Final protected publication and hosted review
+  remain separate checks.
+- Historical bootstrap publication was blocked before CI-only regeneration. Three normal
+  Fast pushes publish nothing: C13 README badge mismatch (fixed), an unchanged
+  HTTP `ENOBUFS` failure (57/57 focused rerun), then the unchanged nested
+  non-UTC Node/Jest timestamp probe's 30,119ms `ETIMEDOUT` (6,209/6,210 units).
+  The last attempt passes all 23 preceding static gates. Both lockfiles remain
+  unchanged from master, Hono remains installed/locked at 4.13.7, and no
+  patched GREEN, PR, exact-tip CI or review was claimed at that checkpoint.
+- The separate prerequisite #252 is now normally merged at `fc962a65`, after
+  exact-tip checks and hosted review 5628884972 (COMMENTED, no findings;
+  not human GitHub approval). Its authoritative merged-source CI run
+  39962553306 passes, with test-image digest
+  `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+  Merge master ordinarily into this preserved four-commit Hono branch before
+  retrying its protected bootstrap. This old-dependency image is not Hono proof.
+- The ordinary master merge `62bf4d1e` preserves all four Hono commits.
+  Its normal bootstrap push passes all 25 Fast gates in 783.4 seconds:
+  6,210 unit tests / 213 suites and 2,514 HTTP tests / 118 passing suites,
+  with 42 existing backend skips. Those checks still used old dependencies.
+- CI regeneration run `39965730441`, source `62bf4d1e`, produces artifact
+  `12506119257`, ZIP SHA-256
+  `f2e318928b7aa6e672983ba1acb492bcbd8a73066db5a50355b06e9521b6bf58`.
+  The entire artifact was authenticated and compared: only Hono changes
+  (4.13.7 -> 4.13.11), plus the intended API/web 0.55.59 version metadata.
+  Every package retains public-registry URLs and sha512. The sole changed
+  package was 24.3217 days old at CI verification; no unrelated churn.
+- Approved-registry `npm ci` installs the patch without rewriting the API
+  lockfile. Permanent pin-checker tests now assert the actual committed
+  Hono occurrences and advisory boundary: 19 -> 21 cases. Before applying
+  the artifact, the real lock guard fails on 4.13.7; after restoration, all
+  21 pin tests plus all 21 inherited freshness tests pass (42 total).
+  Whole-unit expectation is 6,210 -> 6,212; final owning-hook/CI results
+  must be read from their receipts, not inferred from this focused pass.
+- Fresh API audit: zero vulnerabilities. Unchanged web dependency graph:
+  three Moderate affected Vitest packages, zero High/Critical; audit exit 1
+  is retained, not relabeled clean. Separate triage is recorded in the policy.
+- Existing performance admission failure, customer migration, operational
+  dispositions, cleanup verification and target-specific human visual
+  observation remain outstanding. No Hono merge, deployment or performance rerun.
+
+### Test-only prerequisite: standalone non-UTC freshness probe
+
+- Backport only the two relevant test-file changes from reviewed
+  `84d11af7658d91c3d3392831a088b89f54279b1d`. Replace redundant nested Jest
+  startup with a real Node leaf loading actual TypeScript source. Preserve
+  the 30-second child and 35-second parent deadlines and all 21 cases.
+- Require runtime entrypoint/loader identity, New York January offset 300,
+  exactly one snapshot read and both UTC timestamps. The retained full-hook
+  30,119ms ETIMEDOUT is the observed RED, not a timestamp assertion failure.
+  Reinstating the former launcher fails the receipt assertion even when the
+  child exits normally; removing actual production UTC interpretation fails
+  both timestamp values (05:00Z instead of 00:00Z). Production source is restored
+  byte-identically. Focused freshness: 21 -> 21 PASS; targeted ESLint and
+  fixture syntax PASS. Full protected-gate and exact-tip review evidence belong
+  to the prerequisite PR, not the old isolated PASS.
+- No product/version/lockfile, application/UI, performance runner, quota or
+  admission change in #252. Its normal merge and merged-source checks are
+  recorded above; only that prerequisite is merged, not #251 or this Hono patch.
 
 ### 0.55.58 consolidation onto token-lifetime master
 
