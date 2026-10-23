@@ -3,6 +3,78 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## Offline DERIVED reference preparation, not baseline adoption
+
+**Exact-image source proof now confirms the known raw database-URL startup
+emitter.** One explicitly owned, never-started container was created from
+the cached immutable 0.55.20 parent. Its exact compiled Prisma file has SHA-256
+`00ea9943fb8f6ecf296b34af5c9072d447b346d15b213669ba83d1f422f92c33`
+and contains both logging statements corrected by reviewed commit
+`5896771677e3a67308160d2853c69349ad4188c3`. This strengthens the earlier
+release-associated source evidence; it still does not reconstruct any
+destroyed matched runtime line or OS-07 row.
+
+The source container remained in `created`, with `Running=false` and a zero
+start timestamp. Its entire `/app` distribution was copied as a sealed archive
+without starting an entrypoint, health check, application, Node or PostgreSQL
+process. Ownership-checked removal and a separate empty inventory check
+succeeded. Evidence is retained in
+`test-results/derived-reference-20261023/source/`.
+
+An explicit-opt-in local builder,
+`scripts/performance/build-membership-privacy-reference.cjs`, is being prepared
+for the separately named **DERIVED** privacy reference. It does not modify
+the frozen baseline protocol, existing images, application-reported version,
+admission logic, request paths, SQL, dependencies, fixtures or resource limits.
+The only intended content change is removal of the known successful-startup
+database-URL message and replacement of its fallback warning with the
+reviewed static warning.
+
+The complete original compiled-file hash and exact startup-statement source
+hash are pinned before transformation. The resulting compiled-file hash must
+be exactly
+`f558ea53e53492776ed88fc7f44ee36e30a2a706025703264ca071e6b3c68c24`.
+These are hashes of source files/statements, not generated credentials.
+No displayed/redacted source literal is used as a replacement authority.
+
+The recipe uses the exact cached parent, no external Dockerfile frontend,
+`--pull=false`, `--network=none`, no `RUN` or npm steps, fixed copied-file
+timestamps and `SOURCE_DATE_EPOCH=0`. Only the approved compiled file is
+copied, preserving its actual mode, UID and GID. New labels disclose DERIVED,
+parent, source commit and no runtime qualification/admission. A unique local
+tag prevents overwriting any tag. One build is bounded by five minutes with
+45 seconds reserved for cleanup; no retry or application startup is dispatched.
+
+Verification compares the whole application path set, file bytes, links,
+modes and ownership, allowing exactly that compiled-file delta. It also
+requires unchanged parent filesystem layers, exactly one added layer and
+identical nonlabel image runtime configuration. Application file timestamps
+are not compared, and reproducibility of a second build will not be claimed
+from this single authorized build.
+
+### Preparation issues and prevention, captured before the build
+
+| ID | Type / severity | Actual issue and resolution | Detection / prevention |
+|---|---|---|---|
+| DR-01 | Tooling / Low | The installed `docker buildx inspect` rejected `--format`. Supported plain inspection established the existing running `docker` driver and BuildKit v0.33.1, without bootstrap or installation. | Capability probe before build; no unsupported flag is used in the recipe. |
+| DR-02 | Source-proof correctness / High | A tool-rendered startup literal contained a masking placeholder not present in the exact source. Synthetic fixtures passed, but the actual-source preflight failed `Exact reviewed statement count` with `0 !== 1`. The correction pins full compiled bytes plus the complete startup-statement source hash, then removes the exact in-memory statement; no credential-bearing source literal is copied into new tracked code. | Actual-source RED and seven-test GREEN, with zero skips when `DERIVED_REFERENCE_SOURCE` points to the retained extraction. A synthetic fixture alone is not exact-image proof. |
+
+Self-improvement: **applied** actual extracted-source validation alongside
+synthetic drift, missing/duplicate statement, archive-framing, whole-distribution
+and real-child default/admission rejection checks.
+Design/architecture disposition: **accepted** one cohesive opt-in source/build
+tool using native Node and Docker; no generic patch engine or framework seam.
+The existing OS-17 capture-observability follow-up remains separate.
+
+**Before-build status:** source confirmed and owned extraction cleaned up.
+All 31 focused builder/privacy tests passed, including seven builder tests
+and the actual extracted source with zero skips. Two changed code files passed
+native syntax and scoped ESLint using the existing engine; no dependency was
+installed. The tested builder will be committed before the sole build. A successful
+source/build proof will still require an explicit later baseline-adoption
+decision and separately authorized runtime validation. It will not clear
+original negative performance/privacy evidence or any release/deployment hold.
+
 ## Attempt 2 closeout: credential source located, strict result INVALID
 
 **The sole conditional reproduction localized the new privacy rejection to
@@ -47,11 +119,13 @@ category. Existing fix `5896771677e3a67308160d2853c69349ad4188c3`
 removed that successful-startup emitter and made fallback diagnostics static.
 That fix is an ancestor of current 0.55.60 source.
 
-**Attribution limit:** the exact compiled legacy Prisma startup file was not
+**Attribution limit at the attempt-2 closeout:** the exact compiled legacy Prisma startup file was not
 in the retained source copy, the image metadata lacks a valid source-revision
 label, and the matching raw console line was deliberately not retained.
 Therefore this is not proof of a unique emitted line in the exact historical
-image. It neither reconstructs attempt 1's destroyed match nor identifies the
+image from those attempt-2 artifacts alone. The subsequent unstarted extraction
+above now confirms the exact image contains the known emitter, but still does
+not reconstruct attempt 1's destroyed match or identify the
 destroyed OS-07 row. The newly established result is the safe source/kind
 category in attempt 2.
 

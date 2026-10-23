@@ -2,6 +2,25 @@
 
 **Last verified:** 2026-10-23
 
+### Offline derived-reference preparation (2026-10-23)
+
+Exact compiled source from one owned unstarted cached-baseline container
+confirms the known raw Prisma startup emitter and fallback warning. Original
+compiled SHA-256 is
+`00ea9943fb8f6ecf296b34af5c9072d447b346d15b213669ba83d1f422f92c33`;
+the approved two-statement correction yields
+`f558ea53e53492776ed88fc7f44ee36e30a2a706025703264ca071e6b3c68c24`.
+The full `/app` archive was retained and the source container removed without
+startup. Seven focused builder/source tests pass, including actual-source
+RED/GREEN after a displayed masking placeholder was found not to be source.
+
+An explicit offline builder prepares a uniquely named, labeled DERIVED local
+reference, not an approved replacement for the immutable 0.55.20 baseline.
+Its sole five-minute build and whole-distribution/unstarted verification are
+pending after source commit. No application, SQL or performance run is allowed.
+See the indexed observer/statement report and
+`test-results/derived-reference-20261023/`.
+
 ### Privacy source/kind investigation (2026-10-23)
 
 Source-only review of frozen phase-two inputs, copied exact legacy source,

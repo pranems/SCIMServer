@@ -1552,3 +1552,14 @@ and requires a retained INVALID receipt with cause/source/kind and no canary.
 This safeguard is applied in the functional diagnostic and its focused test;
 the post-run correction is not attributed to earlier frozen execution.
 See the [source evidence, OS-13 through OS-18 and explicit attribution limits](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#attempt-2-closeout-credential-source-located-strict-result-invalid).
+
+2026-10-23 follow-up: rendered tool output can replace credential-bearing
+source literals with masking placeholders. A synthetic patch fixture can then
+pass while the exact extracted artifact correctly rejects that displayed
+literal. Treat pinned file bytes and independently pinned complete statement
+source hashes as authority, never a copied rendering. Require a positive
+test against the extracted artifact before a single authorized build; record
+that test explicitly rather than counting a skipped artifact test as proof.
+The [offline DERIVED reference preparation](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#offline-derived-reference-preparation-not-baseline-adoption)
+applies this safeguard without copying credential-bearing source literals into
+new tracked code.
