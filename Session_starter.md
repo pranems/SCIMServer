@@ -2,6 +2,18 @@
 
 **Last verified:** 2026-10-23
 
+### DS-01: qualified DERIVED statement entry implemented (2026-10-23)
+
+Explicit opt-in binds the immutable privacy-derived reference and sealed
+functional qualification against unchanged 0.55.60, for one descriptive
+BAAB/ABBA eight-visit study only. Tests enforce identity, full local input
+closure, independent false policies, explicit read-only observer, eight
+credential-role privacy and diagnostic admission rejection.
+Focused GREEN: 28/28, zero skips; three-file syntax/scoped lint clean.
+Source must be committed before the authorized sole run. No release
+baseline adoption, original receipt rewrite, push/CI/cloud or deployment.
+Actual execution/cleanup will be appended to the indexed DS-01 report.
+
 ### DF-13: local DERIVED artifact functionally qualified (2026-10-23)
 
 One new authorized invocation from clean `4a5e6724` passed all strict

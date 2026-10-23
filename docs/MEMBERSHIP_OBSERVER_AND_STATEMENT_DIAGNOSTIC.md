@@ -3,6 +3,108 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## DS-01: prospective DERIVED statement study (2026-10-23)
+
+**Source implemented and tested; execution result is recorded separately
+below after the sole authorized run.** Explicit
+`--derived-statement-diagnostic-only` selects family
+`membership-derived-statement-diagnostic`, not the existing original-image
+statement family or release admission. Reference A is the functionally
+qualified local image `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`,
+labelled **DERIVEDSTARTUPPRIVACYBACKPORT**, with original parent
+`ghcr.io/pranems/scimserver@sha256:8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a`.
+Candidate B remains immutable 0.55.60
+`ghcr.io/pranems/scimserver@sha256:316a645f021b5c9b833c295d94248e7df00ee37aa13d6d5614e55f9f04c83a4b`.
+The parent authorized this reference only for this descriptive study;
+there is no claim that the user explicitly adopted a changed release
+baseline. Original negative 0.55.58 and four-round phase2/private failures
+remain immutable and are not reinterpreted.
+
+### Prospective contract and executable safeguards
+
+- Shared existing build/source proof validation binds the exact app image;
+  the sealed functional qualification is additionally pinned to SHA-256
+  `cf6b36d17d0f754ae7c57d02d5fc0db801b074c8e80cb90005f0cf1e7d936210`.
+  Missing, changed, unqualified or arbitrary proof is rejected.
+- Exclusive intent precedes Docker. Full resolved manifest, source/Git
+  newline identity and frozen input verification precede allocation.
+  The input closure includes the entire performance runtime directory
+  plus the external `minimal-group-members.ps1` used by the current
+  66-outcome contract, not just the older selected helper list.
+  A separate runtime manifest records actual fixture/app settings and
+  loaded PostgreSQL client module hashes before workload windows.
+- Exactly BAAB then ABBA, with the two apps reused within each block;
+  equivalent new role databases per block. Each visit retains 100 warmup
+  and 1,000 measured complete four-operation cycles, 4,407 checked workload
+  requests and every timing/tail. No replacement or statistical acceptance.
+- The 0.5 CPU, 1 GiB, 384 MiB RSS ceiling, 100 ms period, zero burst and
+  ancestor policy are unchanged. The absolute cap is 45 minutes including
+  the existing 90-second cleanup reservation. Derived cleanup native
+  commands use the tested 30-second maximum, always clamped to remaining
+  absolute budget; original statement dispatch/default identities remain.
+- Server false is read back from the actual app environment; each visit
+  explicitly patches endpoint false and independently reads stored policy
+  through the fixture administrator before windows. The added HTTP PATCH
+  and administrative SQL read are separately recorded, not in 4,407.
+- One new owned cached PG17.11 fixture uses prospective
+  `pg_stat_statements`, query IDs and track-all settings. The observer
+  connection explicitly enables and verifies default read-only
+  transactions. No shared statistics reset, installation, capability
+  smoke, build proof rerun or functional qualification rerun is performed.
+- SQL fingerprint hashing remains inside PostgreSQL. Query IDs remain
+  strings; top/nested, calls/execution/rows/block/temp/WAL/reset/eviction
+  evidence and excluded observer cost are retained. No SQL text,
+  parameters, passwords or private console text is exported.
+- Strict per-owned-database selected-row masks and all eight generated
+  credential roles are checked against complete captured app/PG/tool
+  console inputs, without the former 300-line tail. Final PG console and
+  accumulated cleanup tool output are also scanned. Safe failure
+  source/kind/row and lifecycle action metadata are retained.
+
+### Source validation and RCA at correction
+
+Evidence: `test-results/derived-statements-20261023/`.
+
+| Command | Actual result |
+|---|---|
+| `node --test scripts\test\membership-derived-statements.test.cjs` before implementation | Corrected-interface RED: six executed, one default rejection passed, five failed because the derived implementation/wiring did not exist; `red-guards.log` |
+| `node --test --test-reporter=tap --test-name-pattern="derived entry guard" scripts\test\membership-derived-statements.test.cjs` | RED: one executed/failed, zero skipped; explicit read-only observer setup was absent; `red-readonly.log` |
+| Same one-test selector after adding complete-child-console guard | RED: one executed/failed, zero skipped; derived child still awaited exit rather than pipe closure; `red-complete-child-console.log` |
+| `node --test --test-reporter=tap scripts\test\membership-derived-statements.test.cjs scripts\test\membership-statements.test.cjs scripts\test\membership-lifecycle.test.cjs` | Final execution-source GREEN: 28/28, zero failures/skips, 12,646.2587 ms; `green-execution-source.log` |
+| `node test-results\derived-statements-20261023\validate.cjs static-ready.json` | Three syntax checks and existing seven-rule scoped ESLint passed, zero findings; `static-ready.json`, not full repository lint |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` | Content-only PASS, 27 documents; `freshness-source-content.log`, not full coupled gate |
+
+**Confirmed fixture gap:** the pre-existing observer had only read-statistics
+privileges, but had not explicitly set session read-only transactions.
+The earliest source review found it before runtime. A failing guard was
+added first, then the derived branch sets and verifies the setting. The
+original fixture/default remains unchanged. No historical observer write
+or failure is inferred.
+
+**Complete-console boundary:** a source guard failed before the derived
+branch was changed to await the workload child's `close` acknowledgement,
+not merely process `exit`. This ensures its stdout/stderr pipes have
+closed before the in-memory output is scanned. Default dispatch remains
+unchanged. Successful individual Docker action times are not newly
+instrumented; failures retain the existing closed duration/cause metadata.
+
+**Test/tool friction:** initial new tests used the wrong existing child
+helper signature and admission role vocabulary; the intended-cause
+assertion exposed the latter rather than accepting an unrelated throw.
+The corrected RED log and subsequent GREEN are retained. The first scoped
+validator omitted the Node `console` global; the next pass also caught a
+throw introduced inside `finally`. Globals were corrected and the source
+now emits closed safe failure metadata for nonprivacy report-write errors
+instead of throwing from finalization. Earlier failed static logs remain.
+
+**Self-improvement applied:** executable closure/missing-byte, exact proof,
+read-only policy, eight-role/source privacy and intended admission-cause
+guards. **Architecture disposition: accepted.** The existing runner is
+already large; this narrowly opt-in extension reuses its execution path
+and isolates proof/closure/privacy checks in a small cohesive helper.
+It introduces no lifecycle framework or duplicate build-proof validator.
+No speculative generic dispatcher was added.
+
 ## DF-13: one corrected-lifecycle DERIVED functional qualification (2026-10-23)
 
 **Result: DERIVED_FUNCTIONAL_QUALIFIED, this immutable local artifact only.**
