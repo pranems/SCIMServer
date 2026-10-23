@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is runtime-presence evidence, not proof of exploitability or absence
   of reachable vulnerable middleware. No application or UI behavior changes.
   Final patched-tree validation and hosted review remain pending.
+- Publication is concretely blocked before CI-only regeneration. Three normal
+  Fast pushes publish nothing: C13 README badge mismatch (fixed), an unchanged
+  HTTP `ENOBUFS` failure (57/57 focused rerun), then the unchanged nested
+  non-UTC Node/Jest timestamp probe's 30,119ms `ETIMEDOUT` (6,209/6,210 units).
+  The last attempt passes all 23 preceding static gates. Both lockfiles remain
+  unchanged from master, Hono remains installed/locked at 4.13.7, and no
+  patched GREEN, PR, exact-tip CI or review is claimed.
 - Existing performance admission failure, customer migration, operational
   dispositions, cleanup verification and target-specific human visual
   observation remain outstanding. No merge, deployment or performance rerun.

@@ -56,6 +56,30 @@ The original failure remains retained; a fresh ordinary hook is required
 before publication. The transport-level failure was detected by the first
 applicable HTTP gate; the focused rerun is not a substitute for that gate.
 
+**Concrete blocker (Medium, baseline test harness):** the third ordinary Fast
+push passes all 23 static gates, then fails
+`endpoint-cache-freshness.spec.ts`'s real non-UTC child probe:
+`spawnSync node.exe ETIMEDOUT`, 30,119ms, null status, SIGTERM. Units report
+6,209 passed and one failed across 213 suites; no HTTP gate runs after that
+failure. This is the unchanged nested Node/Jest harness on master, not an
+installed Hono change. The earlier attempt passed all 6,210 units, so that
+pass is retained but is not substituted for the current failure.
+The failure is detected by the first unit gate; importing #251 tooling,
+increasing a timeout, bypassing a hook or retrying until a favorable pass
+would cross this bounded remediation's scope. Stop with the blocker.
+No branch or regeneration workflow was published, both tracked lockfiles
+remain unchanged, and no patched dependency GREEN or reviewed PR exists.
+
+**Evidence completeness:** these three execution issues were recorded from
+the actual retained command logs in this fresh continuation, not a restored
+or reconstructed deleted transcript. Expected HTTP error-path log messages
+were not counted as test failures; only the Jest failing-test summaries and
+gate exits above are causal. **Design disposition: accepted.** The dependency
+patch remains cohesive; the unrelated nested-test harness correction belongs
+to its existing tooling change. **Self-improvement: applied.** Preserve a
+blocked bootstrap as blocked; never infer patched-tree assurance from static
+success or a previous run's test pass.
+
 ### 2026-10-21 Vite security prerequisite
 
 The unchanged 0.55.56 web lockfile reports a High Vite advisory through the

@@ -31,6 +31,10 @@ The eligible patch uses the existing CI-only lockfile process; bootstrap
 checks against the old installation are not patch validation.
 There is no application/UI change, deployment, new image qualification or
 performance admission claim. Existing release holds remain unchanged.
+Bootstrap publication is currently blocked by the unchanged non-UTC nested
+Node/Jest unit probe timing out at its existing 30-second limit. No regenerated
+lockfile, patched installation, PR or reviewed candidate exists yet. The
+version is reserved locally, not released; installed/locked Hono is still 4.13.7.
 
 ### 0.55.58 correction, validated privately and awaiting reviewed merge
 

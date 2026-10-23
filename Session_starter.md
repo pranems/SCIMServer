@@ -20,7 +20,20 @@ and actual target-specific human visual observation remain holds.
 | 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
 
 - [x] ✅ COMPLETED: Verify handoff receipts, fresh base and actual locked RED.
-- [ ] Apply verified CI lockfiles, validate patched tree, complete hosted review.
+- [ ] BLOCKED: Publish bootstrap through ordinary hooks, then apply verified
+  CI lockfiles, validate patched tree and complete hosted review.
+
+**Concrete publication blocker:** three ordinary Fast pushes published
+nothing. The first caught a stale README version badge (fixed). The second
+passed 24 gates but failed one unchanged HTTP test with `ENOBUFS`; its focused
+rerun passed 57/57. The third passed 23 static gates but failed the unchanged
+`endpoint-cache-freshness.spec.ts` non-UTC nested Node/Jest probe at 30,119ms,
+`ETIMEDOUT` (6,209 passed, one failed). That baseline tooling issue must not
+be imported from #251 into this dependency change. No hook bypass, timeout
+change or favorable retry is claimed as GREEN. No remote branch, regeneration
+run, artifact, patched installation or PR exists. API/web lockfiles remain
+byte-identical to master; the real dependency assertion remains RED.
+Retained local evidence: `test-results/hono-security-20261023/`.
 
 **Design disposition: accepted.** An exact transitive patch uses existing
 override/provenance seams; adding an application abstraction is speculative.

@@ -12,6 +12,11 @@
 **2026-10-23 dependency remediation:** 0.55.59 reserves an independent exact
 Hono 4.13.11 patch for #248, based on master e1070ba2. CI-only lockfiles,
 fresh dependency restoration and final hosted review remain required.
+Bootstrap publication is blocked: three ordinary Fast attempts published
+nothing. The final attempt fails the unchanged non-UTC nested Node/Jest
+timestamp probe at its existing 30-second limit (ETIMEDOUT, 6,209 units pass).
+Do not import #251 tooling or bypass the hook to continue. No regenerated
+artifact, installed patch, PR, exact-tip CI or hosted review exists.
 Frozen 0.55.58 runtime-presence evidence is not new-candidate proof.
 Do not absorb #251 tooling, rerun performance or alter its failed admission,
 customer migration, operational, cleanup or human visual verification holds.
