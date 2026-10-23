@@ -5,8 +5,12 @@
 
 ## Corrected-source functional continuation (2026-10-23)
 
-One new `attempt2` invocation is authorized for the same immutable DERIVED
-artifact after the PG optional-label correction. This is not a replacement
+**Outcome: INVALID.** Strict privacy subchecks passed, but final capture and
+removal failed; mandatory safety cleanup finished after the original cap.
+The DERIVED artifact remains functionally unqualified.
+
+One new `attempt2` invocation was authorized and executed for the same
+immutable DERIVED artifact after the PG optional-label correction. This is not a replacement
 for a failed privacy workload: attempt1 allocated zero resources and made
 zero HTTP requests or SQL calls. Its INVALID receipt and absent manifest
 remain unchanged. The new invocation must record its own committed source,
@@ -42,7 +46,126 @@ Self-improvement disposition: **applied**, executable failure/tamper paths
 replace reliance on source ordering alone. Design disposition: **accepted**,
 small inline checks at the existing diagnostic sealing boundary; no new
 framework, test-only production option or speculative shared seam.
-The actual invocation and its outcome will be recorded separately below.
+### Actual attempt2: privacy subchecks passed, overall INVALID
+
+The single authorized corrected-source invocation ran from committed
+`e0d884b97bf74d629da717d4678c96a6240fcdd5`:
+
+```powershell
+node scripts\performance\run-membership-privacy-functional.cjs `
+  --derived-reference-functional-only `
+  test-results\derived-functional-continuation-20261023\attempt2
+```
+
+Run `2612d0d3bceb46b5a27ea7d6fbc38016` started at
+`2026-10-23T21:57:42.131Z`. The runner exited 1 after **228,079 ms**.
+It did not encounter the previous PG metadata defect and did reach the
+functional requests. It remains **INVALID**, not artifact-privacy-qualified:
+strict final capture/removal evidence failed. Mandatory exact-owner cleanup
+was subsequently recovered at **350,556 ms** from the original start,
+outside the five-minute cap. The cap was not resized, and recovery does not
+repair or replace the original receipt.
+
+| Check | Actual observation | Meaning |
+|---|---|---|
+| Preregistration | Exclusive `intent.json`, full resolved `manifest.json` and seven frozen inputs exist; manifest readback/frozen-byte checks precede allocation | The previously missing evidence boundary is now exercised, not backdated into attempt1 |
+| Immutable artifact | App image `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`; original pinned build/source proof verifies | Only the separately identified DERIVED artifact ran |
+| Fixture | One new owned PostgreSQL 17.11 and one DERIVED app; actual app CPU 0.5, memory 1 GiB, no OOM reported in initial metadata | No original/candidate app or new image build |
+| Readiness | Ten runner probes, ending with HTTP 200; limit remains 15 | No readiness replacement loop or expanded limit |
+| Effective persistence | Actual app environment is string `'false'`; independent stored endpoint policy is boolean `false` | Both required policies were verified, not merely requested |
+| Authenticated requests | Exactly seven: endpoint create 201, endpoint policy PATCH 200, Group create 201, Group PATCH 200, missing Group GET 404, missing Group PATCH 404, flush 204 | All expected legacy-supported status contracts were met |
+| Correlated rows | Four distinct request IDs match the owned endpoint, exact methods/routes/statuses; each has authorization present and redacted | Absence was not counted as a required mask |
+| Generated credentials | Strict checks passed for all five generated static roles across selected rows, complete app console, complete PG console and tool console; tool output scanned again after cleanup attempts | A passing privacy subcheck, not a waiver of final evidence or admission |
+| Original final captures | App capture failed; PG capture succeeded; both removal/absence rows failed | The required two successful final captures and verified cleanup were not achieved in the invocation |
+| Recovery | Fresh exact-ID/image/owner/run checks preceded removal of only those two containers and their network; independent inventories are empty | Safety cleanup completed, but after the original cap and without changing the INVALID receipt |
+
+The five generated credential roles were `postgres-admin-password`,
+`scim-shared-secret`, `jwt-signing-secret`, `oauth-client-secret` and
+`credential-encryption-key`. Their values, matched context, lengths and
+credential hashes were not exported. Raw headers and complete consoles
+remained memory-only. No SQL timing, statement probe, performance samples,
+baseline adoption or deployment occurred.
+
+### What failed, and what is still unknown
+
+The earliest recorded failure is the app's final metadata capture
+(`captureError=true`), followed by removal failures for both resources.
+The closed outer failures are `cleanup-network / NETWORK_CLEANUP`,
+`cleanup-inventory / INVENTORY` and
+`derived-cleanup-evidence / INCOMPLETE_CLEANUP_PROOF`.
+The shared finalizer retains booleans rather than the inner exception code,
+so the original capture/removal exception cannot be reconstructed.
+This is the existing OS-17 observability gap, not evidence of a new
+application privacy defect.
+
+Source inspection confirms a ten-second per-command cleanup limit.
+The later exact-owner recovery's public-metadata inspection took
+10,926 ms, with its other CLI calls taking 8,145-9,574 ms.
+That is consistent with CLI startup latency exceeding the cleanup command
+bound, but it does **not** prove the original swallowed exception was a
+timeout. These are collector/lifecycle observations, not request-latency
+measurements or performance evidence.
+
+| Issue | Evidence, disposition and prevention | Detection / escape |
+|---|---|---|
+| DF-12, finalization / Medium | Actual privacy checks passed but strict app final capture and both removals failed. Exact owned recovery removed the two containers/network and independently verified absence at 350,556 ms, beyond the original cap. Original receipt stays INVALID. OS-17 safe per-action cause retention and bounded lifecycle-command handling are **scheduled**, not fixed or waived here. Owner: diagnostic-harness maintainer; target: 2026-10-24, before proposing another functional invocation. Keep both final captures, owner checks and the five-minute cap. | Actual finalization, after successful privacy checks; executable slow/failing lifecycle-child coverage could expose the missing cause/budget interaction earlier |
+| DF-13, closeout checking / Low | The first independent inventory assertion compared all containers, including five unrelated stopped IDs, against a preflight that recorded only running containers. It failed without mutation. Corrected comparison uses the same running scope, while separate all-state exact-run queries still require zero owned resources. Preflight did not record the stopped IDs, so their creation time is unknown; none was touched. | Independent preservation check; corrected scope verifies the original three running containers and empty owned inventories |
+| DF-14, tooling / Low | Initial combined reads exceeded display limits, and one later bounded read requested lines beyond EOF. No generated temporary-output file was opened; narrower original-file reads and an exact source lookup recovered the needed context. No runtime or source behavior changed. | Immediate tool feedback; no application escape |
+| DF-15, test portability / Medium | The new child tests depend on ignored local immutable build evidence and would fail rather than report unavailable evidence on a fresh checkout. Test-first availability handling now explicitly skips those three cases when the proof is absent, matching the existing retained-proof test convention. A bounded isolated availability probe proves three skips; with actual local proof, all three real tests still execute and pass. No local runtime requirement or guard was weakened. | Post-run test review before commit; no remote invocation |
+| DF-16, native test context / Low | The initial isolated availability probe inherited `NODE_TEST_CONTEXT` and returned no test output despite exit 0. Test-count assertions rejected that false green. Clearing only that inherited context for the bounded independent native test process yields the expected three-test accounting. Existing non-UTC child/parent bounds are unchanged. | New portability probe, before acceptance; retained `red-portability.log` |
+
+### Frozen identity and independent closeout
+
+The new on-disk hashes are:
+
+| Evidence | SHA-256 |
+|---|---|
+| Intent | `3ee5c7172fd9e2f0f9821b349582e11ad1c35aa141520fad83ac7e36fade9209` |
+| Full resolved manifest | `c51156c438b3d527101af7b3b80a0242db94eb49b0f910be94f1bab8bfcef7be` |
+| Original attempt2 INVALID receipt | `c0539898e82e491fc7481dca125a8343dea888d1dccf8cea0440b9d89bdd44f8` |
+| Separate safety-cleanup recovery | `281ec91fa4380b7bb3ff234ffbdecc70b337b0204c2d47a44c44ac57c56ed354` |
+
+Runner disk SHA-256 is
+`e739b14d99dcba844f40c70b47d112b5af131957689f1e3bba83bde924940959`;
+its Git-normalized hash is
+`11fa1c3e63a6f01b28adb5a5f13d9a6fc22aa1148ade71a948e0ce1c384932ac`.
+Raw bytes differ, but newline normalization matches for all seven inputs.
+The manifest also pins Node v24.13.0 and pg client 8.22.0.
+
+`closeout-proof.json` verifies both new sealed records and earlier retained
+manifest/build proof hashes. Attempt1's receipt remains
+`0d42ce93932add958e17a2a02a2ee7de6c815c8d506c26416468e6f177058ab7`,
+and its manifest remains absent. Phase1, observer, original phase2 and
+earlier privacy evidence were not rewritten.
+The same three shared running containers are untouched; exact owned
+container/network inventories are empty. Ninety local branches, ten
+stashes, local qualification `d25b6155` and origin qualification
+`f6f03a52` remain preserved. No push, remote CI, PR mutation or cloud
+operation occurred.
+
+Self-improvement disposition: **applied** real-child preregistration/tamper
+guards and scope-correct independent inventories; **scheduled** OS-17
+safe-cause and bounded-finalization follow-up as DF-12 above.
+Design disposition: **accepted**, no speculative shared-finalizer
+refactor bundled into this bounded run. There will be no automatic further
+functional invocation. The artifact remains functionally unqualified,
+and baseline adoption, publication, timing comparison and release admission
+remain held.
+
+Post-run test-only portability validation used
+`node --test --test-name-pattern="real bounded functional child|local real-child regressions" scripts\test\membership-derived-functional.test.cjs`:
+four executed, four passed, zero outer skips. Three are the actual
+retained-proof child controls; the fourth independently verifies three
+explicit skips only when proof is declared unavailable. The behavior RED
+and GREEN are retained in `red-portability-assertion.log` and
+`green-portability-and-real-child.log`. Six-file syntax/scoped lint
+remains green in `static-postrun-tests.json`. No production input changed
+after the actual invocation, and no additional functional run occurred.
+Content-only freshness passed 27 documents with `-SkipCoupling`, retained
+in `freshness-final-content.log`; this is not the full coupled gate.
+No full debug-transcript pointer is exposed; RCA reconciliation covers
+the retained commands/results and visible activity, not an asserted
+complete earlier-session transcript.
 
 ## Functional qualification of the DERIVED artifact (2026-10-23)
 

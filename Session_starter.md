@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-10-23
 
-### Corrected-source DERIVED continuation (2026-10-23)
+### Corrected-source DERIVED continuation: INVALID finalization (2026-10-23)
 
 One new attempt2 is authorized after the optional-PG-label fix; attempt1
 remains INVALID with zero prior workload and its missing manifest unchanged.
@@ -14,6 +14,22 @@ syntax/scoped lint passes. Full manifest readback and frozen hashes now
 validate before any resource creation, only in explicit DERIVED mode.
 No new build, original/candidate startup, performance or adoption is allowed.
 See the indexed observer/statement report for DF-10/DF-11 and actual outcome.
+
+Executed `e0d884b9`, run `2612d0d3bceb46b5a27ea7d6fbc38016`: exactly
+seven authenticated requests and ten readiness probes. Both effective
+persistence policies were false, four correlated authorization masks and
+all generated-credential absence checks passed. Overall INVALID at
+228.079 seconds: app final capture and both removals failed. Exact-owner
+safety cleanup recovered both containers/network at 350.556 seconds,
+outside the original five-minute cap; no waiver or replacement run.
+Independent inventories verify zero owned resources and the same three
+shared running containers. The original inner cleanup error is unavailable
+through OS-17's boolean-only finalizer; later metadata inspection took
+10.926 seconds against the original ten-second command limit, consistent
+with but not proving a timeout. Safe-cause/bounded-finalization follow-up
+is scheduled before any next invocation. Artifact remains unqualified.
+Actual frozen manifest/receipt and recovery hashes are in
+`test-results/derived-functional-continuation-20261023/closeout-proof.json`.
 
 ### DERIVED functional qualification: INVALID preflight (2026-10-23)
 
@@ -80,6 +96,7 @@ See the indexed observer/statement report and
 
 | Date | Summary |
 |---|---|
+| 2026-10-23 | Corrected-source DERIVED attempt2 from `e0d884b9`: strict privacy subchecks passed for seven authenticated requests/four masks, but finalization failed and safety cleanup completed after the five-minute cap. Overall INVALID, no further invocation. All exact owned resources removed; three shared running containers, earlier receipts, 90 branches and ten stashes preserved. |
 | 2026-10-23 | Completed the sole DERIVED functional invocation as INVALID before allocation: zero HTTP/SQL. Committed tested metadata/intent/cleanup correction `462365db` without retry. Independent closeout preserves images, earlier proof, 90 branches, ten stashes and all shared containers. Artifact remains functionally unqualified; adoption/publication/performance held. |
 | 2026-10-23 | Confirmed the exact cached startup emitter, committed strict opt-in offline tooling, retained a failed preflight and completed the single DERIVED build with one-file whole-distribution proof and unstarted cleanup. Original images/evidence and admission holds remain unchanged. |
 

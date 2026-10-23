@@ -199,7 +199,8 @@ function runFunctionalPreflightChild(mode) {
   assert.equal(report.artifactPrivacyQualified, false);
   return { output, events, report };
 }
-test('real bounded functional child seals exclusive intent before failing fake metadata', () => {
+test('real bounded functional child seals exclusive intent before failing fake metadata',
+  { skip: !fs.existsSync(path.join(proofRoot, 'offline-build/receipt.json')) }, () => {
   const { output, events, report } = runFunctionalPreflightChild('metadata-failure');
   assert.deepEqual(events[0], { kind: 'intent', exclusive: true });
   assert.deepEqual(events[1], { kind: 'docker', command: ['image', 'inspect'] });
@@ -220,13 +221,35 @@ test('real bounded functional child seals exclusive intent before failing fake m
   assert.deepEqual(report.failures, [{ stage: 'app-image-preflight', code: 'OWNED_DOCKER' }]);
 });
 for (const mode of ['manifest-drift', 'frozen-drift'])
-  test(`real bounded functional child rejects ${mode} before any resource creation`, () => {
+  test(`real bounded functional child rejects ${mode} before any resource creation`,
+    { skip: !fs.existsSync(path.join(proofRoot, 'offline-build/receipt.json')) }, () => {
     const { events, report } = runFunctionalPreflightChild(mode);
     assert.equal(events.some(event => event.kind === 'manifest' && event.exclusive), true);
     assert.equal(events.some(event => /run|create|start/.test(event.command?.join(' ') ?? '')), false,
       'The full resolved manifest and frozen bytes must be validated before any resource creation');
     assert.deepEqual(report.failures, [{ stage: 'resolved-manifest-validation', code: 'ERR_ASSERTION' }]);
   });
+test('local real-child regressions explicitly skip when retained immutable proof is unavailable', () => {
+  const directory = path.join(root, 'test-results/derived-functional-unit', randomUUID());
+  fs.mkdirSync(directory, { recursive: true });
+  const preload = path.join(directory, 'missing-proof.cjs');
+  fs.writeFileSync(preload, `
+    const fs=require('node:fs'),path=require('node:path');
+    const exists=fs.existsSync;
+    const missing=${JSON.stringify(path.join(proofRoot, 'offline-build/receipt.json'))};
+    fs.existsSync=file=>path.resolve(file)===missing?false:exists(file);
+  `, { flag: 'wx' });
+  const environment = { ...process.env };
+  delete environment.NODE_TEST_CONTEXT;
+  const child = spawnSync(process.execPath, ['--require', preload, '--test',
+    '--test-name-pattern=real bounded functional child', __filename],
+  { cwd: root, encoding: 'utf8', timeout: 10000, maxBuffer: 16384, env: environment });
+  assert.equal(child.error, undefined);
+  assert.equal(child.status, 0, 'A clean checkout without ignored local evidence must not fail the runner');
+  assert.match(child.stdout, /tests 3/);
+  assert.match(child.stdout, /pass 0/);
+  assert.match(child.stdout, /skipped 3/);
+});
 test('real bounded workload child stops before Group requests when fixture policy is rejected', async () => {
   const routes = [];
   const endpointId = '11111111-1111-4111-8111-111111111111';
