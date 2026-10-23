@@ -16,6 +16,19 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Dependency classification is not deployed package inventory
+
+The #248 Hono remediation found an affected `devOptional` transitive package
+inside the exact frozen 0.55.58 runtime image, alongside Prisma tooling.
+Lockfile development/optional flags and an absent direct source import do
+not prove production absence or unreachability. Inspect the actual immutable
+artifact with a metadata-only, offline, read-only entrypoint; never start the
+application or connect a database just to inventory packages.
+Keep the resulting claim narrow: package presence is not exploitability,
+and an old digest's receipt does not qualify a new candidate. Pair a minimal
+exact override with a regression over every actual locked occurrence, then
+check the restored installation after CI-only regeneration.
+
 ### A real-timezone regression should launch one real leaf, not another suite
 
 A real child process is necessary to test Node's non-UTC date interpretation;

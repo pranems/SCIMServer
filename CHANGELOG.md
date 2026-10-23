@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.59 Hono dependency security patch (#248)
+
+- Pin the API's transitive Hono override exactly to 4.13.11, the smallest
+  patched release for GHSA-5r4p-p66f-jhc7 / CVE-2026-111757 (Medium).
+  The patch was published 2026-09-29T06:15:49Z and became seven-day eligible
+  2026-10-06T06:15:49Z. No quarantine exception or registry change is needed.
+- Reserve 0.55.59 for the shipped dependency change; API and web product
+  versions move together. The existing public-registry CI workflow owns both
+  lockfiles. Bootstrap checks on the old installation do not prove the patch.
+  The actual locked dependency regression first fails on Hono 4.13.7.
+- The frozen 0.55.58 image contains Hono despite its `devOptional` lock flag.
+  This is runtime-presence evidence, not proof of exploitability or absence
+  of reachable vulnerable middleware. No application or UI behavior changes.
+  The restored private installation now proves Hono 4.13.11 in both actual
+  Prisma dependency routes. Final protected publication and hosted review
+  remain separate checks.
+- Historical bootstrap publication was blocked before CI-only regeneration. Three normal
+  Fast pushes publish nothing: C13 README badge mismatch (fixed), an unchanged
+  HTTP `ENOBUFS` failure (57/57 focused rerun), then the unchanged nested
+  non-UTC Node/Jest timestamp probe's 30,119ms `ETIMEDOUT` (6,209/6,210 units).
+  The last attempt passes all 23 preceding static gates. Both lockfiles remain
+  unchanged from master, Hono remains installed/locked at 4.13.7, and no
+  patched GREEN, PR, exact-tip CI or review was claimed at that checkpoint.
+- The separate prerequisite #252 is now normally merged at `fc962a65`, after
+  exact-tip checks and hosted review 5628884972 (COMMENTED, no findings;
+  not human GitHub approval). Its authoritative merged-source CI run
+  39962553306 passes, with test-image digest
+  `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
+  Merge master ordinarily into this preserved four-commit Hono branch before
+  retrying its protected bootstrap. This old-dependency image is not Hono proof.
+- The ordinary master merge `62bf4d1e` preserves all four Hono commits.
+  Its normal bootstrap push passes all 25 Fast gates in 783.4 seconds:
+  6,210 unit tests / 213 suites and 2,514 HTTP tests / 118 passing suites,
+  with 42 existing backend skips. Those checks still used old dependencies.
+- CI regeneration run `39965730441`, source `62bf4d1e`, produces artifact
+  `12506119257`, ZIP SHA-256
+  `f2e318928b7aa6e672983ba1acb492bcbd8a73066db5a50355b06e9521b6bf58`.
+  The entire artifact was authenticated and compared: only Hono changes
+  (4.13.7 -> 4.13.11), plus the intended API/web 0.55.59 version metadata.
+  Every package retains public-registry URLs and sha512. The sole changed
+  package was 24.3217 days old at CI verification; no unrelated churn.
+- Approved-registry `npm ci` installs the patch without rewriting the API
+  lockfile. Permanent pin-checker tests now assert the actual committed
+  Hono occurrences and advisory boundary: 19 -> 21 cases. Before applying
+  the artifact, the real lock guard fails on 4.13.7; after restoration, all
+  21 pin tests plus all 21 inherited freshness tests pass (42 total).
+  Whole-unit expectation is 6,210 -> 6,212; final owning-hook/CI results
+  must be read from their receipts, not inferred from this focused pass.
+- Fresh API audit: zero vulnerabilities. Unchanged web dependency graph:
+  three Moderate affected Vitest packages, zero High/Critical; audit exit 1
+  is retained, not relabeled clean. Separate triage is recorded in the policy.
+- Existing performance admission failure, customer migration, operational
+  dispositions, cleanup verification and target-specific human visual
+  observation remain outstanding. No Hono merge, deployment or performance rerun.
+
 ### Test-only prerequisite: standalone non-UTC freshness probe
 
 - Backport only the two relevant test-file changes from reviewed
@@ -23,8 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixture syntax PASS. Full protected-gate and exact-tip review evidence belong
   to the prerequisite PR, not the old isolated PASS.
 - No product/version/lockfile, application/UI, performance runner, quota or
-  admission change. The preserved Hono branch remains blocked until this
-  separate prerequisite is reviewed and normally merged.
+  admission change in #252. Its normal merge and merged-source checks are
+  recorded above; only that prerequisite is merged, not #251 or this Hono patch.
 
 ### 0.55.58 consolidation onto token-lifetime master
 
