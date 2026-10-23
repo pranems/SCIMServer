@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.59`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.59`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -31,10 +31,23 @@ The eligible patch uses the existing CI-only lockfile process; bootstrap
 checks against the old installation are not patch validation.
 There is no application/UI change, deployment, new image qualification or
 performance admission claim. Existing release holds remain unchanged.
-Bootstrap publication is currently blocked by the unchanged non-UTC nested
-Node/Jest unit probe timing out at its existing 30-second limit. No regenerated
-lockfile, patched installation, PR or reviewed candidate exists yet. The
-version is reserved locally, not released; installed/locked Hono is still 4.13.7.
+The historical non-UTC nested-Jest timeout was corrected in separate,
+normally merged prerequisite #252 without changing either deadline. The
+Hono branch preserves all four original commits and merges master normally.
+Its protected bootstrap passes, then exact-source CI regeneration
+`39965730441` produces only the Hono patch and coordinated version metadata,
+with public-registry URLs, sha512 and a verified publication age over 24 days.
+The actual restored private dependency tree and lockfile both contain 4.13.11;
+42 focused pin/freshness tests pass. This is not a deployed release or new
+performance qualification. Final protected publication, exact-tip CI and
+hosted Hono review remain separate checks.
+
+Fresh API dependency audit reports zero vulnerabilities. The unchanged web
+dependency graph reports three Moderate affected Vitest packages, zero
+High/Critical, from GHSA-qxg6-89mg-rqv8 and GHSA-xp26-3454-mjgp. This patch
+does not silently upgrade that unrelated toolchain or claim its audit is
+clean; separate triage is tracked in the
+[supply-chain policy](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md).
 
 ### 0.55.58 correction, validated privately and awaiting reviewed merge
 

@@ -29,6 +29,53 @@ import {
   type PackageAdvisory,
 } from './check-dependency-pins';
 import fs from 'fs/promises';
+import { resolve } from 'node:path';
+
+describe('Hono security remediation (GHSA-5r4p-p66f-jhc7)', () => {
+  const vulnerableRange = '>= 4.12.4, < 4.13.11';
+
+  it('recognizes the affected range and recommends the minimal exact patch', () => {
+    expect(satisfiesGhsaRange('4.12.3', vulnerableRange)).toBe(false);
+    expect(satisfiesGhsaRange('4.13.7', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('4.13.11', vulnerableRange)).toBe(false);
+    const findings = evaluatePins(
+      { hono: '4.13.7' },
+      [{
+        packageName: 'hono',
+        ghsaId: 'GHSA-5r4p-p66f-jhc7',
+        cveId: 'CVE-2026-111757',
+        severity: 'medium',
+        summary: 'serveStatic double decoding can bypass protected static-prefix middleware',
+        vulnerableRanges: [vulnerableRange],
+        firstPatchedVersions: ['4.13.11'],
+      }],
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0].recommendedVersion).toBe('4.13.11');
+  });
+
+  it('locks every actual Hono occurrence to the exact patched override with public provenance', async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: { hono: string } };
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, { version: string; resolved?: string; integrity?: string }>;
+    };
+    const entries = Object.entries(lock.packages).filter(([name]) =>
+      /(?:^|\/)node_modules\/hono$/.test(name),
+    );
+    expect(manifest.overrides.hono).toBe('4.13.11');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [, entry] of entries) {
+      expect(entry.version).toBe(manifest.overrides.hono);
+      expect(satisfiesGhsaRange(entry.version, vulnerableRange)).toBe(false);
+      expect(entry.resolved).toMatch(/^https:\/\/registry\.npmjs\.org\/hono\/-\//);
+      expect(entry.integrity).toMatch(/^sha512-[A-Za-z0-9+/]+=*$/);
+    }
+  });
+});
 
 describe('compareVersions', () => {
   it('orders by numeric segment, not lexically', () => {

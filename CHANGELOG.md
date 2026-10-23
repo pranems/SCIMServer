@@ -20,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The frozen 0.55.58 image contains Hono despite its `devOptional` lock flag.
   This is runtime-presence evidence, not proof of exploitability or absence
   of reachable vulnerable middleware. No application or UI behavior changes.
-  Final patched-tree validation and hosted review remain pending.
+  The restored private installation now proves Hono 4.13.11 in both actual
+  Prisma dependency routes. Final protected publication and hosted review
+  remain separate checks.
 - Historical bootstrap publication was blocked before CI-only regeneration. Three normal
   Fast pushes publish nothing: C13 README badge mismatch (fixed), an unchanged
   HTTP `ENOBUFS` failure (57/57 focused rerun), then the unchanged nested
@@ -35,6 +37,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sha256:93ab5bd73465bdd215eeb2e3471022188d854d97a730d50b752c17e00eb238b0`.
   Merge master ordinarily into this preserved four-commit Hono branch before
   retrying its protected bootstrap. This old-dependency image is not Hono proof.
+- The ordinary master merge `62bf4d1e` preserves all four Hono commits.
+  Its normal bootstrap push passes all 25 Fast gates in 783.4 seconds:
+  6,210 unit tests / 213 suites and 2,514 HTTP tests / 118 passing suites,
+  with 42 existing backend skips. Those checks still used old dependencies.
+- CI regeneration run `39965730441`, source `62bf4d1e`, produces artifact
+  `12506119257`, ZIP SHA-256
+  `f2e318928b7aa6e672983ba1acb492bcbd8a73066db5a50355b06e9521b6bf58`.
+  The entire artifact was authenticated and compared: only Hono changes
+  (4.13.7 -> 4.13.11), plus the intended API/web 0.55.59 version metadata.
+  Every package retains public-registry URLs and sha512. The sole changed
+  package was 24.3217 days old at CI verification; no unrelated churn.
+- Approved-registry `npm ci` installs the patch without rewriting the API
+  lockfile. Permanent pin-checker tests now assert the actual committed
+  Hono occurrences and advisory boundary: 19 -> 21 cases. Before applying
+  the artifact, the real lock guard fails on 4.13.7; after restoration, all
+  21 pin tests plus all 21 inherited freshness tests pass (42 total).
+  Whole-unit expectation is 6,210 -> 6,212; final owning-hook/CI results
+  must be read from their receipts, not inferred from this focused pass.
+- Fresh API audit: zero vulnerabilities. Unchanged web dependency graph:
+  three Moderate affected Vitest packages, zero High/Critical; audit exit 1
+  is retained, not relabeled clean. Separate triage is recorded in the policy.
 - Existing performance admission failure, customer migration, operational
   dispositions, cleanup verification and target-specific human visual
   observation remain outstanding. No Hono merge, deployment or performance rerun.

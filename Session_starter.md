@@ -9,8 +9,9 @@ Branch `chore/regen-lockfile-hono-security-20261023` starts from fresh
 It now ordinarily incorporates prerequisite merge `fc962a65` / #252. Fresh
 master remains 0.55.58, so the reserved next patch 0.55.59 is still correct.
 Reserve 0.55.59 for exact Hono 4.13.11 (#248). The actual lock dependency
-regression is RED on 4.13.7; CI-only regeneration and patched-tree checks
-remain required. The preserved qualification branch stays at f6f03a52.
+regression was RED on 4.13.7. CI-only regeneration and a private restored
+installation now prove exact Hono 4.13.11; final publication/review remain
+required. The preserved qualification branch stays at f6f03a52.
 Frozen 0.55.58 image presence is not new-candidate qualification.
 No original deleted transcript was restored. No Hono merge or deployment.
 The unchanged 39875689201 A/A p99 failure (ratio 1.23928982, limit 1.10),
@@ -21,12 +22,19 @@ and actual target-specific human visual observation remain holds.
 |---|---|
 | 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
 | 2026-10-23 | Normally merge prerequisite #252 and verify its authoritative merged-source CI/artifact, then preserve both contexts in the ordinary Hono/master merge. |
+| 2026-10-23 | Protected bootstrap 25/25 PASS; authenticate minimal CI artifact 12506119257/run 39965730441 and prove actual installed+locked Hono 4.13.11 with 42 focused tests. |
 
 - [x] ✅ COMPLETED: Verify handoff receipts, fresh base and actual locked RED.
 - [x] ✅ COMPLETED: Normally merge reviewed prerequisite #252, verify merged
   source CI and ordinarily incorporate master without rewriting Hono history.
-- [ ] Publish bootstrap through ordinary hooks, then apply verified
-  CI lockfiles, validate patched tree and complete hosted review.
+- [x] ✅ COMPLETED: Publish bootstrap through ordinary hooks, 25/25 PASS
+  (783.4 seconds); CI-only regeneration at exact source `62bf4d1e`.
+- [x] ✅ COMPLETED: Verify downloaded ZIP, all lock entries/ages and minimal
+  diff, apply only intended locks, restore via approved-registry `npm ci`
+  without lock rewrites, prove actual installed/locked Hono 4.13.11.
+- [x] ✅ COMPLETED: Permanent actual-lock guard RED then GREEN; pin checker
+  19 -> 21 cases, plus 21 inherited freshness cases, 42/42 PASS.
+- [ ] Final patched-tree protected push, exact-tip CI and hosted Hono review.
 
 **Historical publication blockers:** three ordinary Fast pushes published
 nothing. The first caught a stale README version badge (fixed). The second
@@ -36,10 +44,17 @@ rerun passed 57/57. The third passed 23 static gates but failed the unchanged
 `ETIMEDOUT` (6,209 passed, one failed). That baseline tooling issue was
 isolated in prerequisite #252, not imported as unrelated #251 tooling.
 No hook bypass, timeout
-change or favorable retry is claimed as GREEN. No remote branch, regeneration
-run, artifact, patched installation or Hono PR exists yet. API/web lockfiles remain
-byte-identical to master; the real dependency assertion remains RED.
+change or favorable retry is claimed as the historical GREEN. The separate
+prerequisite and ordinary merge now unblock publication, as recorded above.
 Retained local evidence: `test-results/hono-security-20261023/`.
+
+**Current dependency receipts:** artifact run `39965730441` / ID `12506119257`,
+ZIP SHA-256 `f2e318928b7aa6e672983ba1acb492bcbd8a73066db5a50355b06e9521b6bf58`.
+Only Hono changes; web package entries are unchanged, with version metadata
+only. API lock SHA-256 `ee7c44126acd1ef5949320f5c181c5e1291794cb41920f6c1324ab3689f7b4fc`.
+Fresh API audit is zero; web audit exits 1 with three unchanged Moderate
+Vitest packages (zero High/Critical), tracked separately in the policy.
+This is private dependency proof, not deployment or new performance admission.
 
 **Design disposition: accepted.** An exact transitive patch uses existing
 override/provenance seams; adding an application abstraction is speculative.
