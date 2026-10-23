@@ -82,6 +82,24 @@ passed the same bounded inventory script without cross-shell quote rewriting.
 The immediate shell error caught it before source changes; no dependency
 absence conclusion relies on that failed invocation.
 
+**Medium, local validation environment:** the first final Validate push
+passed all 25 Fast gates, including 6,214 units and 2,514 HTTP tests, then
+stopped at `PrismaConfigEnvError: Cannot resolve environment variable:
+DATABASE_URL`. No final commit was published by that attempt. Prisma's
+existing config eagerly evaluates `env('DATABASE_URL')` even for generation;
+the apparent fallback does not avoid that lookup. A process-local,
+credential-free `postgresql://localhost:1/scim_codegen` URL permits
+`npx prisma generate` to pass (Prisma 7.8.0, 119 ms generation) without
+connecting a database. No environment file, source, registry setting,
+migration or real estate is changed. Detection was the first applicable
+Validate-only generation gate; an environment preflight could have caught
+it before the full hook. The next normal Validate push must carry this
+same generation-only URL. The failed receipt stays in `final-push.log`;
+the focused correction is `prisma-generate-green.log`, not a substitute
+for the normal hook. Prevention: check generation's required environment
+before escalation; do not weaken or skip its gate. This environment
+correction justifies a new protected run, not favorable benchmark retry.
+
 **Self-improvement: applied.** A permanent regression checks the exact pin and
 the deliberate absence of parser entries and incoming edges. Scanner rows
 must be distinguished from distinct active flaws; withdrawn duplicates are
