@@ -5,8 +5,14 @@
 
 ## DS-01: prospective DERIVED statement study (2026-10-23)
 
-**Source implemented and tested; execution result is recorded separately
-below after the sole authorized run.** Explicit
+**Actual sole invocation: INVALID after four BAAB visits.** All eight visits
+were required. ABBA was not started, and no replacement was attempted.
+The first blocker was a complete-console Docker `logs` operation after the
+first block's 66-outcome contract passed. All owned cleanup succeeded within
+the unchanged cap. The partial SQL data suggests a logging-write concentration,
+but it is not a completed study, privacy qualification or admission result.
+
+Explicit
 `--derived-statement-diagnostic-only` selects family
 `membership-derived-statement-diagnostic`, not the existing original-image
 statement family or release admission. Reference A is the functionally
@@ -19,6 +25,209 @@ The parent authorized this reference only for this descriptive study;
 there is no claim that the user explicitly adopted a changed release
 baseline. Original negative 0.55.58 and four-round phase2/private failures
 remain immutable and are not reinterpreted.
+
+### Actual execution, first blocker and cleanup
+
+Source was committed and clean at
+`7b3ac1c74be54ec907e048254c00232ccc249794` before this sole command:
+
+```powershell
+node scripts\performance\run-membership-statements.cjs `
+  --derived-statement-diagnostic-only `
+  test-results\derived-statements-20261023\attempt1-20261023T233120820Z\run
+```
+
+The outer authorization intent was frozen before the safety preflight;
+the runner's exclusive intent preceded Docker, and the full resolved
+manifest and 23-file frozen closure preceded allocation. Preflight found
+zero matching owned heavy processes, zero pre-existing study resources,
+and the same three shared running containers. This is not a dedicated-host
+or idle Windows/WSL scheduling claim.
+
+| Check | Actual result |
+|---|---|
+| Start / finish UTC | `2026-10-23T23:32:18.891Z` / `2026-10-23T23:42:07.538Z` |
+| Absolute cap / cleanup reservation | Unchanged 2,700,000 ms / 90,000 ms |
+| Elapsed including cleanup | **588,647 ms**, command exit 1 |
+| Schedule completed | BAAB only: B1, A2, A3, B4; 4/8 visits, zero ABBA visits |
+| Original checked workload requests | **17,628**, four times 4,407 |
+| Timing arrays | 16,000 measured operation samples plus 1,600 warmup operation samples; all four receipts and boundary arrays retained |
+| Outside-window policy setup | Four additional HTTP PATCH requests and four independent administrator SQL policy reads, not included in 17,628 |
+| Effective policy | Actual server false and stored endpoint false independently verified before every completed visit's windows |
+| Actual identities/resources | Pinned A/B/PG platform IDs verified, all Linux/amd64; client Node v24.13.0; both apps 0.5 CPU/1 GiB, unchanged quota/period/burst/ancestor and RSS assertions |
+| Other HTTP accounting | 16 readiness probes; the first current contract passed 66 outcomes. Contract/setup/flush requests remain outside workload accounting; no invented total contract HTTP count |
+| SQL observer | Read-only default verified; app-role snapshots exclude observer-role work, preserve string query IDs and reset/eviction checks |
+| First root failure record | Stage `contract-baab`, code `OWNED_DOCKER` |
+| Retained safe action cause | Operation `command`, command `logs`, role `owned-container`, stage `docker-command`, phase `work`, category `unexpected`, duration **8,394 ms**, numeric exit code and signal both null |
+| Complete private qualification | **NOT established**: no block role-privacy receipts were written; selected-row and complete app-console qualification did not finish |
+| Final privacy checks | Final PG-console capture and accumulated tool-output checks completed without a reported canary rejection. These do not replace missing complete app-console/selected-row checks |
+| Finalization | Four owned resources: metadata capture, removal and independent absence all passed; network removal/absence passed |
+| Independent inventory | Zero owned containers/networks; exactly the same three shared full container IDs still running |
+| Recovery or replacement | None needed; no second invocation, no cap extension |
+
+The first contract file explicitly records `complete:true` and
+`assertions:66`. The unchanged coarse stage name therefore must not be
+read as evidence that the contract itself failed. The source next captures
+the full PG console, then each role's selected rows and full app console.
+The safe action receipt identifies a failed `logs` command in this interval,
+but does **not** identify which of those captures or its native inner code.
+Neither stderr nor a private console fragment was saved to reconstruct it.
+
+**Established cause boundary:** a work-phase complete-console capture failed,
+not the 45-minute cap or reserved cleanup. The source's work command limit
+is 60 seconds; the failed operation lasted 8.394 seconds, and more than
+33 minutes of work budget remained even at final completion. The tested
+30-second cleanup maximum
+remained clamped to the absolute deadline, and every finalization action
+succeeded. It is a per-command maximum, not added time beyond the outer cap.
+
+**Open inner cause:** the wrapper uses an 8 MiB `execFile` output buffer.
+A complete console can exceed that buffer, and
+`ERR_CHILD_PROCESS_STDIO_MAXBUFFER` is not distinguished by the current
+finite classifier. This is a source-proven risk and a plausible hypothesis,
+**not a verified explanation of this historical error**. Transient native
+errors also remain possible. The reused splitter is actually exported as a
+function; a source-only load dismissed a missing-export hypothesis without
+Docker dispatch. No privacy leak or application defect is inferred merely
+from a failed console command.
+
+### Partial BAAB SQL observations, not an eight-visit result
+
+The following totals combine the two completed measured visits per role,
+each with 1,000 complete four-operation cycles. A is the explicitly
+privacy-derived reference, not actual production 0.55.20. Top-level and
+nested statements are kept separate; they must not be added and called CPU.
+
+| Measured top-level metric | DERIVED reference A | Immutable 0.55.60 B |
+|---|---:|---:|
+| Calls | 48,486 | 46,483 |
+| Execution time, ms | 1,667.507 | 2,440.937 |
+| Rows | 36,004 | 42,003 |
+| Delta execution / delta calls, ms | 0.034392 | 0.052512 |
+| WAL bytes | 27,855,524 | 45,346,701 |
+| Logging INSERT calls / rows | 160 / 8,000 | 160 / 8,000 |
+| Logging INSERT execution, ms | 610.069 | 1,043.575 |
+| Logging INSERT mean, ms per completed call | 3.812929 | 6.522343 |
+| Logging INSERT WAL bytes | 25,719,136 | 43,166,123 |
+| Non-logging execution, ms | 1,057.438 | 1,397.362 |
+| Separate nested calls / execution, ms | 4,000 / 33.378 | 4,000 / 27.260 |
+
+Candidate top-level calls were **4.13% fewer**, while execution was
+**46.38% greater** and the weighted per-call mean **52.69% greater**.
+Logging INSERTs had the same 160 calls and 8,000 rows, but **71.06% greater**
+execution. They account arithmetically for **56.05% of additional top-level
+execution** and **99.75% of additional WAL bytes**. Their WAL share was
+92.33% for A versus 95.19% for B. This supports prioritizing the logging
+write family, but does not explain all execution change: non-logging
+execution also increased, and the statement mix differs substantially.
+This is not a uniform per-query slowdown: the SCIM-resource UPDATE family
+was 168.444 ms for A versus 166.786 ms for B across the same 4,000 calls,
+while the separate nested total decreased. A higher overall weighted mean
+also reflects the changed mix of cheap and expensive statements.
+
+The `references-resource-member` top-level family had 18,002 A calls versus
+4,000 B calls; B additionally had 12,000 `mixed` calls and 8,001
+endpoint-reference calls. Labels are query-text-reference classifications,
+not exclusive application responsibilities. Distinct fingerprints cannot
+be treated as the same query or execution plan.
+
+| Visit | Role | Top-level calls | Execution, ms | WAL bytes | App CPU, seconds |
+|---|---|---:|---:|---:|---:|
+| BAAB 1 | B | 23,243 | 1,188.821 | 22,367,520 | 22.316 |
+| BAAB 2 | A | 24,243 | 851.262 | 13,941,336 | 27.588 |
+| BAAB 3 | A | 24,243 | 816.245 | 13,914,188 | 22.304 |
+| BAAB 4 | B | 23,240 | 1,252.116 | 22,979,181 | 23.048 |
+
+Leading logging fingerprints, without SQL text or parameters:
+
+| Role | SHA-256 fingerprint | Calls | Execution, ms |
+|---|---|---:|---:|
+| A | `1287f7333f0724a1e2809945cf56ed79a714e71505672ffa23a92ed3631b6aad` | 160 | 610.069 |
+| B | `871c0a0b86c9d6d40e9b322de5c9d5bae5705b6ab2fd94e5d444f554afd64176` | 160 | 1,043.575 |
+
+Every per-fingerprint entry, operation/label, string query ID, call/row
+delta, block/temp/WAL delta and weighted mean is retained in
+`run/descriptive-analysis.json` and the original summaries. Shared-block
+reads and temporary-block reads/writes were zero in these measured deltas;
+shared hits, dirtied/written blocks, WAL records and full-page images remain
+available rather than being silently omitted from raw evidence.
+
+Application CPU was 49.892 seconds for A and 45.364 seconds for B, the
+opposite direction from database execution. Throttled periods were
+988/1,000 and 898/909 respectively. Pooled p99 request times in milliseconds
+were A/B: add 88.453/84.294, populated read 69.054/62.880,
+remove 79.504/83.267, empty read 66.967/63.497. These are retained-array
+descriptions, not acceptance thresholds, causal attribution or evidence
+that SQL execution equals request latency.
+
+Sixteen warmup/measured boundary reads took 384.223 ms in aggregate,
+18.390-32.849 ms each; their SQL-observer portions took 294.603 ms,
+13.375-27.562 ms each. Measured-window observer execution deltas were
+17.822 ms for A and 27.958 ms for B, excluded from app-role totals.
+Sampling boundaries, buffered logging, query mix, app history and shared
+Windows/WSL scheduling can affect these associations. The planned 200-row
+selection is not a join from every request to every SQL event; it did not
+produce a successful privacy receipt here. Missing ABBA and incomplete
+privacy qualification prevent promoting these partial observations to
+the requested complete diagnostic.
+
+### Evidence, execution RCA and next bounded action
+
+All evidence is under
+`test-results/derived-statements-20261023/attempt1-20261023T233120820Z/`.
+`sealed-evidence.json` verifies all 23 frozen files, six unchanged admission/
+fixture files, four prior failed receipts, seven original frozen inputs,
+the failed 62-test logs, corrected 66-test aggregate and qualified functional
+receipt. All 23 new disk/Git raw hashes differ because of CRLF versus LF;
+normalized source equality is verified, not falsely called raw equality.
+The current statement runner intentionally differs from OS-17's old source;
+the old executed inputs and receipts do not.
+
+| Immutable new evidence | SHA-256 |
+|---|---|
+| Preallocation manifest and preregistered plan | `da57e6abda9c11815662e0ca93eb5e9a77920fb865374acb3ca66af74cfd7b82` |
+| Actual runtime manifest | `ff49eaeefa769be68d57f844af64864bc8fe19097f1604bb60f45dcf85049302` |
+| INVALID raw report | `346f5e3c3aca811901f674d5edc6c97ef0e4952131d51a68d3f473d5766d2abc` |
+| Safe partial descriptive analysis | `989988e33fd484c5d0ed2400f73b7c4120f06cd547364e0eff7397b26c8d83b9` |
+
+**Execution issue DS-02, tooling/observability, Medium:** complete-console
+capture failed after real workload and contract execution. The actual
+native cause was not retained beyond `unexpected`; no guessed inner code
+is substituted. Detection was the first block's real console collection.
+The earliest prevention opportunity was a bounded fake-CLI integration
+test covering full-output limits, typed native failure classification and
+the actual statement caller's role-specific capture path. Static wiring
+and the small successful functional artifact qualification did not prove
+large-workload console collection.
+
+**Self-improvement disposition: scheduled, not falsely marked fixed.**
+Owner: diagnostic harness maintainer. Target: 2026-10-24, in the next
+source-only change and before any new runtime authorization. Add real bounded fake-CLI tests
+for output-limit and native failures, preserve a closed native category
+and exact static capture role, and choose a complete-output collection
+strategy that keeps strict privacy scans, no raw private files and the
+same absolute deadline. Do not truncate the console, enlarge time caps,
+relax privacy, or rerun this study for a favorable result. The 8 MiB
+hypothesis must be tested independently, not recorded as the actual cause.
+
+Architecture disposition: **accepted** for this source chain. The explicit
+opt-in reuses the existing runner, shared proof validator and lifecycle;
+new identity/closure/privacy checks are cohesive and no generic lifecycle
+framework was introduced. The next correction must stay on the concrete
+capture boundary rather than spreading a new abstraction across admission.
+
+Completeness provenance: this entry reconciles the exact committed/frozen
+source, focused RED/GREEN and static logs, actual run/contract/round receipts,
+closed action metadata and independent cleanup inventory. No full original
+session transcript or destroyed historical raw error is claimed available.
+The missing-export hypothesis was source-checked and dismissed.
+
+The prior DERIVED functional qualification remains its own immutable,
+narrow result. This study remains **INVALID**. Publication, release-baseline
+adoption, admission and any new performance campaign remain on hold.
+Post-run tracked changes are documentation-only. Content-only freshness
+passed for 27 documents and `git diff --check` passed; this is not a
+full coupled documentation gate. The unchanged focused suite was not rerun.
 
 ### Prospective contract and executable safeguards
 

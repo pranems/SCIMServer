@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-10-23
 
-### DS-01: qualified DERIVED statement entry implemented (2026-10-23)
+### DS-01/DS-02: sole DERIVED statement study INVALID after BAAB (2026-10-23)
 
 Explicit opt-in binds the immutable privacy-derived reference and sealed
 functional qualification against unchanged 0.55.60, for one descriptive
@@ -10,9 +10,20 @@ BAAB/ABBA eight-visit study only. Tests enforce identity, full local input
 closure, independent false policies, explicit read-only observer, eight
 credential-role privacy and diagnostic admission rejection.
 Focused GREEN: 28/28, zero skips; three-file syntax/scoped lint clean.
-Source must be committed before the authorized sole run. No release
-baseline adoption, original receipt rewrite, push/CI/cloud or deployment.
-Actual execution/cleanup will be appended to the indexed DS-01 report.
+Clean source `7b3ac1c7` was committed before the sole run. Actual result:
+four BAAB visits, 17,628 checked workload requests, 16,000 measured samples,
+66 current contract outcomes, independently false policies; **INVALID**
+at 588,647 ms because a complete-console `logs` command failed during work.
+Safe category is `unexpected`, duration 8,394 ms; exact inner code and
+capture role remain unknown. No ABBA/replacement or completed private
+qualification. All four owned metadata captures/removals/absence and network cleanup
+passed; independent inventory confirmed zero owned resources and the same
+three shared containers. Partial SQL: B had 4.13% fewer top-level calls,
+46.38% more execution; logging INSERTs explain 56.05% of extra execution
+and 99.75% of extra WAL arithmetically, not causally. The indexed report
+preserves exact hashes and schedules source-only capture/typed-cause tests
+before any new runtime. No release baseline adoption, original receipt
+rewrite, push/CI/cloud or deployment.
 
 ### DF-13: local DERIVED artifact functionally qualified (2026-10-23)
 
@@ -171,6 +182,7 @@ See the indexed observer/statement report and
 
 | Date | Summary |
 |---|---|
+| 2026-10-23 | Sole prospective DERIVED statement study from `7b3ac1c7`: INVALID after four BAAB visits, 17,628 workload requests and a passing 66-outcome contract because full-console collection failed. Partial SQL/WAL evidence retained; exact owned cleanup and unchanged shared inventory verified. No ABBA replacement, admission, baseline adoption or deployment. |
 | 2026-10-23 | Corrected-source DERIVED attempt2 from `e0d884b9`: strict privacy subchecks passed for seven authenticated requests/four masks, but finalization failed and safety cleanup completed after the five-minute cap. Overall INVALID, no further invocation. All exact owned resources removed; three shared running containers, earlier receipts, 90 branches and ten stashes preserved. |
 | 2026-10-23 | Completed the sole DERIVED functional invocation as INVALID before allocation: zero HTTP/SQL. Committed tested metadata/intent/cleanup correction `462365db` without retry. Independent closeout preserves images, earlier proof, 90 branches, ten stashes and all shared containers. Artifact remains functionally unqualified; adoption/publication/performance held. |
 | 2026-10-23 | Confirmed the exact cached startup emitter, committed strict opt-in offline tooling, retained a failed preflight and completed the single DERIVED build with one-file whole-distribution proof and unstarted cleanup. Original images/evidence and admission holds remain unchanged. |
