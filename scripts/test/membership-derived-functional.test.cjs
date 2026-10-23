@@ -122,6 +122,111 @@ test('only DERIVED app metadata requires labels; PG optional labels must not be 
   assert.ok(source.indexOf("write('intent.json'") < source.indexOf('const images = {}'),
     'Intent must be sealed even when metadata preflight fails');
 });
+function runFunctionalPreflightChild(mode) {
+  const directory = path.join(root, 'test-results/derived-functional-unit', randomUUID());
+  fs.mkdirSync(directory, { recursive: true });
+  const output = path.join(directory, 'output');
+  const eventsFile = path.join(directory, 'events.jsonl');
+  const preload = path.join(directory, 'preload.cjs');
+  fs.writeFileSync(preload, `
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const cp = require('node:child_process');
+    const {promisify} = require('node:util');
+    const originalWrite = fs.writeFileSync;
+    const execute = promisify(cp.execFile);
+    const output = ${JSON.stringify(output)};
+    const mode = ${JSON.stringify(mode)};
+    const record = value => fs.appendFileSync(${JSON.stringify(eventsFile)}, JSON.stringify(value)+'\\n');
+    fs.writeFileSync = (file, bytes, options) => {
+      const result = originalWrite(file, bytes, options);
+      if (path.resolve(file) === path.join(output, 'intent.json'))
+        record({kind:'intent',exclusive:options.flag==='wx'});
+      if (path.resolve(file) === path.join(output, 'manifest.json')) {
+        record({kind:'manifest',exclusive:options.flag==='wx'});
+        if (mode === 'manifest-drift') {
+          const changed = JSON.parse(bytes);
+          changed.policy.maximumAuthenticatedRequests = 8;
+          originalWrite(file, JSON.stringify(changed));
+        } else if (mode === 'frozen-drift')
+          originalWrite(path.join(output,'frozen-inputs','membership-protocol.json'),'{}');
+      }
+      return result;
+    };
+    const intercepted = async (file,args,options) => {
+      if (file === 'git' && args[0] === 'status') return {stdout:'',stderr:''};
+      if (file !== 'docker') return execute(file,args,options);
+      const command = args.slice(2);
+      record({kind:'docker',command:command.slice(0,2)});
+      if (command[0] === 'image') {
+        if (mode === 'metadata-failure')
+          throw Object.assign(new Error('withheld fixture metadata'), {
+            code:1,stdout:'',stderr:'PRIVATE_FAKE_METADATA_OUTPUT'});
+        const tool = require(${JSON.stringify(path.join(root, 'scripts/performance/membership-derived-functional.cjs'))});
+        const proof = tool.loadBuildProof(${JSON.stringify(root)});
+        const isApp = command.at(-1) === proof.imageId;
+        return {stdout:JSON.stringify({id:isApp?proof.imageId:command.at(-1).split('@')[1],
+          digests:[command.at(-1)],os:'linux',architecture:'amd64',
+          ...(isApp?{labels:proof.labels}:{})}),stderr:''};
+      }
+      if (command[0] === 'ps' || (command[0] === 'network' && command[1] === 'ls'))
+        return {stdout:'',stderr:''};
+      throw Object.assign(new Error('No real Docker dispatch allowed'),{code:1,stdout:'',stderr:''});
+    };
+    cp.execFile = () => { throw new Error('Unexpected direct child process dispatch'); };
+    Object.defineProperty(cp.execFile,promisify.custom,{value:intercepted});
+    require('node:assert/strict').equal(promisify(cp.execFile),intercepted);
+  `, { flag: 'wx' });
+  const child = spawnSync(process.execPath, ['--require', preload,
+    path.join(root, 'scripts/performance/run-membership-privacy-functional.cjs'),
+    '--derived-reference-functional-only', output], {
+    cwd: root, encoding: 'utf8', timeout: 10000, maxBuffer: 16384,
+  });
+  assert.equal(child.error, undefined);
+  assert.equal(child.signal, null);
+  assert.equal(child.status, 1);
+  assert.doesNotMatch(child.stdout + child.stderr, /PRIVATE_FAKE_METADATA_OUTPUT/);
+  const events = fs.readFileSync(eventsFile, 'utf8').trim().split(/\r?\n/).map(JSON.parse);
+  const reportText = fs.readFileSync(path.join(output, 'report.json'), 'utf8');
+  assert.doesNotMatch(reportText, /PRIVATE_FAKE_METADATA_OUTPUT|stack|stderr/);
+  const report = JSON.parse(reportText);
+  assert.equal(report.status, 'INVALID');
+  assert.equal(report.requests.length, 0);
+  assert.equal(report.readiness.length, 0);
+  assert.deepEqual(report.cleanup, { rows: [], verified: true });
+  assert.equal(report.remainingOwned, '');
+  assert.equal(report.remainingNetworks, '');
+  assert.equal(report.artifactPrivacyQualified, false);
+  return { output, events, report };
+}
+test('real bounded functional child seals exclusive intent before failing fake metadata', () => {
+  const { output, events, report } = runFunctionalPreflightChild('metadata-failure');
+  assert.deepEqual(events[0], { kind: 'intent', exclusive: true });
+  assert.deepEqual(events[1], { kind: 'docker', command: ['image', 'inspect'] });
+  assert.equal(events.some(event => event.kind === 'manifest'), false);
+  assert.equal(events.some(event => /run|create|start/.test(event.command?.join(' ') ?? '')), false);
+  const intent = JSON.parse(fs.readFileSync(path.join(output, 'intent.json')));
+  const tool = implementation();
+  assert.equal(intent.requestedImages.app, tool.imageId);
+  assert.equal(intent.requestedImages.pg, require('../performance/membership-protocol.json').postgres);
+  assert.match(intent.sourceTip, /^[a-f0-9]{40}$/);
+  assert.match(intent.hypothesis, /sole approved logging backport/);
+  assert.deepEqual([intent.policy.maximumAuthenticatedRequests, intent.policy.maximumReadinessProbes,
+    intent.policy.wallCapMs, intent.policy.cleanupReservationMs], [7, 15, 300000, 120000]);
+  const { createHash } = require('node:crypto');
+  assert.equal(Object.keys(intent.sourceHashes).length, 7);
+  for (const [file, hash] of Object.entries(intent.sourceHashes))
+    assert.equal(hash, createHash('sha256').update(fs.readFileSync(path.join(root, 'scripts/performance', file))).digest('hex'));
+  assert.deepEqual(report.failures, [{ stage: 'app-image-preflight', code: 'OWNED_DOCKER' }]);
+});
+for (const mode of ['manifest-drift', 'frozen-drift'])
+  test(`real bounded functional child rejects ${mode} before any resource creation`, () => {
+    const { events, report } = runFunctionalPreflightChild(mode);
+    assert.equal(events.some(event => event.kind === 'manifest' && event.exclusive), true);
+    assert.equal(events.some(event => /run|create|start/.test(event.command?.join(' ') ?? '')), false,
+      'The full resolved manifest and frozen bytes must be validated before any resource creation');
+    assert.deepEqual(report.failures, [{ stage: 'resolved-manifest-validation', code: 'ERR_ASSERTION' }]);
+  });
 test('real bounded workload child stops before Group requests when fixture policy is rejected', async () => {
   const routes = [];
   const endpointId = '11111111-1111-4111-8111-111111111111';

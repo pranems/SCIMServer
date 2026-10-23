@@ -215,6 +215,14 @@ async function main() {
     for (const file of files) fs.copyFileSync(path.join(__dirname, file), path.join(directory, 'frozen-inputs', file),
       fs.constants.COPYFILE_EXCL);
     write('manifest.json', manifest);
+    if (derived) {
+      stage = 'resolved-manifest-validation';
+      const resolved = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json')));
+      assert.deepEqual(resolved, manifest, 'Full resolved manifest must retain its intended values');
+      for (const [file, hash] of Object.entries(resolved.sourceHashes))
+        assert.equal(digest(fs.readFileSync(path.join(directory, 'frozen-inputs', file))), hash,
+          'Frozen input bytes must match the resolved manifest');
+    }
     report.manifestSha256 = digest(fs.readFileSync(path.join(directory, 'manifest.json')));
     stage = 'owned-pg';
     await docker(['network', 'create', ...labels, network]);

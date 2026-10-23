@@ -2,6 +2,19 @@
 
 **Last verified:** 2026-10-23
 
+### Corrected-source DERIVED continuation (2026-10-23)
+
+One new attempt2 is authorized after the optional-PG-label fix; attempt1
+remains INVALID with zero prior workload and its missing manifest unchanged.
+Three actual bounded child tests now prove failed-metadata preregistration
+and reject resolved-manifest/frozen-input tampering before allocation.
+Behavioral RED retained one pass/two failures; GREEN is three executed,
+three passed, zero skips. Four-file focused regression is 34/34; six-file
+syntax/scoped lint passes. Full manifest readback and frozen hashes now
+validate before any resource creation, only in explicit DERIVED mode.
+No new build, original/candidate startup, performance or adoption is allowed.
+See the indexed observer/statement report for DF-10/DF-11 and actual outcome.
+
 ### DERIVED functional qualification: INVALID preflight (2026-10-23)
 
 Executed source `1ac35593` stopped INVALID after 27.828 seconds, before any

@@ -3,6 +3,47 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## Corrected-source functional continuation (2026-10-23)
+
+One new `attempt2` invocation is authorized for the same immutable DERIVED
+artifact after the PG optional-label correction. This is not a replacement
+for a failed privacy workload: attempt1 allocated zero resources and made
+zero HTTP requests or SQL calls. Its INVALID receipt and absent manifest
+remain unchanged. The new invocation must record its own committed source,
+exclusive preregistration, full resolved manifest and frozen inputs.
+No original/candidate app, build, performance experiment or baseline
+adoption is authorized.
+
+Actual bounded child tests now prove that deliberately failing fake metadata
+leaves an exclusive intent containing source hashes, requested immutable
+images, the hypothesis and unchanged caps. The safe INVALID receipt has
+zero allocations, readiness probes and requests. Two further real child
+negative controls tamper with the full resolved manifest or a frozen input;
+both must stop before any resource creation. No test-only production flag
+or new production abstraction was added. Full manifest readback must equal
+the intended complete object, and every frozen input must match its hash,
+before network creation or container start.
+
+Evidence root: `test-results/derived-functional-continuation-20261023/`.
+
+| Command | Actual result |
+|---|---|
+| `node --test --test-name-pattern="real bounded functional child" scripts\test\membership-derived-functional.test.cjs` before manifest guard | RED: three real tests executed, one passed and two failed on attempted resource creation after tampering; zero skips. `red-resolved-seal.log` |
+| Same filtered command after the guard | GREEN: three real tests executed, three passed, zero skips; `green-real-child.log` |
+| `node --test scripts\test\membership-derived-functional.test.cjs scripts\test\membership-privacy-functional.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-statements.test.cjs` | 34 passed, zero skips; `green-focused.log` |
+| `node test-results\derived-functional-20261023\validate.cjs ..\derived-functional-continuation-20261023\static.json` | Six syntax checks and scoped seven-rule ESLint passed, zero errors; `static.json`. Not the full normal lint configuration. |
+
+| Issue | Root cause, fix and prevention | Detection / escape |
+|---|---|---|
+| DF-10, test harness / Low | The first child shim assigned to Node's non-writable custom-promisification property, so interception did not take effect and three children hit their ten-second bound. Git dirty-source rejection occurred before intent/fixture creation; its read-only cleanup inventories could use the real CLI. The corrected shim replaces the function, installs an explicit custom property and asserts promisification identity before entry. The subsequent three real child cases execute in under four seconds collectively and never dispatch real Docker. | Test execution, before the authorized invocation; the failed harness output remains in `red-real-child.log`, not counted as behavioral RED. |
+| DF-11, evidence-integrity guard / Medium | Static ordering did not prove that the resolved manifest or frozen bytes were checked before allocation. Actual tamper children reproduced attempted creation after drift. Minimal DERIVED-only readback/equality and frozen-byte verification now reject both cases before any allocation. The default/admission path is unchanged. | New real-child negative controls; closed before the one corrected-source invocation. |
+
+Self-improvement disposition: **applied**, executable failure/tamper paths
+replace reliance on source ordering alone. Design disposition: **accepted**,
+small inline checks at the existing diagnostic sealing boundary; no new
+framework, test-only production option or speculative shared seam.
+The actual invocation and its outcome will be recorded separately below.
+
 ## Functional qualification of the DERIVED artifact (2026-10-23)
 
 One functional run of the immutable local DERIVED image was authorized,
