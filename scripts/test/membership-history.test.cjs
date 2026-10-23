@@ -222,6 +222,8 @@ for (const mode of ['history', 'capture-failure', 'default']) {
           assert.ok(Object.values(row.samples).every(values => values.length === 1000));
         } else {
           validateReceipt(row);
+          assert.throws(() => validateReceipt({ ...row, version: '0.55.20' }));
+          validateReceipt({ ...row, version: '0.55.20' }, '0.55.20');
           assert.deepEqual(boundaries, ['warmup-before', 'warmup-after', 'measured-before', 'measured-after']);
           assert.throws(() => validateReceipt({ ...row, requestCount: 4406 }));
           assert.throws(() => validateReceipt({ ...row, samples: { ...row.samples, add: row.samples.add.slice(1) } }));

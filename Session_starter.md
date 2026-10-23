@@ -10,7 +10,14 @@ diagnostic with a 45-minute cap. The prior 16-round experiment must not repeat.
 One persistent read-only observer stream replaces serial Docker CLI boundary
 launches. Nineteen focused real-child/history tests and seven unchanged
 admission selectors pass after RED/GREEN; scoped lint and syntax are clean.
-Actual smoke and conditional statement outcomes remain pending, not PASS.
+The single smoke completed 32 reads: median 3.5414 ms, p95 4.9941 ms,
+110.587 seconds including verified removal of both owned containers.
+Intentional restart detection and explicit refresh succeeded. The cached
+PG17.11 statement library probe passed without installation. The separate real
+SQL probe then passed in 43.688 seconds including verified owned cleanup.
+Statement source is implemented and passes 27 focused tests plus seven
+unchanged admission selectors and scoped lint. The eight-round phase-two
+execution remains pending; neither probe is release PASS.
 See `docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md`.
 
 ### Unreleased local application-history diagnostic (2026-10-23)

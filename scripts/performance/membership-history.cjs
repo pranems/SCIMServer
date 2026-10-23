@@ -86,11 +86,12 @@ function windowDelta(before, after) {
   return { cpu, before, after, diagnosticOnly: true };
 }
 
-function validateReceipt(row) {
+function validateReceipt(row, expectedVersion = '0.55.60') {
   assert.equal(row.diagnosticOnly, true);
   assert.equal(row.complete, true, 'Incomplete workload');
   assert.equal(row.status, 'PASS', 'Workload assertions failed');
-  assert.equal(row.version, '0.55.60');
+  assert.ok(['0.55.20', '0.55.60'].includes(expectedVersion));
+  assert.equal(row.version, expectedVersion);
   assert.equal(row.warmupIterations, 100);
   assert.equal(row.requestCount, 4407);
   assert.equal(row.cleanup.verified, true);

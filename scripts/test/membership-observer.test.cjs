@@ -81,8 +81,10 @@ test('reply framing rejects unknown IDs, duplicates, missing snapshots and secre
     "process.stderr.write('PRIVATE_CANARY')",
     "process.stdout.write('PRIVATE_CANARY\\n')",
     "process.stdout.write('x'.repeat(70000))",
+    `const reply=JSON.stringify({requestId:1,ok:true,snapshot:row('12','${id}')})+'\\n';
+      process.stdout.write(reply+reply)`,
   ]) {
-    const instance = spawn(process.execPath, ['-e', `process.stdin.once('data',()=>{${snippet}})`]);
+    const instance = spawn(process.execPath, ['-e', `${fixture} process.stdin.once('data',()=>{${snippet}})`]);
     const channel = new ObserverChannel(instance, owner, 1000);
     try {
       await assert.rejects(channel.request({ kind: 'snapshot', id }), error =>
