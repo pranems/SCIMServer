@@ -7,7 +7,7 @@ const { promisify } = require('node:util');
 const { setTimeout: delay } = require('node:timers/promises');
 const { ObserverChannel } = require('./membership-observer.cjs');
 const { sourceTip, windowDelta, validateReceipt, validatePrivacy, finalizeOwned, runVisits } = require('./membership-history.cjs');
-const { statementDelta, summarizeStatements } = require('./membership-statements.cjs');
+const { statementDelta, summarizeStatements, validateLegacyPrivacy } = require('./membership-statements.cjs');
 const fixture = require('./membership-statement-fixture.cjs');
 const exec = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
@@ -333,14 +333,7 @@ async function main() {
         const secrets = [...Object.values(credentials), ...Object.values(passwords)];
         let privacy;
         if (role === 'B') privacy = validatePrivacy(logs, consoleLog, secrets);
-        else {
-          assert.equal(logs.length, 200);
-          for (const secret of secrets)
-            assert.ok(!JSON.stringify(logs).includes(secret) && !consoleLog.includes(secret), 'Legacy credential leaked');
-          for (const row of logs) assert.equal(JSON.parse(row.requestHeaders).authorization, '[REDACTED]');
-          privacy = { diagnosticOnly: true, complete: true, validatedRows: logs.length,
-            contract: 'Legacy redaction only; no current-only error categorization assertion', rawLogsExported: false };
-        }
+        else privacy = validateLegacyPrivacy(logs, consoleLog, secrets);
         write(path.join(directory, `${block.name}-${role}-privacy.json`), privacy);
         await remove(app.id);
       }
@@ -353,7 +346,8 @@ async function main() {
     report.status = 'INVALID';
     report.failures.push({ stage, code: error.code || error.name,
       message: error.code ? 'PG/child operation failed; raw text withheld for privacy' : error.message,
-      causalFrames: error.stack?.split('\n').slice(1, 7) });
+      causalFrames: error.stack?.split('\n').slice(1, 7),
+      ...(error.code === 'DIAGNOSTIC_PRIVACY' ? { safeDetails: error.safeDetails } : {}) });
     process.exitCode = 1;
   } finally {
     for (const [name, connection] of [['observer', statistics?.observer], ['admin', admin]]) {

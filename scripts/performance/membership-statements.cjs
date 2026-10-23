@@ -120,6 +120,39 @@ function summarizeStatements(statements) {
     .sort((a, b) => b.execMs - a.execMs);
 }
 
+function validateLegacyPrivacy(rows, consoleLog, secrets) {
+  assert.ok(Array.isArray(secrets) && secrets.length > 0, 'Required generated-credential canaries');
+  assert.equal(typeof consoleLog, 'string', 'Required private console sample');
+  const fail = safeDetails => {
+    const error = new Error('Legacy privacy validation failed; private values withheld');
+    error.code = 'DIAGNOSTIC_PRIVACY';
+    error.safeDetails = safeDetails;
+    throw error;
+  };
+  assert.ok(Array.isArray(rows) && rows.length === 200, 'Original legacy private log sample');
+  const encoded = JSON.stringify(rows);
+  for (const secret of secrets) {
+    assert.ok(typeof secret === 'string' && secret.length > 0);
+    if (encoded.includes(secret) || consoleLog.includes(secret))
+      fail({ reason: 'generated-credential-detected' });
+  }
+  for (const [rowIndex, row] of rows.entries()) {
+    let headers;
+    try { headers = JSON.parse(row.requestHeaders); }
+    catch { fail({ reason: 'headers-not-json', rowIndex }); }
+    if (!headers || typeof headers !== 'object' || Array.isArray(headers))
+      fail({ reason: 'headers-not-object', rowIndex });
+    const authorizationPresent = Object.hasOwn(headers, 'authorization');
+    if (!authorizationPresent)
+      fail({ reason: 'authorization-missing', rowIndex, authorizationPresent });
+    if (headers.authorization !== '[REDACTED]')
+      fail({ reason: 'authorization-mask-mismatch', rowIndex, authorizationPresent });
+  }
+  return { diagnosticOnly: true, complete: true, validatedRows: rows.length,
+    contract: 'Legacy redaction only; no current-only error categorization assertion',
+    rawLogsExported: false };
+}
+
 function snapshotSql(columns) {
   checkColumns(columns);
   const counters = columns.map(name => `'${name}',${name}::text`).join(',');
@@ -166,4 +199,5 @@ SELECT jsonb_build_object(
 FROM public.pg_stat_statements_info info CROSS JOIN observer`;
 }
 
-module.exports = { counterColumns, validatePgSnapshot, statementDelta, snapshotSql, summarizeStatements };
+module.exports = { counterColumns, validatePgSnapshot, statementDelta, snapshotSql, summarizeStatements,
+  validateLegacyPrivacy };

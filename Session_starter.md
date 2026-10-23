@@ -17,7 +17,19 @@ PG17.11 statement library probe passed without installation. The separate real
 SQL probe then passed in 43.688 seconds including verified owned cleanup.
 Statement source is implemented and passes 27 focused tests plus seven
 unchanged admission selectors and scoped lint. The eight-round phase-two
-execution remains pending; neither probe is release PASS.
+attempt ran once from committed source `f6731ffb`. It stopped INVALID after
+four complete BAAB visits: 17,628 checked requests and 16,000 measured samples,
+with a legacy authorization-mask assertion failure after the block.
+All four owned containers and the network were verified removed in 8.875
+minutes total. No ABBA, replacement or retry ran. The frozen manifest hash is
+`ef712837359d4149d6e85d6cb89c9c1c071880ed66d48f4f9b7816e529041d0a`.
+Partial statement sums show fewer calls but greater execution in current,
+with RequestLog insert families contributing 53.04% of that difference;
+this is descriptive, incomplete evidence, not a code/root-cause conclusion.
+A subsequent strict, secret-free privacy-failure classifier passes 28 focused
+tests but is unmeasured. The actual differing legacy header value remains
+unresolved; no guard was relaxed. Original negative admission, publication,
+customer-data and deployment holds remain unchanged.
 See `docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md`.
 
 ### Unreleased local application-history diagnostic (2026-10-23)

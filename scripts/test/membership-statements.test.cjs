@@ -108,3 +108,33 @@ test('safe summaries retain nesting mix even when the opaque query ID is unchang
   assert.deepEqual(group.topLevels, [false, true]);
   assert.equal(group.identityMix, true);
 });
+
+test('legacy privacy retains strict redaction and exports a safe failure category, never header values', () => {
+  const { validateLegacyPrivacy } = require('../performance/membership-statements.cjs');
+  assert.equal(typeof validateLegacyPrivacy, 'function');
+  const rows = Array.from({ length: 200 }, () => ({
+    requestHeaders: '{"authorization":"[REDACTED]"}',
+  }));
+  assert.equal(validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']).validatedRows, 200);
+  assert.throws(() => validateLegacyPrivacy(rows, '', []), /Required generated-credential canaries/);
+  assert.throws(() => validateLegacyPrivacy(rows, null, ['PRIVATE_CANARY']), /Required private console sample/);
+  for (const [headers, reason, present] of [
+    ['{}', 'authorization-missing', false],
+    ['{"authorization":"other-mask"}', 'authorization-mask-mismatch', true],
+  ]) {
+    rows[0].requestHeaders = headers;
+    assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']), error => {
+      assert.equal(error.code, 'DIAGNOSTIC_PRIVACY');
+      assert.deepEqual(error.safeDetails, { reason, rowIndex: 0, authorizationPresent: present });
+      assert.ok(!JSON.stringify(error).includes('other-mask'));
+      return true;
+    });
+  }
+  rows[0].requestHeaders = '{"authorization":"PRIVATE_CANARY"}';
+  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']), error => {
+    assert.equal(error.safeDetails.reason, 'generated-credential-detected');
+    assert.ok(!JSON.stringify(error).includes('PRIVATE_CANARY'));
+    assert.ok(!error.message.includes('PRIVATE_CANARY'));
+    return true;
+  });
+});
