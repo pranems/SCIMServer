@@ -3,7 +3,101 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
-## OS-07 bounded functional follow-up
+## Source-only policy review and complete failure telemetry
+
+**The frozen phase-two fixture did not request masking.** It omitted both
+the server persistence environment variable and an endpoint persistence
+override. The exact cached 0.55.20 image has no image-level override, and its
+copied `rfc-standard` preset omits `PersistRequestSecrets`. Exact compiled
+source therefore predicts the legacy default, true. Requiring a mask without
+explicitly disabling persistence was an unjustified fixture assumption.
+Confidence in that source-level contract conflict is high; the destroyed
+runtime settings, cache and individual OS-07 row are still unknown.
+
+| Input or state | Frozen phase two | First new functional fixture |
+|---|---|---|
+| Launcher `PERSIST_REQUEST_SECRETS` | Not passed | Explicit false, independently observed false |
+| Cached image environment override | Absent | Same exact baseline image |
+| Requested endpoint preset | `rfc-standard` | `rfc-standard` |
+| Exact copied preset persistence setting | Absent | Observed absent before explicit update |
+| Explicit endpoint persistence update | None | False, independently read from owned database |
+| Effective setting of the destroyed old row | Not retained | Not reconstructed from the new fixture |
+
+This does not establish that the old mismatch was a raw generated
+authorization header: the frozen validator's generated-credential check
+preceded its mask assertion and did not fail there. A raw generated credential
+would have failed that earlier check. The old SQL also lacked endpoint and
+request-ID correlation. Policy inheritance explains why the asserted contract
+was unsupported, not which destroyed row or value caused OS-07.
+
+The separate OS-11 failure from functional attempt 1 remains a different
+question. That fixture sent credentials only through its authorization
+header, selected four correlated Group records, observed four exact masks,
+and then rejected a generated-credential match somewhere in its selected rows
+or combined console input. The selected nonheader fields derive from owned
+identifiers, static routes/methods and statuses; no body was selected.
+Application-container startup runs Prisma migrations before the application.
+Its migration stdout is suppressed but stderr is not. The logging sanitizer
+redacts sensitive object keys; a string containing a credential is not
+necessarily redacted by that key-based mechanism. These are possible paths,
+not an identified emitter.
+
+The new discriminating hypothesis is that startup/migration or other
+container output, rather than a Group authorization field, supplied OS-11.
+The implementation separately scans selected rows, application-container
+records, PostgreSQL-container records and Docker tool output. Docker
+`--timestamps` prefixes distinguish container records from unframed tool
+diagnostics; they do not identify a particular application statement.
+PostgreSQL administrative output and tool diagnostics must not be mislabeled
+as application defects. No raw stream or matching context is persisted.
+
+### Executable information-preservation safeguard
+
+`membership-privacy.cjs` now constructs every rejection in this diagnostic
+privacy family through a closed schema: static reason, input source,
+credential kind, and row index when applicable. Credential roles are declared
+by the real callers, not inferred from values. All matching source/role
+combinations are retained, rather than only the first. Missing inputs,
+invalid roles, serialization failures, malformed headers, missing masks,
+provenance failures and report-output rejection keep the same safe contract.
+Unknown metadata is rejected using a fixed safe category, never echoed.
+
+The report writer rejects private output before writing and preserves a
+minimal INVALID receipt with safe cause/source/kind and cleanup facts. An
+actual bounded Node child verifies that path. Tests also reject added
+private-value, credential-hash, length or context fields in failure metadata.
+A static regression selector prevents bare canary assertions from returning
+to the active statement helper and both current diagnostic runners.
+The original admission/default path and all frozen input directories remain
+unchanged; this is prospective diagnostic tooling only.
+
+Before any conditional attempt, 23 focused tests and three unchanged
+deadline/finalization/admission selectors passed. Seven changed code files
+passed native syntax and scoped ESLint correctness rules with zero errors.
+This is not a repeated performance campaign.
+
+### Execution issues and immediate prevention
+
+| Issue | Type / severity | Confirmed cause and fix | Detection and earliest applicable check |
+|---|---|---|---|
+| OS-13 | Diagnostic evidence / High | The previous correction retained a row/console location but lost credential role; input and output assertions could bypass metadata entirely. One typed, allowlisted failure seam now covers real callers, all private inputs and final receipt writing. No secret-derived identifier or context is exported. | Focused RED observed missing `source`; complete input/output negative tests and bounded-child GREEN now prevent recurrence. |
+| OS-14 | Test/tooling / Low | An insertion matched an inner closing brace. The first name-filtered command executed no matching subtest and reported only a file-level success. A full small selector exposed the missing metadata. A later misplaced helper declaration failed module loading. Both were corrected using full function boundaries. | Whole-file selectors and `no-undef` catch these before execution; file-level success is not evidence that a named test ran. |
+| OS-15 | Static correctness / Low | A newly added throw inside `finally` violated `no-unsafe-finally`. The minimal-receipt writer was extracted into a small cohesive function, then proved in an actual bounded child. | Scoped ESLint caught it before any fixture; zero errors after the correction. |
+
+The source-only facts and exact command evidence are retained under
+`test-results/os07-functional-20261023/`: `source-review-2.json`,
+`red-source-kind-full.log`, `red-complete-functional-telemetry.log`,
+`red-final-receipt-and-null-row.log`, `green-attempt2-ready.log`,
+`regression-owned-finalization.log`, and `static-attempt2-final.json`.
+No new container was created for the source-only review.
+
+Self-improvement: **applied** the closed failure schema, branch-matrix negative
+tests, static bare-assertion check and real-child minimal receipt proof.
+Design/architecture disposition: **applied** one small shared privacy seam
+for two real diagnostic callers; default/admission behavior and historical
+application images are not generalized or changed. No new framework is needed.
+
+## OS-07 first bounded functional follow-up
 
 **Outcome: INVALID and inconclusive for OS-07.** The single functional run
 completed seven authenticated requests and verified cleanup in 182.033 seconds.

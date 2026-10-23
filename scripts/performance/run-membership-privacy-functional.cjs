@@ -8,10 +8,43 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { client } = require('./membership-statement-fixture.cjs');
 const { finalizeOwned, sourceTip } = require('./membership-history.cjs');
 const { validateLegacyPrivacy, classifyLegacyHeaders } = require('./membership-statements.cjs');
+const { fail, credentialCanaries, assertCanariesAbsent, encodeSafeJson,
+  validateSafeFailure } = require('./membership-privacy.cjs');
 const protocol = require('./membership-protocol.json');
 const exec = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const functionalPolicy = Object.freeze({ maximumAuthenticatedRequests: 7, maximumReadinessProbes: 15,
+  readinessIntervalMs: 1000, wallCapMs: 300000, cleanupReservationMs: 120000 });
+
+function splitDockerLogOutput(output) {
+  const container = [];
+  const tool = [];
+  for (const stream of [output.stdout, output.stderr]) {
+    for (const line of stream.split(/\r?\n/)) {
+      const frame = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z /.exec(line);
+      if (frame) container.push(line.slice(frame[0].length));
+      else tool.push(line);
+    }
+  }
+  return { container: container.join('\n'), tool: tool.join('\n') };
+}
+
+function writeFunctionalReport(write, report) {
+  try { write('report.json', report); }
+  catch (error) {
+    if (error.code !== 'DIAGNOSTIC_PRIVACY') throw error;
+    report.status = 'INVALID';
+    write('report.json', { family: report.family, run: report.run, status: 'INVALID', diagnosticOnly: true,
+      admissionEligible: false, elapsedMs: report.elapsedMs, cleanup: report.cleanup,
+      remainingOwned: report.remainingOwned, remainingNetworks: report.remainingNetworks,
+      failures: [{ stage: 'report-output', code: error.code,
+        safeDetails: validateSafeFailure(error.safeDetails),
+        safeFindings: error.safeFindings.map(validateSafeFailure) }] });
+    return true;
+  }
+  return false;
+}
 
 async function readFunctionalResponse(response, status) {
   if (status === undefined) assert.ok(response.ok, 'Original successful flush contract');
@@ -21,14 +54,18 @@ async function readFunctionalResponse(response, status) {
 }
 
 function verifyProvenance(rows, expected, endpointId) {
-  assert.equal(rows.length, expected.length, 'Required authorized row count');
-  assert.equal(new Set(rows.map(row => row.requestId)).size, expected.length, 'Duplicate private row');
-  for (const row of rows) {
+  if (!Array.isArray(rows) || rows.length !== expected.length)
+    fail('provenance-row-count', 'selected-rows');
+  if (new Set(rows.map(row => row.requestId)).size !== expected.length)
+    fail('provenance-duplicate', 'selected-rows');
+  for (const [rowIndex, row] of rows.entries()) {
+    const reject = reason => fail(reason, 'selected-rows', 'not-applicable', { rowIndex });
     const request = expected.find(item => item.requestId === row.requestId);
-    assert.ok(request, 'Unknown request owner');
-    assert.equal(row.endpointId, endpointId, 'Foreign endpoint row');
-    for (const key of ['method', 'url', 'status'])
-      assert.equal(row[key], request[key], `Private row ${key} mismatch`);
+    if (!request) reject('provenance-owner');
+    if (row.endpointId !== endpointId) reject('provenance-endpoint');
+    for (const [key, reason] of [['method', 'provenance-method'], ['url', 'provenance-route'],
+      ['status', 'provenance-status']])
+      if (row[key] !== request[key]) reject(reason);
   }
   return true;
 }
@@ -40,8 +77,8 @@ async function main() {
   assert.ok(directory.startsWith(root + path.sep));
   fs.mkdirSync(directory);
   const started = Date.now();
-  const deadline = started + 300000;
-  const workDeadline = deadline - 120000;
+  const deadline = started + functionalPolicy.wallCapMs;
+  const workDeadline = deadline - functionalPolicy.cleanupReservationMs;
   const run = crypto.randomUUID().replaceAll('-', '');
   const owner = 'membership-privacy-functional';
   const prefix = `scim-os07-${run.slice(0, 12)}`;
@@ -51,12 +88,13 @@ async function main() {
   const secrets = Object.fromEntries(['POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET',
     'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK'].map(key => [key, crypto.randomBytes(32).toString('hex')]));
   const environment = { ...process.env, ...secrets };
+  const canaries = credentialCanaries(secrets);
+  let toolConsole = '';
   const report = { family: owner, diagnosticOnly: true, admissionEligible: false,
     run, status: 'INCOMPLETE', startedAtUtc: new Date(started).toISOString(),
     deadlineUtc: new Date(deadline).toISOString(), requests: [], readiness: [], failures: [] };
   const write = (name, data) => {
-    const bytes = JSON.stringify(data, null, 2) + '\n';
-    for (const secret of Object.values(secrets)) assert.ok(!bytes.includes(secret), 'Output privacy canary');
+    const bytes = encodeSafeJson(data, canaries);
     fs.writeFileSync(path.join(directory, name), bytes, { flag: 'wx' });
   };
   let connection;
@@ -64,7 +102,7 @@ async function main() {
   let stage = 'preflight';
   const allocated = [];
   const check = () => assert.ok(Date.now() < workDeadline, 'Functional work cap; cleanup reserved');
-  async function docker(args, cleanup = false, combined = false) {
+  async function docker(args, cleanup = false, logs = false) {
     if (!cleanup) check();
     const remaining = (cleanup ? deadline : workDeadline) - Date.now();
     assert.ok(remaining > 0, 'Functional total cap');
@@ -73,8 +111,16 @@ async function main() {
         cwd: root, env: environment, windowsHide: true, maxBuffer: 2 * 1024 * 1024,
         timeout: Math.min(cleanup ? 10000 : 30000, remaining),
       });
-      return (combined ? result.stdout + result.stderr : result.stdout).trim();
+      if (logs) {
+        const separated = splitDockerLogOutput(result);
+        toolConsole += '\n' + separated.tool;
+        return separated.container;
+      }
+      toolConsole += '\n' + result.stdout + '\n' + result.stderr;
+      return result.stdout.trim();
     } catch (error) {
+      toolConsole += '\n' + (typeof error.stdout === 'string' ? error.stdout : '') +
+        '\n' + (typeof error.stderr === 'string' ? error.stderr : '');
       const safe = new Error('Owned functional Docker operation failed; private output withheld');
       safe.code = ['ENOENT', 'ETIMEDOUT'].includes(error.code) ? error.code : 'OWNED_DOCKER';
       throw safe;
@@ -105,26 +151,32 @@ async function main() {
     const routes = ['endpoint-create', 'endpoint-policy', 'group-create', 'group-patch',
       'group-missing-read', 'group-missing-patch', 'flush'];
     const requestIds = Object.fromEntries(routes.map(route => [route, crypto.randomUUID()]));
-    const files = ['run-membership-privacy-functional.cjs', 'membership-statements.cjs',
+    const files = ['run-membership-privacy-functional.cjs', 'membership-statements.cjs', 'membership-privacy.cjs',
       'membership-statement-fixture.cjs', 'membership-history.cjs', 'membership-protocol.json'];
     const inspected = {};
     const legacyRoot = path.join(root, 'test-results/os07-functional-20261023/legacy-source');
     for (const file of ['logging/logging.service.js', 'logging/request-logging.interceptor.js',
-      'filters/scim-exception.filter.js', 'endpoint-config.interface.js', 'dto/update-endpoint.dto.d.ts'])
+      'filters/scim-exception.filter.js', 'endpoint-config.interface.js', 'dto/update-endpoint.dto.d.ts',
+      'endpoint-profile/presets/rfc-standard.json', 'logging/scim-logger.service.js'])
       inspected[file] = digest(fs.readFileSync(path.join(legacyRoot, file)));
     const manifest = { ...report, sourceTip: await sourceTip(root), images,
       inspectedLegacySourceHashes: inspected,
       client: { node: process.version, executableSha256: digest(fs.readFileSync(process.execPath)),
         pgVersion: require(path.join(root, 'api/node_modules/pg/package.json')).version },
       sourceHashes: Object.fromEntries(files.map(file => [file, digest(fs.readFileSync(path.join(__dirname, file)))])),
-      policy: { maximumAuthenticatedRequests: 7, expectedAuthorizedRows: 4,
+      sourceOnlyReviewSha256: digest(fs.readFileSync(path.join(root,
+        'test-results/os07-functional-20261023/source-review-2.json'))),
+      policy: { ...functionalPolicy, expectedAuthorizedRows: 4,
         workloadRoutes: routes.slice(2, 6), readinessRoute: '/scim/health',
         requestIdRequired: true, exactEndpointMethodRouteStatus: true,
         requestedServerPersistRequestSecrets: false, requestedEndpointPersistRequestSecrets: false,
         profilePreset: 'rfc-standard', appCpu: 0.5, appMemory: 1073741824,
         wallCapMs: 300000, cleanupReservationMs: 120000, flushDeadlineMs: 10000,
         performanceCycles: 0, statisticsExtension: false, rawPrivateExport: false },
-      hypothesis: 'With explicit legacy secret persistence disabled, known authorized success/error rows retain object-shaped JSON and the exact mask. Readiness/admin rows are excluded by request IDs and endpoint/method/route.',
+      hypothesis: 'With explicit false persistence, four known authorized Group rows remain masked. A generated-credential match may originate in application-container startup/migration output rather than Group authorization fields. Separate selected-row, application-container, PG-container and tool inputs plus static credential roles discriminate this; no specific emitter is presumed.',
+      expectedCategories: ['All four masks remain mandatory', 'Any generated-credential match is INVALID',
+        'Report every matching static source/kind and row index where applicable; never private text'],
+      consoleProvenance: 'Docker logs --timestamps prefix identifies container records, not a particular application emitter. Unframed output and all non-log command output are tool-console. No console text is exported.',
       requestIds, ownerNames: names, network };
     fs.mkdirSync(path.join(directory, 'frozen-inputs'));
     for (const file of files) fs.copyFileSync(path.join(__dirname, file), path.join(directory, 'frozen-inputs', file),
@@ -167,14 +219,14 @@ async function main() {
     assert.match(appPort, /^127\.0\.0\.1:\d+$/);
     const base = `http://${appPort}`;
     let ready = false;
-    for (let attempt = 0; attempt < 45; attempt++) {
+    for (let attempt = 0; attempt < functionalPolicy.maximumReadinessProbes; attempt++) {
       check();
       let status;
       try { status = (await fetch(`${base}/scim/health`, { signal: AbortSignal.timeout(1500) })).status; }
       catch (error) { if (!['TypeError', 'TimeoutError'].includes(error.name)) throw error; }
       report.readiness.push({ attempt, status: status ?? null });
       if (status === 200) { ready = true; break; }
-      await delay(500);
+      await delay(functionalPolicy.readinessIntervalMs);
     }
     assert.ok(ready, 'Owned functional readiness');
     report.app = await inspect(names[1]);
@@ -191,7 +243,7 @@ async function main() {
     async function request(route, method, url, body, status, workload = false) {
       check();
       stage = route;
-      assert.ok(report.requests.length < 7, 'Authenticated request cap');
+      assert.ok(report.requests.length < functionalPolicy.maximumAuthenticatedRequests, 'Authenticated request cap');
       const response = await fetch(base + url, { method,
         headers: { Authorization: `Bearer ${secrets.SCIM_SHARED_SECRET}`,
           'Content-Type': 'application/scim+json', 'X-Request-Id': requestIds[route] },
@@ -246,13 +298,21 @@ async function main() {
       ...classifyLegacyHeaders(row.requestHeaders),
     }));
     verifyProvenance(rows, expected, endpoint.id);
-    const privateConsole = await docker(['logs', '--tail', '300', names[1]], false, true);
-    report.privacy = validateLegacyPrivacy(rows, privateConsole, Object.values(secrets), 4);
+    const privateConsole = await docker(['logs', '--timestamps', '--tail', '300', names[1]], false, true);
+    const privatePgConsole = await docker(['logs', '--timestamps', '--tail', '300', names[0]], false, true);
+    report.privateSourcesCollected = ['selected-rows', 'app-console', 'pg-console', 'tool-console'];
+    assertCanariesAbsent([
+      ...rows.map((row, rowIndex) => ({ source: 'selected-rows', rowIndex, text: JSON.stringify(row) })),
+      { source: 'app-console', text: privateConsole }, { source: 'pg-console', text: privatePgConsole },
+      { source: 'tool-console', text: toolConsole },
+    ], canaries);
+    report.privacy = validateLegacyPrivacy(rows, privateConsole, canaries, 4);
     report.status = 'FUNCTIONAL-COMPLETE';
   } catch (error) {
     report.status = 'INVALID';
     report.failures.push({ stage, code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : error.name,
-      ...(error.code === 'DIAGNOSTIC_PRIVACY' ? { safeDetails: error.safeDetails } : {}) });
+      ...(error.code === 'DIAGNOSTIC_PRIVACY' ? { safeDetails: validateSafeFailure(error.safeDetails),
+        safeFindings: error.safeFindings.map(validateSafeFailure) } : {}) });
     process.exitCode = 1;
   } finally {
     if (connection) {
@@ -278,19 +338,26 @@ async function main() {
       report.remainingNetworks = await docker(['network', 'ls', '--filter', `label=scimserver.run=${run}`,
         '--format', '{{.ID}}'], true);
     } catch { report.failures.push({ stage: 'cleanup-inventory', code: 'INVENTORY' }); }
+    try { assertCanariesAbsent([{ source: 'tool-console', text: toolConsole }], canaries); }
+    catch (error) {
+      report.failures.push({ stage: 'tool-output-privacy', code: 'DIAGNOSTIC_PRIVACY',
+        safeDetails: validateSafeFailure(error.safeDetails),
+        safeFindings: error.safeFindings.map(validateSafeFailure) });
+    }
     report.elapsedMs = Date.now() - started;
     if (!report.cleanup.verified || report.remainingOwned !== '' || report.remainingNetworks !== '' ||
       report.elapsedMs > 300000 || report.failures.length) {
       report.status = 'INVALID';
       process.exitCode = 1;
     }
-    write('report.json', report);
+    if (writeFunctionalReport(write, report)) process.exitCode = 1;
     console.log(JSON.stringify({ status: report.status, run, requests: report.requests.length,
       elapsedMs: report.elapsedMs, cleanup: report.cleanup.verified }));
   }
 }
 
-module.exports = { verifyProvenance, readFunctionalResponse };
+module.exports = { verifyProvenance, readFunctionalResponse, splitDockerLogOutput, functionalPolicy,
+  writeFunctionalReport };
 if (require.main === module) main().catch(() => {
   console.error('Functional entry failed; private details withheld');
   process.exitCode = 1;

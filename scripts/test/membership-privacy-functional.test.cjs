@@ -32,3 +32,60 @@ test('functional entry cannot dispatch by default and cannot enter admission', (
     role, diagnosticOnly: true, family: 'membership-privacy-functional',
   })), { order: 'BAAB', sameImage: false }, {}), /Diagnostic receipts cannot enter release admission/);
 });
+
+test('private provenance rejections preserve safe cause, input source and applicable row', () => {
+  const expected = [{ requestId: 'owned', method: 'GET', url: '/owned', status: 404 }];
+  const row = { ...expected[0], endpointId: 'owned' };
+  for (const [rows, reason, rowIndex] of [
+    [[], 'provenance-row-count'],
+    [[{ ...row, requestId: 'foreign' }], 'provenance-owner', 0],
+    [[{ ...row, endpointId: 'foreign' }], 'provenance-endpoint', 0],
+    [[{ ...row, method: 'PATCH' }], 'provenance-method', 0],
+    [[{ ...row, url: '/foreign' }], 'provenance-route', 0],
+    [[{ ...row, status: 401 }], 'provenance-status', 0],
+  ]) assert.throws(() => verifyProvenance(rows, expected, 'owned'), error => {
+    assert.deepEqual(error.safeDetails, { reason, source: 'selected-rows',
+      credentialKind: 'not-applicable', ...(rowIndex === undefined ? {} : { rowIndex }) });
+    return true;
+  });
+});
+
+test('timestamped container records stay separate from unframed Docker tool diagnostics', () => {
+  const { splitDockerLogOutput, functionalPolicy } =
+    require('../performance/run-membership-privacy-functional.cjs');
+  assert.equal(typeof splitDockerLogOutput, 'function');
+  const result = splitDockerLogOutput({
+    stdout: '2026-10-23T20:00:00.123456789Z PRIVATE_APP_CANARY\n',
+    stderr: '2026-10-23T20:00:01Z PRIVATE_CONTAINER_STDERR_CANARY\nDocker warning PRIVATE_TOOL_CANARY\n',
+  });
+  assert.match(result.container, /PRIVATE_APP_CANARY/);
+  assert.match(result.container, /PRIVATE_CONTAINER_STDERR_CANARY/);
+  assert.doesNotMatch(result.container, /PRIVATE_TOOL_CANARY/);
+  assert.match(result.tool, /PRIVATE_TOOL_CANARY/);
+  assert.doesNotMatch(result.tool, /PRIVATE_APP_CANARY/);
+  assert.equal(functionalPolicy.maximumReadinessProbes, 15);
+  assert.equal(functionalPolicy.maximumAuthenticatedRequests, 7);
+});
+
+test('functional report-output rejection keeps a minimal safe receipt through a bounded child', () => {
+  const file = path.resolve(__dirname, '../performance/run-membership-privacy-functional.cjs');
+  const privacy = path.resolve(__dirname, '../performance/membership-privacy.cjs');
+  const child = spawnSync(process.execPath, ['-e', `
+    const {writeFunctionalReport}=require(${JSON.stringify(file)});
+    const {encodeSafeJson}=require(${JSON.stringify(privacy)});
+    const canaries=[{kind:'scim-shared-secret',value:'PRIVATE_OUTPUT_CANARY'}];
+    const report={family:'membership-privacy-functional',run:'owned',status:'FUNCTIONAL-COMPLETE',
+      diagnosticOnly:true,admissionEligible:false,payload:canaries[0].value,cleanup:{verified:true},
+      remainingOwned:'',remainingNetworks:'',elapsedMs:1};
+    const rejected=writeFunctionalReport((name,data)=>process.stdout.write(encodeSafeJson(data,canaries)),report);
+    if(!rejected)process.exitCode=2;
+  `], { encoding: 'utf8', timeout: 2000, maxBuffer: 4096 });
+  assert.equal(child.status, 0);
+  assert.equal(child.stderr, '');
+  assert.doesNotMatch(child.stdout, /PRIVATE_OUTPUT_CANARY|payload|stack/);
+  const report = JSON.parse(child.stdout);
+  assert.equal(report.status, 'INVALID');
+  assert.equal(report.cleanup.verified, true);
+  assert.deepEqual(report.failures[0].safeDetails, { reason: 'generated-credential-detected',
+    source: 'report-output', credentialKind: 'scim-shared-secret' });
+});

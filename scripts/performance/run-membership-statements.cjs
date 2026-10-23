@@ -8,6 +8,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { ObserverChannel } = require('./membership-observer.cjs');
 const { sourceTip, windowDelta, validateReceipt, validatePrivacy, finalizeOwned, runVisits } = require('./membership-history.cjs');
 const { statementDelta, summarizeStatements, validateLegacyPrivacy } = require('./membership-statements.cjs');
+const { credentialCanaries, assertCanariesAbsent } = require('./membership-privacy.cjs');
 const fixture = require('./membership-statement-fixture.cjs');
 const exec = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
@@ -47,6 +48,7 @@ async function main() {
   const credentials = Object.fromEntries(['POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET',
     'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'CREDENTIAL_KEK'].map(key => [key, crypto.randomBytes(32).toString('hex')]));
   const passwords = Object.fromEntries(['a', 'b', 'observer'].map(key => [key, crypto.randomBytes(32).toString('hex')]));
+  const canaries = credentialCanaries(credentials, passwords);
   const environment = { ...process.env, ...credentials };
   const report = { family: owner, diagnosticOnly: true, admissionEligible: false,
     status: 'INCOMPLETE', run, startedAtUtc: new Date(started).toISOString(),
@@ -131,8 +133,7 @@ async function main() {
     const result = { cpu, pg, hostRead: { startUtc, endUtc: new Date().toISOString(),
       elapsedMs: Number(process.hrtime.bigint() - start) / 1e6 } };
     const encoded = JSON.stringify(result);
-    for (const secret of [...Object.values(credentials), ...Object.values(passwords)])
-      assert.ok(!encoded.includes(secret), 'Private collector canary leaked');
+    assertCanariesAbsent([{ source: 'collector-snapshot', text: encoded }], canaries);
     return result;
   }
   async function round(app, block, role, visit) {
@@ -214,7 +215,7 @@ async function main() {
       assert.equal(images[name].os, 'linux');
     }
     const files = ['run-membership-statements.cjs', 'membership-statement-fixture.cjs',
-      'membership-statements.cjs', 'membership-observer.cjs', 'membership-history.cjs',
+      'membership-statements.cjs', 'membership-privacy.cjs', 'membership-observer.cjs', 'membership-history.cjs',
       'membership-cpu-trace.cjs', 'benchmark-membership.cjs', 'membership-protocol.json',
       'membership-history-contract.ps1'];
     const manifest = { family: owner, diagnosticOnly: true, admissionEligible: false,
@@ -331,9 +332,13 @@ async function main() {
         } finally { await privateClient.end(); }
         const consoleLog = await docker(['logs', '--tail', '300', app.id], false, true);
         const secrets = [...Object.values(credentials), ...Object.values(passwords)];
+        assertCanariesAbsent([
+          ...logs.map((row, rowIndex) => ({ source: 'selected-rows', rowIndex, text: JSON.stringify(row) })),
+          { source: 'app-console', text: consoleLog },
+        ], canaries);
         let privacy;
         if (role === 'B') privacy = validatePrivacy(logs, consoleLog, secrets);
-        else privacy = validateLegacyPrivacy(logs, consoleLog, secrets);
+        else privacy = validateLegacyPrivacy(logs, consoleLog, canaries);
         write(path.join(directory, `${block.name}-${role}-privacy.json`), privacy);
         await remove(app.id);
       }
@@ -347,7 +352,8 @@ async function main() {
     report.failures.push({ stage, code: error.code || error.name,
       message: error.code ? 'PG/child operation failed; raw text withheld for privacy' : error.message,
       causalFrames: error.stack?.split('\n').slice(1, 7),
-      ...(error.code === 'DIAGNOSTIC_PRIVACY' ? { safeDetails: error.safeDetails } : {}) });
+      ...(error.code === 'DIAGNOSTIC_PRIVACY' ? { safeDetails: error.safeDetails,
+        safeFindings: error.safeFindings } : {}) });
     process.exitCode = 1;
   } finally {
     for (const [name, connection] of [['observer', statistics?.observer], ['admin', admin]]) {

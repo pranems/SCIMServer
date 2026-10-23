@@ -2,6 +2,36 @@
 
 **Last verified:** 2026-10-23
 
+### Privacy source/kind investigation (2026-10-23)
+
+Source-only review of frozen phase-two inputs, copied exact legacy source,
+the copied preset and cached image metadata establishes that neither
+secret-persistence flag was explicitly false. The exact preset/image omit an
+override and legacy source defaults to true. The old expected mask conflicted
+with its declared fixture contract; this does not reconstruct the destroyed
+OS-07 row. Its earlier canary check had passed, so a raw generated credential
+is not established as that old mismatch.
+
+The distinct OS-11 functional failure still needs source/credential-kind
+attribution. A complete allowlisted failure schema now preserves every static
+input source, credential role and applicable row index, including input,
+serialization and report-output rejection. Twenty-three focused tests and
+three unchanged lifecycle/admission selectors pass; seven changed code files
+pass syntax and scoped lint. The new source-grounded hypothesis separates
+application-container startup/migration output from Group rows, PostgreSQL
+container output and Docker tool diagnostics. No new container or runtime
+attempt has occurred in this source-only stage.
+
+One conditional attempt 2 is authorized only under its separate frozen
+manifest: seven authenticated requests, at most 15 readiness probes, five
+minutes total including two minutes reserved for cleanup. No performance
+cycles, replacement or further attempt is authorized. All earlier executed
+bytes, receipts, raw data and release/deployment holds remain unchanged.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Established the frozen legacy persistence-contract mismatch, closed missing source/kind rejection paths with RED/GREEN and real-child proof, and implemented separately attributable console inputs for the sole conditional functional reproduction. |
+
 ### OS-07 functional follow-up (2026-10-23)
 
 One separately preregistered functional attempt ran from local source
@@ -20,8 +50,9 @@ The frozen manifest is
 Five frozen files match their manifest hashes and Git after newline
 normalization, but zero match raw Git bytes. A subsequent row/console-only
 canary-location correction passes 14 focused tests and is unmeasured.
-No runtime retry is authorized. See the indexed observer/statement diagnostic
-document and `test-results/os07-functional-20261023/`.
+That closeout authorized no runtime retry. The later, separately authorized
+source/kind investigation is recorded above. See the indexed observer/statement
+diagnostic document and `test-results/os07-functional-20261023/`.
 
 | Date | Summary |
 |---|---|

@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { requiredUnsigned } = require('./membership-history.cjs');
+const { fail, validateCanaries, assertCanariesAbsent } = require('./membership-privacy.cjs');
 const counterColumns = ['shared_blks_hit', 'shared_blks_read', 'shared_blks_dirtied',
   'shared_blks_written', 'local_blks_hit', 'local_blks_read', 'local_blks_dirtied',
   'local_blks_written', 'temp_blks_read', 'temp_blks_written', 'wal_records',
@@ -133,29 +134,25 @@ function classifyLegacyHeaders(raw) {
 }
 
 function validateLegacyPrivacy(rows, consoleLog, secrets, requiredRows = 200) {
-  assert.ok(Array.isArray(secrets) && secrets.length > 0, 'Required generated-credential canaries');
-  assert.equal(typeof consoleLog, 'string', 'Required private console sample');
-  const fail = safeDetails => {
-    const error = new Error('Legacy privacy validation failed; private values withheld');
-    error.code = 'DIAGNOSTIC_PRIVACY';
-    error.safeDetails = safeDetails;
-    throw error;
-  };
-  assert.ok(Number.isSafeInteger(requiredRows) && requiredRows > 0 && requiredRows <= 200,
-    'Required private row count');
-  assert.ok(Array.isArray(rows) && rows.length === requiredRows, 'Original legacy private log sample');
-  const encoded = JSON.stringify(rows);
-  for (const secret of secrets) {
-    assert.ok(typeof secret === 'string' && secret.length > 0);
-    const locations = [];
-    if (encoded.includes(secret)) locations.push('rows');
-    if (consoleLog.includes(secret)) locations.push('console');
-    if (locations.length) fail({ reason: 'generated-credential-detected', locations });
-  }
+  validateCanaries(secrets);
+  if (typeof consoleLog !== 'string') fail('private-source-missing', 'app-console');
+  if (!Number.isSafeInteger(requiredRows) || requiredRows <= 0 || requiredRows > 200)
+    fail('required-row-count', 'selected-rows');
+  if (!Array.isArray(rows) || rows.length !== requiredRows)
+    fail('row-count-mismatch', 'selected-rows');
+  const inputs = rows.map((row, rowIndex) => {
+    let text;
+    try { text = JSON.stringify(row); }
+    catch { fail('private-source-serialization', 'selected-rows', 'not-applicable', { rowIndex }); }
+    return { source: 'selected-rows', rowIndex, text };
+  });
+  assertCanariesAbsent([...inputs, { source: 'app-console', text: consoleLog }], secrets);
   for (const [rowIndex, row] of rows.entries()) {
+    if (!row || typeof row !== 'object' || Array.isArray(row))
+      fail('headers-not-object', 'selected-rows', 'not-applicable', { rowIndex });
     const result = classifyLegacyHeaders(row.requestHeaders);
     if (result.reason !== 'authorization-redacted')
-      fail({ reason: result.reason, rowIndex,
+      fail(result.reason, 'selected-rows', 'not-applicable', { rowIndex,
         ...(result.authorizationPresent === undefined ? {} : { authorizationPresent: result.authorizationPresent }) });
   }
   return { diagnosticOnly: true, complete: true, validatedRows: rows.length,

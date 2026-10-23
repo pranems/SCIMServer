@@ -5,6 +5,7 @@ const path = require('node:path');
 const { statementDelta, validatePgSnapshot, snapshotSql, summarizeStatements } =
   require('../performance/membership-statements.cjs');
 const columns = ['shared_blks_hit', 'temp_blks_written', 'wal_bytes'];
+const privateCanaries = [{ kind: 'scim-shared-secret', value: 'PRIVATE_CANARY' }];
 function entry(overrides = {}) {
   return { queryId: '-9223372036854775807', fingerprint: 'a'.repeat(64),
     topLevel: true, label: 'references-resource-member', operation: 'select',
@@ -115,23 +116,24 @@ test('legacy privacy retains strict redaction and exports a safe failure categor
   const rows = Array.from({ length: 200 }, () => ({
     requestHeaders: '{"authorization":"[REDACTED]"}',
   }));
-  assert.equal(validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']).validatedRows, 200);
+  assert.equal(validateLegacyPrivacy(rows, '', privateCanaries).validatedRows, 200);
   assert.throws(() => validateLegacyPrivacy(rows, '', []), /Required generated-credential canaries/);
-  assert.throws(() => validateLegacyPrivacy(rows, null, ['PRIVATE_CANARY']), /Required private console sample/);
+  assert.throws(() => validateLegacyPrivacy(rows, null, privateCanaries), /Required private console sample/);
   for (const [headers, reason, present] of [
     ['{}', 'authorization-missing', false],
     ['{"authorization":"other-mask"}', 'authorization-mask-mismatch', true],
   ]) {
     rows[0].requestHeaders = headers;
-    assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']), error => {
+    assert.throws(() => validateLegacyPrivacy(rows, '', privateCanaries), error => {
       assert.equal(error.code, 'DIAGNOSTIC_PRIVACY');
-      assert.deepEqual(error.safeDetails, { reason, rowIndex: 0, authorizationPresent: present });
+      assert.deepEqual(error.safeDetails, { reason, rowIndex: 0, authorizationPresent: present,
+        source: 'selected-rows', credentialKind: 'not-applicable' });
       assert.ok(!JSON.stringify(error).includes('other-mask'));
       return true;
     });
   }
   rows[0].requestHeaders = '{"authorization":"PRIVATE_CANARY"}';
-  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']), error => {
+  assert.throws(() => validateLegacyPrivacy(rows, '', privateCanaries), error => {
     assert.equal(error.safeDetails.reason, 'generated-credential-detected');
     assert.ok(!JSON.stringify(error).includes('PRIVATE_CANARY'));
     assert.ok(!error.message.includes('PRIVATE_CANARY'));
@@ -144,9 +146,9 @@ test('small functional privacy sample remains explicitly counted and strictly ma
   const rows = Array.from({ length: 4 }, () => ({
     requestHeaders: '{"authorization":"[REDACTED]"}',
   }));
-  assert.equal(validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 4).validatedRows, 4);
-  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY']), /Original legacy private log sample/);
-  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 0), /Required private row count/);
+  assert.equal(validateLegacyPrivacy(rows, '', privateCanaries, 4).validatedRows, 4);
+  assert.throws(() => validateLegacyPrivacy(rows, '', privateCanaries), /Original legacy private log sample/);
+  assert.throws(() => validateLegacyPrivacy(rows, '', privateCanaries, 0), /Required private row count/);
   for (const [raw, reason] of [
     ['{}', 'authorization-missing'],
     ['"{\\"authorization\\":\\"PRIVATE_CANARY\\"}"', 'headers-not-object'],
@@ -158,22 +160,36 @@ test('small functional privacy sample remains explicitly counted and strictly ma
     assert.ok(!JSON.stringify(result).includes('PRIVATE_CANARY'));
   }
   rows[0].requestHeaders = '{}';
-  assert.throws(() => validateLegacyPrivacy(rows, '', ['PRIVATE_CANARY'], 4),
+  assert.throws(() => validateLegacyPrivacy(rows, '', privateCanaries, 4),
     error => error.safeDetails.reason === 'authorization-missing');
 });
 
-test('generated-credential rejection retains only static row-versus-console provenance', () => {
+test('generated-credential rejection retains only static source, credential role and row provenance', () => {
   const { validateLegacyPrivacy } = require('../performance/membership-statements.cjs');
-  for (const [raw, consoleLog, locations] of [
-    ['{"authorization":"PRIVATE_CANARY"}', '', ['rows']],
-    ['{"authorization":"[REDACTED]"}', 'PRIVATE_CANARY', ['console']],
-    ['{"authorization":"PRIVATE_CANARY"}', 'PRIVATE_CANARY', ['rows', 'console']],
+  for (const [raw, consoleLog, sources] of [
+    ['{"authorization":"PRIVATE_CANARY"}', '', ['selected-rows']],
+    ['{"authorization":"[REDACTED]"}', 'PRIVATE_CANARY', ['app-console']],
+    ['{"authorization":"PRIVATE_CANARY"}', 'PRIVATE_CANARY', ['selected-rows', 'app-console']],
   ]) {
-    assert.throws(() => validateLegacyPrivacy([{ requestHeaders: raw }], consoleLog, ['PRIVATE_CANARY'], 1),
+    assert.throws(() => validateLegacyPrivacy([{ requestHeaders: raw }], consoleLog, privateCanaries, 1),
       error => {
-        assert.deepEqual(error.safeDetails, { reason: 'generated-credential-detected', locations });
+        assert.deepEqual(error.safeFindings.map(row => row.source), sources);
+        assert.equal(error.safeDetails.credentialKind, 'scim-shared-secret');
         assert.ok(!JSON.stringify(error).includes('PRIVATE_CANARY'));
         return true;
       });
+
   }
+});
+
+test('every legacy privacy rejection must retain static input source and credential kind', () => {
+  const { validateLegacyPrivacy } = require('../performance/membership-statements.cjs');
+  assert.throws(() => validateLegacyPrivacy(
+    [{ requestHeaders: '{"authorization":"PRIVATE_CANARY"}' }], '', privateCanaries, 1),
+  error => {
+    assert.equal(error.safeDetails.source, 'selected-rows');
+    assert.equal(typeof error.safeDetails.credentialKind, 'string');
+    assert.equal(error.safeDetails.rowIndex, 0);
+    return true;
+  });
 });
