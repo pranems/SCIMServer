@@ -206,5 +206,12 @@ SELECT jsonb_build_object(
 FROM public.pg_stat_statements_info info CROSS JOIN observer`;
 }
 
+function maskPolicyPatch() { return { profile: { settings: { PersistRequestSecrets: false } } }; }
+function verifyMaskPolicy(server, endpoint) {
+  assert.equal(server, 'false', 'Actual server secret persistence must be false');
+  assert.equal(endpoint, false, 'Actual stored endpoint secret persistence must be false');
+  return true;
+}
+
 module.exports = { counterColumns, validatePgSnapshot, statementDelta, snapshotSql, summarizeStatements,
-  validateLegacyPrivacy, classifyLegacyHeaders };
+  validateLegacyPrivacy, classifyLegacyHeaders, maskPolicyPatch, verifyMaskPolicy };

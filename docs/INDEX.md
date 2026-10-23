@@ -468,7 +468,7 @@ These are the definitive source files for key aspects of the system:
 
 - [Minimal imported Group membership correctness and execution RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md)
 - [Unreleased local application-history diagnostic and execution RCA](MEMBERSHIP_HISTORY_DIAGNOSTIC.md)
-- [Low-disturbance observer and statement diagnostic](MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md) - Local collector correction, statement evidence, exact legacy source/privacy diagnosis and offline DERIVED reference preparation; no baseline adoption or admission.
+- [Low-disturbance observer and statement diagnostic](MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md) - Local collector correction, statement evidence, exact legacy source/privacy diagnosis, offline DERIVED reference and its separate functional qualification; no baseline adoption or admission.
 # Group reference preservation
 
 - [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

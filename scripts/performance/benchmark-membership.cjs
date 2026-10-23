@@ -34,7 +34,11 @@ assert.ok(
   'History diagnostics require the explicit IPC owner and trace mode',
 );
 const history = process.env.SCIM_BENCH_HISTORY === '1';
-async function boundary(name) {
+assert.ok(process.env.SCIM_BENCH_REQUIRE_MASKS === undefined ||
+  (process.env.SCIM_BENCH_REQUIRE_MASKS === '1' && history),
+  'Mask fixture policy requires the explicit diagnostic IPC owner');
+const requireMasks = process.env.SCIM_BENCH_REQUIRE_MASKS === '1';
+async function boundary(name, extra = {}) {
   if (!history) return;
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -49,7 +53,7 @@ async function boundary(name) {
       else reject(new Error('History boundary capture failed'));
     }
     process.on('message', reply);
-    process.send({ boundary: name });
+    process.send({ boundary: name, ...extra });
   });
 }
 const spans = [];
@@ -143,6 +147,7 @@ async function main() {
     ).body;
     endpointId = endpoint.id;
     assert.ok(endpointId);
+    if (requireMasks) await boundary('fixture-policy', { endpointId });
     const scoped = `/scim/endpoints/${endpointId}`;
     const user = (
       await request('POST', `${scoped}/Users`, {

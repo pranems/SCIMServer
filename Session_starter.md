@@ -2,6 +2,18 @@
 
 **Last verified:** 2026-10-23
 
+### DERIVED functional qualification preparation (2026-10-23)
+
+Explicit immutable-image/proof-bound functional validation is implemented,
+not yet executed. Initial focused RED is retained; 80 focused tests passed,
+then five final targeted tests after a lint-caught port-scope correction.
+Six-file syntax/scoped lint passed without dependency changes.
+The future statement fixture now requests and independently verifies false
+server/endpoint policies before all windows through a diagnostic-only IPC
+gate; its actual child failure test produces zero workload samples.
+No statement diagnostic or baseline adoption is authorized. See the current
+indexed observer/statement report and `test-results/derived-functional-20261023/`.
+
 ### Offline derived-reference preparation (2026-10-23)
 
 Exact compiled source from one owned unstarted cached-baseline container

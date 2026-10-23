@@ -11,6 +11,7 @@ const { validateLegacyPrivacy, classifyLegacyHeaders } = require('./membership-s
 const { fail, credentialCanaries, assertCanariesAbsent, encodeSafeJson,
   validateSafeFailure } = require('./membership-privacy.cjs');
 const protocol = require('./membership-protocol.json');
+const derivedTool = require('./membership-derived-functional.cjs');
 const exec = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -35,7 +36,9 @@ function writeFunctionalReport(write, report) {
   catch (error) {
     if (error.code !== 'DIAGNOSTIC_PRIVACY') throw error;
     report.status = 'INVALID';
-    write('report.json', { family: 'membership-privacy-functional', status: 'INVALID', diagnosticOnly: true,
+    write('report.json', { family: report.family === 'membership-derived-reference-functional'
+      ? 'membership-derived-reference-functional' : 'membership-privacy-functional',
+      status: 'INVALID', diagnosticOnly: true,
       admissionEligible: false, cleanup: { verified: report.cleanup?.verified === true },
       remainingOwned: report.remainingOwned === '' ? '' : 'unverified',
       remainingNetworks: report.remainingNetworks === '' ? '' : 'unverified',
@@ -72,8 +75,12 @@ function verifyProvenance(rows, expected, endpointId) {
 }
 
 async function main() {
-  assert.equal(process.argv[2], '--functional-only', 'Explicit functional opt-in required');
+  assert.ok(['--functional-only', '--derived-reference-functional-only'].includes(process.argv[2]),
+    'Explicit functional opt-in required');
   assert.equal(process.argv.length, 4);
+  const derived = process.argv[2] === '--derived-reference-functional-only';
+  const buildProof = derived ? derivedTool.loadBuildProof(root) : undefined;
+  const appImage = derived ? buildProof.imageId : protocol.baseline.image;
   const directory = path.resolve(process.argv[3]);
   assert.ok(directory.startsWith(root + path.sep));
   fs.mkdirSync(directory);
@@ -81,8 +88,8 @@ async function main() {
   const deadline = started + functionalPolicy.wallCapMs;
   const workDeadline = deadline - functionalPolicy.cleanupReservationMs;
   const run = crypto.randomUUID().replaceAll('-', '');
-  const owner = 'membership-privacy-functional';
-  const prefix = `scim-os07-${run.slice(0, 12)}`;
+  const owner = derived ? 'membership-derived-reference-functional' : 'membership-privacy-functional';
+  const prefix = `${derived ? 'scim-derived-functional' : 'scim-os07'}-${run.slice(0, 12)}`;
   const labels = ['--label', `scimserver.owner=${owner}`, '--label', `scimserver.run=${run}`];
   const names = [`${prefix}-pg`, `${prefix}-app`];
   const network = `${prefix}-net`;
@@ -92,6 +99,8 @@ async function main() {
   const canaries = credentialCanaries(secrets);
   let toolConsole = '';
   const report = { family: owner, diagnosticOnly: true, admissionEligible: false,
+    ...(derived ? { derivedReference: true, baselineAdoptionApproved: false, performanceQualified: false,
+      buildProof, artifactPrivacyQualified: false } : {}),
     run, status: 'INCOMPLETE', startedAtUtc: new Date(started).toISOString(),
     deadlineUtc: new Date(deadline).toISOString(), requests: [], readiness: [], failures: [] };
   const write = (name, data) => {
@@ -142,10 +151,11 @@ async function main() {
   }
   try {
     const images = {};
-    for (const [role, image] of Object.entries({ app: protocol.baseline.image, pg: protocol.postgres })) {
+    for (const [role, image] of Object.entries({ app: appImage, pg: protocol.postgres })) {
       const row = JSON.parse(await docker(['image', 'inspect', '--format',
-        '{"id":{{json .Id}},"digests":{{json .RepoDigests}},"os":{{json .Os}},"architecture":{{json .Architecture}}}', image]));
-      assert.ok(row.digests.includes(image));
+        '{"id":{{json .Id}},"digests":{{json .RepoDigests}},"os":{{json .Os}},"architecture":{{json .Architecture}},"labels":{{json .Config.Labels}}}', image]));
+      if (derived && role === 'app') derivedTool.verifyDerivedImage(row, buildProof);
+      else assert.ok(row.digests.includes(image));
       assert.equal(row.os, 'linux');
       images[role] = { ...row, requested: image };
     }
@@ -153,14 +163,27 @@ async function main() {
       'group-missing-read', 'group-missing-patch', 'flush'];
     const requestIds = Object.fromEntries(routes.map(route => [route, crypto.randomUUID()]));
     const files = ['run-membership-privacy-functional.cjs', 'membership-statements.cjs', 'membership-privacy.cjs',
-      'membership-statement-fixture.cjs', 'membership-history.cjs', 'membership-protocol.json'];
+      'membership-statement-fixture.cjs', 'membership-history.cjs', 'membership-protocol.json',
+      'membership-derived-functional.cjs'];
     const inspected = {};
     const legacyRoot = path.join(root, 'test-results/os07-functional-20261023/legacy-source');
     for (const file of ['logging/logging.service.js', 'logging/request-logging.interceptor.js',
       'filters/scim-exception.filter.js', 'endpoint-config.interface.js', 'dto/update-endpoint.dto.d.ts',
       'endpoint-profile/presets/rfc-standard.json', 'logging/scim-logger.service.js'])
       inspected[file] = digest(fs.readFileSync(path.join(legacyRoot, file)));
-    const manifest = { ...report, sourceTip: await sourceTip(root), images,
+    const sourceCommit = await sourceTip(root);
+    if (derived) assert.equal((await exec('git', ['status', '--porcelain'], { cwd: root })).stdout.trim(), '',
+      'Derived functional source must be committed and clean');
+    const sourceByteIdentity = {};
+    for (const file of files) {
+      const disk = fs.readFileSync(path.join(__dirname, file));
+      const git = Buffer.from((await exec('git', ['show', `${sourceCommit}:scripts/performance/${file}`],
+        { cwd: root, timeout: 3000 })).stdout);
+      sourceByteIdentity[file] = { onDiskSha256: digest(disk), gitSha256: digest(git),
+        rawEqual: disk.equals(git),
+        newlineNormalizedEqual: disk.toString('utf8').replace(/\r\n/g, '\n') === git.toString('utf8').replace(/\r\n/g, '\n') };
+    }
+    const manifest = { ...report, sourceTip: sourceCommit, sourceByteIdentity, images,
       inspectedLegacySourceHashes: inspected,
       client: { node: process.version, executableSha256: digest(fs.readFileSync(process.execPath)),
         pgVersion: require(path.join(root, 'api/node_modules/pg/package.json')).version },
@@ -174,7 +197,9 @@ async function main() {
         profilePreset: 'rfc-standard', appCpu: 0.5, appMemory: 1073741824,
         wallCapMs: 300000, cleanupReservationMs: 120000, flushDeadlineMs: 10000,
         performanceCycles: 0, statisticsExtension: false, rawPrivateExport: false },
-      hypothesis: 'With explicit false persistence, four known authorized Group rows remain masked. A generated-credential match may originate in application-container startup/migration output rather than Group authorization fields. Separate selected-row, application-container, PG-container and tool inputs plus static credential roles discriminate this; no specific emitter is presumed.',
+      hypothesis: derived
+        ? 'The sole approved logging backport should remove the known startup credential emission. With independently verified false server and endpoint persistence, all four correlated Group rows must retain exact masks and every generated credential must be absent from selected rows and separately collected app, PG and tool consoles. This qualifies only this immutable DERIVED artifact, not the production baseline or performance.'
+        : 'With explicit false persistence, four known authorized Group rows remain masked. A generated-credential match may originate in application-container startup/migration output rather than Group authorization fields. Separate selected-row, application-container, PG-container and tool inputs plus static credential roles discriminate this; no specific emitter is presumed.',
       expectedCategories: ['All four masks remain mandatory', 'Any generated-credential match is INVALID',
         'Report every matching static source/kind and row index where applicable; never private text'],
       consoleProvenance: 'Docker logs --timestamps prefix identifies container records, not a particular application emitter. Unframed output and all non-log command output are tool-console. No console text is exported.',
@@ -214,7 +239,7 @@ async function main() {
       ...Object.keys(secrets).filter(key => key !== 'POSTGRES_PASSWORD').flatMap(key => ['--env', key]),
       '--env', 'PERSISTENCE_BACKEND=prisma', '--env', 'NODE_ENV=production',
       '--env', 'PERSIST_REQUEST_SECRETS=false', '--env', 'PORT=8080',
-      '--entrypoint', 'sh', protocol.baseline.image, '-c',
+      '--entrypoint', 'sh', appImage, '-c',
       'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node dist/main.js']);
     const appPort = await docker(['port', names[1], '8080/tcp']);
     assert.match(appPort, /^127\.0\.0\.1:\d+$/);
@@ -263,9 +288,10 @@ async function main() {
     [endpoint.id])).rows[0].persist;
     report.presetPersistRequestSecrets = await policy();
     await request('endpoint-policy', 'PATCH', `/scim/admin/endpoints/${endpoint.id}`,
-      { profile: { settings: { PersistRequestSecrets: false } } }, 200);
+      derivedTool.maskPolicyPatch(), 200);
     report.actualEndpointPersistRequestSecrets = await policy();
     assert.equal(report.actualEndpointPersistRequestSecrets, false, 'Actual endpoint secret persistence');
+    derivedTool.verifyMaskPolicy(report.application.persist, report.actualEndpointPersistRequestSecrets);
     const scope = `/scim/endpoints/${endpoint.id}/Groups`;
     const group = await request('group-create', 'POST', scope,
       { schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'], displayName: 'Owned OS07 group' }, 201, true);
@@ -299,16 +325,24 @@ async function main() {
       ...classifyLegacyHeaders(row.requestHeaders),
     }));
     verifyProvenance(rows, expected, endpoint.id);
-    const privateConsole = await docker(['logs', '--timestamps', '--tail', '300', names[1]], false, true);
-    const privatePgConsole = await docker(['logs', '--timestamps', '--tail', '300', names[0]], false, true);
+    const logArguments = derived ? ['logs', '--timestamps'] : ['logs', '--timestamps', '--tail', '300'];
+    stage = 'app-console-capture';
+    const privateConsole = await docker([...logArguments, names[1]], false, true);
+    stage = 'pg-console-capture';
+    const privatePgConsole = await docker([...logArguments, names[0]], false, true);
+    stage = 'private-source-validation';
     report.privateSourcesCollected = ['selected-rows', 'app-console', 'pg-console', 'tool-console'];
     assertCanariesAbsent([
       ...rows.map((row, rowIndex) => ({ source: 'selected-rows', rowIndex, text: JSON.stringify(row) })),
       { source: 'app-console', text: privateConsole }, { source: 'pg-console', text: privatePgConsole },
       { source: 'tool-console', text: toolConsole },
     ], canaries);
-    report.privacy = validateLegacyPrivacy(rows, privateConsole, canaries, 4);
-    report.status = 'FUNCTIONAL-COMPLETE';
+    report.privacy = derived
+      ? derivedTool.validateFunctionalPrivacy(rows, {
+        'app-console': privateConsole, 'pg-console': privatePgConsole, 'tool-console': toolConsole,
+      }, canaries)
+      : validateLegacyPrivacy(rows, privateConsole, canaries, 4);
+    report.status = derived ? 'DERIVED-FUNCTIONAL-PRIVACY-QUALIFIED' : 'FUNCTIONAL-COMPLETE';
   } catch (error) {
     report.status = 'INVALID';
     report.failures.push({ stage, code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : error.name,
@@ -346,11 +380,14 @@ async function main() {
         safeFindings: error.safeFindings.map(validateSafeFailure) });
     }
     report.elapsedMs = Date.now() - started;
+    if (derived && !derivedTool.completeOwnedCleanup(report.cleanup))
+      report.failures.push({ stage: 'derived-cleanup-evidence', code: 'INCOMPLETE_CLEANUP_PROOF' });
     if (!report.cleanup.verified || report.remainingOwned !== '' || report.remainingNetworks !== '' ||
       report.elapsedMs > 300000 || report.failures.length) {
       report.status = 'INVALID';
       process.exitCode = 1;
     }
+    if (derived) report.artifactPrivacyQualified = report.status === 'DERIVED-FUNCTIONAL-PRIVACY-QUALIFIED';
     if (writeFunctionalReport(write, report)) process.exitCode = 1;
     console.log(JSON.stringify({ status: report.status, run, requests: report.requests.length,
       elapsedMs: report.elapsedMs, cleanup: report.cleanup.verified }));

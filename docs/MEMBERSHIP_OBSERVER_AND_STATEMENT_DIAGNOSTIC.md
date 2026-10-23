@@ -3,6 +3,89 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## Functional qualification of the DERIVED artifact (2026-10-23)
+
+The next authorized check is one functional run of the immutable local
+DERIVED image, not a production-baseline adoption, original-image retry or
+performance experiment. The explicit entry is
+`--derived-reference-functional-only`; default, unknown and incomplete calls
+reject before Docker dispatch. The build manifest, successful receipt and
+original unstarted source proof must match their pinned byte hashes.
+The app is requested by immutable image ID `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`,
+not by its local tag; actual image identity and DERIVED labels must match.
+This reuses the completed whole-distribution proof without hashing it again.
+
+The fixed functional policy retains at most seven authenticated requests,
+15 readiness probes and five minutes including a 120-second cleanup
+reservation. A unique frozen manifest precedes owned fixture creation.
+Server false is checked independently from stored endpoint false before
+four correlated Group requests. All four exact authorization masks remain
+mandatory. Selected rows and complete app, PostgreSQL and tool console inputs
+are separately scanned in memory for every generated credential; missing or
+empty console input rejects. No raw console/header material is exported.
+Only this new artifact can receive functional privacy qualification; original
+privacy failures and all performance/admission holds remain unchanged.
+
+### Prospective statement fixture correction, not an executed diagnostic
+
+The old statement fixture omitted both explicit false policies while requiring
+masked rows. Future statement source now requests server false at app startup
+and verifies its actual environment. An opt-in workload IPC gate pauses after
+endpoint creation, before User/Group setup and all counter windows. The parent
+uses the supported endpoint PATCH to set false, independently reads the stored
+policy, then acknowledges the gate. Missing, true or string `"false"` stored
+values reject. This additional setup HTTP request and administrator policy
+read are reported separately; the original 4,407 checked child requests,
+payloads, cycles, samples and default/admission behavior remain unchanged.
+No statement diagnostic is authorized or executed here.
+
+### Focused evidence and preparation issues
+
+Evidence root: `test-results/derived-functional-20261023/`.
+Initial RED retained three failed new guard tests and one existing default/
+admission rejection success. After implementation, the five-file focused
+selection passed 80 tests with zero skips; a final five-test targeted run
+passed after scope correction. The actual bounded workload child test rejects
+the fixture-policy acknowledgement and proves zero User/Group requests or
+timing samples, with successful fake-fixture cleanup. Negative controls reject
+the old omitted statement policy.
+After final private-structure and cleanup-evidence negative controls, the
+four-file source/privacy selection passed 30 tests with zero skips. Six-file
+syntax and scoped correctness lint remain green. All checks are local and
+unreleased, with no dependency restoration.
+
+| Issue | Cause, correction and prevention | Detection stage |
+|---|---|---|
+| DF-01, tooling / Low | A shell wildcard was passed as a literal ripgrep path and an endpoint service was sought outside its `services` directory. Corrected bounded path discovery located the DTO and source. No production behavior was involved. | Source exploration; earliest applicable stage |
+| DF-02, source correctness / Medium | The new policy callback initially referenced `pgPort` declared inside the later try block. Scoped `no-undef` caught it; the port now lives in the enclosing runner scope. | Static gate, before any fixture or timed workload; no runtime escape |
+| DF-03, checking-tool correctness / Low | The scoped lint harness initially omitted Node's standard `URL` global and flagged unchanged code. Declaring that real global removed the false positive without disabling a rule or editing the application. Six-file syntax and scoped seven-rule lint then passed with zero errors. | Static harness; earliest applicable stage |
+| DF-04, privacy telemetry / Medium | An undefined selected row serialized to undefined and reached the shared missing-input guard without its row index; a null console collection would have raised a generic TypeError. Targeted RED reproduced the lost row attribution. The new validator now rejects serialization and console-collection shape through the closed source/kind schema, retaining the applicable row index. Thirty focused tests pass after the fix. | New negative control before functional execution; no runtime escape |
+| DF-05, qualification safeguard / Medium | The existing finalizer intentionally reports removal verification independently from final metadata capture. A new DERIVED result must not count verified absence as complete final evidence. RED/GREEN added a narrow qualification check requiring both owned resources captured, removed and independently verified. The shared finalizer and its OS-17 observability limitation are unchanged. | Source review and new negative control before execution |
+
+Self-improvement disposition: **applied** immutable-proof drift tests,
+closed source/kind privacy negatives, old-policy negative controls and a real
+pre-window IPC failure test. Design/architecture disposition: **accepted**:
+shared two-policy checks live in the existing statement privacy module, with
+two actual callers; the statement runner does not depend on DERIVED build
+identity tooling. No speculative framework or shared cleanup refactor.
+The functional execution result is pending the committed-source preflight.
+
+Reproducible validation commands and retained results:
+
+| Command | Result |
+|---|---|
+| `node --test scripts\test\membership-derived-functional.test.cjs` before implementation | RED: three failures, one existing rejection test passed; `red.log` |
+| `node --test scripts\test\membership-derived-functional.test.cjs scripts\test\membership-privacy-functional.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-statements.test.cjs scripts\test\membership-performance.test.cjs` | 80 passed, zero skips before the final narrow guards; `green-focused.log` |
+| `node --test scripts\test\membership-derived-functional.test.cjs scripts\test\membership-privacy-functional.test.cjs scripts\test\membership-privacy.test.cjs scripts\test\membership-statements.test.cjs` | Final 30 passed, zero skips; `green-source-final.log` |
+| `node test-results\derived-functional-20261023\validate.cjs static-source-final.json` | Six syntax checks and scoped seven-rule ESLint: zero errors. This is the retained exclusive-output invocation, not the unavailable full normal lint configuration. |
+
+The `--test-name-pattern` RED invocations and exact safe assertion stacks
+are retained in `red-private-structure.log` and `red-cleanup-proof.log`.
+No full suite was duplicated. Full-transcript reconciliation is unavailable
+because no debug-log location is exposed; this new issue list is reconciled
+against the retained commands and outputs of this bounded activity, not
+claimed complete for earlier sessions.
+
 ## Offline DERIVED reference preparation, not baseline adoption
 
 **Exact-image source proof now confirms the known raw database-URL startup

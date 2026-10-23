@@ -7,7 +7,8 @@ const { promisify } = require('node:util');
 const { setTimeout: delay } = require('node:timers/promises');
 const { ObserverChannel } = require('./membership-observer.cjs');
 const { sourceTip, windowDelta, validateReceipt, validatePrivacy, finalizeOwned, runVisits } = require('./membership-history.cjs');
-const { statementDelta, summarizeStatements, validateLegacyPrivacy } = require('./membership-statements.cjs');
+const { statementDelta, summarizeStatements, validateLegacyPrivacy, maskPolicyPatch,
+  verifyMaskPolicy } = require('./membership-statements.cjs');
 const { credentialCanaries, assertCanariesAbsent } = require('./membership-privacy.cjs');
 const fixture = require('./membership-statement-fixture.cjs');
 const exec = promisify(execFile);
@@ -25,7 +26,8 @@ const distributionHashScript = `const fs=require('fs'),c=require('crypto'),p=req
 function hash(d){const h=c.createHash('sha256');function walk(q){for(const n of fs.readdirSync(q).sort()){
 const f=p.join(q,n);if(fs.statSync(f).isDirectory())walk(f);else{h.update(p.relative(d,f));h.update(fs.readFileSync(f));}}}
 walk(d);return h.digest('hex');}
-console.log(JSON.stringify({version:require('/app/package.json').version,dist:hash('/app/dist'),fixture:hash('/app/prisma')}));`;
+console.log(JSON.stringify({version:require('/app/package.json').version,dist:hash('/app/dist'),fixture:hash('/app/prisma'),
+persistRequestSecrets:process.env.PERSIST_REQUEST_SECRETS}));`;
 
 async function main() {
   assert.equal(process.argv[2], '--diagnostic-only', 'Explicit statement diagnostic opt-in required');
@@ -57,6 +59,7 @@ async function main() {
   let channel;
   let admin;
   let statistics;
+  let pgPort;
   let stage = 'preflight';
   const checkDeadline = () => assert.ok(Date.now() < workDeadline, 'Phase-two work cap; cleanup reservation begins');
   async function docker(args, cleanup = false, combined = false) {
@@ -94,6 +97,7 @@ async function main() {
       '--publish', '127.0.0.1::8080', '--cpus', '0.5', '--memory', '1g',
       '--env', 'DATABASE_URL', ...Object.keys(credentials).filter(key => key !== 'POSTGRES_PASSWORD').flatMap(key => ['--env', key]),
       '--env', 'PERSISTENCE_BACKEND=prisma', '--env', 'NODE_ENV=production', '--env', 'PORT=8080',
+      '--env', 'PERSIST_REQUEST_SECRETS=false',
       '--entrypoint', 'sh', roles[role].image, '-c',
       'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node dist/main.js']);
     const port = await docker(['port', id, '8080/tcp']);
@@ -119,6 +123,7 @@ async function main() {
     const initial = await channel.request({ kind: 'bind', id, pid: String(info.state.Pid) });
     const distribution = JSON.parse(await docker(['exec', id, 'node', '-e', distributionHashScript]));
     assert.equal(distribution.version, roles[role].version);
+    assert.equal(distribution.persistRequestSecrets, 'false', 'Actual diagnostic server policy');
     report.epochs.push({ id, block, role, target, imageId: info.image,
       initial, distribution, configuredCpu: info.nanoCpus, configuredMemory: info.memory });
     return { id, role, url, target, epoch: initial.epoch, distribution };
@@ -148,7 +153,8 @@ async function main() {
       env: { ...environment, SCIM_BENCH_BASE_URL: app.url, SCIM_BENCH_TOKEN: credentials.SCIM_SHARED_SECRET,
         SCIM_BENCH_VERSION: roles[role].version, SCIM_BENCH_OUTPUT: output,
         SCIM_BENCH_DEADLINE_UTC: String(workDeadline), SCIM_BENCH_TRACE: '1',
-        SCIM_BENCH_HISTORY: '1', SCIM_BENCH_HISTORY_OWNER: 'membership-history-diagnostic' },
+        SCIM_BENCH_HISTORY: '1', SCIM_BENCH_HISTORY_OWNER: 'membership-history-diagnostic',
+        SCIM_BENCH_REQUIRE_MASKS: '1' },
     });
     child.stdout.resume();
     child.stderr.resume();
@@ -158,6 +164,38 @@ async function main() {
     child.on('message', async message => {
       try {
         assert.equal(active, false, 'Overlapping workload boundary');
+        if (message.boundary === 'fixture-policy') {
+          assert.equal(row.fixturePolicy, undefined, 'One fixture policy setup per round');
+          assert.equal(Object.keys(row.boundaries).length, 0, 'Policy precedes all counter windows');
+          assert.match(message.endpointId, /^[a-f0-9-]{36}$/i);
+          active = true;
+          checkDeadline();
+          const response = await fetch(`${app.url}/scim/admin/endpoints/${message.endpointId}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${credentials.SCIM_SHARED_SECRET}`,
+              'Content-Type': 'application/scim+json' }, body: JSON.stringify(maskPolicyPatch()),
+            signal: AbortSignal.timeout(Math.max(1, Math.min(10000, workDeadline - Date.now()))),
+          });
+          assert.equal(response.status, 200, 'Release-supported fixture policy update');
+          await response.arrayBuffer();
+          const policyClient = fixture.client({ port: pgPort, database: app.target.database, user: 'scim',
+            password: credentials.POSTGRES_PASSWORD, application_name: 'statement-policy-observer' });
+          let actual;
+          try {
+            await policyClient.connect();
+            const rows = (await policyClient.query(`SELECT profile->'settings'->'PersistRequestSecrets' AS persist
+              FROM "Endpoint" WHERE id=$1`, [message.endpointId])).rows;
+            assert.equal(rows.length, 1, 'Owned endpoint policy row required');
+            actual = rows[0].persist;
+          } finally { await policyClient.end(); }
+          verifyMaskPolicy(app.distribution.persistRequestSecrets, actual);
+          row.fixturePolicy = { serverPersistRequestSecrets: false, storedEndpointPersistRequestSecrets: actual,
+            observerApplicationName: 'statement-policy-observer', outsideWindows: true,
+            additionalSetupHttpRequests: 1, includedInOriginal4407: false };
+          active = false;
+          if (child.connected) child.send({ boundary: message.boundary, ok: true });
+          return;
+        }
+        assert.ok(row.fixturePolicy, 'Mask policy verified before counter windows');
         assert.equal(message.boundary, expected[Object.keys(row.boundaries).length]);
         active = true;
         row.boundaries[message.boundary] = await boundary(app);
@@ -235,6 +273,8 @@ async function main() {
         statistics: 'NEW owned PG fixture, preload pg_stat_statements, compute_query_id=on, track=all',
         statsReset: false, eviction: 'invalidate', collection: 'persistent pipe CPU then persistent native pg connection',
         legacyContract: 'Original 4407 checked requests per round; no current-only minimal-members assertions',
+        maskPolicy: 'Explicit server false; one supported endpoint PATCH per round and independent stored-policy read before user/group setup and all windows',
+        additionalSetupRequestsPerRound: 1, policyQueriesExcludedFromWorkloadRole: true,
         currentContract: 'Original checked workload plus 66-outcome current runtime contract after each block',
         forcedGc: false, queryTextExported: false, phaseOneReinterpretation: false },
       startedAtUtc: report.startedAtUtc, deadlineUtc: report.deadlineUtc };
@@ -256,7 +296,7 @@ async function main() {
       '-c', 'compute_query_id=on', '-c', 'pg_stat_statements.track=all']);
     const port = await docker(['port', pg, '5432/tcp']);
     assert.match(port, /^127\.0\.0\.1:\d+$/);
-    const pgPort = Number(port.split(':')[1]);
+    pgPort = Number(port.split(':')[1]);
     stage = 'owned-pg-capability';
     for (let attempt = 0; attempt < 30; attempt++) {
       checkDeadline();
