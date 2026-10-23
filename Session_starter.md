@@ -2,6 +2,22 @@
 
 **Last verified:** 2026-10-23
 
+### OS-18 child-boundary correction (2026-10-23)
+
+The applicable corrected seven-file serial aggregate now passes **66/66,
+zero failures/skips**, in 26,012.7132 ms. The old 58/62 aggregate remains
+FAILED; isolated four-case passes were not a replacement gate.
+Test-only IPC fixtures now acknowledge startup separately from unchanged
+protocol/operation deadlines, refuse all external child dispatch, require
+the intended negative-control cause and await closure. Actual held-readiness
+and phase-specific failure controls are included. Nine existing lifecycle
+controls remain unchanged. Five-file syntax/scoped lint passes.
+No Docker, application, SQL, image inspection/build or remote action ran.
+The historical inner cleanup error remains unknown; the 30-second command
+maximum is clamped to the original five-minute deadline, not a cap extension.
+See the indexed [OS-18 RCA](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md).
+DERIVED runtime qualification, adoption and performance holds remain.
+
 ### OS-17 / DF-12 source-only finalization correction (2026-10-23)
 
 Implemented safe per-action cause retention and strict fallback projection.

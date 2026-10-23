@@ -16,6 +16,23 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### A child startup timeout is not an operation failure
+
+OS-18's four aggregate failures exposed a test-boundary defect: a request
+timer armed immediately after spawn, or a whole-process timer including
+module imports, could expire before the intended negative operation started.
+An isolated pass does not replace a failed aggregate or identify the old
+phase. Acknowledge bounded startup, then start the original operation clock;
+require the intended failure cause and await child closure before continuing.
+Record setup versus operation failure separately, without raw child errors.
+
+The executable held-readiness control and bounded IPC fixture in
+`scripts/test/membership-observer.test.cjs` demonstrate the false-negative
+mechanism without sleeps, larger operation deadlines or host-noise claims.
+The corrected aggregate passes 66/66 while retaining all old FAILED logs.
+The [indexed RCA](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+distinguishes source proof, current observations and unretained old phases.
+
 ### Finalization must preserve safe causes and the actual budget phase
 
 OS-17 / DF-12 demonstrated two different evidence losses: a native wrapper

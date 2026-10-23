@@ -3,6 +3,189 @@
 **Last verified:** 2026-10-23
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## OS-18: corrected child-boundary aggregate (2026-10-23)
+
+**Applicable gate: PASS, 66 tests, zero failures, zero skips.** Exactly one
+corrected seven-file serial aggregate was executed after the test-source
+correction. The earlier 58/62 aggregate remains **FAILED**; its isolated
+four passes were diagnosis, not a replacement gate. This is test-harness
+qualification only. The DERIVED functional receipt remains INVALID and its
+artifact remains unqualified. No new application, Docker command, image
+inspection, SQL, build, timing campaign, remote operation or deployment ran.
+
+### Observed failures versus proven source defects
+
+The retained evidence is
+`test-results/os17-source-finalization-20261023/green-serial-focused.log`.
+Its filename does not mean it passed.
+
+| Original failing child | Retained causal evidence | Source-proven test boundary |
+|---|---|---|
+| Missing counter fields/private extras | `Observer request timeout`, not the intended `Observer reply rejected`; 1,181.1741 ms | The 1,000 ms request timer started immediately after `spawn`, before Node/module startup or listener readiness was acknowledged. |
+| Functional report-output fallback | Exit status `null`, expected `0`; 2,111.4927 ms | A 2,000 ms `spawnSync` timer included Node startup, importing the functional runner and its eager PG dependency, executing the serializer, and closing the child. |
+| Minimal privacy fallback | Exit status `null`, expected `0`; 2,027.0918 ms | The same mixed startup/operation/close timer; no phase marker distinguished them. |
+| Statement default-dispatch rejection | Exit status `null`, expected `1`; 2,096.2652 ms | The same mixed 2,000 ms timer; the old assertion did not require the actual opt-in failure cause. |
+
+The observer stack proves the wrong failure category reached its assertion.
+The three exit-status stacks are consistent with their configured total
+timeout, but their original native `error`/`signal` and boot/readiness
+timestamps were not retained. It is therefore **not possible to identify
+their exact historical startup-versus-operation phase**. Neither current
+startup measurements nor later isolated passes reconstruct that missing
+evidence. No specific host-noise, shared-state, inherited test-discovery or
+application defect is asserted.
+
+The source also allowed observer teardown to send `kill` without awaiting
+the child's `close` acknowledgement before the next fixture. That permits
+overlap; the old evidence does not prove such overlap actually occurred.
+Corrected teardown waits for closure. Clearing `NODE_TEST_CONTEXT` follows
+the already-existing owned-child pattern and is asserted in each child
+acknowledgement, not offered as a proven historical cause.
+
+### Applied correction and causal controls
+
+The change is confined to five test/fixture files. No production or
+diagnostic workload implementation changed.
+`scripts/test/membership-child-fixture.cjs` uses ordinary Node IPC:
+
+```text
+Fork one owned Node fixture
+  -> BOOT acknowledgement
+  -> load actual dependencies
+  -> READY acknowledgement within bounded startup
+  -> parent sends GO
+  -> operation and normal child exit within original operation deadline
+  -> await CLOSE acknowledgement before continuing
+```
+
+Startup has a separate 10,000 ms bound, matching the existing derived
+preflight-child budget. This is not a blanket increase of operation timers.
+Observer requests remain 1,000 ms, the intentional hanging-request control
+remains 100 ms, raw-frame rejection remains 1,500 ms, both report serializers
+and statement default rejection remain 2,000 ms, and functional/DERIVED
+default guards remain 3,000 ms. For report/default fixtures, one operation
+deadline covers **both** execution and normal process closure; closure does
+not receive a second operation allowance. Exceptional fixture termination
+has a bounded 1,000 ms close acknowledgement. The existing 4,096-byte report
+output limit is preserved.
+
+For real default-entry tests, dependency loading completes before READY.
+The loader then executes the unchanged actual main entry, with the intended
+arguments, and records only whether the **specific required assertion
+failed**. An arbitrary exit `1` is insufficient. This does not claim a cold
+CLI startup performance result. All subprocess APIs inside these test
+fixtures are replaced with a closed, counted refusal; there is no Docker or
+other external-command fallback. Test processes are not benchmark workers.
+
+Three new cases supplement the existing 63:
+
+- A structural RED requires readiness-aware fixtures in all three affected
+  test families. It failed once before correction, with the missing
+  startup-acknowledgement assertion.
+- A real bounded fixture distinguishes `FIXTURE_STARTUP_TIMEOUT`,
+  `FIXTURE_OPERATION_TIMEOUT` and `FIXTURE_EXTERNAL_DISPATCH`, verifies a
+  successful exit, and proves that an unrelated exit `1` has zero intended
+  guard hits. No sleeps or adaptive retry are used.
+- A real, prepared-but-not-started observer deliberately receives a request
+  before GO. It reproduces exactly `Observer request timeout`, demonstrating
+  the old clock-placement failure without attributing it to host noise.
+  The ordinary malformed-counter tests then require the intended
+  `Observer reply rejected` after the listener acknowledges readiness.
+
+Malformed reply tests now require their exact reply/stderr rejection cause,
+not merely any exception without a private canary. All nine OS-17 lifecycle
+controls remain in the aggregate, unchanged. No 30-second/35-second non-UTC
+bound, five-minute functional cap, cleanup reservation, canary condition or
+admission assertion changed.
+
+### Actual corrected aggregate observations
+
+These are fake-child test observations, not application/performance results.
+The observer's final column is the GO-to-listener acknowledgement, **not**
+the duration of the subsequent malformed protocol request.
+
+| Child in the corrected aggregate | Boot ms | Ready after imports ms | Operation/normal-close ms |
+|---|---:|---:|---:|
+| Observer missing CPU counter | 66 | 74 | 2, listener acknowledgement only |
+| Observer private extra field | 66 | 73 | 1, listener acknowledgement only |
+| Report-output fallback | 63 | 150 | 12 |
+| Minimal privacy fallback | 67 | 153 | 12 |
+| Statement default guard | 74 | 159 | 14 |
+
+These timings demonstrate the new boundaries on this run. They do not
+establish how long startup took in the old failing aggregate or guarantee
+that a future host always starts a child within the startup cap.
+
+### Exact validation and gate table
+
+All commands ran from the exclusive
+`SCIMServer-gallery-mapping-20261014` worktree. Evidence is in
+`test-results/os18-child-boundaries-20261023/`; no old log was overwritten.
+
+| Command/evidence | Actual result |
+|---|---|
+| `node --test --test-reporter=tap --test-name-pattern='fixture clocks exclude' scripts\test\membership-observer.test.cjs` (`red-boundaries.log`) | RED: 1 executed, 1 failed, zero skipped; missing readiness boundary |
+| Three-file targeted boundary selection (`focused-boundaries.log`) | GREEN: 7 executed, 7 passed, zero skipped |
+| Four-file targeted causal/default selection (`focused-causal-controls.log`) | GREEN: 5 executed, 5 passed, zero skipped |
+| `node test-results\os18-child-boundaries-20261023\validate.cjs` (`static.json`) | Five changed CJS files pass syntax and the existing seven-rule scoped ESLint check, zero findings; not full repository lint |
+| Corrected seven-file command below (`aggregate-serial.log`) | **PASS: 66 executed, 66 passed, zero failed/cancelled/skipped; 26,012.7132 ms** |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` (`freshness-content.log`) | PASS, 27 documents; content-only, not the full coupled gate |
+
+```powershell
+node --test --test-concurrency=1 --test-reporter=tap `
+  scripts\test\membership-lifecycle.test.cjs `
+  scripts\test\membership-history.test.cjs `
+  scripts\test\membership-privacy.test.cjs `
+  scripts\test\membership-privacy-functional.test.cjs `
+  scripts\test\membership-derived-functional.test.cjs `
+  scripts\test\membership-observer.test.cjs `
+  scripts\test\membership-statements.test.cjs
+```
+
+The two targeted commands, including their exact selectors and file lists,
+are retained in the source-only validation command record. There was no
+unchanged aggregate retry and no serial-only production-fix claim: serial
+execution is the explicitly requested aggregate selector, while the
+correction is fixture readiness, cause checking and lifecycle closure.
+
+### RCA, cap interpretation and remaining holds
+
+**Type/severity:** test correctness and lifecycle observability / Medium.
+**Symptom:** an applicable aggregate failed while isolated tests passed.
+**Root mechanism:** operation assertions used clocks that also charged
+unacknowledged process/import startup, and insufficient lifecycle/cause
+evidence made unrelated timeout/exit failures indistinguishable from their
+intended negative controls. The exact old native inner phase is unknown.
+**Fix:** acknowledged startup and operation boundaries, original operation
+deadlines, specific failing guard/reply assertions, external-dispatch
+refusal and awaited child closure.
+**Why it works:** a slow or broken setup now fails explicitly as setup;
+it cannot consume the malformed-protocol/serializer/default-guard budget
+before that operation is allowed to start. Exit status alone cannot satisfy
+the default guard. Each owned fixture has completed closure before reuse.
+**Detection/escape:** the original aggregate caught this; the earliest
+possible gate was an executable pre-readiness/causal-negative fixture
+control, now added in-place. Isolated passes never close a failed aggregate.
+
+The OS-17 cleanup maximum remains 30,000 ms, **clamped to the remaining
+absolute outer deadline**. It replaces a shorter per-command limit, not the
+five-minute wall cap: each call receives `min(30000, deadline - now)`;
+nonpositive remaining time rejects before dispatch. It does not promise
+twelve full 30-second allowances or extend the 120-second reservation.
+Both final captures, successful removals, independent absence evidence and
+the original 300,000 ms total limit remain mandatory. The destroyed actual
+legacy cleanup exception is still unknown.
+
+**Architecture disposition: accepted.** A small test-only IPC fixture is
+shared by observer, privacy and default-entry tests; no production seam,
+dependency, pool, framework, product version, protocol or configuration knob
+was introduced. Splitting this cohesive fixture further is speculative.
+**Self-improvement: applied.** Readiness/operation/close acknowledgement and
+intended-cause negative controls now execute in the applicable aggregate.
+No additional functional invocation is authorized by this result. Baseline
+adoption, publication, performance qualification, PR #251, CI/cloud and
+deployment holds remain unchanged.
+
 ## OS-17 / DF-12 source-only correction (2026-10-23)
 
 **Result: implemented and locally tested, not runtime-qualified.** The

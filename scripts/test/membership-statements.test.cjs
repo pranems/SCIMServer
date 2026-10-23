@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { runDefaultChild } = require('./membership-child-fixture.cjs');
 const path = require('node:path');
 const { statementDelta, validatePgSnapshot, snapshotSql, summarizeStatements } =
   require('../performance/membership-statements.cjs');
@@ -78,16 +78,17 @@ test('fingerprint summaries do not assume opaque query IDs align across roles', 
   assert.equal(result[0].identityMix, true);
 });
 
-test('new family is rejected by admission and cannot dispatch without explicit opt-in', () => {
+test('new family is rejected by admission and cannot dispatch without explicit opt-in', async t => {
   const { assessBlock } = require('../performance/assess-membership.cjs');
   assert.throws(() => assessBlock(['candidate', 'baseline', 'baseline', 'candidate'].map(role => ({
     role, family: 'membership-statement-diagnostic', diagnosticOnly: true,
   })), { order: 'BAAB', sameImage: false }, {}), /Diagnostic receipts cannot enter release admission/);
-  const child = spawnSync(process.execPath,
-    [path.resolve(__dirname, '../performance/run-membership-statements.cjs')], {
-      timeout: 2000, encoding: 'utf8',
-    });
+  const child = await runDefaultChild(path.resolve(__dirname, '../performance/run-membership-statements.cjs'),
+    'Explicit statement diagnostic opt-in required');
+  t.diagnostic(JSON.stringify(child.timings));
   assert.equal(child.status, 1);
+  assert.equal(child.value.guardHits, 1);
+  assert.match(child.stderr, /Statement diagnostic startup failed \(ERR_ASSERTION\); details withheld/);
   assert.doesNotMatch(child.stdout, /checked requests|STATEMENT-DIAGNOSTIC-COMPLETE/);
 });
 

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync, fork, execFileSync } = require('node:child_process');
+const { runDefaultChild } = require('./membership-child-fixture.cjs');
 const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { test } = require('node:test');
@@ -67,11 +68,13 @@ test('derived privacy requires all private sources and exact masks, preserving s
   assert.throws(() => tool.validateFunctionalPrivacy(rows, null, canaries),
     error => error.code === 'DIAGNOSTIC_PRIVACY' && error.safeDetails.source === 'privacy-inputs');
 });
-test('real default child and derived family cannot dispatch or enter admission', () => {
+test('real default child and derived family cannot dispatch or enter admission', async () => {
   const file = path.join(root, 'scripts/performance/run-membership-privacy-functional.cjs');
   for (const args of [[], ['--unknown'], ['--derived-reference-functional-only']]) {
-    const child = spawnSync(process.execPath, [file, ...args], { encoding: 'utf8', timeout: 3000 });
+    const child = await runDefaultChild(file, args[0] === '--derived-reference-functional-only'
+      ? null : 'Explicit functional opt-in required', args, 3000);
     assert.equal(child.status, 1);
+    assert.equal(child.value.guardHits, 1);
     assert.doesNotMatch(child.stdout, /FUNCTIONAL-COMPLETE|QUALIFIED/);
   }
   const { assessBlock } = require('../performance/assess-membership.cjs');

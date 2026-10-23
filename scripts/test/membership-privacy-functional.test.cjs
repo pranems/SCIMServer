@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { runChild, runDefaultChild } = require('./membership-child-fixture.cjs');
 const path = require('node:path');
 const { verifyProvenance, readFunctionalResponse } = require('../performance/run-membership-privacy-functional.cjs');
 
@@ -22,10 +22,11 @@ test('functional selection proves every known authorized row and rejects foreign
   }
 });
 
-test('functional entry cannot dispatch by default and cannot enter admission', () => {
+test('functional entry cannot dispatch by default and cannot enter admission', async () => {
   const file = path.resolve(__dirname, '../performance/run-membership-privacy-functional.cjs');
-  const child = spawnSync(process.execPath, [file], { timeout: 3000, encoding: 'utf8' });
+  const child = await runDefaultChild(file, 'Explicit functional opt-in required', [], 3000);
   assert.equal(child.status, 1);
+  assert.equal(child.value.guardHits, 1);
   assert.doesNotMatch(child.stdout, /FUNCTIONAL-COMPLETE/);
   const { assessBlock } = require('../performance/assess-membership.cjs');
   assert.throws(() => assessBlock(['candidate', 'baseline', 'baseline', 'candidate'].map(role => ({
@@ -67,19 +68,21 @@ test('timestamped container records stay separate from unframed Docker tool diag
   assert.equal(functionalPolicy.maximumAuthenticatedRequests, 7);
 });
 
-test('functional report-output rejection keeps a minimal safe receipt through a bounded child', () => {
+test('functional report-output rejection keeps a minimal safe receipt through a bounded child', async t => {
   const file = path.resolve(__dirname, '../performance/run-membership-privacy-functional.cjs');
   const privacy = path.resolve(__dirname, '../performance/membership-privacy.cjs');
-  const child = spawnSync(process.execPath, ['-e', `
+  const child = await runChild(`
     const {writeFunctionalReport}=require(${JSON.stringify(file)});
     const {encodeSafeJson}=require(${JSON.stringify(privacy)});
+  `, `
     const canaries=[{kind:'scim-shared-secret',value:'PRIVATE_OUTPUT_CANARY'}];
     const report={family:'membership-privacy-functional',run:'owned',status:'FUNCTIONAL-COMPLETE',
       diagnosticOnly:true,admissionEligible:false,payload:canaries[0].value,cleanup:{verified:true},
       remainingOwned:'',remainingNetworks:'',elapsedMs:1};
     const rejected=writeFunctionalReport((name,data)=>process.stdout.write(encodeSafeJson(data,canaries)),report);
     if(!rejected)process.exitCode=2;
-  `], { encoding: 'utf8', timeout: 2000, maxBuffer: 4096 });
+  `);
+  t.diagnostic(JSON.stringify(child.timings));
   assert.equal(child.status, 0);
   assert.equal(child.stderr, '');
   assert.doesNotMatch(child.stdout, /PRIVATE_OUTPUT_CANARY|payload|stack/);
@@ -90,17 +93,19 @@ test('functional report-output rejection keeps a minimal safe receipt through a 
     source: 'report-output', credentialKind: 'scim-shared-secret' });
 });
 
-test('minimal privacy receipt never recycles private cleanup or inventory fields into a second rejection', () => {
+test('minimal privacy receipt never recycles private cleanup or inventory fields into a second rejection', async t => {
   const file = path.resolve(__dirname, '../performance/run-membership-privacy-functional.cjs');
   const privacy = path.resolve(__dirname, '../performance/membership-privacy.cjs');
-  const child = spawnSync(process.execPath, ['-e', `
+  const child = await runChild(`
     const {writeFunctionalReport}=require(${JSON.stringify(file)});
     const {encodeSafeJson}=require(${JSON.stringify(privacy)});
+  `, `
     const c=[{kind:'scim-shared-secret',value:'PRIVATE_CLEANUP_CANARY'}];
     const report={family:c[0].value,run:c[0].value,status:'INVALID',elapsedMs:1,
       cleanup:{verified:true,unexpected:c[0].value},remainingOwned:c[0].value,remainingNetworks:''};
     writeFunctionalReport((name,data)=>process.stdout.write(encodeSafeJson(data,c)),report);
-  `], { encoding: 'utf8', timeout: 2000, maxBuffer: 4096 });
+  `);
+  t.diagnostic(JSON.stringify(child.timings));
   assert.equal(child.status, 0);
   assert.equal(child.stderr, '');
   assert.doesNotMatch(child.stdout, /PRIVATE_CLEANUP_CANARY|unexpected/);
