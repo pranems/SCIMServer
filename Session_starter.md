@@ -20,6 +20,11 @@ correction, not reconstructed runtime proof. The indexed observer/statement
 report records RED/GREEN counts, existing bounded-child timeout failures and
 their unchanged-limit isolated passes, source preservation and remaining
 adoption/publication/performance holds. OS-17 is no longer merely scheduled.
+Implementation/RCA commit: `9f8d4911`. Preservation proof verifies all seven
+original frozen inputs and four immutable attempt2/recovery artifacts,
+plus six unchanged admission/fixture/proof files. Current seven CJS files
+match Git after newline normalization only; raw CRLF/LF hashes differ.
+All 90 branches and ten stashes remain. No new runtime inventory was queried.
 
 ### Corrected-source DERIVED continuation: INVALID finalization (2026-10-23)
 

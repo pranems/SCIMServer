@@ -154,6 +154,65 @@ projection, and actual default/admission rejection through existing tests.
 All Docker-looking calls in test fixtures are intercepted; the only
 executed native fixture is Node. No real Docker fallback is allowed.
 
+### Committed source and preservation proof
+
+Implementation, tests and the in-place RCA are committed as
+`9f8d491169bdc07769b1c17515c751ec1a4d6466`.
+The following source-only command passed after that commit:
+
+```powershell
+node test-results\os17-source-finalization-20261023\preservation.cjs `
+  committed source-preservation.json
+```
+
+Its exclusive output
+`test-results/os17-source-finalization-20261023/source-preservation.json`
+has SHA-256
+`497b51e6d6bf9be1cb2e9d6d101f180c48c942f1bcd47d6ed180d97808e4395e`.
+This is **source preservation evidence, not a new functional receipt**.
+
+| Verified identity | Result |
+|---|---|
+| Original attempt2 intent, manifest, INVALID receipt and separate recovery receipt | All four match their retained hashes byte-for-byte |
+| Original seven frozen inputs | Each matches its manifest's original on-disk hash and executed commit after newline normalization |
+| Current seven changed CJS inputs/tests | Each matches implementation commit after newline normalization. Every raw disk/Git comparison is false because disk CRLF and Git LF differ; raw equality is not claimed. |
+| Current functional runner on-disk SHA-256 | `ebb87efb7229d3cde6d3ba52574eef1418dfac2725c220cb16a9b8a8d3293085` |
+| Current functional runner Git SHA-256 | `335fb8dc15c9931d66ea12fdd5fe7421bee04158d05a4c6bc85fbc748e1ab5d5` |
+| Normal qualification runner, assessor, protocol, benchmark, PG fixture and DERIVED proof helper | All six remain unchanged from `3563b5e4` after newline normalization |
+| Local qualification ref | Still `d25b6155bace7af2ec4ccb89f2eb0048e2db0c26` |
+| Branches/stashes | All 90 local branches and ten stashes retained; no branch/history/stash operation performed |
+
+The final phase-only correction has targeted GREEN evidence in addition to
+the eight earlier new cases. There are nine unique new lifecycle cases and
+54 existing focused cases covered in the retained runs. The failed aggregate
+commands remain failed evidence; no single clean 63-case aggregate is
+claimed. No additional aggregate was run merely to replace that evidence.
+The final closeout is documentation-only, not another source or runtime
+iteration.
+
+One additional fake-subprocess hypothesis was checked before closeout:
+could ignoring graceful termination overrun the remaining cleanup time?
+The exploratory wrapper test failed an over-specific `SIGKILL` expectation,
+returning actual `SIGTERM` instead
+(`termination-edge-red.log`: one executed, one failed, zero skipped;
+12,432.6389 ms includes the existing 11-second metadata fixture).
+This was **not evidence of a deadline overrun**. A separate bounded native
+Node fixture on `win32`, with a `SIGTERM` listener and an independent
+1,800 ms safety exit, was terminated at 1,230 ms under its 1,200 ms timeout;
+the closed safe classifier retained `terminated`/`SIGTERM`.
+Its output is `termination-edge-observation.log`.
+No Docker command was involved. The exploratory signal-policy assertions
+were removed, restoring the committed test exactly; no speculative kill
+policy was added. This observation establishes neither Linux behavior nor
+the destroyed historical native cause. An initial PowerShell quoting error
+was rejected by the parser before the fixture started; stdin script input
+corrected that tooling friction without changing source or time limits.
+
+Final documentation validation is retained in
+`freshness-final-closeout-content.log`:
+`pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling`.
+It is the 27-document **content-only** check, not the full coupled gate.
+
 ### RCA, escape analysis and remaining holds
 
 | Issue | Root cause and resolution | Detection and earliest useful check |
