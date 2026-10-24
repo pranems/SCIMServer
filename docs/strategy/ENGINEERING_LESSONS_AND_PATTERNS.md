@@ -1628,3 +1628,24 @@ that test explicitly rather than counting a skipped artifact test as proof.
 The [offline DERIVED reference preparation](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#offline-derived-reference-preparation-not-baseline-adoption)
 applies this safeguard without copying credential-bearing source literals into
 new tracked code.
+
+## Separate cleanup ownership from experiment qualification
+
+**Observed:** 2026-10-24, disposable URL GIN diagnostic source preparation.
+Real bounded Node fixtures found two lifecycle errors before database execution:
+recovery ran before normal capture/removal, and an OOM qualification assertion
+prevented removal of an otherwise exactly identified owned container.
+
+**Pattern:** Run normal finalization first and independently verify absence
+before deciding whether safety recovery is necessary. Authorize every removal
+using fresh full resource ID, owner/run labels and expected image identity.
+Do not make that removal authorization depend on the workload remaining healthy
+or satisfying its CPU/memory policy. Failed qualification must remain INVALID
+without making disposal impossible.
+
+**Applied enforcement:** The actual-entry regression exercises healthy and OOM
+fixtures with real bounded Node subprocesses and no Docker fallback. It requires
+capture before removal when qualified, capture rejection when OOM-invalid,
+successful exact owned removal in both cases, first-cause retention and no
+unnecessary recovery. Existing native-operation and absolute-deadline caps are
+not extended. See [the causal RED/GREEN evidence and disposition](../DISPOSABLE_URL_GIN_COUNTERFACTUAL.md#source-test-execution-issues-and-prevention).

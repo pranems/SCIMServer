@@ -2,6 +2,20 @@
 
 **Last verified:** 2026-10-24
 
+### Separate disposable URL GIN counterfactual (2026-10-24)
+
+The opt-in database-only runner and causal source/fixture guards are
+implemented in `scripts/performance/run-membership-gin.cjs` and
+`membership-gin.cjs`. The fixed experiment is BAAB + ABBA, eight fresh
+equivalent current-schema clones, 8,000 identical synthetic rows in
+160 batches per trial, with insertion and explicit pending-list drain
+measured separately. Source validation passed 39/39 tests with zero skips.
+The single authorized actual execution is pending at the source commit;
+its eventual result is recorded in
+[the focused report](docs/DISPOSABLE_URL_GIN_COUNTERFACTUAL.md).
+No application server, production index change or admission is involved;
+DS-03 and all earlier evidence remain unchanged.
+
 ### DS-03: corrected statement diagnostic complete (2026-10-24)
 
 One runner invocation from committed source

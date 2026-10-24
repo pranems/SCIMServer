@@ -470,6 +470,8 @@ These are the definitive source files for key aspects of the system:
 - [Unreleased local application-history diagnostic and execution RCA](MEMBERSHIP_HISTORY_DIAGNOSTIC.md)
 - [Low-disturbance observer and statement diagnostic](MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md) - DS-03 corrected-source study COMPLETE 8/8 in 1,071.628 seconds, with all-eight-role privacy, seven complete captures and independent cleanup. Absolute SQL/WAL, CPU, HTTP and fingerprint findings are descriptive only. Preserves DS-01 INVALID evidence, DS-02 84/84 source validation and earlier functional qualification; release-baseline adoption, admission and index changes remain held.
 # Group reference preservation
+- [Disposable URL GIN counterfactual](DISPOSABLE_URL_GIN_COUNTERFACTUAL.md) - Explicitly opted-in owned-database experiment; fixed equivalent current-schema clones, one-index difference, complete pending-list drain and read guards. No production index change or admission.
+
 
 - [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
 ## Responsive inventory layout
