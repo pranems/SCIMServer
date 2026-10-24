@@ -17,6 +17,7 @@ replaced, and no release admission or deployment follows from these checks.
 | CR-04 | Environment / Low | The first protected Validate push passed 26 gates, then Prisma generation rejected an unset `DATABASE_URL` after 852.1 seconds. This was a missing local code-generation input, not a database failure. | Add an early Validate/Full configuration gate, preserve Fast-mode behavior, and supply an explicit non-connecting local URL only in the retry process. No default credential, live database or runtime fallback is introduced. | The real protected hook caught it at its late generation gate. A new regression now checks the actual early PowerShell block for missing, blank and supplied configuration, plus Fast-mode compatibility. Earliest useful gate: configuration preflight before heavy suites. Applied. |
 | CR-05 | Validation capacity / Medium | The configured retry passed 29 gates but Vitest lost 15 worker processes. Only 109/124 files completed, despite 1,301 reported passing assertions. The log retained generic unexpected exits, not a proven native cause. | Run the same complete web selector with two workers. All 124 files / 1,655 tests passed with no pending tests. Apply that explicit worker bound to pre-push and both CI jobs, without changing assertions, skips, timeouts or admission thresholds. | The ordinary web gate correctly rejected incomplete execution. A new wiring regression protects the complete selector and worker limit. The original process exits are not retrospectively attributed to memory exhaustion or another unmeasured cause. Applied; the complete protected retry is still required. |
 | CR-06 | Editing scope / Low | A repeated `npm test` command was initially changed in the neighboring API gate instead of the web gate. | Anchor the correction to the named gate blocks and add a negative regression requiring the API command to stay unchanged. | The new web wiring test caught the wrong target before any altered API command ran. Earliest useful gate: focused command-scope regression. Applied. |
+| CR-07 | CI input availability / Medium | Exact-tip branch CI failed four tests because checkout retained only the tip commit. Historical `git show` and the pinned ancestor check could not resolve their required commits. The two bounded GIN children consequently stopped before their intended fake-image/SQL failures. | Fetch complete history in both ordinary validation checkouts and protect that setting with a fifth wiring regression. Keep all four tests and their fail-closed source checks unchanged. | CI caught this; an independent depth-one checkout reproduced the same four failures. Fetching history alone made all 38 relevant tests complete with 34 passed / four evidence-dependent skips and zero failures. Earliest useful gate: a real isolated checkout with CI-equivalent history. Applied. |
 
 ### Evidence and limits
 
@@ -56,6 +57,31 @@ replaced, and no release admission or deployment follows from these checks.
 - `web-capacity-red.log`, `web-capacity-green.log` and
   `web-capacity-final-green.log` retain the missing-capacity control, the
   caught wrong-gate edit and all four final wiring checks passing.
+- `protected-push-bounded-web.log`: the complete third Validate hook
+  passed all 30 gates in 1,379.8 seconds and pushed `ff9091c0`.
+  Membership passed 223/225 with two explicit skips; API unit passed
+  213 suites / 6,214 tests; API E2E passed 118 suites / 2,514 tests with
+  existing skips; web passed all 124 files / 1,655 tests. API lint retained
+  zero errors / 512 warnings; web TypeScript retained 66 errors within
+  the configured 96-error ratchet. Neither is a zero-warning/type-error claim.
+- Exact-tip Build Test Image run `40058896931` then failed the membership
+  step with 213 passed / four failed / eight explicit skips out of 225.
+  Downstream validation and image publication did not run. CodeQL run
+  `40058897048` passed on that same `ff9091c0` tip; it does not override
+  the failed build.
+- `ci-shallow-red.log`: a separate depth-one clone reproduced exactly
+  those four test failures, with no Docker dispatch. `ci-history-green.log`
+  records 34 passed / zero failed / four explicit skips out of the same
+  38 tests after fetching complete history, without changing their files.
+  `ci-history-wiring-red.log` and `ci-history-wiring-green.log` retain the
+  missing checkout-depth control and all five final wiring tests passing.
+
+The earlier source-archive portability check was nested beneath the owned
+repository and could discover its full Git metadata. It established the
+absence-of-ignored-evidence claim, not shallow-checkout compatibility.
+The isolated clone's own `.git` directory makes that additional condition
+explicit. Runtime ancestry checks are not relaxed and missing history is
+not converted into a test skip.
 - `fresh-installed-green-all.log`: all 15 membership test files completed
   in 105.376 seconds, with 213 passed, zero failed and eight explicit
   skips out of 221 registered tests. Seven skips require local evidence

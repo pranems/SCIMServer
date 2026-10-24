@@ -33,6 +33,17 @@ controls pass and preserve the neighboring API command. The original
 worker exits' native cause remains unknown. A new complete protected push
 is still required; no failed gate was waived or relabeled.
 
+The subsequent complete hook passed all 30 gates in 1,379.8 seconds and
+pushed `ff9091c0`; the remote SHA and clean tracking state were verified.
+Exact-tip CodeQL `40058897048` passed, but Build Test Image `40058896931`
+failed four membership tests because the CI checkout lacked historical
+Git objects. An isolated depth-one clone reproduced exactly those four
+failures; fetching history alone made all 38 relevant tests complete with
+34 passed / zero failed / four explicit evidence skips. Both ordinary
+validation checkouts now request complete history; all five wiring checks
+pass. A new protected push and exact-tip CI remain required for that
+correction. No tests, ancestry checks or release holds were waived.
+
 ### Separate disposable URL GIN counterfactual (2026-10-24)
 
 The opt-in database-only runner and causal source/fixture guards are

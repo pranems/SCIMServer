@@ -15,6 +15,17 @@ test('ordinary branch and release CI run all portable membership tests', () => {
   }
 });
 
+test('ordinary CI retains the Git history required by source identity and historical negative controls', () => {
+  for (const file of ['build-test.yml', 'build-and-push.yml']) {
+    const source = fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8');
+    const first = source.indexOf('      - name: Checkout repository');
+    const next = source.indexOf('\n      - name:', first + 1);
+    assert.ok(first >= 0 && next > first, file);
+    assert.match(source.slice(first, next), /^\s+fetch-depth: 0\s*$/m,
+      `${file} must provide the immutable historical commits used by the tests`);
+  }
+});
+
 test('default pre-push runs the complete membership test selector and rejects empty discovery', () => {
   const source = fs.readFileSync(path.join(root, 'scripts/pre-push-checks.ps1'), 'utf8');
   const first = source.indexOf("Invoke-Gate -Name 'tools: membership unit tests'");

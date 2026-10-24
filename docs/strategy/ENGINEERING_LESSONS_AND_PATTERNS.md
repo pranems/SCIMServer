@@ -106,6 +106,14 @@ the chosen capacity policy, not an invented native exit cause. Anchor edits
 to named gate blocks and assert neighboring commands remain unchanged when
 multiple steps contain the same command text.
 
+A source snapshot nested under an existing repository is not an isolated
+Git checkout: Git can walk upward and find the parent's full history.
+When tests enforce ancestry or inspect historical source, reproduce CI's
+checkout depth in a clone with its own `.git`. Four new CI failures were
+reproduced at depth one and disappeared after fetching history alone,
+without changing or skipping their assertions. Declare history availability
+as a validation input and guard the active checkout setting.
+
 The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
 records exact RED/GREEN results and the still-unqualified runtime outcome.
 The correction reuses existing finalizer/privacy modules rather than adding

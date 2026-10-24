@@ -154,6 +154,13 @@ still run and runtime proof validation remains fail-closed. The real
 PostgreSQL probe remains separately opt-in. CI triggers, benchmark
 thresholds, publication tags and deployment behavior are unchanged.
 
+Both validation jobs check out complete Git history (`fetch-depth: 0`).
+The source-identity guard and historical negative controls require pinned
+ancestor objects; a default depth-one checkout cannot satisfy those inputs.
+An isolated shallow clone reproduced four failures, and fetching history
+alone made the same 38-test subset pass with its four explicit local-proof
+skips. The checks remain active rather than skipping missing ancestry.
+
 `membership-tool-gates.test.cjs` checks the active CI commands and default
 hook selector so ordinary application CI cannot silently omit this tooling.
 This source review does not refresh any live-estate observation below.
