@@ -1648,4 +1648,4 @@ fixtures with real bounded Node subprocesses and no Docker fallback. It requires
 capture before removal when qualified, capture rejection when OOM-invalid,
 successful exact owned removal in both cases, first-cause retention and no
 unnecessary recovery. Existing native-operation and absolute-deadline caps are
-not extended. See [the causal RED/GREEN evidence and disposition](../DISPOSABLE_URL_GIN_COUNTERFACTUAL.md#source-test-execution-issues-and-prevention).
+not extended. See [the causal RED/GREEN evidence and disposition](../DISPOSABLE_URL_GIN_COUNTERFACTUAL.md#source-and-test-execution-issues-and-prevention).

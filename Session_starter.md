@@ -10,9 +10,13 @@ implemented in `scripts/performance/run-membership-gin.cjs` and
 equivalent current-schema clones, 8,000 identical synthetic rows in
 160 batches per trial, with insertion and explicit pending-list drain
 measured separately. Source validation passed 39/39 tests with zero skips.
-The single authorized actual execution is pending at the source commit;
-its eventual result is recorded in
-[the focused report](docs/DISPOSABLE_URL_GIN_COUNTERFACTUAL.md).
+One invocation from `0de430f8` completed all eight trials / 64,000 synthetic
+rows in 191.076 seconds including exact owned cleanup. Omitting URL GIN
+reduced measured insertion-plus-drain execution by 981.471 ms / 61.32%
+and WAL by 58,542,228 bytes / 52.55% across 32,000 rows per condition.
+The absent-URL read worsened from 0.163 ms to 10.945 ms, so retain the
+production index and require a read-preserving design. Full evidence and
+limits are in [the focused report](docs/DISPOSABLE_URL_GIN_COUNTERFACTUAL.md).
 No application server, production index change or admission is involved;
 DS-03 and all earlier evidence remain unchanged.
 
@@ -242,6 +246,7 @@ See the indexed observer/statement report and
 
 | Date | Summary |
 |---|---|
+| 2026-10-24 | Disposable URL GIN counterfactual COMPLETE 8/8 in one 191.076-second invocation, including owned cleanup. Identical current-schema fixtures / 64,000 rows; omitting only GIN saved 981.471 ms measured full-cycle execution and 58.542228 MB WAL across 32,000 rows per condition, but worsened absent-URL reads by 10.7825 ms. Source guards 39/39; all eight shared containers and prior evidence preserved. Keep production GIN; no admission, baseline adoption or deployment. |
 | 2026-10-24 | DS-03 corrected-source statement study COMPLETE 8/8: 35,256 checked requests, 32,000 measured samples, all-eight-role privacy and seven complete captures; 1,071.628 seconds including verified owned cleanup. Logging extra SQL execution is 764.806 ms / 16,000 rows, not a request-tail cause. Preserved prior INVALID evidence; no admission, baseline adoption, index change or deployment. |
 | 2026-10-24 | DS-02 source-only correction: exact frozen maxBuffer reproduction, bounded complete-console streaming, all eight credential-role guards and closed native causes. Single affected aggregate PASS 84/84; ten-file syntax/scoped lint clean. No Docker/SQL/runtime rerun, admission or baseline adoption. |
 | 2026-10-23 | Sole prospective DERIVED statement study from `7b3ac1c7`: INVALID after four BAAB visits, 17,628 workload requests and a passing 66-outcome contract because full-console collection failed. Partial SQL/WAL evidence retained; exact owned cleanup and unchanged shared inventory verified. No ABBA replacement, admission, baseline adoption or deployment. |
