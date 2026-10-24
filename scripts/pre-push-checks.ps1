@@ -27,7 +27,7 @@
         committed and pushed with every gate green.
 
       Validate (mirrors CI .github/workflows/build-test.yml validate job)
-                                          ~11-14 min
+                                          ~20 min local budget (host-dependent)
         - Everything in Fast, plus:
         - api npx prisma generate (required before lint + tests)
         - api migration linter (npx ts-node lint-migrations.ts)
@@ -422,7 +422,7 @@ if ($Mode -in @('Validate', 'Full')) {
         # A worker-startup error leaves files unexecuted even when every reported
         # assertion passes. Preserve npm's failure exit; never admit partial counts.
         # Focused or instrumented results do not replace a complete ordinary run.
-        npm test 2>&1 | Out-Host
+        npm test -- --maxWorkers=2 2>&1 | Out-Host
     }
 }
 

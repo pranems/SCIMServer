@@ -165,6 +165,14 @@ does not require a live database: a caller can supply a non-connecting
 local code-generation URL in that process. The guard never invents a
 default connection string or prints an existing value.
 
+The complete web Vitest selector now uses `--maxWorkers=2` in pre-push and
+both build workflows. A local default-worker run lost 15 workers and left
+15 files unexecuted; the separate two-worker run completed all 124 files
+and 1,655 tests. No test filter, assertion, timeout, skip policy or
+performance threshold changed. The worker exits' native cause was not
+retained, so this is a measured capacity configuration, not proof of a
+historical memory failure. The existing API unit command is unchanged.
+
 ## Isolated Docker image handoff
 
 The parent deployment pipeline assigns the unique Compose project identity

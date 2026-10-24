@@ -26,6 +26,21 @@ test('default pre-push runs the complete membership test selector and rejects em
   assert.match(block, /^\s+node --test --test-reporter=tap --test-concurrency=1 @membershipTests/m);
 });
 
+test('web validation uses two workers without changing the complete test selector', () => {
+  for (const file of ['build-test.yml', 'build-and-push.yml']) {
+    const source = fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8');
+    assert.match(source, /working-directory: web\r?\n\s+run: npm test -- --maxWorkers=2\s*$/m, file);
+  }
+  const source = fs.readFileSync(path.join(root, 'scripts/pre-push-checks.ps1'), 'utf8');
+  const first = source.indexOf("Invoke-Gate -Name 'web: vitest'");
+  assert.ok(first >= 0);
+  assert.match(source.slice(first), /^\s+npm test -- --maxWorkers=2 2>&1 \| Out-Host\s*$/m);
+  const api = source.indexOf("Invoke-Gate -Name 'api: unit tests (jest)'");
+  assert.ok(api >= 0);
+  assert.match(source.slice(api, source.indexOf('\nInvoke-Gate ', api + 1)),
+    /^\s+npm test 2>&1 \| Out-Host\s*$/m);
+});
+
 test('Validate rejects missing codegen configuration before heavy gates without requiring it in Fast mode',
   { timeout: 45000 }, () => {
     const source = fs.readFileSync(path.join(root, 'scripts/pre-push-checks.ps1'), 'utf8');

@@ -97,6 +97,15 @@ explain that distinction; do not silently substitute a live URL or
 credential. Exercise the actual preflight block and preserve modes that
 do not require that input.
 
+Validation capacity belongs in the gate definition. A completed assertion
+count does not prove that every discovered test file ran: the default web
+pool lost 15 workers while reporting 1,301 passing assertions. Preserve that
+failure and verify unique-file accounting under a declared worker bound.
+The full two-worker run completed all 124 files / 1,655 tests. This supports
+the chosen capacity policy, not an invented native exit cause. Anchor edits
+to named gate blocks and assert neighboring commands remain unchanged when
+multiple steps contain the same command text.
+
 The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
 records exact RED/GREEN results and the still-unqualified runtime outcome.
 The correction reuses existing finalizer/privacy modules rather than adding

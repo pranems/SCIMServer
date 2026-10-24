@@ -24,7 +24,14 @@ rendering checks, then correctly blocked at Prisma generation because
 this late failure; explicit generation-only configuration made the real
 Prisma command pass. No package was installed. A complete hook-protected
 retry and exact-tip CI remain pending; no branch was pushed by the failed
-attempt.
+attempt. The configured retry passed 29 gates but failed at web Vitest:
+15 workers exited unexpectedly, leaving 109/124 files complete. A separate
+fixed two-worker invocation completed all 124 distinct files / 1,655 tests,
+zero failures or pending tests, in 616.860 seconds. The bounded complete
+selector is now wired into pre-push and both CI jobs; four focused wiring
+controls pass and preserve the neighboring API command. The original
+worker exits' native cause remains unknown. A new complete protected push
+is still required; no failed gate was waived or relabeled.
 
 ### Separate disposable URL GIN counterfactual (2026-10-24)
 

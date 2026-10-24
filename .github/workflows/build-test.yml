@@ -127,7 +127,7 @@ jobs:
 
       - name: Test web (Vitest)
         working-directory: web
-        run: npm test
+        run: npm test -- --maxWorkers=2
 
       - name: Build web (production bundle)
         working-directory: web
