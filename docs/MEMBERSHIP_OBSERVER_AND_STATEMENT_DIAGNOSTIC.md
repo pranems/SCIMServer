@@ -1,7 +1,221 @@
 # Low-disturbance membership observation and statement diagnosis
 
-**Last verified:** 2026-10-23
+**Last verified:** 2026-10-24
 **Scope:** Unreleased local diagnostics, not release admission.
+
+## DS-02: bounded complete-console capture and native causes (2026-10-24)
+
+**Executive summary:** the source-only correction is implemented and the
+single affected nine-file aggregate passes **84/84**, with zero failures,
+cancellations or skips. No Docker, application, SQL, image inspection,
+build, functional invocation, timing study or remote operation occurred.
+The DS-01 study remains **INVALID after four BAAB visits**. Corrected source
+is not a completed eight-round study, runtime qualification or admission.
+
+### What is proven, and what remains unknown
+
+The regression executes the **exact frozen DS-01 work-wrapper function**
+from its retained source, substituting only a real bounded Node fixture for
+the requested Docker executable. The fixture is configured to emit more
+than 9 MiB on each native output pipe. Node actually reports
+`ERR_CHILD_PROCESS_STDIO_MAXBUFFER` under the frozen 8 MiB `execFile` limit.
+Before the classifier correction, the assertion failed because the safe
+category was `unexpected`; afterward it is `output-limit`, retaining that
+finite native code. This proves a reproducible wrapper defect, **not the
+historical DS-01 inner cause**. The old 8,394 ms failure did not retain its
+native error or exact target. Neither is reconstructed.
+
+Complete capture no longer depends on holding the full Docker console in
+an `execFile` result. The explicit derived statement path uses one small
+shared scanner for the PostgreSQL and application pipes:
+
+```text
+owned log subprocess: stdout + stderr
+  -> fixed byte/record/deadline gates
+  -> incremental canary scans + bounded record correlation
+  -> both EOF events + successful native close
+  -> live, immutable, non-text capture proof
+
+any gate failure -> closed role-specific cause -> INVALID, never partial success
+```
+
+Both application roles and PostgreSQL have static identities:
+`reference-app`, `candidate-app`, and `pg`. Complete framed records retain
+their application/PostgreSQL origin. Unframed text, unfinished fragments
+and cross-channel matches use the explicit `ambiguous-console` source;
+the scanner never invents application-versus-Docker-tool attribution.
+Its conservative tail combinations can reject an ambiguous reconstruction.
+They cannot make an incomplete capture pass.
+
+### Fixed limits, memory and unchanged deadlines
+
+These constants are source-frozen and included in any future derived
+manifest before allocation. They are not adjustable command-line settings.
+
+| Boundary | Fixed maximum or requirement | Why it exists |
+|---|---|---|
+| One complete console capture, both pipes together | 64 MiB | Finite read/scan budget, not a 64 MiB allocated buffer |
+| One newline-delimited record | 65,536 bytes | Bounds partial-record storage and JSON correlation work |
+| One received chunk | 65,536 bytes | Rejects unexpected pipe-buffer growth rather than allocating an arbitrary chunk |
+| Records in one capture | 1,000,000 | Bounds parsing work independently of bytes |
+| Generated credentials | Eight roles, at most 256 UTF-8 bytes each | The five common roles include administrator; the other three are both application database users and the observer user |
+| Scanner tails | Longest canary minus one byte | Detects chunk, normalized timestamp-frame and both channel-order boundary matches |
+| Retained console frames | Two fixed 64 KiB buffers plus bounded tails | No complete console string, raw record or tail is exported |
+| Other diagnostic tool text across the run | 8 MiB, incrementally checked | Bounds the existing in-memory metadata/tool input; it is not a raw Docker-log archive |
+| Successful capture | Both pipes exist and reach EOF, close code zero, no signal, nonempty framed container text and no unfinished record | Empty, missing, truncated or unsuccessful input is never a complete proof |
+| Current candidate correlation | Original categorized negative-request record must match the selected row | A generic error line or an unrelated request cannot substitute |
+| Work / cleanup native maximum | Existing 60 seconds / 30 seconds, always clamped to the applicable absolute deadline | No deadline or reservation extension |
+| Native-close allowance inside that maximum | 100 ms reserved inside, not added after, the command deadline | Bounds termination/closure handling within the existing maximum |
+
+The 64 MiB limit is a prospective collection budget for this fixed workload,
+not a claim that every possible logger output fits. For scale, it permits
+roughly sixteen thousand 4 KiB records, while a block has 17,628 checked
+workload requests distributed across the two apps. Logging is not assumed
+to be one record per request. A larger actual output remains INVALID;
+no automatic cap increase, tail dropping or replacement invocation exists.
+The scanner's retained frame allocation is 128 KiB, not 64 MiB. Transient
+chunk/string work is bounded by the chunk/frame limits; this is not a
+claim about the entire Node process's resident memory.
+
+The statement study still has a 45-minute absolute cap including its
+90-second cleanup reservation. The separate functional harness still has
+its unchanged 300-second cap and 120-second reservation. A 30-second
+cleanup command maximum clamped to remaining absolute time is not an
+extension of either outer cap. No functional harness or original admission
+default was switched to this new diagnostic stream path.
+
+### Privacy, native errors and proof identity
+
+Selected rows are validated independently of console collection. Extracted
+row-only checks do not pass dummy or empty consoles into old validators.
+The original default validator keeps its exact result keys, correlation
+predicate and privacy-first failure order; a new causal regression locks
+that ordering. The derived path requires all eight actual generated
+credential roles, independently masked rows, complete branded app/PG
+captures and a nonempty checked tool input. Candidate correlation is bound
+to the selected request identifier. A spread/serialized capture object, a
+changed canary vector, a missing database role or a mismatched request
+cannot replace the live proof.
+
+Native metadata now has an allowlisted `nativeCode` as well as category,
+numeric exit, known signal, duration, work/cleanup phase and static
+operation/role/stage/command. Output-limit, native-buffer/memory/I/O,
+spawn, abort, timeout, termination, unsuccessful exit and explicitly
+unrecognized causes remain distinguishable. Unknown native strings become
+`UNRECOGNIZED`, never an unchecked report field. Historical records without
+the new optional field still validate.
+
+The same safe taxonomy covers work Docker commands, complete log captures,
+Git/PowerShell native failures, workload child failures and observer
+startup/input errors, not only cleanup. Real Node children prove exit 7,
+overflow and native `ENOENT`. A deliberately injected unknown native event
+on a real owned child proves safe handling of private exception fields;
+it is not claimed as an actual operating-system error code.
+The first native cause survives a secondary privacy rejection.
+Active minimal statement serialization retains exact reference/PG roles
+and finite native codes without recycling private cleanup or error data.
+Capture, removal, independent absence and network failures remain separate.
+
+All eight roles are tested across genuinely separately acknowledged
+one-character pipe chunks, timestamp-frame boundaries, both output pipes
+and both cross-channel orders. There are no sleeps or Docker fallbacks.
+Nonsecret output above 8 MiB on **each** pipe passes without retained
+console text; over-total/over-record-frame, incomplete, empty, missing-pipe,
+nonzero-exit, killed, hanging, wrong-correlation and forged-proof cases
+reject for their intended causes.
+
+### Execution issues and actual validation
+
+Evidence directory: `test-results/ds02-stream-capture-20261023/`. Its name
+records the task start date; the final source validation completed on
+2026-10-24 UTC.
+
+| Issue / detection | Confirmed mechanism and correction | Prevention / earliest possible detection |
+|---|---|---|
+| DS-02, observability / Medium | The frozen wrapper actually overflows on the synthetic fixture and formerly loses its finite native code. Streaming bounds memory independently of complete output and retains closed native identity. Historical DS-01 error remains unknown. | Exact frozen-wrapper and real pipe-volume tests before any long diagnostic |
+| Missing database-role guard, test correctness / Medium | The first streamed-input implementation rejected a shortened canary vector only as a generic proof mismatch. The causal RED requires the closed `canaries-required` reason before proof validation. | Explicit eight-role guard and all-role row/tool/capture controls |
+| Observer startup cause loss, observability / Medium | A real `ENOENT` child startup became only `Observer child startup failure`. Its native cause is now projected safely through the existing failure path. | Actual failed-spawn child and strict finite-code assertion |
+| Extraction first-cause order, test correctness / Medium | The initial row extraction checked a malformed row before a console credential. A targeted RED caught this change introduced during implementation. The shared check now preserves the original console-privacy-first order. | Permanent default-validator ordering control; caught before the aggregate |
+| Patch/lint friction, tooling / Low | Stale context hunks were refused, sometimes after explicitly reported partial application. Exact contexts were reread before applying remaining hunks. Scoped lint then caught the now-unused `fail` import; it was removed. | Final diff, ten-file syntax/lint and the aggregate prove the converged source; failed logs are retained |
+
+The first three defects are detected in focused source-only controls, not
+in a new runtime. The original complete-console defect escaped those
+controls because they previously exercised small output. Detection-stage
+escape is closed by adding a real bounded high-volume fixture, rather than
+by claiming that the earlier functional pass covered workload-sized logs.
+
+| Exact command / evidence | Actual result |
+|---|---|
+| `node --test --test-reporter=tap --test-name-pattern="exact frozen work wrapper" scripts\test\membership-console.test.cjs` (`red-frozen-wrapper.log`) | RED: one executed/failed, zero skipped; actual native MAXBUFFER assertion passed, safe category was incorrectly `unexpected` |
+| Selector `streaming drains` (`red-streaming.log`) | RED: one executed/failed, zero skipped; new scanner absent |
+| Selector `streamed statement inputs` (`red-streamed-inputs.log`) | RED: one executed/failed, zero skipped; missing closed all-role guard |
+| Selector `observer native spawn` (`red-observer-native.log`) | RED: one executed/failed, zero skipped; actual native startup code discarded |
+| Selector `original default console-privacy` (`red-default-order.log`, then `green-default-order.log`) | RED one/one; GREEN one/one, zero skips; original default first cause restored |
+| Two-file focused streaming/derived integration (`green-console-integration.log`) | PASS 16/16, zero failures/skips, 8,975.1093 ms, before the last minimal-receipt/default-order controls were added |
+| Final console-focused set (`green-console-final-focused.log`) | PASS 10/10, zero failures/skips, 8,704.2255 ms; final ordering control is covered by the subsequent one-test GREEN and aggregate |
+| Single nine-file command below (`aggregate-serial.log`) | **PASS 84/84, zero failed/cancelled/skipped, 51,111.7441 ms** |
+| `node test-results\ds02-stream-capture-20261023\validate.cjs static-final.json` | PASS: syntax and scoped ESLint for ten changed CJS files, zero findings |
+| `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling` (`freshness-content.log`, final `freshness-final.log`) | PASS: 27 documents; content-only, not a full coupled deployment gate |
+
+```powershell
+node --test --test-concurrency=1 --test-reporter=tap `
+  scripts\test\membership-lifecycle.test.cjs `
+  scripts\test\membership-history.test.cjs `
+  scripts\test\membership-privacy.test.cjs `
+  scripts\test\membership-privacy-functional.test.cjs `
+  scripts\test\membership-derived-functional.test.cjs `
+  scripts\test\membership-observer.test.cjs `
+  scripts\test\membership-statements.test.cjs `
+  scripts\test\membership-derived-statements.test.cjs `
+  scripts\test\membership-console.test.cjs
+```
+
+This includes all prior lifecycle controls and the four former aggregate
+failures, plus current/legacy privacy, observer, derived proof, default
+dispatch and exact diagnostic-admission rejection. The non-UTC 30-second/
+35-second bounds and all existing runtime/cleanup assertions remain.
+The old failed 62-test logs and the earlier 66/66 result are preserved;
+this is not a rerun of an unchanged suite to obtain a favorable outcome.
+
+The authoritative aggregate log SHA-256 is
+`1b14c6b27d8119a5f99b589bcdaa9ee313390b95b4dfbe67fcb35b9d35e8c6f7`.
+The closeout `preservation.json` records ten changed-source disk/staged-Git
+hash pairs: all ten differ as raw CRLF/LF bytes, and all ten match after
+newline normalization. It verifies 21 DS-01 evidence files, 23 frozen
+inputs, four prior failed receipts, seven prior frozen inputs, six
+unchanged admission/fixture files, both failed aggregate logs, the
+corrected 66-test aggregate and the qualified functional receipt. The
+prospective local runtime closure contains 24 files, including the new
+scanner. All 90 local branches and ten stashes remain present.
+`commit-closeout.json` binds the same bytes to the ordinary source commit
+and checks that every other local branch and stash identity is unchanged.
+Corrected current source is not relabeled as the source of any old
+receipt. No Docker inventory was reread during this source-only task.
+
+**Self-improvement: applied.** Real complete-output volume, explicit
+EOF/native close, all-role boundary canaries and safe cause retention are
+now executable guards. The recurring OS-17/DS-02 cause-loss lesson is
+promoted into the central engineering patterns and standing instructions.
+**Architecture: applied, with the existing orchestration size accepted.**
+The concrete PG/application users share a small scanner and the old
+validators share row predicates. The already-large statement runner
+delegates scanning/validation; this correction does not introduce a
+benchmark/lifecycle framework, dependencies or configuration knobs.
+
+**Provenance limitation:** this entry is reconciled against all named
+source-only RED/GREEN/static artifacts and exact frozen/current source,
+including the failed lint output and context-patch recovery. It does not
+claim to have reconstructed the unavailable historical native exception
+or reconciled an unavailable full parent transcript. The parent's separate
+read-only logging/index history evidence remains separate; no API history
+research, index change or counterfactual SQL experiment was performed here.
+
+**Remaining hold:** corrected streaming has not been exercised against a
+new Docker study, nor is such an invocation authorized by this source-only
+task. Any later invocation needs its own prospective identity, manifest
+and source seal. The actual DS-01 partial SQL/WAL evidence remains
+descriptive and INVALID, not causal. Baseline adoption, original-production
+equivalence, release admission, publication and deployment remain held.
 
 ## DS-01: prospective DERIVED statement study (2026-10-23)
 
@@ -200,7 +414,8 @@ the actual statement caller's role-specific capture path. Static wiring
 and the small successful functional artifact qualification did not prove
 large-workload console collection.
 
-**Self-improvement disposition: scheduled, not falsely marked fixed.**
+**Historical closeout disposition: scheduled at DS-01, now corrected in
+source only by DS-02 above, not runtime-qualified.**
 Owner: diagnostic harness maintainer. Target: 2026-10-24, in the next
 source-only change and before any new runtime authorization. Add real bounded fake-CLI tests
 for output-limit and native failures, preserve a closed native category

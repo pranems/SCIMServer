@@ -1,6 +1,24 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-23
+**Last verified:** 2026-10-24
+
+### DS-02: bounded complete-console source correction (2026-10-24)
+
+Source-only correction is implemented. The single affected nine-file
+aggregate passed **84/84**, zero failures/cancellations/skips, in
+51,111.7441 ms; syntax/scoped lint passed for ten changed CJS inputs.
+The exact frozen wrapper actually produced native MAXBUFFER on a real
+nonsecret Node fixture above 8 MiB. This does not identify DS-01's
+unretained historical inner error.
+Derived PG/reference/candidate captures now stream through fixed
+64 MiB total / 64 KiB frame limits, bounded tails, all eight canary
+roles, mandatory EOF/exit-zero and original current-request correlation.
+Finite native causes/static roles survive work and minimal fallback
+serialization. Original defaults, admission, caps and old frozen evidence
+remain separate and unchanged. No Docker/SQL/app/build/timing/remote
+operation occurred. Runtime qualification of corrected source remains
+pending explicit authorization. See the indexed observer/statement report
+and `test-results/ds02-stream-capture-20261023/`.
 
 ### DS-01/DS-02: sole DERIVED statement study INVALID after BAAB (2026-10-23)
 
@@ -21,8 +39,8 @@ passed; independent inventory confirmed zero owned resources and the same
 three shared containers. Partial SQL: B had 4.13% fewer top-level calls,
 46.38% more execution; logging INSERTs explain 56.05% of extra execution
 and 99.75% of extra WAL arithmetically, not causally. The indexed report
-preserves exact hashes and schedules source-only capture/typed-cause tests
-before any new runtime. No release baseline adoption, original receipt
+preserves exact hashes; DS-02 above closes the source-only capture/typed-cause
+correction before any new runtime. No release baseline adoption, original receipt
 rewrite, push/CI/cloud or deployment.
 
 ### DF-13: local DERIVED artifact functionally qualified (2026-10-23)
@@ -182,6 +200,7 @@ See the indexed observer/statement report and
 
 | Date | Summary |
 |---|---|
+| 2026-10-24 | DS-02 source-only correction: exact frozen maxBuffer reproduction, bounded complete-console streaming, all eight credential-role guards and closed native causes. Single affected aggregate PASS 84/84; ten-file syntax/scoped lint clean. No Docker/SQL/runtime rerun, admission or baseline adoption. |
 | 2026-10-23 | Sole prospective DERIVED statement study from `7b3ac1c7`: INVALID after four BAAB visits, 17,628 workload requests and a passing 66-outcome contract because full-console collection failed. Partial SQL/WAL evidence retained; exact owned cleanup and unchanged shared inventory verified. No ABBA replacement, admission, baseline adoption or deployment. |
 | 2026-10-23 | Corrected-source DERIVED attempt2 from `e0d884b9`: strict privacy subchecks passed for seven authenticated requests/four masks, but finalization failed and safety cleanup completed after the five-minute cap. Overall INVALID, no further invocation. All exact owned resources removed; three shared running containers, earlier receipts, 90 branches and ten stashes preserved. |
 | 2026-10-23 | Completed the sole DERIVED functional invocation as INVALID before allocation: zero HTTP/SQL. Committed tested metadata/intent/cleanup correction `462365db` without retry. Independent closeout preserves images, earlier proof, 90 branches, ten stashes and all shared containers. Artifact remains functionally unqualified; adoption/publication/performance held. |

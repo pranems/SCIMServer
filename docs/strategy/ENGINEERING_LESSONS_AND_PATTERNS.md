@@ -16,6 +16,31 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Complete-output evidence does not require complete-output retention
+
+DS-02 executed the exact frozen DS-01 work wrapper against a real bounded
+Node fixture above 8 MiB per pipe. Its native maxBuffer failure was proven;
+the historical DS-01 inner code remains unknown. Increasing a buffer
+would only move the failure boundary and allocate more private text.
+Stream both pipes through fixed byte/frame/record/deadline gates, retain
+only bounded scan tails and correlation state, and require both EOF events
+plus successful native close before issuing a non-text proof.
+
+All generated database and application credentials belong in the canary
+set. Exercise actual chunk acknowledgements, normalized timestamp-frame
+boundaries and both channel orders; do not assume multiple writes imply
+multiple native chunks. Uncertain container/tool attribution must remain
+explicitly ambiguous. Missing, incomplete, over-limit or nonzero-exit input
+is INVALID, not a complete-success-shaped fallback.
+
+OS-17 and DS-02 also show that safe cause retention must cover work
+commands, not only cleanup. Preserve finite native codes and static roles
+through every minimal serializer without retaining stderr, arguments or
+nested exceptions. The executable guards are in
+`scripts/test/membership-console.test.cjs`; the single affected aggregate
+passes 84/84. See the [indexed RCA](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+for fixed budgets, causal RED/GREEN and the remaining runtime hold.
+
 ### A child startup timeout is not an operation failure
 
 OS-18's four aggregate failures exposed a test-boundary defect: a request

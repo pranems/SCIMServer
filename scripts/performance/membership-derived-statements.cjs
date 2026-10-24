@@ -3,8 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const reference = require('./membership-derived-functional.cjs');
-const { fail, assertCanariesAbsent } = require('./membership-privacy.cjs');
-const { validateLegacyPrivacy } = require('./membership-statements.cjs');
+const { fail, assertCanariesAbsent, validateCanaries, credentialKinds } = require('./membership-privacy.cjs');
+const { validateLegacyPrivacy, validateLegacyRows } = require('./membership-statements.cjs');
+const { validatePrivacyRows } = require('./membership-history.cjs');
+const { requireCapture } = require('./membership-console.cjs');
 const family = 'membership-derived-statement-diagnostic';
 const qualificationHash = 'cf6b36d17d0f754ae7c57d02d5fc0db801b074c8e80cb90005f0cf1e7d936210';
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -80,5 +82,23 @@ function validatePrivateInputs(rows, consoles, canaries) {
   return validateLegacyPrivacy(rows, consoles['app-console'], canaries);
 }
 
+function validateStreamedPrivateInputs(rows, app, pg, toolConsole, canaries, role) {
+  validateCanaries(canaries);
+  if (canaries.length !== 8 || credentialKinds.slice(0, 8).some(kind =>
+    !canaries.some(row => row.kind === kind))) fail('canaries-required', 'privacy-inputs');
+  assert.ok(['A', 'B'].includes(role), 'Static statement application role required');
+  if (typeof toolConsole !== 'string' || !toolConsole.trim()) fail('private-source-missing', 'tool-console');
+  assertCanariesAbsent([{ source: 'tool-console', text: toolConsole }], canaries);
+  const legacy = validateLegacyRows(rows, canaries);
+  const checked = role === 'B' ? validatePrivacyRows(rows, canaries.map(row => row.value)) : legacy;
+  requireCapture(app, { role: role === 'A' ? 'reference-app' : 'candidate-app', source: 'app-console',
+    canaries, ...(role === 'B' ? { correlationRequestId: checked.requestId } : {}) });
+  requireCapture(pg, { role: 'pg', source: 'pg-console', canaries });
+  const safeRows = { ...checked };
+  delete safeRows.requestId;
+  return { ...safeRows, consoleCaptures: [app, pg], credentialRoles: canaries.map(row => row.kind),
+    ...(role === 'B' ? { sameRecordPresent: app.correlationPresent } : {}) };
+}
+
 module.exports = { family, validateQualification, loadReference, runtimeFiles, freezeInputs,
-  verifyInputs, validatePrivateInputs, inputPath };
+  verifyInputs, validatePrivateInputs, validateStreamedPrivateInputs, inputPath };

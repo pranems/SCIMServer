@@ -136,6 +136,15 @@ function classifyLegacyHeaders(raw) {
 function validateLegacyPrivacy(rows, consoleLog, secrets, requiredRows = 200) {
   validateCanaries(secrets);
   if (typeof consoleLog !== 'string') fail('private-source-missing', 'app-console');
+  return checkLegacyRows(rows, secrets, requiredRows, [{ source: 'app-console', text: consoleLog }]);
+}
+
+function validateLegacyRows(rows, secrets, requiredRows = 200) {
+  validateCanaries(secrets);
+  return checkLegacyRows(rows, secrets, requiredRows, []);
+}
+
+function checkLegacyRows(rows, secrets, requiredRows, consoleInputs) {
   if (!Number.isSafeInteger(requiredRows) || requiredRows <= 0 || requiredRows > 200)
     fail('required-row-count', 'selected-rows');
   if (!Array.isArray(rows) || rows.length !== requiredRows)
@@ -146,7 +155,7 @@ function validateLegacyPrivacy(rows, consoleLog, secrets, requiredRows = 200) {
     catch { fail('private-source-serialization', 'selected-rows', 'not-applicable', { rowIndex }); }
     return { source: 'selected-rows', rowIndex, text };
   });
-  assertCanariesAbsent([...inputs, { source: 'app-console', text: consoleLog }], secrets);
+  assertCanariesAbsent([...inputs, ...consoleInputs], secrets);
   for (const [rowIndex, row] of rows.entries()) {
     if (!row || typeof row !== 'object' || Array.isArray(row))
       fail('headers-not-object', 'selected-rows', 'not-applicable', { rowIndex });
@@ -214,4 +223,4 @@ function verifyMaskPolicy(server, endpoint) {
 }
 
 module.exports = { counterColumns, validatePgSnapshot, statementDelta, snapshotSql, summarizeStatements,
-  validateLegacyPrivacy, classifyLegacyHeaders, maskPolicyPatch, verifyMaskPolicy };
+  validateLegacyPrivacy, validateLegacyRows, classifyLegacyHeaders, maskPolicyPatch, verifyMaskPolicy };

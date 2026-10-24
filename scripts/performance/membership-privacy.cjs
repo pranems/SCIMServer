@@ -1,5 +1,5 @@
 const sources = ['selected-rows', 'app-console', 'pg-console', 'tool-console',
-  'collector-snapshot', 'report-output', 'privacy-inputs'];
+  'collector-snapshot', 'report-output', 'privacy-inputs', 'ambiguous-console'];
 const credentialKinds = ['postgres-admin-password', 'scim-shared-secret', 'jwt-signing-secret',
   'oauth-client-secret', 'credential-encryption-key', 'role-a-password', 'role-b-password',
   'observer-password', 'not-applicable'];
@@ -109,20 +109,44 @@ function encodeSafeJson(value, canaries) {
 
 const lifecycleOperations = ['command', 'capture', 'remove', 'verify', 'discovery', 'inventory',
   'close-client', 'close-channel', 'network-inspect', 'network-remove', 'network-verify'];
-const lifecycleRoles = ['app', 'pg', 'observer', 'owned-container', 'network', 'client'];
+const lifecycleRoles = ['app', 'reference-app', 'candidate-app', 'pg', 'observer', 'owned-container', 'network', 'client'];
 const lifecycleCategories = ['unexpected', 'exit', 'terminated', 'timeout', 'spawn',
-  'deadline', 'ownership', 'assertion', 'aborted', 'still-present', 'invalid-metadata'];
-const lifecycleSignals = ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT'];
+  'deadline', 'ownership', 'assertion', 'aborted', 'still-present', 'invalid-metadata',
+  'output-limit', 'native-buffer', 'native-memory', 'native-io', 'incomplete-output', 'privacy'];
+const nativeCategories = {
+  ERR_CHILD_PROCESS_STDIO_MAXBUFFER: 'output-limit', ENOBUFS: 'native-buffer',
+  ERR_BUFFER_OUT_OF_BOUNDS: 'native-buffer', ERR_BUFFER_TOO_LARGE: 'native-buffer',
+  ERR_STRING_TOO_LONG: 'native-buffer', ENOMEM: 'native-memory',
+  EIO: 'native-io', EPIPE: 'native-io', EBADF: 'native-io', ENOSPC: 'native-io',
+  ECONNRESET: 'native-io', ECONNREFUSED: 'native-io',
+  ERR_STREAM_PREMATURE_CLOSE: 'incomplete-output',
+  CAPTURE_TOTAL_LIMIT: 'output-limit', CAPTURE_FRAME_LIMIT: 'output-limit',
+  CAPTURE_RECORD_LIMIT: 'output-limit', CAPTURE_EMPTY: 'incomplete-output',
+  CAPTURE_CHANNEL: 'incomplete-output', CAPTURE_INCOMPLETE: 'incomplete-output',
+  CAPTURE_CORRELATION: 'incomplete-output', ABORT_ERR: 'aborted', ECANCELED: 'aborted',
+  ETIMEDOUT: 'timeout', ENOENT: 'spawn', EACCES: 'spawn', EPERM: 'spawn',
+  E2BIG: 'spawn', ENOEXEC: 'spawn', ERR_IPC_CHANNEL_CLOSED: 'native-io',
+  ERR_INVALID_ARG_TYPE: 'invalid-metadata', ERR_OUT_OF_RANGE: 'invalid-metadata',
+  LIFECYCLE_DEADLINE: 'deadline', LIFECYCLE_OWNER: 'ownership',
+  LIFECYCLE_STILL_PRESENT: 'still-present', LIFECYCLE_METADATA: 'invalid-metadata',
+  ERR_ASSERTION: 'assertion', DIAGNOSTIC_PRIVACY: 'privacy',
+};
+const lifecycleSignals = ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGBUS',
+  'SIGILL', 'SIGFPE', 'SIGHUP', 'SIGQUIT', 'SIGPIPE', 'SIGTRAP', 'SIGXCPU', 'SIGXFSZ'];
 const lifecycleCommands = ['unspecified', 'inspect', 'rm', 'ps', 'network-inspect',
-  'network-rm', 'network-ls', 'logs', 'run', 'image-inspect', 'other'];
+  'network-rm', 'network-ls', 'logs', 'run', 'image-inspect', 'other', 'git', 'contract',
+  'workload', 'observer-exec'];
 
 function validateLifecycleFailure(row) {
   const fields = ['operation', 'role', 'stage', 'category', 'phase', 'exitCode', 'signal',
-    'durationMs', 'command'];
-  if (!row || Object.keys(row).length !== fields.length ||
+    'durationMs', 'command', 'nativeCode'];
+  if (!row || ![fields.length, fields.length - 1].includes(Object.keys(row).length) ||
       Object.keys(row).some(key => !fields.includes(key)) ||
+      fields.filter(key => key !== 'nativeCode').some(key => !Object.hasOwn(row, key)) ||
+      (Object.hasOwn(row, 'nativeCode') && row.nativeCode !== 'UNRECOGNIZED' &&
+        !Object.hasOwn(nativeCategories, row.nativeCode)) ||
       !lifecycleOperations.includes(row.operation) || !lifecycleRoles.includes(row.role) ||
-      !['finalization', 'docker-command'].includes(row.stage) ||
+      !['finalization', 'docker-command', 'native-command'].includes(row.stage) ||
       !lifecycleCategories.includes(row.category) || !['work', 'cleanup'].includes(row.phase) ||
       !(row.exitCode === null || (Number.isInteger(row.exitCode) && row.exitCode >= 0 && row.exitCode <= 255)) ||
       !(row.signal === null || lifecycleSignals.includes(row.signal)) ||
@@ -139,27 +163,23 @@ function lifecycleFailure(error, context) {
   const code = error?.code;
   let category = inner?.category ?? 'unexpected';
   if (!inner) {
-    if (Number.isInteger(code) && code >= 0 && code <= 255) category = 'exit';
-    else if (code === 'ETIMEDOUT') category = 'timeout';
-    else if (code === 'LIFECYCLE_DEADLINE') category = 'deadline';
-    else if (code === 'LIFECYCLE_OWNER') category = 'ownership';
-    else if (code === 'LIFECYCLE_STILL_PRESENT') category = 'still-present';
-    else if (code === 'LIFECYCLE_METADATA') category = 'invalid-metadata';
-    else if (code === 'ERR_ASSERTION') category = 'assertion';
-    else if (code === 'ABORT_ERR') category = 'aborted';
-    else if (['ENOENT', 'EACCES', 'EPERM'].includes(code)) category = 'spawn';
+    if (typeof code === 'string' && Object.hasOwn(nativeCategories, code)) category = nativeCategories[code];
+    else if (Number.isInteger(code) && code >= 0 && code <= 255) category = 'exit';
     else if (error?.killed === true || lifecycleSignals.includes(error?.signal)) category = 'terminated';
   }
   return validateLifecycleFailure({
     operation: lifecycleOperations.includes(context.operation) ? context.operation : 'command',
-    role: lifecycleRoles.includes(context.role) ? context.role : 'owned-container',
-    stage: ['finalization', 'docker-command'].includes(context.stage) ? context.stage : 'finalization',
+    role: ['reference-app', 'candidate-app', 'pg'].includes(inner?.role) ? inner.role :
+      lifecycleRoles.includes(context.role) ? context.role : 'owned-container',
+    stage: ['finalization', 'docker-command', 'native-command'].includes(context.stage) ? context.stage : 'finalization',
     category, phase: inner?.phase ?? (context.phase === 'work' ? 'work' : 'cleanup'),
     exitCode: inner?.exitCode ?? (Number.isInteger(code) && code >= 0 && code <= 255 ? code : null),
     signal: inner?.signal ?? (lifecycleSignals.includes(error?.signal) ? error.signal : null),
     durationMs: Number.isSafeInteger(context.durationMs) && context.durationMs >= 0
       ? context.durationMs : inner?.durationMs ?? null,
     command: lifecycleCommands.includes(context.command) ? context.command : inner?.command ?? 'unspecified',
+    nativeCode: inner?.nativeCode ?? (typeof code === 'string' && Object.hasOwn(nativeCategories, code)
+      ? code : 'UNRECOGNIZED'),
   });
 }
 

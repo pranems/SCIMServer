@@ -7,14 +7,15 @@ const { promisify } = require('node:util');
 const { setTimeout: delay } = require('node:timers/promises');
 const { ObserverChannel } = require('./membership-observer.cjs');
 const { sourceTip, windowDelta, validateReceipt, validatePrivacy, finalizeOwned, runVisits,
-  commandTimeout, requireOwnedContainer, dockerOperation, requireEmptyInventory } = require('./membership-history.cjs');
+  commandTimeout, requireOwnedContainer, dockerOperation, requireEmptyInventory,
+  validatePrivacyRows } = require('./membership-history.cjs');
 const { statementDelta, summarizeStatements, validateLegacyPrivacy, maskPolicyPatch,
   verifyMaskPolicy } = require('./membership-statements.cjs');
-const { credentialCanaries, assertCanariesAbsent, lifecycleFailure, encodeSafeJson, fail,
+const { credentialCanaries, assertCanariesAbsent, lifecycleFailure, encodeSafeJson,
   validateSafeFailure, projectLifecycleFailures } = require('./membership-privacy.cjs');
 const derivedTool = require('./membership-derived-statements.cjs');
 const derivedReference = require('./membership-derived-functional.cjs');
-const { splitDockerLogOutput } = require('./run-membership-privacy-functional.cjs');
+const consoleCapture = require('./membership-console.cjs');
 const fixture = require('./membership-statement-fixture.cjs');
 const exec = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
@@ -64,6 +65,16 @@ async function main() {
   const canaries = credentialCanaries(credentials, passwords);
   const environment = { ...process.env, ...credentials };
   let toolConsole = '';
+  let toolBytes = 0;
+  function appendTool(text) {
+    if (!derived || !text) return;
+    const bytes = Buffer.byteLength(text);
+    if (toolBytes + bytes > consoleCapture.limits.toolBytes)
+      throw Object.assign(Error('Diagnostic tool-output cap'), { code: 'CAPTURE_TOTAL_LIMIT' });
+    assertCanariesAbsent([{ source: 'tool-console', text: toolConsole.slice(-255) + text }], canaries);
+    toolBytes += bytes;
+    toolConsole += text;
+  }
   const writeResult = (file, value) => derived
     ? fs.writeFileSync(file, encodeSafeJson(value, canaries), { flag: 'wx' }) : write(file, value);
   const report = { family: owner, diagnosticOnly: true, admissionEligible: false,
@@ -77,7 +88,53 @@ async function main() {
   let pgPort;
   let stage = 'preflight';
   const checkDeadline = () => assert.ok(Date.now() < workDeadline, 'Phase-two work cap; cleanup reservation begins');
+  async function native(file, args, options) {
+    if (!derived) return exec(file, args, options);
+    assert.ok(['git', 'pwsh'].includes(file), 'Static native command required');
+    const started = Date.now();
+    try { return await exec(file, args, options); }
+    catch (error) {
+      const actionFailure = lifecycleFailure(error, { operation: 'command', role: 'client',
+        stage: 'native-command', phase: 'work', command: file === 'git' ? 'git' : 'contract',
+        durationMs: Date.now() - started });
+      try { appendTool('\n' + (typeof error.stdout === 'string' ? error.stdout : '') +
+        '\n' + (typeof error.stderr === 'string' ? error.stderr : '')); }
+      catch (validation) {
+        validation.secondaryActionFailure = lifecycleFailure(validation, { operation: 'command',
+          role: 'client', stage: 'native-command', phase: 'work',
+          command: file === 'git' ? 'git' : 'contract' });
+        validation.actionFailure = actionFailure;
+        throw validation;
+      }
+      const failure = new Error('Native operation failed; output withheld');
+      failure.code = 'OWNED_NATIVE';
+      failure.actionFailure = actionFailure;
+      throw failure;
+    }
+  }
+  async function captureLogs(id, cleanup, correlationRequestId) {
+    const role = resourceRoles.get(id);
+    assert.ok(['pg', 'reference-app', 'candidate-app'].includes(role), 'Static capture role required');
+    const started = Date.now();
+    try {
+      const nativeDeadline = Date.now() +
+        commandTimeout(workDeadline, deadline, cleanup, cleanup ? 30000 : 60000);
+      const child = spawn('docker', ['--context', 'desktop-linux', 'logs', '--timestamps', id],
+        { cwd: root, env: environment, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const receipt = await consoleCapture.captureChild(child, { role,
+        source: role === 'pg' ? 'pg-console' : 'app-console', phase: cleanup ? 'cleanup' : 'work',
+        deadline: nativeDeadline, canaries, correlationRequestId });
+      (report.consoleCaptures ??= []).push(receipt);
+      return receipt;
+    } catch (error) {
+      error.actionFailure ??= lifecycleFailure(error, { operation: 'capture', role,
+        stage: 'docker-command', phase: cleanup ? 'cleanup' : 'work', command: 'logs',
+        durationMs: Date.now() - started });
+      throw error;
+    }
+  }
   async function docker(args, cleanup = false, combined = false) {
+    if (derived && args[0] === 'logs') return captureLogs(args[args.length - 1], cleanup);
     const commandStarted = Date.now();
     try {
       const row = await exec('docker', ['--context', 'desktop-linux', ...args], {
@@ -85,22 +142,29 @@ async function main() {
         timeout: commandTimeout(workDeadline, deadline, cleanup, derived && cleanup ? 30000 : cleanup ? 15000 : 60000),
       });
       if (derived) {
-        if (args[0] === 'logs') {
-          const separated = splitDockerLogOutput(row);
-          toolConsole += '\n' + separated.tool;
-          return separated.container;
-        }
-        toolConsole += '\n' + row.stdout + '\n' + row.stderr;
+        appendTool('\n' + row.stdout + '\n' + row.stderr);
       }
       return (combined ? row.stdout + row.stderr : row.stdout).trim();
     } catch (error) {
-      if (derived) toolConsole += '\n' + (typeof error.stdout === 'string' ? error.stdout : '') +
-        '\n' + (typeof error.stderr === 'string' ? error.stderr : '');
+      let privateError;
+      try {
+        appendTool('\n' + (typeof error.stdout === 'string' ? error.stdout : '') +
+          '\n' + (typeof error.stderr === 'string' ? error.stderr : ''));
+      } catch (validation) { privateError = validation; }
       const failure = new Error('Owned Docker operation failed; output withheld');
       failure.code = 'OWNED_DOCKER';
       failure.actionFailure = lifecycleFailure(error, { operation: 'command', role: 'owned-container',
         stage: 'docker-command', phase: cleanup ? 'cleanup' : 'work',
         command: dockerOperation(args), durationMs: Date.now() - commandStarted });
+      if (privateError) failure.secondaryActionFailure = lifecycleFailure(privateError, {
+        operation: 'command', role: 'owned-container', stage: 'docker-command',
+        phase: cleanup ? 'cleanup' : 'work', command: dockerOperation(args) });
+      if (error.code === 'DIAGNOSTIC_PRIVACY' || privateError?.code === 'DIAGNOSTIC_PRIVACY') {
+        const rejected = privateError ?? error;
+        rejected.actionFailure = failure.actionFailure;
+        rejected.secondaryActionFailure = failure.secondaryActionFailure;
+        throw rejected;
+      }
       throw failure;
     }
   }
@@ -130,7 +194,8 @@ async function main() {
       '--env', 'PERSISTENCE_BACKEND=prisma', '--env', 'NODE_ENV=production', '--env', 'PORT=8080',
       '--env', 'PERSIST_REQUEST_SECRETS=false',
       '--entrypoint', 'sh', studyRoles[role].image, '-c',
-      'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node dist/main.js']);
+      'node node_modules/prisma/build/index.js migrate deploy >/dev/null && exec node dist/main.js'],
+    derived ? (role === 'A' ? 'reference-app' : 'candidate-app') : 'app');
     const port = await docker(['port', id, '8080/tcp']);
     assert.match(port, /^127\.0\.0\.1:\d+$/);
     const url = `http://${port}`;
@@ -187,10 +252,21 @@ async function main() {
         SCIM_BENCH_HISTORY: '1', SCIM_BENCH_HISTORY_OWNER: 'membership-history-diagnostic',
         SCIM_BENCH_REQUIRE_MASKS: '1' },
     });
-    let childConsole = '';
-    child.stdout.on('data', bytes => { if (derived) childConsole += bytes.toString(); });
-    child.stderr.on('data', bytes => { if (derived) childConsole += bytes.toString(); });
     let failure;
+    const collectTool = bytes => {
+      if (!derived) return;
+      try { appendTool(bytes.toString()); }
+      catch (error) {
+        if (!failure) {
+          error.actionFailure = lifecycleFailure(error, { operation: 'command',
+            role: resourceRoles.get(app.id), stage: 'native-command', phase: 'work', command: 'workload' });
+          failure = error;
+        }
+        child.kill();
+      }
+    };
+    child.stdout.on('data', collectTool);
+    child.stderr.on('data', collectTool);
     let active = false;
     const expected = ['warmup-before', 'warmup-after', 'measured-before', 'measured-after'];
     child.on('message', async message => {
@@ -234,19 +310,30 @@ async function main() {
         active = false;
         if (child.connected) child.send({ boundary: message.boundary, ok: true });
       } catch (error) {
-        failure = error;
+        failure ||= error;
         if (child.connected) child.send({ boundary: message.boundary, ok: false });
       }
     });
     row.exit = await new Promise((resolve, reject) => {
-      child.once('error', reject);
+      child.once('error', error => {
+        if (derived) {
+          const safe = new Error('Workload native startup failed; output withheld');
+          safe.code = 'OWNED_NATIVE';
+          safe.actionFailure = lifecycleFailure(error, { operation: 'command',
+            role: resourceRoles.get(app.id), stage: 'native-command', phase: 'work', command: 'workload' });
+          reject(safe);
+        } else reject(error);
+      });
       child.once(derived ? 'close' : 'exit', (code, signal) => resolve({ code, signal }));
     });
     writeResult(path.join(directory, `${name}-windows.json`), row);
-    if (derived) toolConsole += '\n' + childConsole;
     if (failure) throw failure;
-    if (derived) {
-      assertCanariesAbsent([{ source: 'tool-console', text: childConsole }], canaries);
+    if (derived && (row.exit.code !== 0 || row.exit.signal)) {
+      const safe = new Error('Workload native exit failed; partial receipt retained');
+      safe.code = 'OWNED_NATIVE';
+      safe.actionFailure = lifecycleFailure(row.exit, { operation: 'command',
+        role: resourceRoles.get(app.id), stage: 'native-command', phase: 'work', command: 'workload' });
+      throw safe;
     }
     assert.equal(row.exit.code, 0, 'Original workload failed; partial receipt retained');
     const receipt = JSON.parse(fs.readFileSync(output));
@@ -271,7 +358,8 @@ async function main() {
   try {
     const sourceCommit = await sourceTip(root);
     if (derived) {
-      assert.equal((await exec('git', ['status', '--porcelain'], { cwd: root })).stdout.trim(), '',
+      assert.equal((await native('git', ['status', '--porcelain'], { cwd: root,
+        ...(derived ? { timeout: 5000, maxBuffer: 8 * 1024 * 1024 } : {}) })).stdout.trim(), '',
         'Derived statement source must be committed and clean');
       writeResult(path.join(directory, 'intent.json'), { ...report, status: 'PREREGISTERED_BEFORE_DOCKER',
         sourceCommit, referenceProof, roles: studyRoles, blocks,
@@ -333,13 +421,15 @@ async function main() {
         forcedGc: false, queryTextExported: false, phaseOneReinterpretation: false },
       startedAtUtc: report.startedAtUtc, deadlineUtc: report.deadlineUtc };
     if (derived) manifest.policy.observerDefaultTransactionReadOnly = 'on';
+    if (derived) manifest.policy.consoleCapture = { ...consoleCapture.limits,
+      eofAndSuccessfulExitRequired: true, rawConsoleRetention: false };
     if (derived) {
       manifest.sourceClosure = 'All performance-directory runtime inputs plus the external 66-outcome PowerShell helper';
       manifest.sourceByteIdentity = {};
       for (const file of files) {
         const sourcePath = path.relative(root, derivedTool.inputPath(root, file)).split(path.sep).join('/');
         const disk = fs.readFileSync(derivedTool.inputPath(root, file));
-        const committed = Buffer.from((await exec('git', ['show',
+        const committed = Buffer.from((await native('git', ['show',
           `${sourceCommit}:${sourcePath}`], { cwd: root, timeout: 5000 })).stdout);
         const normalized = disk.toString('utf8').replace(/\r\n/g, '\n') === committed.toString('utf8').replace(/\r\n/g, '\n');
         assert.equal(normalized, true, 'Committed runtime source required');
@@ -442,10 +532,10 @@ async function main() {
       await runVisits(block, apps, { checkDeadline, restart() { throw Error('No restart scheduled'); },
         visit: (app, role, visit) => round(app, block, role, visit) });
       stage = `contract-${block.name}`;
-      const contractResult = await exec('pwsh', ['-NoProfile', '-File', path.join(__dirname, 'membership-history-contract.ps1'),
+      const contractResult = await native('pwsh', ['-NoProfile', '-File', path.join(__dirname, 'membership-history-contract.ps1'),
         '-BaseUrl', apps.B.url, '-OutputPath', path.join(directory, `${block.name}-current-contract.json`)],
       { cwd: root, env: environment, timeout: Math.max(1, Math.min(120000, workDeadline - Date.now())) });
-      if (derived) toolConsole += '\n' + contractResult.stdout + '\n' + contractResult.stderr;
+      if (derived) appendTool('\n' + contractResult.stdout + '\n' + contractResult.stderr);
       const pgConsole = derived ? await docker(['logs', '--timestamps', pg], false, true) : undefined;
       for (const role of ['A', 'B']) {
         const app = apps[role];
@@ -463,19 +553,23 @@ async function main() {
             WHERE url LIKE '%/Groups%' AND (status >= 400 OR method='PATCH')
             ORDER BY "createdAt" DESC LIMIT 200`)).rows;
         } finally { await privateClient.end(); }
-        const consoleLog = await docker(derived ? ['logs', '--timestamps', app.id] :
-          ['logs', '--tail', '300', app.id], false, true);
         const secrets = [...Object.values(credentials), ...Object.values(passwords)];
-        assertCanariesAbsent([
-          ...logs.map((row, rowIndex) => ({ source: 'selected-rows', rowIndex, text: JSON.stringify(row) })),
-          { source: 'app-console', text: consoleLog },
-        ], canaries);
+        if (derived) assertCanariesAbsent(logs.map((row, rowIndex) =>
+          ({ source: 'selected-rows', rowIndex, text: JSON.stringify(row) })), canaries);
+        const currentRows = derived && role === 'B' ? validatePrivacyRows(logs, secrets) : undefined;
+        const consoleLog = derived ? await captureLogs(app.id, false, currentRows?.requestId) :
+          await docker(['logs', '--tail', '300', app.id], false, true);
         let privacy;
-        if (derived) derivedTool.validatePrivateInputs(logs, {
-          'app-console': consoleLog, 'pg-console': pgConsole, 'tool-console': toolConsole,
-        }, canaries);
-        if (role === 'B') privacy = validatePrivacy(logs, consoleLog, secrets);
-        else privacy = validateLegacyPrivacy(logs, consoleLog, canaries);
+        if (derived) privacy = derivedTool.validateStreamedPrivateInputs(logs, consoleLog,
+          pgConsole, toolConsole, canaries, role);
+        else {
+          assertCanariesAbsent([
+            ...logs.map((row, rowIndex) => ({ source: 'selected-rows', rowIndex, text: JSON.stringify(row) })),
+            { source: 'app-console', text: consoleLog },
+          ], canaries);
+          if (role === 'B') privacy = validatePrivacy(logs, consoleLog, secrets);
+          else privacy = validateLegacyPrivacy(logs, consoleLog, canaries);
+        }
         writeResult(path.join(directory, `${block.name}-${role}-privacy.json`), { ...privacy,
           ...(derived ? { completeConsolesScanned: ['app-console', 'pg-console', 'tool-console'],
             credentialRoles: canaries.map(item => item.kind) } : {}) });
@@ -496,10 +590,13 @@ async function main() {
   } catch (error) {
     report.status = 'INVALID';
     if (error.actionFailure) report.actionFailures.push(lifecycleFailure(error, error.actionFailure));
+    if (error.secondaryActionFailure) report.actionFailures.push(
+      lifecycleFailure({ actionFailure: error.secondaryActionFailure }, error.secondaryActionFailure));
     if (derived && !error.actionFailure) report.actionFailures.push(lifecycleFailure(error, {
       operation: 'command', role: 'client', stage: 'docker-command', phase: 'work' }));
     report.failures.push({ stage, code: derived ? (error.code === 'DIAGNOSTIC_PRIVACY' ? 'DIAGNOSTIC_PRIVACY' :
       error.code === 'ERR_ASSERTION' ? 'ERR_ASSERTION' : error.code === 'OWNED_DOCKER' ? 'OWNED_DOCKER' :
+        error.code === 'OWNED_NATIVE' ? 'OWNED_NATIVE' :
         'DIAGNOSTIC_OPERATION') : error.code || error.name,
       ...(derived ? {} : { message: error.code ? 'PG/child operation failed; raw text withheld for privacy' : error.message,
         causalFrames: error.stack?.split('\n').slice(1, 7) }),
@@ -549,9 +646,7 @@ async function main() {
           await inspect(id, true);
           if (derived && resourceRoles.get(id) === 'pg') {
             try {
-              const consoleLog = await docker(['logs', '--timestamps', id], true, true);
-              if (!consoleLog.trim()) fail('private-source-missing', 'pg-console');
-              assertCanariesAbsent([{ source: 'pg-console', text: consoleLog }], canaries);
+              await captureLogs(id, true);
             } catch (error) {
               if (error.code === 'DIAGNOSTIC_PRIVACY') report.failures.push({
                 stage: 'final-pg-console-privacy', code: 'DIAGNOSTIC_PRIVACY',

@@ -468,7 +468,7 @@ These are the definitive source files for key aspects of the system:
 
 - [Minimal imported Group membership correctness and execution RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md)
 - [Unreleased local application-history diagnostic and execution RCA](MEMBERSHIP_HISTORY_DIAGNOSTIC.md)
-- [Low-disturbance observer and statement diagnostic](MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md) - Local collector correction, statement evidence, exact legacy source/privacy diagnosis, offline DERIVED reference, preserved INVALID attempts, OS-17 finalization, OS-18 aggregate PASS 66/66, DF-13 functional qualification PASS and DS-01 prospective derived statement study INVALID after BAAB, partial SQL/WAL findings and DS-02 complete-console capture blocker; no release baseline adoption or admission.
+- [Low-disturbance observer and statement diagnostic](MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md) - Local collector correction, statement evidence, exact legacy source/privacy diagnosis, offline DERIVED reference, preserved INVALID attempts, OS-17 finalization, OS-18 aggregate PASS 66/66, DF-13 functional qualification PASS and DS-01 prospective derived statement study INVALID after BAAB with partial SQL/WAL findings. DS-02 implements bounded streaming and safe native causes with source-only aggregate PASS 84/84; runtime qualification, baseline adoption and admission remain held.
 # Group reference preservation
 
 - [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).

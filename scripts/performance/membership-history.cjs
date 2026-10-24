@@ -184,12 +184,16 @@ async function finalizeOwned(resources, actions) {
   return { rows, verified: rows.every(r => r.verified), ...(failures.length ? { failures } : {}) };
 }
 
-function validatePrivacy(rows, consoleLog, secrets) {
+function validatePrivacyRows(rows, secrets) {
+  return checkPrivacyRows(rows, secrets, () => true);
+}
+
+function checkPrivacyRows(rows, secrets, consoleAbsent) {
   assert.equal(rows.length, 200, 'Original private log sample');
   const privateLog = JSON.stringify(rows);
   for (const secret of secrets) {
     assert.ok(typeof secret === 'string' && secret.length > 0);
-    assert.ok(!privateLog.includes(secret) && !consoleLog.includes(secret), 'Generated credential leaked');
+    assert.ok(!privateLog.includes(secret) && consoleAbsent(secret), 'Generated credential leaked');
   }
   const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   for (const row of rows) {
@@ -201,18 +205,25 @@ function validatePrivacy(rows, consoleLog, secrets) {
   }
   const errors = rows.filter(row => row.status >= 400);
   assert.ok(errors.length > 0, 'Negative-path log required');
-  const requestId = errors[0].requestId;
-  const sameRecord = consoleLog.split(/\r?\n/).some(line => {
-    if (line.startsWith('{"timestamp":')) {
-      const record = JSON.parse(line);
-      return record.category === 'scim.patch' && record.requestId === requestId;
-    }
-    return new RegExp(`^\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\\s+scim\\.patch\\s+\\[${requestId.slice(0, 8)}\\]`)
-      .test(line.replace(/\x1b\[[0-9;]*m/g, ''));
-  });
+  return { diagnosticOnly: true, complete: true, validatedRows: rows.length,
+    errorRows: errors.length, requestId: errors[0].requestId, rawLogsExported: false };
+}
+
+function matchesPatchRecord(line, requestId) {
+  if (line.startsWith('{"timestamp":')) {
+    const record = JSON.parse(line);
+    return record.category === 'scim.patch' && record.requestId === requestId;
+  }
+  return new RegExp(`^\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\\s+scim\\.patch\\s+\\[${requestId.slice(0, 8)}\\]`)
+    .test(line.replace(/\x1b\[[0-9;]*m/g, ''));
+}
+
+function validatePrivacy(rows, consoleLog, secrets) {
+  const checked = checkPrivacyRows(rows, secrets, secret => !consoleLog.includes(secret));
+  const sameRecord = consoleLog.split(/\r?\n/).some(line => matchesPatchRecord(line, checked.requestId));
   assert.ok(sameRecord, 'Same-record categorized error correlation required');
   return { diagnosticOnly: true, complete: true, validatedRows: rows.length,
-    errorRows: errors.length, sameRecordPresent: sameRecord, rawLogsExported: false };
+    errorRows: checked.errorRows, sameRecordPresent: sameRecord, rawLogsExported: false };
 }
 
 // Runs only in the owned read-only observer container, never at import time.
@@ -288,6 +299,7 @@ function collect(pid, containerId) {
 }
 
 module.exports = { schedule, runVisits, windowDelta, validateSnapshot, validateReceipt, validatePrivacy,
+  validatePrivacyRows, matchesPatchRecord,
   finalizeOwned, commandTimeout, requireOwnedContainer, dockerOperation, requireEmptyInventory,
   collect, requiredUnsigned, sourceTip };
 if (require.main === module) {

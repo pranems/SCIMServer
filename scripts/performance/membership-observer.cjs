@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { StringDecoder } = require('node:string_decoder');
+const { lifecycleFailure } = require('./membership-privacy.cjs');
 const { collect, validateSnapshot } = require('./membership-history.cjs');
 const maximumFrame = 65536;
 const snapshotKeys = ['epoch', 'pid', 'startTicks', 'readStartUtc', 'readStartNs',
@@ -113,8 +114,8 @@ class ObserverChannel {
         resolve({ code, signal });
       });
     });
-    child.on('error', () => this.fail('Observer child startup failure'));
-    child.stdin.on('error', () => this.fail('Observer input closed'));
+    child.on('error', error => this.fail('Observer child startup failure', error));
+    child.stdin.on('error', error => this.fail('Observer input closed', error));
     child.stderr.on('data', bytes => {
       this.stderrBytes = Math.min(1025, (this.stderrBytes || 0) + bytes.length);
       this.fail('Observer stderr rejected; content withheld');
@@ -155,8 +156,13 @@ class ObserverChannel {
     });
   }
 
-  fail(message) {
-    this.failure ||= new Error(message);
+  fail(message, cause) {
+    if (!this.failure) {
+      this.failure = new Error(message);
+      if (cause) this.failure.actionFailure = lifecycleFailure(cause, {
+        operation: 'command', role: 'observer', stage: 'native-command', phase: 'work',
+        command: 'observer-exec' });
+    }
     this.buffer = '';
     if (this.pending) {
       clearTimeout(this.pending.timer);
@@ -177,7 +183,7 @@ class ObserverChannel {
       const timer = setTimeout(() => this.fail('Observer request timeout'), this.timeoutMs);
       this.pending = { id, resolve, reject, timer };
       this.child.stdin.write(line, error => {
-        if (error) this.fail('Observer write failed');
+        if (error) this.fail('Observer write failed', error);
       });
     });
   }

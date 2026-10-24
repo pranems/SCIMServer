@@ -194,6 +194,24 @@ Every URL-carried identifier and every SCIM attribute identifier is matched case
 
 Validation and deployment gates must never reuse a database because it is listening on a known port, and must never remove a container because it has a familiar fixed name. Each gate creates a uniquely named container with task and run labels, binds it to a Docker-assigned loopback port, uses tmpfs storage unless persistence is the behavior under test, passes the exact generated connection string to every database-backed lane, verifies labels before cleanup, removes only the captured full container ID, and verifies that exact ID is absent afterward. An inherited or shared database is not valid release evidence.
 
+## Complete Diagnostic Output and Native Cause Rule (added 2026-10-24)
+
+Long diagnostic console evidence must use prospectively fixed byte, frame,
+record, memory and absolute-deadline bounds. Do not replace a native
+maxBuffer failure by unbounded buffering or silently raise its budget.
+Complete-output proof requires both native pipes to finish, successful
+exit and all generated credential-role scans across real chunk boundaries;
+missing, empty, truncated, over-limit or failed input is INVALID.
+Keep uncertain container/tool attribution explicitly ambiguous.
+Every work and cleanup native failure must retain its first closed cause,
+finite allowlisted code, static operation/role/stage/command and available
+exit/signal/duration/phase through minimal receipt fallbacks. Unknown codes
+stay explicitly unrecognized; never persist raw stderr, arguments,
+exception messages or nested causes. Require real bounded Node/fake-CLI
+regressions for output volume and native failures before another runtime.
+Source-only tests do not reconstruct an unretained historical error or
+authorize another diagnostic invocation.
+
 ## Mutable Tag Registry Parity Rule (CRITICAL - added 2026-09-30)
 
 Every shipping tag replicated across GHCR and ACR must come from one authoritative CI build and resolve to the same manifest digest in every registry. Never assign `latest`, a semantic version, or a promotion tag to a separately rebuilt local image. Optional local validation images use only a visibly non-shipping `local-<sha>` tag. A no-cache local build must also use `--pull` when it claims current base-image parity because `--no-cache` alone can reuse a stale `FROM` image. Registry replication is incomplete until version and mutable tags exist and their digests equal the authoritative source digest.

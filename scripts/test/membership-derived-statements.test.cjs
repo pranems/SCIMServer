@@ -29,7 +29,7 @@ test('derived closure freezes every local runtime helper and rejects missing or 
   const implementation = tool();
   const files = implementation.runtimeFiles(root);
   for (const required of ['membership-privacy.cjs', 'membership-history.cjs', 'membership-observer.cjs',
-    'membership-derived-functional.cjs', 'membership-derived-statements.cjs',
+    'membership-derived-functional.cjs', 'membership-derived-statements.cjs', 'membership-console.cjs',
     'benchmark-membership.cjs', 'membership-history-contract.ps1', 'minimal-group-members.ps1'])
     assert.ok(files.includes(required), required);
   const directory = path.join(root, 'test-results', `derived-closure-test-${crypto.randomUUID()}`);
@@ -37,7 +37,7 @@ test('derived closure freezes every local runtime helper and rejects missing or 
   try {
     const hashes = implementation.freezeInputs(root, directory);
     assert.equal(implementation.verifyInputs(root, directory, hashes), true);
-    const target = path.join(directory, 'frozen-inputs', 'membership-privacy.cjs');
+    const target = path.join(directory, 'frozen-inputs', 'membership-console.cjs');
     fs.appendFileSync(target, '\n');
     assert.throws(() => implementation.verifyInputs(root, directory, hashes), /Frozen runtime input changed/);
     fs.unlinkSync(target);
@@ -105,7 +105,10 @@ test('derived entry guard, preallocation seal, complete console capture and unch
   assert.ok(intent >= 0 && intent < source.indexOf("images[name] ="));
   assert.ok(source.indexOf('derivedTool.verifyInputs(root, directory') < source.indexOf("await docker(['network', 'create'"));
   assert.ok(source.includes('derived && cleanup ? 30000 : cleanup ? 15000 : 60000'));
-  assert.ok(source.includes('derivedTool.validatePrivateInputs'));
+  assert.ok(source.includes('derivedTool.validateStreamedPrivateInputs'));
+  assert.ok(source.includes('await consoleCapture.captureChild'));
+  assert.ok(source.includes('manifest.policy.consoleCapture'));
+  assert.ok(source.includes("await captureLogs(app.id, false, currentRows?.requestId)"));
   assert.ok(source.includes("derived ? 'runtime-manifest.json' : 'manifest.json'"));
   assert.ok(source.includes('45 * 60000'));
   assert.ok(source.includes("SET default_transaction_read_only=on"));
