@@ -8,6 +8,7 @@
     Three modes, from cheapest to most thorough:
 
       Fast (default for the hook)         ~9-10 min
+        - membership tooling unit regressions (serial; explicit local-evidence skips)
         - api npm run build (TS compile)
         - api npm run lint
         - web npx tsc --noEmit
@@ -164,6 +165,12 @@ function Show-Summary {
 
 Invoke-Gate -Name 'dependencies: ownership negative controls' -Action {
     pwsh -NoProfile -File (Join-Path $PSScriptRoot 'test' 'dependency-ownership.contract.ps1')
+}
+
+Invoke-Gate -Name 'tools: membership unit tests' -Action {
+    $membershipTests = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'test') -Filter 'membership-*.test.cjs' | Sort-Object Name | ForEach-Object FullName)
+    if ($membershipTests.Count -eq 0) { throw 'No membership tooling tests found' }
+    node --test --test-reporter=tap --test-concurrency=1 @membershipTests 2>&1 | Out-Host
 }
 
 Invoke-Gate -Name 'api: tsc build' -WorkingDir (Join-Path $repoRoot 'api') -Action {

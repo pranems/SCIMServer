@@ -100,6 +100,65 @@ test('absolute cleanup expiry bounds a real hanging command and refuses later di
   assert.equal(result.failures[1].phase, 'cleanup');
 });
 
+test('actual history wrapper stops expired work while reserved cleanup still dispatches',
+  { timeout: 8000 }, async () => {
+    const source = fs.readFileSync(path.join(root, 'scripts/performance/run-membership-history.cjs'), 'utf8');
+    const first = source.indexOf('  async function docker(');
+    const last = source.indexOf('  async function inspect(', first);
+    assert.ok(first > 0 && last > first);
+    const dispatched = [];
+    const context = {
+      root, environment: {}, Date, Error,
+      workDeadline: Date.now() - 1, deadline: Date.now() + 4000,
+      commandTimeout: history.commandTimeout, dockerOperation: history.dockerOperation,
+      lifecycleFailure: privacy.lifecycleFailure,
+      async exec(file, args, options) {
+        assert.equal(file, 'docker');
+        dispatched.push(args[2]);
+        return fakeCli("setTimeout(()=>console.log('owned-fixture'),20)", options.timeout);
+      },
+    };
+    const command = vm.runInNewContext(`(${source.slice(first, last).trim()})`, context);
+    await assert.rejects(command(['inspect', 'fixture'], false), error =>
+      error.actionFailure.category === 'deadline' && error.actionFailure.phase === 'work');
+    assert.deepEqual(dispatched, []);
+    const result = await history.finalizeOwned(['fixture'], {
+      role: () => 'app',
+      capture: id => command(['inspect', id], true),
+      remove: id => command(['rm', '-f', id], true),
+      async verify(id) { return (await command(['ps', id], true)) === 'owned-fixture'; },
+    });
+    assert.equal(result.verified, true);
+    assert.deepEqual(dispatched, ['inspect', 'rm', 'ps']);
+    assert.ok(Date.now() < context.deadline);
+    assert.equal(dockerDispatches, 0);
+  });
+
+test('history work and child lifetimes leave ninety seconds inside the unchanged outer cap', () => {
+  const source = fs.readFileSync(path.join(root, 'scripts/performance/run-membership-history.cjs'), 'utf8');
+  const first = source.indexOf('  const started = Date.now();');
+  const last = source.indexOf('  const run =', first);
+  const started = Date.now();
+  const deadlines = vm.runInNewContext(`${source.slice(first, last)};
+    ({ started, deadline, workDeadline: typeof workDeadline === 'undefined' ? null : workDeadline })`,
+  { Date: { now: () => started } });
+  assert.equal(deadlines.deadline - deadlines.started, 60 * 60 * 1000);
+  assert.equal(deadlines.deadline - deadlines.workDeadline, 90000);
+  const childStart = source.indexOf('    const child = fork(');
+  const childEnd = source.indexOf('    child.stdout.resume();', childStart);
+  let options;
+  const context = {
+    __dirname, root, path, Math, environment: {}, credentials: {}, app: { url: 'fixture' },
+    receiptPath: 'fixture', owner: 'fixture', deadline: deadlines.deadline,
+    workDeadline: deadlines.workDeadline, commandTimeout: history.commandTimeout,
+    Date: { now: () => deadlines.workDeadline - 1000 },
+    fork(file, args, value) { options = value; return {}; },
+  };
+  vm.runInNewContext(source.slice(childStart, childEnd), context);
+  assert.equal(options.timeout, 1000);
+  assert.equal(Number(options.env.SCIM_BENCH_DEADLINE_UTC), deadlines.workDeadline);
+});
+
 test('real fixture ownership mismatch refuses removal without hiding its cause', { timeout: 4000 }, async () => {
   const id = 'a'.repeat(64);
   let removed = false;

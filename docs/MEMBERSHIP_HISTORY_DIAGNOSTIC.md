@@ -1,7 +1,58 @@
 # Local application-history diagnostic
 
-**Last verified:** 2026-10-23
+**Last verified:** 2026-10-24
 **Scope:** Unreleased local tooling, never release admission.
+
+## Consolidation corrections (2026-10-24, source-only)
+
+Independent review found two reliability defects. Both are corrected and
+regression-tested below. No workload was repeated, no historical receipt was
+replaced, and no release admission or deployment follows from these checks.
+
+| Issue | Type / severity | Symptom and root cause | Correction and why it works | Detection and prevention |
+|---|---|---|---|---|
+| CR-01 | Lifecycle / Medium | The history runner gave work and finalization the same deadline. At expiry, even discovery and removal could not dispatch; the child could additionally outlive that deadline by 70 seconds. | Keep the existing 60-minute outer cap, reserve its final 90 seconds for cleanup, and clamp Docker work, the benchmark child, contract execution and log-flush HTTP to the earlier work deadline. Finalization retains the outer deadline. | Fresh review caught what the existing helper and presence-only caller tests missed. New tests execute the actual history wrapper with expired work and available cleanup, verify zero work dispatches and successful capture/removal/verification, and measure the actual configured child lifetime. Earliest useful gate: unit regression. Applied. |
+| CR-02 | Test portability / Medium | Two tests read ignored historical proofs or a frozen runner unconditionally. A fresh source checkout failed with `ENOENT`. The closure test also assumed its ignored parent directory already existed. | The positive retained-proof test explicitly skips only when its complete four-file proof set is unavailable. Portable synthetic negative tests still require runtime proof validation to fail closed. A committed work-wrapper fixture reproduces the native output-limit failure; an optional comparison checks it against retained historical source. Temporary closure directories are created independently. | Fresh review found the missing-artifact dependency; a fresh-source reproduction additionally caught the absent parent directory. Earliest useful gate: tests with installed dependencies but without ignored experiment artifacts. Applied. |
+| CR-03 | Test automation / Medium | Ordinary application CI and pre-push did not select the newly added membership tooling tests, so their green result could not prove those tools were tested. | Add the complete serial membership test selector to default pre-push and both ordinary branch/release CI validation jobs. Installed API dependencies precede the CI test step. | Independent automation inspection found the gap. Two new wiring regressions failed before the change and passed afterwards; commented-out CI commands cannot satisfy the selector check. Earliest useful gate: test-completeness audit before protected push. Applied; remote execution remains pending. |
+
+### Evidence and limits
+
+- `test-results/diagnostic-review-fixes-20261024/deadline-red.log`
+  records the missing expected work-deadline rejection and missing cleanup
+  reservation before the correction.
+- `fresh-red.log` records the three missing-file/directory failures.
+- `affected-green.log`: all 31 affected tests passed with retained local
+  proofs, zero failures and zero skips.
+- `gate-wiring-red.log` and `gate-wiring-green.log`: both new automatic
+  selector checks changed from failing to passing. Both changed workflow
+  files parsed, the pre-push script parsed, five changed CJS files passed
+  syntax checks, and the content-only freshness audit passed all 27 docs.
+  These checks are not a substitute for the normal protected hook or CI.
+- `fresh-installed-green-all.log`: all 15 membership test files completed
+  in 105.376 seconds, with 213 passed, zero failed and eight explicit
+  skips out of 221 registered tests. Seven skips require local evidence
+  or extracted source; one requires the separately opt-in PostgreSQL probe.
+  No experiment evidence was copied into this source snapshot.
+- The first full snapshot check omitted the API dependency directory and
+  failed module loading. The corrected check reused the existing installed
+  dependencies through a temporary junction, removed afterwards. Nothing
+  was installed or changed in the dependency manifests.
+
+These are source and test-portability claims, not a repeat of the original
+53.966-minute experiment. Runtime proof hashes remain mandatory; missing or
+modified evidence still cannot qualify a reference.
+
+**Self-improvement: applied.** Exercise each real caller's deadline selection,
+not just the shared helper or the presence of a helper call. Test a source
+checkout without ignored evidence as a separate portability condition.
+**Design disposition: accepted.** Reuse the existing deadline and finalizer
+helpers; no new application dependency, lifecycle framework or speculative
+abstraction is introduced.
+
+**Provenance limit:** This correction was reconciled against the independent
+review, current execution output and retained RED/GREEN logs. It is not a
+claim of reconciliation against the deleted original conversation or an
+unavailable full-session transcript.
 
 ## Executive summary
 

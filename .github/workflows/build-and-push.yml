@@ -49,6 +49,9 @@ jobs:
         working-directory: api
         run: npx prisma generate
 
+      - name: Test membership tooling (portable unit regressions)
+        run: node --test --test-reporter=tap --test-concurrency=1 scripts/test/membership-*.test.cjs
+
       - name: Lint API
         working-directory: api
         run: npm run lint

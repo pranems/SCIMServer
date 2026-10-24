@@ -76,6 +76,20 @@ it there. Unavailable durations remain unavailable, not invented zeroes.
 No post-incident observation reconstructs an unretained historical error.
 
 Applied safeguards are in `scripts/test/membership-lifecycle.test.cjs`.
+Consolidation review found that a caller could still pass its outer deadline
+as both arguments while every presence-only wiring check passed. Execute the
+actual caller with expired work and remaining cleanup: work must not dispatch,
+but capture, removal and independent verification must still run. Also measure
+the configured child's lifetime so a separate grace period cannot consume the
+cleanup reservation. The history runner now reserves 90 seconds inside its
+unchanged outer cap; historical experiment receipts are not rewritten.
+
+Ignored evidence is a separate portability boundary. Keep portable negative
+proof tests and committed nonsecret regression fixtures executable without
+local artifacts. Explicitly skip only retained-evidence comparisons when their
+complete inputs are absent; never turn that skip into runtime qualification.
+Verify this with installed dependencies and no copied experiment evidence.
+
 The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
 records exact RED/GREEN results and the still-unqualified runtime outcome.
 The correction reuses existing finalizer/privacy modules rather than adding

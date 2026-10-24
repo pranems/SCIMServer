@@ -1,15 +1,34 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
+const os = require('node:os');
 const { test } = require('node:test');
 const { runDefaultChild } = require('./membership-child-fixture.cjs');
 const root = path.resolve(__dirname, '../..');
 const qualification = path.join(root, 'test-results/derived-functional-continuation-20261023',
   'attempt3-20261023T230634807Z/qualification-receipt.json');
 const tool = () => require('../performance/membership-derived-statements.cjs');
+const requiredProofs = [
+  qualification,
+  ...['offline-build/manifest.json', 'offline-build/receipt.json', 'source/proof.json']
+    .map(file => path.join(root, 'test-results/derived-reference-20261023', file)),
+];
+const missingProofs = requiredProofs.filter(file => !fs.existsSync(file));
 
-test('derived statement reference binds exact functional receipt and original build proof', () => {
+test('derived qualification rejects synthetic and missing proof rather than adopting a fallback', () => {
+  const implementation = tool();
+  for (const bytes of [undefined, Buffer.from('{}'),
+    Buffer.from(JSON.stringify({ status: 'DERIVED_FUNCTIONAL_QUALIFIED', admissionEligible: false }))])
+    assert.throws(() => implementation.validateQualification(bytes), /Pinned functional qualification required/);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'derived-missing-proof-'));
+  try {
+    assert.throws(() => implementation.loadReference(directory), error => error.code === 'ENOENT');
+  } finally { fs.rmSync(directory, { recursive: true }); }
+});
+
+test('derived statement reference binds exact functional receipt and original build proof', {
+  skip: missingProofs.length ? `Retained local proof set unavailable (${missingProofs.length} missing files)` : false,
+}, () => {
   const implementation = tool();
   const bytes = fs.readFileSync(qualification);
   const result = implementation.validateQualification(bytes);
@@ -32,8 +51,7 @@ test('derived closure freezes every local runtime helper and rejects missing or 
     'membership-derived-functional.cjs', 'membership-derived-statements.cjs', 'membership-console.cjs',
     'benchmark-membership.cjs', 'membership-history-contract.ps1', 'minimal-group-members.ps1'])
     assert.ok(files.includes(required), required);
-  const directory = path.join(root, 'test-results', `derived-closure-test-${crypto.randomUUID()}`);
-  fs.mkdirSync(directory);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'derived-closure-test-'));
   try {
     const hashes = implementation.freezeInputs(root, directory);
     assert.equal(implementation.verifyInputs(root, directory, hashes), true);

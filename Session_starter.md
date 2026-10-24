@@ -2,6 +2,24 @@
 
 **Last verified:** 2026-10-24
 
+### Diagnostic consolidation review corrections (2026-10-24)
+
+Both independent review findings are corrected locally: the history runner
+now reserves 90 seconds for cleanup inside the unchanged 60-minute outer
+cap, and tests no longer require ignored historical artifacts to run their
+portable regressions. All 31 affected retained-proof tests passed with zero
+skips. A separate tracked-source snapshot with existing API dependencies
+and no copied experiment evidence passed 213/221 tests, zero failures,
+eight explicit evidence/integration skips across all 15 membership test
+files. The temporary dependency junction was removed. No workload,
+admission, push or deployment occurred. See the
+[correction ledger](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md#consolidation-corrections-2026-10-24-source-only).
+The complete serial membership test selector is now wired into ordinary
+branch/release CI and default pre-push; two regression controls passed after
+failing on the missing wiring. Workflow, CJS and PowerShell syntax checks
+and content-only freshness for all 27 manifest docs passed. The protected
+push and exact-tip remote CI have not yet run.
+
 ### Separate disposable URL GIN counterfactual (2026-10-24)
 
 The opt-in database-only runner and causal source/fixture guards are

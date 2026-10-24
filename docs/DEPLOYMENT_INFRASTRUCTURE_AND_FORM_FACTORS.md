@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-22 - **Repo version at capture:** `api/package.json` = `0.55.54`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-24 - **Repo version at capture:** `api/package.json` = `0.55.54`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -80,7 +80,7 @@ pending runs while still allowing only one active benchmark. Queue saturation
 can still cancel additional arrivals and must not look like measured success.
 See [GitHub's concurrency queue documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
-This header's 2026-10-22 verification covers the source workflows above.
+The 2026-10-22 verification covers the source workflows above.
 The estate snapshots below retain their original capture dates; no fresh
 Azure inventory or serving change is claimed by this diagnostic work.
 
@@ -138,6 +138,25 @@ removed; label-scoped absence was verified. This is local Docker evidence,
 not publication, local-node evidence or an Azure update. A depth-10 JSON
 diagnostic warning remains explicit; the parsed summary and 1,729 test
 entries agree with the console result.
+
+## Portable diagnostic test coverage (2026-10-24 source change)
+
+The ordinary branch/PR workflow (`build-test.yml`), tag/manual build workflow
+(`build-and-push.yml`) and default pre-push gates now discover every
+`scripts/test/membership-*.test.cjs` file and run them serially through Node's
+built-in test runner. CI runs this step after API dependency installation
+and Prisma generation. No package or lockfile change is required.
+
+These are unit regressions, not performance qualification or another
+experiment. Missing retained local evidence produces explicit skips only
+for the corresponding evidence comparisons; portable failure controls
+still run and runtime proof validation remains fail-closed. The real
+PostgreSQL probe remains separately opt-in. CI triggers, benchmark
+thresholds, publication tags and deployment behavior are unchanged.
+
+`membership-tool-gates.test.cjs` checks the active CI commands and default
+hook selector so ordinary application CI cannot silently omit this tooling.
+This source review does not refresh any live-estate observation below.
 
 ## Isolated Docker image handoff
 
@@ -1262,6 +1281,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-10-24 | Added the complete serial membership unit-test selector to ordinary branch/release CI and default pre-push. Kept experiments, performance admission, publication and deployment separate; no live infrastructure changed. |
 | 2026-10-16 | Verified dev/canary 0.55.54 on the same existing digest after the full no-skip db10b13e run: 40 PASS, zero FAIL/SKIPPED, nine reviewer PENDING. Refreshed actual serving revisions and two-revision retention; no customer-production operation or new image publication. |
 | 2026-10-16 | Added physical dependency ownership preflight before executing validation/deployment work, with actual runner refusal and command-sentinel negative controls. No topology, live deployment, publication or promotion behavior changed. |
 | 2026-10-14 | Migrated the Stage 3 reviewer-gate registrations in [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) from deleted prompt-file terminology to committed Agent Skill slash invocations. This is an orchestration-label and operator-guidance change only: executable deployment stages, image publication, estate resolution, Azure operations, and promotion behavior are unchanged. Re-reviewed the Section 10 drift register with no topology or live-estate fact change. |

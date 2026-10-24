@@ -30,6 +30,7 @@ async function main() {
   fs.mkdirSync(directory);
   const started = Date.now();
   const deadline = started + 60 * 60 * 1000;
+  const workDeadline = deadline - 90000;
   const run = crypto.randomUUID().replaceAll('-', '');
   const prefix = `scim-history-${run.slice(0, 12)}`;
   const network = `${prefix}-net`;
@@ -44,6 +45,7 @@ async function main() {
   const report = {
     run, status: 'INCOMPLETE', diagnosticOnly: true, admissionEligible: false,
     startedAtUtc: new Date(started).toISOString(), deadlineUtc: new Date(deadline).toISOString(),
+    workDeadlineUtc: new Date(workDeadline).toISOString(),
     rounds: [], resourceEpochs: [], readiness: [], failures: [], actionFailures: [],
     limitation: 'Shared Windows/WSL Docker Desktop scheduling and caches; no dedicated host, per-request throttle attribution, causal independence or release acceptance.',
   };
@@ -52,13 +54,13 @@ async function main() {
   let channel;
   let pg;
   let stage = 'identity-preflight';
-  function checkDeadline() { assert.ok(Date.now() < deadline, 'Phase-one 60-minute work cap reached'); }
+  function checkDeadline() { assert.ok(Date.now() < workDeadline, 'Phase-one work cap; cleanup reservation begins'); }
   async function docker(args, cleanup = false, combined = false) {
     const commandStarted = Date.now();
     try {
       const result = await exec('docker', ['--context', 'desktop-linux', ...args], {
         cwd: root, env: environment, windowsHide: true, maxBuffer: 8 * 1024 * 1024,
-        timeout: commandTimeout(deadline, deadline, cleanup, cleanup ? 30000 : 60000),
+        timeout: commandTimeout(workDeadline, deadline, cleanup, cleanup ? 30000 : 60000),
       });
       return (combined ? result.stdout + result.stderr : result.stdout).trim();
     } catch (error) {
@@ -140,10 +142,10 @@ async function main() {
     report.rounds.push(row);
     let captureFailure;
     const child = fork(path.join(__dirname, 'benchmark-membership.cjs'), [], {
-      cwd: root, silent: true, timeout: Math.max(1, deadline - Date.now() + 70000),
+      cwd: root, silent: true, timeout: commandTimeout(workDeadline, deadline, false, workDeadline - Date.now()),
       env: { ...environment, SCIM_BENCH_BASE_URL: app.url, SCIM_BENCH_TOKEN: credentials.SCIM_SHARED_SECRET,
         SCIM_BENCH_VERSION: '0.55.60', SCIM_BENCH_OUTPUT: receiptPath,
-        SCIM_BENCH_DEADLINE_UTC: String(deadline), SCIM_BENCH_TRACE: '1',
+        SCIM_BENCH_DEADLINE_UTC: String(workDeadline), SCIM_BENCH_TRACE: '1',
         SCIM_BENCH_HISTORY: '1', SCIM_BENCH_HISTORY_OWNER: owner },
     });
     child.stdout.resume();
@@ -212,7 +214,7 @@ async function main() {
       policy: { cpu: 0.5, memory: 1073741824, rssCeiling: 402653184,
         cpuMax: '50000 100000', cpuBurst: 0, finiteAncestorQuota: 'reject',
         warmupCycles: 100, measuredCycles: 1000, requestsPerRound: 4407, samples: 64000,
-        wallMinutes: 60, phaseTwo: false, freshPostgres: false,
+        wallMinutes: 60, cleanupReservationMs: 90000, phaseTwo: false, freshPostgres: false,
         resetSharedStatistics: false, forcedGc: false, instrumentation: 'boundary-only IPC',
         processContrast: 'restart scheduled application only versus retained role processes',
         readinessAndObserverRequests: 'separate report arrays; not workload requests',
@@ -221,6 +223,7 @@ async function main() {
       host: JSON.parse(await docker(['info', '--format',
         '{"serverVersion":{{json .ServerVersion}},"os":{{json .OperatingSystem}},"cpus":{{json .NCPU}},"memory":{{json .MemTotal}}}'])),
       startedAtUtc: report.startedAtUtc, deadlineUtc: report.deadlineUtc,
+      workDeadlineUtc: report.workDeadlineUtc,
     };
     save(path.join(directory, 'preregistered-plan.json'), manifest);
     stage = 'owned-topology';
@@ -286,11 +289,11 @@ async function main() {
       checkDeadline();
       await exec('pwsh', ['-NoProfile', '-File', path.join(__dirname, 'membership-history-contract.ps1'),
         '-BaseUrl', apps.B.url, '-OutputPath', path.join(directory, `${block.name}-contract.json`)], {
-        cwd: root, env: environment, timeout: Math.min(120000, deadline - Date.now()),
+        cwd: root, env: environment, timeout: commandTimeout(workDeadline, deadline, false, 120000),
       });
       const flushed = await fetch(`${apps.B.url}/scim/admin/logs/flush`, {
         method: 'POST', headers: { Authorization: `Bearer ${credentials.SCIM_SHARED_SECRET}` },
-        signal: AbortSignal.timeout(Math.max(1, Math.min(30000, deadline - Date.now()))),
+        signal: AbortSignal.timeout(commandTimeout(workDeadline, deadline, false, 30000)),
       });
       assert.ok(flushed.ok, 'Original buffered log flush');
       const sql = 'SELECT COALESCE(json_agg(r),\'[]\') FROM (SELECT "requestId","endpointId",status,"durationMs","requestHeaders","responseHeaders","requestBody","responseBody","authDecision" FROM "RequestLog" WHERE url LIKE \'%/Groups%\' AND (status >= 400 OR method = \'PATCH\') ORDER BY "createdAt" DESC LIMIT 200) r';

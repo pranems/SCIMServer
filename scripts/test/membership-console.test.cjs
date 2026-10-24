@@ -17,6 +17,9 @@ const canaries = privacy.credentialCanaries(Object.fromEntries(
   observer: 'synthetic-private-observer-only',
 });
 const scanner = () => require('../performance/membership-console.cjs');
+const wrapperFixture = path.join(__dirname, 'fixtures/membership-maxbuffer-wrapper.txt');
+const retainedRunner = path.join(root,
+  'test-results/derived-statements-20261023/attempt1-20261023T233120820Z/run/frozen-inputs/run-membership-statements.cjs');
 let dockerDispatches = 0;
 const spawn = cp.spawn;
 cp.spawn = function (file, ...args) {
@@ -63,10 +66,17 @@ async function capture(mode, value, extra = {}) {
   }
 }
 
-test('exact frozen work wrapper reproduces large-output failure with closed native code', { timeout: 15000 }, async () => {
-  const frozen = fs.readFileSync(path.join(root,
-    'test-results/derived-statements-20261023/attempt1-20261023T233120820Z/run/frozen-inputs/run-membership-statements.cjs'), 'utf8');
+test('committed work-wrapper fixture matches retained historical source when available', {
+  skip: fs.existsSync(retainedRunner) ? false : 'Retained historical runner unavailable in this checkout',
+}, () => {
+  const frozen = fs.readFileSync(retainedRunner, 'utf8');
   const body = frozen.slice(frozen.indexOf('  async function docker('), frozen.indexOf('  async function allocate('));
+  assert.equal(fs.readFileSync(wrapperFixture, 'utf8').replaceAll('\r\n', '\n').trim(),
+    body.replaceAll('\r\n', '\n').trim());
+});
+
+test('committed work wrapper reproduces large-output failure with closed native code', { timeout: 15000 }, async () => {
+  const body = fs.readFileSync(wrapperFixture, 'utf8');
   let native;
   const sandbox = { derived: true, environment: {}, root, toolConsole: '', Date, Error,
     commandTimeout: () => 10000, workDeadline: Date.now() + 10000, deadline: Date.now() + 10000,
