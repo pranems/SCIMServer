@@ -90,6 +90,13 @@ local artifacts. Explicitly skip only retained-evidence comparisons when their
 complete inputs are absent; never turn that skip into runtime qualification.
 Verify this with installed dependencies and no copied experiment evidence.
 
+Check required configuration before expensive validation, including inputs
+needed only to load a tool's configuration. Prisma generation can require
+an explicit URL without needing a database connection. Fail early and
+explain that distinction; do not silently substitute a live URL or
+credential. Exercise the actual preflight block and preserve modes that
+do not require that input.
+
 The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
 records exact RED/GREEN results and the still-unqualified runtime outcome.
 The correction reuses existing finalizer/privacy modules rather than adding

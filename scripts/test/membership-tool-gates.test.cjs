@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '../..');
@@ -24,3 +25,29 @@ test('default pre-push runs the complete membership test selector and rejects em
   assert.match(block, /if \(\$membershipTests\.Count -eq 0\) \{ throw /);
   assert.match(block, /^\s+node --test --test-reporter=tap --test-concurrency=1 @membershipTests/m);
 });
+
+test('Validate rejects missing codegen configuration before heavy gates without requiring it in Fast mode',
+  { timeout: 45000 }, () => {
+    const source = fs.readFileSync(path.join(root, 'scripts/pre-push-checks.ps1'), 'utf8');
+    const first = source.indexOf('# Validate configuration preflight');
+    const last = source.indexOf('# Fast gates (always run)', first);
+    assert.ok(first >= 0 && last > first, 'Validate configuration must be checked before heavy gates');
+    assert.ok(last < source.indexOf("Invoke-Gate -Name 'dependencies: ownership negative controls'"));
+    for (const [mode, value, expected] of [
+      ['Validate', undefined, 1], ['Full', ' ', 1],
+      ['Validate', 'postgresql://127.0.0.1:1/prepush_codegen', 0], ['Fast', undefined, 0],
+    ]) {
+      const env = { ...process.env };
+      delete env.DATABASE_URL;
+      if (value !== undefined) env.DATABASE_URL = value;
+      const result = spawnSync('pwsh', ['-NoProfile', '-Command',
+        `$ErrorActionPreference='Stop'; $Mode='${mode}';
+        function Invoke-Gate { param([string]$Name, [scriptblock]$Action) & $Action }
+        ${source.slice(first, last)}`], {
+        env, encoding: 'utf8', windowsHide: true, timeout: 10000,
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status, expected, mode);
+      if (expected) assert.match(result.stderr, /DATABASE_URL is required/);
+    }
+  });

@@ -17,8 +17,14 @@ admission, push or deployment occurred. See the
 The complete serial membership test selector is now wired into ordinary
 branch/release CI and default pre-push; two regression controls passed after
 failing on the missing wiring. Workflow, CJS and PowerShell syntax checks
-and content-only freshness for all 27 manifest docs passed. The protected
-push and exact-tip remote CI have not yet run.
+and content-only freshness for all 27 manifest docs passed. The first protected Validate push passed 26 gates, including 221/223
+membership tests (two explicit skips), API unit/E2E, static/build and
+rendering checks, then correctly blocked at Prisma generation because
+`DATABASE_URL` was unset. A tested early configuration gate now prevents
+this late failure; explicit generation-only configuration made the real
+Prisma command pass. No package was installed. A complete hook-protected
+retry and exact-tip CI remain pending; no branch was pushed by the failed
+attempt.
 
 ### Separate disposable URL GIN counterfactual (2026-10-24)
 

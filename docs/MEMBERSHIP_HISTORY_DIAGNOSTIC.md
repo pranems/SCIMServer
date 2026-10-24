@@ -14,6 +14,7 @@ replaced, and no release admission or deployment follows from these checks.
 | CR-01 | Lifecycle / Medium | The history runner gave work and finalization the same deadline. At expiry, even discovery and removal could not dispatch; the child could additionally outlive that deadline by 70 seconds. | Keep the existing 60-minute outer cap, reserve its final 90 seconds for cleanup, and clamp Docker work, the benchmark child, contract execution and log-flush HTTP to the earlier work deadline. Finalization retains the outer deadline. | Fresh review caught what the existing helper and presence-only caller tests missed. New tests execute the actual history wrapper with expired work and available cleanup, verify zero work dispatches and successful capture/removal/verification, and measure the actual configured child lifetime. Earliest useful gate: unit regression. Applied. |
 | CR-02 | Test portability / Medium | Two tests read ignored historical proofs or a frozen runner unconditionally. A fresh source checkout failed with `ENOENT`. The closure test also assumed its ignored parent directory already existed. | The positive retained-proof test explicitly skips only when its complete four-file proof set is unavailable. Portable synthetic negative tests still require runtime proof validation to fail closed. A committed work-wrapper fixture reproduces the native output-limit failure; an optional comparison checks it against retained historical source. Temporary closure directories are created independently. | Fresh review found the missing-artifact dependency; a fresh-source reproduction additionally caught the absent parent directory. Earliest useful gate: tests with installed dependencies but without ignored experiment artifacts. Applied. |
 | CR-03 | Test automation / Medium | Ordinary application CI and pre-push did not select the newly added membership tooling tests, so their green result could not prove those tools were tested. | Add the complete serial membership test selector to default pre-push and both ordinary branch/release CI validation jobs. Installed API dependencies precede the CI test step. | Independent automation inspection found the gap. Two new wiring regressions failed before the change and passed afterwards; commented-out CI commands cannot satisfy the selector check. Earliest useful gate: test-completeness audit before protected push. Applied; remote execution remains pending. |
+| CR-04 | Environment / Low | The first protected Validate push passed 26 gates, then Prisma generation rejected an unset `DATABASE_URL` after 852.1 seconds. This was a missing local code-generation input, not a database failure. | Add an early Validate/Full configuration gate, preserve Fast-mode behavior, and supply an explicit non-connecting local URL only in the retry process. No default credential, live database or runtime fallback is introduced. | The real protected hook caught it at its late generation gate. A new regression now checks the actual early PowerShell block for missing, blank and supplied configuration, plus Fast-mode compatibility. Earliest useful gate: configuration preflight before heavy suites. Applied. |
 
 ### Evidence and limits
 
@@ -28,6 +29,19 @@ replaced, and no release admission or deployment follows from these checks.
   files parsed, the pre-push script parsed, five changed CJS files passed
   syntax checks, and the content-only freshness audit passed all 27 docs.
   These checks are not a substitute for the normal protected hook or CI.
+- `protected-push.log`: the first normal hook blocked publication at Prisma
+  generation. Its completed membership gate passed 221/223 tests with two
+  explicit skips; API build/lint, web type-check/build, Mermaid rendering,
+  documentation/security-policy contracts, API unit and in-memory E2E
+  gates passed. E2E retained 118 passing suites / 2,514 passing tests and
+  its existing 42 skipped tests.
+- `codegen-preflight-red.log` and `codegen-preflight-green.log`: the new
+  early configuration regression failed before the guard, then all three
+  gate-wiring tests passed. `prisma-generate-configured.log` confirms that
+  `npx --no-install prisma generate` succeeded with
+  `DATABASE_URL=postgresql://127.0.0.1:1/prepush_codegen`. That process used
+  the existing installed Prisma 7.8.0, without installing packages.
+  The next tracking push must still execute the complete normal hook.
 - `fresh-installed-green-all.log`: all 15 membership test files completed
   in 105.376 seconds, with 213 passed, zero failed and eight explicit
   skips out of 221 registered tests. Seven skips require local evidence

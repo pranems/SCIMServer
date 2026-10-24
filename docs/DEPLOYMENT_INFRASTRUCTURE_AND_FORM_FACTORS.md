@@ -158,6 +158,13 @@ thresholds, publication tags and deployment behavior are unchanged.
 hook selector so ordinary application CI cannot silently omit this tooling.
 This source review does not refresh any live-estate observation below.
 
+Validate/Full pre-push now checks for an explicit `DATABASE_URL` before
+heavy suites, because Prisma's configuration loader requires it even for
+client generation. Fast mode retains its previous behavior. Generation
+does not require a live database: a caller can supply a non-connecting
+local code-generation URL in that process. The guard never invents a
+default connection string or prints an existing value.
+
 ## Isolated Docker image handoff
 
 The parent deployment pipeline assigns the unique Compose project identity

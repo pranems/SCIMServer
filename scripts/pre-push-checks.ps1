@@ -159,6 +159,15 @@ function Show-Summary {
     }
 }
 
+# Validate configuration preflight
+if ($Mode -in @('Validate', 'Full')) {
+    Invoke-Gate -Name 'environment: Prisma codegen configuration' -Action {
+        if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
+            throw 'DATABASE_URL is required for Prisma client generation in Validate/Full mode. Set it explicitly for this process; generation does not connect to the database.'
+        }
+    }
+}
+
 # -------------------------------------------------------------------------
 # Fast gates (always run)
 # -------------------------------------------------------------------------
