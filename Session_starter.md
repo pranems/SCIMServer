@@ -2,6 +2,34 @@
 
 **Last verified:** 2026-10-24
 
+### DS-03: corrected statement diagnostic complete (2026-10-24)
+
+One runner invocation from committed source
+`5f6203a91e252b47136ea90c4944bd40314aec76` completed all eight
+BAAB/ABBA visits in 1,071.628 seconds including cleanup. It retained
+35,256 checked requests, 32,000 measured samples, 3,200 warmup spans,
+eight explicit false-policy verifications, 132 current contract assertions
+and four complete all-eight-role privacy receipts. Seven complete
+PG/application captures scanned 57,190,021 bytes with both EOFs and exit
+zero. Six owned containers and their network are absent; all three
+shared running and five exited non-owned containers remain unchanged.
+
+The 0.55.60 candidate made 4.12% fewer top-level SQL calls but accumulated
+1,407.449 ms more SQL execution. Logging contributed 764.806 ms additional
+execution and 32,431,349 additional WAL bytes, or 0.047800 ms execution
+per equal inserted row. Nonlogging execution also increased; application
+CPU and pooled HTTP p99 were lower. These are descriptive observations,
+not request-level causes, GIN proof or admission.
+
+The zero-runner preflight launcher initially compared all containers with
+a running-only snapshot; its state-matched guard was fixed and validated
+before the sole runner invocation. No benchmark retry or postrun runtime
+code change occurred. Source/test evidence, historical INVALID receipts,
+90 branches and ten stashes were preserved. See
+[DS-03 report](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#ds-03-corrected-complete-capture-statement-study-2026-10-24).
+The derived reference is authorized only for this diagnostic. No release
+baseline adoption, index counterfactual, push, CI or deployment occurred.
+
 ### DS-02: bounded complete-console source correction (2026-10-24)
 
 Source-only correction is implemented. The single affected nine-file
@@ -200,6 +228,7 @@ See the indexed observer/statement report and
 
 | Date | Summary |
 |---|---|
+| 2026-10-24 | DS-03 corrected-source statement study COMPLETE 8/8: 35,256 checked requests, 32,000 measured samples, all-eight-role privacy and seven complete captures; 1,071.628 seconds including verified owned cleanup. Logging extra SQL execution is 764.806 ms / 16,000 rows, not a request-tail cause. Preserved prior INVALID evidence; no admission, baseline adoption, index change or deployment. |
 | 2026-10-24 | DS-02 source-only correction: exact frozen maxBuffer reproduction, bounded complete-console streaming, all eight credential-role guards and closed native causes. Single affected aggregate PASS 84/84; ten-file syntax/scoped lint clean. No Docker/SQL/runtime rerun, admission or baseline adoption. |
 | 2026-10-23 | Sole prospective DERIVED statement study from `7b3ac1c7`: INVALID after four BAAB visits, 17,628 workload requests and a passing 66-outcome contract because full-console collection failed. Partial SQL/WAL evidence retained; exact owned cleanup and unchanged shared inventory verified. No ABBA replacement, admission, baseline adoption or deployment. |
 | 2026-10-23 | Corrected-source DERIVED attempt2 from `e0d884b9`: strict privacy subchecks passed for seven authenticated requests/four masks, but finalization failed and safety cleanup completed after the five-minute cap. Overall INVALID, no further invocation. All exact owned resources removed; three shared running containers, earlier receipts, 90 branches and ten stashes preserved. |

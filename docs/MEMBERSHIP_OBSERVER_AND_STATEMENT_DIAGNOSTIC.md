@@ -3,6 +3,301 @@
 **Last verified:** 2026-10-24
 **Scope:** Unreleased local diagnostics, not release admission.
 
+## DS-03: corrected complete-capture statement study (2026-10-24)
+
+**Executive summary:** the single corrected-source runner invocation completed
+**8/8 visits**, BAAB then ABBA, in **1,071.628 seconds including cleanup**.
+Its status is `DERIVED-STATEMENT-DIAGNOSTIC-COMPLETE`, not admission PASS.
+Candidate 0.55.60 made **3,997 fewer top-level SQL calls (-4.12%)** but
+accumulated **1,407.449 ms more SQL execution (+40.53%)**. Logging INSERTs
+account arithmetically for **764.806 ms** of that difference and
+**32,431,349 bytes** of additional write-ahead log (WAL).
+That is **0.047800 ms extra logging execution per equal inserted row**,
+not evidence that logging caused a particular HTTP tail.
+
+Application CPU was **12.977 seconds lower**, and pooled HTTP p99 values
+were lower in this run. SQL execution time is not CPU time. These are
+descriptive observations from a shared Windows/WSL host, not release
+acceptance, an explanation of the original 0.55.58 incident, or an index
+removal recommendation.
+
+### Identity, preregistration and unchanged boundaries
+
+Evidence directory:
+`test-results\derived-statements-20261023\attempt2-20261024T003025656Z`.
+The runner's committed source is
+`5f6203a91e252b47136ea90c4944bd40314aec76`.
+The new authorization intent preceded Docker metadata reads; the runner's
+own intent preceded its Docker operations, and its fully resolved manifest
+and frozen-input verification preceded network/container allocation.
+
+| Item | Actual identity or constraint |
+|---|---|
+| Reference A | `DERIVEDSTARTUPPRIVACYBACKPORT`, local immutable image `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4` |
+| Original parent, not started | `ghcr.io/pranems/scimserver@sha256:8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a` |
+| Candidate B | Immutable 0.55.60, `ghcr.io/pranems/scimserver@sha256:316a645f021b5c9b833c295d94248e7df00ee37aa13d6d5614e55f9f04c83a4b` |
+| PostgreSQL | Cached 17.11, `postgres@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3`; actual Linux/amd64 identities retained |
+| Proof binding | Pinned whole-app build proof and functional qualification receipt `cf6b36d17d0f754ae7c57d02d5fc0db801b074c8e80cb90005f0cf1e7d936210` verified; neither proof was rerun |
+| Source closure | All 24 current local runtime inputs frozen; loaded PostgreSQL client module hashes retained; all 24 disk/Git pairs differ as raw CRLF/LF bytes and match after newline normalization |
+| Schedule | Exactly BAAB then ABBA; two reused application processes per block; equivalent new role database fixtures per block; one constant PostgreSQL process |
+| Workload | Each visit: 100 complete warmup cycles, then 1,000 measured four-operation cycles; unchanged payload, correctness and child cleanup |
+| Application resources | Each 0.5 CPU, 1 GiB; 384 MiB RSS ceiling; `50000 100000` CPU quota/period, zero burst and original ancestor checks |
+| Time | Started `2026-10-24T00:33:01.080Z`; finished `00:50:52.708Z`; fixed absolute deadline `01:18:01.080Z`; 90-second cleanup reservation unchanged |
+| Additional conservative elapsed view | 1,226.756 seconds from the earlier authorization intent through runner cleanup; also below 45 minutes |
+| Streaming | Fixed 64 MiB total per capture, 64 KiB frame/chunk, 1,000,000 records, eight canaries, 256-byte maximum canary, 8 MiB tool budget; no growth or truncation |
+| Native deadlines | Work maximum 60 seconds and cleanup maximum 30 seconds, each clamped to the remaining applicable absolute deadline; not a cap extension |
+
+The reference was adopted **only for this descriptive diagnostic**.
+`baselineAdoptionApproved`, `originalProductionImageEquivalent` and
+`admissionEligible` remain false. This is not the actual production
+0.55.20 image, and no explicit user approval of a release baseline is claimed.
+
+### Execution accounting and strict checks
+
+| Check | Actual result |
+|---|---|
+| Runner invocations | Exactly one; no replacement visits, alternative order or favorable retry |
+| Original child requests | **35,256 = 8 x 4,407**, all complete; each original receipt and SHA-256 retained |
+| Timing detail | **32,000 measured samples**, **3,200 warmup spans**, 56 lifecycle spans; all 35,256 request-index/operation/phase/cycle-linked spans retained |
+| Policy setup | Eight authenticated policy PATCH requests, outside counter windows and outside 4,407; eight separate administrator SQL reads independently verified stored false; server false verified from each app's actual environment |
+| Current contract | Two original 66-outcome batches, **132 assertions**, both complete |
+| Other HTTP accounting | Four explicit buffered-log flushes; 51 deterministic HTTP invocations per successful contract batch, 102 total, derived from its fixed source path rather than a separate wire counter |
+| Readiness | 34 probes: four successful ready responses, 30 not-yet-ready outcomes; these are separate from the checked workload |
+| Selected rows | Four complete privacy receipts, 200 selected rows each, **800 rows** checked; candidate receipts each include seven error rows and same-record PATCH console correlation |
+| Legacy/current distinction | Reference validates legacy redaction only; it does not pretend to satisfy current-only error categorization |
+| Credentials | All eight actual generated roles checked: PostgreSQL administrator, SCIM shared secret, JWT signing secret, OAuth client secret, encryption key, role-A password, role-B password and observer password |
+| Complete inputs | Selected rows, complete PG/app outputs and nonempty collected tool output passed strict credential-absence guards; no raw output, credentials, SQL text or parameters exported |
+| Counter provenance | All 32 warmup/measured boundary reads retained; one PostgreSQL postmaster epoch and one statistics-reset epoch; deallocation remained zero; query IDs are strings |
+| Observer | Read-only observer enforced and excluded from application SQL totals; reported window deltas: warmup 8 calls / 117.854 ms, measured 8 calls / 102.618 ms |
+| Observer boundary cost | 32 recorded window-boundary host reads: total 869.630 ms, range 18.926-47.579 ms; additional pre-work canary snapshots retained separately |
+| Resource checks | Maximum sampled/current-or-high-water RSS **233,459,712 bytes (222.645 MiB)**; no OOM kill; unchanged quota/period/burst and epoch guards passed |
+| Finalization | Six owned containers captured/finalized/removed with independent absence; network verified absent; observer exited zero without signal; no failure/action-failure rows |
+| Independent postflight | Zero owned containers, networks or diagnostic processes; all three shared running and five exited non-owned containers retained with identical IDs and states |
+
+The four-method functional mask proof remains the separately pinned earlier
+qualification; it was **not rerun** or counted as new requests here. This
+study's mask evidence is the actual selected-row and console-correlation
+checks above. Selected-row coverage is bounded to the most recent 200
+matching rows per app/block, not every database row. Complete console
+coverage has a different, whole-output scope.
+
+Tool-output presence and all-eight-role absence are attested, with the
+fixed 8 MiB collector bound. An actual tool-byte count is not serialized;
+none is invented. The 35,256 child request count is directly receipted.
+Other HTTP/SQL counts are explicitly separated so 66 assertions are not
+misrepresented as 66 HTTP requests.
+
+### Complete captures, not retained console text
+
+Each row below covers both native output pipes through EOF with native
+exit zero and no signal. Every capture checked all eight credential roles;
+all reported zero ambiguous records. Bytes describe **entire outputs**,
+not secret lengths. Four application captures exceeded the old 8 MiB
+native buffer without retaining the output in memory as a complete string.
+
+| Capture | Bytes | Timestamp-framed records | Duration ms |
+|---|---:|---:|---:|
+| BAAB PG | 4,934 | 55 | 10,725 |
+| BAAB reference app | 14,252,462 | 26,636 | 13,704 |
+| BAAB candidate app | 14,334,484 | 26,791 | 15,543 |
+| ABBA PG | 5,364 | 57 | 8,050 |
+| ABBA reference app | 14,253,419 | 26,636 | 8,334 |
+| ABBA candidate app | 14,333,661 | 26,790 | 8,350 |
+| Final cleanup PG | 5,697 | 58 | 7,420 |
+| **Total scanned across seven captures** | **57,190,021** | | |
+
+Repeated PG captures each cover that process's complete output at that
+boundary; their byte totals are not unique-log-volume measurements.
+Timestamp-framed container attribution and the scanner's conservative
+ambiguous-source rules remain unchanged.
+
+### SQL concentration, absolute sizes and separate application CPU
+
+Values aggregate four measured visits per role. Top-level execution is
+**not added to nested execution**, which may already be represented in
+parent statements. Means are execution delta divided by call delta,
+not means of independently averaged statement rows.
+
+| Measured metric | Derived reference A | Candidate B | B minus A |
+|---|---:|---:|---:|
+| Top-level calls | 96,969 | 92,972 | -3,997 (-4.12%) |
+| Top-level execution ms | 3,472.627 | 4,880.076 | +1,407.449 (+40.53%) |
+| Weighted mean execution ms/call | 0.035812 | 0.052490 | +0.016678 (+46.57%) |
+| Top-level returned/affected rows | 72,009 | 84,012 | +12,003 (+16.67%) |
+| Top-level WAL bytes | 55,984,786 | 88,449,344 | +32,464,558 (+57.99%) |
+| Logging INSERT calls / rows | 320 / 16,000 | 320 / 16,000 | Equal |
+| Logging INSERT execution ms | 1,268.754 | 2,033.560 | +764.806 (+60.28%) |
+| Logging INSERT WAL bytes | 51,672,534 | 84,103,883 | +32,431,349 (+62.76%) |
+| Nonlogging top-level execution ms | 2,203.873 | 2,846.517 | +642.643 (+29.16%) |
+| Nonlogging top-level WAL bytes | 4,312,252 | 4,345,461 | +33,209 (+0.77%) |
+| Nested calls / execution ms, separately | 8,000 / 66.595 | 8,000 / 57.258 | Equal calls; -9.337 ms |
+| Application CPU seconds, not PG CPU | 105.632 | 92.655 | -12.977 (-12.29%) |
+| Application periods / throttled periods | 2,117 / 2,096 | 1,862 / 1,810 | Actual separate counter windows |
+| Application throttled microseconds | 108,399,530 | 87,202,325 | Not SQL execution time |
+| Shared block hits / reads | 622,102 / 0 | 720,019 / 0 | +97,917 hits; no reads |
+| Shared blocks dirtied / written | 5,137 / 5,146 | 7,154 / 7,161 | +2,017 / +2,015 |
+| WAL records / full-page images | 235,578 / 60 | 273,720 / 316 | +38,142 / +256 |
+| Local and temporary block counters | All zero | All zero | No measured temporary-block spill |
+
+Logging accounts arithmetically for **54.34% of additional top-level
+execution** and **99.90% of additional top-level WAL**. Nonlogging execution
+also increased, so this is not a logging-only execution change.
+The logging statement mean increased from 3.965 to 6.355 ms per batch;
+with equal 16,000 rows, its aggregate extra execution is
+**764.806 / 16,000 = 0.047800 ms/row**. The earlier partial study's
+433.506 / 8,000 = 0.054188 ms/row was also an aggregate arithmetic result,
+not a 20 ms HTTP p99 explanation.
+
+Likewise, 1,407.449 ms additional total SQL execution divided by 16,000
+measured HTTP operations per role is about **0.087966 ms/operation**.
+Neither division establishes how a particular request waited for a
+batched write, lock, scheduler period, connection or other work.
+There is no per-request SQL tracing or PostgreSQL CPU measurement.
+Higher full-page-image counts and checkpoint/cache history are additional
+WAL interpretation limits.
+
+### Per-visit measured results and HTTP tails
+
+Every visit contains 1,000 measured cycles and 4,000 measured samples.
+Its logging family has 80 INSERT calls and 4,000 rows. All p50/p95/p99
+values and full samples remain in the linked visit receipts and
+`descriptive-analysis.json`; the table shows p99 to make order/history
+variation visible rather than replacing visits with a favorable pool.
+
+| Visit | Top calls | Top exec ms | Logging exec ms | Logging WAL bytes | App CPU s | Add p99 ms | Populated-read p99 ms | Remove p99 ms | Empty-read p99 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| BAAB-1 B | 23,243 | 1,446.281 | 620.993 | 20,633,860 | 28.838 | 103.330 | 84.287 | 86.013 | 86.257 |
+| BAAB-2 A | 24,243 | 833.227 | 280.838 | 12,856,489 | 26.266 | 109.971 | 57.823 | 99.215 | 62.437 |
+| BAAB-3 A | 24,240 | 763.261 | 281.789 | 12,894,297 | 22.223 | 77.659 | 50.617 | 88.857 | 37.436 |
+| BAAB-4 B | 23,243 | 1,169.346 | 511.368 | 21,766,327 | 21.104 | 103.045 | 62.005 | 62.608 | 49.384 |
+| ABBA-1 A | 24,243 | 905.889 | 326.352 | 13,043,780 | 28.822 | 102.001 | 88.118 | 83.646 | 85.094 |
+| ABBA-2 B | 23,243 | 1,128.402 | 450.497 | 20,987,824 | 22.050 | 77.211 | 59.516 | 81.080 | 71.715 |
+| ABBA-3 B | 23,243 | 1,136.048 | 450.701 | 20,715,872 | 20.663 | 53.456 | 54.858 | 88.946 | 74.529 |
+| ABBA-4 A | 24,243 | 970.250 | 379.775 | 12,877,968 | 28.321 | 91.190 | 75.249 | 98.760 | 78.388 |
+
+Each pooled row below retains all 4,000 samples for that operation/role;
+it is not an admission statistic or a replacement for the visit table.
+
+| Operation | A p50 / p95 / p99 ms | B p50 / p95 / p99 ms |
+|---|---:|---:|
+| Add | 12.530 / 53.511 / 98.131 | 10.963 / 39.229 / 89.992 |
+| Populated read | 5.030 / 27.605 / 68.094 | 4.851 / 28.703 / 67.618 |
+| Remove | 10.553 / 49.029 / 94.212 | 9.883 / 41.713 / 83.281 |
+| Empty read | 4.923 / 27.625 / 75.935 | 4.707 / 28.792 / 71.953 |
+
+### Fingerprint-level findings and classification limits
+
+All 132 reference and 152 candidate fingerprint records, including
+zero-delta records, remain in `descriptive-analysis.json`.
+Twelve reference and fifteen candidate records had positive call deltas,
+including one nested fingerprint per role. Full hashed identities, string
+query IDs, top/nested flags, means, rows and every available block/temp/WAL
+counter are retained. Prefixes below are display abbreviations only.
+
+| Role / level | Fingerprint prefix | Recorded family / operation | Calls | Execution ms | Rows | WAL bytes |
+|---|---|---|---:|---:|---:|---:|
+| A top | `1287f7333f07` | RequestLog / INSERT | 320 | 1,268.754 | 16,000 | 51,672,534 |
+| B top | `871c0a0b86c9` | RequestLog / INSERT | 320 | 2,033.560 | 16,000 | 84,103,883 |
+| A top | `893e9aa443db` | ScimResource / SELECT | 24,000 | 671.407 | 24,000 | 1,344 |
+| A top | `bc1def86bd2b` | ResourceMember / SELECT | 24,003 | 355.029 | 12,003 | 832 |
+| B top | `dd988e886af7` | Mixed / SELECT | 16,000 | 878.151 | 16,000 | 35,870 |
+| B top | `848a6f179312` | Mixed / SELECT | 8,000 | 432.268 | 8,000 | 0 |
+| A top | `01629902672b` | ResourceMember / INSERT | 4,000 | 521.844 | 4,000 | 2,479,776 |
+| B top | `66ef960f4507` | ResourceMember / unresolved operation | 4,000 | 610.292 | 4,000 | 2,483,567 |
+| A top | `666edf15fe19` | ScimResource / UPDATE | 8,000 | 368.873 | 8,000 | 1,610,963 |
+| B top | `8d070fa04d58` | ScimResource / UPDATE | 8,000 | 356.640 | 8,000 | 1,610,008 |
+| B top | `6cb13ba98292` | Endpoint / unresolved operation | 16,000 | 298.044 | 16,000 | 0 |
+| A top | `f8cbda416705` | ResourceMember / DELETE | 8,000 | 125.712 | 4,000 | 219,145 |
+| B top | `f8cbda416705` | ResourceMember / DELETE | 4,000 | 73.663 | 4,000 | 216,016 |
+| A nested | `0dbe2a1c6509` | ScimResource / SELECT | 8,000 | 66.595 | 8,000 | 476,340 |
+| B nested | `0dbe2a1c6509` | ScimResource / SELECT | 8,000 | 57.258 | 8,000 | 435,320 |
+
+The same hashed DELETE family had 4,000 fewer calls with the same affected
+row count. The net total is 3,997 fewer calls because other fingerprints
+also differ. This is an observed query-mix contribution, not a traced
+code-path cause. Logging SQL has different fingerprints across releases,
+so equal call/row counts do not establish identical SQL shape.
+`mixed` and `unresolved` are deliberately coarse classifier results,
+not guesses about hidden SQL. The complete records retain smaller
+families omitted from this human-facing concentration table.
+
+The parent's separate source-history evidence found RequestLog secondary
+indexes growing from seven to ten, including the URL GIN index, other
+index changes and persisted `endpointName`. Those facts are consistent
+with investigating write amplification, but do not prove that GIN caused
+this difference. Its historical read-win claims were not reproduced here.
+Parent evidence:
+`logging-write-amplification-source-20261023.json` in the parent session's
+persistent evidence directory. That production-history research was not
+repeated, and no production code or index was changed.
+
+**Next bounded engineering action:** preregister a disposable, same-payload
+current-index-set versus minus-only-URL-GIN counterfactual, with explicit
+read-query regression guards and fixed WAL/checkpoint accounting, before
+seeking authorization to execute it. This study does not authorize that
+experiment or a production index drop, and it would answer only part of
+the broader nonlogging execution contrast.
+
+### Execution issue, evidence closure and remaining holds
+
+**DS-03-PREFLIGHT, tooling/fixture, Low:** the first local launcher compared
+all container IDs with the historical three-ID shared-container snapshot. It stopped
+before the runner, requests, SQL or resource allocation. Independent
+metadata showed the same three expected containers running plus five exited,
+non-owned containers. The correction compared lifecycle-equivalent
+running sets and separately preserved the exited set, using that recorded
+inventory without repeating Docker preflight or starting a second runner.
+The original intent and blocked metadata remain unchanged.
+
+The actual bounded PowerShell regression reproduced the old mismatch,
+passed the corrected guard and passed three exact-cause negative controls
+for a changed running ID, an already-invoked runner and an owned resource.
+It dispatched no Docker or workload. The correction and evidence hashes
+were preregistered before the sole runner invocation. The issue was
+captured when the guard fix passed, in `execution-issue-preflight.json`.
+It escaped the earliest metadata-shape check because the one-off launcher
+had no state-matched inventory fixture; that fixture now exists.
+
+| Gate or proof | Result |
+|---|---|
+| Existing 84-test aggregate | Prior PASS preserved, not rerun unchanged |
+| Local launch-guard regression | PASS: causal RED, corrected positive, three intended-cause negatives; zero workload |
+| Authorized statement runner | **COMPLETE 8/8**, native exit zero, no failures/action failures |
+| Policies, resource/counter guards, 132 current assertions and four complete privacy receipts | PASS |
+| Seven streaming captures, ownership/removal/network and independent postflight | PASS |
+| Frozen-source and historical evidence seal | PASS: current 24 inputs, original DS-01 21 evidence files / 23 frozen inputs, prior failures and 84/66-test evidence preserved |
+| Postrun runtime source changes / repeated suites | None / none |
+| Content-only documentation validation | `pwsh -NoProfile -File scripts\audit-doc-freshness.ps1 -SkipCoupling`: PASS, 27 docs; `git diff --check`: PASS. Not a full deployment/coupling gate |
+
+Exact hashes:
+
+- Raw report: `2b1a447bff7a150ed3a43000bee00dbc166cce2ecbceb97e1b1aafbf12256b1e`.
+- Preallocation manifest: `b557bd264dea533298a3517f79a3c170ca6de918cd7073088b2306e539443648`.
+- Runtime manifest: `7e60d8d70319fbd553ad0053ea1d00550bc2df9f34af6537df193d1a99123d82`.
+- Evidence seal: `a0ab5668252b3eb9a828711d18c0798e3f19249686fdf2d03e4c9ccd5b23d027`.
+
+`summary-metrics.json` reconciles counts, traces, settings and absolute
+contrasts; `sealed-evidence.json` binds every new receipt/analysis hash,
+all 24 frozen inputs, image/build/qualification proofs and unchanged
+historical bytes. `postflight-final.json` records independent absence and
+unchanged unrelated inventory. All 90 local branches and ten stashes were
+checked before the ordinary report commit; its closeout checks every
+other branch and stash again.
+
+**Self-improvement: applied.** The state-matched inventory regression
+closes the launch-fixture gap, and this run supplies actual large-output
+validation of DS-02's bounded scanner. **Architecture: accepted.**
+No postrun runtime code, abstraction, dependency, protocol or configuration
+knob was added; the existing runner and analyzer were reused.
+This account reconciles the actual run, source and named evidence, not an
+unavailable full parent transcript or the lost historical native error.
+
+The earlier DS-01 remains **INVALID**, and its native inner cause remains
+**UNKNOWN**. Original production-image failures, the original negative
+0.55.58 evidence and all admission restrictions remain unchanged.
+No build, separate functional/capability/smoke rerun, release-baseline adoption,
+push, PR251 change, CI, cloud operation or deployment occurred.
+
 ## DS-02: bounded complete-console capture and native causes (2026-10-24)
 
 **Executive summary:** the source-only correction is implemented and the
