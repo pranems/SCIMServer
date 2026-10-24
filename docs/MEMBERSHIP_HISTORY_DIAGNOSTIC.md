@@ -18,6 +18,7 @@ replaced, and no release admission or deployment follows from these checks.
 | CR-05 | Validation capacity / Medium | The configured retry passed 29 gates but Vitest lost 15 worker processes. Only 109/124 files completed, despite 1,301 reported passing assertions. The log retained generic unexpected exits, not a proven native cause. | Run the same complete web selector with two workers. All 124 files / 1,655 tests passed with no pending tests. Apply that explicit worker bound to pre-push and both CI jobs, without changing assertions, skips, timeouts or admission thresholds. | The ordinary web gate correctly rejected incomplete execution. A new wiring regression protects the complete selector and worker limit. The original process exits are not retrospectively attributed to memory exhaustion or another unmeasured cause. Applied; the complete protected retry is still required. |
 | CR-06 | Editing scope / Low | A repeated `npm test` command was initially changed in the neighboring API gate instead of the web gate. | Anchor the correction to the named gate blocks and add a negative regression requiring the API command to stay unchanged. | The new web wiring test caught the wrong target before any altered API command ran. Earliest useful gate: focused command-scope regression. Applied. |
 | CR-07 | CI input availability / Medium | Exact-tip branch CI failed four tests because checkout retained only the tip commit. Historical `git show` and the pinned ancestor check could not resolve their required commits. The two bounded GIN children consequently stopped before their intended fake-image/SQL failures. | Fetch complete history in both ordinary validation checkouts and protect that setting with a fifth wiring regression. Keep all four tests and their fail-closed source checks unchanged. | CI caught this; an independent depth-one checkout reproduced the same four failures. Fetching history alone made all 38 relevant tests complete with 34 passed / four evidence-dependent skips and zero failures. Earliest useful gate: a real isolated checkout with CI-equivalent history. Applied. |
+| CR-08 | Test deadline fidelity / Medium | The next protected hook stopped because a positive cleanup fixture reported capture failure. Its child had an independent 700 ms cap despite 1,800 ms remaining for cleanup. | Keep the original 1,800 ms absolute deadline and 4,000 ms test bound, but let the positive child use the remaining cleanup budget. Make the successful fixture wait 800 ms so the old cap fails deterministically; include safe lifecycle details in failed assertions. No production deadline changes. | The hook caught the original failure. A controlled 800 ms child reproduced termination under the old cap; the corrected lifecycle and wiring files passed 16/16. Earliest useful gate: this focused positive native-child regression. Applied. |
 
 ### Evidence and limits
 
@@ -82,6 +83,22 @@ absence-of-ignored-evidence claim, not shallow-checkout compatibility.
 The isolated clone's own `.git` directory makes that additional condition
 explicit. Runtime ancestry checks are not relaxed and missing history is
 not converted into a test skip.
+
+The first protected push of the history correction (`8b8129ac`) was blocked
+after 140.3 seconds: membership had 223 passed / one failed / two explicit
+skips out of 226, and later gates did not run. The original capture assertion
+did not retain its child error, so its exact native cause is unverified.
+`cleanup-budget-red.log` separately proves that an otherwise successful
+800 ms child is terminated by the fixture's 700 ms cap before its unchanged
+1,800 ms absolute cleanup deadline. `cleanup-budget-green.log` records
+16/16 lifecycle and wiring tests passing after the correction. This repairs
+the test's budget model, not a production performance threshold or a waiver.
+
+Design/architecture disposition: accepted. These corrections configure
+required CI inputs and align one cohesive fixture with its existing deadline;
+they add no production responsibility or dependency edge. Another abstraction
+would not improve this bounded correction. Test/gate improvement: applied
+through the checkout wiring control and deterministic slow-success fixture.
 - `fresh-installed-green-all.log`: all 15 membership test files completed
   in 105.376 seconds, with 213 passed, zero failed and eight explicit
   skips out of 221 registered tests. Seven skips require local evidence

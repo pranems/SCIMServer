@@ -58,24 +58,25 @@ test('real failing capture and hanging removal retain separate first safe causes
 });
 
 test('exhausted work budget retains reserved cleanup and real slow success', { timeout: 4000 }, async () => {
-  const deadline = Date.now() + 1800;
+  const cleanupBudgetMs = 1800;
+  const deadline = Date.now() + cleanupBudgetMs;
   const workDeadline = Date.now() - 1;
   assert.throws(() => history.commandTimeout(workDeadline, deadline, false, 700),
     error => error.code === 'LIFECYCLE_DEADLINE' && error.actionFailure.phase === 'work');
   const result = await history.finalizeOwned(['pg'], {
     role: () => 'pg',
     async capture() {
-      const timeout = history.commandTimeout(workDeadline, deadline, true, 700);
-      await fakeCli('setTimeout(()=>process.exit(0),80)', timeout);
+      const timeout = history.commandTimeout(workDeadline, deadline, true, cleanupBudgetMs);
+      await fakeCli('setTimeout(()=>process.exit(0),800)', timeout);
     },
     async remove() {
-      await fakeCli('process.exit(0)', history.commandTimeout(workDeadline, deadline, true, 700));
+      await fakeCli('process.exit(0)', history.commandTimeout(workDeadline, deadline, true, cleanupBudgetMs));
     },
     async verify() { return true; },
   });
   assert.equal(result.verified, true);
-  assert.equal(result.rows[0].capture, true);
-  assert.equal(result.rows[0].removed, true);
+  assert.equal(result.rows[0].capture, true, JSON.stringify(result));
+  assert.equal(result.rows[0].removed, true, JSON.stringify(result));
   assert.equal(result.failures, undefined);
   assert.ok(Date.now() < deadline);
 });

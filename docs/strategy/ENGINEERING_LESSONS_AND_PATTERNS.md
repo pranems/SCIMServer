@@ -114,6 +114,13 @@ reproduced at depth one and disappeared after fetching history alone,
 without changing or skipping their assertions. Declare history availability
 as a validation input and guard the active checkout setting.
 
+A positive cleanup fixture must model the reserved cleanup budget, not
+silently impose a tighter per-child startup deadline. Keep the absolute
+deadline unchanged, exercise a successful child that would exceed the old
+independent cap, and retain sanitized lifecycle details on assertion failure.
+This separates testing deadline enforcement from accidentally measuring
+native process startup speed on a shared host.
+
 The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
 records exact RED/GREEN results and the still-unqualified runtime outcome.
 The correction reuses existing finalizer/privacy modules rather than adding

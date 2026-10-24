@@ -44,6 +44,15 @@ validation checkouts now request complete history; all five wiring checks
 pass. A new protected push and exact-tip CI remain required for that
 correction. No tests, ancestry checks or release holds were waived.
 
+The protected push of `8b8129ac` then stopped at the membership gate
+(223 passed / one failed / two explicit skips out of 226). A positive
+cleanup fixture had an independent 700 ms child cap inside its 1,800 ms
+reserved deadline. A controlled 800 ms successful child reproduced that
+premature termination. The fixture now uses the remaining original deadline,
+retains safe failure details and passes all 16 focused lifecycle/wiring
+tests. Production deadlines and test outer bounds are unchanged; another
+normal protected push is required.
+
 ### Separate disposable URL GIN counterfactual (2026-10-24)
 
 The opt-in database-only runner and causal source/fixture guards are
