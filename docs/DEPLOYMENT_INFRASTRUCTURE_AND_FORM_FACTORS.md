@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-24 - **Repo version at capture:** `api/package.json` = `0.55.54`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-28 - **Repo version at capture:** `api/package.json` = `0.55.54`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -138,6 +138,33 @@ removed; label-scoped absence was verified. This is local Docker evidence,
 not publication, local-node evidence or an Azure update. A depth-10 JSON
 diagnostic warning remains explicit; the parsed summary and 1,729 test
 entries agree with the console result.
+
+## Draft campaign execution boundary (2026-10-28 source change)
+
+The qualification, CPU timeline and native-function workflows retain their
+existing workloads, timeouts, shared concurrency group, permissions and
+admission limits. Only allocation during draft consolidation changes:
+
+| Invocation | Expensive campaign job | Ordinary correctness CI |
+|---|---|---|
+| Draft pull request opened, synchronized or reopened | Skipped before runner allocation | Still runs |
+| Non-draft pull request opened, synchronized or reopened | Runs as before | Still runs |
+| Draft marked ready for review | Runs through explicit `ready_for_review` event | Existing checks remain required |
+| Explicit workflow dispatch | Runs, including when a draft exists | Does not substitute for normal CI |
+
+This makes PR #251's preserved-history reconciliation possible without
+automatically repeating frozen failed experiments. A skipped draft job is
+not performance qualification and cannot clear the failed same-image control
+or authorize merge/deployment. Keep the PR draft until a reviewed measurement
+and release-admission route is ready. Explicit dispatch can allocate the
+campaign deliberately; no dispatch was performed for this change.
+
+The new source-boundary test evaluates all three actual job conditions for
+draft, non-draft and dispatch inputs. It also requires the ready event and
+confirms both ordinary validation jobs remain unconditionally active with
+the complete membership selector. The focused four-file aggregate passed
+116/116 after the missing-boundary RED; no workload or threshold changed.
+This verification updates source/workflow facts only, not live-estate claims.
 
 ## Portable diagnostic test coverage (2026-10-24 source change)
 

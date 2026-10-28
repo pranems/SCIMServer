@@ -16,6 +16,20 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Separate draft consolidation from expensive campaign admission
+
+PR synchronization is not always an experiment request. When preserving
+already measured source and evidence, an automatic frozen campaign can
+silently become an unchanged retry. Use the native draft boundary for
+expensive job allocation, retain ordinary correctness/contract CI, and add
+the ready-for-review event so leaving draft restores automatic execution.
+Explicit dispatch remains a deliberate allocation path.
+
+Test the actual job conditions for draft, non-draft and dispatch inputs and
+protect ordinary CI from inheriting the draft skip. Record skipped campaigns
+as unexecuted, not qualified. This avoids a general scheduler or label-policy
+abstraction while preserving the independent release-admission requirement.
+
 ### Recover shared tooling without resetting unrelated work
 
 The Docker context-metadata sharing violation recurred on 2026-10-28 after

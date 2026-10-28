@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '../..');
 const unitCommand = /^\s+run: node --test --test-reporter=tap --test-concurrency=1 scripts\/test\/membership-\*\.test\.cjs\s*$/m;
@@ -23,6 +24,41 @@ test('ordinary CI retains the Git history required by source identity and histor
     assert.ok(first >= 0 && next > first, file);
     assert.match(source.slice(first, next), /^\s+fetch-depth: 0\s*$/m,
       `${file} must provide the immutable historical commits used by the tests`);
+  }
+});
+
+test('draft consolidation pauses expensive campaigns but readiness and explicit dispatch retain execution', () => {
+  for (const [file, job] of [
+    ['performance-qualification.yml', 'qualify'],
+    ['membership-cpu-diagnostic.yml', 'diagnose'],
+    ['membership-function-diagnostic.yml', 'profile'],
+  ]) {
+    const source = fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8');
+    assert.match(source, /^    types: \[opened, synchronize, reopened, ready_for_review\]$/m, file);
+    const header = source.slice(source.indexOf(`\n  ${job}:`), source.indexOf('    steps:'));
+    const condition = header.match(/^    if: \$\{\{ (.+) \}\}$/m);
+    assert.ok(condition, `${file} must guard allocation at the job boundary`);
+    for (const [event, draft, expected] of [
+      ['pull_request', true, false],
+      ['pull_request', false, true],
+      ['workflow_dispatch', undefined, true],
+    ]) {
+      const github = {
+        event_name: event,
+        event: draft === undefined ? {} : { pull_request: { draft } },
+      };
+      assert.equal(vm.runInNewContext(condition[1], { github }), expected, `${file}: ${event}/${draft}`);
+    }
+    assert.match(source, /^  workflow_dispatch:$/m, file);
+    assert.match(source, /^  group: membership-performance-qualification$/m, file);
+  }
+  for (const file of ['build-test.yml', 'build-and-push.yml']) {
+    const source = fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8');
+    const first = source.indexOf('\n  validate:');
+    const last = source.indexOf('    steps:', first);
+    assert.ok(first > 0 && last > first, file);
+    assert.doesNotMatch(source.slice(first, last), /^    if:/m, `${file} must retain ordinary draft validation`);
+    assert.match(source, unitCommand, file);
   }
 });
 

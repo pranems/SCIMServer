@@ -3,6 +3,7 @@ name: Membership CPU timeline diagnostic
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/membership-cpu-diagnostic.yml'
       - 'scripts/performance/**'
@@ -20,6 +21,7 @@ concurrency:
 
 jobs:
   diagnose:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

@@ -21,8 +21,12 @@ On 28 October, the unchanged diagnostic branch contains both current master
 match master. All original commits are preserved. PR #251 has no unresolved
 review threads but remains conflicting at its older head; its current
 pull-request synchronization triggers would rerun three frozen campaigns.
-Reconciliation is not complete until that execution boundary is settled
-without suppressing required contract tests or performance admission.
+PR #251 was converted to draft before synchronization. The source correction
+now skips the three expensive jobs only on draft PR events; non-draft
+events, explicit dispatch and the added `ready_for_review` event retain
+campaign execution. Both ordinary correctness jobs remain unconditional
+and select the complete membership contracts. Reconciliation remains pending
+normal protected publication and exact-tip CI; a draft skip is not admission.
 
 The recovered Docker engine is responsive through the user's isolated
 configuration. A fresh exact-digest scan now confirms two HIGH findings in
@@ -31,6 +35,30 @@ published 0.55.60, not a diagnostic performance result. See the
 and [issue #256](https://github.com/pranems/SCIMServer/issues/256).
 No index removal, new workload, threshold change, baseline adoption, merge
 or deployment follows from this checkpoint.
+
+### CR-09: draft synchronization must not repeat frozen campaigns
+
+The workflow audit found that all three old campaigns allocate on a relevant
+PR synchronization, even when the intent is only preserving reviewed source
+and evidence. This was detected before any new campaign, rather than by
+canceling one after allocation. A missing-boundary test failed first.
+The three job conditions now evaluate false for draft PRs, true for non-draft
+PRs and true for explicit dispatch. The ready-for-review event is explicit.
+The test also protects ordinary CI from acquiring a draft skip.
+
+The affected qualification, timeline, native-profile and wiring aggregate
+passed 116/116 with no skips; all three workflow YAML files parsed.
+Evidence: `test-results/release-resume-20261028/draft-campaign-boundary-red.log`
+and `draft-campaign-boundary-green.log`. No application, workload, quota,
+sample, timeout, threshold or historical failed receipt changed.
+
+Detection-stage disposition: applied at the pre-publication trigger audit,
+the earliest useful stage. Test/gate improvement: applied through the
+source-bound job-condition matrix and ordinary-CI counter-check.
+Design disposition: accepted. A native draft lifecycle boundary is sufficient;
+another scheduler, label policy or general execution framework would add
+unnecessary responsibility. PR readiness remains a deliberate transition,
+not a way to call skipped performance evidence green.
 
 ## Consolidation corrections (2026-10-24, source-only)
 

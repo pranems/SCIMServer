@@ -31,10 +31,14 @@ Raw scan, advisory and database receipts are retained under
 `test-results/release-resume-20261028/`.
 
 Updating #251's head currently auto-launches three old frozen campaigns.
-Do not silently advance it or rerun those campaigns unchanged. Settle that
-execution boundary with a reviewed change while preserving ordinary CI,
-contracts and the independent performance-admission hold. No merge,
-deployment, serving-code edit or performance waiver occurred.
+PR #251 was converted to draft before synchronization. The source correction
+skips the three expensive jobs only for draft PRs, keeps explicit dispatch
+and non-draft execution, and adds `ready_for_review` so readiness triggers
+the normal campaigns. The regression evaluates actual conditions and protects
+unconditional ordinary CI; 116/116 affected contracts and workflow YAML pass.
+Normal protected publication/exact-tip CI remain pending. A skipped draft
+campaign is not qualification; preserve the independent admission hold.
+No merge, deployment, serving-code edit or performance waiver occurred.
 See the [current diagnostic status](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
 
 | Date | Summary |
