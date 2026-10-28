@@ -16,6 +16,24 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Recover shared tooling without resetting unrelated work
+
+The Docker context-metadata sharing violation recurred on 2026-10-28 after
+the earlier RC-I19 recovery. A reboot had released the earlier lock but had
+not identified its initiating actor. Treat recovery and causal diagnosis as
+separate claims: an ownerless handle scan does not establish a kernel or
+security-product defect.
+
+Before resetting a shared workstation, preserve idle tool storage and
+configuration, then test process-scoped configuration isolation against the
+same data. The recurrence recovered Docker without a Windows restart:
+original metadata replacement access remained error 32, isolated metadata
+access succeeded, the server responded, and a disposable read-only,
+network-disabled workload passed with exact cleanup. Require actual server
+readiness rather than pipe existence, retain a reusable isolated launcher,
+and compare existing resource identities before and after the smoke test.
+This is a continuity mitigation, not proof that the original lock is fixed.
+
 ### Complete-output evidence does not require complete-output retention
 
 DS-02 executed the exact frozen DS-01 work wrapper against a real bounded

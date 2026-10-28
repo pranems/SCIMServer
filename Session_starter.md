@@ -1,6 +1,45 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-24
+**Last verified:** 2026-10-28
+
+### Post-recovery release checkpoint (2026-10-28)
+
+Docker server 29.9.2 responds on desktop-linux when commands use the
+process-scoped configuration under
+`%LOCALAPPDATA%\DockerRecovery\20261028-162019\isolated-config`.
+Do not restart the engine or rewrite the original locked context metadata.
+The original lock's initiating actor remains unverified. The two existing
+uncommitted recovery-ledger updates were present before this continuation.
+
+Owned HEAD and remote remain `8321dab6`; GitHub master is `5bfff2de`.
+The final 24 October protected push passed 30/30 gates in 1,594.7 seconds;
+Build Test Image `40061707692` and CodeQL `40061707691` passed on that exact
+tip. Those receipts supersede the source-time "retry pending" entries below,
+without erasing the earlier failures. No application API/web tree differences
+exist against that master. PR #251 has zero unresolved review threads, but its
+older head is still conflicting. Its remote head and current master are both
+ancestors of the preserved diagnostic branch.
+
+Fresh Trivy 0.76.1 scanning of the exact published 0.55.60 digest completed
+with exit 1: HIGH body-parser 2.3.0/CVE-2026-111181 and
+multer 2.4.0/CVE-2026-113872. The approved feed rejects the listed fixes
+2.4.0 and 2.5.0 with E404; their exact npm publication/eligibility dates
+are unverified. No registry bypass, installation or new ignore entry occurred.
+Recheck approved availability on 30 October and use CI-only regeneration
+once actual age and compatibility are proved. Issue #256 remains open.
+Raw scan, advisory and database receipts are retained under
+`test-results/release-resume-20261028/`.
+
+Updating #251's head currently auto-launches three old frozen campaigns.
+Do not silently advance it or rerun those campaigns unchanged. Settle that
+execution boundary with a reviewed change while preserving ordinary CI,
+contracts and the independent performance-admission hold. No merge,
+deployment, serving-code edit or performance waiver occurred.
+See the [current diagnostic status](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
+
+| Date | Summary |
+|---|---|
+| 2026-10-28 | Verified isolated Docker readiness; completed exact-release scan and identified two HIGH findings with an approved-feed hold; reconciled preserved branch ancestry and PR review/thread state without launching old campaigns. |
 
 ### Diagnostic consolidation review corrections (2026-10-24)
 

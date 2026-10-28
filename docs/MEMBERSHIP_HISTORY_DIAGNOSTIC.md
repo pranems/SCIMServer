@@ -1,7 +1,36 @@
 # Local application-history diagnostic
 
-**Last verified:** 2026-10-24
+**Last verified:** 2026-10-28
 **Scope:** Unreleased local tooling, never release admission.
+
+## Current consolidation and release checkpoint (2026-10-28)
+
+The final protected push at `8321dab6` passed 30/30 Validate gates in
+1,594.7 seconds. Exact-tip
+[Build Test Image 40061707692](https://github.com/pranems/SCIMServer/actions/runs/40061707692)
+and [CodeQL 40061707691](https://github.com/pranems/SCIMServer/actions/runs/40061707691)
+passed. Local membership reports 224 passed / two explicit skips out of 226;
+CI reports 218 passed / eight explicit skips. API unit reports 6,214 passed,
+API E2E 2,514 passed with 42 existing skips, and web all 124 files / 1,655
+passed. API lint retains 512 warnings and web TypeScript 66 errors within
+its 96-error ratchet. These later receipts supersede pending-push wording
+in the historical correction entries below.
+
+On 28 October, the unchanged diagnostic branch contains both current master
+`5bfff2de` and PR #251's remote `f6f03a52` as ancestors. Its API/web trees
+match master. All original commits are preserved. PR #251 has no unresolved
+review threads but remains conflicting at its older head; its current
+pull-request synchronization triggers would rerun three frozen campaigns.
+Reconciliation is not complete until that execution boundary is settled
+without suppressing required contract tests or performance admission.
+
+The recovered Docker engine is responsive through the user's isolated
+configuration. A fresh exact-digest scan now confirms two HIGH findings in
+published 0.55.60, not a diagnostic performance result. See the
+[supply-chain checkpoint](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-10-28-exact-release-image-scan-and-approved-feed-hold)
+and [issue #256](https://github.com/pranems/SCIMServer/issues/256).
+No index removal, new workload, threshold change, baseline adoption, merge
+or deployment follows from this checkpoint.
 
 ## Consolidation corrections (2026-10-24, source-only)
 

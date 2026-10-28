@@ -9,6 +9,48 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-28 exact-release image scan and approved-feed hold
+
+After isolated Docker recovery, the exact published 0.55.60 image
+`sha256:316a645f021b5c9b833c295d94248e7df00ee37aa13d6d5614e55f9f04c83a4b`
+was exported locally and scanned without starting an application or database.
+Official Trivy 0.76.1, verified against its release SHA-256, used database
+update `2026-10-28T19:18:03.419608319Z`. The existing HIGH/CRITICAL,
+ignore-unfixed and unchanged `.trivyignore` policy completed with exit 1:
+
+| Actual runtime package | HIGH advisory | Listed fix |
+|---|---|---|
+| body-parser 2.3.0 | [GHSA-27r3-jxmh-p828 / CVE-2026-111181](https://github.com/advisories/GHSA-27r3-jxmh-p828) | 2.4.0 |
+| multer 2.4.0 | [GHSA-q7qp-rjg7-q26m / CVE-2026-113872](https://github.com/advisories/GHSA-q7qp-rjg7-q26m) | 2.5.0 |
+
+These are two scanner findings in the actual candidate, not proven exploit
+paths. The approved feed returned E404 for both fixed versions and omitted
+their publication-time entries. GitHub release timestamps are 22 October,
+but GitHub release age is not npm publication age. Quarantine is a plausible
+availability explanation, not a verified cause of E404 or an exact eligibility
+date. Client `min-release-age=undefined` does not remove proxy enforcement.
+
+No public-registry fallback, install, lockfile regeneration, manifest edit
+or new suppression was performed. Recheck approved-feed availability on
+30 October, prove actual npm age and compatibility, then use the existing
+CI-only regeneration route for the smallest exact-pin correction. Until
+then retain the security hold. Issue
+[#256](https://github.com/pranems/SCIMServer/issues/256) tracks this plus other
+independently reported pins; do not close it from this two-finding scan.
+
+Receipts remain under `test-results/release-resume-20261028/`: Trivy JSON/log,
+database metadata, image identity, official checksum list and advisory JSON.
+The 24 October branch scan PASS is historical, not current clearance.
+Self-improvement is applied through exact-digest rescanning and a dated
+follow-up. Design disposition is accepted: the existing override/regeneration
+mechanism is sufficient; a new package mechanism would be speculative.
+
+Execution friction was confined to the harness: an initial PowerShell
+`foreach` pipeline was rejected before dispatch and was corrected to collect
+an array; `gh release view --tag` was rejected and corrected to the documented
+positional tag. Neither attempt scanned, installed or altered a package.
+Both were caught at command parsing, the earliest available stage.
+
 ### 2026-10-23 web ip-address exact override correction (#248)
 
 The next independent proposed patch, 0.55.60, updates the web override to
