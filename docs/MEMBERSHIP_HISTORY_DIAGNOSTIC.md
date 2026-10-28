@@ -16,17 +16,21 @@ passed. API lint retains 512 warnings and web TypeScript 66 errors within
 its 96-error ratchet. These later receipts supersede pending-push wording
 in the historical correction entries below.
 
-On 28 October, the unchanged diagnostic branch contains both current master
+On 28 October, the preserved diagnostic branch contains both current master
 `5bfff2de` and PR #251's remote `f6f03a52` as ancestors. Its API/web trees
-match master. All original commits are preserved. PR #251 has no unresolved
-review threads but remains conflicting at its older head; its current
-pull-request synchronization triggers would rerun three frozen campaigns.
+match master. All original commits are preserved.
 PR #251 was converted to draft before synchronization. The source correction
 now skips the three expensive jobs only on draft PR events; non-draft
 events, explicit dispatch and the added `ready_for_review` event retain
 campaign execution. Both ordinary correctness jobs remain unconditional
-and select the complete membership contracts. Reconciliation remains pending
-normal protected publication and exact-tip CI; a draft skip is not admission.
+and select the complete membership contracts. The normal protected push to
+PR #251 advanced its head to `6716b3bb` after 30/30 gates passed in 1,228.6
+seconds. It is now conflict-free, still draft. Both image workflows passed
+ordinary validation and failed Trivy on the two known HIGH findings.
+CodeQL, docs freshness and RFC currency workflows passed. All three campaign
+jobs were skipped with null runner identities and zero steps. A draft skip
+is not admission. CodeQL also surfaced the archive-race review addressed
+in CR-11 below; its correction still needs publication and exact-tip checks.
 
 The recovered Docker engine is responsive through the user's isolated
 configuration. A fresh exact-digest scan now confirms two HIGH findings in
@@ -84,8 +88,44 @@ Detection-stage disposition: applied through real upstream refresh; an
 offline expiry check at consolidation entry could have caught this before
 the hook's earlier static gates. Self-improvement: check calendar-bound
 evidence before long consolidation, rather than assuming an unchanged
-source tree preserves its validity. Design disposition: accepted; the
-existing corpus updater and 90-day gate are sufficient.
+source tree preserves its validity. The subsequent protected push passed
+all 30 gates. Design disposition: accepted; the existing corpus updater and
+90-day gate are sufficient.
+
+### CR-11: captured evidence must not be reopened through a replaceable name
+
+The 28 October CodeQL review
+[comment](https://github.com/pranems/SCIMServer/pull/251#discussion_r4407248843)
+flagged the derived-reference archive reader. The tool exclusively created
+the output, sent Docker's capture to its descriptor, closed it, then read
+the pathname. A different file could occupy that name before verification.
+This is a High scanner finding in local diagnostic tooling, not evidence
+of an observed exploit or an application request-path defect.
+
+The correction retains a single exclusively created read/write descriptor
+until capture, container-state verification and archive reading finish.
+The reader uses positional reads starting at zero because the capture child
+leaves the shared file offset at EOF. Short reads are accumulated, premature
+EOF fails explicitly, and the descriptor closes in `finally`. No pathname
+is reopened for archive verification. The existing tar, byte-distribution,
+ownership, time-budget and non-admission checks remain unchanged.
+
+The new regression was RED before implementation. Its GREEN result proves
+that replacing the pathname changes the old pathname-based result but not
+the owned-descriptor bytes; it also exercises the EOF offset, short reads
+and premature EOF rejection. Three privacy files report 20 passed, zero
+failed and one explicit retained-source skip out of 21. Evidence is retained
+in `archive-descriptor-red.log` and `archive-descriptor-green.log` under
+`test-results/release-resume-20261028/`. No Docker build or campaign ran.
+
+Detection-stage escape: hosted CodeQL review caught what the existing byte
+and archive-format tests did not cover; the earliest suitable gate was a
+local pathname-replacement regression. Test/gate improvement: applied through
+that regression and caller wiring checks. Design disposition: accepted.
+One small positional-reader helper supports the existing capture lifecycle;
+another filesystem abstraction or scheduler is not justified. A successful
+CodeQL workflow alone is not proof of no findings. Publication and hosted
+alert confirmation are still required; no alert is manually dismissed.
 
 ## Consolidation corrections (2026-10-24, source-only)
 

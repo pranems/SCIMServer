@@ -112,6 +112,16 @@ function assertNoOnBuild(config) {
   return config.OnBuild === null ? 'null' : 'empty-array';
 }
 
+function readCapturedArchive(fd) {
+  const bytes = Buffer.alloc(fs.fstatSync(fd).size);
+  for (let offset = 0; offset < bytes.length;) {
+    const count = fs.readSync(fd, bytes, offset, bytes.length - offset, offset);
+    assert.ok(count > 0, 'Captured archive truncated while reading');
+    offset += count;
+  }
+  return bytes;
+}
+
 function buildReference(sourceDirectory, outputDirectory) {
   const root = process.cwd();
   for (const directory of [sourceDirectory, outputDirectory]) {
@@ -245,17 +255,18 @@ function buildReference(sourceDirectory, outputDirectory) {
     };
     checkState();
     const archiveFile = path.join(out, 'derived-app.tar');
-    const fd = fs.openSync(archiveFile, 'wx');
+    const fd = fs.openSync(archiveFile, 'wx+');
     let captured;
+    let derivedArchive;
     try {
       commands.push(['docker', '--context', 'desktop-linux', 'cp', `${id}:/app`, '-']);
       captured = spawnSync('docker', ['--context', 'desktop-linux', 'cp', `${id}:/app`, '-'],
         { stdio: ['ignore', fd, 'pipe'], timeout: timeout(false, 90000), maxBuffer: 65536 });
+      if (captured.error) throw captured.error;
+      assert.equal(captured.status, 0, 'Unstarted full application capture');
+      checkState();
+      derivedArchive = readCapturedArchive(fd);
     } finally { fs.closeSync(fd); }
-    if (captured.error) throw captured.error;
-    assert.equal(captured.status, 0, 'Unstarted full application capture');
-    checkState();
-    const derivedArchive = fs.readFileSync(archiveFile);
     const after = readArchive(derivedArchive);
     report.distribution = verifyDistribution(before.entries, after.entries);
     assert.equal(JSON.parse(after.contents.get('app/package.json')).version, '0.55.20');
@@ -287,7 +298,7 @@ function buildReference(sourceDirectory, outputDirectory) {
 }
 
 module.exports = { parentImage, target, originalHash, derivedHash, oldWarning, startupPrefix, newWarning,
-  patchStatements, patchOriginal, readArchive, verifyDistribution, assertNoOnBuild, buildReference };
+  patchStatements, patchOriginal, readArchive, verifyDistribution, assertNoOnBuild, readCapturedArchive, buildReference };
 if (require.main === module) {
   const args = process.argv.slice(2);
   if (args.length !== 3 || args[0] !== '--build-derived-reference') {

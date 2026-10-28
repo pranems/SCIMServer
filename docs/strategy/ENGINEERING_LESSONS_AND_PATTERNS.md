@@ -16,6 +16,22 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Verify captured evidence through the owned descriptor
+
+Exclusive creation protects the initial open, not a later pathname lookup.
+Keep the created descriptor open through child capture and verification,
+then read that descriptor rather than reopening a name another process can
+replace. Read with explicit offsets: a child sharing the descriptor can
+leave its offset at EOF. Accumulate short reads and reject premature EOF.
+
+The 28 October archive regression replaces the path, proves the old pathname
+read sees different bytes, and verifies that the descriptor still yields the
+captured bytes. It also exercises short reads and truncation. This closes
+the gap between archive-format checks and captured-file identity without
+repeating an experiment. A green CodeQL workflow can still publish a new
+finding; inspect the actual alert/review state before declaring it clear.
+See [CR-11](../MEMBERSHIP_HISTORY_DIAGNOSTIC.md#cr-11-captured-evidence-must-not-be-reopened-through-a-replaceable-name).
+
 ### Separate draft consolidation from expensive campaign admission
 
 PR synchronization is not always an experiment request. When preserving

@@ -11,14 +11,22 @@ Do not restart the engine or rewrite the original locked context metadata.
 The original lock's initiating actor remains unverified. The two existing
 uncommitted recovery-ledger updates were present before this continuation.
 
-Owned HEAD and remote remain `8321dab6`; GitHub master is `5bfff2de`.
+The 28 October protected push advanced PR #251 to `6716b3bb`, preserving
+all commits and current master `5bfff2de` as ancestors. It passed all 30
+Validate gates in 1,228.6 seconds. The PR is now conflict-free and remains
+draft. Both exact-tip image workflows passed ordinary validation and failed
+their image scan on the two known HIGH advisories. CodeQL, docs freshness
+and RFC currency workflows passed, but CodeQL added review comment
+`discussion_r4407248843` about reopening a captured archive by pathname.
+The descriptor correction below requires another protected publication.
+The diagnostic remote intentionally remains `8321dab6`.
+
 The final 24 October protected push passed 30/30 gates in 1,594.7 seconds;
 Build Test Image `40061707692` and CodeQL `40061707691` passed on that exact
 tip. Those receipts supersede the source-time "retry pending" entries below,
 without erasing the earlier failures. No application API/web tree differences
-exist against that master. PR #251 has zero unresolved review threads, but its
-older head is still conflicting. Its remote head and current master are both
-ancestors of the preserved diagnostic branch.
+exist against that master. Historical PR head `f6f03a52` and current master
+remain ancestors of the preserved diagnostic branch.
 
 Fresh Trivy 0.76.1 scanning of the exact published 0.55.60 digest completed
 with exit 1: HIGH body-parser 2.3.0/CVE-2026-111181 and
@@ -36,8 +44,9 @@ skips the three expensive jobs only for draft PRs, keeps explicit dispatch
 and non-draft execution, and adds `ready_for_review` so readiness triggers
 the normal campaigns. The regression evaluates actual conditions and protects
 unconditional ordinary CI; 116/116 affected contracts and workflow YAML pass.
-Normal protected publication/exact-tip CI remain pending. A skipped draft
-campaign is not qualification; preserve the independent admission hold.
+Exact-tip campaign jobs were skipped with no runner IDs, runner names or
+steps allocated. A skipped draft campaign is not qualification; preserve
+the independent admission hold.
 No merge, deployment, serving-code edit or performance waiver occurred.
 See the [current diagnostic status](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
 
@@ -48,10 +57,20 @@ live updater verified all 19 RFC mirrors (C1-C5 and O1-O3 PASS), refreshed
 five errata-count records with no new Verified counts, and changed no text
 bytes or update/obsolete graph. The matching offline gate now passes.
 Manifest generation and README counts are preserved; another full hook
-is required. See correction CR-10 and retained update/failed-push receipts.
+passed after this refresh. See correction CR-10 and retained receipts.
+
+The new archive-race review is corrected locally by retaining the exclusively
+created read/write descriptor through capture and verification, then reading
+it with explicit offsets before closing it. The regression replaces the
+pathname, leaves the descriptor at end-of-file, exercises short reads and
+rejects premature EOF. The three privacy files passed 20 tests with one
+explicit retained-source skip out of 21. No Docker campaign was rerun.
+See correction CR-11. Final correction publication and CodeQL confirmation
+remain pending; no merge or release admission is claimed.
 
 | Date | Summary |
 |---|---|
+| 2026-10-28 | Protected reconciliation passed 30/30 gates and removed PR #251 conflicts; exact-tip image scans retained the two HIGH holds; corrected the newly surfaced archive-race review with a descriptor-bound regression. |
 | 2026-10-28 | Verified isolated Docker readiness; completed exact-release scan and identified two HIGH findings with an approved-feed hold; reconciled preserved branch ancestry and PR review/thread state without launching old campaigns. |
 
 ### Diagnostic consolidation review corrections (2026-10-24)

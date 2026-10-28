@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const test = require('node:test');
 const file = path.resolve(__dirname, '../performance/build-membership-privacy-reference.cjs');
@@ -102,4 +103,30 @@ test('optional image OnBuild omission is explicit absence, never a present unkno
   assert.equal(t.assertNoOnBuild({ OnBuild: [] }), 'empty-array');
   for (const value of [['RUN forbidden'], false, '', {}, undefined])
     assert.throws(() => t.assertNoOnBuild({ OnBuild: value }));
+});
+
+test('captured archive reads the owned descriptor from offset zero despite pathname replacement', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-derived-archive-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const archive = path.join(dir, 'archive.tar');
+  const fd = fs.openSync(archive, 'wx+');
+  try {
+    const bytes = Buffer.from('original captured archive');
+    fs.writeFileSync(fd, bytes);
+    fs.renameSync(archive, path.join(dir, 'captured.tar'));
+    fs.writeFileSync(archive, 'replacement must not be read', { flag: 'wx' });
+    assert.notDeepEqual(fs.readFileSync(archive), bytes, 'The previous pathname read observes replacement bytes');
+    assert.deepEqual(tool().readCapturedArchive(fd), bytes,
+      'Read the captured file, not its replaced name or the inherited EOF offset');
+    const read = fs.readSync;
+    t.mock.method(fs, 'readSync', (descriptor, buffer, offset, length, position) =>
+      read(descriptor, buffer, offset, Math.min(length, 3), position));
+    assert.deepEqual(tool().readCapturedArchive(fd), bytes, 'Short reads retain every captured byte');
+    t.mock.method(fs, 'readSync', () => 0);
+    assert.throws(() => tool().readCapturedArchive(fd), /Captured archive truncated while reading/);
+    t.mock.restoreAll();
+  } finally { fs.closeSync(fd); }
+  const source = fs.readFileSync(file, 'utf8');
+  assert.match(source, /derivedArchive = readCapturedArchive\(fd\)/);
+  assert.doesNotMatch(source, /fs\.readFileSync\(archiveFile\)/);
 });
