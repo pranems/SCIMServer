@@ -41,6 +41,15 @@ campaign is not qualification; preserve the independent admission hold.
 No merge, deployment, serving-code edit or performance waiver occurred.
 See the [current diagnostic status](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
 
+The first protected PR reconciliation push passed 24 gates then stopped at
+RFC freshness (91 days versus the unchanged 90-day limit); no remote head
+was published and later application suites did not run. The sanctioned
+live updater verified all 19 RFC mirrors (C1-C5 and O1-O3 PASS), refreshed
+five errata-count records with no new Verified counts, and changed no text
+bytes or update/obsolete graph. The matching offline gate now passes.
+Manifest generation and README counts are preserved; another full hook
+is required. See correction CR-10 and retained update/failed-push receipts.
+
 | Date | Summary |
 |---|---|
 | 2026-10-28 | Verified isolated Docker readiness; completed exact-release scan and identified two HIGH findings with an approved-feed hold; reconciled preserved branch ancestry and PR review/thread state without launching old campaigns. |

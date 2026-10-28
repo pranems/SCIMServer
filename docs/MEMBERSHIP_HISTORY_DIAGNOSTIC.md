@@ -60,6 +60,33 @@ another scheduler, label policy or general execution framework would add
 unnecessary responsibility. PR readiness remains a deliberate transition,
 not a way to call skipped performance evidence green.
 
+### CR-10: calendar expiry blocks otherwise unchanged publication
+
+The first protected PR reconciliation push passed 24 gates, then correctly
+stopped at RFC currency after 505.9 seconds. The manifest's verification date
+was 30 July, 91 days before the current check, exceeding the unchanged 90-day
+limit. API unit/E2E, Prisma generation and web tests did not run afterwards.
+This is expiring external-source evidence, not a workflow-condition failure.
+
+The sanctioned `scripts/sync-rfcs.ps1 -Update` fetched RFC Editor source data
+and verified all 19 mirrors. C1-C5 and online O1-O3 passed; no RFC text bytes,
+status or update/obsolete graph changed. Errata metadata changed for RFCs
+7643, 9865, 6750, 7519 and 8414, with no new Verified counts. The SCIM README
+table now reflects the updated held/reported counts. The manifest was
+generated, not hand-restamped; the same offline gate then passed.
+
+Retained evidence: `protected-pr-reconciliation-push.log`,
+`rfc-corpus-update.log` and `rfc-corpus-offline-green.log` under
+`test-results/release-resume-20261028/`. The failed push published no head.
+Another complete normal hook remains required; no gate or expiry was waived.
+
+Detection-stage disposition: applied through real upstream refresh; an
+offline expiry check at consolidation entry could have caught this before
+the hook's earlier static gates. Self-improvement: check calendar-bound
+evidence before long consolidation, rather than assuming an unchanged
+source tree preserves its validity. Design disposition: accepted; the
+existing corpus updater and 90-day gate are sufficient.
+
 ## Consolidation corrections (2026-10-24, source-only)
 
 Independent review found two reliability defects. Both are corrected and

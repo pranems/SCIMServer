@@ -30,6 +30,13 @@ protect ordinary CI from inheriting the draft skip. Record skipped campaigns
 as unexecuted, not qualified. This avoids a general scheduler or label-policy
 abstraction while preserving the independent release-admission requirement.
 
+Calendar-bound evidence can expire without any source change. Before a long
+consolidation hook, run the existing cheap offline currency checks; when a
+date expires, use the sanctioned live verifier rather than editing the date.
+The 28 October RFC refresh verified all 19 mirror texts, graph metadata and
+errata, changing only the manifest date and five errata-count records. Keep
+dependent human tables synchronized and preserve the original failed hook.
+
 ### Recover shared tooling without resetting unrelated work
 
 The Docker context-metadata sharing violation recurred on 2026-10-28 after
