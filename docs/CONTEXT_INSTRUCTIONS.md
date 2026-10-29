@@ -2,12 +2,80 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.61
-> **Last Updated**: October 21, 2026
+> **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-29 current consolidation:** security PR #258 merged normally at
+`80460d59`. Draft #257 integrates that master while preserving its prior
+`9d6d5c62` fixture/diagnosis history. Product remains 0.55.61 and CI-owned
+locks remain unchanged. Exact integration-tip protected gates and CI are
+required; older source-time results below are historical, not new-tip proof.
+The improved passive Windows observer brackets signaling within 47.4 ms
+with parent callbacks inside, but the remaining native/OS component is
+unassigned. Do not change runtime teardown, deadlines, workers or exclusions.
+PR #251 remains separate at `e5e107f5`. No #257 merge, live mutation or deploy.
+Performance 1.23928982 > 1.10, customer-data proof, cleanup 403, measured
+browser/human visual proof and the global Mermaid conflict remain open.
+Self-improvement: reuse cheap currency preflight before protected broad runs.
+Design disposition: accepted, cohesive test fixtures need no new abstraction.
+Integration preflight passes RFC currency, 27-doc freshness/content, focused
+fixture 99/99, dependency pins 29/29 and actual installed inventory exit 0.
+The existing protected Validate push owns the broad suites; this preflight
+does not claim their result or the new-tip hosted result in advance.
+
+**2026-10-28 independent test-only follow-up:** actual master is `5bfff2de`
+at 0.55.60; #252/#253/#254 are merged. PR #251 is separately preserved at
+`e5e107f5`, draft and conflict-free, with security/performance admission still
+blocked. The current branch corrects two unit SSE fixtures that failed
+to disconnect, plus two prune startup fixtures and their zero-timer guards.
+Both logging controller suites pass 82/82 and exit naturally under
+`--detectOpenHandles`. This is not proof of leak-free full E2E teardown.
+The subsequent full-unit diagnostic identified two more fixture intervals
+in enabled-prune startup tests. They now use constructor-time environment
+configuration instead of the runtime setter before initialization, with a
+zero-timer shutdown guard. The three logging controller/prune suites pass
+99/99. Full serial handle diagnostics then pass 213 suites / 6,214 tests
+and exit naturally in 83.657 seconds without reported open handles.
+Published draft PR #257 at `2d57e785` passes the ordinary protected Fast
+hook 25/25 in 558.6 seconds. Its parallel unit gate passes all 6,214 tests
+without the former unit worker-exit warning. Exact-tip hosted validation,
+CodeQL, documentation and RFC checks pass; Trivy still fails on the two
+known HIGH dependencies. Neither #251 nor #257 is merged or deployed.
+See [RC-I107](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
+No serving-code change or version bump. The older dated entries below are
+historical source-time checkpoints, not current merge/deployment claims.
+
+**2026-10-28 parallel HTTP phase attribution:** two actual two-worker runs
+each reproduce the warning with 2,514 passes / 42 existing skips. Native
+milestones show JavaScript exit within 1.5 ms and the Environment end marker
+within 3.5 ms, but parent exit observation after 5.84 and 6.79 seconds.
+Both workers report code 0; the parent's kill requests return false.
+The measured warning is not evidence of another application timer leak.
+The remaining exit-observation delay is still unassigned: worker native
+finalization, OS notification delivery and parent processing are not yet
+separated. Do not infer native destruction completed at the Environment
+marker, or that the worker remained alive until parent observation.
+Existing deadlines, workers, skips and force-exit settings are unchanged.
+Use [RC-I110](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak)
+before proposing another timer fix or changing a runner setting.
+
+**2026-10-29 passive Windows follow-up:** the unchanged ordinary HTTP
+selectors pass 2,514 tests / 42 skips in 374.41 seconds, warning retained.
+An external, controlled, limited-query/synchronize observer sees exit code
+0 while the owned worker process objects are still unsignaled at 105 and
+166 ms after END. Parent exit callbacks occur at 6.088/6.378 seconds;
+first observed signaled states occur at 6.115/6.418 seconds. Polling samples
+are not exact transition times; unchanged polls and maximum sampling gaps
+were not retained. Pinned libuv source separately checks exit status when
+killing and waits on the process handle for exit notification. This is a
+source-compatible explanation of the apparently conflicting observations,
+not a captured native error or an attribution of the remaining delay to a
+driver, library or parent callback. Keep the warning investigation open.
+No deadline, worker, dependency, product version or application change.
 
 **2026-10-29 independent request-body security correction:** proposed 0.55.61
 pins API body-parser 2.4.0 and multer 2.5.0 from master `5bfff2de`.

@@ -8,18 +8,38 @@ describe('LoggingService - Auto-Prune', () => {
   let prisma: { requestLog: { deleteMany: jest.Mock; count: jest.Mock; findMany: jest.Mock; create: jest.Mock; createMany: jest.Mock } };
   let logger: { info: jest.Mock; error: jest.Mock; debug: jest.Mock; warn: jest.Mock; trace: jest.Mock };
 
+  async function createService(autoPruneEnabled: boolean): Promise<LoggingService> {
+    const saved = {
+      PERSISTENCE_BACKEND: process.env.PERSISTENCE_BACKEND,
+      LOG_AUTO_PRUNE: process.env.LOG_AUTO_PRUNE,
+      LOG_RETENTION_DAYS: process.env.LOG_RETENTION_DAYS,
+      LOG_PRUNE_INTERVAL_MS: process.env.LOG_PRUNE_INTERVAL_MS,
+    };
+    Object.assign(process.env, {
+      PERSISTENCE_BACKEND: 'prisma',
+      LOG_AUTO_PRUNE: String(autoPruneEnabled),
+      LOG_RETENTION_DAYS: '7',
+      LOG_PRUNE_INTERVAL_MS: '3600000',
+    });
+    try {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          LoggingService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: ScimLogger, useValue: logger },
+        ],
+      }).compile();
+      return module.get<LoggingService>(LoggingService);
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  }
+
   beforeEach(async () => {
-    // Ensure prisma backend for auto-prune tests
-    const savedBackend = process.env.PERSISTENCE_BACKEND;
-    const savedPrune = process.env.LOG_AUTO_PRUNE;
-    const savedRetention = process.env.LOG_RETENTION_DAYS;
-    const savedInterval = process.env.LOG_PRUNE_INTERVAL_MS;
-
-    process.env.PERSISTENCE_BACKEND = 'prisma';
-    process.env.LOG_AUTO_PRUNE = 'false'; // Disable auto-init to control manually
-    process.env.LOG_RETENTION_DAYS = '7';
-    process.env.LOG_PRUNE_INTERVAL_MS = '3600000';
-
+    jest.useFakeTimers();
     prisma = {
       requestLog: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -38,26 +58,16 @@ describe('LoggingService - Auto-Prune', () => {
       trace: jest.fn(),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LoggingService,
-        { provide: PrismaService, useValue: prisma },
-        { provide: ScimLogger, useValue: logger },
-      ],
-    }).compile();
-
-    service = module.get<LoggingService>(LoggingService);
-
-    // Restore env
-    process.env.PERSISTENCE_BACKEND = savedBackend || '';
-    process.env.LOG_AUTO_PRUNE = savedPrune || '';
-    process.env.LOG_RETENTION_DAYS = savedRetention || '';
-    process.env.LOG_PRUNE_INTERVAL_MS = savedInterval || '';
+    service = await createService(false);
   });
 
   afterEach(async () => {
-    // Clean up any timers the service might have started
-    await service.onModuleDestroy();
+    try {
+      await service.onModuleDestroy();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   describe('getAutoPruneConfig', () => {
@@ -178,7 +188,8 @@ describe('LoggingService - Auto-Prune', () => {
     });
 
     it('should start timers when auto-prune is enabled', async () => {
-      service.setAutoPruneConfig({ enabled: true });
+      await service.onModuleDestroy();
+      service = await createService(true);
 
       const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
@@ -196,7 +207,8 @@ describe('LoggingService - Auto-Prune', () => {
     });
 
     it('should log when auto-prune is enabled on init', async () => {
-      service.setAutoPruneConfig({ enabled: true });
+      await service.onModuleDestroy();
+      service = await createService(true);
       await service.onModuleInit();
       expect(logger.info).toHaveBeenCalledWith(
         expect.any(String),

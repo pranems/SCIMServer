@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixture branch integration with merged security master (2026-10-29)
+
+- Normally integrate security PR #258 merge `80460d59` into draft PR #257,
+  preserving every constituent fixture and security commit. Product remains
+  0.55.61; the integration adds no serving behavior or dependency changes.
+- Preserve historical diagnostic measurements below. The separate parallel
+  HTTP worker warning remains unassigned; no successful kill is claimed.
+- Self-improvement: apply the existing cheap RFC/doc preflight before broad
+  protected gates. Design disposition: accepted, test fixtures remain small
+  and cohesive; a new runtime abstraction would be speculative.
+- Integration preflight: fixtures 99/99, dependency pins 29/29, npm inventory
+  exit 0, RFC currency and 27-doc freshness/content PASS. Broad protected
+  Validate and exact-tip hosted checks remain separate evidence.
+
+### Log-stream unit fixture teardown
+
+- Disconnect the header and connected-event SSE fixtures through the
+  controller's existing response-close callback. Both previously passed
+  assertions but leaked real keep-alive timers and prevented natural exit.
+- Require zero pending timers after every stream case. The new guard was
+  RED in exactly two cases and GREEN after fixture cleanup. Both logging
+  controller suites remain 82/82; three related InMemory HTTP suites remain
+  62/62 and exit naturally under `--detectOpenHandles`.
+- Complete serial InMemory HTTP diagnostics pass 120 suites / 2,570 tests
+  with existing two suites / 42 skips and natural exit. Ordinary gates
+  retain their two log-suite exclusions (56 tests) and parallel settings;
+  this diagnostic does not explain the separate parallel exit warning.
+- Full-unit handle attribution found two further prune-fixture timers.
+  Configure enabled startup before service construction, not with a runtime
+  setter before initialization, and require zero timers after shutdown.
+  That guard was RED in exactly two cases; all three logging controller/prune
+  suites remain 99/99 and exit naturally. The final complete serial unit
+  diagnostic passes 213 suites / 6,214 tests with natural exit and no reported
+  open handles in 83.657 seconds. Ordinary parallel checks remain separate.
+- Published fixture correction #257 passes the normal Fast hook 25/25;
+  its ordinary parallel unit gate no longer emits the worker-exit warning.
+  Two subsequent parallel HTTP diagnostics each retain 2,514 passes /
+  42 existing skips and reproduce the separate warning. Native milestones
+  place the observed delay after JavaScript exit and the Environment end
+  marker; both workers eventually report code 0 and kill requests return
+  false. This narrows the warning's phase, not its final native root cause.
+  No application timer fix or runner relaxation is inferred from it.
+- A controlled, passive Windows follow-up preserves the ordinary HTTP
+  counts and warning. Its process handles show successful exit status before
+  process-object signaling. Retain the distinct status, signal and parent
+  callback measurements, their polling limits and pinned libuv explanation
+  in RC-I110; the remaining native/OS delay is not claimed fixed.
+- Test-only correction: no application, version, dependency, runner timeout
+  or force-exit change. Full-suite lifecycle and hosted checks are separate
+  evidence; release security and performance holds are unchanged.
+
 ### 0.55.61 request-body dependency security correction (#256)
 
 - Pin API body-parser 2.3.0 -> 2.4.0 for HIGH CVE-2026-111181 and
