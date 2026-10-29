@@ -13,6 +13,10 @@ artifact 12906712562; all 35 focused tests and full web npm inventory pass.
 API package graph is unchanged; its pre-existing full-tree override-context
 errors remain explicit, despite top-level inventory exit 0.
 Final protected Validate and hosted review remain pending.
+Historical `52200e33` Validate passed locally, but hosted CI correctly failed
+installed-web tests in the API-before-web-install lane. All six regressions
+now live in web's existing post-install Vitest lane and pass focused GREEN.
+No workflow order, test skip or assertion relaxation was introduced.
 See [scope, RCA and validation](docs/WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
 The prior fixture/draft boundary below is historical. Keep issue #256 open,
 PR #251 untouched, and all release holds. No merge or deployment authorized.

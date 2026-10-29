@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 
 type PackageEntry = {
   version?: string;
@@ -10,8 +13,10 @@ type PackageEntry = {
   peerDependencies?: Record<string, string>;
 };
 
+// CI installs web dependencies after its API unit-test lane.
 describe('web Seroval and Undici remediation (#256)', () => {
-  const web = resolve(__dirname, '../../../web');
+  const web = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const require = createRequire(import.meta.url);
   const patches = [
     { name: 'seroval', version: '1.6.11', owners: [
       ['node_modules/@tanstack/router-core', 'dependencies', '^1.5.4'],

@@ -78,6 +78,23 @@ applicable stage. Authenticated lock import and clean restore resolve all six
 assertions; the combined existing/new dependency specs pass 35/35.
 The exact pins remove the vulnerable versions from every actual web lock
 occurrence and all installed owner contexts, not merely manifest metadata.
+Those initial 35 tests were run in API locally; the six new checks now live
+in the web workspace for the CI-order reason below.
+
+**Confirmed and fixed test-lane failure (Medium, CI prerequisite ordering):**
+source run 40899500545 and PR run 40899546495 fail four installed-web checks
+with `ENOENT`, because the unchanged CI workflow runs API units before its
+web install step. Both installed trees existed locally, hiding that invalid
+prerequisite assumption. The fix moves all six new regressions to
+`web/src/test/web-advisory-pins.test.ts` in the existing web Vitest lane,
+which runs after web installation. Native `createRequire` resolves the same
+actual owner contexts there. Focused web GREEN passes all six assertions
+without changing a workflow, skipping a test or relaxing an assertion.
+Detection: hosted API unit stage; earliest feasible detection: source review
+of each test's installation prerequisites before first publication.
+Prevention is structural: installed-package checks belong to their owning
+workspace's existing post-install test lane. The original source/PR failures
+and local success remain retained, not relabeled as intentional RED.
 
 **Pre-existing API inventory finding (Medium, separate follow-up):** full `npm ls --all`
 reports the two intentionally stale web packages after the manifest edit.
@@ -105,7 +122,8 @@ API work in issue #256 (owner: repository maintainer; target: 2026-11-05).
 | Web artifact/after-restore SHA-256 | `312b4337d1571c0f962178272d5b7330b453cd6994686a57b90dabd962ce1ecb` |
 | Provenance and metadata | Every non-root entry uses public registry URLs and sha512; both changed integrity values equal the approved exact-version metadata |
 | Clean restores | `npm --prefix api ci --no-audit --no-fund` and `npm --prefix web ci --no-audit --no-fund`: PASS; both lockfiles byte-identical to their CI artifacts afterward |
-| Focused GREEN | API `npm test -- --runInBand --runTestsByPath src/scripts/web-advisory-pins.spec.ts src/scripts/check-dependency-pins.spec.ts`: 35/35 in two suites |
+| Initial focused GREEN, before CI-order correction | API `npm test -- --runInBand --runTestsByPath src/scripts/web-advisory-pins.spec.ts src/scripts/check-dependency-pins.spec.ts`: 35/35 in two suites on a machine with both installations; not proof of CI prerequisite ordering |
+| Correct workspace focused GREEN | Web `npm test -- src/test/web-advisory-pins.test.ts`: all six preserved regressions PASS after relocation |
 | Actual web inventory | `npm --prefix web ls --all --json`: exit 0, no problems. Both actual Seroval owners and jsdom's Undici resolve the intended patches |
 | Advisory scan | `npm --prefix api run check:pins`: web eight pins, zero findings; overall exit 1 correctly retains six separate API advisory records. No scanner suppression or blanket clearance |
 | Bootstrap hook only | Normal Fast push at bootstrap source: 25/25 gates, 618.2 seconds; units 6,220, HTTP 2,514 plus 42 skips. The existing HTTP worker warning remains distinct from unit fixture correctness |
@@ -116,6 +134,12 @@ parent-authenticated source hashes exactly: API
 `b8b3b3e0395879222e19e7a95c2dc1eb8ee1be8b9f6514eb3f06f32c9f67be1e`,
 web `b0ae8b65b876e51f7c915df2f7f6586f05192cade4094ba0109430acca57252a`.
 No baseline package content changed before CI import.
+
+Source `52200e33` passed the normal local Validate hook (28/28, 783.1
+seconds; units 6,226, HTTP 2,514 plus 42 skips, web 1,655), then the
+independent hosted lane correctly caught the installation-order error.
+Those are historical results, not final-tip proof. The correcting source
+must pass a fresh normal Validate and exact-tip hosted checks.
 
 **Self-improvement: applied.** The regression checks every actual lock
 occurrence and resolves from every installed owner, so a valid-looking root

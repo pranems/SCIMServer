@@ -17,6 +17,10 @@ retained; authenticated CI locks (run 40895972413), 35/35 focused tests and
 actual full web npm inventory now pass. API graph is unchanged, with existing
 full-tree override-context errors explicitly retained as a separate finding.
 Normal final Validate and hosted review remain pending.
+Hosted source `52200e33` exposed API tests reading web packages before CI
+installs them. All six new regressions now run in web's existing Vitest lane;
+focused 6/6 passes without workflow changes or skips. Prior local Validate
+results are historical and must not be substituted for the corrected tip.
 See [scope and RCA](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
 This supersedes the older draft #257 status below. No merge/deployment,
 release admission or closure of issue #256 is authorized.

@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bootstrap ordinary Fast hook: 25/25 gates, 618.2 seconds; units 6,220 and
   HTTP 2,514 plus 42 skips. The retained native/OS HTTP worker warning is not
   reclassified as a fixed unit-fixture leak.
+- Hosted CI caught a local-only prerequisite assumption: API units run
+  before web installation. Move all six dependency regressions to the
+  existing web Vitest lane, preserving every assertion and using native
+  owner resolution. Focused web GREEN: 6/6. No workflow/gate redesign or skip.
+  Earlier local Validate at `52200e33` passed 28/28 in 783.1 seconds with
+  units 6,226, HTTP 2,514 +42 skips and web 1,655; those are not final-tip
+  proof after the test relocation. Fresh protected Validate is required.
 - Update user-facing release notes, indexed scope/RCA, Session and Context.
   Issue #256 stays open for six independent API advisory records.
 - Self-improvement: all-occurrence and real-owner regressions, without skips.
