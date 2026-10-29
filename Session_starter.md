@@ -2,7 +2,47 @@
 
 **Last verified:** 2026-10-29
 
-### Current reviewed-master integration (2026-10-29)
+### Current advisory integration (2026-10-29)
+
+PR #260 merged normally at `287ea671abf1619d7b172c495310769078bd685b`
+after 28/28 protected Validate gates, seven successful exact-head checks and
+separate technical review. API units were 6,229, HTTP 2,514 plus 42 existing
+skips, and web 1,661 across 125 files. PR #259 is also merged.
+
+The existing 0.55.64 branch now normally integrates that reviewed master,
+preserving all constituent commits. Its qs 6.16.1 and fast-uri 4.2.3 changes
+remain separate from the Hono correction and performance tooling. Both
+historical preparation sections below are retained, not current status.
+Installed-graph verification, coordinated clean-CI lock confirmation,
+protected Validate, refreshed review and exact-head CI still own this head.
+Parent-union manifests/locks pass with zero non-root drift; clean API restore
+preserves both lock hashes and both complete npm inventories exit 0.
+No application, auth, UI, schema, deployment or release-admission change.
+All performance, data/restore, live/browser and operator-visual holds remain.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally merge reviewed API #260 at 0.55.63, then integrate its master into preserved advisory #261 at 0.55.64; new-head proof remains required. |
+
+### Historical stacked API advisory remediation (2026-10-29)
+
+Proposed 0.55.64 starts from exact draft #260 head
+`6eb1b59cb1a8ea324bb1a32b17355fabc605279d` on
+`fix/api-advisory-pins-20261029`. Only qs 6.16.1 and fast-uri 4.2.3
+are selected. Actual consumers are three qs owners and nested Ajv 8.20.0;
+its pre-existing forced major remains explicitly outside `^3.0.1`.
+Corrected RED before manifest edits: 11 failed, three passed, 14 tests.
+[Compatibility, advisory boundaries and RCA](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records why Hono 2.1.3 remains blocked by unproved actual Prisma lifecycle
+compatibility. No service is started and no other worktree is owned.
+CI-only run 40923567650, artifact 12918583682, changes exactly two API entries
+and no non-root web entry. Approved-feed bytes match authenticated SHA-512;
+clean API/web restores keep both lock hashes identical. Initial restored
+focus is 57/57 in three suites including 19 new checks; complete npm
+inventory exits 0 without problems. Final protected Validate remains required.
+PR #259/#260 are unmerged, #251 and every existing hold remain unchanged.
+
+### Historical reviewed-master integration for 0.55.63 (2026-10-29)
 
 PR #259 merged normally as `0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`
 after successful exact-head CI and a separate read-only technical review.

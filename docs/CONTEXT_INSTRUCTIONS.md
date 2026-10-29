@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.63
+> **Version**: 0.55.64
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
@@ -9,6 +9,27 @@
 
 ## Active Delivery Process
 
+**2026-10-29 current advisory integration:** #260 merged normally at
+`287ea671abf1619d7b172c495310769078bd685b`, after 28/28 protected Validate
+gates and all seven exact-head checks plus separate technical review.
+The preserved 0.55.64 advisory branch now integrates that master, including
+merged web #259. Both historical paragraphs below describe earlier states.
+Coordinated CI locks, installed graph, new-head protected validation,
+refreshed review and hosted checks remain mandatory. No deployment or
+final-artifact qualification is implied.
+
+**Historical independent 0.55.64 preparation:**
+**2026-10-29 stacked API advisory remediation:** proposed 0.55.64 is based
+on draft #260 exact head `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`,
+not master or web #259. [Consumer compatibility and RCA](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records qs 6.16.1, fast-uri 4.2.3, actual-parent RED and the unchanged
+Hono adapter compatibility blocker. Ajv's forced 4.x remains a documented
+range exception, not semver acceptance. CI lock run 40923567650 changes only
+the two API packages; authenticated archive and approved-feed SHA-512 agree.
+Clean restored final focus 57/57, complete inventory exit 0. Protected
+Validate is recorded separately after execution. No merge or deploy.
+
+**Historical 0.55.63 integration preparation:**
 **2026-10-29 current integration:** reviewed web #259 merged normally at
 `0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`. API #260 now integrates that
 master at its existing 0.55.63 boundary, preserving both histories and

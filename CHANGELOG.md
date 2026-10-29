@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.64 reviewed-master integration (2026-10-29)
+
+- Normally integrate reviewed master `287ea671` after #259 and #260 merged.
+  Preserve every original advisory commit and both preparation histories.
+  Retain qs 6.16.1, fast-uri 4.2.3, the four API root override contexts and
+  merged web Seroval 1.6.11 / Undici 7.30.1. No new runtime implementation.
+- Parent #260 passed 28/28 protected Validate gates and seven exact-head
+  checks, with independent technical review. Those results are provenance,
+  not substitutes for this integration's protected gates or hosted CI.
+- Both roots remain at the already reserved 0.55.64. Confirm the
+  coordinated lock graph in clean CI without local lock regeneration.
+  No new test/gate improvement identified: existing installed-owner,
+  complete-inventory and graph-union checks cover the integration.
+  Design accepted: ordinary history-preserving merge, no new abstraction.
+  No deployment, full advisory clearance or performance admission.
+
+### 0.55.64 preparation - compatible API advisory pins, stacked on draft #260
+
+- Reserve 0.55.64 after checking existing branches, pull requests and releases.
+  Keep the exact #260 ancestry; do not merge or retarget either draft.
+- Select qs 6.16.1 and fast-uri 4.2.3 to address five of the six assessed
+  advisory records. Leave `@hono/node-server` 1.19.15 unchanged because
+  compatibility with the actual Prisma development lifecycle is unproved.
+- Add 19 actual-consumer and advisory-boundary regressions: pre-manifest RED is 11
+  failures / three passes. Existing Ajv compiler, Express parser, Superagent
+  serializer and body-parser stream behavior already pass at baseline.
+- [Public changes, actual ownership, advisory boundaries and execution RCA](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md).
+  Authenticated CI run 40923567650 changes exactly two API entries and no
+  non-root web entry; approved-feed bytes match locked SHA-512. Clean restore
+  keeps both lock hashes identical and full API npm inventory exits 0.
+  Final restored focus: 57/57 in three suites, up from 38 parent checks.
+  Bootstrap units 6,229/214 suites and HTTP 2,514/118 passing suites retain
+  42 existing skipped tests and two skipped suites. Final broad protected
+  Validate counts are recorded in the handoff after execution;
+  no deployed release claim.
+
 ### 0.55.63 reviewed-master integration (2026-10-29)
 
 - Normally integrate web #259's merged master `0a9b3d04` into the preserved

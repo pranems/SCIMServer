@@ -16,6 +16,19 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### A parent-compatible dependency patch needs actual consumer evidence
+
+An engine range only answers whether Node can load a package, not whether an
+exact-pinned parent remains correct. Likewise, a pre-existing forced major
+does not make the next forced version semver-compatible. Enumerate locked
+and installed owners, assess public API changes, and exercise the real
+parent's parser/compiler/lifecycle. Preserve successful baseline behavior
+alongside discriminating security RED/GREEN. A toy replacement fixture is
+not proof for an actual parent's initialization and shutdown.
+The [stacked API advisory patch](../API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+keeps the Prisma/Hono adapter blocked because those lifecycle claims cannot
+be verified under the no-service-start constraint.
+
 ### PowerShell location is not every library's working directory
 
 `Set-Location` changes PowerShell's provider location, but a .NET API resolving

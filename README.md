@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.63`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.64`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -9,9 +9,14 @@ cover 0.55.58 correction preparation, merged 0.55.57 source, the deployed 0.55.5
 cumulative changes since 0.55.20, migration/rollback steps and known limits.
 See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
 
-**Pending source-only inventory correction:** [API override-context validity](docs/API_OVERRIDE_CONTEXT_VALIDITY.md)
-describes proposed 0.55.63 and the complete-tree npm regression. It changes
-no application behavior and does not qualify a deployment or clear the
+**Pending API advisory integration:** [Consumer compatibility and remaining Hono blocker](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+describes proposed 0.55.64 integrating reviewed master after #259 and #260
+merged. Five assessed advisory records are targeted; this proposal is not
+a deployed release or full advisory-clearance claim.
+
+**Merged source-only inventory correction:** [API override-context validity](docs/API_OVERRIDE_CONTEXT_VALIDITY.md)
+describes merged 0.55.63 source and the complete-tree npm regression. It
+changes no application behavior and does not qualify a deployment or clear the
 separately tracked API security advisories.
 
 For actual supported shapes and integration limits, see
@@ -20,7 +25,7 @@ For actual supported shapes and integration limits, see
 Keep strict validation enabled for Entra; diagnose the request and effective
 schema before applying a targeted compatibility setting.
 
-[![Version](https://img.shields.io/badge/version-0.55.63-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.64-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
