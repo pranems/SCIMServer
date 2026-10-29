@@ -16,6 +16,13 @@ blocked. The current branch only corrects two unit SSE fixtures that failed
 to disconnect, plus a zero-pending-timer assertion for the seven stream cases.
 Both logging controller suites pass 82/82 and exit naturally under
 `--detectOpenHandles`. This is not proof of leak-free full E2E teardown.
+The subsequent full-unit diagnostic identified two more fixture intervals
+in enabled-prune startup tests. They now use constructor-time environment
+configuration instead of the runtime setter before initialization, with a
+zero-timer shutdown guard. The three logging controller/prune suites pass
+99/99. Full serial handle diagnostics then pass 213 suites / 6,214 tests
+and exit naturally in 83.657 seconds without reported open handles.
+Final ordinary parallel and protected publication checks remain required.
 See [RC-I107](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
 No serving-code change or version bump. The older dated entries below are
 historical source-time checkpoints, not current merge/deployment claims.

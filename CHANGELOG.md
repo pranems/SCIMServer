@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with existing two suites / 42 skips and natural exit. Ordinary gates
   retain their two log-suite exclusions (56 tests) and parallel settings;
   this diagnostic does not explain the separate parallel exit warning.
+- Full-unit handle attribution found two further prune-fixture timers.
+  Configure enabled startup before service construction, not with a runtime
+  setter before initialization, and require zero timers after shutdown.
+  That guard was RED in exactly two cases; all three logging controller/prune
+  suites remain 99/99 and exit naturally. The final complete serial unit
+  diagnostic passes 213 suites / 6,214 tests with natural exit and no reported
+  open handles in 83.657 seconds. Ordinary parallel checks remain separate.
 - Test-only correction: no application, version, dependency, runner timeout
   or force-exit change. Full-suite lifecycle and hosted checks are separate
   evidence; release security and performance holds are unchanged.

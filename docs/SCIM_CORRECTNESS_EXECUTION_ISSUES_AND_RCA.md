@@ -136,6 +136,7 @@ cases and the PATCH-envelope cache guard. The companion receipt is
 | RC-I106 | Fresh-worktree tooling / Low | The first normal push passed API build, API lint and web type-check, then the web production build reported that `vite` was not recognized | The isolated worktree intentionally had no web `node_modules`; only API dependencies had been restored after the earlier missing-Jest failure | Compare SHA-256 hashes for `web/package.json` and `web/package-lock.json`, then reuse a matching installed dependency tree through an ignored junction. No package install, manifest edit or lock rewrite occurred. The unchanged push retry passes all 22 Fast gates in 356.5 seconds | Dependency preflight / first normal push | Applied convention: before a multi-surface hook in a fresh worktree, verify required local tool trees. Reuse dependencies only after exact manifest and lock equality |
 | RC-I107 | Test lifecycle / Medium | API unit assertions passed while Jest force-exited a worker; two isolated SSE tests also passed assertions but retained two real keep-alive timers and did not exit | The header and connected-event fixtures opened streams without invoking the registered response-close callback; other stream fixtures already disconnected | Disconnect both fixtures, assert response completion, and require zero pending timers after every SSE test. Both logging controller suites pass 82/82 and exit naturally under `--detectOpenHandles` | Bounded real-handle diagnostic after repeated ordinary-hook warnings / fixture lifecycle unit assertion could have caught this when the two tests were written | Applied: zero-timer guard was RED in exactly the two defective cases and GREEN after disconnect. No application timer, timeout, worker count or force-exit change. Independent E2E warning is not attributed to this unit-only defect |
 | RC-I108 | Branch preflight / Low | The first follow-up push reached the render gate before inspection confirmed that its master-based RFC manifest still carried 30 July, outside the 90-day limit | The same-day live-verified refresh existed only on the preserved diagnostic branch; switching to master did not carry that prerequisite | Stop only the owned push before publishing, apply exactly the two RFC files from verified commit `6716b3bb`, prove byte identity against that commit, and pass the cheap offline RFC check before retry | Branch preflight during the hook / immediately after choosing a different base | Applied: currency preflight belongs to every base transition, not once per session. No upstream refetch, manual date restamp, waived age limit or unrelated diagnostic source was imported |
+| RC-I109 | Test lifecycle / Medium | The subsequent ordinary unit run still force-exited a worker; full serial handle diagnostics passed all 6,214 assertions but retained two prune timers | Two startup tests called the runtime config setter before module initialization. The setter created an interval, then initialization overwrote its only tracked handle with a second interval | Configure the enabled startup state through the existing environment before service construction, destroy the replaced disabled fixture, restore environment exactly in `finally`, and assert zero timers after service shutdown | Full-unit handle allocation stacks / unit fixture teardown assertion could have caught this at authoring | Applied: zero-timer guard RED exactly the two startup cases, then all three logging controller/prune suites pass 99/99 with natural exit. Production lifecycle/timers and runner settings remain unchanged |
 
 ### RC-I107: unit stream fixtures must disconnect
 
@@ -180,6 +181,43 @@ accepted.** The controller's existing disconnect behavior is correct; a
 test fixture fix and a small shared disconnect helper are sufficient.
 Changing production timers or forcing the runner to exit would hide the
 test ownership error rather than correct it.
+
+### RC-I109: startup fixtures must not use a runtime setter before initialization
+
+The first protected follow-up push passed 25/25 gates in 487.1 seconds,
+but retained the unit worker-exit warning. The SSE correction was therefore
+not declared a full teardown fix. A complete serial
+`--detectOpenHandles` diagnostic passed all 6,214 assertions and identified
+two remaining intervals allocated by `setAutoPruneConfig`, traced to the
+two enabled-startup cases in `logging-auto-prune.spec.ts`. The diagnostic
+process remained alive and only that owned shell was stopped after capture.
+
+Those cases enabled pruning through the runtime setter before calling
+`onModuleInit`. The setter scheduled one interval; initialization scheduled
+another and overwrote the tracked handle. Shutdown cleared only the latter.
+The tests did not represent the real startup path, which reads its initial
+configuration before construction and receives runtime changes afterwards.
+
+A zero-timer assertion after service shutdown was RED in exactly those two
+cases, with one timer remaining in each. Their replacement fixture sets the
+enabled startup environment before creating the service, restores all four
+environment values in `finally`, and destroys the replaced disabled fixture
+before assigning a new one. The service implementation remains unchanged.
+All three logging controller/prune suites pass 99/99 and exit naturally.
+
+Retained evidence: `full-unit-open-handles.log`,
+`unit-prune-timer-red.log` and `unit-prune-timer-green.log` under
+`test-results/release-resume-20261028/`.
+The complete serial unit diagnostic then passes 213 suites / 6,214 tests
+and exits naturally in 83.657 seconds with no reported open handles.
+`full-unit-open-handles-green.log` retains that result. Final ordinary
+parallel and protected publication checks remain required.
+
+**Test/gate improvement: applied.** The prune suite now checks its owned
+timers after shutdown, not merely whether initialization calls timer APIs.
+**Design disposition: accepted.** A typed fixture factory with real disabled
+and enabled startup modes models the existing lifecycle; changing production
+timer policy would treat an artificial test ordering as a product defect.
 
 **2026-10-15 completeness note:** the current continuation was reconciled
 against its structured test receipts, command results, failure signals and the

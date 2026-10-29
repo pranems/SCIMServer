@@ -27,6 +27,16 @@ The complete serial InMemory HTTP handle diagnostic exits naturally:
 log suites / 56 tests are explicitly excluded by ordinary CI/pre-push.
 This diagnostic does not establish the cause of the parallel-worker warning;
 no runner setting or existing exclusion was changed.
+The first follow-up protected push passed 25/25 Fast gates in 487.1 seconds
+but retained the unit exit warning. Full unit handle diagnostics then located
+two additional prune-fixture intervals: the tests used a runtime enable setter
+before initialization, which overwrote the first timer handle. A second
+zero-timer guard was RED in those two cases. Enabled startup fixtures now use
+constructor-time environment settings and restore environment exactly.
+All three logging controller/prune suites pass 99/99 with natural exit.
+The complete serial unit diagnostic now passes 213 suites / 6,214 tests
+and exits naturally in 83.657 seconds, with no reported open handles.
+Final ordinary parallel and protected publication checks remain required.
 See [RC-I107](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
 Protected publication and final hosted checks remain required.
 The first follow-up push was stopped at the render gate after detecting the
