@@ -2,6 +2,30 @@
 
 **Last verified:** 2026-10-29
 
+### Current consolidation boundary (2026-10-29)
+
+Security PR #258 is normally merged into master at `80460d59`. Draft PR #257
+integrates that exact master while preserving fixture head `9d6d5c62` and
+all constituent commits. Product remains 0.55.61, with body-parser 2.4.0,
+multer 2.5.0 and compatible global iconv-lite 0.7.3. CI-generated API/web
+locks are retained unchanged. Current focused and protected validation
+results are recorded in the integration handoff, not inferred from older tips.
+PR #251 stays separate at `e5e107f5`; no merge of #257 or deployment is included.
+The dated fixture/security observations below are historical checkpoints.
+The stronger passive observer brackets Windows signaling within 47.4 ms
+and contains the parent callbacks, but the native/OS component remains
+unassigned. No further diagnosis experiment or runtime change is included.
+The frozen performance failure (1.23928982 > 1.10), customer-data proof,
+cleanup 403, browser/human visual proof and Mermaid renderer conflict remain
+outstanding. Self-improvement uses existing cheap currency checks before
+protected gates. Design disposition: accepted, cohesive test-only fixtures;
+no speculative runtime seam is needed.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally integrate merged security master into preserved draft #257 at product 0.55.61; retain source histories and historical receipts, with exact new-tip validation still required. |
+| 2026-10-29 | Integration preflight passes: RFC currency, 27-doc freshness/content, focused fixture 99/99 with natural handle-detection exit, dependency pins 29/29 and real npm inventory exit 0. Protected Validate push owns broad runs; exact-tip CI remains required. |
+
 ### Independent log-stream test teardown correction (2026-10-28)
 
 This test-only follow-up starts from actual master `5bfff2de` at 0.55.60,
@@ -96,6 +120,27 @@ No application timer, runner limit or release hold changes. The observer's
 first control failed on an ES-module/CommonJS mismatch and was corrected
 with explicit ES-module imports before the real run. See the measured table,
 flow and limitations in [RC-I110](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
+
+### Independent request-body security correction (2026-10-29)
+
+Product 0.55.61 is reserved on `fix/request-body-security-20261029` from
+fresh master `5bfff2de`. API overrides body-parser 2.4.0 and multer 2.5.0
+change; a follow-up adds one global iconv-lite 0.7.3 pin to make its three
+compatible actual owners share one override context. Both security patches
+passed seven-day eligibility on 29 October, not 30 October.
+See [scope, validation lanes and RCA](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+CI owns lock generation; bootstrap tests do not prove a patched installation.
+PR #257 and #251 remain separate. No merge or deployment is authorized.
+The expired master RFC prerequisite is carried byte-identically from
+`47cf8397` (live-verified source `6716b3bb`), only its two RFC files.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Request-body exact override RED confirmed: two failures, 24 passes; RFC offline preflight caught expired master before heavy publication and exact verified prerequisite passed. |
+| 2026-10-29 | CI lock run 40873804998 and archive digest verified. Only body-parser, multer and required iconv-lite change. Approved-feed clean restores preserve lock hashes; focused installed GREEN 28/28. Bootstrap hook 25/25 PASS, units 6,217 and HTTP 2,514. Final Validate and exact-tip scans pending; supplementary npm inventory override-context error preserved in the security report. |
+| 2026-10-29 | Owner-consistency follow-up on draft #258: verified every locked/installed iconv-lite owner and compatible range before adding a single exact global 0.7.3 override. Focused RED 28 pass/one failure, GREEN 29/29, real npm inventory exit 1 -> 0. Fresh CI lock verification/restoration and new-tip Validate/image evidence remain required; earlier failed receipts retained. |
+
+**Last verified:** 2026-10-23
 
 ### Independent web ip-address override remediation (2026-10-23)
 

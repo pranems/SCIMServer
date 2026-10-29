@@ -29,7 +29,110 @@ import {
   type PackageAdvisory,
 } from './check-dependency-pins';
 import fs from 'fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+
+describe('request-body security remediation (#256)', () => {
+  it('gives every compatible iconv-lite owner one exact shared override context', async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: Record<string, unknown> };
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, {
+        dependencies?: Record<string, string>;
+        optionalDependencies?: Record<string, string>;
+        peerDependencies?: Record<string, string>;
+      }>;
+    };
+    const owners = Object.entries(lock.packages).flatMap(([path, entry]) =>
+      ['dependencies', 'optionalDependencies', 'peerDependencies'].flatMap(kind => {
+        const range = entry[kind as keyof typeof entry]?.['iconv-lite'];
+        return range ? [[path, range]] : [];
+      }),
+    );
+    expect(owners).toEqual([
+      ['node_modules/body-parser', '^0.7.3'],
+      ['node_modules/mysql2', '^0.7.2'],
+      ['node_modules/raw-body', '~0.7.0'],
+    ]);
+    const overridePaths: string[] = [];
+    const collect = (overrides: Record<string, unknown>, parents: string[] = []): void => {
+      for (const [selector, value] of Object.entries(overrides)) {
+        const path = [...parents, selector];
+        if (selector.includes('iconv-lite')) overridePaths.push(path.join(' > '));
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+          collect(value as Record<string, unknown>, path);
+        }
+      }
+    };
+    collect(manifest.overrides);
+    expect(overridePaths).toEqual(['iconv-lite']);
+    expect(manifest.overrides['iconv-lite']).toBe('0.7.3');
+    for (const [owner] of owners) {
+      const ownerPath = resolve(__dirname, '../..', owner, 'package.json');
+      const installedPath = require.resolve('iconv-lite/package.json', { paths: [dirname(ownerPath)] });
+      const installed = JSON.parse(await fs.readFile(installedPath, 'utf8')) as { version: string };
+      expect(installed.version).toBe('0.7.3');
+    }
+  });
+
+  it.each([
+    ['body-parser', '2.3.0', '2.4.0', '>= 2.0.0, < 2.4.0'],
+    ['multer', '2.4.0', '2.5.0', '>= 2.0.0, < 2.5.0'],
+  ])('pins %s to the exact patched 2.x release', async (name, oldVersion, patched, range) => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: Record<string, string> };
+    expect(satisfiesGhsaRange(oldVersion, range)).toBe(true);
+    expect(satisfiesGhsaRange(patched, range)).toBe(false);
+    expect(manifest.overrides[name]).toBe(patched);
+  });
+
+  it('covers the actual Express and Nest multipart ownership without adding browser parsers', async () => {
+    const api = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as { packages: Record<string, { dependencies?: Record<string, string> }> };
+    const web = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../../web/package-lock.json'), 'utf8'),
+    ) as { packages: Record<string, unknown> };
+    expect(api.packages['node_modules/express'].dependencies?.['body-parser']).toBeDefined();
+    expect(api.packages['node_modules/@nestjs/platform-express'].dependencies?.multer).toBeDefined();
+    for (const name of ['body-parser', 'multer']) {
+      expect(Object.keys(api.packages).filter(path =>
+        path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
+      ).length).toBeGreaterThan(0);
+      expect(Object.keys(web.packages).filter(path =>
+        path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
+      )).toEqual([]);
+    }
+  });
+
+  it.each([
+    ['body-parser', '2.4.0', 'express', '>= 2.0.0, < 2.4.0'],
+    ['multer', '2.5.0', '@nestjs/platform-express', '>= 2.0.0, < 2.5.0'],
+  ])('locks every actual %s occurrence to the patched release with public provenance', async (name, patched, owner, range) => {
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, { version: string; resolved?: string; integrity?: string }>;
+    };
+    const entries = Object.entries(lock.packages).filter(([path]) =>
+      path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
+    );
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [, entry] of entries) {
+      expect(entry.version).toBe(patched);
+      expect(satisfiesGhsaRange(entry.version, range)).toBe(false);
+      expect(entry.resolved).toBe(`https://registry.npmjs.org/${name}/-/${name}-${patched}.tgz`);
+      expect(entry.integrity).toMatch(/^sha512-[A-Za-z0-9+/]+=*$/);
+    }
+    const ownerPath = require.resolve(`${owner}/package.json`);
+    const installedPath = require.resolve(`${name}/package.json`, { paths: [dirname(ownerPath)] });
+    const installed = JSON.parse(await fs.readFile(installedPath, 'utf8')) as { version: string };
+    expect(installed.version).toBe(patched);
+  });
+});
 
 describe('web ip-address security remediation (GHSA-rxp7-6hxx-x8q5)', () => {
   const vulnerableRange = '<= 10.7.3';

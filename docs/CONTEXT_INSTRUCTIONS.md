@@ -1,13 +1,31 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.60
+> **Version**: 0.55.61
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-29 current consolidation:** security PR #258 merged normally at
+`80460d59`. Draft #257 integrates that master while preserving its prior
+`9d6d5c62` fixture/diagnosis history. Product remains 0.55.61 and CI-owned
+locks remain unchanged. Exact integration-tip protected gates and CI are
+required; older source-time results below are historical, not new-tip proof.
+The improved passive Windows observer brackets signaling within 47.4 ms
+with parent callbacks inside, but the remaining native/OS component is
+unassigned. Do not change runtime teardown, deadlines, workers or exclusions.
+PR #251 remains separate at `e5e107f5`. No #257 merge, live mutation or deploy.
+Performance 1.23928982 > 1.10, customer-data proof, cleanup 403, measured
+browser/human visual proof and the global Mermaid conflict remain open.
+Self-improvement: reuse cheap currency preflight before protected broad runs.
+Design disposition: accepted, cohesive test fixtures need no new abstraction.
+Integration preflight passes RFC currency, 27-doc freshness/content, focused
+fixture 99/99, dependency pins 29/29 and actual installed inventory exit 0.
+The existing protected Validate push owns the broad suites; this preflight
+does not claim their result or the new-tip hosted result in advance.
 
 **2026-10-28 independent test-only follow-up:** actual master is `5bfff2de`
 at 0.55.60; #252/#253/#254 are merged. PR #251 is separately preserved at
@@ -58,6 +76,18 @@ source-compatible explanation of the apparently conflicting observations,
 not a captured native error or an attribution of the remaining delay to a
 driver, library or parent callback. Keep the warning investigation open.
 No deadline, worker, dependency, product version or application change.
+
+**2026-10-29 independent request-body security correction:** proposed 0.55.61
+pins API body-parser 2.4.0 and multer 2.5.0 from master `5bfff2de`.
+Both patches are now seven-day eligible. CI-only locks and a subsequent clean
+installation are required; bootstrap evidence is not final graph proof.
+The owner-consistency follow-up adds one exact global iconv-lite 0.7.3
+override, verified compatible with all three actual API owners, so the real
+npm inventory exits 0. Keep 0.55.61; require fresh CI artifact/restoration,
+Validate and exact new-tip image evidence rather than adopting the prior tip.
+[Scope, evidence and RCA](REQUEST_BODY_SECURITY_REMEDIATION.md).
+PR #257 fixture corrections and #251 performance work remain separate.
+No merge, deployment, customer restore or performance acceptance is included.
 
 **2026-10-23 next independent remediation:** proposed 0.55.60 updates the
 dormant web ip-address override to exact 10.7.4 from master cddeb5a5.
