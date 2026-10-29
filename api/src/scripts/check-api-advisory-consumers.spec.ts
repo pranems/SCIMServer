@@ -141,7 +141,7 @@ describe('API advisory pins and actual installed consumers', () => {
         'content-length': String(Buffer.byteLength(body)),
       },
       method: 'POST',
-      body: undefined as unknown,
+      body: undefined,
     });
     const bodyParser = require('body-parser') as {
       urlencoded(options: { extended: boolean }): (
