@@ -1,6 +1,6 @@
 # SCIM correctness implementation: issues and lessons
 
-> **Last verified:** 2026-10-15
+> **Last verified:** 2026-10-28
 >
 > **Status:** Implementation ledger, updated when an issue is confirmed
 >
@@ -134,6 +134,51 @@ cases and the PATCH-envelope cache guard. The companion receipt is
 | RC-I104 | Validation sequencing / Low | The first long owned Prisma run had to be stopped after direct review found RC-I103 | The discriminating run started after focused GREEN but before the changed-code correctness review was complete | Stop only the task-owned shell, verify the exact owner/run labels, remove its one container and matching database marker, finish review, then start a fresh owned run from stable source. No partial result was accepted | Preflight review / review during the first long run | Applied convention: finish direct changed-code review before launching a long authoritative gate. If source changes, discard the in-flight result and re-run from a new owned target |
 | RC-I105 | Shell working directory / Low | The first focused RED command returned `npm error Missing script: "test"` | Every PowerShell tool call starts in the session repository, not the sibling implementation worktree | Repeat with an explicit `Set-Location` to the task worktree's `api` folder; the intended test then failed for the expected assertion and later passed | Command preflight / first focused RED invocation | Applied convention: every sibling-worktree command sets its absolute working directory explicitly |
 | RC-I106 | Fresh-worktree tooling / Low | The first normal push passed API build, API lint and web type-check, then the web production build reported that `vite` was not recognized | The isolated worktree intentionally had no web `node_modules`; only API dependencies had been restored after the earlier missing-Jest failure | Compare SHA-256 hashes for `web/package.json` and `web/package-lock.json`, then reuse a matching installed dependency tree through an ignored junction. No package install, manifest edit or lock rewrite occurred. The unchanged push retry passes all 22 Fast gates in 356.5 seconds | Dependency preflight / first normal push | Applied convention: before a multi-surface hook in a fresh worktree, verify required local tool trees. Reuse dependencies only after exact manifest and lock equality |
+| RC-I107 | Test lifecycle / Medium | API unit assertions passed while Jest force-exited a worker; two isolated SSE tests also passed assertions but retained two real keep-alive timers and did not exit | The header and connected-event fixtures opened streams without invoking the registered response-close callback; other stream fixtures already disconnected | Disconnect both fixtures, assert response completion, and require zero pending timers after every SSE test. Both logging controller suites pass 82/82 and exit naturally under `--detectOpenHandles` | Bounded real-handle diagnostic after repeated ordinary-hook warnings / fixture lifecycle unit assertion could have caught this when the two tests were written | Applied: zero-timer guard was RED in exactly the two defective cases and GREEN after disconnect. No application timer, timeout, worker count or force-exit change. Independent E2E warning is not attributed to this unit-only defect |
+
+### RC-I107: unit stream fixtures must disconnect
+
+The final diagnostic-branch hook logs retained both unit and E2E worker
+force-exit warnings. A bounded unit-only run selected the log-config header
+and connected-event cases. Both assertions passed, but Jest reported two
+real `Timeout` handles, each allocated by the controller's 30-second
+keep-alive interval and traced to one of those tests. The process did not
+exit naturally and was stopped through its exact owned shell after retaining
+the stacks. No shared service or unattributed process was stopped.
+
+Adding fake timers plus a zero-pending-timer assertion at stream-suite
+teardown produced the expected RED: each of the two cases left one timer.
+The existing controller already clears the interval and unsubscribes on
+response close. The fix therefore changes only the fixtures: invoke that
+registered callback and assert the response ended. The seven stream tests
+must all finish with zero timers; the guard restores real timers in
+`finally`, even when it fails. Both logging controller suites then pass
+82/82 and exit naturally with `--detectOpenHandles`.
+
+Evidence under `test-results/release-resume-20261028/`:
+`unit-stream-open-handles-before.log`, `unit-stream-timer-red.log` and
+`unit-stream-timer-green.log`. The earlier force-exit warnings are retained,
+not relabeled as passing lifecycle evidence. The two controller suites do
+not prove that all unit or E2E worker handles are resolved.
+
+The three related InMemory HTTP suites additionally pass 62/62 and exit
+naturally under `--detectOpenHandles`. They do not reproduce the independent
+full-run E2E warning, so no HTTP lifecycle cause is inferred from this result.
+
+One complete InMemory HTTP diagnostic also exits naturally with
+`--runInBand --detectOpenHandles`: 120 suites / 2,570 passed, with the
+existing two suites / 42 skips. This selector includes the two log suites
+that ordinary CI/pre-push explicitly exclude, explaining the extra two
+suites / 56 tests relative to the ordinary 118 / 2,514 result. The serial
+diagnostic does not reproduce or explain the parallel-worker exit warning;
+the existing gate exclusions and force-exit settings are unchanged.
+
+**Test/gate improvement: applied.** Stream lifecycle assertions cover
+cleanup, not just initial headers and content. **Design disposition:
+accepted.** The controller's existing disconnect behavior is correct; a
+test fixture fix and a small shared disconnect helper are sufficient.
+Changing production timers or forcing the runner to exit would hide the
+test ownership error rather than correct it.
 
 **2026-10-15 completeness note:** the current continuation was reconciled
 against its structured test receipts, command results, failure signals and the

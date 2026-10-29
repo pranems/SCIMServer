@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Log-stream unit fixture teardown
+
+- Disconnect the header and connected-event SSE fixtures through the
+  controller's existing response-close callback. Both previously passed
+  assertions but leaked real keep-alive timers and prevented natural exit.
+- Require zero pending timers after every stream case. The new guard was
+  RED in exactly two cases and GREEN after fixture cleanup. Both logging
+  controller suites remain 82/82; three related InMemory HTTP suites remain
+  62/62 and exit naturally under `--detectOpenHandles`.
+- Complete serial InMemory HTTP diagnostics pass 120 suites / 2,570 tests
+  with existing two suites / 42 skips and natural exit. Ordinary gates
+  retain their two log-suite exclusions (56 tests) and parallel settings;
+  this diagnostic does not explain the separate parallel exit warning.
+- Test-only correction: no application, version, dependency, runner timeout
+  or force-exit change. Full-suite lifecycle and hosted checks are separate
+  evidence; release security and performance holds are unchanged.
+
 ### 0.55.60 web ip-address override security correction (#248)
 
 - Update the dormant web ip-address override from 10.7.1 to exact 10.7.4

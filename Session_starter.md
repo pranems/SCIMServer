@@ -1,6 +1,34 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-23
+**Last verified:** 2026-10-28
+
+### Independent log-stream test teardown correction (2026-10-28)
+
+This test-only follow-up starts from actual master `5bfff2de` at 0.55.60,
+not the diagnostic branch. PR #251 is separately preserved at `e5e107f5`,
+draft and conflict-free; its image/security and performance holds remain.
+The historical dependency-remediation checkpoints below are not current
+merge or deployment status.
+
+Two log-config controller unit tests opened SSE streams without simulating
+disconnect. A bounded real-timer run passed both assertions but reported
+two open handles at the keep-alive allocation and did not exit naturally;
+only that owned diagnostic process was stopped after retaining the stacks.
+A zero-timer teardown assertion then failed both tests with one pending
+timer each. The fixtures now invoke their registered close callback and
+assert response completion. All seven SSE tests must finish with zero timers.
+The two logging controller suites pass 82/82 and exit naturally under
+`--detectOpenHandles`. No application timer, runner timeout, worker count,
+force-exit setting, dependency or version changed.
+
+This proves the two unit fixture leaks, not the independent full E2E warning.
+The complete serial InMemory HTTP handle diagnostic exits naturally:
+120 suites / 2,570 passed plus existing two suites / 42 skips. Its two extra
+log suites / 56 tests are explicitly excluded by ordinary CI/pre-push.
+This diagnostic does not establish the cause of the parallel-worker warning;
+no runner setting or existing exclusion was changed.
+See [RC-I107](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
+Protected publication and final hosted checks remain required.
 
 ### Independent web ip-address override remediation (2026-10-23)
 
@@ -39,6 +67,7 @@ and actual target-specific human visual observation remain holds.
 
 | Date | Summary |
 |---|---|
+| 2026-10-28 | Isolated two real SSE fixture timer leaks, added a RED zero-timer teardown guard, and verified 82 logging controller tests with natural exit; separate test-only follow-up, no application or release change. |
 | 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
 | 2026-10-23 | Normally merge prerequisite #252 and verify its authoritative merged-source CI/artifact, then preserve both contexts in the ordinary Hono/master merge. |
 | 2026-10-23 | Protected bootstrap 25/25 PASS; authenticate minimal CI artifact 12506119257/run 39965730441 and prove actual installed+locked Hono 4.13.11 with 42 focused tests. |

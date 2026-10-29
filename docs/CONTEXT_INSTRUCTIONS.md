@@ -2,12 +2,23 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.60
-> **Last Updated**: October 21, 2026
-> **Last verified:** 2026-10-23
+> **Last Updated**: October 28, 2026
+> **Last verified:** 2026-10-28
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-28 independent test-only follow-up:** actual master is `5bfff2de`
+at 0.55.60; #252/#253/#254 are merged. PR #251 is separately preserved at
+`e5e107f5`, draft and conflict-free, with security/performance admission still
+blocked. The current branch only corrects two unit SSE fixtures that failed
+to disconnect, plus a zero-pending-timer assertion for the seven stream cases.
+Both logging controller suites pass 82/82 and exit naturally under
+`--detectOpenHandles`. This is not proof of leak-free full E2E teardown.
+See [RC-I107](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
+No serving-code change or version bump. The older dated entries below are
+historical source-time checkpoints, not current merge/deployment claims.
 
 **2026-10-23 next independent remediation:** proposed 0.55.60 updates the
 dormant web ip-address override to exact 10.7.4 from master cddeb5a5.
