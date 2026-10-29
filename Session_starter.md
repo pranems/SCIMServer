@@ -13,7 +13,11 @@ Corrected RED before manifest edits: 11 failed, three passed, 14 tests.
 [Compatibility, advisory boundaries and RCA](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md)
 records why Hono 2.1.3 remains blocked by unproved actual Prisma lifecycle
 compatibility. No service is started and no other worktree is owned.
-CI-only lock import and final protected validation remain required.
+CI-only run 40923567650, artifact 12918583682, changes exactly two API entries
+and no non-root web entry. Approved-feed bytes match authenticated SHA-512;
+clean API/web restores keep both lock hashes identical. Initial restored
+focus is 57/57 in three suites including 19 new checks; complete npm
+inventory exits 0 without problems. Final protected Validate remains required.
 PR #259/#260 are unmerged, #251 and every existing hold remain unchanged.
 
 ### Independent API override-context correction (2026-10-29)

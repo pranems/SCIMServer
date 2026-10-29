@@ -14,7 +14,10 @@ on draft #260 exact head `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`,
 not master or web #259. [Consumer compatibility and RCA](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
 records qs 6.16.1, fast-uri 4.2.3, actual-parent RED and the unchanged
 Hono adapter compatibility blocker. Ajv's forced 4.x remains a documented
-range exception, not semver acceptance. No merge or deploy is authorized.
+range exception, not semver acceptance. CI lock run 40923567650 changes only
+the two API packages; authenticated archive and approved-feed SHA-512 agree.
+Clean restored final focus 57/57, complete inventory exit 0. Protected
+Validate is recorded separately after execution. No merge or deploy.
 
 **2026-10-29 independent API correction:** proposed 0.55.63 branches from
 master `727860866c53c7ec8d01d1ff5bae858f80a1715d`, excluding draft #259.

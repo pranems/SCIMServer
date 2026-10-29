@@ -103,12 +103,53 @@ compatibility paths already passed on old dependencies; exact pins, installed
 versions, comma serialization and all four URI mechanisms failed as expected.
 Logs are retained under `test-results/api-advisory-pins-20261029/`.
 
-CI-only lock generation, authenticated digest verification, approved-feed byte
-verification, clean restore, final GREEN and normal protected Validate
-publication are required before this draft can claim patch qualification.
-Bootstrap publication, if needed to dispatch the unchanged lock workflow,
-is not final dependency qualification. No hosted PR-to-master matrix is
-inferred when the draft uses a stacked base.
+Follow-up fixture correction distinguishes `parse` returning an error from
+`normalize` preserving malformed input, and tests suffix serialization with
+an explicit input scheme that is omitted from output. The public advisory's
+string-normalization example does not reproduce on the patch. Replaying the
+real old 4.1.5 approved-feed bytes produces four URI assertion failures and
+one Ajv compiler pass; restoring 4.2.3 passes all five. This is separate from
+the original pre-manifest RED, not a rewritten account of it. Comma-format
+serialization also asserts the full hardened output, not merely no exception.
+
+The final regression includes five explicit published advisory boundaries,
+for 19 new tests. The first complete authenticated-restore focus passed 52/52
+before adding those boundary assertions, including the existing 38 regressions.
+The final focus passes 57/57 in three suites. Lock provenance, documentation
+freshness, documentation content and diff whitespace checks also pass.
+Protected Validate totals are retained in the handoff after execution.
+
+### Clean CI lock and restore receipts
+
+- Unchanged regeneration workflow run
+  [40923567650](https://github.com/pranems/SCIMServer/actions/runs/40923567650)
+  uses exact bootstrap source `eb797fd69ef2b371e3a1812198fe6f159eeafc1c`.
+- Artifact `12918583682` ZIP SHA-256:
+  `bb3b81a1a4dd2eeb14f04e4838d50f6f883fae666057d0ece60e05d42ff29edf`.
+  Authenticated GitHub metadata and downloaded bytes agree.
+- API lock SHA-256:
+  `01c0c63e29db93f5520195d3bfccf3b22fedbe20bcb1ca77effb0bccf136209e`.
+  Web lock SHA-256:
+  `b0c972aa28b428439e46913847b5e25ac85ae5395e5ed3ab6078c1ad33e629c9`.
+- Exactly two non-root API entries change: qs and fast-uri. Zero non-root
+  web entries change. Only product/root versions change otherwise.
+- Approved-feed tarball bytes match both authenticated locked SHA-512 values.
+  Missing SHA-512 metadata from the proxy was not treated as success.
+- CI measured ages at 2026-10-29T17:40:35.970Z: qs 14.815 days,
+  fast-uri 9.784 days, both above the unchanged seven-day floor.
+- Physical ownership checks precede restore. Clean `npm ci` in API and web
+  succeeds through the existing corporate registry, with both tracked locks
+  byte-identical afterwards. The actual complete API inventory exits 0
+  with no problems and empty stderr.
+
+The normal Fast bootstrap push passes 25 gates, 6,229 API units in 214 suites
+and 2,514 HTTP tests in 118 passing suites (42 existing skipped tests and two
+skipped suites). This bootstrap uses provisional dependencies, not final
+qualification. Hosted bootstrap Build Test Image `40923545248` correctly
+fails `npm ci` on the two intentionally stale lock entries; its failure
+receipt is retained. The final normal Validate push owns broad applicable
+gates after the clean CI-lock restore. No PR-to-master matrix is inferred
+when the draft uses a stacked base.
 
 ## Execution issues and root-cause analysis
 
@@ -116,11 +157,20 @@ inferred when the draft uses a stacked base.
 |---|---|---|---|
 | AC-1 / test correctness / Low | Initial Superagent fixture called its private query finalizer before the real request builder serializes queued objects. URL stayed unchanged. | Use the actual public form serializer, assert complete values, and retain corrected RED before manifests change. No network request is needed. | First focused RED / same |
 | AC-2 / tooling / Low | Comparing Hono v1.19.15 to v2.1.3 returned HTTP 404 because that comparison ref is unavailable. | Read authenticated public v2 release notes and patch release plus actual installed parent bundle. Do not equate failed lookup with compatibility. | Assessment / same |
+| AC-3 / test correctness / Medium | Initial URI fixtures assumed normalize throws and that a scheme-free suffix object discriminates the colon defect. The patch preserves malformed input; that object was already safe on old bytes. | Assert parse's actual error, normalization preservation and resolve's throw separately. Supply an explicit omitted output scheme for suffix serialization. Real old-byte replay fails all four mechanisms, while the actual Ajv compiler remains green. | First provisional GREEN / same |
+| AC-4 / dependency tooling / Low | Bootstrap install without a lockfile write changed the provisional local tree and left one platform-related extraneous package. | Remove that owned extraneous directory, retain full inventory output, and replace the entire provisional installation with clean npm ci from authenticated CI locks. Bootstrap is never final consumer evidence. No lockfile was generated locally. | Focused inventory / same |
+| AC-5 / CI bootstrap / Low | Hosted bootstrap npm ci rejects the deliberately stale qs/fast-uri entries. | Dispatch the existing regeneration workflow from the protected source, authenticate run and archive, allow only the two intended entries, then restore and publish normally. | Hosted install / expected before authenticated artifact |
+| AC-6 / documentation / Low | Header freshness repair left the README badge and source-coupled release notes requiring explicit updates. A first index edit assumed the wrong heading. | Use actual headings, update badge and release narrative, then pass existing freshness and content gates. | Bootstrap static audit / same |
+| AC-7 / tooling / Low | A source-snippet command had shell quoting error; one guessed documentation command/file did not exist, and gh run view rejected a path JSON field. | Use exact discovered filenames and GitHub REST run metadata for workflow path. Retain failed receipts without interpreting them as package failures. | Assessment / same |
 
 Provenance: this bounded execution retains raw command logs and public metadata
-in the ignored evidence directory. Final handoff reconciles tool failures,
-assertions and publication receipts; no full-transcript reconciliation is
-claimed unless the complete transcript is available.
+in the ignored evidence directory. Tool failures, assertion failures and
+publication receipts were reconciled against this execution's available
+commands and retained logs. `VSCODE_TARGET_SESSION_LOG` is not present, so a
+full debug-transcript reconciliation could not be performed and is not claimed.
+The original assertion assumptions were corrected as AC-3, not dismissed.
+Existing Jest worker/forced-exit warnings and competing-renderer diagnostics
+remain inherited holds, not new runtime regressions or resolved problems.
 
 ## Self-improvement and design disposition
 
