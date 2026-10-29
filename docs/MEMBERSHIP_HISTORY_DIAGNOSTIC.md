@@ -21,11 +21,22 @@ external-evidence skip. Full API `npm ls --all --json` still exits 1 with
 three invalid override-context packages; that independent baseline is not
 waived or fixed by this consolidation.
 
-At this source checkpoint, protected publication, CI-owned version-only
-lock artifacts and exact-tip CI/review evidence remain to be collected under
-`test-results/performance-master-integration-20261029/`. Nine bounded actual
-review threads are resolved at intake; historical reviews are not integration
-tip approval. The PR remains draft. No benchmark or live service is started.
+Source merge `ffc25528` passes 30/30 normal protected Validate gates in
+1,126.6 seconds: API 6,220 tests / 213 suites; HTTP 2,514 / 118 with 42 tests
+and two existing suites skipped; web 1,655 / 124; membership 226 pass / two
+explicit skips. Clean-CI lock run `40936685877` authenticates exact source
+`ffc2552832e3f80b1bbdcc14cb6baad2db630660` and artifact `12925301374`.
+Its SHA-256 digest is
+`55c3e768993862fa1a3b34b4af9b4684d9869bc2c503ab666ed13125fb7c8c06`.
+Only four root version fields change .61 -> .65. Package graph, public
+registry and SHA-512 provenance remain identical; the seven-day report
+contains zero changed package versions.
+
+Final lock-tip protected publication and exact-tip CI/review evidence remain
+separate under `test-results/performance-master-integration-20261029/`.
+Nine bounded actual review threads are resolved at intake; historical reviews
+are not integration-tip approval. The PR remains draft. No benchmark or live
+service is started.
 
 Frozen run `39875689201` remains FAILED, with populated-read p99 ratio
 `1.23928982 > 1.10`. Cleanup HTTP 403 remains a cleanup failure, not CLEANED.

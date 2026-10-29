@@ -22,6 +22,15 @@ remain historical. Frozen run `39875689201` is FAILED with ratio
 `1.23928982 > 1.10`, not baseline-accepted. No performance qualification,
 live-service change, artifact admission or release completion is claimed.
 
+**Source publication and lock provenance:** two-parent merge `ffc25528`
+passes 30/30 normal Validate gates in 1,126.6 seconds (API 6,220 / 213;
+HTTP 2,514 / 118 with 42 tests and two existing suites skipped; web
+1,655 / 124; membership 226 pass / two explicit skips). The unchanged
+full npm inventory still fails on three contexts. Existing CI lock run
+`40936685877` authenticates source `ffc25528` and artifact `12925301374`;
+only four root-version fields change .61 -> .65, with no package graph
+change. Final lock-tip protected publication and review/CI remain required.
+
 **2026-10-23 local consolidation:** reviewed master `5bfff2de`, product
 0.55.60, is reconciled into the preserved local qualification branch through
 an ordinary merge. Keep the original 20 commits and historical narrative,

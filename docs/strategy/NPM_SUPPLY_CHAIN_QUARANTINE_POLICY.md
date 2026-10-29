@@ -9,6 +9,26 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-29 preserved performance candidate version-only locks
+
+The independent 0.55.65 performance-source integration retains master's
+dependency graph, including the already-merged request-body patches.
+Existing `regen-lockfile.yml` run
+[40936685877](https://github.com/pranems/SCIMServer/actions/runs/40936685877)
+is dispatched once with `workspace=both` against protected source
+`ffc2552832e3f80b1bbdcc14cb6baad2db630660`.
+Artifact `12925301374` has SHA-256 digest
+`55c3e768993862fa1a3b34b4af9b4684d9869bc2c503ab666ed13125fb7c8c06`,
+verified against the downloaded archive before extraction or adoption.
+
+Source/workflow identities and artifact source agree. Only the top-level
+and root-package version values in each API/web lock change .61 -> .65.
+Every package entry, registry host and SHA-512 integrity stays identical.
+The existing seven-day quarantine report records zero changed package
+versions. No local lock generation, feed/configuration change or unmerged
+#259/#260/#261 dependency patch is used. Minimal graph proof is retained in
+`test-results/performance-master-integration-20261029/lock-artifact-proof.json`.
+
 ### 2026-10-28 exact-release image scan and approved-feed hold
 
 After isolated Docker recovery, the exact published 0.55.60 image

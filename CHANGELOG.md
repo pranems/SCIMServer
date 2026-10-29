@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The frozen performance run `39875689201` remains FAILED: populated-read
   p99 ratio `1.23928982` exceeds `1.10`. Source integration is not performance
   qualification, artifact admission, deployment or release completion.
+- Source merge `ffc25528` passes 30/30 protected Validate gates in 1,126.6
+  seconds: API unit 6,220 / 213 suites; HTTP 2,514 / 118 suites with 42 tests
+  and two existing suites skipped; web 1,655 / 124 files; membership
+  226 pass / two explicit skips. Historical source counts below are not
+  overwritten. Lint is zero errors / 507 warnings; web TypeScript retains
+  66 errors within the unchanged 96-error ceiling.
+- Clean-CI lock run `40936685877`, exact source `ffc25528`, yields authenticated
+  artifact `12925301374`; only four API/web root version values change
+  .61 -> .65, with zero changed package entries. Final lock-tip publication
+  and exact-tip CI/review are not replaced by the source-tip gate receipt.
 
 ### Local qualification branch reconciliation (no product bump)
 

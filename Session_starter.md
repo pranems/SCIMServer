@@ -18,6 +18,22 @@ at intake; that is historical review, not review of the integration tip.
 Protected Validate publication and exact-tip CI/review receipts belong in
 `test-results/performance-master-integration-20261029/`.
 
+The exact two-parent source merge is `ffc25528`. Its normal Validate push
+passes 30/30 gates in 1,126.6 seconds: API 6,220 tests / 213 suites; HTTP
+2,514 tests / 118 suites, with 42 tests and two existing suites skipped;
+web 1,655 tests / 124 files; membership 226 pass / two explicit skips.
+API lint is 507 warnings / zero errors, and web TypeScript retains 66 errors
+within the unchanged 96-error ratchet. The native worker warning remains.
+
+Existing clean-CI lock workflow run `40936685877` authenticates source
+`ffc2552832e3f80b1bbdcc14cb6baad2db630660` and artifact `12925301374`,
+digest `sha256:55c3e768993862fa1a3b34b4af9b4684d9869bc2c503ab666ed13125fb7c8c06`.
+Only the two root version fields in each API/web lock change from .61 to .65.
+Package entries, graph, public registry provenance and SHA-512 remain
+unchanged; the seven-day report has zero changed package versions.
+Final lock-tip protected publication and exact-tip review/CI remain separate
+from these source-tip receipts.
+
 The frozen run `39875689201` remains FAILED with populated-read p99 ratio
 `1.23928982 > 1.10`. Cleanup HTTP 403 is not successful cleanup.
 No live application, database, Docker operation, benchmark, deployment,
