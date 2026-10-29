@@ -1,5 +1,24 @@
 ## SCIMServer - Condensed Session Memory
 
+### Independent request-body security correction (2026-10-29)
+
+Product 0.55.61 is reserved on `fix/request-body-security-20261029` from
+fresh master `5bfff2de`. API overrides body-parser 2.4.0 and multer 2.5.0
+change; a follow-up adds one global iconv-lite 0.7.3 pin to make its three
+compatible actual owners share one override context. Both security patches
+passed seven-day eligibility on 29 October, not 30 October.
+See [scope, validation lanes and RCA](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+CI owns lock generation; bootstrap tests do not prove a patched installation.
+PR #257 and #251 remain separate. No merge or deployment is authorized.
+The expired master RFC prerequisite is carried byte-identically from
+`47cf8397` (live-verified source `6716b3bb`), only its two RFC files.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Request-body exact override RED confirmed: two failures, 24 passes; RFC offline preflight caught expired master before heavy publication and exact verified prerequisite passed. |
+| 2026-10-29 | CI lock run 40873804998 and archive digest verified. Only body-parser, multer and required iconv-lite change. Approved-feed clean restores preserve lock hashes; focused installed GREEN 28/28. Bootstrap hook 25/25 PASS, units 6,217 and HTTP 2,514. Final Validate and exact-tip scans pending; supplementary npm inventory override-context error preserved in the security report. |
+| 2026-10-29 | Owner-consistency follow-up on draft #258: verified every locked/installed iconv-lite owner and compatible range before adding a single exact global 0.7.3 override. Focused RED 28 pass/one failure, GREEN 29/29, real npm inventory exit 1 -> 0. Fresh CI lock verification/restoration and new-tip Validate/image evidence remain required; earlier failed receipts retained. |
+
 **Last verified:** 2026-10-23
 
 ### Independent web ip-address override remediation (2026-10-23)

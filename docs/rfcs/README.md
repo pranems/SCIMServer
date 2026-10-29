@@ -83,9 +83,9 @@ Always read the mirror **and** the errata page:
 | RFC | Errata (as of the manifest's `lastVerified`) | Page |
 |---|---|---|
 | RFC 7642 | 1 verified, 2 held | [errata](https://www.rfc-editor.org/errata_search.php?rfc=7642) |
-| RFC 7643 | **16 verified**, 7 reported, 12 held, 5 rejected | [errata](https://www.rfc-editor.org/errata_search.php?rfc=7643) |
+| RFC 7643 | **16 verified**, 7 reported, 13 held, 5 rejected | [errata](https://www.rfc-editor.org/errata_search.php?rfc=7643) |
 | RFC 7644 | 5 verified, 7 reported, 6 held | [errata](https://www.rfc-editor.org/errata_search.php?rfc=7644) |
-| RFC 9865 | none | [errata](https://www.rfc-editor.org/errata_search.php?rfc=9865) |
+| RFC 9865 | 1 reported | [errata](https://www.rfc-editor.org/errata_search.php?rfc=9865) |
 | RFC 9967 | none | [errata](https://www.rfc-editor.org/errata_search.php?rfc=9967) |
 
 Those counts are asserted by check **O3** of the gate. When the RFC Editor verifies a new erratum, the gate fails and names it.

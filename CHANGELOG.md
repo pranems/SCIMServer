@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.61 request-body dependency security correction (#256)
+
+- Pin API body-parser 2.3.0 -> 2.4.0 for HIGH CVE-2026-111181 and
+  multer 2.4.0 -> 2.5.0 for HIGH CVE-2026-113872. Preserve major versions,
+  existing owners and browser dependency absence. No unrelated pin updates.
+- Synchronize API/web version metadata; public-registry lockfiles are generated
+  only by the sanctioned CI workflow. Bootstrap installation is not patched
+  dependency evidence. Actual exact-tip image outcomes remain required.
+- Focused pin regression tests: 23 -> 26; RED is two expected override
+  failures and 24 passes. Bootstrap/final GREEN and hook-owned broad counts
+  are recorded separately in [the evidence report](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+- Bootstrap GREEN is 26/26; final graph/installed regressions increase the
+  focused total to 28. Both actual-lock RED and stale-install RED fail exactly
+  two tests. Sanctioned run 40873804998 yields only body-parser, multer and
+  required iconv-lite 0.7.3 changes plus API/web 0.55.61 root metadata.
+- Final focused GREEN is 28/28 after clean API/web approved-feed restores
+  with unchanged lock hashes. Bootstrap protected hook is 25/25 PASS:
+  API units 6,214 -> 6,217, HTTP unchanged 2,514 passed / 42 existing skips.
+  Final unit expectation is 6,219 after the two graph/installed regressions;
+  final hook/web/image results are pending, not inferred from bootstrap.
+  Supplementary npm inventory's override-context ELSPROBLEMS is preserved
+  separately from passing actual-owner resolution and semver checks.
+- Follow-up closes that inventory failure rather than accepting a failed
+  graph: pin shared iconv-lite to exact 0.7.3 globally after verifying every
+  actual owner accepts it (body-parser ^0.7.3, mysql2 ^0.7.2, raw-body ~0.7.0).
+  There were no explicit owner-specific iconv-lite overrides to remove.
+  Focused RED adds one failing context guard, 28 pass/one failure; GREEN
+  is 29/29 and real npm inventory now exits 0. No version/major/tool upgrade.
+  Fresh CI lock verification, restoration, Validate and current-tip image
+  outcomes are required; earlier 78b88d1c evidence is historical only.
+- Carry only the two exact, live-verified RFC prerequisite files from
+  `47cf8397` after master failed offline currency at 91 days. No manual
+  date restamp, age waiver, logging-fixture import or deployment is included.
+
 ### 0.55.60 web ip-address override security correction (#248)
 
 - Update the dormant web ip-address override from 10.7.1 to exact 10.7.4
