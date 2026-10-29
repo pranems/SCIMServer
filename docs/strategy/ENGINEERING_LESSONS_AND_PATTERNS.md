@@ -369,6 +369,57 @@ new assertion fails for the original defect; restore it before any gate run.
 Keep deadlines unchanged and distinguish isolated timings from full-load proof.
 See ER-68l in the same ledger.
 
+### A parent-compatible dependency patch needs actual consumer evidence
+
+An engine range only answers whether Node can load a package, not whether an
+exact-pinned parent remains correct. Likewise, a pre-existing forced major
+does not make the next forced version semver-compatible. Enumerate locked
+and installed owners, assess public API changes, and exercise the real
+parent's parser/compiler/lifecycle. Preserve successful baseline behavior
+alongside discriminating security RED/GREEN. A toy replacement fixture is
+not proof for an actual parent's initialization and shutdown.
+The [stacked API advisory patch](../API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+keeps the Prisma/Hono adapter blocked because those lifecycle claims cannot
+be verified under the no-service-start constraint.
+
+### PowerShell location is not every library's working directory
+
+`Set-Location` changes PowerShell's provider location, but a .NET API resolving
+a relative path can still use the process's original current directory.
+Always construct and validate absolute source and destination paths before
+archive extraction or other library-driven writes. Do not repair a misplaced
+artifact with broad cleanup: verify its exact files against the trusted
+source and move only the generated directory. The
+[API integration ledger](../API_OVERRIDE_CONTEXT_VALIDITY.md) records the
+three-file ignored-artifact incident and its bounded cleanup.
+
+### Separate the required review claim from one provider's availability
+
+An acknowledged request is not a completed review. Conversely, an unavailable
+hosted reviewer must not become an extra policy requirement when the written
+process permits independent technical review and does not mandate that
+provider. Verify both the written requirement and actual branch protection;
+retain exact-head review provenance, findings and limits. Never fabricate
+approval or remove a genuine approval requirement. The
+[API integration ledger](../API_OVERRIDE_CONTEXT_VALIDITY.md) records the
+unnecessary hold and its correction through ordinary reviewed PR integration.
+
+### Shared override repairs must reach complete-tree acceptance
+
+An installed version can satisfy every owner range while Arborist rejects
+its edges for incomparable override ancestry. Exact root pins at already
+locked compatible versions can unify the context without changing packages.
+Check every owner against installed metadata and actual resolution, not only
+the owner that happened to be reported first. Then run the real
+`npm ls --all --json` and require exit 0 without filtering problems.
+
+The API correction initially removed three invalid records but exposed a
+fourth shared descendant, hasown. A clean restore reproduced the remaining
+defect, and the complete-tree regression blocked incomplete GREEN.
+See [mechanism, regression and RCA](../API_OVERRIDE_CONTEXT_VALIDITY.md).
+Keep advisory clearance, inventory validity and deployed artifact contents
+as separate claims. Pin maintenance stays with the existing watcher.
+
 ### A worker warning must be attributed to an observed lifecycle phase
 
 The same Jest warning accompanied real unit-fixture timer leaks and a

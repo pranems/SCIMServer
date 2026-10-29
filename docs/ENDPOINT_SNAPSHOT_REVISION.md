@@ -5,6 +5,27 @@
 **Status:** Implemented and tested locally, not released or deployed.
 Performance admission and the independent release gates remain open.
 
+## Current reviewed-source union (2026-10-29)
+
+The preserved 0.55.65 performance candidate now normally integrates reviewed
+master `cffc64c8`, after #259, #260 and #261 merged. Original candidate
+`6fe4d2e2` and all 58 preserved constituents remain in the history. The
+current master dependency corrections are inherited through reviewed merges,
+not copied from unreviewed drafts.
+
+This is source consolidation, not a new performance measurement or a claim
+that the frozen p99 failure passed. Complete source/dependency preservation,
+protected gates, clean-CI exact-byte confirmation, refreshed review and
+exact-head CI remain requirements before ordinary merge. Final merged-artifact
+backend, migration, live/browser, data/restore and visual evidence stay
+independent. Hono correction #262 is still a separate pending boundary.
+
+Self-improvement is applied through the existing explicit source/graph
+preservation checks and the CRLF verification correction recorded as AC-9
+in [the advisory execution ledger](API_ADVISORY_CONSUMER_COMPATIBILITY.md).
+Design disposition: **accepted**, an ordinary history-preserving integration
+with no new runtime responsibility or speculative abstraction.
+
 ## Test-harness prerequisite: real non-UTC leaf (2026-10-23)
 
 This section changes only test execution, not endpoint behavior or any frozen

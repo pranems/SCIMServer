@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.65 reviewed-master performance union (2026-10-29)
+
+- Normally integrate reviewed master `cffc64c8` after #259, #260 and #261
+  merged. Preserve all 58 performance constituents, current serving source,
+  exact API/web dependency fixes and both documentation histories.
+- Retain the reserved 0.55.65 boundary. Resolve only strict version conflicts
+  and preserve five narrative unions; no local npm lock generation.
+  Complete parent-union checks and clean-CI exact-byte confirmation remain
+  distinct from protected gates, refreshed review and exact-head CI.
+- Carry the Windows CRLF verification correction into advisory RCA AC-9:
+  compare CI locks with committed Git blobs, separately verify checkout
+  newline differences, and never normalize archive-authentication bytes.
+  Positive and changed-content negative controls passed.
+- No benchmark rerun, performance admission, application refactor or
+  deployment. Existing preservation assertions cover this ordinary merge.
+  Design accepted: coherent integration with no speculative abstraction.
+
 ### Preserved performance source integration - candidate 0.55.65 (2026-10-29)
 
 - Normally merge current master `72786086` into preserved PR #251 head
@@ -214,6 +231,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic control flow. Windows helper startup allows only `SystemRoot`;
   Linux inherits no environment. Product remains 0.55.58 with no dependency,
   lockfile, serving or cloud change. Linux diagnostic execution is pending.
+
+### 0.55.64 reviewed-master integration (2026-10-29)
+
+- Normally integrate reviewed master `287ea671` after #259 and #260 merged.
+  Preserve every original advisory commit and both preparation histories.
+  Retain qs 6.16.1, fast-uri 4.2.3, the four API root override contexts and
+  merged web Seroval 1.6.11 / Undici 7.30.1. No new runtime implementation.
+- Parent #260 passed 28/28 protected Validate gates and seven exact-head
+  checks, with independent technical review. Those results are provenance,
+  not substitutes for this integration's protected gates or hosted CI.
+- Both roots remain at the already reserved 0.55.64. Confirm the
+  coordinated lock graph in clean CI without local lock regeneration.
+  No new test/gate improvement identified: existing installed-owner,
+  complete-inventory and graph-union checks cover the integration.
+  Design accepted: ordinary history-preserving merge, no new abstraction.
+  No deployment, full advisory clearance or performance admission.
+
+### 0.55.64 preparation - compatible API advisory pins, stacked on draft #260
+
+- Reserve 0.55.64 after checking existing branches, pull requests and releases.
+  Keep the exact #260 ancestry; do not merge or retarget either draft.
+- Select qs 6.16.1 and fast-uri 4.2.3 to address five of the six assessed
+  advisory records. Leave `@hono/node-server` 1.19.15 unchanged because
+  compatibility with the actual Prisma development lifecycle is unproved.
+- Add 19 actual-consumer and advisory-boundary regressions: pre-manifest RED is 11
+  failures / three passes. Existing Ajv compiler, Express parser, Superagent
+  serializer and body-parser stream behavior already pass at baseline.
+- [Public changes, actual ownership, advisory boundaries and execution RCA](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md).
+  Authenticated CI run 40923567650 changes exactly two API entries and no
+  non-root web entry; approved-feed bytes match locked SHA-512. Clean restore
+  keeps both lock hashes identical and full API npm inventory exits 0.
+  Final restored focus: 57/57 in three suites, up from 38 parent checks.
+  Bootstrap units 6,229/214 suites and HTTP 2,514/118 passing suites retain
+  42 existing skipped tests and two skipped suites. Final broad protected
+  Validate counts are recorded in the handoff after execution;
+  no deployed release claim.
+
+### 0.55.63 reviewed-master integration (2026-10-29)
+
+- Normally integrate web #259's merged master `0a9b3d04` into the preserved
+  API inventory correction. Retain all constituent commits, four API root
+  overrides and the merged Seroval/Undici pins without a new runtime change.
+- Resolve version-only documentation conflicts at 0.55.63 and retain both
+  historical preparation records below. Keep CI-origin locks unchanged
+  until authenticated clean-CI regeneration supplies the integrated roots.
+- New-tip restored checks, protected Validate and hosted CI remain pending;
+  no old counts are substituted for their results. No deployment occurred.
+- Bootstrap Fast passes 25/25; API units 6,229, HTTP 2,514 plus 42 existing
+  skips. CI regeneration 40963173363 supplies both 0.55.63 lock roots with
+  zero non-root drift, preserving the already restored integrated graph.
+- Self-improvement applied: an exact-marker negative control prevents a
+  Markdown ruler from being mistaken for an unresolved merge separator.
+  Fully qualified .NET archive destinations prevent cross-worktree writes;
+  the three misplaced generated files were verified and moved into scope.
+  Design accepted: ordinary integration, no new abstraction or gate waiver.
+
+### 0.55.63 preparation - API complete-tree override context validity
+
+- Independent rollback unit from master 0.55.61; 0.55.62 is reserved by the
+  separate draft web PR #259 and is not inherited.
+- Add exact root debug 4.4.3, get-intrinsic 1.3.0, call-bind-apply-helpers
+  1.0.2 and hasown 2.0.4 overrides at existing locked versions. Preserve
+  every earlier security override and all non-root versions.
+- Focused TDD: initial four real failures, then two remaining failures for
+  the tightly coupled hasown context; final nine new checks plus 29 existing
+  checks PASS. Actual full-tree npm inventory changes from EXIT 1 to EXIT 0.
+- [Mechanism, execution RCA and validation plan](docs/API_OVERRIDE_CONTEXT_VALIDITY.md).
+  Broad test totals are not inferred from historical runs; the protected
+  push owns applicable consolidation gates. CI-only locks remain required.
+- No HTTP/UI/auth/schema/performance edits, deployment or merge. Six API
+  advisory records remain outside this inventory-only correction.
+- Self-improvement applied: permanent real full-tree inventory and every-owner
+  installed resolution. Design accepted: reuse small flat exact pin pattern.
+
+### 0.55.62 web advisory patch bootstrap (2026-10-29)
+
+- Reserve 0.55.62 from merged master `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
+  Change only exact web Seroval 1.6.3 -> 1.6.11 and Undici 7.29.1 -> 7.30.1;
+  preserve the API dependency graph and merged security/fixture corrections.
+- Focused TDD RED: six real assertions fail before manifest edits across pins,
+  all lock occurrences and all installed owners. Preserve the draft outside
+  source until authenticated CI lock import; bootstrap hook GREEN is old-tree
+  evidence only, not a patched dependency result.
+- Prior merged counts: API units 6,220; HTTP 2,514 plus 42 skips; web 1,655.
+  Final current-tip counts and CI-owned lock provenance remain pending.
+- Authenticated regeneration 40895972413 / artifact 12906712562 changes only
+  the two web packages and coordinated release metadata. Clean restores keep
+  both CI lock hashes unchanged. Focused GREEN: 35/35, including six new
+  regressions. Web full npm inventory exits 0; existing API full-tree owner
+  context errors remain a separate explicit limitation, not blanket clearance.
+- Bootstrap ordinary Fast hook: 25/25 gates, 618.2 seconds; units 6,220 and
+  HTTP 2,514 plus 42 skips. The retained native/OS HTTP worker warning is not
+  reclassified as a fixed unit-fixture leak.
+- Hosted CI caught a local-only prerequisite assumption: API units run
+  before web installation. Move all six dependency regressions to the
+  existing web Vitest lane, preserving every assertion and using native
+  owner resolution. Focused web GREEN: 6/6. No workflow/gate redesign or skip.
+  Earlier local Validate at `52200e33` passed 28/28 in 783.1 seconds with
+  units 6,226, HTTP 2,514 +42 skips and web 1,655; those are not final-tip
+  proof after the test relocation. Fresh protected Validate is required.
+- Update user-facing release notes, indexed scope/RCA, Session and Context.
+  Issue #256 stays open for six independent API advisory records.
+- Self-improvement: all-occurrence and real-owner regressions, without skips.
+  Design disposition: accepted, existing exact override/process is cohesive.
+  No application refactor, browser behavior change, merge or deployment.
 
 ### Fixture branch integration with merged security master (2026-10-29)
 

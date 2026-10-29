@@ -9,6 +9,15 @@
 
 ## Active Delivery Process
 
+**2026-10-29 current performance union:** reviewed #261 merged at
+`cffc64c8a188a721fabb85c37a80243d5e65a74f`, after 28/28 protected gates,
+seven exact-head checks, independent review and clean-CI confirmation.
+The existing 0.55.65 performance branch now normally integrates that master,
+including merged #259/#260/#261 fixes while preserving all 58 constituents.
+The following preparation paragraphs are historical. New-source preservation,
+protected validation, clean-CI bytes, refreshed review and exact-head CI
+remain separate requirements. No performance or final-artifact admission.
+
 **2026-10-29 preserved performance integration:** ordinary merge of current
 master `72786086` into PR #251's preserved `e5e107f5` history, candidate
 0.55.65. Keep the two parent histories, master's security dependencies and
@@ -215,6 +224,66 @@ round and twelve +10% ceilings remain unchanged. No serving/dependency/version
 change; dev's last retained serving checkpoint is 0.55.56, not a fresh cloud
 inventory. Earlier failed receipts remain failed.
 See [protocol and limitations](ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
+**2026-10-29 current advisory integration:** #260 merged normally at
+`287ea671abf1619d7b172c495310769078bd685b`, after 28/28 protected Validate
+gates and all seven exact-head checks plus separate technical review.
+The preserved 0.55.64 advisory branch now integrates that master, including
+merged web #259. Both historical paragraphs below describe earlier states.
+Coordinated CI locks, installed graph, new-head protected validation,
+refreshed review and hosted checks remain mandatory. No deployment or
+final-artifact qualification is implied.
+
+**Historical independent 0.55.64 preparation:**
+**2026-10-29 stacked API advisory remediation:** proposed 0.55.64 is based
+on draft #260 exact head `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`,
+not master or web #259. [Consumer compatibility and RCA](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records qs 6.16.1, fast-uri 4.2.3, actual-parent RED and the unchanged
+Hono adapter compatibility blocker. Ajv's forced 4.x remains a documented
+range exception, not semver acceptance. CI lock run 40923567650 changes only
+the two API packages; authenticated archive and approved-feed SHA-512 agree.
+Clean restored final focus 57/57, complete inventory exit 0. Protected
+Validate is recorded separately after execution. No merge or deploy.
+
+**Historical 0.55.63 integration preparation:**
+**2026-10-29 current integration:** reviewed web #259 merged normally at
+`0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`. API #260 now integrates that
+master at its existing 0.55.63 boundary, preserving both histories and
+the API override and web advisory corrections. The historical independent
+preparation records below no longer describe the integrated branch's scope.
+Separate technical review plus exact-head CI supplies the written review
+gate; no human or GitHub-hosted approval is fabricated. New CI-owned locks,
+restored dependency checks, protected Validate and exact-tip CI remain
+required before merging this integration. No deployment or release
+admission is implied, and all final-artifact qualification holds remain.
+Bootstrap Fast is 25/25; authenticated CI run 40963173363 supplies integrated
+0.55.63 lock roots without any non-root change. Final Validate and new-tip
+review/CI still own the consolidation result.
+
+**2026-10-29 independent API correction:** proposed 0.55.63 branches from
+master `727860866c53c7ec8d01d1ff5bae858f80a1715d`, excluding draft #259.
+[API override-context correction and RCA](API_OVERRIDE_CONTEXT_VALIDITY.md)
+records four shared exact pins at unchanged versions, full-tree RED/GREEN
+and every installed owner check. Focused 38/38 in two suites after
+authenticated CI-lock clean restore; full inventory exit 0 and lock hashes
+unchanged. Protected Validate and hosted exact-tip proof remain separate.
+Existing security advisories and PR #251 stay out of scope. No deploy/merge.
+Self-improvement applied: full-tree acceptance; design accepted: flat pins.
+**2026-10-29 independent web advisory patch:** merged master is
+`727860866c53c7ec8d01d1ff5bae858f80a1715d` (0.55.61).
+The new bounded patch reserves 0.55.62 for Seroval 1.6.11 and Undici 7.30.1,
+with no API dependency graph changes. Six genuine focused RED assertions are
+retained; authenticated CI locks (run 40895972413), 35/35 focused tests and
+actual full web npm inventory now pass. API graph is unchanged, with existing
+full-tree override-context errors explicitly retained as a separate finding.
+Normal final Validate and hosted review remain pending.
+Hosted source `52200e33` exposed API tests reading web packages before CI
+installs them. All six new regressions now run in web's existing Vitest lane;
+focused 6/6 passes without workflow changes or skips. Prior local Validate
+results are historical and must not be substituted for the corrected tip.
+See [scope and RCA](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+This supersedes the older draft #257 status below. No merge/deployment,
+release admission or closure of issue #256 is authorized.
 
 **2026-10-29 current consolidation:** security PR #258 merged normally at
 `80460d59`. Draft #257 integrates that master while preserving its prior

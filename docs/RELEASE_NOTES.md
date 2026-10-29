@@ -17,17 +17,51 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ### 0.55.65 preserved performance-source integration
 
-This draft candidate integrates the preserved performance-qualification history
-with current master, including the merged request-body security patches and
-logging test-fixture corrections. It adds no new serving behavior and does not
-include the independent 0.55.62, 0.55.63 or 0.55.64 draft dependency patches.
+This draft candidate now integrates the preserved performance-qualification
+history with reviewed master `cffc64c8`, after #259, #260 and #261 merged.
+It preserves their web/API dependency fixes, request-body security patches,
+logging test-fixture corrections and every constituent commit. It adds no new
+serving behavior. New-head gates and review remain required.
 See the [local diagnostic checkpoint](MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
 
 The original frozen performance run remains FAILED: populated-read p99 ratio
 1.23928982 exceeds the unchanged 1.10 limit. Source consolidation, ordinary CI
 and version reservation do not qualify performance or admit a release artifact.
-The existing full API npm inventory error is also retained, not repaired by
-copying another draft's override changes.
+The formerly independent complete-inventory correction is now inherited
+through normally merged #260, not copied from an unreviewed draft.
+
+### Historical source consolidation preparation: 0.55.64
+
+Reviewed web #259 and API inventory #260 are merged, most recently at
+`287ea671`. The proposed 0.55.64 advisory patch now integrates that master,
+retaining both fixes and every constituent commit. Its new-head validation,
+review and CI remain separate requirements. Historical preparation notes
+below remain provenance, not claims about the current merged/deployed state.
+The Hono and final-artifact qualification boundaries remain unchanged.
+
+### Stacked API advisory preparation: 0.55.64
+
+The [actual-consumer compatibility report](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records proposed qs 6.16.1 and fast-uri 4.2.3 pins, stacked on unmerged
+draft #260. Five assessed API advisory records are targeted. The Prisma
+development adapter advisory remains blocked pending actual-parent lifecycle
+qualification; this is not full advisory clearance or a deployed release.
+No API response contract, migration or operator configuration changes.
+
+### 0.55.62 web Seroval and Undici security dependency patch
+
+This proposed patch updates exact web overrides from Seroval 1.6.3 to
+1.6.11 and Undici 7.29.1 to 7.30.1. These minimal compatible patches address
+the five Seroval and eight Undici advisory records listed in
+[issue #256](https://github.com/pranems/SCIMServer/issues/256).
+Both patches exceed the seven-day quarantine minimum. The existing API
+request-body security correction remains intact; six separate API advisory
+records remain open. See [ownership, scope and validation](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+CI-generated locks now contain only the two intended package updates; the
+restored web dependency inventory and all focused pin/owner tests pass.
+Final protected validation and hosted review remain required.
+No UI behavior, deployment, browser
+exploitability assessment or overall release approval is included.
 
 ### 0.55.61 request-body security dependency patch
 
