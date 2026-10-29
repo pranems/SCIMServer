@@ -65,6 +65,7 @@ inventory and requires both exit 0 and no problems.
 | OV-2 | Dependency tooling / Medium | After the first three fixes, full inventory remains exit 1 for hasown. Clean restore reproduces it. es-set-tostringtag and form-data edges carry form-data ancestry while their target carries get-intrinsic ancestry. | Add hasown 2.0.4 to the same exact root pattern after verifying all three real owners accept it. This directly coupled descendant must be fixed for complete-tree validity. | Focused full-tree regression immediately after first three changes / same stage. No escape. |
 | OV-3 | Documentation / Low | The cheap content audit rejects the old README version badge after the ordinary freshness fix updates headers. | Update the badge to the reserved version; keep the existing content audit as the enforcement mechanism. | Cheap preflight / same stage. No escape. |
 | OV-4 | Registry metadata / Low | Configured corporate-feed metadata exposes tarball and SHA-1 shasum, not public SHA-512 integrity. | Do not treat absent metadata as a hash match or rewrite locks. Compare downloaded approved-feed bytes to existing SHA-512 locks and authenticate clean CI's public-provenance artifact. | Metadata preflight / same stage. No escape. |
+| OV-5 | Evidence tooling / Low | PowerShell's default JSON object conversion rejects the lock's empty-string root package key. | Use `ConvertFrom-Json -AsHashtable` for lock metadata and explicit structural Node comparisons for CI import; no source or lock was changed by the failed read. | Evidence preflight / same stage. No escape. |
 
 OV-1 RED: four actual assertions failed (three missing shared contexts and
 the real inventory); three owner/provenance checks already passed.
@@ -82,6 +83,45 @@ sequence through focused GREEN; final publication evidence belongs in its
 HANDOFF receipt. No diagnosed issue was discarded as harmless.
 
 ## Validation and release boundary
+
+### Authenticated CI lock receipt
+
+Unchanged `regen-lockfile.yml` run
+[`40913629689`](https://github.com/pranems/SCIMServer/actions/runs/40913629689)
+succeeded at source `c9cddb3dfdbb1b7b022ce39404f647c9782006db`.
+Artifact `12914787144`, `regenerated-lockfiles`, has authenticated archive
+SHA-256 `bad38ee1bd6a8fed20170e71aa8090d589ed0785d449525da91873b123c09d21`.
+The downloaded archive matches that digest before extraction or import.
+
+Both locks differ from master only in the two root version fields:
+0.55.61 to 0.55.63. Every non-root entry is structurally identical, including
+version, source URL, integrity, dependency ranges and flags. No new package
+was resolved; the CI publication-age report at 2026-10-29T16:39:01.212Z
+therefore has an empty changed-package list and retains the seven-day floor.
+The four new pins' publication timestamps above were checked independently.
+Approved-feed tarball bytes match each existing public lock's SHA-512.
+
+| CI file | SHA-256 before restore |
+|---|---|
+| API lock | `0dd66eb53bc7c508cbbef80dc63417ef7178bf9a36f44066299b03f2634b3fb3` |
+| Web lock | `fc6121573eb5de28bbc2a70b9f9d9c2eae16d54f660628d7a33d0a2b34269899` |
+
+Both `npm --prefix api ci --no-audit --no-fund` and
+`npm --prefix web ci --no-audit --no-fund` PASS serially after physical
+ownership checks, through the unchanged configured corporate feed.
+Both lock hashes remain byte-identical. The restored full API inventory
+exits 0 and all 38 focused checks pass again. The checked-in build-test
+workflow supplies the process-only DATABASE_URL prerequisite without
+printing its value; no global configuration is edited.
+
+Bootstrap publication used a normal default protected push: 25/25 gates
+PASS in 536.4 seconds, API units 6,229 in 214 suites, HTTP 2,514 in 118
+suites plus existing 42 skipped tests and two skipped suites. Lint retains
+507 warnings and zero errors. The pre-existing parallel HTTP worker-exit
+warning remains a separate unresolved observation; no runner setting changed.
+This bootstrap evidence does not substitute for the final restored graph's
+normal Validate push and exact-tip hosted checks. The final ignored HANDOFF
+receipt and draft PR body own those publication results.
 
 1. Retain the actual baseline full inventory and add discriminating RED tests.
 2. Verify all real owner ranges and metadata, then add only existing-version

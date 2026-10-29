@@ -8,8 +8,9 @@ Proposed 0.55.63 starts from fresh master `727860866c53c7ec8d01d1ff5bae858f80a17
 not draft web PR #259 (0.55.62). Four shared exact root overrides retain
 existing locked versions and correct full-tree npm INVALID contexts.
 Focused RED/GREEN is recorded in [the correction and RCA](docs/API_OVERRIDE_CONTEXT_VALIDITY.md):
-9 new checks plus 29 existing pin checks pass. Full npm inventory exits 0
-before final CI-lock restore; final protected/hosted results remain separate.
+9 new checks plus 29 existing pin checks pass after serial clean restore of
+authenticated CI locks, with byte-identical hashes and full npm inventory
+exit 0. Final protected/hosted results remain separate.
 No runtime, UI, auth, schema, performance, merge or deployment change.
 Six API advisory records remain held. Self-improvement: full-tree exit and
 every installed owner are asserted. Design: accepted, established flat pins.
