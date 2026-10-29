@@ -14,6 +14,7 @@ The expired master RFC prerequisite is carried byte-identically from
 | Date | Summary |
 |---|---|
 | 2026-10-29 | Request-body exact override RED confirmed: two failures, 24 passes; RFC offline preflight caught expired master before heavy publication and exact verified prerequisite passed. |
+| 2026-10-29 | CI lock run 40873804998 and archive digest verified. Only body-parser, multer and required iconv-lite change. Approved-feed clean restores preserve lock hashes; focused installed GREEN 28/28. Bootstrap hook 25/25 PASS, units 6,217 and HTTP 2,514. Final Validate and exact-tip scans pending; supplementary npm inventory override-context error preserved in the security report. |
 
 **Last verified:** 2026-10-23
 

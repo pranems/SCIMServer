@@ -29,7 +29,7 @@ import {
   type PackageAdvisory,
 } from './check-dependency-pins';
 import fs from 'fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 describe('request-body security remediation (#256)', () => {
   it.each([
@@ -61,6 +61,31 @@ describe('request-body security remediation (#256)', () => {
         path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
       )).toEqual([]);
     }
+  });
+
+  it.each([
+    ['body-parser', '2.4.0', 'express', '>= 2.0.0, < 2.4.0'],
+    ['multer', '2.5.0', '@nestjs/platform-express', '>= 2.0.0, < 2.5.0'],
+  ])('locks every actual %s occurrence to the patched release with public provenance', async (name, patched, owner, range) => {
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, { version: string; resolved?: string; integrity?: string }>;
+    };
+    const entries = Object.entries(lock.packages).filter(([path]) =>
+      path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
+    );
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [, entry] of entries) {
+      expect(entry.version).toBe(patched);
+      expect(satisfiesGhsaRange(entry.version, range)).toBe(false);
+      expect(entry.resolved).toBe(`https://registry.npmjs.org/${name}/-/${name}-${patched}.tgz`);
+      expect(entry.integrity).toMatch(/^sha512-[A-Za-z0-9+/]+=*$/);
+    }
+    const ownerPath = require.resolve(`${owner}/package.json`);
+    const installedPath = require.resolve(`${name}/package.json`, { paths: [dirname(ownerPath)] });
+    const installed = JSON.parse(await fs.readFile(installedPath, 'utf8')) as { version: string };
+    expect(installed.version).toBe(patched);
   });
 });
 

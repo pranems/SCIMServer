@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Focused pin regression tests: 23 -> 26; RED is two expected override
   failures and 24 passes. Bootstrap/final GREEN and hook-owned broad counts
   are recorded separately in [the evidence report](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+- Bootstrap GREEN is 26/26; final graph/installed regressions increase the
+  focused total to 28. Both actual-lock RED and stale-install RED fail exactly
+  two tests. Sanctioned run 40873804998 yields only body-parser, multer and
+  required iconv-lite 0.7.3 changes plus API/web 0.55.61 root metadata.
+- Final focused GREEN is 28/28 after clean API/web approved-feed restores
+  with unchanged lock hashes. Bootstrap protected hook is 25/25 PASS:
+  API units 6,214 -> 6,217, HTTP unchanged 2,514 passed / 42 existing skips.
+  Final unit expectation is 6,219 after the two graph/installed regressions;
+  final hook/web/image results are pending, not inferred from bootstrap.
+  Supplementary npm inventory's override-context ELSPROBLEMS is preserved
+  separately from passing actual-owner resolution and semver checks.
 - Carry only the two exact, live-verified RFC prerequisite files from
   `47cf8397` after master failed offline currency at 91 days. No manual
   date restamp, age waiver, logging-fixture import or deployment is included.
