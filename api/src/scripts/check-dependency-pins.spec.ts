@@ -31,6 +31,39 @@ import {
 import fs from 'fs/promises';
 import { resolve } from 'node:path';
 
+describe('request-body security remediation (#256)', () => {
+  it.each([
+    ['body-parser', '2.3.0', '2.4.0', '>= 2.0.0, < 2.4.0'],
+    ['multer', '2.4.0', '2.5.0', '>= 2.0.0, < 2.5.0'],
+  ])('pins %s to the exact patched 2.x release', async (name, oldVersion, patched, range) => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: Record<string, string> };
+    expect(satisfiesGhsaRange(oldVersion, range)).toBe(true);
+    expect(satisfiesGhsaRange(patched, range)).toBe(false);
+    expect(manifest.overrides[name]).toBe(patched);
+  });
+
+  it('covers the actual Express and Nest multipart ownership without adding browser parsers', async () => {
+    const api = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as { packages: Record<string, { dependencies?: Record<string, string> }> };
+    const web = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../../web/package-lock.json'), 'utf8'),
+    ) as { packages: Record<string, unknown> };
+    expect(api.packages['node_modules/express'].dependencies?.['body-parser']).toBeDefined();
+    expect(api.packages['node_modules/@nestjs/platform-express'].dependencies?.multer).toBeDefined();
+    for (const name of ['body-parser', 'multer']) {
+      expect(Object.keys(api.packages).filter(path =>
+        path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
+      ).length).toBeGreaterThan(0);
+      expect(Object.keys(web.packages).filter(path =>
+        path.endsWith(`/node_modules/${name}`) || path === `node_modules/${name}`,
+      )).toEqual([]);
+    }
+  });
+});
+
 describe('web ip-address security remediation (GHSA-rxp7-6hxx-x8q5)', () => {
   const vulnerableRange = '<= 10.7.3';
 

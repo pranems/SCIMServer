@@ -9,6 +9,17 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-10-29 request-body exact patches (#256)
+
+body-parser 2.4.0 was published 2026-10-22T11:39:38Z and multer 2.5.0
+2026-10-22T11:58:46Z. Approved-proxy unversioned publication metadata and exact
+version lookups confirm both eligible after their respective seven-day
+timestamps on 29 October. No 30 October wait or exception is required.
+Their metadata tarball URLs are internal and must not enter committed locks.
+Use the sanctioned public-registry CI artifact, verify every changed entry,
+then verify approved ages before `npm ci` through the proxy.
+See [the bounded implementation report](../REQUEST_BODY_SECURITY_REMEDIATION.md).
+
 ### 2026-10-23 web ip-address exact override correction (#248)
 
 The next independent proposed patch, 0.55.60, updates the web override to

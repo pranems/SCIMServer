@@ -1,5 +1,20 @@
 ## SCIMServer - Condensed Session Memory
 
+### Independent request-body security correction (2026-10-29)
+
+Product 0.55.61 is reserved on `fix/request-body-security-20261029` from
+fresh master `5bfff2de`. Only API overrides body-parser 2.4.0 and multer
+2.5.0 change. Both passed seven-day eligibility on 29 October, not 30 October.
+See [scope, validation lanes and RCA](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+CI owns lock generation; bootstrap tests do not prove a patched installation.
+PR #257 and #251 remain separate. No merge or deployment is authorized.
+The expired master RFC prerequisite is carried byte-identically from
+`47cf8397` (live-verified source `6716b3bb`), only its two RFC files.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Request-body exact override RED confirmed: two failures, 24 passes; RFC offline preflight caught expired master before heavy publication and exact verified prerequisite passed. |
+
 **Last verified:** 2026-10-23
 
 ### Independent web ip-address override remediation (2026-10-23)

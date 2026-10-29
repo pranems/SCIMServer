@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.61 request-body dependency security correction (#256)
+
+- Pin API body-parser 2.3.0 -> 2.4.0 for HIGH CVE-2026-111181 and
+  multer 2.4.0 -> 2.5.0 for HIGH CVE-2026-113872. Preserve major versions,
+  existing owners and browser dependency absence. No unrelated pin updates.
+- Synchronize API/web version metadata; public-registry lockfiles are generated
+  only by the sanctioned CI workflow. Bootstrap installation is not patched
+  dependency evidence. Actual exact-tip image outcomes remain required.
+- Focused pin regression tests: 23 -> 26; RED is two expected override
+  failures and 24 passes. Bootstrap/final GREEN and hook-owned broad counts
+  are recorded separately in [the evidence report](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+- Carry only the two exact, live-verified RFC prerequisite files from
+  `47cf8397` after master failed offline currency at 91 days. No manual
+  date restamp, age waiver, logging-fixture import or deployment is included.
+
 ### 0.55.60 web ip-address override security correction (#248)
 
 - Update the dormant web ip-address override from 10.7.1 to exact 10.7.4
