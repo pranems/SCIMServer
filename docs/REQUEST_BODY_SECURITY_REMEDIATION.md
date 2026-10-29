@@ -164,6 +164,17 @@ Detailed follow-up receipts live in ignored
 
 ## Open checks
 
+The first owner-consistency Validate push stopped at the documentation freshness
+gate: changing `api/package.json` requires a same-change review of
+`docs/RELEASE_NOTES.md` (F4). The earlier release-note version restamp did not
+document this dependency outcome, and this follow-up omitted the coupled file.
+Severity: Low, process/documentation. The correction adds the operator-facing
+0.55.61 scope and ownership explanation, not a date-only restamp. Detection was
+the normal pre-push gate; the earliest available check was the cheap coupled
+freshness audit before publication. Prevention is to run that audit, rather
+than only the content audit, before a manifest-changing push. The blocked
+attempt and its successful gates remain in `owner-consistency/validate-push.log`.
+
 - [x] Initial CI lock artifact source, changed package inventory and approved ages.
 - [x] Initial patched local installation and regression evidence.
 - [x] Complete shared iconv-lite owner inventory, focused RED/GREEN and actual npm inventory exit 0.
