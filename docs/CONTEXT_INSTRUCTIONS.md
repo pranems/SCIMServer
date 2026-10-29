@@ -1,13 +1,20 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.63
+> **Version**: 0.55.64
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-29 stacked API advisory remediation:** proposed 0.55.64 is based
+on draft #260 exact head `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`,
+not master or web #259. [Consumer compatibility and RCA](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records qs 6.16.1, fast-uri 4.2.3, actual-parent RED and the unchanged
+Hono adapter compatibility blocker. Ajv's forced 4.x remains a documented
+range exception, not semver acceptance. No merge or deploy is authorized.
 
 **2026-10-29 independent API correction:** proposed 0.55.63 branches from
 master `727860866c53c7ec8d01d1ff5bae858f80a1715d`, excluding draft #259.

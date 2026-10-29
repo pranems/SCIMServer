@@ -2,6 +2,20 @@
 
 **Last verified:** 2026-10-29
 
+### Stacked API advisory remediation (2026-10-29)
+
+Proposed 0.55.64 starts from exact draft #260 head
+`6eb1b59cb1a8ea324bb1a32b17355fabc605279d` on
+`fix/api-advisory-pins-20261029`. Only qs 6.16.1 and fast-uri 4.2.3
+are selected. Actual consumers are three qs owners and nested Ajv 8.20.0;
+its pre-existing forced major remains explicitly outside `^3.0.1`.
+Corrected RED before manifest edits: 11 failed, three passed, 14 tests.
+[Compatibility, advisory boundaries and RCA](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records why Hono 2.1.3 remains blocked by unproved actual Prisma lifecycle
+compatibility. No service is started and no other worktree is owned.
+CI-only lock import and final protected validation remain required.
+PR #259/#260 are unmerged, #251 and every existing hold remain unchanged.
+
 ### Independent API override-context correction (2026-10-29)
 
 Proposed 0.55.63 starts from fresh master `727860866c53c7ec8d01d1ff5bae858f80a1715d`,

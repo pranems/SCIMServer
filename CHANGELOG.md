@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.64 preparation - compatible API advisory pins, stacked on draft #260
+
+- Reserve 0.55.64 after checking existing branches, pull requests and releases.
+  Keep the exact #260 ancestry; do not merge or retarget either draft.
+- Select qs 6.16.1 and fast-uri 4.2.3 to address five of the six assessed
+  advisory records. Leave `@hono/node-server` 1.19.15 unchanged because
+  compatibility with the actual Prisma development lifecycle is unproved.
+- Add 14 actual-consumer regressions: corrected pre-manifest RED is 11
+  failures / three passes. Existing Ajv compiler, Express parser, Superagent
+  serializer and body-parser stream behavior already pass at baseline.
+- [Public changes, actual ownership, advisory boundaries and execution RCA](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md).
+  Full test counts and final protected publication are recorded only after
+  the authenticated CI locks and clean restore. No deployed release claim.
+
 ### 0.55.63 preparation - API complete-tree override context validity
 
 - Independent rollback unit from master 0.55.61; 0.55.62 is reserved by the

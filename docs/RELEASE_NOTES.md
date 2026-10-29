@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.63`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.64`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,15 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### Stacked API advisory preparation: 0.55.64
+
+The [actual-consumer compatibility report](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+records proposed qs 6.16.1 and fast-uri 4.2.3 pins, stacked on unmerged
+draft #260. Five assessed API advisory records are targeted. The Prisma
+development adapter advisory remains blocked pending actual-parent lifecycle
+qualification; this is not full advisory clearance or a deployed release.
+No API response contract, migration or operator configuration changes.
 
 ### 0.55.61 request-body security dependency patch
 
