@@ -7,7 +7,7 @@
     "are `rfc`, `file`, `role`, `retrieved` and the waivers[] array.",
     "Enforced by scripts/sync-rfcs.ps1 (checks C1-C5 offline, O1-O3 with -Online)."
   ],
-  "lastVerified": "2026-07-30",
+  "lastVerified": "2026-10-28",
   "sources": {
     "index": "https://www.rfc-editor.org/rfc-index.xml",
     "errata": "https://www.rfc-editor.org/errata.json",
@@ -45,7 +45,7 @@
       ],
       "obsoletedBy": [],
       "errata": {
-        "Held for Document Update": 12,
+        "Held for Document Update": 13,
         "Rejected": 5,
         "Reported": 7,
         "Verified": 16
@@ -82,7 +82,9 @@
       "published": "2025-October",
       "updatedBy": [],
       "obsoletedBy": [],
-      "errata": {},
+      "errata": {
+        "Reported": 1
+      },
       "sha256": "ed56d0cf69e82c757480a42df4c68f3c636647493cfb3e9f8f12ceea158edc6d"
     },
     {
@@ -134,7 +136,7 @@
       ],
       "obsoletedBy": [],
       "errata": {
-        "Reported": 2
+        "Reported": 4
       },
       "sha256": "9dc385cf4ecdd85024e5a95e447ede9230e11700bf35251906b25b37557d604b"
     },
@@ -167,7 +169,7 @@
       ],
       "obsoletedBy": [],
       "errata": {
-        "Rejected": 2,
+        "Rejected": 3,
         "Reported": 3,
         "Verified": 2
       },
@@ -244,7 +246,7 @@
       "obsoletedBy": [],
       "errata": {
         "Rejected": 1,
-        "Reported": 1
+        "Reported": 2
       },
       "sha256": "16c816e4e0fdbffb7e910ff3017867bf39debe9cb7f52f5cbc508a052ed660e8"
     },

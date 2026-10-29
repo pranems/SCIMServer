@@ -29,6 +29,11 @@ This diagnostic does not establish the cause of the parallel-worker warning;
 no runner setting or existing exclusion was changed.
 See [RC-I107](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
 Protected publication and final hosted checks remain required.
+The first follow-up push was stopped at the render gate after detecting the
+master base's expired RFC date. The exact two-file same-day live-verified
+refresh from `6716b3bb` was applied and proved byte-identical; its offline
+check passes. This is a gate prerequisite, not another upstream verification
+or a manual restamp. Check cheap currency gates after every base transition.
 
 ### Independent web ip-address override remediation (2026-10-23)
 
