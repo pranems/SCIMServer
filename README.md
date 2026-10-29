@@ -9,13 +9,14 @@ cover 0.55.58 correction preparation, merged 0.55.57 source, the deployed 0.55.5
 cumulative changes since 0.55.20, migration/rollback steps and known limits.
 See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
 
-**Pending stacked API advisory patch:** [Consumer compatibility and remaining Hono blocker](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md)
-describes proposed 0.55.64 on unmerged draft #260. Five assessed advisory
-records are targeted; no merge, deployment or full advisory-clearance claim.
+**Pending API advisory integration:** [Consumer compatibility and remaining Hono blocker](docs/API_ADVISORY_CONSUMER_COMPATIBILITY.md)
+describes proposed 0.55.64 integrating reviewed master after #259 and #260
+merged. Five assessed advisory records are targeted; this proposal is not
+a deployed release or full advisory-clearance claim.
 
-**Pending source-only inventory correction:** [API override-context validity](docs/API_OVERRIDE_CONTEXT_VALIDITY.md)
-describes proposed 0.55.63 and the complete-tree npm regression. It changes
-no application behavior and does not qualify a deployment or clear the
+**Merged source-only inventory correction:** [API override-context validity](docs/API_OVERRIDE_CONTEXT_VALIDITY.md)
+describes merged 0.55.63 source and the complete-tree npm regression. It
+changes no application behavior and does not qualify a deployment or clear the
 separately tracked API security advisories.
 
 For actual supported shapes and integration limits, see

@@ -29,6 +29,28 @@ The [stacked API advisory patch](../API_ADVISORY_CONSUMER_COMPATIBILITY.md)
 keeps the Prisma/Hono adapter blocked because those lifecycle claims cannot
 be verified under the no-service-start constraint.
 
+### PowerShell location is not every library's working directory
+
+`Set-Location` changes PowerShell's provider location, but a .NET API resolving
+a relative path can still use the process's original current directory.
+Always construct and validate absolute source and destination paths before
+archive extraction or other library-driven writes. Do not repair a misplaced
+artifact with broad cleanup: verify its exact files against the trusted
+source and move only the generated directory. The
+[API integration ledger](../API_OVERRIDE_CONTEXT_VALIDITY.md) records the
+three-file ignored-artifact incident and its bounded cleanup.
+
+### Separate the required review claim from one provider's availability
+
+An acknowledged request is not a completed review. Conversely, an unavailable
+hosted reviewer must not become an extra policy requirement when the written
+process permits independent technical review and does not mandate that
+provider. Verify both the written requirement and actual branch protection;
+retain exact-head review provenance, findings and limits. Never fabricate
+approval or remove a genuine approval requirement. The
+[API integration ledger](../API_OVERRIDE_CONTEXT_VALIDITY.md) records the
+unnecessary hold and its correction through ordinary reviewed PR integration.
+
 ### Shared override repairs must reach complete-tree acceptance
 
 An installed version can satisfy every owner range while Arborist rejects

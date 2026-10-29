@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.64 reviewed-master integration (2026-10-29)
+
+- Normally integrate reviewed master `287ea671` after #259 and #260 merged.
+  Preserve every original advisory commit and both preparation histories.
+  Retain qs 6.16.1, fast-uri 4.2.3, the four API root override contexts and
+  merged web Seroval 1.6.11 / Undici 7.30.1. No new runtime implementation.
+- Parent #260 passed 28/28 protected Validate gates and seven exact-head
+  checks, with independent technical review. Those results are provenance,
+  not substitutes for this integration's protected gates or hosted CI.
+- Both roots remain at the already reserved 0.55.64. Confirm the
+  coordinated lock graph in clean CI without local lock regeneration.
+  No new test/gate improvement identified: existing installed-owner,
+  complete-inventory and graph-union checks cover the integration.
+  Design accepted: ordinary history-preserving merge, no new abstraction.
+  No deployment, full advisory clearance or performance admission.
+
 ### 0.55.64 preparation - compatible API advisory pins, stacked on draft #260
 
 - Reserve 0.55.64 after checking existing branches, pull requests and releases.
@@ -27,6 +43,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Validate counts are recorded in the handoff after execution;
   no deployed release claim.
 
+### 0.55.63 reviewed-master integration (2026-10-29)
+
+- Normally integrate web #259's merged master `0a9b3d04` into the preserved
+  API inventory correction. Retain all constituent commits, four API root
+  overrides and the merged Seroval/Undici pins without a new runtime change.
+- Resolve version-only documentation conflicts at 0.55.63 and retain both
+  historical preparation records below. Keep CI-origin locks unchanged
+  until authenticated clean-CI regeneration supplies the integrated roots.
+- New-tip restored checks, protected Validate and hosted CI remain pending;
+  no old counts are substituted for their results. No deployment occurred.
+- Bootstrap Fast passes 25/25; API units 6,229, HTTP 2,514 plus 42 existing
+  skips. CI regeneration 40963173363 supplies both 0.55.63 lock roots with
+  zero non-root drift, preserving the already restored integrated graph.
+- Self-improvement applied: an exact-marker negative control prevents a
+  Markdown ruler from being mistaken for an unresolved merge separator.
+  Fully qualified .NET archive destinations prevent cross-worktree writes;
+  the three misplaced generated files were verified and moved into scope.
+  Design accepted: ordinary integration, no new abstraction or gate waiver.
+
 ### 0.55.63 preparation - API complete-tree override context validity
 
 - Independent rollback unit from master 0.55.61; 0.55.62 is reserved by the
@@ -44,6 +79,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   advisory records remain outside this inventory-only correction.
 - Self-improvement applied: permanent real full-tree inventory and every-owner
   installed resolution. Design accepted: reuse small flat exact pin pattern.
+
+### 0.55.62 web advisory patch bootstrap (2026-10-29)
+
+- Reserve 0.55.62 from merged master `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
+  Change only exact web Seroval 1.6.3 -> 1.6.11 and Undici 7.29.1 -> 7.30.1;
+  preserve the API dependency graph and merged security/fixture corrections.
+- Focused TDD RED: six real assertions fail before manifest edits across pins,
+  all lock occurrences and all installed owners. Preserve the draft outside
+  source until authenticated CI lock import; bootstrap hook GREEN is old-tree
+  evidence only, not a patched dependency result.
+- Prior merged counts: API units 6,220; HTTP 2,514 plus 42 skips; web 1,655.
+  Final current-tip counts and CI-owned lock provenance remain pending.
+- Authenticated regeneration 40895972413 / artifact 12906712562 changes only
+  the two web packages and coordinated release metadata. Clean restores keep
+  both CI lock hashes unchanged. Focused GREEN: 35/35, including six new
+  regressions. Web full npm inventory exits 0; existing API full-tree owner
+  context errors remain a separate explicit limitation, not blanket clearance.
+- Bootstrap ordinary Fast hook: 25/25 gates, 618.2 seconds; units 6,220 and
+  HTTP 2,514 plus 42 skips. The retained native/OS HTTP worker warning is not
+  reclassified as a fixed unit-fixture leak.
+- Hosted CI caught a local-only prerequisite assumption: API units run
+  before web installation. Move all six dependency regressions to the
+  existing web Vitest lane, preserving every assertion and using native
+  owner resolution. Focused web GREEN: 6/6. No workflow/gate redesign or skip.
+  Earlier local Validate at `52200e33` passed 28/28 in 783.1 seconds with
+  units 6,226, HTTP 2,514 +42 skips and web 1,655; those are not final-tip
+  proof after the test relocation. Fresh protected Validate is required.
+- Update user-facing release notes, indexed scope/RCA, Session and Context.
+  Issue #256 stays open for six independent API advisory records.
+- Self-improvement: all-occurrence and real-owner regressions, without skips.
+  Design disposition: accepted, existing exact override/process is cohesive.
+  No application refactor, browser behavior change, merge or deployment.
 
 ### Fixture branch integration with merged security master (2026-10-29)
 
