@@ -13,8 +13,11 @@
 `727860866c53c7ec8d01d1ff5bae858f80a1715d` (0.55.61).
 The new bounded patch reserves 0.55.62 for Seroval 1.6.11 and Undici 7.30.1,
 with no API dependency graph changes. Six genuine focused RED assertions are
-retained; authenticated CI locks, installed-owner GREEN and normal final
-Validate remain pending. See [scope and RCA](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+retained; authenticated CI locks (run 40895972413), 35/35 focused tests and
+actual full web npm inventory now pass. API graph is unchanged, with existing
+full-tree override-context errors explicitly retained as a separate finding.
+Normal final Validate and hosted review remain pending.
+See [scope and RCA](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
 This supersedes the older draft #257 status below. No merge/deployment,
 release admission or closure of issue #256 is authorized.
 

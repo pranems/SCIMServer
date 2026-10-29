@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evidence only, not a patched dependency result.
 - Prior merged counts: API units 6,220; HTTP 2,514 plus 42 skips; web 1,655.
   Final current-tip counts and CI-owned lock provenance remain pending.
+- Authenticated regeneration 40895972413 / artifact 12906712562 changes only
+  the two web packages and coordinated release metadata. Clean restores keep
+  both CI lock hashes unchanged. Focused GREEN: 35/35, including six new
+  regressions. Web full npm inventory exits 0; existing API full-tree owner
+  context errors remain a separate explicit limitation, not blanket clearance.
+- Bootstrap ordinary Fast hook: 25/25 gates, 618.2 seconds; units 6,220 and
+  HTTP 2,514 plus 42 skips. The retained native/OS HTTP worker warning is not
+  reclassified as a fixed unit-fixture leak.
 - Update user-facing release notes, indexed scope/RCA, Session and Context.
   Issue #256 stays open for six independent API advisory records.
 - Self-improvement: all-occurrence and real-owner regressions, without skips.

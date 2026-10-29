@@ -1,7 +1,7 @@
 # Web Seroval and Undici advisory remediation
 
 **Last verified:** 2026-10-29
-**Status:** Bootstrap proposal for 0.55.62. CI-owned lockfiles, restored dependency validation and exact-tip review are pending. Not merged or deployed.
+**Status:** 0.55.62 CI locks authenticated and restored; focused web dependency checks pass. Final protected Validate and exact-tip hosted review are pending. Not merged or deployed.
 
 ## Executive summary
 
@@ -70,21 +70,52 @@ Undici. Use those original UTC strings, not timezone-adjusted prose, for age
 calculations. Both remain eligible. Detection and correction occurred during
 metadata preflight, the earliest applicable gate.
 
-**Confirmed pre-change failure (High, dependency pin drift):** exact overrides
+**Confirmed and fixed failure (High, dependency pin drift):** exact overrides
 retained vulnerable releases after their original fixes aged. The focused
 regressions fail 6/6: expected Seroval 1.6.11, received 1.6.3; expected Undici
 7.30.1, received 7.29.1. Detection is the initial focused unit lane, the earliest
-applicable stage. Resolution remains pending until authenticated lock import
-and restored-owner GREEN, not merely manifest edits.
+applicable stage. Authenticated lock import and clean restore resolve all six
+assertions; the combined existing/new dependency specs pass 35/35.
+The exact pins remove the vulnerable versions from every actual web lock
+occurrence and all installed owner contexts, not merely manifest metadata.
 
-**Pre-restore inventory finding (resolution pending):** full `npm ls --all`
+**Pre-existing API inventory finding (Medium, separate follow-up):** full `npm ls --all`
 reports the two intentionally stale web packages after the manifest edit.
 It also reports API `debug`, `get-intrinsic` and `call-bind-apply-helpers`
 invalid in the existing installed tree, although no API override or locked
-package was changed. Do not call these harmless or claim a valid inventory.
-Restore both CI-owned workspaces and inspect the resulting owner contexts
-before deciding whether any source correction is required. The initial
-inventory failure logs are retained separately from the intentional pin RED.
+package was changed. A clean API restore of the authenticated unchanged
+package graph retains the same three invalidity classes. Top-level API
+`npm ls` exits 0 but is not full-tree clearance. This patch does not change
+API overrides or label the errors harmless. Web `npm ls --all` exits 0 with
+no problems after its clean restore. The initial and restored failure logs
+are retained separately from intentional pin RED. Detection was full
+inventory preflight, earlier than broad tests; a top-level-only inventory
+would miss these owner-context errors. Track diagnosis with the independent
+API work in issue #256 (owner: repository maintainer; target: 2026-11-05).
+
+## Authenticated CI locks and measured results
+
+| Evidence | Result |
+|---|---|
+| Regeneration | [Run 40895972413](https://github.com/pranems/SCIMServer/actions/runs/40895972413), SUCCESS; unchanged workflow, both workspaces; exact source `419596869f3f2de0aa605290d958dcda7ad57e80` |
+| Artifact authentication | `regenerated-lockfiles`, ID 12906712562; downloaded ZIP SHA-256 `a84a0114a0cd91bcb2596815fa7ce72f0711b65f3c8778f802f4ad759980e928`, equal to GitHub's authenticated artifact digest |
+| Entire graph delta | API has zero non-root package changes; web has only Seroval 1.6.3 -> 1.6.11 and Undici 7.29.1 -> 7.30.1. Both root versions become 0.55.62 |
+| CI publication ages | Checked 2026-10-29T14:53:28.243Z: Seroval 11.1289 days, Undici 14.0243 days. CI's original registry timestamps also retain milliseconds; approved-feed timestamps agree to seconds |
+| API artifact/after-restore SHA-256 | `7e0a61ca78c652ceac6239a4db5ac92ca597cab7a5a9ad8041ecdeb08277a087` |
+| Web artifact/after-restore SHA-256 | `312b4337d1571c0f962178272d5b7330b453cd6994686a57b90dabd962ce1ecb` |
+| Provenance and metadata | Every non-root entry uses public registry URLs and sha512; both changed integrity values equal the approved exact-version metadata |
+| Clean restores | `npm --prefix api ci --no-audit --no-fund` and `npm --prefix web ci --no-audit --no-fund`: PASS; both lockfiles byte-identical to their CI artifacts afterward |
+| Focused GREEN | API `npm test -- --runInBand --runTestsByPath src/scripts/web-advisory-pins.spec.ts src/scripts/check-dependency-pins.spec.ts`: 35/35 in two suites |
+| Actual web inventory | `npm --prefix web ls --all --json`: exit 0, no problems. Both actual Seroval owners and jsdom's Undici resolve the intended patches |
+| Advisory scan | `npm --prefix api run check:pins`: web eight pins, zero findings; overall exit 1 correctly retains six separate API advisory records. No scanner suppression or blanket clearance |
+| Bootstrap hook only | Normal Fast push at bootstrap source: 25/25 gates, 618.2 seconds; units 6,220, HTTP 2,514 plus 42 skips. The existing HTTP worker warning remains distinct from unit fixture correctness |
+
+Baseline locks in this Windows checkout use CRLF, whereas CI artifacts and
+Git source use LF. Normalizing the baseline's line endings matches the
+parent-authenticated source hashes exactly: API
+`b8b3b3e0395879222e19e7a95c2dc1eb8ee1be8b9f6514eb3f06f32c9f67be1e`,
+web `b0ae8b65b876e51f7c915df2f7f6586f05192cade4094ba0109430acca57252a`.
+No baseline package content changed before CI import.
 
 **Self-improvement: applied.** The regression checks every actual lock
 occurrence and resolves from every installed owner, so a valid-looking root
@@ -95,6 +126,9 @@ The existing full npm inventory remains required separately.
 No new strategy, runtime abstraction, policy exception or gate redesign is
 justified. The broader browser-bundle scan coverage question is a bounded
 follow-up, not part of this patch.
+Owner: repository maintainer; target: next dependency-gate review by
+2026-11-05. Evaluate bundled browser dependency scanning separately from
+runtime-image scanning without introducing an exception here.
 
 ## Limitations and handoff
 

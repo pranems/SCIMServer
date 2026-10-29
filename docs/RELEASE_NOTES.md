@@ -24,8 +24,10 @@ the five Seroval and eight Undici advisory records listed in
 Both patches exceed the seven-day quarantine minimum. The existing API
 request-body security correction remains intact; six separate API advisory
 records remain open. See [ownership, scope and validation](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
-CI-generated locks and restored dependency verification are required before
-this proposal is considered validated. No UI behavior, deployment, browser
+CI-generated locks now contain only the two intended package updates; the
+restored web dependency inventory and all focused pin/owner tests pass.
+Final protected validation and hosted review remain required.
+No UI behavior, deployment, browser
 exploitability assessment or overall release approval is included.
 
 ### 0.55.61 request-body security dependency patch

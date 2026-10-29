@@ -8,7 +8,11 @@ PR #257 is normally merged at `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
 The independent branch `fix/web-seroval-undici-20261029` reserves 0.55.62:
 web Seroval 1.6.11 and Undici 7.30.1 only, API graph unchanged.
 Six focused assertions failed on actual old pins/locks/installed owners before
-manifest edits. CI-only locks and final protected validation remain pending.
+manifest edits. CI-only locks are authenticated from run 40895972413 and
+artifact 12906712562; all 35 focused tests and full web npm inventory pass.
+API package graph is unchanged; its pre-existing full-tree override-context
+errors remain explicit, despite top-level inventory exit 0.
+Final protected Validate and hosted review remain pending.
 See [scope, RCA and validation](docs/WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
 The prior fixture/draft boundary below is historical. Keep issue #256 open,
 PR #251 untouched, and all release holds. No merge or deployment authorized.
