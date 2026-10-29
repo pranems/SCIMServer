@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.62`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.63`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)

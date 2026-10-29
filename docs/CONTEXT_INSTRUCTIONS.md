@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.62
+> **Version**: 0.55.63
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
@@ -9,6 +9,29 @@
 
 ## Active Delivery Process
 
+**2026-10-29 current integration:** reviewed web #259 merged normally at
+`0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`. API #260 now integrates that
+master at its existing 0.55.63 boundary, preserving both histories and
+the API override and web advisory corrections. The historical independent
+preparation records below no longer describe the integrated branch's scope.
+Separate technical review plus exact-head CI supplies the written review
+gate; no human or GitHub-hosted approval is fabricated. New CI-owned locks,
+restored dependency checks, protected Validate and exact-tip CI remain
+required before merging this integration. No deployment or release
+admission is implied, and all final-artifact qualification holds remain.
+Bootstrap Fast is 25/25; authenticated CI run 40963173363 supplies integrated
+0.55.63 lock roots without any non-root change. Final Validate and new-tip
+review/CI still own the consolidation result.
+
+**2026-10-29 independent API correction:** proposed 0.55.63 branches from
+master `727860866c53c7ec8d01d1ff5bae858f80a1715d`, excluding draft #259.
+[API override-context correction and RCA](API_OVERRIDE_CONTEXT_VALIDITY.md)
+records four shared exact pins at unchanged versions, full-tree RED/GREEN
+and every installed owner check. Focused 38/38 in two suites after
+authenticated CI-lock clean restore; full inventory exit 0 and lock hashes
+unchanged. Protected Validate and hosted exact-tip proof remain separate.
+Existing security advisories and PR #251 stay out of scope. No deploy/merge.
+Self-improvement applied: full-tree acceptance; design accepted: flat pins.
 **2026-10-29 independent web advisory patch:** merged master is
 `727860866c53c7ec8d01d1ff5bae858f80a1715d` (0.55.61).
 The new bounded patch reserves 0.55.62 for Seroval 1.6.11 and Undici 7.30.1,

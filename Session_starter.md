@@ -2,6 +2,44 @@
 
 **Last verified:** 2026-10-29
 
+### Current reviewed-master integration (2026-10-29)
+
+PR #259 merged normally as `0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`
+after successful exact-head CI and a separate read-only technical review.
+That review is recorded publicly, without a fabricated GitHub approval.
+The written process requires green review and CI, not a particular hosted
+reviewer or approval count; the earlier platform-specific hold was excessive.
+
+The existing 0.55.63 API correction now normally integrates that master,
+preserving both constituent histories, the four API root overrides and
+web Seroval/Undici fixes. Version-only conflicts retain 0.55.63; historical
+preparation sections from both branches remain below. Clean-CI lock
+regeneration, restored-graph checks, protected Validate and exact-head CI
+must finish before this integration is eligible to merge.
+Protected bootstrap Fast passes 25/25, with 6,229 API units and 2,514 HTTP
+tests plus 42 existing skips. Authenticated regeneration 40963173363 supplies
+both 0.55.63 roots with zero non-root drift; the final protected Validate
+push and refreshed review/CI remain pending. The archive destination issue
+and exact generated-file cleanup are recorded in the API correction ledger.
+No new runtime, auth, schema, UI or performance implementation is added.
+Performance, data/restore, live/browser, visual and production holds remain.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally merge reviewed web PR #259, then integrate its master into preserved API PR #260; retain both fixes and CI-only lock provenance, with new-tip validation pending. |
+
+### Independent API override-context correction (2026-10-29)
+
+Proposed 0.55.63 starts from fresh master `727860866c53c7ec8d01d1ff5bae858f80a1715d`,
+not draft web PR #259 (0.55.62). Four shared exact root overrides retain
+existing locked versions and correct full-tree npm INVALID contexts.
+Focused RED/GREEN is recorded in [the correction and RCA](docs/API_OVERRIDE_CONTEXT_VALIDITY.md):
+9 new checks plus 29 existing pin checks pass after serial clean restore of
+authenticated CI locks, with byte-identical hashes and full npm inventory
+exit 0. Final protected/hosted results remain separate.
+No runtime, UI, auth, schema, performance, merge or deployment change.
+Six API advisory records remain held. Self-improvement: full-tree exit and
+every installed owner are asserted. Design: accepted, established flat pins.
 ### Independent web advisory patch boundary (2026-10-29)
 
 PR #257 is normally merged at `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
@@ -44,6 +82,7 @@ no speculative runtime seam is needed.
 
 | Date | Summary |
 |---|---|
+| 2026-10-29 | Reserve independent 0.55.63 API override-context fix; four same-version shared pins and discriminating full-tree regression, no inheritance from draft #259. |
 | 2026-10-29 | Normally integrate merged security master into preserved draft #257 at product 0.55.61; retain source histories and historical receipts, with exact new-tip validation still required. |
 | 2026-10-29 | Integration preflight passes: RFC currency, 27-doc freshness/content, focused fixture 99/99 with natural handle-detection exit, dependency pins 29/29 and real npm inventory exit 0. Protected Validate push owns broad runs; exact-tip CI remains required. |
 

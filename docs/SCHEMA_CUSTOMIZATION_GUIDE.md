@@ -10,7 +10,7 @@ effective mutability and response projection. See
 [reference persistence and migration compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
 and [release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.62`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.63`
 
 > **P7a correctness, included since 0.55.36:** [Declaration and POST/PUT validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > documents the source changes below, with owned PostgreSQL/InMemory evidence.

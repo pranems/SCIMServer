@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.63 reviewed-master integration (2026-10-29)
+
+- Normally integrate web #259's merged master `0a9b3d04` into the preserved
+  API inventory correction. Retain all constituent commits, four API root
+  overrides and the merged Seroval/Undici pins without a new runtime change.
+- Resolve version-only documentation conflicts at 0.55.63 and retain both
+  historical preparation records below. Keep CI-origin locks unchanged
+  until authenticated clean-CI regeneration supplies the integrated roots.
+- New-tip restored checks, protected Validate and hosted CI remain pending;
+  no old counts are substituted for their results. No deployment occurred.
+- Bootstrap Fast passes 25/25; API units 6,229, HTTP 2,514 plus 42 existing
+  skips. CI regeneration 40963173363 supplies both 0.55.63 lock roots with
+  zero non-root drift, preserving the already restored integrated graph.
+- Self-improvement applied: an exact-marker negative control prevents a
+  Markdown ruler from being mistaken for an unresolved merge separator.
+  Fully qualified .NET archive destinations prevent cross-worktree writes;
+  the three misplaced generated files were verified and moved into scope.
+  Design accepted: ordinary integration, no new abstraction or gate waiver.
+
+### 0.55.63 preparation - API complete-tree override context validity
+
+- Independent rollback unit from master 0.55.61; 0.55.62 is reserved by the
+  separate draft web PR #259 and is not inherited.
+- Add exact root debug 4.4.3, get-intrinsic 1.3.0, call-bind-apply-helpers
+  1.0.2 and hasown 2.0.4 overrides at existing locked versions. Preserve
+  every earlier security override and all non-root versions.
+- Focused TDD: initial four real failures, then two remaining failures for
+  the tightly coupled hasown context; final nine new checks plus 29 existing
+  checks PASS. Actual full-tree npm inventory changes from EXIT 1 to EXIT 0.
+- [Mechanism, execution RCA and validation plan](docs/API_OVERRIDE_CONTEXT_VALIDITY.md).
+  Broad test totals are not inferred from historical runs; the protected
+  push owns applicable consolidation gates. CI-only locks remain required.
+- No HTTP/UI/auth/schema/performance edits, deployment or merge. Six API
+  advisory records remain outside this inventory-only correction.
+- Self-improvement applied: permanent real full-tree inventory and every-owner
+  installed resolution. Design accepted: reuse small flat exact pin pattern.
+
 ### 0.55.62 web advisory patch bootstrap (2026-10-29)
 
 - Reserve 0.55.62 from merged master `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
