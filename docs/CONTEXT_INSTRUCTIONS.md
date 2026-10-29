@@ -15,7 +15,12 @@ stacked on exact #261 `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`.
 Prisma/dev lifecycle with both adapters, security exploit RED/GREEN, and
 explicit container cleanup despite inherited post-close process retention.
 Existing security pins remain; #251 and reserved 0.55.65 are untouched.
-Source preparation is not final lock/Validate/CI or external review proof.
+Authenticated CI lock run 40948177653 changes only the API adapter outside
+root records. Clean restores retain lock bytes; installed focused GREEN is
+6/6 and complete npm inventory exits 0. Final real-parent isolated run passes
+all 12 claims and cleans up its container; native invocation fails closed.
+Final protected Validate/exact-tip CI remain separate receipts in the ignored
+handoff. No external review or overall release proof is inferred.
 
 **2026-10-29 stacked API advisory remediation:** proposed 0.55.64 is based
 on draft #260 exact head `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`,

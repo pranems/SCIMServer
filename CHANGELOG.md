@@ -19,7 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Actual HTTP exploit RED exposes the synthetic protected file at 1.19.15;
   2.1.3 returns 404. Six permanent focused checks have pre-manifest RED:
   four failed / two passed, including the exploit and complete inventory.
-  GREEN, final broad counts and authenticated locks follow at consolidation.
+  Final focused GREEN is 6/6 in one suite, targeted lint passes, and full
+  unfiltered installed npm inventory exits 0 with empty stderr.
+- Exact-source CI lock run 40948177653 and authenticated artifact 12929363808
+  change only the API adapter outside root records; both clean restores
+  preserve their source lock bytes. Final clean-installed actual-parent
+  isolation check passes all 12 claims and removes its owned container.
+- Bootstrap protected Fast passes 25/25, with 6,248 API unit and 2,514
+  HTTP E2E tests (42 existing skipped). Final Validate/hosted counts are
+  recorded separately in the bounded handoff after execution, not assumed.
 - Both adapters retain a process after successful public close and listener
   release. Explicit owned-container stop is recorded, never represented as
   natural process exit or concealed by changing Jest worker/exit settings.

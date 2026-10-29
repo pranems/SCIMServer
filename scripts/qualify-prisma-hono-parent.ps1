@@ -26,6 +26,7 @@ $args = @(
     '--env', 'XDG_DATA_HOME=/qualification/state/data',
     '--env', 'XDG_CONFIG_HOME=/qualification/state/config',
     '--env', 'XDG_CACHE_HOME=/qualification/state/cache',
+    '--env', 'SCIM_HONO_ISOLATED=1',
     '--env', "EXPECT_ADAPTER=$ExpectedAdapter"
 )
 if ($AdapterPath) {

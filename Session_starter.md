@@ -12,8 +12,13 @@ writes, close/port/data cleanup with old and candidate adapters. Exploit
 RED/GREEN is 200 protected-file exposure versus patched 404. Both versions
 retain a post-close process; only exact owned containers were stopped.
 Six permanent regressions observed pre-manifest RED (four fail/two pass).
-Final locks, installed GREEN, Validate and exact-tip CI are pending at source
-preparation. Draft review and all release/performance/visual/prod holds remain.
+Authenticated CI lock run 40948177653 was imported with an adapter-only API
+delta and no non-root web delta. Both clean restores preserve lock bytes.
+Installed focused GREEN is 6/6; full npm inventory exits 0 with empty stderr.
+Final installed parent passes all 12 claims; native invocation refuses before
+loading the parent. Bootstrap Fast passes 25/25; final Validate/exact-tip CI
+receipts follow separately in the ignored handoff. Draft review and all
+release/performance/visual/prod holds remain.
 
 | Date | Summary |
 |---|---|

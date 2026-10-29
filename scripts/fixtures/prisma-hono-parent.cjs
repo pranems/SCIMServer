@@ -2,6 +2,11 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const net = require('node:net');
+if (process.env.SCIM_HONO_ISOLATED !== '1' || process.platform !== 'linux' ||
+    !require('node:fs').existsSync('/.dockerenv') ||
+    Object.values(require('node:os').networkInterfaces()).flat().some(address => !address.internal)) {
+  throw new Error('Actual parent qualification requires the network-isolated container runner.');
+}
 const { Client } = require('pg');
 const { startPrismaDevServer, PortNotAvailableError } = require('@prisma/dev');
 const path = require('node:path');

@@ -110,6 +110,11 @@ constraint, actual owner resolution, adapter exports/global-object contract,
 the security exploit with normal-routing controls, and the complete unfiltered
 installed npm inventory. The permanent lifecycle runner is separate from the
 unit suite so ordinary Jest never starts an actual Prisma development server.
+The fixture refuses native invocation before loading its parent. It requires
+the runner's explicit flag, a Linux container marker, and internal-only network
+interfaces. The final clean-installed run passed all 12 lifecycle claims and
+stopped/removed its exact owned container; the native refusal check failed
+closed as expected.
 
 ```powershell
 # Set DOCKER_CONFIG in this process only if the local recovery profile is needed.
@@ -138,8 +143,24 @@ adapter-only API graph delta, and no non-root web graph delta. Approved-feed
 tarball bytes must match the imported public lock integrity. Local
 `package-lock-only`, feed rewriting and quarantine exceptions are forbidden.
 
-At source preparation the final lock import, six-test GREEN, protected
-Validate push and exact-tip hosted runs are still pending. The ignored
+Clean-runner workflow `40948177653`, exact source
+`38b1a781eed63905d429feef2480c899dd203161`, produced artifact `12929363808`.
+The authenticated archive SHA-256 is
+`bf1c5791b9cfddf1a9e22beacd71a4549835c3d37ebf32db413e0d4629048946`.
+The API lock changes only the adapter outside its root record; the web lock
+changes no non-root record. Both clean installs retained byte-identical locks,
+Prisma client generation reported 7.8.0, and approved-feed adapter bytes match
+the imported public SHA-512. The public publication timestamp remains the raw
+UTC string `2026-09-29T06:10:34.512Z`.
+
+The final permanent suite passes 6/6 in one suite, targeted ESLint passes,
+and the complete unfiltered installed API npm inventory exits 0 with empty
+stderr. Bootstrap protected Fast passed 25/25 gates, including 6,248 API
+unit tests in 215 suites and 2,514 HTTP E2E tests (42 existing skipped).
+Those bootstrap counts do not include the six permanent tests restored at
+lock consolidation. Final protected Validate and exact-tip hosted runs are
+separate pending publication evidence, not inferred from that earlier run.
+The ignored
 `test-results/hono-parent-qualification-20261029/HANDOFF.md` records their
 actual commands, counts and immutable receipts after consolidation.
 
@@ -151,6 +172,8 @@ actual commands, counts and immutable receipts after consolidation.
 | Parent process retention / Medium | Old and new parents release ports and data after real close, but keep a process alive. Preliminary containers required explicit stop; no root cause inside the parent/runtime is claimed. | Separate happy-only and public-error-path runs showed retention in both. Permanent runner records actual pre-cleanup state, then stops/verifies/removes its exact owned container. This bounds resources without modifying the parent or pretending natural exit passed. | Actual lifecycle probe / same probe. |
 | Upstream comparison lookup / Low | A fresh `v1.19.15...v2.1.3` GitHub comparison returned 404. | Read the fresh security commit and published v2.0.0/v2.1.3 release records instead; npm package metadata and verified bytes remain the identity evidence. An absent tag is not an absent fix. | Metadata intake / same intake. |
 | Lockless bootstrap graph drift / High | An attempted selected-package `npm install --no-package-lock --no-save` re-resolved compatible ranges: installed Prisma became 7.10.1/dev 0.24.17 instead of locked 7.8.0/dev 0.24.3. Source locks remained byte-identical. | Discarded the privately owned wrong graph, clean-restored the exact parent manifest/lock in owned scratch state, then installed only verified candidate tarball bytes into that graph. Regenerated the client at actual 7.8.0 and complete npm inventory exited 0. Final consolidation still requires clean `npm ci` from CI-generated locks. | Post-install real-parent identity check / same check before any compatibility claim. |
+| Transitional source CI / Low | Bootstrap image run `40948154638` rejected the deliberately stale lock: 1.19.15 does not satisfy 2.1.3. The source must first be published for the existing CI-only lock workflow. | Exact-source regeneration run `40948177653` succeeded; imported its authenticated minimal artifact and clean-restored both workspaces. This is a transitional failed run, not final-tip success or a waived install gate. | Hosted install / source-lock consistency check; expected until artifact import. |
+| Evidence replay baseline / Low | Rerunning the pre-import lock comparison after import reported zero changed records, correctly failing its expected one-record delta. Its mutable baseline was now the imported artifact itself. | Pinned the comparison to bootstrap commit `38b1a78` and separately require current source bytes to equal the authenticated artifact. Baseline identity and import identity are now independent assertions. | Local evidence replay / immutable-baseline check before reuse. |
 
 **Completeness provenance:** this ledger was reconciled with every command
 and diagnosed failure in this bounded execution, including preliminary
