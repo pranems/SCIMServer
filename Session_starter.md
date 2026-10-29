@@ -36,14 +36,45 @@ constructor-time environment settings and restore environment exactly.
 All three logging controller/prune suites pass 99/99 with natural exit.
 The complete serial unit diagnostic now passes 213 suites / 6,214 tests
 and exits naturally in 83.657 seconds, with no reported open handles.
-Final ordinary parallel and protected publication checks remain required.
+Published as draft PR #257 at `2d57e785`: the normal protected Fast push
+passes 25/25 gates in 558.6 seconds. Its ordinary parallel unit run passes
+all 6,214 tests without the previous unit worker-exit warning. Exact-tip
+hosted validation, CodeQL, documentation and RFC checks pass; the image
+scan still fails on the two known HIGH dependencies. Both #251 and #257
+remain draft, unmerged and conflict-free, with zero unresolved review
+threads at the latest read. No release admission or deployment is claimed.
 See [RC-I107](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
-Protected publication and final hosted checks remain required.
 The first follow-up push was stopped at the render gate after detecting the
 master base's expired RFC date. The exact two-file same-day live-verified
 refresh from `6716b3bb` was applied and proved byte-identical; its offline
 check passes. This is a gate prerequisite, not another upstream verification
 or a manual restamp. Check cheap currency gates after every base transition.
+
+### Parallel HTTP warning: actual exit phase captured (2026-10-28)
+
+Two bounded diagnostics preserve the ordinary two-worker HTTP selectors,
+existing skips and 500 ms worker deadline: each passes 118 suites / 2,514
+tests plus 42 existing skips, while reproducing the warning. In the native
+trace run both workers reach JavaScript exit with code 0 within 1.5 ms of
+the shutdown request. Only two pipe resources remain; no referenced timer
+or server appears. The native Environment end marker follows within 3.5 ms.
+The parent receives their exit events only after 5.84 and 6.79 seconds.
+Its SIGTERM and SIGKILL calls return false, rather than killing a worker.
+Thus this observed warning is a late-exit-observation case, not evidence
+of another leaked application timer or a successful forced termination.
+The remaining exit-observation delay is not yet attributed. Worker native
+finalization, OS notification delivery and parent-side processing have not
+been separated; the marker does not prove every C++ destructor has completed
+or that the worker remains alive throughout the gap.
+
+The scratch observer adds no IPC message listener. Its delayed-consumer
+control proves queued delivery, event return values, zero added message
+listeners and natural child exit. Native tracing uses only
+`node.environment`, not request bodies or broad async-hook capture.
+No deadline, worker count, exclusion, production code or version changed.
+See [RC-I110](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
+The security, performance, customer-data, cleanup and visual-acceptance
+release holds remain unchanged.
 
 ### Independent web ip-address override remediation (2026-10-23)
 

@@ -137,6 +137,7 @@ cases and the PATCH-envelope cache guard. The companion receipt is
 | RC-I107 | Test lifecycle / Medium | API unit assertions passed while Jest force-exited a worker; two isolated SSE tests also passed assertions but retained two real keep-alive timers and did not exit | The header and connected-event fixtures opened streams without invoking the registered response-close callback; other stream fixtures already disconnected | Disconnect both fixtures, assert response completion, and require zero pending timers after every SSE test. Both logging controller suites pass 82/82 and exit naturally under `--detectOpenHandles` | Bounded real-handle diagnostic after repeated ordinary-hook warnings / fixture lifecycle unit assertion could have caught this when the two tests were written | Applied: zero-timer guard was RED in exactly the two defective cases and GREEN after disconnect. No application timer, timeout, worker count or force-exit change. Independent E2E warning is not attributed to this unit-only defect |
 | RC-I108 | Branch preflight / Low | The first follow-up push reached the render gate before inspection confirmed that its master-based RFC manifest still carried 30 July, outside the 90-day limit | The same-day live-verified refresh existed only on the preserved diagnostic branch; switching to master did not carry that prerequisite | Stop only the owned push before publishing, apply exactly the two RFC files from verified commit `6716b3bb`, prove byte identity against that commit, and pass the cheap offline RFC check before retry | Branch preflight during the hook / immediately after choosing a different base | Applied: currency preflight belongs to every base transition, not once per session. No upstream refetch, manual date restamp, waived age limit or unrelated diagnostic source was imported |
 | RC-I109 | Test lifecycle / Medium | The subsequent ordinary unit run still force-exited a worker; full serial handle diagnostics passed all 6,214 assertions but retained two prune timers | Two startup tests called the runtime config setter before module initialization. The setter created an interval, then initialization overwrote its only tracked handle with a second interval | Configure the enabled startup state through the existing environment before service construction, destroy the replaced disabled fixture, restore environment exactly in `finally`, and assert zero timers after service shutdown | Full-unit handle allocation stacks / unit fixture teardown assertion could have caught this at authoring | Applied: zero-timer guard RED exactly the two startup cases, then all three logging controller/prune suites pass 99/99 with natural exit. Production lifecycle/timers and runner settings remain unchanged |
+| RC-I110 | Harness / native lifecycle / Medium | Parallel HTTP tests pass but Jest reports a force-exit warning even after the four unit fixture timers are corrected | The measured workers reach JavaScript exit and the native Environment end marker within milliseconds, while parent process-exit observation arrives seconds later. Kill requests return false. Worker native finalization, OS notification and parent processing have not yet been separated | Retain real parent/worker timing and native milestones; distinguish this observed phase from a timer leak. Do not change application timers, worker count or the 500 ms deadline without causal evidence | Actual two-worker diagnostic / the first reproducible ordinary warning could have triggered phase capture rather than serial-only inference | Applied: observer has a delayed-consumer/no-added-IPC-listener control and minimal native tracing. Native/notification root-cause work remains open; no warning suppression or release waiver |
 
 ### RC-I107: unit stream fixtures must disconnect
 
@@ -210,14 +211,116 @@ Retained evidence: `full-unit-open-handles.log`,
 `test-results/release-resume-20261028/`.
 The complete serial unit diagnostic then passes 213 suites / 6,214 tests
 and exits naturally in 83.657 seconds with no reported open handles.
-`full-unit-open-handles-green.log` retains that result. Final ordinary
-parallel and protected publication checks remain required.
+`full-unit-open-handles-green.log` retains that result. Published draft
+PR #257 at `2d57e785` then passes the normal Fast hook 25/25 in 558.6 seconds;
+its ordinary parallel unit gate passes 213 suites / 6,214 tests without
+the previous unit worker-exit warning. Exact-tip hosted validation, CodeQL,
+documentation and RFC checks pass. The independent image security and
+release admission holds remain.
 
 **Test/gate improvement: applied.** The prune suite now checks its owned
 timers after shutdown, not merely whether initialization calls timer APIs.
 **Design disposition: accepted.** A typed fixture factory with real disabled
 and enabled startup modes models the existing lifecycle; changing production
 timer policy would treat an artificial test ordering as a product defect.
+
+### RC-I110: a worker warning is not proof of a timer leak
+
+**Summary.** Actual parallel HTTP receipts now locate this occurrence after
+JavaScript exit and the native Environment end marker, not in an observed
+referenced timer or server. This is a phase attribution, not a complete
+native root-cause fix. All historical failures and release holds remain.
+
+**Observed setup.** Windows, Node `v24.13.0`, Jest `30.4.2`, jest-worker
+`30.4.1`; two workers and the existing 500 ms graceful-exit deadline.
+Both diagnostics preserve the ordinary two excluded log suites and all
+42 existing backend skips. Each passes 118 suites / 2,514 tests and
+reproduces the warning. Their durations are 186.759 and 155.477 seconds.
+No shared application, database, Docker container or live estate is used.
+
+The first observer captures parent END, worker receipt, active resource
+names, JavaScript exit, attempted signals and parent process-exit events.
+It adds no message listener or timer. A separate delayed-consumer control
+proves that both queued messages arrive in order, the original event
+arguments and return values survive, zero message listeners are added,
+and the child exits naturally. The second run adds only Node's
+`node.environment` native category and records signal-call return values.
+
+| Milestone after parent END | Worker 1, PID 20472 | Worker 2, PID 81832 | What it establishes |
+|---|---:|---:|---|
+| Worker receives END | 0.700 ms | 0.571 ms | Neither worker is stuck before receiving shutdown |
+| JavaScript `exit`, code 0 | 1.326 ms | 1.410 ms | Both reach JavaScript exit well before the parent deadline |
+| Native `RunCleanup` duration | 1.617 ms | 1.366 ms | This measured cleanup span does not explain the seconds-long delay |
+| Native Environment end marker | 3.413 ms | 3.258 ms | The remaining delay follows this marker, not necessarily every C++ destructor |
+| Parent SIGTERM request | 504.048 ms, false | 504.103 ms, false | The requested termination does not succeed |
+| Parent SIGKILL request | 1008.341 ms, false | 1008.115 ms, false | The follow-up request also does not succeed |
+| Parent receives process exit | 5838.091 ms, code 0 | 6790.108 ms, code 0 | Actual observed exits are successful, with no termination signal |
+
+After END dispatch both workers report only two `PipeWrap` resources.
+There is no referenced timeout or server in those snapshots. Resource names
+alone do not identify every native object or prove the origin of the pipes.
+
+```mermaid
+flowchart TD
+    A["Parent sends END: 0 ms"] --> B["Workers reach JavaScript exit: under 1.5 ms"]
+    B --> C["Environment end marker: under 3.5 ms"]
+    C --> D["Remaining exit-observation delay: not yet attributed"]
+    D --> E["Parent receives code 0 exit: 5.84 to 6.79 seconds"]
+    A --> F["Parent deadline: 500 ms"]
+    F --> G["Kill requests at about 504 and 1008 ms: false"]
+    G --> H["Jest reports its force-exit warning"]
+```
+
+The two paths show why the warning and a successful worker exit can coexist:
+the parent deadline measures its exit observation, not the timestamp of the
+worker's JavaScript `exit` event. Jest's warning therefore does not, by
+itself, establish another test timer leak or a successful forced kill.
+The exact remaining delay still requires owned-process and OS-notification
+evidence. V8 disposal, remaining C++ destruction, OS notification delivery
+and parent-side handling are possibilities, not established causes.
+The parent's native trace continues to record short timer/immediate
+callbacks during the gap, with no captured Environment-category span over
+50 ms in that window. This does not trace every possible parent callback
+or establish when the worker actually becomes unavailable to OS queries.
+Do not equate delayed parent observation with the worker staying alive
+throughout the gap.
+
+**Source verification.** The installed worker uses
+`workerGracefulExitTimeout`, default 500 ms, and sets its `forceExited`
+flag when it calls `forceExit`, irrespective of the eventual exit code.
+Node's [trace-event documentation](https://nodejs.org/docs/latest-v24.x/api/tracing.html)
+documents the Environment category. Version-pinned
+[environment cleanup](https://github.com/nodejs/node/blob/v24.13.0/src/env.cc#L1298)
+and [main-instance teardown](https://github.com/nodejs/node/blob/v24.13.0/src/node_main_instance.cc#L64)
+explain why native work can continue after JavaScript exit. The Environment
+end marker is inside C++ destruction, not proof that all member and isolate
+destructors have finished. An initial search summary's claim that native
+tracing cannot continue after JavaScript exit was rejected against the
+versioned source and actual trace.
+
+**Evidence.** Ignored `test-results/release-resume-20261028/` contains
+`parallel-worker-probe-control-final.log`,
+`parallel-http-worker-20261028-193819/`,
+`parallel-http-native-20261028-194544/`, and
+`parallel-http-native-exit-summary.json`. Each run retains raw per-process
+JSONL, its complete Jest log and, for the second run, per-process native
+trace files. Only selected resource names, filenames and lifecycle metadata
+are recorded by the observer; it does not persist IPC payloads or credentials.
+This entry is reconciled against those actual command/trace receipts.
+It does not claim recovery of the deleted original conversation.
+
+**Next action.** The release continuation owner retains the native/notification
+question for the next focused investigation checkpoint,
+target 2026-10-30. Do not rerun an unchanged broad suite without a new
+native-phase observation plan, or change runner limits to hide the warning.
+The two known HIGH dependencies, performance admission, actual customer-data
+restore, final cleanup and operator visual acceptance remain independent.
+
+**Test/gate improvement: applied.** The observer is controlled for queued IPC
+and natural exit; diagnosis now correlates actual parallel parent/worker
+events rather than inferring a parallel cause from serial handle tests.
+**Design disposition: accepted.** This remains a small ignored diagnostic,
+not another permanent runner abstraction or a production lifecycle change.
 
 **2026-10-15 completeness note:** the current continuation was reconciled
 against its structured test receipts, command results, failure signals and the

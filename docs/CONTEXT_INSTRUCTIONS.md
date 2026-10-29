@@ -12,8 +12,8 @@
 **2026-10-28 independent test-only follow-up:** actual master is `5bfff2de`
 at 0.55.60; #252/#253/#254 are merged. PR #251 is separately preserved at
 `e5e107f5`, draft and conflict-free, with security/performance admission still
-blocked. The current branch only corrects two unit SSE fixtures that failed
-to disconnect, plus a zero-pending-timer assertion for the seven stream cases.
+blocked. The current branch corrects two unit SSE fixtures that failed
+to disconnect, plus two prune startup fixtures and their zero-timer guards.
 Both logging controller suites pass 82/82 and exit naturally under
 `--detectOpenHandles`. This is not proof of leak-free full E2E teardown.
 The subsequent full-unit diagnostic identified two more fixture intervals
@@ -22,10 +22,28 @@ configuration instead of the runtime setter before initialization, with a
 zero-timer shutdown guard. The three logging controller/prune suites pass
 99/99. Full serial handle diagnostics then pass 213 suites / 6,214 tests
 and exit naturally in 83.657 seconds without reported open handles.
-Final ordinary parallel and protected publication checks remain required.
+Published draft PR #257 at `2d57e785` passes the ordinary protected Fast
+hook 25/25 in 558.6 seconds. Its parallel unit gate passes all 6,214 tests
+without the former unit worker-exit warning. Exact-tip hosted validation,
+CodeQL, documentation and RFC checks pass; Trivy still fails on the two
+known HIGH dependencies. Neither #251 nor #257 is merged or deployed.
 See [RC-I107](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
 No serving-code change or version bump. The older dated entries below are
 historical source-time checkpoints, not current merge/deployment claims.
+
+**2026-10-28 parallel HTTP phase attribution:** two actual two-worker runs
+each reproduce the warning with 2,514 passes / 42 existing skips. Native
+milestones show JavaScript exit within 1.5 ms and the Environment end marker
+within 3.5 ms, but parent exit observation after 5.84 and 6.79 seconds.
+Both workers report code 0; the parent's kill requests return false.
+The measured warning is not evidence of another application timer leak.
+The remaining exit-observation delay is still unassigned: worker native
+finalization, OS notification delivery and parent processing are not yet
+separated. Do not infer native destruction completed at the Environment
+marker, or that the worker remained alive until parent observation.
+Existing deadlines, workers, skips and force-exit settings are unchanged.
+Use [RC-I110](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak)
+before proposing another timer fix or changing a runner setting.
 
 **2026-10-23 next independent remediation:** proposed 0.55.60 updates the
 dormant web ip-address override to exact 10.7.4 from master cddeb5a5.

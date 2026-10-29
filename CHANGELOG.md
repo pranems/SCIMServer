@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suites remain 99/99 and exit naturally. The final complete serial unit
   diagnostic passes 213 suites / 6,214 tests with natural exit and no reported
   open handles in 83.657 seconds. Ordinary parallel checks remain separate.
+- Published fixture correction #257 passes the normal Fast hook 25/25;
+  its ordinary parallel unit gate no longer emits the worker-exit warning.
+  Two subsequent parallel HTTP diagnostics each retain 2,514 passes /
+  42 existing skips and reproduce the separate warning. Native milestones
+  place the observed delay after JavaScript exit and the Environment end
+  marker; both workers eventually report code 0 and kill requests return
+  false. This narrows the warning's phase, not its final native root cause.
+  No application timer fix or runner relaxation is inferred from it.
 - Test-only correction: no application, version, dependency, runner timeout
   or force-exit change. Full-suite lifecycle and hosted checks are separate
   evidence; release security and performance holds are unchanged.
