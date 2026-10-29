@@ -1,13 +1,29 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.61
+> **Version**: 0.55.62
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-29 independent web advisory patch:** merged master is
+`727860866c53c7ec8d01d1ff5bae858f80a1715d` (0.55.61).
+The new bounded patch reserves 0.55.62 for Seroval 1.6.11 and Undici 7.30.1,
+with no API dependency graph changes. Six genuine focused RED assertions are
+retained; authenticated CI locks (run 40895972413), 35/35 focused tests and
+actual full web npm inventory now pass. API graph is unchanged, with existing
+full-tree override-context errors explicitly retained as a separate finding.
+Normal final Validate and hosted review remain pending.
+Hosted source `52200e33` exposed API tests reading web packages before CI
+installs them. All six new regressions now run in web's existing Vitest lane;
+focused 6/6 passes without workflow changes or skips. Prior local Validate
+results are historical and must not be substituted for the corrected tip.
+See [scope and RCA](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+This supersedes the older draft #257 status below. No merge/deployment,
+release admission or closure of issue #256 is authorized.
 
 **2026-10-29 current consolidation:** security PR #258 merged normally at
 `80460d59`. Draft #257 integrates that master while preserving its prior
