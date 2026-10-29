@@ -15,6 +15,21 @@ notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
 
+### 0.55.62 web Seroval and Undici security dependency patch
+
+This proposed patch updates exact web overrides from Seroval 1.6.3 to
+1.6.11 and Undici 7.29.1 to 7.30.1. These minimal compatible patches address
+the five Seroval and eight Undici advisory records listed in
+[issue #256](https://github.com/pranems/SCIMServer/issues/256).
+Both patches exceed the seven-day quarantine minimum. The existing API
+request-body security correction remains intact; six separate API advisory
+records remain open. See [ownership, scope and validation](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+CI-generated locks now contain only the two intended package updates; the
+restored web dependency inventory and all focused pin/owner tests pass.
+Final protected validation and hosted review remain required.
+No UI behavior, deployment, browser
+exploitability assessment or overall release approval is included.
+
 ### 0.55.61 request-body security dependency patch
 
 This draft patch pins body-parser to 2.4.0 and multer to 2.5.0 for the two

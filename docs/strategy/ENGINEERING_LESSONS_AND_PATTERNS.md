@@ -16,6 +16,17 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Separate the required review claim from one provider's availability
+
+An acknowledged request is not a completed review. Conversely, an unavailable
+hosted reviewer must not become an extra policy requirement when the written
+process permits independent technical review and does not mandate that
+provider. Verify both the written requirement and actual branch protection;
+retain exact-head review provenance, findings and limits. Never fabricate
+approval or remove a genuine approval requirement. The
+[API integration ledger](../API_OVERRIDE_CONTEXT_VALIDITY.md) records the
+unnecessary hold and its correction through ordinary reviewed PR integration.
+
 ### Shared override repairs must reach complete-tree acceptance
 
 An installed version can satisfy every owner range while Arborist rejects

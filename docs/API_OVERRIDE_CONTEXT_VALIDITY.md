@@ -18,6 +18,21 @@ Draft PR #259 reserves 0.55.62 and is not inherited, edited or admitted.
 No merge, deployment, latest-image qualification, auth, schema, UI or
 performance changes are included.
 
+### Current integration supersedes the independent preparation boundary
+
+PR #259 subsequently merged normally at
+`0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`. The existing 0.55.63 branch
+now integrates that master without rewriting any constituent commit.
+Its API graph retains the four exact root overrides; its web graph inherits
+the already reviewed Seroval/Undici correction.
+
+The new integrated locks must come from clean CI, with archive authentication
+and structural package-union checks before import. Existing authenticated
+parent locks are retained unchanged during the bootstrap, not regenerated
+locally. New-tip restored checks, protected Validate and hosted CI remain
+required. Original development measurements below remain historical.
+This integration does not admit a release artifact or authorize deployment.
+
 ## Observed mechanism and replacement
 
 The baseline `npm ls --all --json` exits 1 with three invalid package
@@ -66,6 +81,8 @@ inventory and requires both exit 0 and no problems.
 | OV-3 | Documentation / Low | The cheap content audit rejects the old README version badge after the ordinary freshness fix updates headers. | Update the badge to the reserved version; keep the existing content audit as the enforcement mechanism. | Cheap preflight / same stage. No escape. |
 | OV-4 | Registry metadata / Low | Configured corporate-feed metadata exposes tarball and SHA-1 shasum, not public SHA-512 integrity. | Do not treat absent metadata as a hash match or rewrite locks. Compare downloaded approved-feed bytes to existing SHA-512 locks and authenticate clean CI's public-provenance artifact. | Metadata preflight / same stage. No escape. |
 | OV-5 | Evidence tooling / Low | PowerShell's default JSON object conversion rejects the lock's empty-string root package key. | Use `ConvertFrom-Json -AsHashtable` for lock metadata and explicit structural Node comparisons for CI import; no source or lock was changed by the failed read. | Evidence preflight / same stage. No escape. |
+| OV-6 | Integration tooling / Low | An overly broad remaining-conflict scan treated a long Markdown equals-sign ruler as a seven-character merge separator. The resolver refused before writing any file. | Require exact separator lines and add negative/positive controls before applying the bulk merge plan. Both historical sections and current-version headers are preserved. | Checked merge plan / same stage. No escape; no partial source edit. |
+| OV-7 | Review process / Medium | A reconstructed hold required a GitHub-hosted review even though the written process requires green review and CI without mandating that provider. Empty hosted requests were incorrectly made an additional release dependency. | Verify actual policy and protection settings, complete a separate exact-head technical review, publish its provenance and limitations, then use ordinary PR integration without an invented approval. Web #259 merged at `0a9b3d04`; exact merged-master CodeQL and pin-review jobs pass. | Release continuation / first review-hold classification. The delay could have been avoided at the initial policy check. |
 
 OV-1 RED: four actual assertions failed (three missing shared contexts and
 the real inventory); three owner/provenance checks already passed.
