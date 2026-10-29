@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.60`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.65`
 
-> **Version:** 0.55.60 - **Updated:** 2026-10-21
+> **Version:** 0.55.65 - **Updated:** 2026-10-21
 > 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Unreleased preparation:** [endpoint token lifetime integration and original
@@ -10,6 +10,10 @@ TDD evidence](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md) distinguishes the
 current-master port from earlier isolated validation and deployed behavior.
 
 ### Start here
+
+**Pending request-body security correction:** [Implementation and evidence](REQUEST_BODY_SECURITY_REMEDIATION.md)
+records proposed 0.55.61, exact API patches, CI-only locks and distinct bootstrap
+versus installed-graph validation. No merge or deployment is authorized.
 
 **Pending security correction:** [Web ip-address override remediation](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md)
 records the exact 10.7.4 dormant override, dependency inventory and CI-only

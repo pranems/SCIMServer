@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.60`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.65`
 
 **Current UI presentation:** absolute timestamps in Logs, Activity, Operations
 and live/detail drawers include full UTC date/time and milliseconds. Copy

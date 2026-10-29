@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.60`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.65`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,33 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.65 preserved performance-source integration
+
+This draft candidate integrates the preserved performance-qualification history
+with current master, including the merged request-body security patches and
+logging test-fixture corrections. It adds no new serving behavior and does not
+include the independent 0.55.62, 0.55.63 or 0.55.64 draft dependency patches.
+See the [local diagnostic checkpoint](MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
+
+The original frozen performance run remains FAILED: populated-read p99 ratio
+1.23928982 exceeds the unchanged 1.10 limit. Source consolidation, ordinary CI
+and version reservation do not qualify performance or admit a release artifact.
+The existing full API npm inventory error is also retained, not repaired by
+copying another draft's override changes.
+
+### 0.55.61 request-body security dependency patch
+
+This draft patch pins body-parser to 2.4.0 and multer to 2.5.0 for the two
+High request-body advisories tracked by
+[issue #256](https://github.com/pranems/SCIMServer/issues/256).
+A single exact iconv-lite 0.7.3 override gives its three compatible API owners
+one shared npm override context. This corrects an actual dependency inventory
+failure without changing the already-patched package versions.
+All selected patches meet the seven-day quarantine minimum.
+See [scope, ownership and validation](REQUEST_BODY_SECURITY_REMEDIATION.md).
+This is not a deployment or release-admission claim; independent release
+prerequisites remain open.
 
 ### 0.55.60 web dependency override correction
 

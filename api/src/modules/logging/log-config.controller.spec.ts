@@ -397,6 +397,18 @@ describe('LogConfigController', () => {
   // ─── GET /admin/log-config/stream (SSE) ───────────────────────────
 
   describe('streamLogs (SSE)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      try {
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     function createMockResponse() {
       const chunks: string[] = [];
       const headers: Record<string, string> = {};
@@ -405,11 +417,18 @@ describe('LogConfigController', () => {
         flushHeaders: jest.fn(),
         write: jest.fn((data: string) => { chunks.push(data); return true; }),
         end: jest.fn(),
-        on: jest.fn(),
+        on: jest.fn<void, [string, () => void]>(),
         chunks,
         headers,
       };
       return res;
+    }
+
+    function disconnect(res: ReturnType<typeof createMockResponse>) {
+      const close = res.on.mock.calls.find(([event]) => event === 'close')?.[1];
+      expect(close).toBeDefined();
+      close!();
+      expect(res.end).toHaveBeenCalledTimes(1);
     }
 
     it('should set SSE headers', () => {
@@ -420,6 +439,7 @@ describe('LogConfigController', () => {
       expect(res.headers['Connection']).toBe('keep-alive');
       expect(res.headers['X-Accel-Buffering']).toBe('no');
       expect(res.flushHeaders).toHaveBeenCalled();
+      disconnect(res);
     });
 
     it('should send initial connected event', () => {
@@ -427,6 +447,7 @@ describe('LogConfigController', () => {
       controller.streamLogs(undefined, undefined, undefined, res as never);
       expect(res.chunks[0]).toContain('event: connected');
       expect(res.chunks[0]).toContain('Log stream connected');
+      disconnect(res);
     });
 
     it('should stream log entries in real-time', () => {

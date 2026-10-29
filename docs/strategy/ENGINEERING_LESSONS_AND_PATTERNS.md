@@ -16,6 +16,16 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Prove preservation independently of successful integration
+
+An ordinary merge preserves history, but conflict-free runtime files alone
+do not prove which runtime source survived. For preserved diagnostic branches,
+record both exact parents, classify every conflict, compare runtime/security
+and fixture paths against incoming master, and verify every constituent
+commit remains an ancestor. Keep draft-only dependency patches outside that
+comparison. This 29 October integration uses those explicit negative checks;
+source correctness and green CI still do not admit a failed performance run.
+
 ### Verify captured evidence through the owned descriptor
 
 Exclusive creation protects the initial open, not a later pathname lookup.
@@ -358,6 +368,37 @@ cheaper harness, reverse the relevant production behavior and confirm that the
 new assertion fails for the original defect; restore it before any gate run.
 Keep deadlines unchanged and distinguish isolated timings from full-load proof.
 See ER-68l in the same ledger.
+
+### A worker warning must be attributed to an observed lifecycle phase
+
+The same Jest warning accompanied real unit-fixture timer leaks and a
+different parallel HTTP shutdown observation. In the latter, both workers
+reached JavaScript exit with code 0 within 1.5 ms and the native Environment
+end marker within 3.5 ms, yet the parent observed process exit 5.84-6.79
+seconds later. Its timeout-triggered kill calls returned false. The warning
+alone therefore proves neither a retained timer nor a successful kill.
+
+Retain parent shutdown/kill/exit receipts alongside worker resources and
+native lifecycle milestones before choosing a fix. Keep the existing
+deadline and worker count while attributing the phase. Do not equate an
+Environment trace marker with completion of every C++ destructor, and do
+not generalize one observed phase to every historical warning.
+
+For Windows diagnostics, record process exit status, process-object signaling
+and parent callback separately. A follow-up captured status 0 while the same
+owned process handle remained unsignaled. Retain the handle from a verified
+live state to avoid PID reuse, and request only limited-query/synchronize
+access. Polling gives observation times, not exact kernel transition times.
+Without retained unchanged polls or maximum gaps, do not claim a precise
+sampling bound or uninterrupted state throughout the interval. Source paths
+can explain compatible behavior without proving which native branch executed.
+
+Diagnostic observers must preserve the behavior they observe. In
+particular, adding an IPC `message` listener changes channel liveness and
+can consume queued messages before the real consumer attaches. The bounded
+observer control checks delayed queued delivery, original event arguments
+and return values, zero added message listeners, and natural child exit.
+See [RC-I110](../SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
 
 ### Dependency classification is not deployed package inventory
 

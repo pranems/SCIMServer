@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Preserved performance source integration - candidate 0.55.65 (2026-10-29)
+
+- Normally merge current master `72786086` into preserved PR #251 head
+  `e5e107f5`, keeping both parents and every constituent commit. Retain all
+  merged request-body security patches, logging fixture fixes, TTL settings,
+  production URL GIN index and stopped authentication-advertisement boundary.
+- Reserve 0.55.65 after checking open PRs and version history. Independent
+  drafts #259 (0.55.62), #260 (0.55.63) and #261 (0.55.64) remain separate;
+  none of their unmerged dependency changes belongs to this integration.
+- Only documentation conflicts require resolution. Preserve both historical
+  narratives below; current-tip validation is recorded separately under
+  `test-results/performance-master-integration-20261029/`.
+- The frozen performance run `39875689201` remains FAILED: populated-read
+  p99 ratio `1.23928982` exceeds `1.10`. Source integration is not performance
+  qualification, artifact admission, deployment or release completion.
+
 ### Local qualification branch reconciliation (no product bump)
 
 - Ordinarily merge reviewed master `5bfff2de` (0.55.60) into preserved
@@ -188,6 +204,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic control flow. Windows helper startup allows only `SystemRoot`;
   Linux inherits no environment. Product remains 0.55.58 with no dependency,
   lockfile, serving or cloud change. Linux diagnostic execution is pending.
+
+### Fixture branch integration with merged security master (2026-10-29)
+
+- Normally integrate security PR #258 merge `80460d59` into draft PR #257,
+  preserving every constituent fixture and security commit. Product remains
+  0.55.61; the integration adds no serving behavior or dependency changes.
+- Preserve historical diagnostic measurements below. The separate parallel
+  HTTP worker warning remains unassigned; no successful kill is claimed.
+- Self-improvement: apply the existing cheap RFC/doc preflight before broad
+  protected gates. Design disposition: accepted, test fixtures remain small
+  and cohesive; a new runtime abstraction would be speculative.
+- Integration preflight: fixtures 99/99, dependency pins 29/29, npm inventory
+  exit 0, RFC currency and 27-doc freshness/content PASS. Broad protected
+  Validate and exact-tip hosted checks remain separate evidence.
+
+### Log-stream unit fixture teardown
+
+- Disconnect the header and connected-event SSE fixtures through the
+  controller's existing response-close callback. Both previously passed
+  assertions but leaked real keep-alive timers and prevented natural exit.
+- Require zero pending timers after every stream case. The new guard was
+  RED in exactly two cases and GREEN after fixture cleanup. Both logging
+  controller suites remain 82/82; three related InMemory HTTP suites remain
+  62/62 and exit naturally under `--detectOpenHandles`.
+- Complete serial InMemory HTTP diagnostics pass 120 suites / 2,570 tests
+  with existing two suites / 42 skips and natural exit. Ordinary gates
+  retain their two log-suite exclusions (56 tests) and parallel settings;
+  this diagnostic does not explain the separate parallel exit warning.
+- Full-unit handle attribution found two further prune-fixture timers.
+  Configure enabled startup before service construction, not with a runtime
+  setter before initialization, and require zero timers after shutdown.
+  That guard was RED in exactly two cases; all three logging controller/prune
+  suites remain 99/99 and exit naturally. The final complete serial unit
+  diagnostic passes 213 suites / 6,214 tests with natural exit and no reported
+  open handles in 83.657 seconds. Ordinary parallel checks remain separate.
+- Published fixture correction #257 passes the normal Fast hook 25/25;
+  its ordinary parallel unit gate no longer emits the worker-exit warning.
+  Two subsequent parallel HTTP diagnostics each retain 2,514 passes /
+  42 existing skips and reproduce the separate warning. Native milestones
+  place the observed delay after JavaScript exit and the Environment end
+  marker; both workers eventually report code 0 and kill requests return
+  false. This narrows the warning's phase, not its final native root cause.
+  No application timer fix or runner relaxation is inferred from it.
+- A controlled, passive Windows follow-up preserves the ordinary HTTP
+  counts and warning. Its process handles show successful exit status before
+  process-object signaling. Retain the distinct status, signal and parent
+  callback measurements, their polling limits and pinned libuv explanation
+  in RC-I110; the remaining native/OS delay is not claimed fixed.
+- Test-only correction: no application, version, dependency, runner timeout
+  or force-exit change. Full-suite lifecycle and hosted checks are separate
+  evidence; release security and performance holds are unchanged.
+
+### 0.55.61 request-body dependency security correction (#256)
+
+- Pin API body-parser 2.3.0 -> 2.4.0 for HIGH CVE-2026-111181 and
+  multer 2.4.0 -> 2.5.0 for HIGH CVE-2026-113872. Preserve major versions,
+  existing owners and browser dependency absence. No unrelated pin updates.
+- Synchronize API/web version metadata; public-registry lockfiles are generated
+  only by the sanctioned CI workflow. Bootstrap installation is not patched
+  dependency evidence. Actual exact-tip image outcomes remain required.
+- Focused pin regression tests: 23 -> 26; RED is two expected override
+  failures and 24 passes. Bootstrap/final GREEN and hook-owned broad counts
+  are recorded separately in [the evidence report](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+- Bootstrap GREEN is 26/26; final graph/installed regressions increase the
+  focused total to 28. Both actual-lock RED and stale-install RED fail exactly
+  two tests. Sanctioned run 40873804998 yields only body-parser, multer and
+  required iconv-lite 0.7.3 changes plus API/web 0.55.61 root metadata.
+- Final focused GREEN is 28/28 after clean API/web approved-feed restores
+  with unchanged lock hashes. Bootstrap protected hook is 25/25 PASS:
+  API units 6,214 -> 6,217, HTTP unchanged 2,514 passed / 42 existing skips.
+  Final unit expectation is 6,219 after the two graph/installed regressions;
+  final hook/web/image results are pending, not inferred from bootstrap.
+  Supplementary npm inventory's override-context ELSPROBLEMS is preserved
+  separately from passing actual-owner resolution and semver checks.
+- Follow-up closes that inventory failure rather than accepting a failed
+  graph: pin shared iconv-lite to exact 0.7.3 globally after verifying every
+  actual owner accepts it (body-parser ^0.7.3, mysql2 ^0.7.2, raw-body ~0.7.0).
+  There were no explicit owner-specific iconv-lite overrides to remove.
+  Focused RED adds one failing context guard, 28 pass/one failure; GREEN
+  is 29/29 and real npm inventory now exits 0. No version/major/tool upgrade.
+  Fresh CI lock verification, restoration, Validate and current-tip image
+  outcomes are required; earlier 78b88d1c evidence is historical only.
+- Carry only the two exact, live-verified RFC prerequisite files from
+  `47cf8397` after master failed offline currency at 91 days. No manual
+  date restamp, age waiver, logging-fixture import or deployment is included.
 
 ### 0.55.60 web ip-address override security correction (#248)
 

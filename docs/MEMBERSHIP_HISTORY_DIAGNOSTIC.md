@@ -1,7 +1,40 @@
 # Local application-history diagnostic
 
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 **Scope:** Unreleased local tooling, never release admission.
+
+## Current-master source integration (2026-10-29)
+
+PR #251 preserves exact remote head `e5e107f5` through an ordinary merge of
+master `72786086`. Five overlapping documentation files retain both histories;
+runtime, Prisma schema, UI source and the incoming logging fixtures match
+master. Performance source, frozen protocol and prior review fixes match the
+preserved head. Candidate 0.55.65 is reserved independently of drafts #259,
+#260 and #261, whose unmerged sources are not included.
+
+Preflight verifies these tree boundaries, both manifest graphs and unchanged
+dependency graphs. Restoring the privately owned API/web dependency trees
+from master's locks succeeds without changing either lock hash. The incoming
+logging fixture and dependency-pin unit tests pass 3 suites / 111 tests.
+Focused tooling and archive-descriptor contracts pass 14 with one explicit
+external-evidence skip. Full API `npm ls --all --json` still exits 1 with
+three invalid override-context packages; that independent baseline is not
+waived or fixed by this consolidation.
+
+At this source checkpoint, protected publication, CI-owned version-only
+lock artifacts and exact-tip CI/review evidence remain to be collected under
+`test-results/performance-master-integration-20261029/`. Nine bounded actual
+review threads are resolved at intake; historical reviews are not integration
+tip approval. The PR remains draft. No benchmark or live service is started.
+
+Frozen run `39875689201` remains FAILED, with populated-read p99 ratio
+`1.23928982 > 1.10`. Cleanup HTTP 403 remains a cleanup failure, not CLEANED.
+There is no customer-data restoration, browser/operator visual receipt,
+performance qualification or release admission implied by this integration.
+
+Self-improvement is applied through independent history/source/graph
+preservation checks. Design/architecture disposition is accepted: no runtime
+orchestrator grows, and adding a strategy abstraction would be speculative.
 
 ## Current consolidation and release checkpoint (2026-10-28)
 

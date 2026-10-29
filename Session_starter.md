@@ -1,6 +1,35 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
+
+### Current preserved performance integration (2026-10-29)
+
+PR #251 is being integrated through an ordinary merge of current master
+`727860866c53c7ec8d01d1ff5bae858f80a1715d` into preserved remote head
+`e5e107f5b6882d2e71c8015adbeb16e89d8b3524`, on the privately owned
+`integration/performance-master-20261029` branch. Both parent histories
+remain intact. Five documentation conflicts preserve both narratives below.
+The current candidate is 0.55.65, reserved after an open-PR/history collision
+check; independent drafts #259/.62, #260/.63 and #261/.64 are not inherited.
+
+All merged master source, security dependencies and four logging fixture
+corrections are retained. The nine actual review threads were all resolved
+at intake; that is historical review, not review of the integration tip.
+Protected Validate publication and exact-tip CI/review receipts belong in
+`test-results/performance-master-integration-20261029/`.
+
+The frozen run `39875689201` remains FAILED with populated-read p99 ratio
+`1.23928982 > 1.10`. Cleanup HTTP 403 is not successful cleanup.
+No live application, database, Docker operation, benchmark, deployment,
+promotion, artifact admission or operator visual verification is authorized.
+The remaining native Windows worker warning is not fixed by consolidation.
+
+Self-improvement: applied an explicit two-parent and master-source preservation
+preflight instead of relying on merge success alone. Design/architecture
+disposition: accepted; this is a source-history/documentation integration
+with no new runtime responsibility or speculative abstraction.
+
+### Historical preserved-branch checkpoints
 
 ### Post-recovery release checkpoint (2026-10-28)
 
@@ -543,6 +572,148 @@ do not change triggers, resources, thresholds or frozen inputs to bypass it.
 Focused commands, hashes, conflict dispositions and preservation evidence
 are retained in `test-results/qualification-consolidation-20261023/`.
 
+### Historical incoming-master checkpoints
+
+### Current consolidation boundary (2026-10-29)
+
+Security PR #258 is normally merged into master at `80460d59`. Draft PR #257
+integrates that exact master while preserving fixture head `9d6d5c62` and
+all constituent commits. Product remains 0.55.61, with body-parser 2.4.0,
+multer 2.5.0 and compatible global iconv-lite 0.7.3. CI-generated API/web
+locks are retained unchanged. Current focused and protected validation
+results are recorded in the integration handoff, not inferred from older tips.
+PR #251 stays separate at `e5e107f5`; no merge of #257 or deployment is included.
+The dated fixture/security observations below are historical checkpoints.
+The stronger passive observer brackets Windows signaling within 47.4 ms
+and contains the parent callbacks, but the native/OS component remains
+unassigned. No further diagnosis experiment or runtime change is included.
+The frozen performance failure (1.23928982 > 1.10), customer-data proof,
+cleanup 403, browser/human visual proof and Mermaid renderer conflict remain
+outstanding. Self-improvement uses existing cheap currency checks before
+protected gates. Design disposition: accepted, cohesive test-only fixtures;
+no speculative runtime seam is needed.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally integrate merged security master into preserved draft #257 at product 0.55.61; retain source histories and historical receipts, with exact new-tip validation still required. |
+| 2026-10-29 | Integration preflight passes: RFC currency, 27-doc freshness/content, focused fixture 99/99 with natural handle-detection exit, dependency pins 29/29 and real npm inventory exit 0. Protected Validate push owns broad runs; exact-tip CI remains required. |
+
+### Independent log-stream test teardown correction (2026-10-28)
+
+This test-only follow-up starts from actual master `5bfff2de` at 0.55.60,
+not the diagnostic branch. PR #251 is separately preserved at `e5e107f5`,
+draft and conflict-free; its image/security and performance holds remain.
+The historical dependency-remediation checkpoints below are not current
+merge or deployment status.
+
+Two log-config controller unit tests opened SSE streams without simulating
+disconnect. A bounded real-timer run passed both assertions but reported
+two open handles at the keep-alive allocation and did not exit naturally;
+only that owned diagnostic process was stopped after retaining the stacks.
+A zero-timer teardown assertion then failed both tests with one pending
+timer each. The fixtures now invoke their registered close callback and
+assert response completion. All seven SSE tests must finish with zero timers.
+The two logging controller suites pass 82/82 and exit naturally under
+`--detectOpenHandles`. No application timer, runner timeout, worker count,
+force-exit setting, dependency or version changed.
+
+This proves the two unit fixture leaks, not the independent full E2E warning.
+The complete serial InMemory HTTP handle diagnostic exits naturally:
+120 suites / 2,570 passed plus existing two suites / 42 skips. Its two extra
+log suites / 56 tests are explicitly excluded by ordinary CI/pre-push.
+This diagnostic does not establish the cause of the parallel-worker warning;
+no runner setting or existing exclusion was changed.
+The first follow-up protected push passed 25/25 Fast gates in 487.1 seconds
+but retained the unit exit warning. Full unit handle diagnostics then located
+two additional prune-fixture intervals: the tests used a runtime enable setter
+before initialization, which overwrote the first timer handle. A second
+zero-timer guard was RED in those two cases. Enabled startup fixtures now use
+constructor-time environment settings and restore environment exactly.
+All three logging controller/prune suites pass 99/99 with natural exit.
+The complete serial unit diagnostic now passes 213 suites / 6,214 tests
+and exits naturally in 83.657 seconds, with no reported open handles.
+Published as draft PR #257 at `2d57e785`: the normal protected Fast push
+passes 25/25 gates in 558.6 seconds. Its ordinary parallel unit run passes
+all 6,214 tests without the previous unit worker-exit warning. Exact-tip
+hosted validation, CodeQL, documentation and RFC checks pass; the image
+scan still fails on the two known HIGH dependencies. Both #251 and #257
+remain draft, unmerged and conflict-free, with zero unresolved review
+threads at the latest read. No release admission or deployment is claimed.
+See [RC-I107](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i107-unit-stream-fixtures-must-disconnect).
+The first follow-up push was stopped at the render gate after detecting the
+master base's expired RFC date. The exact two-file same-day live-verified
+refresh from `6716b3bb` was applied and proved byte-identical; its offline
+check passes. This is a gate prerequisite, not another upstream verification
+or a manual restamp. Check cheap currency gates after every base transition.
+
+### Parallel HTTP warning: actual exit phase captured (2026-10-28)
+
+Two bounded diagnostics preserve the ordinary two-worker HTTP selectors,
+existing skips and 500 ms worker deadline: each passes 118 suites / 2,514
+tests plus 42 existing skips, while reproducing the warning. In the native
+trace run both workers reach JavaScript exit with code 0 within 1.5 ms of
+the shutdown request. Only two pipe resources remain; no referenced timer
+or server appears. The native Environment end marker follows within 3.5 ms.
+The parent receives their exit events only after 5.84 and 6.79 seconds.
+Its SIGTERM and SIGKILL calls return false, rather than killing a worker.
+Thus this observed warning is a late-exit-observation case, not evidence
+of another leaked application timer or a successful forced termination.
+The remaining exit-observation delay is not yet attributed. Worker native
+finalization, OS notification delivery and parent-side processing have not
+been separated; the marker does not prove every C++ destructor has completed
+or that the worker remains alive throughout the gap.
+
+The scratch observer adds no IPC message listener. Its delayed-consumer
+control proves queued delivery, event return values, zero added message
+listeners and natural child exit. Native tracing uses only
+`node.environment`, not request bodies or broad async-hook capture.
+No deadline, worker count, exclusion, production code or version changed.
+See [RC-I110](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
+The security, performance, customer-data, cleanup and visual-acceptance
+release holds remain unchanged.
+
+### Windows process status and completion are separate observations (2026-10-29)
+
+A third ordinary-selector parallel HTTP diagnostic passes 118 suites /
+2,514 tests plus 42 existing skips in 374.41 seconds, retaining the warning.
+A controlled external observer opens only the two verified worker process
+handles, with limited-query and synchronization rights. Windows reports
+exit code 0 while each process object is still unsignaled at the samples
+105.003 and 166.421 ms after END. The parent receives successful exit events
+at 6.088 and 6.378 seconds; the observer first samples signaled process
+objects at 6.115 and 6.418 seconds. These are polling observations, not exact
+kernel transition times or proof of uninterrupted sampling.
+
+Version-pinned libuv source distinguishes its exit-status-based kill check
+from its process-handle-based exit notification. That explains how an
+already-exited response can coexist with a pending completion notification;
+the actual native error and the component consuming the delay are untraced.
+No application timer, runner limit or release hold changes. The observer's
+first control failed on an ES-module/CommonJS mismatch and was corrected
+with explicit ES-module imports before the real run. See the measured table,
+flow and limitations in [RC-I110](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
+
+### Independent request-body security correction (2026-10-29)
+
+Product 0.55.61 is reserved on `fix/request-body-security-20261029` from
+fresh master `5bfff2de`. API overrides body-parser 2.4.0 and multer 2.5.0
+change; a follow-up adds one global iconv-lite 0.7.3 pin to make its three
+compatible actual owners share one override context. Both security patches
+passed seven-day eligibility on 29 October, not 30 October.
+See [scope, validation lanes and RCA](docs/REQUEST_BODY_SECURITY_REMEDIATION.md).
+CI owns lock generation; bootstrap tests do not prove a patched installation.
+PR #257 and #251 remain separate. No merge or deployment is authorized.
+The expired master RFC prerequisite is carried byte-identically from
+`47cf8397` (live-verified source `6716b3bb`), only its two RFC files.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Request-body exact override RED confirmed: two failures, 24 passes; RFC offline preflight caught expired master before heavy publication and exact verified prerequisite passed. |
+| 2026-10-29 | CI lock run 40873804998 and archive digest verified. Only body-parser, multer and required iconv-lite change. Approved-feed clean restores preserve lock hashes; focused installed GREEN 28/28. Bootstrap hook 25/25 PASS, units 6,217 and HTTP 2,514. Final Validate and exact-tip scans pending; supplementary npm inventory override-context error preserved in the security report. |
+| 2026-10-29 | Owner-consistency follow-up on draft #258: verified every locked/installed iconv-lite owner and compatible range before adding a single exact global 0.7.3 override. Focused RED 28 pass/one failure, GREEN 29/29, real npm inventory exit 1 -> 0. Fresh CI lock verification/restoration and new-tip Validate/image evidence remain required; earlier failed receipts retained. |
+
+**Last verified:** 2026-10-23
+
 ### Independent web ip-address override remediation (2026-10-23)
 
 Reserve 0.55.60 from verified master `cddeb5a569b3997000fc3c3bb38349357d83e2ed`
@@ -580,6 +751,7 @@ and actual target-specific human visual observation remain holds.
 
 | Date | Summary |
 |---|---|
+| 2026-10-28 | Isolated two real SSE fixture timer leaks, added a RED zero-timer teardown guard, and verified 82 logging controller tests with natural exit; separate test-only follow-up, no application or release change. |
 | 2026-10-23 | Independent exact Hono remediation started from master; dependency RED confirmed; runtime-presence lesson retained. |
 | 2026-10-23 | Normally merge prerequisite #252 and verify its authoritative merged-source CI/artifact, then preserve both contexts in the ordinary Hono/master merge. |
 | 2026-10-23 | Protected bootstrap 25/25 PASS; authenticate minimal CI artifact 12506119257/run 39965730441 and prove actual installed+locked Hono 4.13.11 with 42 focused tests. |
