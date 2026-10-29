@@ -174,6 +174,7 @@ actual commands, counts and immutable receipts after consolidation.
 | Lockless bootstrap graph drift / High | An attempted selected-package `npm install --no-package-lock --no-save` re-resolved compatible ranges: installed Prisma became 7.10.1/dev 0.24.17 instead of locked 7.8.0/dev 0.24.3. Source locks remained byte-identical. | Discarded the privately owned wrong graph, clean-restored the exact parent manifest/lock in owned scratch state, then installed only verified candidate tarball bytes into that graph. Regenerated the client at actual 7.8.0 and complete npm inventory exited 0. Final consolidation still requires clean `npm ci` from CI-generated locks. | Post-install real-parent identity check / same check before any compatibility claim. |
 | Transitional source CI / Low | Bootstrap image run `40948154638` rejected the deliberately stale lock: 1.19.15 does not satisfy 2.1.3. The source must first be published for the existing CI-only lock workflow. | Exact-source regeneration run `40948177653` succeeded; imported its authenticated minimal artifact and clean-restored both workspaces. This is a transitional failed run, not final-tip success or a waived install gate. | Hosted install / source-lock consistency check; expected until artifact import. |
 | Evidence replay baseline / Low | Rerunning the pre-import lock comparison after import reported zero changed records, correctly failing its expected one-record delta. Its mutable baseline was now the imported artifact itself. | Pinned the comparison to bootstrap commit `38b1a78` and separately require current source bytes to equal the authenticated artifact. Baseline identity and import identity are now independent assertions. | Local evidence replay / immutable-baseline check before reuse. |
+| Process-local validation environment / Low | The first protected Validate passed 6,254 unit and 2,514 E2E tests, then Prisma generation rejected a missing `DATABASE_URL`. The earlier generation shell's process-local value did not persist into the push shell. | The unchanged generate command passed after deriving the exact checked-in `build-test.yml` CI value without printing it. Repeat that derivation in the same process as the normal Validate push; no database connection, global configuration or gate change is required. | Protected generate gate / process-environment preflight before push. |
 
 **Completeness provenance:** this ledger was reconciled with every command
 and diagnosed failure in this bounded execution, including preliminary
@@ -191,6 +192,9 @@ lockless broad installation as a shortcut for the CI-only lock workflow.
   actual old-byte exploit RED, complete installed inventory, and a reusable
   isolated real-parent lifecycle/cleanup check. An illustrative adapter
   example alone cannot satisfy that claim.
+- **Applied:** validation process setup must be repeated in the push shell.
+  A successful earlier generation process is not evidence that a later shell
+  inherited its environment.
 - **Accepted:** natural process exit remains unqualified and explicit. The
   proposed adapter does not fix a pre-existing parent/runtime retention
   behavior; no unrelated parent internals or Jest worker settings change.
