@@ -16,6 +16,11 @@ web Seroval/Undici fixes. Version-only conflicts retain 0.55.63; historical
 preparation sections from both branches remain below. Clean-CI lock
 regeneration, restored-graph checks, protected Validate and exact-head CI
 must finish before this integration is eligible to merge.
+Protected bootstrap Fast passes 25/25, with 6,229 API units and 2,514 HTTP
+tests plus 42 existing skips. Authenticated regeneration 40963173363 supplies
+both 0.55.63 roots with zero non-root drift; the final protected Validate
+push and refreshed review/CI remain pending. The archive destination issue
+and exact generated-file cleanup are recorded in the API correction ledger.
 No new runtime, auth, schema, UI or performance implementation is added.
 Performance, data/restore, live/browser, visual and production holds remain.
 

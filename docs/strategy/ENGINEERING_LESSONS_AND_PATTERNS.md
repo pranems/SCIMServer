@@ -16,6 +16,17 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### PowerShell location is not every library's working directory
+
+`Set-Location` changes PowerShell's provider location, but a .NET API resolving
+a relative path can still use the process's original current directory.
+Always construct and validate absolute source and destination paths before
+archive extraction or other library-driven writes. Do not repair a misplaced
+artifact with broad cleanup: verify its exact files against the trusted
+source and move only the generated directory. The
+[API integration ledger](../API_OVERRIDE_CONTEXT_VALIDITY.md) records the
+three-file ignored-artifact incident and its bounded cleanup.
+
 ### Separate the required review claim from one provider's availability
 
 An acknowledged request is not a completed review. Conversely, an unavailable

@@ -17,8 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   until authenticated clean-CI regeneration supplies the integrated roots.
 - New-tip restored checks, protected Validate and hosted CI remain pending;
   no old counts are substituted for their results. No deployment occurred.
+- Bootstrap Fast passes 25/25; API units 6,229, HTTP 2,514 plus 42 existing
+  skips. CI regeneration 40963173363 supplies both 0.55.63 lock roots with
+  zero non-root drift, preserving the already restored integrated graph.
 - Self-improvement applied: an exact-marker negative control prevents a
   Markdown ruler from being mistaken for an unresolved merge separator.
+  Fully qualified .NET archive destinations prevent cross-worktree writes;
+  the three misplaced generated files were verified and moved into scope.
   Design accepted: ordinary integration, no new abstraction or gate waiver.
 
 ### 0.55.63 preparation - API complete-tree override context validity
