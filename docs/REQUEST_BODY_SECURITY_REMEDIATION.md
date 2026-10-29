@@ -64,6 +64,7 @@ are part of this outcome. Existing release holds remain independent.
 | Issue | Type / severity | Symptom and mechanism | Resolution and why it works | Detection / earliest gate | Prevention |
 |---|---|---|---|---|---|
 | RFC base prerequisite | Environment currency / Medium | Offline RFC check fails on fresh master: corpus verified 91 days ago, limit 90. Security branch inherits expired validation evidence. | Carry only docs/rfcs/README.md and docs/rfcs/rfc-manifest.json byte-identically from `47cf83971ffa418b4ef6d8d9d19172297d15a7f0`, whose source is live-verified `6716b3bb`. Offline check passes; no invented date or age waiver. | Cheap preflight, before heavy hook; earliest offline preflight. Escape delta zero in this run. | Run cheap base-currency checks before protected publication. |
+| Version badge | Documentation coupling / Low | First bootstrap hook stopped at C13 after 12 PASS gates: README badge still claimed 0.55.60. The freshness fixer updates headers, not the independent shields.io claim. | Synchronize that one badge to 0.55.61 and confirm the existing content audit GREEN. No gate bypass or test reduction. | Hook C13; earliest cheap content audit immediately after version synchronization. | The version-change preflight includes both freshness and `node scripts/audit-doc-content.mjs`, before the heavy hook. Preserve the failed bootstrap receipt. |
 
 Provenance: this bounded implementation records issues when confirmed.
 `red.log`, `rfc-preflight.log` and `rfc-green.log` preserve causal output.
