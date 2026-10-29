@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marker; both workers eventually report code 0 and kill requests return
   false. This narrows the warning's phase, not its final native root cause.
   No application timer fix or runner relaxation is inferred from it.
+- A controlled, passive Windows follow-up preserves the ordinary HTTP
+  counts and warning. Its process handles show successful exit status before
+  process-object signaling. Retain the distinct status, signal and parent
+  callback measurements, their polling limits and pinned libuv explanation
+  in RC-I110; the remaining native/OS delay is not claimed fixed.
 - Test-only correction: no application, version, dependency, runner timeout
   or force-exit change. Full-suite lifecycle and hosted checks are separate
   evidence; release security and performance holds are unchanged.

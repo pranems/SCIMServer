@@ -298,6 +298,93 @@ destructors have finished. An initial search summary's claim that native
 tracing cannot continue after JavaScript exit was rejected against the
 versioned source and actual trace.
 
+#### 29 October: exit status is not the process-object signal
+
+**New measurement, separate run.** An external Windows observer now samples
+the two actual worker process handles. It does not instrument the kernel,
+read memory, suspend threads or send signals. It opens a handle only after
+matching the PID to this run's parent-fork and worker-header receipts, retains
+that handle to avoid PID reuse, and uses only `QUERY_LIMITED_INFORMATION`
+and `SYNCHRONIZE` rights. A synthetic delayed-consumer control first proves
+the live/unsignaled to successful/signaled transition with natural exit.
+
+The real run retains two workers, ordinary exclusions, all 42 existing
+skips, `--forceExit` and the existing 500 ms deadline. It passes 118 suites /
+2,514 tests in 374.41 seconds and reproduces the warning. Parent PID is
+79336. Unlike the preceding native trace, this run measures Windows status
+and wait results; do not combine the two runs into one worker timeline.
+
+| Milestone after that worker's parent END | PID 97984 | PID 9968 | Interpretation |
+|---|---:|---:|---|
+| Worker JavaScript exit, code 0 | 1.264 ms | 1.075 ms | JavaScript has reached its exit event |
+| First sampled exit code 0, process object still unsignaled | 166.421 ms | 105.003 ms | `GetExitCodeProcess=0`, `WaitForSingleObject(handle,0)=258` |
+| Parent SIGTERM request, returns false | 513.395 ms | 513.324 ms | Observed Node call result, not a captured native error |
+| Parent SIGKILL request, returns false | 1017.094 ms | 1016.790 ms | The later request also does not succeed |
+| Parent process-exit callback, code 0, no signal | 6377.966 ms | 6088.494 ms | The eventual callback reports successful exit |
+| First sampled signaled process object, exit code 0 | 6418.031 ms | 6115.038 ms | Wait result is now 0; polling may observe this after the parent callback |
+
+Microsoft documents [exit status](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess)
+and [zero-time process-handle waits](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject)
+as separate queries. Wait result 258 means nonsignaled; 0 means signaled.
+The [process termination documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/terminating-a-process)
+lists setting exit status and signaling the process object separately.
+Here, the actual paired queries demonstrate that a successful reported
+status must not be substituted for an observed process-object signal.
+
+The pinned Node/libuv implementation
+[registers the exit callback on the process handle](https://github.com/nodejs/node/blob/v24.13.0/deps/uv/src/win/process.c#L1128).
+Its [termination failure path](https://github.com/nodejs/node/blob/v24.13.0/deps/uv/src/win/process.c#L1307)
+can return `UV_ESRCH` when the queried status is no longer `STILL_ACTIVE`;
+the adjacent comment explicitly describes a process handle not yet signaled.
+These different checks provide a source-compatible explanation for a kill
+call reporting an already-exited process before the parent exit notification.
+The diagnostic does not capture `GetLastError` inside libuv, so it does not
+prove that particular native error path executed.
+
+```mermaid
+sequenceDiagram
+    participant P as Jest parent
+    participant W as Owned worker
+    participant N as Node and libuv
+    participant S as Windows process object
+    participant O as Read-only external observer
+    P->>W: END shutdown request
+    W->>W: JavaScript exit code 0 at about 1 ms
+    O->>S: Query exit status and zero-time wait
+    S-->>O: Status 0 but unsignaled at 105 to 166 ms
+    P->>N: SIGTERM then SIGKILL at 513 and 1017 ms
+    N-->>P: Both calls return false
+    Note over N,S: Source uses separate status and handle-notification checks
+    S-->>N: Process-handle completion notification
+    N-->>P: Exit callback at 6.09 to 6.38 seconds
+    O->>S: Later zero-time wait sample
+    S-->>O: First observed signaled at 6.12 to 6.42 seconds
+```
+
+The flow separates the recorded events from the notification mechanism in
+the source. The observer polls nominally every 20 ms but retains transitions,
+not every unchanged query or a maximum sampling gap. Therefore the final
+sample is an observation time, not the exact signaling time; this run does
+not prove continuous nonsignaling throughout six seconds. It does prove a
+successful status and an unsignaled process object coexist at the earlier
+samples. No driver, security product, native destructor or parent scheduling
+delay has been identified as the cause of the remaining interval.
+
+**Tooling issue and prevention.** The first control used CommonJS `require`
+in the required `processChild.js` fixture, which inherits the root ES-module
+boundary. It failed visibly before the real run. Three explicit ES-module
+imports corrected the fixture; the same control then passed. This is a
+Low-severity harness issue, not a product bug or intentional TDD RED. The
+control gate caught it at the earliest execution stage, before accepting
+any real OS evidence. Keep both failed and green receipts.
+
+**Documentation-tool limitation.** The Microsoft documentation MCP server
+could not initialize because its cached `azmcp.exe` copy returned `EBUSY`
+(-4082). Direct first-party Microsoft Learn retrieval verified the sources
+instead. This is a Low-severity tooling workaround, not a repaired MCP server,
+an Azure permission failure or a reason to clear shared caches or kill other
+sessions. No cloud operation was attempted.
+
 **Evidence.** Ignored `test-results/release-resume-20261028/` contains
 `parallel-worker-probe-control-final.log`,
 `parallel-http-worker-20261028-193819/`,
@@ -306,6 +393,11 @@ versioned source and actual trace.
 JSONL, its complete Jest log and, for the second run, per-process native
 trace files. Only selected resource names, filenames and lifecycle metadata
 are recorded by the observer; it does not persist IPC payloads or credentials.
+The Windows follow-up adds `os-control-20261029-052506/` (failed),
+`os-control-20261029-052540/` (green),
+`os-http-20261029-052621/` (real HTTP and OS receipts), and
+`owned-worker-os-http-summary.json`. Its read-only observer and bounded
+runner are retained alongside those receipts.
 This entry is reconciled against those actual command/trace receipts.
 It does not claim recovery of the deleted original conversation.
 
@@ -318,7 +410,8 @@ restore, final cleanup and operator visual acceptance remain independent.
 
 **Test/gate improvement: applied.** The observer is controlled for queued IPC
 and natural exit; diagnosis now correlates actual parallel parent/worker
-events rather than inferring a parallel cause from serial handle tests.
+events and independently queried Windows states rather than inferring a
+parallel cause from serial handle tests or exit status alone.
 **Design disposition: accepted.** This remains a small ignored diagnostic,
 not another permanent runner abstraction or a production lifecycle change.
 

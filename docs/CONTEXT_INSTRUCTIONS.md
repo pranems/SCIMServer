@@ -2,8 +2,8 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.60
-> **Last Updated**: October 28, 2026
-> **Last verified:** 2026-10-28
+> **Last Updated**: October 29, 2026
+> **Last verified:** 2026-10-29
 
 ---
 
@@ -44,6 +44,20 @@ marker, or that the worker remained alive until parent observation.
 Existing deadlines, workers, skips and force-exit settings are unchanged.
 Use [RC-I110](SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak)
 before proposing another timer fix or changing a runner setting.
+
+**2026-10-29 passive Windows follow-up:** the unchanged ordinary HTTP
+selectors pass 2,514 tests / 42 skips in 374.41 seconds, warning retained.
+An external, controlled, limited-query/synchronize observer sees exit code
+0 while the owned worker process objects are still unsignaled at 105 and
+166 ms after END. Parent exit callbacks occur at 6.088/6.378 seconds;
+first observed signaled states occur at 6.115/6.418 seconds. Polling samples
+are not exact transition times; unchanged polls and maximum sampling gaps
+were not retained. Pinned libuv source separately checks exit status when
+killing and waits on the process handle for exit notification. This is a
+source-compatible explanation of the apparently conflicting observations,
+not a captured native error or an attribution of the remaining delay to a
+driver, library or parent callback. Keep the warning investigation open.
+No deadline, worker, dependency, product version or application change.
 
 **2026-10-23 next independent remediation:** proposed 0.55.60 updates the
 dormant web ip-address override to exact 10.7.4 from master cddeb5a5.

@@ -1,6 +1,6 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 ### Independent log-stream test teardown correction (2026-10-28)
 
@@ -75,6 +75,27 @@ No deadline, worker count, exclusion, production code or version changed.
 See [RC-I110](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
 The security, performance, customer-data, cleanup and visual-acceptance
 release holds remain unchanged.
+
+### Windows process status and completion are separate observations (2026-10-29)
+
+A third ordinary-selector parallel HTTP diagnostic passes 118 suites /
+2,514 tests plus 42 existing skips in 374.41 seconds, retaining the warning.
+A controlled external observer opens only the two verified worker process
+handles, with limited-query and synchronization rights. Windows reports
+exit code 0 while each process object is still unsignaled at the samples
+105.003 and 166.421 ms after END. The parent receives successful exit events
+at 6.088 and 6.378 seconds; the observer first samples signaled process
+objects at 6.115 and 6.418 seconds. These are polling observations, not exact
+kernel transition times or proof of uninterrupted sampling.
+
+Version-pinned libuv source distinguishes its exit-status-based kill check
+from its process-handle-based exit notification. That explains how an
+already-exited response can coexist with a pending completion notification;
+the actual native error and the component consuming the delay are untraced.
+No application timer, runner limit or release hold changes. The observer's
+first control failed on an ES-module/CommonJS mismatch and was corrected
+with explicit ES-module imports before the real run. See the measured table,
+flow and limitations in [RC-I110](docs/SCIM_CORRECTNESS_EXECUTION_ISSUES_AND_RCA.md#rc-i110-a-worker-warning-is-not-proof-of-a-timer-leak).
 
 ### Independent web ip-address override remediation (2026-10-23)
 

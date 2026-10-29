@@ -31,6 +31,15 @@ deadline and worker count while attributing the phase. Do not equate an
 Environment trace marker with completion of every C++ destructor, and do
 not generalize one observed phase to every historical warning.
 
+For Windows diagnostics, record process exit status, process-object signaling
+and parent callback separately. A follow-up captured status 0 while the same
+owned process handle remained unsignaled. Retain the handle from a verified
+live state to avoid PID reuse, and request only limited-query/synchronize
+access. Polling gives observation times, not exact kernel transition times.
+Without retained unchanged polls or maximum gaps, do not claim a precise
+sampling bound or uninterrupted state throughout the interval. Source paths
+can explain compatible behavior without proving which native branch executed.
+
 Diagnostic observers must preserve the behavior they observe. In
 particular, adding an IPC `message` listener changes channel liveness and
 can consume queued messages before the real consumer attaches. The bounded
