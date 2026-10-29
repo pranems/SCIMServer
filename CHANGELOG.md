@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.63 preparation - API complete-tree override context validity
+
+- Independent rollback unit from master 0.55.61; 0.55.62 is reserved by the
+  separate draft web PR #259 and is not inherited.
+- Add exact root debug 4.4.3, get-intrinsic 1.3.0, call-bind-apply-helpers
+  1.0.2 and hasown 2.0.4 overrides at existing locked versions. Preserve
+  every earlier security override and all non-root versions.
+- Focused TDD: initial four real failures, then two remaining failures for
+  the tightly coupled hasown context; final nine new checks plus 29 existing
+  checks PASS. Actual full-tree npm inventory changes from EXIT 1 to EXIT 0.
+- [Mechanism, execution RCA and validation plan](docs/API_OVERRIDE_CONTEXT_VALIDITY.md).
+  Broad test totals are not inferred from historical runs; the protected
+  push owns applicable consolidation gates. CI-only locks remain required.
+- No HTTP/UI/auth/schema/performance edits, deployment or merge. Six API
+  advisory records remain outside this inventory-only correction.
+- Self-improvement applied: permanent real full-tree inventory and every-owner
+  installed resolution. Design accepted: reuse small flat exact pin pattern.
+
 ### Fixture branch integration with merged security master (2026-10-29)
 
 - Normally integrate security PR #258 merge `80460d59` into draft PR #257,

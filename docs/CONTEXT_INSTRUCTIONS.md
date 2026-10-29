@@ -1,13 +1,22 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.61
+> **Version**: 0.55.63
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-29 independent API correction:** proposed 0.55.63 branches from
+master `727860866c53c7ec8d01d1ff5bae858f80a1715d`, excluding draft #259.
+[API override-context correction and RCA](API_OVERRIDE_CONTEXT_VALIDITY.md)
+records four shared exact pins at unchanged versions, full-tree RED/GREEN
+and every installed owner check. Focused 38/38 in two suites; final CI-lock,
+protected Validate and hosted exact-tip proof remain separate requirements.
+Existing security advisories and PR #251 stay out of scope. No deploy/merge.
+Self-improvement applied: full-tree acceptance; design accepted: flat pins.
 
 **2026-10-29 current consolidation:** security PR #258 merged normally at
 `80460d59`. Draft #257 integrates that master while preserving its prior

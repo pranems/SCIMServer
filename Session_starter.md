@@ -2,6 +2,18 @@
 
 **Last verified:** 2026-10-29
 
+### Independent API override-context correction (2026-10-29)
+
+Proposed 0.55.63 starts from fresh master `727860866c53c7ec8d01d1ff5bae858f80a1715d`,
+not draft web PR #259 (0.55.62). Four shared exact root overrides retain
+existing locked versions and correct full-tree npm INVALID contexts.
+Focused RED/GREEN is recorded in [the correction and RCA](docs/API_OVERRIDE_CONTEXT_VALIDITY.md):
+9 new checks plus 29 existing pin checks pass. Full npm inventory exits 0
+before final CI-lock restore; final protected/hosted results remain separate.
+No runtime, UI, auth, schema, performance, merge or deployment change.
+Six API advisory records remain held. Self-improvement: full-tree exit and
+every installed owner are asserted. Design: accepted, established flat pins.
+
 ### Current consolidation boundary (2026-10-29)
 
 Security PR #258 is normally merged into master at `80460d59`. Draft PR #257
@@ -23,6 +35,7 @@ no speculative runtime seam is needed.
 
 | Date | Summary |
 |---|---|
+| 2026-10-29 | Reserve independent 0.55.63 API override-context fix; four same-version shared pins and discriminating full-tree regression, no inheritance from draft #259. |
 | 2026-10-29 | Normally integrate merged security master into preserved draft #257 at product 0.55.61; retain source histories and historical receipts, with exact new-tip validation still required. |
 | 2026-10-29 | Integration preflight passes: RFC currency, 27-doc freshness/content, focused fixture 99/99 with natural handle-detection exit, dependency pins 29/29 and real npm inventory exit 0. Protected Validate push owns broad runs; exact-tip CI remains required. |
 

@@ -16,6 +16,22 @@
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Shared override repairs must reach complete-tree acceptance
+
+An installed version can satisfy every owner range while Arborist rejects
+its edges for incomparable override ancestry. Exact root pins at already
+locked compatible versions can unify the context without changing packages.
+Check every owner against installed metadata and actual resolution, not only
+the owner that happened to be reported first. Then run the real
+`npm ls --all --json` and require exit 0 without filtering problems.
+
+The API correction initially removed three invalid records but exposed a
+fourth shared descendant, hasown. A clean restore reproduced the remaining
+defect, and the complete-tree regression blocked incomplete GREEN.
+See [mechanism, regression and RCA](../API_OVERRIDE_CONTEXT_VALIDITY.md).
+Keep advisory clearance, inventory validity and deployed artifact contents
+as separate claims. Pin maintenance stays with the existing watcher.
+
 ### A worker warning must be attributed to an observed lifecycle phase
 
 The same Jest warning accompanied real unit-fixture timer leaks and a

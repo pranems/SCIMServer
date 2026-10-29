@@ -11,7 +11,7 @@ rejected later operation saves no earlier mutation. See
 [reference persistence and rollback compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
 and [current release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.61`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.63`
 
 > Comprehensive, source-verified reference for every PATCH option, mode, setting, path form, verb, and persistence outcome across Users, Groups, custom extensions, and custom resource types - grounded in RFC 7644 / RFC 7643 and the SCIMServer implementation.
 
