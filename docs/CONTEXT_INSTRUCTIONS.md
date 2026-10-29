@@ -13,6 +13,10 @@
 pins API body-parser 2.4.0 and multer 2.5.0 from master `5bfff2de`.
 Both patches are now seven-day eligible. CI-only locks and a subsequent clean
 installation are required; bootstrap evidence is not final graph proof.
+The owner-consistency follow-up adds one exact global iconv-lite 0.7.3
+override, verified compatible with all three actual API owners, so the real
+npm inventory exits 0. Keep 0.55.61; require fresh CI artifact/restoration,
+Validate and exact new-tip image evidence rather than adopting the prior tip.
 [Scope, evidence and RCA](REQUEST_BODY_SECURITY_REMEDIATION.md).
 PR #257 fixture corrections and #251 performance work remain separate.
 No merge, deployment, customer restore or performance acceptance is included.

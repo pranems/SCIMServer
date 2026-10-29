@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   final hook/web/image results are pending, not inferred from bootstrap.
   Supplementary npm inventory's override-context ELSPROBLEMS is preserved
   separately from passing actual-owner resolution and semver checks.
+- Follow-up closes that inventory failure rather than accepting a failed
+  graph: pin shared iconv-lite to exact 0.7.3 globally after verifying every
+  actual owner accepts it (body-parser ^0.7.3, mysql2 ^0.7.2, raw-body ~0.7.0).
+  There were no explicit owner-specific iconv-lite overrides to remove.
+  Focused RED adds one failing context guard, 28 pass/one failure; GREEN
+  is 29/29 and real npm inventory now exits 0. No version/major/tool upgrade.
+  Fresh CI lock verification, restoration, Validate and current-tip image
+  outcomes are required; earlier 78b88d1c evidence is historical only.
 - Carry only the two exact, live-verified RFC prerequisite files from
   `47cf8397` after master failed offline currency at 91 days. No manual
   date restamp, age waiver, logging-fixture import or deployment is included.

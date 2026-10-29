@@ -32,6 +32,51 @@ import fs from 'fs/promises';
 import { dirname, resolve } from 'node:path';
 
 describe('request-body security remediation (#256)', () => {
+  it('gives every compatible iconv-lite owner one exact shared override context', async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: Record<string, unknown> };
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, {
+        dependencies?: Record<string, string>;
+        optionalDependencies?: Record<string, string>;
+        peerDependencies?: Record<string, string>;
+      }>;
+    };
+    const owners = Object.entries(lock.packages).flatMap(([path, entry]) =>
+      ['dependencies', 'optionalDependencies', 'peerDependencies'].flatMap(kind => {
+        const range = entry[kind as keyof typeof entry]?.['iconv-lite'];
+        return range ? [[path, range]] : [];
+      }),
+    );
+    expect(owners).toEqual([
+      ['node_modules/body-parser', '^0.7.3'],
+      ['node_modules/mysql2', '^0.7.2'],
+      ['node_modules/raw-body', '~0.7.0'],
+    ]);
+    const overridePaths: string[] = [];
+    const collect = (overrides: Record<string, unknown>, parents: string[] = []): void => {
+      for (const [selector, value] of Object.entries(overrides)) {
+        const path = [...parents, selector];
+        if (selector.includes('iconv-lite')) overridePaths.push(path.join(' > '));
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+          collect(value as Record<string, unknown>, path);
+        }
+      }
+    };
+    collect(manifest.overrides);
+    expect(overridePaths).toEqual(['iconv-lite']);
+    expect(manifest.overrides['iconv-lite']).toBe('0.7.3');
+    for (const [owner] of owners) {
+      const ownerPath = resolve(__dirname, '../..', owner, 'package.json');
+      const installedPath = require.resolve('iconv-lite/package.json', { paths: [dirname(ownerPath)] });
+      const installed = JSON.parse(await fs.readFile(installedPath, 'utf8')) as { version: string };
+      expect(installed.version).toBe('0.7.3');
+    }
+  });
+
   it.each([
     ['body-parser', '2.3.0', '2.4.0', '>= 2.0.0, < 2.4.0'],
     ['multer', '2.4.0', '2.5.0', '>= 2.0.0, < 2.5.0'],
