@@ -63,12 +63,22 @@ remain independent regression evidence; no dev/browser validation is claimed.
 
 ## Execution issues and prevention
 
-**Low, evidence timestamp transcription:** continuation prose gave publication
-times six hours later than its retained JSON. Fresh approved-feed metadata
-matches the original JSON exactly: 11:47:50Z for Seroval and 14:18:31Z for
-Undici. Use those original UTC strings, not timezone-adjusted prose, for age
-calculations. Both remain eligible. Detection and correction occurred during
-metadata preflight, the earliest applicable gate.
+**Low, evidence timestamp conversion:** continuation prose gave publication
+times six hours later than its retained JSON. The confirmed mechanism was
+PowerShell `ConvertFrom-Json` producing a UTC `DateTime`, followed by
+`DateTimeOffset.Parse` implicitly converting it to text without its UTC kind.
+Parsing that text applied the local -06:00 offset and shifted the instant
+six hours forward. This was not a different registry publication time.
+Fresh approved-feed metadata matches the original JSON exactly: 11:47:50Z
+for Seroval and 14:18:31Z for Undici. Preserve the original UTC strings with
+`JSON.parse`, or use the typed `DateTimeOffset(DateTime)` constructor rather
+than reparsing a date through text. A boundary negative control reproduces
+the old method rejecting a package one second beyond seven days; the typed
+conversion accepts it, and two UTC boundary assertions pass. Corrected
+calculations leave all five assessed package fixes eligible, so no adoption
+decision changed. Metadata preflight first detected the discrepancy; the
+follow-up isolated its conversion mechanism. Prevent recurrence by preserving
+UTC identity and checking both sides of the actual seven-day threshold.
 
 **Confirmed and fixed failure (High, dependency pin drift):** exact overrides
 retained vulnerable releases after their original fixes aged. The focused
