@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.62 web advisory patch bootstrap (2026-10-29)
+
+- Reserve 0.55.62 from merged master `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
+  Change only exact web Seroval 1.6.3 -> 1.6.11 and Undici 7.29.1 -> 7.30.1;
+  preserve the API dependency graph and merged security/fixture corrections.
+- Focused TDD RED: six real assertions fail before manifest edits across pins,
+  all lock occurrences and all installed owners. Preserve the draft outside
+  source until authenticated CI lock import; bootstrap hook GREEN is old-tree
+  evidence only, not a patched dependency result.
+- Prior merged counts: API units 6,220; HTTP 2,514 plus 42 skips; web 1,655.
+  Final current-tip counts and CI-owned lock provenance remain pending.
+- Update user-facing release notes, indexed scope/RCA, Session and Context.
+  Issue #256 stays open for six independent API advisory records.
+- Self-improvement: all-occurrence and real-owner regressions, without skips.
+  Design disposition: accepted, existing exact override/process is cohesive.
+  No application refactor, browser behavior change, merge or deployment.
+
 ### Fixture branch integration with merged security master (2026-10-29)
 
 - Normally integrate security PR #258 merge `80460d59` into draft PR #257,

@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.61`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.62`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,19 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.62 web Seroval and Undici security dependency patch
+
+This proposed patch updates exact web overrides from Seroval 1.6.3 to
+1.6.11 and Undici 7.29.1 to 7.30.1. These minimal compatible patches address
+the five Seroval and eight Undici advisory records listed in
+[issue #256](https://github.com/pranems/SCIMServer/issues/256).
+Both patches exceed the seven-day quarantine minimum. The existing API
+request-body security correction remains intact; six separate API advisory
+records remain open. See [ownership, scope and validation](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+CI-generated locks and restored dependency verification are required before
+this proposal is considered validated. No UI behavior, deployment, browser
+exploitability assessment or overall release approval is included.
 
 ### 0.55.61 request-body security dependency patch
 

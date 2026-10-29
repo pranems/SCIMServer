@@ -2,6 +2,19 @@
 
 **Last verified:** 2026-10-29
 
+### Independent web advisory patch boundary (2026-10-29)
+
+PR #257 is normally merged at `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
+The independent branch `fix/web-seroval-undici-20261029` reserves 0.55.62:
+web Seroval 1.6.11 and Undici 7.30.1 only, API graph unchanged.
+Six focused assertions failed on actual old pins/locks/installed owners before
+manifest edits. CI-only locks and final protected validation remain pending.
+See [scope, RCA and validation](docs/WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+The prior fixture/draft boundary below is historical. Keep issue #256 open,
+PR #251 untouched, and all release holds. No merge or deployment authorized.
+Self-improvement is applied through owner/all-occurrence checks; design
+disposition is accepted because existing exact overrides need no abstraction.
+
 ### Current consolidation boundary (2026-10-29)
 
 Security PR #258 is normally merged into master at `80460d59`. Draft PR #257

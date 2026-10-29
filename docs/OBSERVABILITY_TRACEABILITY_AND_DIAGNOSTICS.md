@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.61`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.62`
 
 **Current operator presentation:** all absolute UI timestamps carry complete
 UTC date/time, milliseconds and timezone; invalid expiry values are explicit,
