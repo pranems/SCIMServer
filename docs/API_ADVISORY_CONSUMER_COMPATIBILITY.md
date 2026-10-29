@@ -4,6 +4,11 @@
 
 ## Executive summary
 
+**Follow-up, separate rollback unit:** [actual Prisma parent qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
+records the proposed 0.55.66 adapter correction stacked on this draft.
+The 0.55.64 blocker below is preserved as the earlier evidence boundary,
+not rewritten as if this draft had already qualified the adapter.
+
 Proposed product 0.55.64 is stacked on draft PR #260 at
 `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`. It changes only qs 6.16.0 to
 6.16.1 and fast-uri 4.1.5 to 4.2.3. Neither this patch nor its parent is

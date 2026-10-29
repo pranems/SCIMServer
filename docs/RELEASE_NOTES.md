@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.64`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.66`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,18 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### Actual Prisma parent adapter preparation: 0.55.66
+
+The [actual-parent qualification report](HONO_PRISMA_PARENT_QUALIFICATION.md)
+records proposed `@hono/node-server` 2.1.3, stacked on unmerged draft #261.
+Real old/new Prisma initialization, synthetic requests/database writes,
+public shutdown and isolated cleanup precede the proposed override.
+The exact upstream 1.x constraint remains a documented exception.
+Natural parent-process exit is not claimed: both versions retained a process
+after releasing the tested listeners and data, and the runner stopped its
+owned containers explicitly. No operator migration or API contract change.
+This is not a reviewed, merged, deployed or performance-qualified release.
 
 ### Stacked API advisory preparation: 0.55.64
 

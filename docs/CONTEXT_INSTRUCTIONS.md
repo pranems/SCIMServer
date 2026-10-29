@@ -1,13 +1,21 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.64
+> **Version**: 0.55.66
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**2026-10-29 actual-parent adapter follow-up:** proposed 0.55.66 is
+stacked on exact #261 `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`.
+[Qualification and RCA](HONO_PRISMA_PARENT_QUALIFICATION.md) records real
+Prisma/dev lifecycle with both adapters, security exploit RED/GREEN, and
+explicit container cleanup despite inherited post-close process retention.
+Existing security pins remain; #251 and reserved 0.55.65 are untouched.
+Source preparation is not final lock/Validate/CI or external review proof.
 
 **2026-10-29 stacked API advisory remediation:** proposed 0.55.64 is based
 on draft #260 exact head `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`,

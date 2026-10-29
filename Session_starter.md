@@ -2,6 +2,23 @@
 
 **Last verified:** 2026-10-29
 
+### Separate Hono real-parent qualification (2026-10-29)
+
+Proposed 0.55.66 branches from exact unmerged #261
+`f4fcfe3ccac83de6548ed9991ed44048ee8d660a`, not performance #251.
+[Real-parent evidence and RCA](docs/HONO_PRISMA_PARENT_QUALIFICATION.md)
+records actual Prisma/dev initialization, requests, synthetic database
+writes, close/port/data cleanup with old and candidate adapters. Exploit
+RED/GREEN is 200 protected-file exposure versus patched 404. Both versions
+retain a post-close process; only exact owned containers were stopped.
+Six permanent regressions observed pre-manifest RED (four fail/two pass).
+Final locks, installed GREEN, Validate and exact-tip CI are pending at source
+preparation. Draft review and all release/performance/visual/prod holds remain.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Executed isolated actual Prisma parent old/new qualification and exploit RED/GREEN; prepared separate 0.55.66 adapter correction without changing existing drafts. |
+
 ### Stacked API advisory remediation (2026-10-29)
 
 Proposed 0.55.64 starts from exact draft #260 head

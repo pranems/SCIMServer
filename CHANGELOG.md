@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.66 preparation - Hono adapter qualified with its real Prisma parent
+
+- Separate draft rollback unit on exact unmerged #261 head
+  `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`; 0.55.65 remains reserved
+  for untouched performance draft #251.
+- Select `@hono/node-server` 2.1.3 for GHSA-rmxm-3fg6-px4f after real
+  Prisma 7.8.0 / dev 0.24.3 old/new startup, HTTP requests, synthetic primary
+  and shadow database writes, dump, public error and close/cleanup checks.
+  The declared exact 1.19.11 parent range remains an explicit exception.
+- Actual HTTP exploit RED exposes the synthetic protected file at 1.19.15;
+  2.1.3 returns 404. Six permanent focused checks have pre-manifest RED:
+  four failed / two passed, including the exploit and complete inventory.
+  GREEN, final broad counts and authenticated locks follow at consolidation.
+- Both adapters retain a process after successful public close and listener
+  release. Explicit owned-container stop is recorded, never represented as
+  natural process exit or concealed by changing Jest worker/exit settings.
+- [Qualification, precise limits and execution RCA](docs/HONO_PRISMA_PARENT_QUALIFICATION.md).
+  No new user interface or SCIM response behavior, merge, deployment, review
+  approval, performance clearance or release completion is claimed.
+
 ### 0.55.64 preparation - compatible API advisory pins, stacked on draft #260
 
 - Reserve 0.55.64 after checking existing branches, pull requests and releases.

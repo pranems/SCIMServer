@@ -14,6 +14,30 @@
 
 ---
 
+## Real-parent evidence for transitive major overrides (2026-10-29)
+
+**Applied in:** [Hono adapter qualification](../HONO_PRISMA_PARENT_QUALIFICATION.md).
+A transitive dependency's unchanged exported function names do not prove
+compatibility when its parent pins an older major and the implementation
+rewrites request/response internals. Exercise the installed parent's real
+initialization, requests, errors and public close contract in an owned,
+network-isolated environment before changing the override.
+
+Keep package-level exploit RED/GREEN distinct from parent compatibility.
+Verify the complete installed graph before the comparison, not just the
+named parent package. Measure port/data cleanup separately from natural
+process exit, and record explicit owned-resource teardown rather than
+hiding a retained process with `forceExit`. Here both adapters retained a
+post-close process, so natural exit remains unqualified while the public
+close, listener release and stateless-file assertions passed.
+
+`npm install --no-package-lock --no-save <selected package>` is not a
+bounded selected-package update: it can re-resolve other semver ranges.
+An observed bootstrap moved Prisma 7.8.0 to 7.10.1 without touching the
+source lock. Compare installed identities against the qualified lock after
+every dependency operation; `npm ls --all` exiting 0 is not that comparison.
+Use clean CI-generated source locks and `npm ci` for final assurance.
+
 ## 1. The self-improvement loop (how this doc is fed and used)
 
 ### A parent-compatible dependency patch needs actual consumer evidence
