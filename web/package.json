@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.55.64",
+  "version": "0.55.66",
   "type": "module",
   "scripts": {
     "dev": "vite",
