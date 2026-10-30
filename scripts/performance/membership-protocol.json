@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "purpose": "Prospective bounded Linux qualification; no retrospective variance waiver",
+  "baseline": {
+    "image": "ghcr.io/pranems/scimserver@sha256:8b00fff083b8aae3226e9680ba987cc776bdb43d7a4ad8fc2812edf8019ecd4a",
+    "version": "0.55.20"
+  },
+  "candidate": {
+    "image": "ghcr.io/pranems/scimserver@sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82",
+    "version": "0.55.58"
+  },
+  "postgres": "postgres@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3",
+  "cpuLimit": 0.5,
+  "memoryLimit": 1073741824,
+  "warmupIterations": 100,
+  "samplesPerRound": 1000,
+  "ceilingRatio": 1.1,
+  "blocks": [
+    {
+      "name": "aa-baab",
+      "sameImage": true,
+      "order": "BAAB"
+    },
+    {
+      "name": "aa-abba",
+      "sameImage": true,
+      "order": "ABBA"
+    },
+    {
+      "name": "ab-baab",
+      "sameImage": false,
+      "order": "BAAB"
+    },
+    {
+      "name": "ab-abba",
+      "sameImage": false,
+      "order": "ABBA"
+    }
+  ]
+}

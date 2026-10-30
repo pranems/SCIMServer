@@ -40,6 +40,359 @@ Use clean CI-generated source locks and `npm ci` for final assurance.
 
 ## 1. The self-improvement loop (how this doc is fed and used)
 
+### Prove preservation independently of successful integration
+
+An ordinary merge preserves history, but conflict-free runtime files alone
+do not prove which runtime source survived. For preserved diagnostic branches,
+record both exact parents, classify every conflict, compare runtime/security
+and fixture paths against incoming master, and verify every constituent
+commit remains an ancestor. Keep draft-only dependency patches outside that
+comparison. This 29 October integration uses those explicit negative checks;
+source correctness and green CI still do not admit a failed performance run.
+
+### Verify captured evidence through the owned descriptor
+
+Exclusive creation protects the initial open, not a later pathname lookup.
+Keep the created descriptor open through child capture and verification,
+then read that descriptor rather than reopening a name another process can
+replace. Read with explicit offsets: a child sharing the descriptor can
+leave its offset at EOF. Accumulate short reads and reject premature EOF.
+
+The 28 October archive regression replaces the path, proves the old pathname
+read sees different bytes, and verifies that the descriptor still yields the
+captured bytes. It also exercises short reads and truncation. This closes
+the gap between archive-format checks and captured-file identity without
+repeating an experiment. A green CodeQL workflow can still publish a new
+finding; inspect the actual alert/review state before declaring it clear.
+See [CR-11](../MEMBERSHIP_HISTORY_DIAGNOSTIC.md#cr-11-captured-evidence-must-not-be-reopened-through-a-replaceable-name).
+
+### Separate draft consolidation from expensive campaign admission
+
+PR synchronization is not always an experiment request. When preserving
+already measured source and evidence, an automatic frozen campaign can
+silently become an unchanged retry. Use the native draft boundary for
+expensive job allocation, retain ordinary correctness/contract CI, and add
+the ready-for-review event so leaving draft restores automatic execution.
+Explicit dispatch remains a deliberate allocation path.
+
+Test the actual job conditions for draft, non-draft and dispatch inputs and
+protect ordinary CI from inheriting the draft skip. Record skipped campaigns
+as unexecuted, not qualified. This avoids a general scheduler or label-policy
+abstraction while preserving the independent release-admission requirement.
+
+Calendar-bound evidence can expire without any source change. Before a long
+consolidation hook, run the existing cheap offline currency checks; when a
+date expires, use the sanctioned live verifier rather than editing the date.
+The 28 October RFC refresh verified all 19 mirror texts, graph metadata and
+errata, changing only the manifest date and five errata-count records. Keep
+dependent human tables synchronized and preserve the original failed hook.
+
+### Recover shared tooling without resetting unrelated work
+
+The Docker context-metadata sharing violation recurred on 2026-10-28 after
+the earlier RC-I19 recovery. A reboot had released the earlier lock but had
+not identified its initiating actor. Treat recovery and causal diagnosis as
+separate claims: an ownerless handle scan does not establish a kernel or
+security-product defect.
+
+Before resetting a shared workstation, preserve idle tool storage and
+configuration, then test process-scoped configuration isolation against the
+same data. The recurrence recovered Docker without a Windows restart:
+original metadata replacement access remained error 32, isolated metadata
+access succeeded, the server responded, and a disposable read-only,
+network-disabled workload passed with exact cleanup. Require actual server
+readiness rather than pipe existence, retain a reusable isolated launcher,
+and compare existing resource identities before and after the smoke test.
+This is a continuity mitigation, not proof that the original lock is fixed.
+
+### Complete-output evidence does not require complete-output retention
+
+DS-02 executed the exact frozen DS-01 work wrapper against a real bounded
+Node fixture above 8 MiB per pipe. Its native maxBuffer failure was proven;
+the historical DS-01 inner code remains unknown. Increasing a buffer
+would only move the failure boundary and allocate more private text.
+Stream both pipes through fixed byte/frame/record/deadline gates, retain
+only bounded scan tails and correlation state, and require both EOF events
+plus successful native close before issuing a non-text proof.
+
+All generated database and application credentials belong in the canary
+set. Exercise actual chunk acknowledgements, normalized timestamp-frame
+boundaries and both channel orders; do not assume multiple writes imply
+multiple native chunks. Uncertain container/tool attribution must remain
+explicitly ambiguous. Missing, incomplete, over-limit or nonzero-exit input
+is INVALID, not a complete-success-shaped fallback.
+
+OS-17 and DS-02 also show that safe cause retention must cover work
+commands, not only cleanup. Preserve finite native codes and static roles
+through every minimal serializer without retaining stderr, arguments or
+nested exceptions. The executable guards are in
+`scripts/test/membership-console.test.cjs`; the single affected aggregate
+passes 84/84. See the [indexed RCA](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+for fixed budgets, causal RED/GREEN and the remaining runtime hold.
+
+### A child startup timeout is not an operation failure
+
+OS-18's four aggregate failures exposed a test-boundary defect: a request
+timer armed immediately after spawn, or a whole-process timer including
+module imports, could expire before the intended negative operation started.
+An isolated pass does not replace a failed aggregate or identify the old
+phase. Acknowledge bounded startup, then start the original operation clock;
+require the intended failure cause and await child closure before continuing.
+Record setup versus operation failure separately, without raw child errors.
+
+The executable held-readiness control and bounded IPC fixture in
+`scripts/test/membership-observer.test.cjs` demonstrate the false-negative
+mechanism without sleeps, larger operation deadlines or host-noise claims.
+The corrected aggregate passes 66/66 while retaining all old FAILED logs.
+The [indexed RCA](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+distinguishes source proof, current observations and unretained old phases.
+
+### Finalization must preserve safe causes and the actual budget phase
+
+OS-17 / DF-12 demonstrated two different evidence losses: a native wrapper
+discarded exit/signal metadata, then a finalizer discarded even the generic
+failure behind booleans. A successful absence query cannot repair a failed
+final capture or prove that a removal command succeeded. Keep those claims
+separate and retain ordered, closed action causes through every fallback
+serializer. Never retain raw native stderr, arguments or nested exceptions.
+
+Budget selection and timeout size are also separate facts. Source inspection
+proved that functional cleanup already used the correct outer deadline;
+its shorter per-command timeout was a different defect. Real fake-CLI
+subprocess tests must discriminate both. A validated inner `work` deadline
+failure must not be relabeled `cleanup` merely because the finalizer caught
+it there. Unavailable durations remain unavailable, not invented zeroes.
+No post-incident observation reconstructs an unretained historical error.
+
+Applied safeguards are in `scripts/test/membership-lifecycle.test.cjs`.
+Consolidation review found that a caller could still pass its outer deadline
+as both arguments while every presence-only wiring check passed. Execute the
+actual caller with expired work and remaining cleanup: work must not dispatch,
+but capture, removal and independent verification must still run. Also measure
+the configured child's lifetime so a separate grace period cannot consume the
+cleanup reservation. The history runner now reserves 90 seconds inside its
+unchanged outer cap; historical experiment receipts are not rewritten.
+
+Ignored evidence is a separate portability boundary. Keep portable negative
+proof tests and committed nonsecret regression fixtures executable without
+local artifacts. Explicitly skip only retained-evidence comparisons when their
+complete inputs are absent; never turn that skip into runtime qualification.
+Verify this with installed dependencies and no copied experiment evidence.
+
+Check required configuration before expensive validation, including inputs
+needed only to load a tool's configuration. Prisma generation can require
+an explicit URL without needing a database connection. Fail early and
+explain that distinction; do not silently substitute a live URL or
+credential. Exercise the actual preflight block and preserve modes that
+do not require that input.
+
+Validation capacity belongs in the gate definition. A completed assertion
+count does not prove that every discovered test file ran: the default web
+pool lost 15 workers while reporting 1,301 passing assertions. Preserve that
+failure and verify unique-file accounting under a declared worker bound.
+The full two-worker run completed all 124 files / 1,655 tests. This supports
+the chosen capacity policy, not an invented native exit cause. Anchor edits
+to named gate blocks and assert neighboring commands remain unchanged when
+multiple steps contain the same command text.
+
+A source snapshot nested under an existing repository is not an isolated
+Git checkout: Git can walk upward and find the parent's full history.
+When tests enforce ancestry or inspect historical source, reproduce CI's
+checkout depth in a clone with its own `.git`. Four new CI failures were
+reproduced at depth one and disappeared after fetching history alone,
+without changing or skipping their assertions. Declare history availability
+as a validation input and guard the active checkout setting.
+
+A positive cleanup fixture must model the reserved cleanup budget, not
+silently impose a tighter per-child startup deadline. Keep the absolute
+deadline unchanged, exercise a successful child that would exceed the old
+independent cap, and retain sanitized lifecycle details on assertion failure.
+This separates testing deadline enforcement from accidentally measuring
+native process startup speed on a shared host.
+
+The [indexed forensic report](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+records exact RED/GREEN results and the still-unqualified runtime outcome.
+The correction reuses existing finalizer/privacy modules rather than adding
+a lifecycle framework. Normal admission and frozen evidence remain separate.
+
+### Performance admission needs a prospective environment control
+
+Container readiness must identify the final service, not a bootstrap process.
+The official PostgreSQL image's temporary initialization server accepts
+Unix-socket connections before restarting. Probe its final TCP listener,
+not the default socket, and keep an actual-loop control where the socket is
+ready but TCP is not. See [ER-63](../ENDPOINT_SNAPSHOT_REVISION.md#linux-initialization-readiness-correction-er-63).
+
+Identical application images can cross regression limits when their execution
+environment is unstable. Keep the original failed receipt; do not choose a
+favorable opposite-order denominator or pool later observations to rewrite it.
+Before a new admission, freeze workload, image identities, limits, complete
+sample counts, order and stop rules. Run same-image controls first on the
+prospective environment and stop if they fail. Passing a small number of
+controls does not quantify a false-failure rate. More rounds, new history
+strata and confidence formulas are not free assurance: justify their decision
+properties and runtime before adopting them. The narrow Linux qualification
+reuses the original lifecycle instead of building a new measurement framework.
+See [protocol and RCA](../ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
+
+### Failure evidence needs its own completion budget and contract
+
+A failed measurement is not the same thing as an absent receipt. Preserve
+explicit partial failure data, exclude it from admission and test a failure
+after samples have actually been collected. Retrieve the receipt before
+destroying its owner. Likewise, `always()` cannot run after a job has already
+exhausted its total deadline: reserve cleanup and upload time outside the work
+budget. Test that work stops, not merely that timeout fields exist.
+See [ER-64/ER-65](../ENDPOINT_SNAPSHOT_REVISION.md#hosted-qualification-review-failed-evidence-and-deadline-guards-er-64er-65).
+
+Independence must extend to files within a capture, not only separate roles.
+If a CPU profile is missing, still attempt its available bootstrap metadata
+before deleting the container. Propagate the first error, keep capture failed
+unless both copies succeed, and test both asymmetric failures plus both
+failures. Assert retained file contents and failure stages, not just a receipt.
+See ER-68m in the [native diagnostic ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Cover the whole authorized lifecycle, not only copying: signal/exit races,
+polling inspection failures and shutdown timeout must still reach independent
+file collection. Re-inspect once after a failed signal, keep unknown exit
+status unknown, and preserve the original lifecycle error even if collection
+or reinspection also fails. Never collect from an unauthorized owner.
+ER-68o closes this second escape and promotes the contract to a standing
+rule; tests discard their source store before checking retained contents.
+
+Persistence readiness is not elapsed time. When logs are buffered, use the
+existing explicit drain endpoint before a privacy snapshot outside the
+measured window, rather than sleeping less than the configured flush interval.
+Write a sanitized failure-first receipt for functional/privacy checks,
+retaining counts and independent predicates, never raw log or credential
+values. Both diagnostic consumers must reject failed/missing privacy proof.
+Preserve a primary work error through secondary capture, cleanup and receipt
+write failures; test combined failures and report when a receipt is not
+durable. See ER-68q-v in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Walk failure precedence through every layer once: client status/copy, round
+observer/resource receipt, privacy, block capture/cleanup and campaign receipt.
+An outer catch cannot preserve an error already replaced by an inner finally.
+Attempt independent evidence operations before deleting their source, retain
+the first ErrorRecord, and put environment restoration in an unconditional
+finally. Test combined failures and originally absent environment values.
+For correlation, match the selected ID and category in the same actual log
+record, not independent substrings across a capture or nested payload fields.
+Keep fixtures faithful to the real formatter and lexical catch semantics.
+See ER-68x-ac in the [ledger](../ENDPOINT_SNAPSHOT_REVISION.md).
+
+Derived audit reports need immutable-input identity too. Require explicit
+artifact/run/output alignment before writing, retain the original producer
+identity separately from the current replay-consumer hash, and include all
+guard inputs in replay scratch. A replay is not a new measurement. Verify a
+wrong-run negative control cannot overwrite an older report. See ER-68w.
+
+The first-error walk includes leaf collectors' status writers. Protecting a
+caller cannot recover an error its callee's finally already replaced.
+Exercise ownership/capture plus writer failure and writer-only failure.
+PowerShell restoration also needs a runtime-family check: .NET 9 distinguishes
+empty values from deletion, while PowerShell can bind ordinary `$null` as
+empty text. Use `[NullString]::Value` for originally absent values and preserve
+real empty values separately. A Windows-only PASS does not prove Linux state
+restoration. Actual container controls close ER-68ad/ae; both conventions are
+promoted to the standing rules rather than left as advisory prose.
+
+Formatter fidelity is not domain fidelity. A syntactically real log line can
+still use the wrong category: Group PATCH operations emit `scim.patch`, not
+the general `scim.group` category. Derive the expected operation/category
+relationship from its producer and keep a source-to-fixture guard plus
+wrong-domain negative controls. Before a costly benchmark, a bounded actual
+contract probe can verify the selected failed request's sanitized category
+counts without exporting raw logs or IDs. This closes ER-68ah; it does not
+retroactively explain an older failure whose predicates were not retained.
+
+Resource measurements need the same failure contract as request timings.
+Persist every collected CPU, database, memory, RSS and OOM observation before
+rejecting a ceiling or deleting its owner. A missing later probe must leave
+earlier observations marked partial, not silently absent. Test the actual
+failure and teardown paths, including exact-boundary failures, and verify
+the values still exist after cleanup. Moving to a different host is not a
+repeatability fix unless its same-image controls pass. See
+[ER-66 and the failed Linux control](../ENDPOINT_SNAPSHOT_REVISION.md#linux-control-result-and-resource-failure-retention-er-66).
+
+### Diagnostic observations must not become admission or causal claims
+
+Retain request spans and independent counter read windows on the same
+verified monotonic clock, including observer cost, gaps and explicit unknown
+coverage. An app-wide counter increasing inside a request does not measure
+that request's lost time. Two read windows must be wholly interior before
+computing a difference; insufficient observations stay unknown, not zero.
+Reject diagnostic-marked receipts from normal admission even when complete,
+and execute the actual mode-selection branch to prove it cannot reach the
+release evaluator or later comparison blocks.
+
+Test real subprocess startup and shutdown, not only mocked lifecycle calls.
+Clearing inherited secrets is desirable, but Windows Node cryptographic
+startup still needs `SystemRoot`; allow that one OS value rather than
+restoring the parent environment or skipping the test. Parameter splatting
+also avoids raw PowerShell backticks colliding with JavaScript template
+delimiters in cross-interpreter fixtures.
+See [ER-67](../ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
+
+Native profiler samples are observations, not measured CPU microseconds.
+Wall-clock sample gaps can include scheduler suspension and must not be used
+as function CPU weights. Retain full function/source identities and idle
+samples; disclose whole-process lifetime, runtime-version and order effects.
+Match every raw request span to the original timing arrays and native clock
+range before publishing a comparative diagnostic.
+
+A generic resource owner label does not authorize a profiler-specific exit
+signal: require an explicit profiler marker as well. If the process already
+exited, collect what it wrote before rejecting its exit code. Store output
+where it survives stop, then collect all independent role receipts before
+removal even when the first capture fails. Prove these lifecycle behaviors
+with actual collector paths and frozen-image capability probes.
+See [ER-68](../ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
+GitHub's `cancel-in-progress: false` is not a queue-all guarantee: by default
+only one pending workflow survives per concurrency group. When three or more
+independent required lanes share a group, use the documented `queue: max`
+on every participant and test the complete participant set. It preserves
+single active execution while retaining up to 100 pending runs; saturation
+still needs explicit failure reporting. Distinguish canceled-before-start
+from a failed measurement, and never repair scheduling loss by admitting
+unexecuted evidence.
+
+Validate mode-specific provenance by executing each real mode's hash-emission
+block and checking both keys and actual bytes. A hash branch nested under an
+incompatible mode can be unreachable while parser and workload tests all pass.
+When extracting PowerShell blocks for focused execution, preserve automatic
+script-path bindings explicitly without replacing the production branching
+or hash logic. See ER-68g in the same ledger.
+
+Do not infer timestamp ordering from an interval field's name. Real native
+profiles can contain signed steps; reconstruct and validate every cumulative
+timestamp against the original profile window, retain every observation and
+report reordering explicitly. Unweighted counts need no sorting or conversion
+of gaps into CPU time. A final in-range sum cannot prove intermediate bounds.
+Verify the official consumer's handling rather than trusting a search
+synthesis. Keep producer commit/hashes distinct from a corrected replay
+consumer's hash, and never relabel an original failed campaign as successful.
+See ER-68h/i in the same ledger.
+
+Observing IPC can change delivery semantics. Node buffers ordinary child
+messages until a message listener exists; an early diagnostic listener can
+drain the queue before the real consumer is installed. Test an observer
+against delayed-consumer delivery before using its output to diagnose a
+startup failure. Avoid installing competing IPC listeners, preserve call
+and return behavior, and keep instrumented runs separate from gate admission.
+See ER-68k in the same ledger.
+
+A real-process timezone regression need not launch a second complete test
+framework. Use a bounded fresh Node process with the established source loader,
+the actual production entry point and mocked external I/O. Assert a complete
+receipt proving the process timezone, production read count and returned values.
+Retain ordinary dependency-injection coverage separately. Before accepting the
+cheaper harness, reverse the relevant production behavior and confirm that the
+new assertion fails for the original defect; restore it before any gate run.
+Keep deadlines unchanged and distinguish isolated timings from full-load proof.
+See ER-68l in the same ledger.
+
 ### A parent-compatible dependency patch needs actual consumer evidence
 
 An engine range only answers whether Node can load a package, not whether an
@@ -1457,3 +1810,58 @@ Include the server's effective log level in live-fixture preflight: suppressing
 INFO output also suppresses ring-buffer evidence that an observability gate
 is meant to verify. Require authenticated readiness after every restart.
 See the [integration execution issues](../auth/EXECUTION_ISSUES_AND_RCA.md#current-master-lifetime-integration-preparation-2026-10-21).
+
+## Preserve safe failure identity through privacy rejection and fallback output
+
+2026-10-23: A privacy diagnostic first lost input provenance, then credential
+role. A later real-child negative test showed that even its minimal fallback
+receipt could copy private cleanup or inventory fields and fail a second time.
+Rejecting private data is necessary, but a rejection that loses its safe
+identity prevents the next bounded investigation from discriminating causes.
+
+Use a closed failure schema with a static reason, static input source, static
+credential role and applicable row index. Generate roles at the caller, never
+from credential hashes, lengths, substrings or surrounding context. Test every
+input, serialization, provenance and output-rejection branch. Scan console
+origins separately; administrative database/tool output is not automatically
+an application defect.
+
+A privacy-safe fallback must project fixed schema fields rather than recycle
+the rejected object, even for apparently harmless cleanup or inventory facts.
+Prove this with a real bounded child that injects a canary into those fields
+and requires a retained INVALID receipt with cause/source/kind and no canary.
+This safeguard is applied in the functional diagnostic and its focused test;
+the post-run correction is not attributed to earlier frozen execution.
+See the [source evidence, OS-13 through OS-18 and explicit attribution limits](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#attempt-2-closeout-credential-source-located-strict-result-invalid).
+
+2026-10-23 follow-up: rendered tool output can replace credential-bearing
+source literals with masking placeholders. A synthetic patch fixture can then
+pass while the exact extracted artifact correctly rejects that displayed
+literal. Treat pinned file bytes and independently pinned complete statement
+source hashes as authority, never a copied rendering. Require a positive
+test against the extracted artifact before a single authorized build; record
+that test explicitly rather than counting a skipped artifact test as proof.
+The [offline DERIVED reference preparation](../MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#offline-derived-reference-preparation-not-baseline-adoption)
+applies this safeguard without copying credential-bearing source literals into
+new tracked code.
+
+## Separate cleanup ownership from experiment qualification
+
+**Observed:** 2026-10-24, disposable URL GIN diagnostic source preparation.
+Real bounded Node fixtures found two lifecycle errors before database execution:
+recovery ran before normal capture/removal, and an OOM qualification assertion
+prevented removal of an otherwise exactly identified owned container.
+
+**Pattern:** Run normal finalization first and independently verify absence
+before deciding whether safety recovery is necessary. Authorize every removal
+using fresh full resource ID, owner/run labels and expected image identity.
+Do not make that removal authorization depend on the workload remaining healthy
+or satisfying its CPU/memory policy. Failed qualification must remain INVALID
+without making disposal impossible.
+
+**Applied enforcement:** The actual-entry regression exercises healthy and OOM
+fixtures with real bounded Node subprocesses and no Docker fallback. It requires
+capture before removal when qualified, capture rejection when OOM-invalid,
+successful exact owned removal in both cases, first-cause retention and no
+unnecessary recovery. Existing native-operation and absolute-deadline caps are
+not extended. See [the causal RED/GREEN evidence and disposition](../DISPOSABLE_URL_GIN_COUNTERFACTUAL.md#source-and-test-execution-issues-and-prevention).

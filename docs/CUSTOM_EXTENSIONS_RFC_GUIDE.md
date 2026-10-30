@@ -9,7 +9,7 @@ or fetching them. See [minimal-schema validation](GOOGLE_MINIMAL_GROUP_MEMBERSHI
 [reference persistence and compatibility](GROUP_MEMBER_REFERENCE_PRESERVATION.md)
 and [release notes](RELEASE_NOTES.md).
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.66`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.67`
 
 > **P7a behavior, included since 0.55.36:** [Profile validation](SCIM_P7A_PROFILE_VALIDATION.md)
 > adds declaration/type/cardinality checks, required extension enforcement,

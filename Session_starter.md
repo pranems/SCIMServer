@@ -2,6 +2,635 @@
 
 **Last verified:** 2026-10-30
 
+### Current Hono-master performance reconciliation (2026-10-30)
+
+Hono #262 merged normally as `eb733f61e7f25d1d642fe746075e266c3b19ad60`,
+master 0.55.66. Its seven exact-tip checks, separate review, 28 protected
+gates and authenticated clean-CI lock equality passed; postmerge dependency
+review and CodeQL also passed. Those are parent evidence, not this new tip.
+The owned branch now normally integrates that master into held performance
+`ff2d2377`, proposed 0.55.67. Preserve all constituents and both histories;
+resolve only strict current-version tokens, not historical identities.
+New-tip graph/source proof, review, protected publication and clean-CI
+confirmation remain pending. No new benchmark or workflow redesign is run.
+Qualification `40974749991` remains failed; release/deployment admission
+is held independently of preparing this source integration.
+
+### Historical reviewed performance union (2026-10-29)
+
+PR #261 merged normally at `cffc64c8a188a721fabb85c37a80243d5e65a74f`,
+after 28/28 protected Validate gates, seven successful exact-head checks,
+separate technical review and authenticated clean-CI lock confirmation.
+Its measured counts were API 6,248/215 suites, HTTP 2,514/118 suites plus
+42 existing skipped tests, and web 1,661/125 files. #259 and #260 are merged.
+
+The preserved 0.55.65 performance candidate now normally integrates that
+reviewed master, retaining all 58 constituents and the dependency fixes.
+The 32 conflicts comprise 32 strictly version-only hunks and five narrative
+unions; both historical records remain below. Both roots retain the already
+reserved 0.55.65 version. Current-source preservation checks, protected
+gates, clean-CI bytes, refreshed review and exact-head CI remain required.
+No new serving behavior, benchmark result, deployment or release admission.
+The frozen performance failure and independent final-artifact holds remain.
+Preservation preflight passes for all 58 constituents, master's serving
+source and dependency graphs, and the original performance/tests/workflows.
+Both complete installed inventories exit 0; unchanged physical graphs need
+no repeat restore. New-head protected gates and CI still remain pending.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally merge reviewed advisory #261 at 0.55.64, then integrate its master into preserved performance #251 at 0.55.65 without rewriting any constituent history. |
+
+### Historical preserved performance integration (2026-10-29)
+
+PR #251 is being integrated through an ordinary merge of current master
+`727860866c53c7ec8d01d1ff5bae858f80a1715d` into preserved remote head
+`e5e107f5b6882d2e71c8015adbeb16e89d8b3524`, on the privately owned
+`integration/performance-master-20261029` branch. Both parent histories
+remain intact. Five documentation conflicts preserve both narratives below.
+The current candidate is 0.55.65, reserved after an open-PR/history collision
+check; independent drafts #259/.62, #260/.63 and #261/.64 are not inherited.
+
+All merged master source, security dependencies and four logging fixture
+corrections are retained. The nine actual review threads were all resolved
+at intake; that is historical review, not review of the integration tip.
+Protected Validate publication and exact-tip CI/review receipts belong in
+`test-results/performance-master-integration-20261029/`.
+
+The exact two-parent source merge is `ffc25528`. Its normal Validate push
+passes 30/30 gates in 1,126.6 seconds: API 6,220 tests / 213 suites; HTTP
+2,514 tests / 118 suites, with 42 tests and two existing suites skipped;
+web 1,655 tests / 124 files; membership 226 pass / two explicit skips.
+API lint is 507 warnings / zero errors, and web TypeScript retains 66 errors
+within the unchanged 96-error ratchet. The native worker warning remains.
+
+Existing clean-CI lock workflow run `40936685877` authenticates source
+`ffc2552832e3f80b1bbdcc14cb6baad2db630660` and artifact `12925301374`,
+digest `sha256:55c3e768993862fa1a3b34b4af9b4684d9869bc2c503ab666ed13125fb7c8c06`.
+Only the two root version fields in each API/web lock change from .61 to .65.
+Package entries, graph, public registry provenance and SHA-512 remain
+unchanged; the seven-day report has zero changed package versions.
+Final lock-tip protected publication and exact-tip review/CI remain separate
+from these source-tip receipts.
+
+The frozen run `39875689201` remains FAILED with populated-read p99 ratio
+`1.23928982 > 1.10`. Cleanup HTTP 403 is not successful cleanup.
+No live application, database, Docker operation, benchmark, deployment,
+promotion, artifact admission or operator visual verification is authorized.
+The remaining native Windows worker warning is not fixed by consolidation.
+
+Self-improvement: applied an explicit two-parent and master-source preservation
+preflight instead of relying on merge success alone. Design/architecture
+disposition: accepted; this is a source-history/documentation integration
+with no new runtime responsibility or speculative abstraction.
+
+### Historical preserved-branch checkpoints
+
+### Post-recovery release checkpoint (2026-10-28)
+
+Docker server 29.9.2 responds on desktop-linux when commands use the
+process-scoped configuration under
+`%LOCALAPPDATA%\DockerRecovery\20261028-162019\isolated-config`.
+Do not restart the engine or rewrite the original locked context metadata.
+The original lock's initiating actor remains unverified. The two existing
+uncommitted recovery-ledger updates were present before this continuation.
+
+The 28 October protected push advanced PR #251 to `6716b3bb`, preserving
+all commits and current master `5bfff2de` as ancestors. It passed all 30
+Validate gates in 1,228.6 seconds. The PR is now conflict-free and remains
+draft. Both exact-tip image workflows passed ordinary validation and failed
+their image scan on the two known HIGH advisories. CodeQL, docs freshness
+and RFC currency workflows passed, but CodeQL added review comment
+`discussion_r4407248843` about reopening a captured archive by pathname.
+The descriptor correction below requires another protected publication.
+The diagnostic remote intentionally remains `8321dab6`.
+
+The final 24 October protected push passed 30/30 gates in 1,594.7 seconds;
+Build Test Image `40061707692` and CodeQL `40061707691` passed on that exact
+tip. Those receipts supersede the source-time "retry pending" entries below,
+without erasing the earlier failures. No application API/web tree differences
+exist against that master. Historical PR head `f6f03a52` and current master
+remain ancestors of the preserved diagnostic branch.
+
+Fresh Trivy 0.76.1 scanning of the exact published 0.55.60 digest completed
+with exit 1: HIGH body-parser 2.3.0/CVE-2026-111181 and
+multer 2.4.0/CVE-2026-113872. The approved feed rejects the listed fixes
+2.4.0 and 2.5.0 with E404; their exact npm publication/eligibility dates
+are unverified. No registry bypass, installation or new ignore entry occurred.
+Recheck approved availability on 30 October and use CI-only regeneration
+once actual age and compatibility are proved. Issue #256 remains open.
+Raw scan, advisory and database receipts are retained under
+`test-results/release-resume-20261028/`.
+
+Updating #251's head currently auto-launches three old frozen campaigns.
+PR #251 was converted to draft before synchronization. The source correction
+skips the three expensive jobs only for draft PRs, keeps explicit dispatch
+and non-draft execution, and adds `ready_for_review` so readiness triggers
+the normal campaigns. The regression evaluates actual conditions and protects
+unconditional ordinary CI; 116/116 affected contracts and workflow YAML pass.
+Exact-tip campaign jobs were skipped with no runner IDs, runner names or
+steps allocated. A skipped draft campaign is not qualification; preserve
+the independent admission hold.
+No merge, deployment, serving-code edit or performance waiver occurred.
+See the [current diagnostic status](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
+
+The first protected PR reconciliation push passed 24 gates then stopped at
+RFC freshness (91 days versus the unchanged 90-day limit); no remote head
+was published and later application suites did not run. The sanctioned
+live updater verified all 19 RFC mirrors (C1-C5 and O1-O3 PASS), refreshed
+five errata-count records with no new Verified counts, and changed no text
+bytes or update/obsolete graph. The matching offline gate now passes.
+Manifest generation and README counts are preserved; another full hook
+passed after this refresh. See correction CR-10 and retained receipts.
+
+The new archive-race review is corrected locally by retaining the exclusively
+created read/write descriptor through capture and verification, then reading
+it with explicit offsets before closing it. The regression replaces the
+pathname, leaves the descriptor at end-of-file, exercises short reads and
+rejects premature EOF. The three privacy files passed 20 tests with one
+explicit retained-source skip out of 21. No Docker campaign was rerun.
+See correction CR-11. Final correction publication and CodeQL confirmation
+remain pending; no merge or release admission is claimed.
+
+| Date | Summary |
+|---|---|
+| 2026-10-28 | Protected reconciliation passed 30/30 gates and removed PR #251 conflicts; exact-tip image scans retained the two HIGH holds; corrected the newly surfaced archive-race review with a descriptor-bound regression. |
+| 2026-10-28 | Verified isolated Docker readiness; completed exact-release scan and identified two HIGH findings with an approved-feed hold; reconciled preserved branch ancestry and PR review/thread state without launching old campaigns. |
+
+### Diagnostic consolidation review corrections (2026-10-24)
+
+Both independent review findings are corrected locally: the history runner
+now reserves 90 seconds for cleanup inside the unchanged 60-minute outer
+cap, and tests no longer require ignored historical artifacts to run their
+portable regressions. All 31 affected retained-proof tests passed with zero
+skips. A separate tracked-source snapshot with existing API dependencies
+and no copied experiment evidence passed 213/221 tests, zero failures,
+eight explicit evidence/integration skips across all 15 membership test
+files. The temporary dependency junction was removed. No workload,
+admission, push or deployment occurred. See the
+[correction ledger](docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md#consolidation-corrections-2026-10-24-source-only).
+The complete serial membership test selector is now wired into ordinary
+branch/release CI and default pre-push; two regression controls passed after
+failing on the missing wiring. Workflow, CJS and PowerShell syntax checks
+and content-only freshness for all 27 manifest docs passed. The first protected Validate push passed 26 gates, including 221/223
+membership tests (two explicit skips), API unit/E2E, static/build and
+rendering checks, then correctly blocked at Prisma generation because
+`DATABASE_URL` was unset. A tested early configuration gate now prevents
+this late failure; explicit generation-only configuration made the real
+Prisma command pass. No package was installed. A complete hook-protected
+retry and exact-tip CI remain pending; no branch was pushed by the failed
+attempt. The configured retry passed 29 gates but failed at web Vitest:
+15 workers exited unexpectedly, leaving 109/124 files complete. A separate
+fixed two-worker invocation completed all 124 distinct files / 1,655 tests,
+zero failures or pending tests, in 616.860 seconds. The bounded complete
+selector is now wired into pre-push and both CI jobs; four focused wiring
+controls pass and preserve the neighboring API command. The original
+worker exits' native cause remains unknown. A new complete protected push
+is still required; no failed gate was waived or relabeled.
+
+The subsequent complete hook passed all 30 gates in 1,379.8 seconds and
+pushed `ff9091c0`; the remote SHA and clean tracking state were verified.
+Exact-tip CodeQL `40058897048` passed, but Build Test Image `40058896931`
+failed four membership tests because the CI checkout lacked historical
+Git objects. An isolated depth-one clone reproduced exactly those four
+failures; fetching history alone made all 38 relevant tests complete with
+34 passed / zero failed / four explicit evidence skips. Both ordinary
+validation checkouts now request complete history; all five wiring checks
+pass. A new protected push and exact-tip CI remain required for that
+correction. No tests, ancestry checks or release holds were waived.
+
+The protected push of `8b8129ac` then stopped at the membership gate
+(223 passed / one failed / two explicit skips out of 226). A positive
+cleanup fixture had an independent 700 ms child cap inside its 1,800 ms
+reserved deadline. A controlled 800 ms successful child reproduced that
+premature termination. The fixture now uses the remaining original deadline,
+retains safe failure details and passes all 16 focused lifecycle/wiring
+tests. Production deadlines and test outer bounds are unchanged; another
+normal protected push is required.
+
+### Separate disposable URL GIN counterfactual (2026-10-24)
+
+The opt-in database-only runner and causal source/fixture guards are
+implemented in `scripts/performance/run-membership-gin.cjs` and
+`membership-gin.cjs`. The fixed experiment is BAAB + ABBA, eight fresh
+equivalent current-schema clones, 8,000 identical synthetic rows in
+160 batches per trial, with insertion and explicit pending-list drain
+measured separately. Source validation passed 39/39 tests with zero skips.
+One invocation from `0de430f8` completed all eight trials / 64,000 synthetic
+rows in 191.076 seconds including exact owned cleanup. Omitting URL GIN
+reduced measured insertion-plus-drain execution by 981.471 ms / 61.32%
+and WAL by 58,542,228 bytes / 52.55% across 32,000 rows per condition.
+The absent-URL read worsened from 0.163 ms to 10.945 ms, so retain the
+production index and require a read-preserving design. Full evidence and
+limits are in [the focused report](docs/DISPOSABLE_URL_GIN_COUNTERFACTUAL.md).
+No application server, production index change or admission is involved;
+DS-03 and all earlier evidence remain unchanged.
+
+### DS-03: corrected statement diagnostic complete (2026-10-24)
+
+One runner invocation from committed source
+`5f6203a91e252b47136ea90c4944bd40314aec76` completed all eight
+BAAB/ABBA visits in 1,071.628 seconds including cleanup. It retained
+35,256 checked requests, 32,000 measured samples, 3,200 warmup spans,
+eight explicit false-policy verifications, 132 current contract assertions
+and four complete all-eight-role privacy receipts. Seven complete
+PG/application captures scanned 57,190,021 bytes with both EOFs and exit
+zero. Six owned containers and their network are absent; all three
+shared running and five exited non-owned containers remain unchanged.
+
+The 0.55.60 candidate made 4.12% fewer top-level SQL calls but accumulated
+1,407.449 ms more SQL execution. Logging contributed 764.806 ms additional
+execution and 32,431,349 additional WAL bytes, or 0.047800 ms execution
+per equal inserted row. Nonlogging execution also increased; application
+CPU and pooled HTTP p99 were lower. These are descriptive observations,
+not request-level causes, GIN proof or admission.
+
+The zero-runner preflight launcher initially compared all containers with
+a running-only snapshot; its state-matched guard was fixed and validated
+before the sole runner invocation. No benchmark retry or postrun runtime
+code change occurred. Source/test evidence, historical INVALID receipts,
+90 branches and ten stashes were preserved. See
+[DS-03 report](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md#ds-03-corrected-complete-capture-statement-study-2026-10-24).
+The derived reference is authorized only for this diagnostic. No release
+baseline adoption, index counterfactual, push, CI or deployment occurred.
+
+### DS-02: bounded complete-console source correction (2026-10-24)
+
+Source-only correction is implemented. The single affected nine-file
+aggregate passed **84/84**, zero failures/cancellations/skips, in
+51,111.7441 ms; syntax/scoped lint passed for ten changed CJS inputs.
+The exact frozen wrapper actually produced native MAXBUFFER on a real
+nonsecret Node fixture above 8 MiB. This does not identify DS-01's
+unretained historical inner error.
+Derived PG/reference/candidate captures now stream through fixed
+64 MiB total / 64 KiB frame limits, bounded tails, all eight canary
+roles, mandatory EOF/exit-zero and original current-request correlation.
+Finite native causes/static roles survive work and minimal fallback
+serialization. Original defaults, admission, caps and old frozen evidence
+remain separate and unchanged. No Docker/SQL/app/build/timing/remote
+operation occurred. Runtime qualification of corrected source remains
+pending explicit authorization. See the indexed observer/statement report
+and `test-results/ds02-stream-capture-20261023/`.
+
+### DS-01/DS-02: sole DERIVED statement study INVALID after BAAB (2026-10-23)
+
+Explicit opt-in binds the immutable privacy-derived reference and sealed
+functional qualification against unchanged 0.55.60, for one descriptive
+BAAB/ABBA eight-visit study only. Tests enforce identity, full local input
+closure, independent false policies, explicit read-only observer, eight
+credential-role privacy and diagnostic admission rejection.
+Focused GREEN: 28/28, zero skips; three-file syntax/scoped lint clean.
+Clean source `7b3ac1c7` was committed before the sole run. Actual result:
+four BAAB visits, 17,628 checked workload requests, 16,000 measured samples,
+66 current contract outcomes, independently false policies; **INVALID**
+at 588,647 ms because a complete-console `logs` command failed during work.
+Safe category is `unexpected`, duration 8,394 ms; exact inner code and
+capture role remain unknown. No ABBA/replacement or completed private
+qualification. All four owned metadata captures/removals/absence and network cleanup
+passed; independent inventory confirmed zero owned resources and the same
+three shared containers. Partial SQL: B had 4.13% fewer top-level calls,
+46.38% more execution; logging INSERTs explain 56.05% of extra execution
+and 99.75% of extra WAL arithmetically, not causally. The indexed report
+preserves exact hashes; DS-02 above closes the source-only capture/typed-cause
+correction before any new runtime. No release baseline adoption, original receipt
+rewrite, push/CI/cloud or deployment.
+
+### DF-13: local DERIVED artifact functionally qualified (2026-10-23)
+
+One new authorized invocation from clean `4a5e6724` passed all strict
+privacy/finalization checks: **199,619 ms**, seven authenticated requests,
+seven readiness probes, independently false server/endpoint policies,
+four correlated exact masks and all five credential-role absence checks.
+Both final captures, full-ID-owned removals, absence checks and network
+cleanup passed within the unchanged 300-second cap/120-second reservation.
+Sealed result: **DERIVED_FUNCTIONAL_QUALIFIED**, immutable local image
+`sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`
+only. Original attempt2 remains INVALID; original images/build labels and
+all frozen evidence remain unchanged. Independent post-run inventory found
+zero owned resources and the same three shared containers running.
+No rebuild, suite rerun, original/candidate startup, timing, remote action,
+baseline adoption or deployment occurred. See DF-13 in the indexed
+[observer/statement report](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md)
+for immutable receipt hashes, exact commands and remaining holds.
+
+### OS-18 child-boundary correction (2026-10-23)
+
+The applicable corrected seven-file serial aggregate now passes **66/66,
+zero failures/skips**, in 26,012.7132 ms. The old 58/62 aggregate remains
+FAILED; isolated four-case passes were not a replacement gate.
+Test-only IPC fixtures now acknowledge startup separately from unchanged
+protocol/operation deadlines, refuse all external child dispatch, require
+the intended negative-control cause and await closure. Actual held-readiness
+and phase-specific failure controls are included. Nine existing lifecycle
+controls remain unchanged. Five-file syntax/scoped lint passes.
+No Docker, application, SQL, image inspection/build or remote action ran.
+The historical inner cleanup error remains unknown; the 30-second command
+maximum is clamped to the original five-minute deadline, not a cap extension.
+See the indexed [OS-18 RCA](docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md).
+DERIVED runtime qualification, adoption and performance holds remain.
+Test/RCA commit: `c306c1e2`. Preservation proof confirms unchanged OS-17
+source, admission/fixture files, original frozen inputs and historical
+receipts; current tested CRLF bytes and normalized Git hashes are distinct.
+All 90 branches and ten stashes remain. No runtime inventory was refreshed.
+
+### OS-17 / DF-12 source-only finalization correction (2026-10-23)
+
+Implemented safe per-action cause retention and strict fallback projection.
+Exact executed source already separated work and cleanup deadlines; no
+inherited abort-state bug was found. A real 11-second Node metadata fixture
+fails through the exact frozen ten-second wrapper, while corrected source
+uses the existing thirty-second maximum within the unchanged five-minute
+absolute cap. Full-ID owner checks and independent final capture/removal/
+absence requirements remain strict; all four diagnostic callers retain
+closed native/action metadata. No Docker dispatch, app/SQL, build, remote
+operation or performance rerun occurred.
+
+Original attempt2 remains INVALID and the DERIVED artifact unqualified.
+The historical inner error is still unavailable; this is a tested source
+correction, not reconstructed runtime proof. The indexed observer/statement
+report records RED/GREEN counts, existing bounded-child timeout failures and
+their unchanged-limit isolated passes, source preservation and remaining
+adoption/publication/performance holds. OS-17 is no longer merely scheduled.
+Implementation/RCA commit: `9f8d4911`. Preservation proof verifies all seven
+original frozen inputs and four immutable attempt2/recovery artifacts,
+plus six unchanged admission/fixture/proof files. Current seven CJS files
+match Git after newline normalization only; raw CRLF/LF hashes differ.
+All 90 branches and ten stashes remain. No new runtime inventory was queried.
+
+### Corrected-source DERIVED continuation: INVALID finalization (2026-10-23)
+
+One new attempt2 is authorized after the optional-PG-label fix; attempt1
+remains INVALID with zero prior workload and its missing manifest unchanged.
+Three actual bounded child tests now prove failed-metadata preregistration
+and reject resolved-manifest/frozen-input tampering before allocation.
+Behavioral RED retained one pass/two failures; GREEN is three executed,
+three passed, zero skips. Four-file focused regression is 34/34; six-file
+syntax/scoped lint passes. Full manifest readback and frozen hashes now
+validate before any resource creation, only in explicit DERIVED mode.
+No new build, original/candidate startup, performance or adoption is allowed.
+See the indexed observer/statement report for DF-10/DF-11 and actual outcome.
+
+Executed `e0d884b9`, run `2612d0d3bceb46b5a27ea7d6fbc38016`: exactly
+seven authenticated requests and ten readiness probes. Both effective
+persistence policies were false, four correlated authorization masks and
+all generated-credential absence checks passed. Overall INVALID at
+228.079 seconds: app final capture and both removals failed. Exact-owner
+safety cleanup recovered both containers/network at 350.556 seconds,
+outside the original five-minute cap; no waiver or replacement run.
+Independent inventories verify zero owned resources and the same three
+shared running containers. The original inner cleanup error is unavailable
+through OS-17's boolean-only finalizer; later metadata inspection took
+10.926 seconds against the original ten-second command limit, consistent
+with but not proving a timeout. The source-only safe-cause/bounded-command
+correction above supersedes the scheduled follow-up; there has been no new
+functional invocation. Artifact remains unqualified.
+Actual frozen manifest/receipt and recovery hashes are in
+`test-results/derived-functional-continuation-20261023/closeout-proof.json`.
+
+### DERIVED functional qualification: INVALID preflight (2026-10-23)
+
+Executed source `1ac35593` stopped INVALID after 27.828 seconds, before any
+container allocation, readiness probe, authenticated request or SQL. Run
+`8032f52ecc0546b780b49421da6df9b5` hit a Docker metadata defect: the template
+requested optional PG image labels that are absent. Read-only metadata
+reproduction confirmed that defect; role-specific corrected metadata succeeds.
+There was no functional retry, original-image startup or candidate startup.
+The full manifest was not written because it followed preflight; this is an
+explicit preregistration gap, not backdated evidence. Executed on-disk bytes
+were preserved afterward with honest CRLF/Git normalization proof.
+Future source now writes intent before metadata preflight, keeps DERIVED app
+label checks strict and correctly handles zero-allocation cleanup evidence.
+Post-run correction: 31 focused tests and six-file syntax/scoped lint pass.
+Correction commit `462365db` is tested but functionally unexecuted.
+Independent closeout verifies zero owned containers/networks, the unchanged
+three shared containers, immutable image/proof identities, 90 branches and
+ten stashes. Content-only freshness passes 27 docs, not the coupled gate.
+The future statement fixture now requests and independently verifies false
+server/endpoint policies before all windows through a diagnostic-only IPC
+gate; its actual child failure test produces zero workload samples.
+The artifact remains functionally unqualified. No further functional run,
+statement diagnostic, baseline adoption or publication is authorized. See the current
+indexed observer/statement report and `test-results/derived-functional-20261023/`.
+
+### Offline derived-reference preparation (2026-10-23)
+
+Exact compiled source from one owned unstarted cached-baseline container
+confirms the known raw Prisma startup emitter and fallback warning. Original
+compiled SHA-256 is
+`00ea9943fb8f6ecf296b34af5c9072d447b346d15b213669ba83d1f422f92c33`;
+the approved two-statement correction yields
+`f558ea53e53492776ed88fc7f44ee36e30a2a706025703264ca071e6b3c68c24`.
+The full `/app` archive was retained and the source container removed without
+startup. Seven focused builder/source tests pass, including actual-source
+RED/GREEN after a displayed masking placeholder was found not to be source.
+
+An explicit offline builder prepares a uniquely named, labeled DERIVED local
+reference, not an approved replacement for the immutable 0.55.20 baseline.
+The sole actual build and unstarted whole-distribution verification completed
+in 150.417 seconds including cleanup, from committed `b7fdb9c6`.
+Local deliverable:
+`scimserver-local:0.55.20-privacy-reference-derived-1b39d0d7-86f`,
+image ID `sha256:4a4b0ec7daccd00dcbb62108218389d25f1400fe9468022c52dcaea0745846c4`.
+All 13,678 application entries were compared; only the approved compiled
+logging file changed, with unchanged mode/ownership and runtime configuration
+apart from explicit DERIVED labels. Package-declared version stays `0.55.20`;
+no version endpoint was invoked.
+Both source containers were removed without ever starting.
+
+An earlier INVALID preparation stopped before dispatching any build because
+optional `OnBuild` was omitted, not null. Its receipt remains in `build1/`.
+Targeted RED/GREEN corrected that metadata contract; eight builder tests and
+two-file static checks pass after correction, following the earlier 31-test
+builder/privacy run. The actual build's manifest SHA-256 is
+`100490fd58eec02c9fec29169a6d25882a475920fdc8a136d8c08a5ab9a2fd54`.
+Frozen on-disk source and Git bytes differ by CRLF normalization; the manifest
+records both. This is source/build proof only, not runtime privacy or
+performance qualification. Explicit baseline adoption and separate runtime
+authorization remain pending. No application, SQL or performance run occurred.
+See the indexed observer/statement report and
+`test-results/derived-reference-20261023/`.
+
+| Date | Summary |
+|---|---|
+| 2026-10-24 | Disposable URL GIN counterfactual COMPLETE 8/8 in one 191.076-second invocation, including owned cleanup. Identical current-schema fixtures / 64,000 rows; omitting only GIN saved 981.471 ms measured full-cycle execution and 58.542228 MB WAL across 32,000 rows per condition, but worsened absent-URL reads by 10.7825 ms. Source guards 39/39; all eight shared containers and prior evidence preserved. Keep production GIN; no admission, baseline adoption or deployment. |
+| 2026-10-24 | DS-03 corrected-source statement study COMPLETE 8/8: 35,256 checked requests, 32,000 measured samples, all-eight-role privacy and seven complete captures; 1,071.628 seconds including verified owned cleanup. Logging extra SQL execution is 764.806 ms / 16,000 rows, not a request-tail cause. Preserved prior INVALID evidence; no admission, baseline adoption, index change or deployment. |
+| 2026-10-24 | DS-02 source-only correction: exact frozen maxBuffer reproduction, bounded complete-console streaming, all eight credential-role guards and closed native causes. Single affected aggregate PASS 84/84; ten-file syntax/scoped lint clean. No Docker/SQL/runtime rerun, admission or baseline adoption. |
+| 2026-10-23 | Sole prospective DERIVED statement study from `7b3ac1c7`: INVALID after four BAAB visits, 17,628 workload requests and a passing 66-outcome contract because full-console collection failed. Partial SQL/WAL evidence retained; exact owned cleanup and unchanged shared inventory verified. No ABBA replacement, admission, baseline adoption or deployment. |
+| 2026-10-23 | Corrected-source DERIVED attempt2 from `e0d884b9`: strict privacy subchecks passed for seven authenticated requests/four masks, but finalization failed and safety cleanup completed after the five-minute cap. Overall INVALID, no further invocation. All exact owned resources removed; three shared running containers, earlier receipts, 90 branches and ten stashes preserved. |
+| 2026-10-23 | Completed the sole DERIVED functional invocation as INVALID before allocation: zero HTTP/SQL. Committed tested metadata/intent/cleanup correction `462365db` without retry. Independent closeout preserves images, earlier proof, 90 branches, ten stashes and all shared containers. Artifact remains functionally unqualified; adoption/publication/performance held. |
+| 2026-10-23 | Confirmed the exact cached startup emitter, committed strict opt-in offline tooling, retained a failed preflight and completed the single DERIVED build with one-file whole-distribution proof and unstarted cleanup. Original images/evidence and admission holds remain unchanged. |
+
+### Privacy source/kind investigation (2026-10-23)
+
+Source-only review of frozen phase-two inputs, copied exact legacy source,
+the copied preset and cached image metadata establishes that neither
+secret-persistence flag was explicitly false. The exact preset/image omit an
+override and legacy source defaults to true. The old expected mask conflicted
+with its declared fixture contract; this does not reconstruct the destroyed
+OS-07 row. Its earlier canary check had passed, so a raw generated credential
+is not established as that old mismatch.
+
+The sole conditional attempt 2 localized the new rejection to `app-console`
+and `postgres-admin-password`. All four correlated Group rows had exact masks;
+the selected rows, PostgreSQL console and Docker tool console had no generated
+credential match. The result remains INVALID: seven authenticated requests,
+13 readiness probes, 224.078 seconds including cleanup. Both owned containers
+and the network were independently verified removed. Final app metadata
+capture failed; its underlying code was not retained, despite successful
+ownership-checked removal.
+
+Executed source is `fe63bd8df8e4d32036a3233078f8c59ccf184315`;
+attempt manifest SHA-256 is
+`8e53459fcf7090725243698ba2f1f79df41f0901f88cd0bb357ba8316aacdc11`.
+Release-associated legacy Prisma source emits the configured database URL.
+Existing fix `58967716`, already in current 0.55.60 source, removes that emitter;
+13 existing Prisma unit tests pass. No exact compiled legacy Prisma file,
+source revision image label or retained matching line proves unique line
+attribution. This does not reconstruct OS-07 or attempt 1's destroyed match.
+
+A complete allowlisted failure schema now preserves every static
+input source, credential role and applicable row index, including input,
+serialization and report-output rejection. Twenty-three focused tests and
+three unchanged lifecycle/admission selectors pass; seven changed code files
+passed syntax and scoped lint before execution. A post-run real-child RED
+exposed unchecked fields in the minimal fallback receipt. Fixed schema
+projection closes that further information-loss route; all 24 focused tests
+pass. This last correction is tested but unmeasured, not the source of attempt 2.
+All earlier manifests retain their hashes; frozen on-disk CRLF bytes remain
+authoritative, not raw Git-byte identity. Content-only freshness is not the
+full coupled gate. Evidence and indexed RCA: the observer/statement diagnostic
+report and `test-results/os07-functional-20261023/attempt2/`.
+
+No further runtime attempt, performance retry, push, PR mutation, cloud change
+or release admission. A new timing comparison needs a separately authorized,
+justified privacy-compatible baseline. Original negative evidence and all
+release/deployment holds remain unchanged.
+
+The one conditional attempt 2 authorization has been consumed under its
+separate frozen manifest: seven authenticated requests, at most 15 readiness
+probes, five minutes total including two minutes reserved for cleanup.
+No performance cycles, replacement or further attempt is authorized. All earlier executed
+bytes, receipts, raw data and release/deployment holds remain unchanged.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Attempt 2 retained strict INVALID with app-console/PostgreSQL-administrative-password attribution, four exact masks, seven authenticated requests and verified owned removal. Existing current Prisma fix has 13 passing unit tests. Post-run fallback RED/GREEN closes a second receipt-loss route; 24 focused tests and two-file static checks pass. Content-only freshness passes 27 docs; no coupled gate or runtime retry claimed. |
+| 2026-10-23 | Established the frozen legacy persistence-contract mismatch, closed missing source/kind rejection paths with RED/GREEN and real-child proof, and implemented separately attributable console inputs for the sole conditional functional reproduction. |
+
+### OS-07 functional follow-up (2026-10-23)
+
+One separately preregistered functional attempt ran from local source
+`ec745e7a`, without repeating any performance experiment. It finished INVALID
+in 182.033 seconds after seven authenticated requests and 15 separate health
+readiness attempts. All four exactly correlated authorized Group rows had
+the `[REDACTED]` mask; the broader generated-credential-absence check rejected
+private input. Its executed classifier did not retain rows-versus-console
+provenance, so neither that input nor the original OS-07 row is reconstructed.
+OS-07 remains unresolved; no legacy application defect is established.
+Both new containers and their network, plus both unstarted source-inspection
+containers, were removed. Shared containers were untouched.
+
+The frozen manifest is
+`6ca5d02cc4875a4935e5eecbb527b3910375e41fd5380bc72e3372242645d52e`.
+Five frozen files match their manifest hashes and Git after newline
+normalization, but zero match raw Git bytes. A subsequent row/console-only
+canary-location correction passes 14 focused tests and is unmeasured.
+That closeout authorized no runtime retry. The later, separately authorized
+source/kind investigation is recorded above. See the indexed observer/statement
+diagnostic document and `test-results/os07-functional-20261023/`.
+
+| Date | Summary |
+|---|---|
+| 2026-10-23 | Completed the one bounded OS-07 functional attempt, retained INVALID and safe mask/provenance observations, verified owned cleanup, and closed a failure-metadata gap with an unmeasured RED/GREEN correction. |
+
+### Low-disturbance observer correction (2026-10-23)
+
+The user authorized one fixed 32-snapshot, three-minute observer-only smoke
+and, only if it passes, one new eight-round 0.55.20-versus-0.55.60 statement
+diagnostic with a 45-minute cap. The prior 16-round experiment must not repeat.
+One persistent read-only observer stream replaces serial Docker CLI boundary
+launches. Nineteen focused real-child/history tests and seven unchanged
+admission selectors pass after RED/GREEN; scoped lint and syntax are clean.
+The single smoke completed 32 reads: median 3.5414 ms, p95 4.9941 ms,
+110.587 seconds including verified removal of both owned containers.
+Intentional restart detection and explicit refresh succeeded. The cached
+PG17.11 statement library probe passed without installation. The separate real
+SQL probe then passed in 43.688 seconds including verified owned cleanup.
+Statement source is implemented and passes 27 focused tests plus seven
+unchanged admission selectors and scoped lint. The eight-round phase-two
+attempt ran once from committed source `f6731ffb`. It stopped INVALID after
+four complete BAAB visits: 17,628 checked requests and 16,000 measured samples,
+with a legacy authorization-mask assertion failure after the block.
+All four owned containers and the network were verified removed in 8.875
+minutes total. No ABBA, replacement or retry ran. The frozen manifest hash is
+`ef712837359d4149d6e85d6cb89c9c1c071880ed66d48f4f9b7816e529041d0a`.
+Partial statement sums show fewer calls but greater execution in current,
+with RequestLog insert families contributing 53.04% of that difference;
+this is descriptive, incomplete evidence, not a code/root-cause conclusion.
+A subsequent strict, secret-free privacy-failure classifier passes 28 focused
+tests but is unmeasured. The actual differing legacy header value remains
+unresolved; no guard was relaxed. Original negative admission, publication,
+customer-data and deployment holds remain unchanged.
+See `docs/MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md`.
+
+### Unreleased local application-history diagnostic (2026-10-23)
+
+The user explicitly advanced the smaller diagnostic-first proposal to one
+bounded local implementation and experiment. Exclusive source branch:
+`feat/membership-history-diagnostic-20261023`, from ordinary merge `d25b6155`.
+The opt-in harness reuses the original checked workload and 66-outcome runtime
+contract, with boundary-only CPU/RSS observations and explicit process epochs.
+Thirteen focused tests and seven admission regression selectors pass; source syntax
+and scoped native ESLint correctness checks pass. No dependency or version
+change was made.
+
+The fixed 16-round phase-one run is identified by
+`355b62c4ac404152b97957289ddea499`, using the 0.55.60 image and seed `20261023`.
+Its frozen manifest SHA-256 is
+`0663f9ffc2c36d4a22dcada5cd4644ef20bd53db6a5c16e4f9539adc72fb8066`.
+Actual outcome: **DIAGNOSTIC-COMPLETE, not release PASS** in 53.966 minutes
+including cleanup. All 16 rounds, 64,000 measured samples, 70,512 checked
+requests, four 66-outcome contracts and four 200-row private-log checks were
+retained. All 18 owned containers and one owned network were verified removed.
+Fresh/reused measured-window CPU means were 24.162/25.684 ms per complete
+cycle; block variation and 12.981-24.731-second observer pauses prevent causal
+or admission claims. Exact evidence is under
+`test-results/membership-history-20261023/phase1/`.
+See `docs/MEMBERSHIP_HISTORY_DIAGNOSTIC.md`.
+The executed implementation is preserved in local commit `8771256b`; a subsequent
+test-first raw-input/source-ancestry guard correction is tested but unmeasured.
+Its hashes are recorded separately; it did not produce the frozen run receipts.
+At that earlier boundary phase two remained unauthorized; the newer conditional
+local authorization above supersedes only that restriction. Publication, remote
+CI, PR #251 changes and deployment remain unauthorized. Diagnostic completion cannot clear the original admission
+failure or any customer, migration, cleanup, capacity or visual hold.
+
+### Local qualification consolidation (2026-10-23)
+
+Ordinarily merge reviewed master `5bfff2dea1dec6f3e4b99c9a4cc0e6cb8e27388d`
+into preserved qualification head `f6f03a523b6370eccc63f1499c3c111dd5cdf200`.
+Current product metadata is 0.55.60, with Hono 4.13.11 and dormant web
+ip-address override 10.7.4 imported intact from master. PRs #252, #253 and
+#254 are merged; the earlier remediation notes below are historical.
+Keep master's real-source leaf and runtime identity assertions, all existing
+scenarios, and unchanged 30-second child / 35-second parent deadlines.
+
+This is a local merge checkpoint only. PR #251's remote head and failed
+qualification remain unchanged. Frozen 0.55.58 image/protocol evidence is
+not replaced by the 0.55.60 publication. At that consolidation checkpoint no
+push, remote CI, measurement, diagnostic campaign or deployment was authorized.
+The later local-only diagnostic authorization is recorded above. All three performance
+workflows also trigger on matching pull-request changes: a tracking push can
+launch admission and diagnostics through synchronize. Next-phase automation
+and prospective performance-admission design require explicit authorization;
+do not change triggers, resources, thresholds or frozen inputs to bypass it.
+Focused commands, hashes, conflict dispositions and preservation evidence
+are retained in `test-results/qualification-consolidation-20261023/`.
+
+### Historical incoming-master checkpoints
+
+### Current advisory integration (2026-10-29)
+
 ### Current Hono reviewed-master integration (2026-10-30)
 
 PR #261 merged normally at `cffc64c8a188a721fabb85c37a80243d5e65a74f`,
@@ -395,7 +1024,203 @@ remain unchanged. The 39875689201 p99 failure is not rerun or waived.
 no application abstraction. **Self-improvement: applied.** Require the child
 to report its actual entrypoint and loader, not just return a success exit.
 
-### Current master/performance reconciliation (2026-10-21)
+### Current master/performance reconciliation (2026-10-22)
+
+**Current PATCH-correlation correction:** published `6febc534` passes all
+28 normal gates in 1184.5 seconds. New Linux qualification/native runs pass
+contracts and all four rounds, then reject the actual negative PATCH category.
+Fresh review `5621836110` agrees: the guard/fixtures use `scim.group`, but the
+producer uses `scim.patch`. A private frozen-image 66-outcome probe proves
+one PATCH-category and zero Group-category records for the selected request.
+Correct all three predicates and add producer-shaped/wrong-domain controls:
+110 focused PASS plus 15 actual Linux privacy cases and one producer guard
+PASS after ten RED.
+See ER-68ah-ai. Protected publication/new-source CI/review remain required;
+no new latency assessment, admission, version bump, merge or deployment.
+
+**Current Linux/review follow-up:** `6a710734` publishes through 28 normal
+Validate gates in 1229.7 seconds. Its three Linux workflows fail campaign
+contracts before benchmark allocation: ordinary PowerShell null binds as
+empty text on .NET 9. A pinned official Linux 7.5.0/.NET 9.0.1 reproduction
+proves the mechanism; typed null restores absence while preserving real empty
+values. Review `5621417287` also exposes the leaf capture-status writer masking
+an earlier error. Both fixes are local: 107 focused PASS and six real Linux
+controls PASS after RED. ER-68ad-ag and tightened standing rules record them.
+Protected publication/new-source CI/review remain; original performance hold
+is unchanged. No merge, deployment, product bump or fabricated human review.
+
+**Current review correction:** `abbcce07` is published through all 28 ordinary
+Validate gates (1171.7 seconds; API 6210/213, HTTP 2514/118, Web 1655/124).
+Review `5620999429` finds four more runner gaps. Local fixes independently
+retain client timing receipts, preserve round errors, require negative
+request/category correlation within one record, and always restore environment
+after campaign receipt failure. Nine substantive controls first fail; all 104 focused
+contracts now pass with zero skips. See ER-68w-ac, including the corrected
+ignored audit helper's run/output provenance and two test-fixture issues.
+This correction still requires protected publication and fresh exact-tip CI
+and review. Native/timeline on `abbcce07` pass; performance `39855403223`
+fails. No admission, merge, deployment or version bump.
+
+**Latest consolidation:** review `5620551104` on published `35b66b36` finds
+three relevant gaps. Local corrections explicitly drain buffered logs through
+the authenticated admin endpoint, retain sanitized partial privacy receipts,
+and preserve primary work errors through secondary finalization failures.
+Both analyzers share the privacy guard. Actual buffered-state and failure
+controls are RED first; all 93 focused contracts pass. Receipt-write
+precedence is also tested. No sample/quota/threshold/serving change.
+Normal protected publication and new-source review/CI remain required.
+See ER-68q-v; prior native `39849505885` passes, performance control still fails.
+
+**Latest review follow-up:** `e312a92f` is published through 28 passing
+Validate gates in 1092 seconds. Review `5620142839` exposes earlier authorized
+signal/shutdown failures bypassing collection. Five real collector controls
+are RED, then all 77 focused contracts pass after local correction.
+Preserve original errors, bounded reinspection, both file attempts and FAIL
+status; no copied partial data grants admission. Publication remains pending.
+Native `39844751546` separately fails negative-log console correlation;
+both incomplete-work profiles survive. Investigate ER-68p without dropping
+privacy/correlation checks or retrying unchanged. No merge/deployment.
+
+**Current publication/review checkpoint:** `84d11af7` is published through all
+28 ordinary Validate gates (1104 seconds): API 6210/213, HTTP 2514/118 with
+42 existing backend-specific skips, Web 1655/124. Local and remote match;
+the worktree was clean after publication. The three preceding failed pushes
+remain retained. Fresh review `5619805016` finds an additional metadata-loss
+path when profile copying fails. Its RED-first local correction attempts
+both files independently, propagates the first error and retains FAIL.
+All 74 focused contracts pass; normal publication of this follow-up is pending.
+Exact-source qualification `39840296611` fails its first same-image control:
+populated-read p99 ratio 1.10065341, empty-read p99 ratio 0.74715670.
+No performance admission, merge, deployment or product bump. Web startup
+cause stays open; timezone harness full ordinary validation is complete.
+See ER-68e/h-n.
+
+Native run `39840296709` on published `84d11af7` succeeds. Independent audit
+verifies nine exact Linux source hashes, four receipts, 17,628 spans and
+16,000 timings plus profile identity, privacy, cleanup and recomputation.
+It is diagnostic only and does not clear failed performance admission.
+
+**Timezone-harness implementation:** remove only the redundant nested Jest
+runner. A fresh non-UTC Node fixture uses existing ts-node and calls actual
+`EndpointService.getEndpoint`; parent checks timezone offset, one snapshot
+read and both UTC timestamps. Receipt RED, 21-case GREEN, production UTC
+negative-control RED and restored 21-case GREEN are retained. Production
+source is unchanged; 30/35-second bounds, workers and assertions are preserved.
+Targeted lint/syntax and full ordinary protected publication pass on `84d11af7`.
+
+| Date | Summary |
+|---|---|
+| 2026-10-22 | Published 6febc534 through 28 gates; real post-round logs and review 5621836110 expose wrong PATCH-category fixtures. Corrected guard passes 110 focused tests, 15 actual Linux privacy cases and a producer guard, plus an isolated frozen-image 66-outcome probe. No performance admission. |
+| 2026-10-22 | Published 6a710734 through 28 gates; Linux CI exposes null/empty restoration mismatch and fresh review finds leaf status-writer masking. Local fixes prove 107 focused PASS plus six Linux controls; no benchmark was allocated by the failed new-source jobs. |
+| 2026-10-22 | Corrected all four findings in review 5620999429 with 104 focused PASS; retained nine substantive RED controls and separate fixture issues. Prior abbcce07 passes 28 ordinary gates but its Linux A/A performance control fails. Publication/review of the new correction remain required. |
+| 2026-10-22 | Published signed-clock/timezone corrections through 28 green gates on 84d11af7; fresh review exposes partial-file capture loss, corrected locally with 74 focused tests. Performance control still fails. |
+| 2026-10-22 | Native signed-clock correction passes 72 focused tests and exact retained-data replay; ordinary publication remains blocked by separately retained Web and nested-Jest startup/deadline failures. |
+
+**Latest actual native execution, 2026-10-22:** `30fbea59` passes all 28
+protected gates, both review findings are resolved and fresh review
+`5618294791` reports no open code issues. Linux run `39822577851` retains
+complete old/current profiles but fails analysis on two baseline `-2`
+microsecond timestamp steps. Local RED-first correction validates every
+reconstructed timestamp, retains unweighted samples and explicitly reports
+reordering. All 72 focused contracts pass. Separate replay verifies nine
+producer hashes, four receipts, 17,628 spans and 16,000 timings; the original
+campaign remains FAIL. Publication/new-source CI of this correction are pending.
+Untraced qualification `39822577951` also fails the first same-image block
+(add p99 too slow, empty-read p99 too fast); there is no deployment admission.
+No serving change, product bump, merge or deployment occurs. See ER-68h/i.
+
+**Latest 2026-10-22 native-profile continuation:** published `a7e51d10` passes
+all 28 protected gates and fresh review `5616280374` has no open code finding.
+Its successful Linux timeline associates 142/168 p99-tail spans with an
+interior app-group throttling-counter increase, not causal delay. Independent
+untraced qualification still fails three same-image limits; no release
+admission, merge or deployment follows. Master remains `e1070ba2`.
+
+Next local tooling adds one diagnostic-only old/current BAAB native profile
+block, retaining original quotas and each process's two visits. All 68 focused
+contracts pass. Actual collector/bootstrap capability probes succeed on both
+frozen images (Node v24.20.0 and v24.22.1), with exact-owned cleanup. These
+are synthetic Node probes, not SCIM performance comparisons. Profiles remain
+unweighted observations; wall-clock gaps are never treated as CPU time.
+Exact-source Linux function profiles and fresh review are still pending.
+See [ER-68](docs/ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+No product-version bump or serving change is made.
+
+Implementation `8f4e1697` is preserved and published through `5c60e41c`,
+with all 28 normal Validate gates PASS (991.4 seconds). The earlier Web
+worker-startup failure remains retained; unchanged complete Web tests pass
+1,655/124. Native CI is then canceled before any job because the shared
+concurrency group's default allows only one pending run. All three workflows
+now explicitly use GitHub's documented `queue: max`, preserving one active
+benchmark rather than dropping a waiting lane. Focused all-participant
+configuration coverage prevents recurrence; service acceptance and actual
+native execution remain pending. See ER-68e/f.
+
+Fresh review `5617819970` confirms the queue issue and finds native source
+hashes unreachable inside the mutually exclusive timeline branch. Make the
+native branch a sibling and execute exact 5/7/9 key/value checks for ordinary/
+timeline/profile modes. All **71 focused tests pass**. Stop the queue-only
+partial hook and preserve its `f7a140d8` commit while batching this correction.
+New protected publication, Linux native execution and fresh review remain
+required; no partial hook or canceled job is called successful.
+
+**2026-10-22 merged-master and qualification continuation:** PR #250 is now
+merged at `e1070ba2`, after reviewed head `5b3136d1`, all 25 protected-push
+gates and seven exact-tip CI checks. Current immutable 0.55.58 image is
+`sha256:f57b765aab497d2cf2861a3d8a3b6906df8abe075320a454c0ad7e193fbecb82`.
+The merged-source matrix passes 6,210 API units per backend, 2,612 PostgreSQL
+HTTP cases, 2,570 InMemory HTTP cases with 42 genuine database exclusions,
+and 1,655 Web unit/coverage cases. These supersede older-source counts below.
+
+Deployment remains held: original BAAB fails two latency ceilings; opposite
+order passes, and one identical-image control flags eight of twelve comparisons.
+The original failed admission is retained, not waived. Dev remains 0.55.56.
+The user requests autonomous implementation rather than another planning hold.
+A separate harness-only branch adds a bounded Linux qualification workflow on
+existing public GitHub Actions runners: BAAB and ABBA A/A controls, then both
+old/current orders only if both controls pass. No new paid host, deployment
+permission, serving change, dependency update or version bump is involved.
+All raw samples, immutable inputs, private-log checks and exact cleanup remain
+required. Initial publication `33c93e4e` passes all 28 Validate gates and opens
+PR #251. Linux run `39778828864` fails before timings because a Unix-socket
+probe accepts PostgreSQL's temporary bootstrap server. Actual pinned-image
+inspection confirms it has no TCP listener. Two new actual-loop RED/GREEN
+guards now require final TCP readiness; all 13 focused contracts pass.
+Original failed setup/artifact and exact cleanup remain retained. Corrected
+publication, review and Linux admission are not yet claimed.
+Hosted review `5614222330` also identifies lost failed-round evidence and
+missing upload headroom. Preserve explicit partial FAIL receipts, copy before
+rejecting a failed client and disallow partial admission. A cooperative
+60-minute work deadline and 65-minute step reserve cleanup/upload within the
+75-minute job. All 17 focused contracts pass; the earlier `216d3961` hook was
+stopped to batch these corrections, not counted as passing.
+Corrected `23d23220` publication passes all 28 Validate gates in 997 seconds;
+all three original review threads are resolved. Linux run `39784232793`
+successfully measures its first same-image block, but five of twelve control
+limits fail (three slower, two faster). All 16,000 timings, 66 functional
+checks, 200 private-log checks and exact cleanup are retained. Later blocks
+correctly do not run: Linux availability alone does not establish repeatability.
+Fresh review `5614795378` confirms the original fixes and finds one missed
+resource-limit receipt loss. A resource-collection `finally` now preserves
+CPU/SQL/memory/RSS/OOM observations before failure/cleanup, including partial
+probe failures and client/deadline rejection. Eight actual-round/cleanup
+controls and actual A/A/A-B identity/order selection bring the focused suite
+to 26 PASS after the resource-retention RED. Published `117d5b1e` passes all
+28 Validate gates; fresh review `5615359957` reports no remaining code finding.
+Its Linux run `39790526704` fails add/remove p99 calibration despite identical
+images, with all four resource receipts and cleanup retained. Seven other
+exact-tip checks pass; qualification remains failed, not waived.
+
+The continuation adds one diagnostic-only same-image BAAB timeline:
+monotonic client spans plus exact-owned app CPU-group reads, outside app
+quota. Clock/cost validation, unknown coverage, actual observer lifecycle and
+diagnostic admission isolation are tested. All 44 combined contracts pass
+after RED (28 existing/client plus 16 CPU). The Linux diagnostic
+has not yet executed; publication and its exact-source artifact remain next.
+Original images, workload, quota, samples and ceilings are unchanged, with
+no serving/dependency/version change. Dev's last retained checkpoint is
+0.55.56, not a fresh cloud query. See ER-67 for local execution issues and limits.
+See [the qualification protocol](docs/ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-22 review checkpoint:** PR #250 is ready, not draft. Hosted review
 works after billing selection. The cache-binding correction is published in

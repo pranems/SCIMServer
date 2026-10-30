@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.66`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.67`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,33 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### Current source reconciliation: 0.55.67 (proposed)
+
+Hono #262 is merged in reviewed master `eb733f61` at 0.55.66, including
+successful postmerge checks. This candidate normally integrates that master
+into the held performance branch, without losing history or downgrading
+the product version. New-tip source/graph proof, protected gates, review,
+hosted checks and clean-CI lock confirmation remain required.
+The historical qualification failure and independent release-admission
+holds remain unchanged. No new performance experiment or deployment is run.
+
+### 0.55.65 preserved performance-source integration (historical)
+
+This draft candidate now integrates the preserved performance-qualification
+history with reviewed master `cffc64c8`, after #259, #260 and #261 merged.
+It preserves their web/API dependency fixes, request-body security patches,
+logging test-fixture corrections and every constituent commit. It adds no new
+serving behavior. New-head gates and review remain required.
+See the [local diagnostic checkpoint](MEMBERSHIP_HISTORY_DIAGNOSTIC.md).
+
+The original frozen performance run remains FAILED: populated-read p99 ratio
+1.23928982 exceeds the unchanged 1.10 limit. Source consolidation, ordinary CI
+and version reservation do not qualify performance or admit a release artifact.
+The formerly independent complete-inventory correction is now inherited
+through normally merged #260, not copied from an unreviewed draft.
+
+### Historical source consolidation preparation: 0.55.64
 
 ### Current source consolidation: 0.55.66
 

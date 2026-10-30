@@ -4,6 +4,28 @@
 
 ## Executive summary
 
+**Current source reconciliation (2026-10-30):** Hono #262 merged normally at
+`eb733f61`, master 0.55.66. The proposed 0.55.67 performance reconciliation
+preserves its qualified API graph and both histories. New-tip validation
+and authoritative clean-CI lock confirmation remain pending; no performance
+failure or release hold is waived.
+
+**Integration RCA AC-10:** advancing master created 32 strictly current-version
+conflict hunks and six narrative unions. The guarded resolver preflights the
+exact parents and hunk counts, preserves both narratives, and changes only
+differing current-version tokens to 0.55.67. An explicit historical-token
+control preserves identical 0.55.66 references; a meaningful-content control
+rejects non-version changes. No local npm regeneration occurs. New-tip
+graph proof and clean-CI lock bytes remain independent required gates.
+
+**Historical 0.55.64 checkpoint:** the 0.55.64 correction merged normally as
+`cffc64c8a188a721fabb85c37a80243d5e65a74f`, after 28/28 protected gates,
+seven exact-head checks, independent review and clean-CI confirmation.
+That is merged source, not a deployed release or full advisory clearance.
+The following preparation receipts describe its pre-merge state.
+
+Proposed product 0.55.64 normally integrated reviewed master
+
 **Current source boundary (2026-10-30):** the 0.55.64 advisory correction
 merged normally as `cffc64c8`. Separate Hono #262 now integrates that reviewed
 master at proposed 0.55.66, preserving its actual-parent qualification and
@@ -204,6 +226,7 @@ when the draft uses a stacked base.
 | AC-6 / documentation / Low | Header freshness repair left the README badge and source-coupled release notes requiring explicit updates. A first index edit assumed the wrong heading. | Use actual headings, update badge and release narrative, then pass existing freshness and content gates. | Bootstrap static audit / same |
 | AC-7 / tooling / Low | A source-snippet command had shell quoting error; one guessed documentation command/file did not exist, and gh run view rejected a path JSON field. | Use exact discovered filenames and GitHub REST run metadata for workflow path. Retain failed receipts without interpreting them as package failures. | Assessment / same |
 | AC-8 / static quality / Low | The first final-push lint run exposed one new unnecessary type assertion in the request-stream fixture, raising warnings from 507 to 508 despite zero errors. | Stop the owned publication before push, remove the redundant assertion, run focused ESLint, then publish normally with the unchanged protected Validate hook. Preserve the interrupted receipt. No warning ceiling is raised. | Consolidation lint / focused new-file lint could have caught it earlier |
+| AC-9 / verification tooling / Low | The first integrated clean-CI raw hash comparison stopped on a valid Windows CRLF checkout. Both complete JSON graphs and exact committed Git blobs matched CI; only physical checkout newline bytes differed. | Compare authenticated CI lock bytes with the exact source Git blobs, then separately prove the working files differ only by CRLF. Positive and changed-content negative controls pass. Archive authentication remains strict raw-byte hashing. This verifies delivered source without modifying locks, changing Git settings or repeating unchanged gates. Exact receipt: `test-results/integration-api-advisory-20261029/ci-lock-byte-confirmation.json`; fixed in verification, documented with the next coherent integration. | Artifact verification / same stage; no application defect or escaped gate failure |
 
 Provenance: this bounded execution retains raw command logs and public metadata
 in the ignored evidence directory. Tool failures, assertion failures and

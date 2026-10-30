@@ -1,0 +1,274 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
+
+const base = process.env.SCIM_BENCH_BASE_URL;
+const token = process.env.SCIM_BENCH_TOKEN;
+const expectedVersion = process.env.SCIM_BENCH_VERSION;
+const output = process.env.SCIM_BENCH_OUTPUT;
+assert.ok(
+  base && token && expectedVersion && output,
+  'Explicit target, token, version and output required',
+);
+const deadline = Number(process.env.SCIM_BENCH_DEADLINE_UTC);
+assert.ok(
+  Number.isSafeInteger(deadline) && deadline > 0,
+  'Explicit work deadline required',
+);
+const runId = randomUUID();
+const userSchema = 'urn:ietf:params:scim:schemas:core:2.0:User';
+const groupSchema = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+const patchSchema = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
+const samples = { add: [], populatedRead: [], remove: [], emptyRead: [] };
+assert.ok(
+  process.env.SCIM_BENCH_TRACE === undefined ||
+    process.env.SCIM_BENCH_TRACE === '1',
+  'SCIM_BENCH_TRACE must be absent or 1',
+);
+const tracing = process.env.SCIM_BENCH_TRACE === '1';
+assert.ok(
+  process.env.SCIM_BENCH_HISTORY === undefined ||
+    (process.env.SCIM_BENCH_HISTORY === '1' &&
+      process.env.SCIM_BENCH_HISTORY_OWNER === 'membership-history-diagnostic' &&
+      typeof process.send === 'function' && tracing),
+  'History diagnostics require the explicit IPC owner and trace mode',
+);
+const history = process.env.SCIM_BENCH_HISTORY === '1';
+assert.ok(process.env.SCIM_BENCH_REQUIRE_MASKS === undefined ||
+  (process.env.SCIM_BENCH_REQUIRE_MASKS === '1' && history),
+  'Mask fixture policy requires the explicit diagnostic IPC owner');
+const requireMasks = process.env.SCIM_BENCH_REQUIRE_MASKS === '1';
+async function boundary(name, extra = {}) {
+  if (!history) return;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      process.removeListener('message', reply);
+      reject(new Error('History boundary timeout'));
+    }, Math.max(1, Math.min(30000, deadline - Date.now())));
+    function reply(message) {
+      if (message.boundary !== name) return;
+      clearTimeout(timer);
+      process.removeListener('message', reply);
+      if (message.ok === true) resolve();
+      else reject(new Error('History boundary capture failed'));
+    }
+    process.on('message', reply);
+    process.send({ boundary: name, ...extra });
+  });
+}
+const spans = [];
+let stage = 'version';
+let cycle = -1;
+let requestCount = 0;
+let cleaningUp = false;
+
+async function request(method, pathname, body) {
+  const remaining = cleaningUp ? 30000 : deadline - Date.now();
+  if (remaining <= 0) {
+    const error = new Error('Work deadline reached');
+    error.code = 'SCIM_WORK_DEADLINE';
+    throw error;
+  }
+  requestCount++;
+  const startNs = tracing ? process.hrtime.bigint() : undefined;
+  const start = performance.now();
+  let status = null;
+  let succeeded = false;
+  let ms;
+  try {
+    const response = await fetch(new URL(pathname, base), {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/scim+json',
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(Math.min(30000, remaining)),
+    });
+    status = response.status;
+    const text = await response.text();
+    if (!response.ok)
+      throw new Error(`${method} ${pathname}: HTTP ${response.status}`);
+    const parsed = text ? JSON.parse(text) : undefined;
+    ms = performance.now() - start;
+    succeeded = true;
+    return { body: parsed, ms };
+  } finally {
+    if (tracing) {
+      const lifecycle = !Object.hasOwn(samples, stage);
+      spans.push({
+        requestIndex: requestCount,
+        operation: stage,
+        phase: lifecycle ? 'lifecycle' : cycle < 100 ? 'warmup' : 'measured',
+        cycle: lifecycle ? null : cycle < 100 ? cycle : cycle - 100,
+        startNs: startNs.toString(),
+        endNs: process.hrtime.bigint().toString(),
+        ms: ms ?? performance.now() - start,
+        status,
+        succeeded,
+      });
+    }
+  }
+}
+
+function describeFailure(error, stage) {
+  const kinds = {
+    AssertionError: 'ASSERTION',
+    TimeoutError: 'TIMEOUT',
+    AbortError: 'ABORT',
+    SyntaxError: 'INVALID_JSON',
+  };
+  return {
+    stage,
+    kind:
+      error.code === 'SCIM_WORK_DEADLINE'
+        ? 'DEADLINE'
+        : (kinds[error.name] ?? 'CLIENT_ERROR'),
+  };
+}
+
+async function main() {
+  let endpointId;
+  const failures = [];
+  const cleanup = { attempted: false, verified: false };
+  try {
+    assert.equal(
+      (await request('GET', '/scim/admin/version')).body.version,
+      expectedVersion,
+    );
+    stage = 'fixture';
+    const endpoint = (
+      await request('POST', '/scim/admin/endpoints', {
+        name: `owned-membership-perf-${runId}`,
+        displayName: `Owned membership performance ${runId}`,
+        description: `Exact-cleanup performance fixture ${runId}`,
+        profilePreset: 'rfc-standard',
+      })
+    ).body;
+    endpointId = endpoint.id;
+    assert.ok(endpointId);
+    if (requireMasks) await boundary('fixture-policy', { endpointId });
+    const scoped = `/scim/endpoints/${endpointId}`;
+    const user = (
+      await request('POST', `${scoped}/Users`, {
+        schemas: [userSchema],
+        userName: `owned-${runId}@example.test`,
+      })
+    ).body;
+    const group = (
+      await request('POST', `${scoped}/Groups`, {
+        schemas: [groupSchema],
+        displayName: `owned-${runId}`,
+      })
+    ).body;
+    await boundary('warmup-before');
+    for (let index = 0; index < 1100; index++) {
+      if (index === 100) {
+        await boundary('warmup-after');
+        await boundary('measured-before');
+      }
+      cycle = index;
+      stage = 'add';
+      const add = await request('PATCH', `${scoped}/Groups/${group.id}`, {
+        schemas: [patchSchema],
+        Operations: [
+          { op: 'add', path: 'members', value: [{ value: user.id }] },
+        ],
+      });
+      if (index >= 100) samples.add.push(add.ms);
+      stage = 'populatedRead';
+      const populated = await request('GET', `${scoped}/Groups/${group.id}`);
+      if (index >= 100) samples.populatedRead.push(populated.ms);
+      assert.deepEqual(
+        populated.body.members.map((member) => member.value),
+        [user.id],
+      );
+      stage = 'remove';
+      const remove = await request('PATCH', `${scoped}/Groups/${group.id}`, {
+        schemas: [patchSchema],
+        Operations: [{ op: 'remove', path: `members[value eq "${user.id}"]` }],
+      });
+      if (index >= 100) samples.remove.push(remove.ms);
+      stage = 'emptyRead';
+      const empty = await request('GET', `${scoped}/Groups/${group.id}`);
+      if (index >= 100) samples.emptyRead.push(empty.ms);
+      assert.equal((empty.body.members ?? []).length, 0);
+    }
+    await boundary('measured-after');
+    stage = 'finalVersion';
+    assert.equal(
+      (await request('GET', '/scim/admin/version')).body.version,
+      expectedVersion,
+    );
+  } catch (error) {
+    failures.push(describeFailure(error, stage));
+  } finally {
+    cleaningUp = true;
+    if (endpointId) {
+      stage = 'cleanup';
+      cleanup.attempted = true;
+      try {
+        await request('DELETE', `/scim/admin/endpoints/${endpointId}`);
+        const inventory = (await request('GET', '/scim/admin/endpoints')).body;
+        assert.ok(Array.isArray(inventory.endpoints));
+        assert.ok(
+          !inventory.endpoints.some((endpoint) => endpoint.id === endpointId),
+          'Exact fixture cleanup',
+        );
+        cleanup.verified = true;
+      } catch (error) {
+        failures.push(describeFailure(error, 'cleanup'));
+      }
+    }
+    if (!failures.length) {
+      try {
+        assert.equal(requestCount, 4407);
+        assert.ok(
+          Object.values(samples).every((values) => values.length === 1000),
+        );
+      } catch (error) {
+        failures.push(describeFailure(error, 'completion'));
+      }
+    }
+    const complete = failures.length === 0;
+    fs.writeFileSync(
+      output,
+      `${JSON.stringify(
+        {
+          runId,
+          version: expectedVersion,
+          nodeVersion: process.version,
+          measuredAt: new Date().toISOString(),
+          warmupIterations: 100,
+          requestCount,
+          samples,
+          status: complete ? 'PASS' : 'FAIL',
+          complete,
+          failures,
+          cleanup,
+          ...(tracing
+            ? {
+                diagnosticOnly: true,
+                traceClock: 'process.hrtime.bigint',
+                spans,
+              }
+            : {}),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    if (!complete) {
+      console.error(
+        `Benchmark failure: ${failures.map((failure) => `${failure.stage}/${failure.kind}`).join(', ')}`,
+      );
+      process.exitCode = 1;
+    }
+    if (history && process.connected) process.disconnect();
+  }
+}
+
+main().catch(() => {
+  console.error('Benchmark receipt could not be persisted; no admission.');
+  process.exitCode = 1;
+});

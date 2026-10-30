@@ -1,0 +1,27 @@
+  async function docker(args, cleanup = false, combined = false) {
+    const commandStarted = Date.now();
+    try {
+      const row = await exec('docker', ['--context', 'desktop-linux', ...args], {
+        cwd: root, env: environment, windowsHide: true, maxBuffer: 8 * 1024 * 1024,
+        timeout: commandTimeout(workDeadline, deadline, cleanup, derived && cleanup ? 30000 : cleanup ? 15000 : 60000),
+      });
+      if (derived) {
+        if (args[0] === 'logs') {
+          const separated = splitDockerLogOutput(row);
+          toolConsole += '\n' + separated.tool;
+          return separated.container;
+        }
+        toolConsole += '\n' + row.stdout + '\n' + row.stderr;
+      }
+      return (combined ? row.stdout + row.stderr : row.stdout).trim();
+    } catch (error) {
+      if (derived) toolConsole += '\n' + (typeof error.stdout === 'string' ? error.stdout : '') +
+        '\n' + (typeof error.stderr === 'string' ? error.stderr : '');
+      const failure = new Error('Owned Docker operation failed; output withheld');
+      failure.code = 'OWNED_DOCKER';
+      failure.actionFailure = lifecycleFailure(error, { operation: 'command', role: 'owned-container',
+        stage: 'docker-command', phase: cleanup ? 'cleanup' : 'work',
+        command: dockerOperation(args), durationMs: Date.now() - commandStarted });
+      throw failure;
+    }
+  }
