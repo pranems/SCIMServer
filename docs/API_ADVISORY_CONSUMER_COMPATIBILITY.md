@@ -4,13 +4,51 @@
 
 ## Executive summary
 
-The 0.55.64 correction merged normally as
+**Current source reconciliation (2026-10-30):** Hono #262 merged normally at
+`eb733f61`, master 0.55.66. The proposed 0.55.67 performance reconciliation
+preserves its qualified API graph and both histories. New-tip validation
+and authoritative clean-CI lock confirmation remain pending; no performance
+failure or release hold is waived.
+
+**Integration RCA AC-10:** advancing master created 32 strictly current-version
+conflict hunks and six narrative unions. The guarded resolver preflights the
+exact parents and hunk counts, preserves both narratives, and changes only
+differing current-version tokens to 0.55.67. An explicit historical-token
+control preserves identical 0.55.66 references; a meaningful-content control
+rejects non-version changes. No local npm regeneration occurs. New-tip
+graph proof and clean-CI lock bytes remain independent required gates.
+
+**Historical 0.55.64 checkpoint:** the 0.55.64 correction merged normally as
 `cffc64c8a188a721fabb85c37a80243d5e65a74f`, after 28/28 protected gates,
 seven exact-head checks, independent review and clean-CI confirmation.
 That is merged source, not a deployed release or full advisory clearance.
 The following preparation receipts describe its pre-merge state.
 
 Proposed product 0.55.64 normally integrated reviewed master
+
+**Current source boundary (2026-10-30):** the 0.55.64 advisory correction
+merged normally as `cffc64c8`. Separate Hono #262 now integrates that reviewed
+master at proposed 0.55.66, preserving its actual-parent qualification and
+both historical accounts below. New-head verification, review and CI remain
+required. No deployment, full advisory clearance or performance admission.
+The earlier Hono blocker below describes the 0.55.64 rollback unit, not an
+assertion that this separate Hono proposal lacks actual-parent evidence.
+
+### Historical independent advisory preparation
+
+**Follow-up, separate rollback unit:** [actual Prisma parent qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
+records the proposed 0.55.66 adapter correction stacked on this draft.
+The 0.55.64 blocker below is preserved as the earlier evidence boundary,
+not rewritten as if this draft had already qualified the adapter.
+
+Proposed product 0.55.64 is stacked on draft PR #260 at
+`6eb1b59cb1a8ea324bb1a32b17355fabc605279d`. It changes only qs 6.16.0 to
+6.16.1 and fast-uri 4.1.5 to 4.2.3. Neither this patch nor its parent is
+merged. PR #259 and #251 remain separate. No deployed version changes.
+
+### Historical reviewed-master advisory integration
+
+Proposed product 0.55.64 now normally integrates reviewed master
 `287ea671abf1619d7b172c495310769078bd685b`, after #259 and #260 merged.
 It preserves original advisory head `f4fcfe3c` and every constituent commit.
 Its bounded package changes remain qs 6.16.0 to 6.16.1 and fast-uri 4.1.5

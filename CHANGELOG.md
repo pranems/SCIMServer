@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 0.55.65 reviewed-master performance union (2026-10-29)
+### 0.55.67 Hono-master performance reconciliation (2026-10-30, proposed)
+
+- Normally integrate reviewed master `eb733f61` after Hono #262 merged at
+  0.55.66. Preserve both histories and all performance constituents.
+- Reconcile only differing current-version fields to 0.55.67. Preserve
+  historical version identities and the reviewed Hono dependency graph.
+  No local npm lockfile regeneration or admission-policy change.
+- New-tip graph/source proof, protected Validate, independent review,
+  exact-tip hosted checks and authoritative clean-CI lock confirmation
+  remain required. Prior parent counts are historical, not new-tip results.
+- Qualification `40974749991` remains failed. This preparation neither
+  reruns an unchanged benchmark nor clears performance or release admission.
+
+### 0.55.65 reviewed-master performance union (2026-10-29, historical)
 
 - Normally integrate reviewed master `cffc64c8` after #259, #260 and #261
   merged. Preserve all 58 performance constituents, current serving source,
@@ -231,6 +244,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic control flow. Windows helper startup allows only `SystemRoot`;
   Linux inherits no environment. Product remains 0.55.58 with no dependency,
   lockfile, serving or cloud change. Linux diagnostic execution is pending.
+
+### 0.55.66 reviewed-master integration (2026-10-30)
+
+- Normally integrate reviewed master `cffc64c8` after #259, #260 and #261
+  merged. Preserve original Hono head `7379a97e` and both documentation
+  histories. No further dependency version or runtime behavior is added.
+- Keep the actual-parent-qualified Hono 2.1.3 override and all incoming
+  inventory, qs, fast-uri and web dependency corrections. Both roots retain
+  the reserved 0.55.66 version. New-head graph, restore, protected gates,
+  clean-CI bytes, independent review and hosted results remain required.
+- Parent #261 passed 28/28 gates with API 6,248/215 suites, HTTP 2,514/118
+  plus 42 skips and web 1,661/125 files; these are parent provenance, not
+  assumed new-head results. Performance #251 and every final-artifact hold
+  remain separate. No benchmark or deployment was started.
+- Self-improvement applied: explicit parent/source/complete-graph preservation.
+  Design accepted: ordinary integration, no new responsibility or abstraction.
+
+### 0.55.66 preparation - Hono adapter qualified with its real Prisma parent
+
+- Separate draft rollback unit on exact unmerged #261 head
+  `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`; 0.55.65 remains reserved
+  for untouched performance draft #251.
+- Select `@hono/node-server` 2.1.3 for GHSA-rmxm-3fg6-px4f after real
+  Prisma 7.8.0 / dev 0.24.3 old/new startup, HTTP requests, synthetic primary
+  and shadow database writes, dump, public error and close/cleanup checks.
+  The declared exact 1.19.11 parent range remains an explicit exception.
+- Actual HTTP exploit RED exposes the synthetic protected file at 1.19.15;
+  2.1.3 returns 404. Six permanent focused checks have pre-manifest RED:
+  four failed / two passed, including the exploit and complete inventory.
+  Final focused GREEN is 6/6 in one suite, targeted lint passes, and full
+  unfiltered installed npm inventory exits 0 with empty stderr.
+- Exact-source CI lock run 40948177653 and authenticated artifact 12929363808
+  change only the API adapter outside root records; both clean restores
+  preserve their source lock bytes. Final clean-installed actual-parent
+  isolation check passes all 12 claims and removes its owned container.
+- Bootstrap protected Fast passes 25/25, with 6,248 API unit and 2,514
+  HTTP E2E tests (42 existing skipped). Final Validate/hosted counts are
+  recorded separately in the bounded handoff after execution, not assumed.
+- Both adapters retain a process after successful public close and listener
+  release. Explicit owned-container stop is recorded, never represented as
+  natural process exit or concealed by changing Jest worker/exit settings.
+- [Qualification, precise limits and execution RCA](docs/HONO_PRISMA_PARENT_QUALIFICATION.md).
+  No new user interface or SCIM response behavior, merge, deployment, review
+  approval, performance clearance or release completion is claimed.
 
 ### 0.55.64 reviewed-master integration (2026-10-29)
 

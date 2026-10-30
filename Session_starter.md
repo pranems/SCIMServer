@@ -1,8 +1,22 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-29
+**Last verified:** 2026-10-30
 
-### Current reviewed performance union (2026-10-29)
+### Current Hono-master performance reconciliation (2026-10-30)
+
+Hono #262 merged normally as `eb733f61e7f25d1d642fe746075e266c3b19ad60`,
+master 0.55.66. Its seven exact-tip checks, separate review, 28 protected
+gates and authenticated clean-CI lock equality passed; postmerge dependency
+review and CodeQL also passed. Those are parent evidence, not this new tip.
+The owned branch now normally integrates that master into held performance
+`ff2d2377`, proposed 0.55.67. Preserve all constituents and both histories;
+resolve only strict current-version tokens, not historical identities.
+New-tip graph/source proof, review, protected publication and clean-CI
+confirmation remain pending. No new benchmark or workflow redesign is run.
+Qualification `40974749991` remains failed; release/deployment admission
+is held independently of preparing this source integration.
+
+### Historical reviewed performance union (2026-10-29)
 
 PR #261 merged normally at `cffc64c8a188a721fabb85c37a80243d5e65a74f`,
 after 28/28 protected Validate gates, seven successful exact-head checks,
@@ -616,6 +630,52 @@ are retained in `test-results/qualification-consolidation-20261023/`.
 ### Historical incoming-master checkpoints
 
 ### Current advisory integration (2026-10-29)
+
+### Current Hono reviewed-master integration (2026-10-30)
+
+PR #261 merged normally at `cffc64c8a188a721fabb85c37a80243d5e65a74f`,
+after 28/28 protected Validate gates, seven exact-head checks and separate
+technical review. Its counts were API 6,248/215 suites, HTTP 2,514/118 suites
+plus 42 existing skips, and web 1,661/125 files. #259 and #260 are merged.
+
+The preserved 0.55.66 Hono candidate now normally integrates that master.
+Five documentation conflicts retain both preparation histories below.
+Original Hono head `7379a97e` and its actual-parent qualification remain
+preserved. Source/graph preservation and the owned API-only clean restore
+pass with both lock byte hashes unchanged; both complete installed inventories
+exit 0 and isolated Prisma generation passes. Protected Validate, clean-CI
+lock confirmation, separate review and hosted checks remain required.
+Performance #251 remains unmerged with a verified same-image control failure;
+no repeated campaign, threshold waiver or deployment follows from this merge.
+If 0.55.66 merges first, the held 0.55.65 candidate must not downgrade it.
+
+| Date | Summary |
+|---|---|
+| 2026-10-30 | Normally integrate reviewed advisory master into independent Hono #262 at its reserved 0.55.66 boundary; retain both histories and all release holds. |
+
+### Historical separate Hono real-parent qualification (2026-10-29)
+
+Proposed 0.55.66 branches from exact unmerged #261
+`f4fcfe3ccac83de6548ed9991ed44048ee8d660a`, not performance #251.
+[Real-parent evidence and RCA](docs/HONO_PRISMA_PARENT_QUALIFICATION.md)
+records actual Prisma/dev initialization, requests, synthetic database
+writes, close/port/data cleanup with old and candidate adapters. Exploit
+RED/GREEN is 200 protected-file exposure versus patched 404. Both versions
+retain a post-close process; only exact owned containers were stopped.
+Six permanent regressions observed pre-manifest RED (four fail/two pass).
+Authenticated CI lock run 40948177653 was imported with an adapter-only API
+delta and no non-root web delta. Both clean restores preserve lock bytes.
+Installed focused GREEN is 6/6; full npm inventory exits 0 with empty stderr.
+Final installed parent passes all 12 claims; native invocation refuses before
+loading the parent. Bootstrap Fast passes 25/25; final Validate/exact-tip CI
+receipts follow separately in the ignored handoff. Draft review and all
+release/performance/visual/prod holds remain.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Executed isolated actual Prisma parent old/new qualification and exploit RED/GREEN; prepared separate 0.55.66 adapter correction without changing existing drafts. |
+
+### Historical advisory integration (2026-10-29)
 
 PR #260 merged normally at `287ea671abf1619d7b172c495310769078bd685b`
 after 28/28 protected Validate gates, seven successful exact-head checks and

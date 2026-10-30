@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.65`
+> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.67`
 
 See [current release notes](RELEASE_NOTES.md) for deployment and acceptance
 boundaries. Endpoints now uses available window height, Dashboard uses compact

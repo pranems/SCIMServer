@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.65`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.67`
 
-> **Version:** 0.55.65 - **Updated:** 2026-10-21
+> **Version:** 0.55.67 - **Updated:** 2026-10-21
 > 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Unreleased preparation:** [endpoint token lifetime integration and original
@@ -10,6 +10,10 @@ TDD evidence](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md) distinguishes the
 current-master port from earlier isolated validation and deployed behavior.
 
 ### Start here
+
+**Pending actual-parent adapter remediation:** [Hono and real Prisma lifecycle qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
+records proposed 0.55.66, actual old/new lifecycle and exploit RED/GREEN,
+explicit cleanup boundaries, and a separate draft stacked on unmerged #261.
 
 **Pending stacked API advisory remediation:** [Actual consumer compatibility and RCA](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
 records proposed 0.55.64, five targeted advisory records and the unchanged

@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.65
+> **Version**: 0.55.67
 > **Last Updated**: October 29, 2026
 > **Last verified:** 2026-10-29
 
@@ -9,7 +9,16 @@
 
 ## Active Delivery Process
 
-**2026-10-29 current performance union:** reviewed #261 merged at
+**2026-10-30 current performance reconciliation:** Hono #262 merged at
+`eb733f61e7f25d1d642fe746075e266c3b19ad60`, master 0.55.66. Proposed 0.55.67
+normally integrates it into held performance `ff2d2377`, preserving both
+histories, reviewed dependency fixes and historical version identities.
+Parent Hono validation passed, including postmerge checks. New-tip source/
+graph proof, review, protected publication and clean-CI confirmation are
+still required. The existing qualification failure is not cleared, no
+unchanged benchmark is repeated and no release/deployment is admitted.
+
+**2026-10-29 historical performance union:** reviewed #261 merged at
 `cffc64c8a188a721fabb85c37a80243d5e65a74f`, after 28/28 protected gates,
 seven exact-head checks, independent review and clean-CI confirmation.
 The existing 0.55.65 performance branch now normally integrates that master,
@@ -226,6 +235,32 @@ inventory. Earlier failed receipts remain failed.
 See [protocol and limitations](ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
 **2026-10-29 current advisory integration:** #260 merged normally at
+
+**2026-10-30 current Hono integration:** #261 merged normally at
+`cffc64c8a188a721fabb85c37a80243d5e65a74f`, with all 28 protected gates,
+seven exact-head checks and separate technical review. Independent #262
+now integrates that master at its reserved 0.55.66 boundary, preserving
+original `7379a97e`, all dependency fixes and both histories below.
+New-head graph/restore, protected Validate, clean-CI bytes, independent
+review and hosted checks remain mandatory. #251 is unmerged and held by
+its verified performance control failure. No deployment/admission follows.
+If 0.55.66 merges first, later #251 integration must not downgrade versions.
+
+**Historical separate adapter preparation:**
+**2026-10-29 actual-parent adapter follow-up:** proposed 0.55.66 is
+stacked on exact #261 `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`.
+[Qualification and RCA](HONO_PRISMA_PARENT_QUALIFICATION.md) records real
+Prisma/dev lifecycle with both adapters, security exploit RED/GREEN, and
+explicit container cleanup despite inherited post-close process retention.
+Existing security pins remain; #251 and reserved 0.55.65 are untouched.
+Authenticated CI lock run 40948177653 changes only the API adapter outside
+root records. Clean restores retain lock bytes; installed focused GREEN is
+6/6 and complete npm inventory exits 0. Final real-parent isolated run passes
+all 12 claims and cleans up its container; native invocation fails closed.
+Final protected Validate/exact-tip CI remain separate receipts in the ignored
+handoff. No external review or overall release proof is inferred.
+
+**Historical 2026-10-29 advisory integration:** #260 merged normally at
 `287ea671abf1619d7b172c495310769078bd685b`, after 28/28 protected Validate
 gates and all seven exact-head checks plus separate technical review.
 The preserved 0.55.64 advisory branch now integrates that master, including
