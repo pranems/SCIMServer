@@ -4,8 +4,23 @@
 
 ## Executive summary
 
-Proposed product 0.55.66 is a separate rollback unit stacked on unmerged
-draft #261, exact base `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`.
+**Current integration (2026-10-30):** PR #261 merged normally at `cffc64c8`.
+The preserved Hono #262 head `7379a97e` now integrates that reviewed master
+through an ordinary merge, retaining the already reserved 0.55.66 version
+and all qualification evidence. New-head graph/restore checks, protected
+Validate, clean-CI lock bytes, separate technical review and exact-head CI
+remain mandatory. This does not clear performance #251 or admit a release.
+If merged first, 0.55.66 must not later be downgraded by held 0.55.65.
+Preservation now passes: API manifests/locks and qualification fixtures equal
+original `7379a97e`; the only non-root package change against reviewed master
+is the already-qualified Hono adapter. Web graph equals master, serving
+source/schema/estate are preserved. Owned API-only clean restore preserves
+both source locks, both complete installed inventories exit 0, and isolated
+Prisma generation passes. No repeat real-parent workload was needed because
+its complete qualified API graph and source are unchanged.
+
+**Historical preparation:** proposed 0.55.66 originally branched from draft
+#261, exact base `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`.
 It selects `@hono/node-server` 2.1.3 only after executing the installed
 Prisma parent's real lifecycle with both 1.19.15 and 2.1.3. The affected
 adapter returns a synthetic protected file through the published exploit;
@@ -175,6 +190,7 @@ actual commands, counts and immutable receipts after consolidation.
 | Transitional source CI / Low | Bootstrap image run `40948154638` rejected the deliberately stale lock: 1.19.15 does not satisfy 2.1.3. The source must first be published for the existing CI-only lock workflow. | Exact-source regeneration run `40948177653` succeeded; imported its authenticated minimal artifact and clean-restored both workspaces. This is a transitional failed run, not final-tip success or a waived install gate. | Hosted install / source-lock consistency check; expected until artifact import. |
 | Evidence replay baseline / Low | Rerunning the pre-import lock comparison after import reported zero changed records, correctly failing its expected one-record delta. Its mutable baseline was now the imported artifact itself. | Pinned the comparison to bootstrap commit `38b1a78` and separately require current source bytes to equal the authenticated artifact. Baseline identity and import identity are now independent assertions. | Local evidence replay / immutable-baseline check before reuse. |
 | Process-local validation environment / Low | The first protected Validate passed 6,254 unit and 2,514 E2E tests, then Prisma generation rejected a missing `DATABASE_URL`. The earlier generation shell's process-local value did not persist into the push shell. | The unchanged generate command passed after deriving the exact checked-in `build-test.yml` CI value without printing it. Repeat that derivation in the same process as the normal Validate push; no database connection, global configuration or gate change is required. | Protected generate gate / process-environment preflight before push. |
+| Integration ownership invocation / Low | The first integration invocation omitted the ownership helper's mandatory `RepositoryRoot` argument and stopped before dependency mutation. | Pass the explicit exclusively owned root. All six directory checks report physical ownership; the API-only clean restore then succeeds with both lock hashes unchanged. Keep the explicit argument in subsequent commands rather than relying on current-directory inference. | Parameter binding / same invocation preflight; no detection-stage escape. |
 
 **Completeness provenance:** this ledger was reconciled with every command
 and diagnosed failure in this bounded execution, including preliminary

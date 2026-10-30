@@ -4,6 +4,16 @@
 
 ## Executive summary
 
+**Current source boundary (2026-10-30):** the 0.55.64 advisory correction
+merged normally as `cffc64c8`. Separate Hono #262 now integrates that reviewed
+master at proposed 0.55.66, preserving its actual-parent qualification and
+both historical accounts below. New-head verification, review and CI remain
+required. No deployment, full advisory clearance or performance admission.
+The earlier Hono blocker below describes the 0.55.64 rollback unit, not an
+assertion that this separate Hono proposal lacks actual-parent evidence.
+
+### Historical independent advisory preparation
+
 **Follow-up, separate rollback unit:** [actual Prisma parent qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
 records the proposed 0.55.66 adapter correction stacked on this draft.
 The 0.55.64 blocker below is preserved as the earlier evidence boundary,
@@ -13,6 +23,32 @@ Proposed product 0.55.64 is stacked on draft PR #260 at
 `6eb1b59cb1a8ea324bb1a32b17355fabc605279d`. It changes only qs 6.16.0 to
 6.16.1 and fast-uri 4.1.5 to 4.2.3. Neither this patch nor its parent is
 merged. PR #259 and #251 remain separate. No deployed version changes.
+
+### Historical reviewed-master advisory integration
+
+Proposed product 0.55.64 now normally integrates reviewed master
+`287ea671abf1619d7b172c495310769078bd685b`, after #259 and #260 merged.
+It preserves original advisory head `f4fcfe3c` and every constituent commit.
+Its bounded package changes remain qs 6.16.0 to 6.16.1 and fast-uri 4.1.5
+to 4.2.3, alongside the inherited web and inventory corrections. This
+integration is not yet merged or deployed. PR #251 and #262 remain separate.
+Historical independent-branch receipts below do not qualify the new head.
+
+The integrated manifests and complete locks match the intended parent union:
+API equals original `f4fcfe3c`, web equals merged `287ea671`, with only
+coordinated 0.55.64 root metadata. There is zero non-root drift. Clean API
+restore passes with both lock hashes unchanged; the physically unchanged
+web graph is retained. Both complete `npm ls --all --json` inventories
+exit 0. Clean-CI byte confirmation and new-head gates are still pending.
+
+Parent #260 passed all 28 protected Validate gates and seven exact-head
+hosted checks, with separately executed technical review. This integration
+still requires its own installed-graph checks, coordinated clean-CI lock
+confirmation, protected Validate, refreshed review and exact-head hosted CI.
+No new test/gate improvement is identified: the existing actual-owner,
+complete-inventory and graph-union assertions cover this ordinary merge.
+Design disposition: **accepted**, existing flat pins and preserved histories;
+no speculative abstraction or new application responsibility.
 
 The six-record assessment consists of one qs advisory, four fast-uri
 advisories and one Hono adapter advisory. Five records can be corrected

@@ -1,8 +1,30 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-29
+**Last verified:** 2026-10-30
 
-### Separate Hono real-parent qualification (2026-10-29)
+### Current Hono reviewed-master integration (2026-10-30)
+
+PR #261 merged normally at `cffc64c8a188a721fabb85c37a80243d5e65a74f`,
+after 28/28 protected Validate gates, seven exact-head checks and separate
+technical review. Its counts were API 6,248/215 suites, HTTP 2,514/118 suites
+plus 42 existing skips, and web 1,661/125 files. #259 and #260 are merged.
+
+The preserved 0.55.66 Hono candidate now normally integrates that master.
+Five documentation conflicts retain both preparation histories below.
+Original Hono head `7379a97e` and its actual-parent qualification remain
+preserved. Source/graph preservation and the owned API-only clean restore
+pass with both lock byte hashes unchanged; both complete installed inventories
+exit 0 and isolated Prisma generation passes. Protected Validate, clean-CI
+lock confirmation, separate review and hosted checks remain required.
+Performance #251 remains unmerged with a verified same-image control failure;
+no repeated campaign, threshold waiver or deployment follows from this merge.
+If 0.55.66 merges first, the held 0.55.65 candidate must not downgrade it.
+
+| Date | Summary |
+|---|---|
+| 2026-10-30 | Normally integrate reviewed advisory master into independent Hono #262 at its reserved 0.55.66 boundary; retain both histories and all release holds. |
+
+### Historical separate Hono real-parent qualification (2026-10-29)
 
 Proposed 0.55.66 branches from exact unmerged #261
 `f4fcfe3ccac83de6548ed9991ed44048ee8d660a`, not performance #251.
@@ -24,7 +46,29 @@ release/performance/visual/prod holds remain.
 |---|---|
 | 2026-10-29 | Executed isolated actual Prisma parent old/new qualification and exploit RED/GREEN; prepared separate 0.55.66 adapter correction without changing existing drafts. |
 
-### Stacked API advisory remediation (2026-10-29)
+### Historical advisory integration (2026-10-29)
+
+PR #260 merged normally at `287ea671abf1619d7b172c495310769078bd685b`
+after 28/28 protected Validate gates, seven successful exact-head checks and
+separate technical review. API units were 6,229, HTTP 2,514 plus 42 existing
+skips, and web 1,661 across 125 files. PR #259 is also merged.
+
+The existing 0.55.64 branch now normally integrates that reviewed master,
+preserving all constituent commits. Its qs 6.16.1 and fast-uri 4.2.3 changes
+remain separate from the Hono correction and performance tooling. Both
+historical preparation sections below are retained, not current status.
+Installed-graph verification, coordinated clean-CI lock confirmation,
+protected Validate, refreshed review and exact-head CI still own this head.
+Parent-union manifests/locks pass with zero non-root drift; clean API restore
+preserves both lock hashes and both complete npm inventories exit 0.
+No application, auth, UI, schema, deployment or release-admission change.
+All performance, data/restore, live/browser and operator-visual holds remain.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally merge reviewed API #260 at 0.55.63, then integrate its master into preserved advisory #261 at 0.55.64; new-head proof remains required. |
+
+### Historical stacked API advisory remediation (2026-10-29)
 
 Proposed 0.55.64 starts from exact draft #260 head
 `6eb1b59cb1a8ea324bb1a32b17355fabc605279d` on
@@ -42,6 +86,32 @@ focus is 57/57 in three suites including 19 new checks; complete npm
 inventory exits 0 without problems. Final protected Validate remains required.
 PR #259/#260 are unmerged, #251 and every existing hold remain unchanged.
 
+### Historical reviewed-master integration for 0.55.63 (2026-10-29)
+
+PR #259 merged normally as `0a9b3d04535dc51dcfc58e9a2360c1c9e112a41a`
+after successful exact-head CI and a separate read-only technical review.
+That review is recorded publicly, without a fabricated GitHub approval.
+The written process requires green review and CI, not a particular hosted
+reviewer or approval count; the earlier platform-specific hold was excessive.
+
+The existing 0.55.63 API correction now normally integrates that master,
+preserving both constituent histories, the four API root overrides and
+web Seroval/Undici fixes. Version-only conflicts retain 0.55.63; historical
+preparation sections from both branches remain below. Clean-CI lock
+regeneration, restored-graph checks, protected Validate and exact-head CI
+must finish before this integration is eligible to merge.
+Protected bootstrap Fast passes 25/25, with 6,229 API units and 2,514 HTTP
+tests plus 42 existing skips. Authenticated regeneration 40963173363 supplies
+both 0.55.63 roots with zero non-root drift; the final protected Validate
+push and refreshed review/CI remain pending. The archive destination issue
+and exact generated-file cleanup are recorded in the API correction ledger.
+No new runtime, auth, schema, UI or performance implementation is added.
+Performance, data/restore, live/browser, visual and production holds remain.
+
+| Date | Summary |
+|---|---|
+| 2026-10-29 | Normally merge reviewed web PR #259, then integrate its master into preserved API PR #260; retain both fixes and CI-only lock provenance, with new-tip validation pending. |
+
 ### Independent API override-context correction (2026-10-29)
 
 Proposed 0.55.63 starts from fresh master `727860866c53c7ec8d01d1ff5bae858f80a1715d`,
@@ -54,6 +124,26 @@ exit 0. Final protected/hosted results remain separate.
 No runtime, UI, auth, schema, performance, merge or deployment change.
 Six API advisory records remain held. Self-improvement: full-tree exit and
 every installed owner are asserted. Design: accepted, established flat pins.
+### Independent web advisory patch boundary (2026-10-29)
+
+PR #257 is normally merged at `727860866c53c7ec8d01d1ff5bae858f80a1715d`.
+The independent branch `fix/web-seroval-undici-20261029` reserves 0.55.62:
+web Seroval 1.6.11 and Undici 7.30.1 only, API graph unchanged.
+Six focused assertions failed on actual old pins/locks/installed owners before
+manifest edits. CI-only locks are authenticated from run 40895972413 and
+artifact 12906712562; all 35 focused tests and full web npm inventory pass.
+API package graph is unchanged; its pre-existing full-tree override-context
+errors remain explicit, despite top-level inventory exit 0.
+Final protected Validate and hosted review remain pending.
+Historical `52200e33` Validate passed locally, but hosted CI correctly failed
+installed-web tests in the API-before-web-install lane. All six regressions
+now live in web's existing post-install Vitest lane and pass focused GREEN.
+No workflow order, test skip or assertion relaxation was introduced.
+See [scope, RCA and validation](docs/WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md).
+The prior fixture/draft boundary below is historical. Keep issue #256 open,
+PR #251 untouched, and all release holds. No merge or deployment authorized.
+Self-improvement is applied through owner/all-occurrence checks; design
+disposition is accepted because existing exact overrides need no abstraction.
 
 ### Current consolidation boundary (2026-10-29)
 

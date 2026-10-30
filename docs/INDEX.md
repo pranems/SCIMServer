@@ -21,7 +21,9 @@ Hono adapter blocker. Its draft base is unmerged #260, not master.
 
 **Pending independent inventory correction:** [API shared override context validity](API_OVERRIDE_CONTEXT_VALIDITY.md)
 records proposed 0.55.63, all real owners, full-tree RED/GREEN and the
-same-version root override correction. Draft web #259 remains independent.
+same-version root override correction. The current integration now inherits
+normally merged web #259; its earlier independent preparation is historical.
+**Independent web Seroval/Undici correction:** [Scope, actual owners and evidence](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md)
 
 **Pending request-body security correction:** [Implementation and evidence](REQUEST_BODY_SECURITY_REMEDIATION.md)
 records proposed 0.55.61, exact API patches, CI-only locks and distinct bootstrap
