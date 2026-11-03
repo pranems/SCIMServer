@@ -56,7 +56,7 @@ function describeSeries(samples) {
   };
 }
 
-function describePrecision(rows, protocol) {
+function validateCalibrationRows(rows, protocol) {
   validateProtocol(protocol);
   assert.match(protocol.candidate.sourceCommit ?? '', /^[a-f0-9]{40}$/, 'Exact checkout source required');
   assert.ok(Array.isArray(rows) && rows.length === 4, 'Exactly four diagnostic visits required');
@@ -81,6 +81,11 @@ function describePrecision(rows, protocol) {
       assert.ok(samples.every(value => Number.isFinite(value) && value > 0), 'Positive finite observations required');
     }
   }
+  return warmup;
+}
+
+function describePrecision(rows, protocol) {
+  const warmup = validateCalibrationRows(rows, protocol);
   const comparisons = operations.flatMap(operation => {
     const values = Object.fromEntries(['baseline', 'candidate'].map(role => [role,
       rows.filter(row => row.role === role).flatMap(row => row.samples[operation]).sort((a, b) => a - b),
@@ -150,7 +155,7 @@ function readBounded(file) {
   }
 }
 
-module.exports = { describePrecision, quantileRanks };
+module.exports = { describePrecision, quantileRanks, validateCalibrationRows, readBounded, nearestRank };
 
 if (require.main === module) {
   try {

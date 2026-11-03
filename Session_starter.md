@@ -1,5 +1,24 @@
 ## SCIMServer - Condensed Session Memory
 
+**2026-11-03 whole-visit CDF feasibility:** isolated
+`fix/qualification-cluster-cdf-20261103` implements a runnable offline
+conditional KL cluster-CDF calculation, not admission. Original pooled
+quantiles, all12 metrics, .67/10%/0.5CPU/1GiB and failed receipts stay fixed.
+29/29 focused contracts PASS after RED. Both actual diagnostic treatments
+preserve all24 ratios/input hashes. An analytic common-regime counterexample
+rules out uniform5% false admission/80% neutral power for any finite count
+without a quantitative dependence restriction. Even an independent-visit
+counterexample subclass with arbitrary internal variation needs at least276
+informative visits; measured45min projection fits only80 total (or56 with
+diagnostic1000warmups). The conditional KL p99 endpoint alone needs793
+visits/role/block at0.05/144 and zero predictable drift, not sufficient10%
+precision. Actual drift/conditional variation/mixing and tail power are
+unestablished. STOP new performance allocation; exact external model input,
+proof and controls are in ENDPOINT_SNAPSHOT_REVISION.md. #266/#251 stay
+draft; migration worktree/PR267 and customer production untouched.
+Independent mathematical/code review found no actionable defects and retained
+the statistical blocker. Protected publication/CI remain separate pending work.
+
 **2026-11-03 prospective precision correction:** the reviewed diagnostic
 41632439081 is complete but NONADMITTING. Exact synthetic196000e5,
 image18901aded3, actual0.55.67/Node24.22.2; 49,656 checked requests and
@@ -16,7 +35,8 @@ draft; migration worktree untouched; customer prod excluded. Initial combined
 81/81 PASS, independent review no actionable defects; protected publication
 30/30 Validate gates PASS at69fd8e5c. Final scrutiny clarified inclusive1.10
 versus a true breach and added a ties/boundary guard; focused21/21 PASS.
-Final-tip protected publication and hosted CI remain separate pending work.
+Final-tip protected publication30/30 PASS and hosted41645985419 PASS at
+302e7d90; #266 remains draft and no performance allocation followed.
 
 **2026-11-03 fixed-warmup diagnostic preparation:** isolated
 `fix/qualification-warmup-study-20261103` implements a bounded non-admitting
@@ -100,6 +120,7 @@ no repeat restore. New-head protected gates and CI still remain pending.
 
 | Date | Summary |
 |---|---|
+| 2026-11-03 | Freeze reviewed offline cluster-CDF infeasibility result and executable controls; admission/deployment remain blocked pending externally justified quantitative model input. |
 | 2026-10-29 | Normally merge reviewed advisory #261 at 0.55.64, then integrate its master into preserved performance #251 at 0.55.65 without rewriting any constituent history. |
 
 ### Historical preserved performance integration (2026-10-29)
