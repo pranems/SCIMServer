@@ -44,6 +44,15 @@ admit a release, prove the Azure image or replace operator visual approval.
 
 ## Tenant bootstrap must verify effects, not command labels (2026-10-31)
 
+A successful optional test mode is not a continuous gate. Verify the actual
+default invocation used by CI: the sixth review of PR #267 found that manual
+distinct-password transport assertions were skipped by `all`. Share the
+assertion body with the default path and return early only in the focused
+mode. An actual-default probe can intercept Docker before allocation to
+demonstrate the omitted assertion's RED/GREEN without touching shared Docker.
+The hosted default must then prove both the serialization assertions and
+the subsequent real database cases; a new optional step is not a substitute.
+
 Exercise every intervening serializer, not only the first parser and final
 client. Fifth review of PR #267 found that direct Docker environment arguments
 bypassed generated job YAML: a valid parsed `copy\new` database became a
@@ -58,6 +67,9 @@ distinct raw/alternate synthetic passwords so transport cannot hide a swap.
 This closes a repeated missing-boundary test pattern without adding a package
 or a new abstraction. Full hosted evidence is still required after local
 transport GREEN.
+That independent real path is now GREEN in hosted `41689528595` at
+`e3fbf7c4`, alongside all29 protected gates and the complete hosted matrix.
+The finding's resolved thread is evidence of correction, not fresh review.
 
 Canonical identity comparison and downstream connection serialization are
 separate safety boundaries. A correctly decoded database name can still

@@ -111,7 +111,7 @@ $fixtureTarget = Split-PgUri -Uri 'postgresql://postgres:synthetic@localhost:543
 $jobFixture = Get-JobFixture -Source $fixtureSource -Target $fixtureTarget -Program $copy
 $environment = $jobFixture.Environment
 $copy = $jobFixture.Program
-if ($Case -eq 'serialization') {
+if ($Case -in @('all', 'serialization')) {
     $src = Split-PgUri -Uri 'postgresql://copy%20user%27%22%5Cpath:source%25"\path@localhost/copy%5Cnew?sslmode=disable' -Which Source
     $dst = Split-PgUri -Uri 'postgresql://copy%2520user:target%25''\path@localhost/target%22%5Cpath?sslmode=disable' -Which Target
     $serialized = Get-JobFixture -Source $src -Target $dst -Program $copy
@@ -132,7 +132,7 @@ if ($Case -eq 'serialization') {
         throw 'Actual YAML round trip changed the worker program.'
     }
     Write-Host 'PASS: full generated YAML preserves all 14 environment values and worker program without Docker'
-    return
+    if ($Case -eq 'serialization') { return }
 }
 try {
     Write-Host "Allocating owned PostgreSQL fixture scim-snapshot-$fixtureRun"

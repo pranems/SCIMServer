@@ -4,6 +4,21 @@
 
 ### Latest review: preserve values across the generated job YAML
 
+Sixth review5757233449 confirms the High fixed at e3fbf7c4, but identifies
+Medium4458623530: optional serialization assertions were skipped by default
+all mode. An actual-default probe intercepts Docker before allocation and
+has RED/GREEN. Both all/serialization now run distinct-password and worker-text
+assertions; only serialization returns early. Focused mode also remains GREEN.
+Corrected protected publication, hosted default PostgreSQL and review are
+pending. Previous full e3 evidence below does not prove this new wiring.
+
+Published correctione3fbf7c4 passes all29 protected gates in1133.1s and
+full hosted41689528595, including actual YAML-to-PostgreSQL identity at
+2026-11-03T18:00:41Z and snapshot/signal/fidelity/isolation through18:00:47Z.
+CodeQL and freshness pass. High4458211788 has an evidence reply and its exact
+thread is resolved. Fresh independent review is pending. Earlier preparation
+paragraphs below describe the pre-publication state. No target is deployed.
+
 Fifth independent review of7a938859 confirms the login correction but finds
 High4458211788: unescaped connection fields in double-quoted job YAML alter
 backslashes or fail parsing. Actual-generator jobyaml assertion is RED before

@@ -79,6 +79,18 @@ execution. Actual-generator RED/GREEN and a Docker-free complete YAML round
 trip pass; corrected hosted PostgreSQL/full CI and independent review remain
 pending. Run `pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1 -Case serialization`
 after API installation for that narrowly classified transport assertion.
+Sixth review confirms the High correction but finds optional-mode assertions
+were absent from the hosted default. The fixture now also runs distinct-password
+and worker-text assertions in `all`, proceeding to actual PostgreSQL afterward.
+Only `serialization` returns early. Actual-default RED/GREEN is established
+with Docker intercepted before allocation; corrected full hosted evidence is
+still required. The workflow retains its existing default command.
+The corrected real PostgreSQL fixture is now GREEN at published `e3fbf7c4`:
+hosted `41689528595` completes identity at `2026-11-03T18:00:41Z` and
+snapshot/signal/fidelity/isolation by `18:00:47Z`. All29 protected gates,
+full hosted validation/image smoke/Trivy, CodeQL and freshness also pass.
+The exact High thread is resolved with evidence; fresh independent review
+remains pending. Earlier pending wording above records preparation history.
 Hosted `41674035838` reproduces the third-review target-identity assertion
 before production code changes. Shared worker setup now quotes every libpq
 value and escapes literal quotes/backslashes, rather than allowing a decoded

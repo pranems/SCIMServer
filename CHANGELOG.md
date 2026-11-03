@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Include distinct-password transport and worker-text assertions in the default
+  snapshot fixture path used by CI, not only its optional serialization mode.
+  Sixth review confirms the High YAML correction and identifies this Medium
+  coverage omission. An actual-default probe has RED/GREEN before intercepted
+  Docker allocation; focused serialization remains GREEN. Corrected protected,
+  full hosted PostgreSQL and independent review are pending.
+- Published YAML-transport correctione3fbf7c4 passes all29 protected gates in
+  1133.1s and full hosted41689528595. Actual YAML-to-PostgreSQL identity and
+  existing snapshot/signal/fidelity/isolation controls pass; CodeQL, freshness,
+  image smoke and Trivy also pass. The High thread is resolved with evidence.
+  Fresh independent review is pending; earlier preparation notes follow.
 - Serialize all10 connection environment values as JSON strings in generated
   job YAML, preserving literal quotes/backslashes and string-valued ports.
   Fifth-review High4458211788 has actual-generator RED/GREEN; the complete

@@ -9,6 +9,21 @@
 
 ## Active Delivery Process
 
+**Current sixth-review correction:** Medium4458623530 identified that default
+all mode skipped the optional distinct-password/worker-text assertions.
+Actual-default RED/GREEN is established without contacting Docker; both modes
+now share those assertions and only serialization returns early. The prior
+High YAML finding is independently confirmed resolved. Corrected protected
+publication, full hosted default PostgreSQL and fresh review remain pending.
+
+**Published correction evidence:** e3fbf7c4 passes29 protected gates in1133.1s
+and full hosted41689528595, including actual generated-YAML-to-PostgreSQL
+identity/snapshot/signal/fidelity/isolation, image smoke and Trivy. CodeQL and
+freshness pass. High4458211788 has an evidence reply and its exact thread is
+resolved. Fresh independent review remains pending. Earlier preparation-time
+pending descriptions below are historical. Requested0.55.67 remains held;
+the user was unavailable to authorize a different admitted-image migration.
+
 **Current correction pending publication:** fifth review High4458211788
 finds that generated double-quoted job YAML reinterprets connection values.
 All10 connection scalars now use JSON string serialization. Actual-generator

@@ -9,7 +9,60 @@
 
 ## Executive summary
 
+### Sixth review: include the assertion in the mode CI actually invokes
+
+Exact-tip independent review `5757233449`, submitted at
+`2026-11-03T18:07:21Z` for `e3fbf7c4`, confirms the High YAML issue resolved.
+Its only new finding is Medium `4458623530`: hosted CI invokes the default
+`all` mode, while distinct-password transport and worker-text assertions
+were confined to the optional `serialization` mode. Default real-database
+fixtures use identical raw/alternate synthetic passwords, so they cannot
+detect a swapped password secret/reference.
+
+A bounded local probe invokes the actual default script and intercepts the
+first Docker call before allocation. Before the correction it records
+`RED: default snapshot runner skipped distinct-password serialization assertions.`
+The minimal correction executes those assertions in both `all` and
+`serialization`, returning early only for the latter. The same probe now
+confirms default-mode serialization completes before the Docker boundary;
+the focused serialization-only command still passes. No Docker service is
+contacted by that probe. Corrected protected publication, full hosted default
+PostgreSQL execution and another independent review remain required.
+
+RCA type/severity: continuous-coverage wiring, Medium. Root cause: a passing
+optional mode was documented without being included in the authoritative
+default invocation. Fix: share the existing assertion body with `all` rather
+than add a second implementation or optional CI step. Why it works: every
+ordinary hosted snapshot run must now compare distinct source/target raw and
+alternate passwords and worker text before database allocation. Detection:
+independent review; earliest suitable detection is the local actual-default
+probe. The existing assertion is now wired continuously, closing the gap
+in-place. Design disposition: accepted; one existing test branch changes,
+with no production/API/UI/dependency/version behavior change or abstraction.
+
+RCA type/severity: CLI option compatibility, Low. The first bounded review
+lookup combined `gh api --slurp` with `--jq`; this installed CLI rejects that
+combination before making the request. Resolution: use supported pagination
+and slurp, then filter the returned JSON locally. The corrected lookup
+returns the exact bot review above. Prevention: keep output collection and
+local filtering separate when that option combination is unsupported.
+Detection and earliest suitable detection are the failed local CLI call.
+No review request was duplicated or changed by the failed lookup.
+
 ### Fifth review: test the generated YAML transport, not a bypass
+
+**Confirmed corrected evidence:** published `e3fbf7c4` passes all 29
+protected gates in 1,133.1 seconds. Exact-tip hosted `41689528595` passes
+validation, image build/push, container smoke and Trivy; CodeQL and freshness
+also pass. The actual generated-YAML-to-PostgreSQL identity controls pass at
+`2026-11-03T18:00:41Z`; termination, extra-table rejection, 2,000-row fidelity
+and concurrent-write isolation complete by `18:00:47Z`. The exact validation
+job log is retained locally, 27,385,675 bytes, SHA-256
+`6834b07cbd3b06c8917f85f69e324971cc72a747b2c58a90a84db9030fd98565`.
+The High finding has an evidence reply and its exact thread is resolved.
+Fresh independent review remains pending; author replies are not review.
+The preparation-time pending statements below are historical, not a claim
+that these completed corrected gates are still running.
 
 Independent bot review `5756727841` of `7a938859`, submitted at
 `2026-11-03T17:27:55Z`, confirms the login correction but reports High
@@ -58,6 +111,19 @@ actual scalar-value RED recorded above. The initial incomplete-coverage
 failure is not counted as behavioral RED. Detection and earliest suitable
 detection are both the focused local test. Full-transcript RCA reconciliation
 and local interrupted Docker fixture absence remain unverified.
+
+RCA type/severity: native CLI argument interpolation, Low. The evidence
+reply succeeded, but the first exact-thread mutation passed literal
+`[0].id` because a native `key=$array[0].property` argument did not evaluate
+the indexing/member access as intended. GitHub rejected it; no thread was
+changed by that failed call. Resolution: select the unique exact thread,
+assign its ID to a string variable, and interpolate the complete `key=value`
+argument explicitly. The corrected mutation returns the expected ID and
+`isResolved: true`, without posting a duplicate reply. Why it works: the
+native CLI receives the evaluated scalar ID. Prevention: use explicit scalar
+arguments and validate GraphQL errors plus the returned outcome. Detection
+and earliest suitable detection are the failed mutation itself; this does
+not invalidate the earlier actual PostgreSQL GREEN.
 
 ### Fourth review: carry the parsed login through the actual boundary
 
