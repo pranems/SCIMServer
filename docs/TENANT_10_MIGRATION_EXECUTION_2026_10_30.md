@@ -46,6 +46,34 @@ step. Design disposition: accepted. Keep connection serialization in the
 existing shared worker setup used by preflight and full copy; no strategy
 framework is justified for this single boundary.
 
+#### Publication interruption: worker startup, not assertion RED
+
+The first protected publication of test-only `fc4e7c32` was blocked after
+28 passing gates. Web Vitest reported 110 passing files / 1,309 passing tests
+but also 15 unhandled fork-startup timeouts, so the gate correctly returned
+exit 1. This is not a full web pass or the intended libpq assertion RED.
+No application source, dependency or web test changed.
+
+The 15 affected files were selected directly from the first causal worker
+errors and rerun together with `--maxWorkers=2`: all 352 tests in those
+15 files pass in 111.77 seconds, exit 0. The editor test tool could not discover
+tests in the separate worktree, so the existing npm runner executed the exact
+selectors. No test, timeout, assertion or gate was disabled. The subsequent
+normal protected push must still pass the full default-concurrency gate.
+
+Type/severity: tooling/environment, Medium. Mechanism: worker startup
+handshakes expired before those files could execute; the underlying host
+cause is not established. A later read-only sample showed about 24 GiB free
+of 64 GiB and 23% CPU; it does not prove memory exhaustion or explain the
+earlier failure. No surviving Node worker in this owned worktree was found,
+and no shared processes were killed. Resolution: targeted bounded-concurrency
+diagnosis, with unchanged full-gate publication still pending. Detection and
+earliest suitable detection are both the existing web runner, which already
+fails closed on unhandled errors. Self-improvement: retain the failed run,
+distinguish startup failures from assertion failures, and prove every missing
+file rather than treating partial counts as success. Design disposition:
+accepted; no unrelated Vitest configuration change is justified.
+
 ### Second review: canonical identity and remaining cleanup boundaries
 
 Corrected tip `05adbacd` passed all 29 protected gates and hosted run
