@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.67 whole-visit CDF method feasibility (2026-11-03, not admission)
+
+- Implement a bounded offline, hash-bound cluster-CDF KL calculation with
+  an explicit predictable-CDF drift assumption, no assumed independent
+  visits, and exactly the original pooled quantile algebra.
+- Derive and execute count-independent common-regime and finite-count
+  independent-regime power counterexamples. A uniform5% false-admission/
+  80% neutral-power method cannot be justified from these receipts; even
+  granting independent visits with arbitrary internal variation needs276
+  informative visits, beyond the measured45min projection of80 total.
+  The conditional finite-upper-p99 calculation needs793 visits/role/block,
+  not a recommended or10%-precision-sufficient count.
+- New cluster contracts16/16 and preserved precision13/13 PASS after RED.
+  Cover every operation/percentile, neutral/regression/drift/visit shock/
+  quota-burst cases, ties, actual CLI, invalid inputs, analytic dependent
+  finite-tree coverage, exact power and fixed budget. All24 retained point
+  ratios and protocol/round hashes remain identical.
+- No admission correction, new campaign, version/dependency/serving change
+  or target deployment. Original failures and draft #266/#251 preserved.
+  Independent mathematical/code review: no actionable defects, statistical
+  blockers retained. Protected publication and hosted CI remain separate.
+
 ### 0.55.67 prospective precision feasibility (2026-11-03, not admission)
 
 - Implement a bounded offline, hash-bound quantile-rank sensitivity report

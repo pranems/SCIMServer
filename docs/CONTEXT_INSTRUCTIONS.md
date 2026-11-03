@@ -9,6 +9,25 @@
 
 ## Active Delivery Process
 
+**2026-11-03 cluster-CDF construction:** runnable offline conditional KL
+bounds preserve original pooled p50/p95/p99, every operation and exact
+diagnostic identities. Focused29/29 PASS after RED, all24 retained ratios
+and input hashes identical. Common-regime analytic controls demonstrate
+uniform5%/80% false-admission/neutral-power infeasibility at any finite
+count without quantitative restrictions. Even the independent-visit
+counterexample subclass needs276 informative visits with arbitrary
+within-visit variation, versus measured45min projection80 total. The
+conditional KL finite p99 endpoint needs793 visits/role/block at0.05/144;
+neither count establishes10% precision or actual power. Actual predictable
+CDF drift, conditional variation and tail separation are unknown. No valid
+admission correction or allocation is implemented. STOP until external
+quantitative dependence/variation and power-model input is justified;
+see ENDPOINT_SNAPSHOT_REVISION.md for proofs, executable checks and finite
+stop. Preserve .67/10%/0.5CPU/1GiB, failures and draft #266/#251; migration
+worktree/PR267, deployment and customer production untouched. Independent
+review found no actionable defects and retained the blocker; ordinary
+protected publication/CI remain separate pending evidence.
+
 **2026-11-03 method-precision implementation:** actual warmup diagnostic
 41632439081 is complete, source196000e5/image18901aded3,0.55.67/Node24.22.2,
 non-admitting. Offline sensitivity now computes all12 original point ratios,
@@ -24,7 +43,7 @@ worktree, deployments and customer production untouched. Initial combined
 publication30/30 Validate gates PASS at69fd8e5c. Final scrutiny clarified
 the inclusive1.10 ceiling versus a true breach; a ties/boundary guard keeps
 all diagnostics non-admitting. Focused21/21 PASS. Final-tip protected
-publication and hosted CI remain separate pending evidence.
+publication30/30 PASS and hosted41645985419 PASS at302e7d90. #266 remains draft.
 
 **2026-11-03 bounded warmup study:** implemented locally, not executed on a
 Linux host. One exact checkout image, two traced same-image BAAB blocks,

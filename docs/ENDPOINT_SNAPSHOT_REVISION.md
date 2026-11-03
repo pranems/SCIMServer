@@ -7,6 +7,326 @@ Performance admission and the independent release gates remain open.
 
 ## Current-checkout image binding (2026-11-03, not released)
 
+### Whole-visit cluster-CDF construction and demonstrated feasibility limit (2026-11-03)
+
+**Executive conclusion:** a runnable conditional cluster-CDF calculation and
+analytic power counterexamples are implemented in
+[`membership-cluster-cdf.cjs`](../scripts/performance/membership-cluster-cdf.cjs).
+They **do not implement a valid admission correction for the actual receipts**.
+Without a quantitative restriction on dependence, uniform 5% false admission
+and 80% neutral power are incompatible for any finite count. Even granting
+independent visits in a counterexample subclass, unrestricted within-visit
+variation defeats that power target at the measured 45-minute budget.
+This is a demonstrated limitation of the stated statistical classes, not
+proof that every externally justified model or actual execution must fail.
+
+The deliverable is frozen for review as an **offline method/infeasibility
+result**, not a prospective allocation manifest. Keep #266 and #251 draft,
+all original failures and raw observations, actual 0.55.67, the inclusive
+1.10 ceiling, 0.5 CPU/1 GiB and `cpu.max=50000 100000`. Original warmup100,
+1000 measured cycles, four operations, all p50/p95/p99 metrics, BAAB/ABBA
+blocks, source/image binding, retention, privacy and exact cleanup are
+unchanged. No benchmark, assessor, protocol, workflow or serving source is
+changed. No new campaign, hardware, cloud resource or deployment is allocated.
+The migration worktree and customer production are untouched.
+
+#### Statistic identity and the precise inference target
+
+For one operation, role and block, let `H_j(x)` be the fraction of that
+visit's 1000 chronological measured values at most `x`. For `R` visits:
+
+```text
+H_j(x) = count(T_ji <= x) / 1000
+Fhat(x) = sum_j H_j(x) / R
+        = count(all retained role values <= x) / (1000 * R)
+Qhat(p) = sorted pooled values[ceil(1000 * R * p) - 1]
+
+Chronological values -> visit CDF counts -> exact pooled CDF -> original quantile
+                    -> whole-visit uncertainty only if its assumptions hold
+```
+
+CDF means cumulative distribution function: the fraction/probability at or
+below a value. Equal-sized visit CDF averaging is exactly original pooling
+within one role/block, with no cross-block pooling or averaged visit
+quantiles. For example, visit1 has 950 ones and 50 hundreds; visit2 has 1000
+twos. Pooled p95 is 2, not the visit-p95 average 1.5; pooled p99 is 100, not
+the visit-p99 average 51. The code tests both distinctions.
+
+A confidence claim needs a distributional target in addition to this fixed
+sample statistic. Here the conditional calculation targets the quantile of
+`F(x) = sum_j E[H_j(x)] / R`, the **fixed-horizon average marginal CDF**
+under the frozen role/order/load schedule. With common marginal visit laws
+this reduces to their common CDF. It is not `E[Qhat]`, an average visit
+quantile, or a separately pooled block.
+
+Let the full prior history before visit `j` be `history_j`, including other
+roles, operations and resource observations. The predictable CDF is
+`G(x) = sum_j E[H_j(x) | history_j] / R`. It may be random. Substituting
+`G` for `F` would condition away persistent regimes and change the
+inferential target; the implementation does not do that.
+
+#### Conditional coverage derivation, without independent visits
+
+The sufficient **external assumption** is an almost-sure prospective bound
+`abs(G(x) - F(x)) <= delta`, at every required true quantile and its left
+limit. A uniform-in-`x` bound suffices. Counts and schedules are fixed
+before observing data. Visits may have arbitrary internal correlation,
+history-dependent conditional variance and cross-operation dependence.
+Independent visits are not required. The actual `delta` is **unknown**;
+zero in the output is a labeled sensitivity, not a receipt-derived estimate.
+
+For completeness, the following derivation supplies the probability bound
+rather than treating a simulation as proof:
+
+1. For a fixed threshold, put `X_j=H_j(x)` and
+   `mu_j=E[X_j | history_j]`. Because `0 <= X_j <= 1`, convexity gives
+   `E[exp(lambda*X_j) | history_j] <= 1+mu_j*(exp(lambda)-1)`.
+2. The exponential of the sum divided by the product of those predictable
+   factors is a nonnegative supermartingale starting at 1. Its expectation
+   is at most 1 by iterated conditioning, not by independence.
+3. Concavity of `log(1+mu*(exp(lambda)-1))` bounds the product by
+   `(1+q*(exp(lambda)-1))^R` whenever the average predictable mean is at
+   most `q` for `lambda>0`, or at least `q` for `lambda<0`.
+4. Markov's inequality and optimization over `lambda` give
+   `Pr(Fhat >= t) <= exp(-R*kl(t,q))` for `t>q`, with the corresponding
+   lower-tail bound for `t<q`. Binary relative entropy is
+   `kl(t,q)=t*log(t/q)+(1-t)*log((1-t)/(1-q))`, using its endpoint limits.
+5. At true quantile `Q(p)`, `F(Q)>=p` and `F(Q-)<=p`, including ties.
+   The lower quantile endpoint therefore uses a lower CDF tail with
+   `q=p-delta`; the upper endpoint uses an upper CDF tail with
+   `q=p+delta`. Invert `R*kl(t,q)>=log(1/a)` separately on each side.
+   With `N=1000*R`, use lower rank `floor(N*t_lower)+1` and upper rank
+   `ceil(N*t_upper)`. Each erroneous endpoint has probability at most `a`.
+   The upper endpoint uses counts strictly below the true quantile, so
+   atoms and equality do not invalidate this inversion.
+6. Code uses outward bisection and checks the discrete rank's exponent
+   after floating-point conversion. Unattainable endpoints stay `null`,
+   never the observed minimum/maximum as a success-shaped substitution.
+
+This is the bounded-CDF Chernoff/KL calculation, sharper than a range-only
+Hoeffding bound; it does not count the 1000 correlated values as independent
+trials. The sufficient predictable-mean restriction is substantive even
+though independence is unnecessary. The general exponential-supermartingale
+framework is described by
+[Howard et al., Time-uniform Chernoff bounds via nonnegative supermartingales](https://arxiv.org/abs/1808.03204);
+the fixed-count bound used here is derived above. Original empirical
+quantiles use [inverse-empirical-CDF/type1 algebra](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/quantile.html),
+not interpolated defaults.
+
+For the explicit sensitivity targets, set `familyAlpha=0.05` and
+`a=0.05/144`. Two A/A blocks need `2*12*4=96` one-sided quantile endpoints;
+two old/current blocks need `2*12*2=48`. A union bound over all144 gives
+at most 5% probability of any erroneous endpoint **if all required
+predictable-CDF restrictions hold**. It needs no independence across blocks,
+metrics or endpoints. This is a proposed analytical target, not an adopted
+replacement for the frozen original policy.
+
+Direct ratio bounds are `U_candidate/L_baseline` and
+`L_candidate/U_baseline`. A prospective noninferiority decision would need
+the upper ratio at most1.10, and A/A also the reciprocal lower ratio at
+least `1/1.10`, for every original metric in its original block. Overlapping
+intervals are not evidence of noninferiority. A true ratio **strictly above**
+1.10 admitted by that upper bound implies an endpoint coverage failure;
+the original inclusive equality boundary is preserved. No such decision
+is wired to the allocator or original assessor.
+
+#### A count-independent obstruction, not an independence assumption
+
+Consider a neutral experiment with baseline and candidate values10. In a
+second model, baseline stays10 and candidate has one latent regime drawn
+for the entire campaign: all10 with probability0.9899, all12 with
+probability0.0101. Its marginal candidate CDF at10 is0.9899, so its true
+pooled-distribution p99 is12 and the ratio is1.20. On the all-fast event
+**all observable evidence can have exactly the neutral law**.
+
+Any procedure admitting that neutral experiment with probability `beta`
+therefore admits the bad model with probability at least `0.9899*beta`.
+At `beta=0.8` this is0.79192, not at most0.05. Uniform 5% protection forces
+neutral power at most `0.05/0.9899=0.05051015`, independently of any finite
+sample count. The same construction uses slow probabilities0.0501 for
+p95 or0.5001 for p50. One affected operation/percentile is enough to
+violate an all-metrics admission requirement.
+
+Constants make the example transparent, not essential: the fast regime
+can have any neutral joint observation law, and the rare regime can put
+candidate values above1.10 times the baseline quantile. The probability
+argument does not diagnose the actual host or invent a production regression.
+It establishes a limitation of a class not excluded by the current evidence.
+
+Merely declaring stationarity/ergodicity does not cure finite-count
+non-identification. A stationary two-state Markov regime with
+`Pr(fast->slow)=0.0101*tau` and
+`Pr(slow->fast)=0.9899*tau` is irreducible and aperiodic for `0<tau<1`.
+Its all-fast probability for `V` visits is
+`0.9899*(1-0.0101*tau)^(V-1)`, arbitrarily close to0.9899 at any fixed
+finite horizon by choosing a sufficiently small positive `tau`. Executable
+controls include this ergodic variant. An upper bound on mixing time,
+not the word "ergodic", would be additional information.
+
+The predictable-CDF assumption explicitly excludes these uncontrolled
+regimes. A negative control shows what happens if it is dropped: with
+40,000 all-fast visits the zero-drift upper p99 endpoint is10 while the
+true marginal p99 is12, missing with probability0.9899. No arrays of
+40 million values are allocated; finite ranks of the constant path are
+computed analytically.
+
+#### Fixed-count power and runtime, without buying a host or extending deadlines
+
+There is a second, stronger-than-"this bound is loose" power check.
+Within the zero-drift conditional class, take **independent Bernoulli
+whole-visit regimes** with slow probability just above0.01; all1000
+values in a visit share its regime. This is one admissible counterexample
+subclass, **not an assumption that actual visits are independent**.
+With `V` informative visits its all-fast probability tends to `0.99^V`.
+Uniform false admission at most0.05 and neutral power0.8 require
+`0.8*0.99^V <= 0.05`, hence at least276 informative visits. This necessary
+condition is not sufficient power or a recommended count.
+
+The retained campaign costs, parsed at millisecond resolution, give:
+
+| Retained diagnostic | Four-visit block | Average/visit | Optimistic balanced visits/role/block in45min | Total visits |
+|---|---:|---:|---:|---:|
+| Original100 warmups | 132.061s | 33.01525s | 10 | 80 |
+| Diagnostic1000 warmups | 174.195s | 43.54875s | 7 | 56 |
+
+These are linear timing projections, not untraced runtime guarantees.
+They do not repurpose the 55-minute step or75-minute job cleanup/upload
+reserve as performance time. The1000 treatment is not a proposed warmup
+change. Even optimistically granting **every** visit an informative
+candidate draw, maximum neutral power in the counterexample class is
+only `0.05/0.99^80=0.111726` or `0.05/0.99^56=0.087781`. The exact
+slow-probability0.0101 model yields false admission at least0.355137 or
+0.453111 if neutral power were0.8. The276-visit lower bound alone projects
+to2.53h or3.34h, before respecting separate roles/blocks. This thought
+experiment grants more information than the actual schedule; it does not
+authorize pooling or a count increase.
+
+For the implemented KL endpoint calculation, even `delta=0` gives:
+
+| Percentile | Minimum visits/role/block for a finite upper endpoint at0.05/144 | Balanced visits across four blocks | Projected campaign at100 /1000 warmups |
+|---|---:|---:|---:|
+| p50 | 12 | 96 | 0.88h /1.16h |
+| p95 | 156 | 1248 | 11.45h /15.10h |
+| p99 | 793 | 6344 | 58.18h /76.74h |
+
+Here `R >= ceil(log(a)/log(p))` is the finite-upper-endpoint condition,
+verified with predecessor/count boundary tests. These are counts for this
+conditional procedure, **not a lower bound for all possible models or
+methods**, and being finite does not establish10% ratio precision.
+Using an individual0.05 endpoint instead still needs299 visits for p99;
+simultaneous allocation is not the fundamental obstacle. At the projected
+counts10 or7 every upper quantile endpoint is unattainable. Exact
+whole-campaign resolution power on the constant neutral model is therefore0
+for this bound, not a Monte Carlo estimate.
+
+Actual tail spacing and CDF separation at the10% value boundary are also
+unknown. Probability-scale precision alone does not guarantee value/ratio
+precision near a flat CDF. Neither276 nor793 establishes a power curve
+for the actual application.
+
+#### What the receipts establish, and what they cannot establish
+
+| Question | Observed fact or explicit limitation |
+|---|---|
+| Original algebra/source binding | Both actual diagnostic treatments were reprocessed offline. All24 original ratios and protocol/round hashes match the prior precision receipts exactly. Shared validation preserves .67/image/quota/1000-sample/diagnostic-marker checks. |
+| Drift and correlation | Chronological within-visit windows, correlated timing and large visit differences are retained. Windows are not independent replicates; small sample ACF is not a quantitative mixing guarantee. |
+| Quota phase | Near-continuous throttling and time-associated CPU traces support quota-associated phase effects as a hypothesis. They do not identify per-request cause, exact quota origin or a probabilistic dependence bound. |
+| `delta`/conditional variation | Neither an almost-sure predictable-CDF drift bound, conditional variance bound, cycle mixing rate nor rare-regime exclusion is established by eight sequential traced visits. Independent visits/process resets cannot be assumed. |
+| Transfer/power | Untraced transportability, actual neutral power, tail separation and worst-case precision are unestablished. Synthetic controls and analytic counterexamples do not measure actual-host probabilities. |
+| Historical result | Failed41615647439, the diagnostic markers and original raw receipts remain immutable. A/A failure is not proof of a production-source regression. |
+
+The exact missing input is **external evidence supporting quantitative
+restrictions on both history dependence and within-visit CDF variation**,
+valid for this workload, resource quota and declared marginal target. For
+example, a justified predictable-drift restriction plus a conditional
+variance/concentration bound could support a sharper calculation. A mixing
+bound would need explicit rates, horizon and error cost. It must also supply
+a neutral model/tail separation sufficient to demonstrate power at a
+fixed count inside the existing45-minute work limit. Independence alone
+with unrestricted whole-visit variation is insufficient at measured cost.
+No arbitrary numerical bound or generic permission to proceed supplies this.
+
+#### Executable verification and finite stop
+
+The runnable implementation and
+[`membership-cluster-cdf.test.cjs`](../scripts/test/membership-cluster-cdf.test.cjs)
+cover the pooled-CDF identity; non-independent, history-dependent
+conditional-variance tree; exact common/ergodic/independent regime controls;
+all12 greater-than10% regression outcomes; chronological drift; whole-visit
+shocks; synthetic quota-period bursts; ties; invalid/partial inputs; fixed
+counts, rank boundaries and runtime; bounded actual CLI and input hashes.
+Synthetic burst controls are not claims about the actual CPU period.
+
+Semantic RED preceded implementation. Final focused cluster/precision
+contracts: **29/29 PASS**, zero skips/failures. This includes16 new
+cluster contracts and the13 preserved precision contracts. The immutable
+original assessor remains separate and unchanged. Reproduce the offline
+analysis with an unused output path:
+
+```powershell
+node --test scripts\test\membership-cluster-cdf.test.cjs scripts\test\membership-precision.test.cjs
+
+$study = 'test-results\warmup-study-41632439081\membership-warmup-diagnostic-41632439081-1'
+$input = Join-Path $study 'warmup-control-100'
+node scripts\performance\membership-cluster-cdf.cjs `
+  (Join-Path $input 'protocol.json') `
+  (Join-Path $input 'aa-baab\rounds.json') `
+  (Join-Path $input 'campaign.json') `
+  'test-results\cluster-cdf-review-control-100.json'
+```
+
+The CLI reads each input once through the shared4MiB-bounded descriptor
+reader, hashes exactly those buffers, and writes exclusively. It accepts
+only complete marked calibration blocks and emits `admissionEligible:false`,
+`authorizedCampaignCount:null`, unknown actual `delta`, conditional
+sensitivity and the specific infeasibility result. It cannot allocate
+performance work or turn diagnostic receipts into admission.
+
+The finite next-step sequence is:
+
+1. Freeze/review the derivation, implementation and discriminating controls;
+   preserve ordinary review and exact-tip CI as independent evidence.
+2. **STOP allocation.** A defensible corrected admission method cannot be
+   implemented autonomously from the current receipts alone. Obtain the
+   specific externally justified dependence/variation and power-model
+   information above, not generic campaign approval.
+3. If supplied, analytically and executably verify its coverage, tail
+   precision, fixed-count power and runtime without changing the estimator,
+   load, resources,10% ceiling or evidence layers. If it does not fit, retain
+   this infeasibility result rather than run or relax the policy.
+4. Only a separate reviewed/frozen prospective method and allocator/test
+   change may precede any new campaign. Old failures never become passes.
+   Release admission and dev/canary deployment remain blocked.
+
+**Execution issues and self-improvement:** the first visit-shock fixture
+incorrectly expected a doubled pooled median when exactly half the role
+samples were slow. The nearest-rank p50 remains at the fast value; p95/p99
+double. The focused test caught the incorrect expectation before publication.
+Corrected the fixture and added explicit per-percentile assertions, keeping
+the production estimator unchanged. A sharper bounded-CDF KL calculation
+replaced a valid but overly loose range-only bound after its own RED;
+the model-independent power obstruction prevents mistaking that improvement
+for admission feasibility. Shared validation/descriptor helpers have two
+actual offline callers rather than duplicated rules.
+
+**Test/gate disposition: applied.** Exact quantile/tie and dependence-
+misspecification controls now catch both averaging and assumed-drift escapes.
+**Design/architecture disposition: accepted.** One cohesive offline module,
+small pure mathematical functions, shared input validation, no allocator or
+runtime coupling; a new abstraction/framework is unjustified. No full-
+transcript RCA completeness is claimed (`VSCODE_TARGET_SESSION_LOG` unset).
+Independent separate-context mathematical/code review found no actionable
+correctness defects and explicitly retained all actual-model/power blockers.
+Ordinary protected publication/CI are separate from these results; no new
+live/browser/database evidence is claimed.
+
+Low-severity source-lookup friction: a search wrapper contained multiple
+JSON records, so single-document parsing failed before any evidence change.
+Extracting only the public citation URLs resolved the lookup. One public
+MIT resource hit a bounded redirect failure; no dependency was installed
+or private data submitted. The coverage proof above is supplied in full
+rather than inferred from an inaccessible source or a search summary.
+
 ### Prospective precision feasibility and release hold (2026-11-03)
 
 **Executive conclusion:** keep actual 0.55.67, the original 10% limit and
