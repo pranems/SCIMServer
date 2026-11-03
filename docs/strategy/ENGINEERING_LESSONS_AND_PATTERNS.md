@@ -52,8 +52,16 @@ including escaped quotes/backslashes. The regression must read the actual
 database/login identity through the production parser and worker, not merely
 compare parsed strings or stub a successful client. PR #267's third review
 and hosted `41674035838` establish this real assertion RED; the corrected
-serializer still requires hosted PostgreSQL GREEN. The existing hosted
-workflow now owns that independent real database check.
+serializer's real PostgreSQL step is GREEN in hosted `41678029555` at
+`b8f9b847`, including the existing signal/fidelity/isolation cases. The
+existing hosted workflow now owns that independent real database check.
+
+Do not overwrite parsed values with expected fixture values before the
+downstream call. The first login fixture did exactly that, so worker quoting
+passed while URI username decoding remained broken. Encode each actual case
+in the input URI and forward the parser's output unchanged. An offline
+parser assertion catches one-time decoding errors quickly; the real database
+then proves the complete path without expected-value substitution.
 
 Compare normalized database identities, not URI spellings: libpq treats
 zero-padded numeric ports as the same port, and percent-encoded database

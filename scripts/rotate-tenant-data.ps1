@@ -165,7 +165,7 @@ function Split-PgUri {
         DbHost   = $h
         Port     = $port
         Database = [Uri]::UnescapeDataString($db)
-        User     = $user
+        User     = [Uri]::UnescapeDataString($user)
         Password = $pass
         SslMode  = $ssl
     }

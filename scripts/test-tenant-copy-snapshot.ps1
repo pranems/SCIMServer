@@ -98,13 +98,14 @@ printf 'TARGET_IDENTITY=%s\n' "$identity"
         @{ SourceDatabase = $redirectDatabase; TargetDatabase = $specialDatabase; User = $specialUser }
     )
     foreach ($identityCase in $identityCases) {
-        $sourceUri = "postgresql://postgres:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.SourceDatabase))?sslmode=disable"
-        $targetUri = "postgresql://postgres:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.TargetDatabase))?sslmode=disable"
+        $encodedUser = [Uri]::EscapeDataString($identityCase.User)
+        $sourceUri = "postgresql://${encodedUser}:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.SourceDatabase))?sslmode=disable"
+        $targetUri = "postgresql://${encodedUser}:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.TargetDatabase))?sslmode=disable"
         $sourceIdentity = Split-PgUri -Uri $sourceUri -Which Source
         $targetIdentity = Split-PgUri -Uri $targetUri -Which Target
         $identityEnvironment = $environment + @(
             '--env', "SRC_DB=$($sourceIdentity.Database)", '--env', "DST_DB=$($targetIdentity.Database)",
-            '--env', "SRC_USER=$($identityCase.User)", '--env', "DST_USER=$($identityCase.User)"
+            '--env', "SRC_USER=$($sourceIdentity.User)", '--env', "DST_USER=$($targetIdentity.User)"
         )
         $output = $identityProbe | & docker exec -i @identityEnvironment $container sh -c 'tr -d "\r" | sh'
         if ($LASTEXITCODE -ne 0) { throw 'Connection-identity probe failed before readback; inspect the PostgreSQL diagnostic.' }

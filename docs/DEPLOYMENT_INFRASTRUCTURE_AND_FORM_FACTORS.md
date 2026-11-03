@@ -73,8 +73,15 @@ The step has a three-minute execution bound on the disposable hosted runner.
 Hosted `41674035838` reproduces the third-review target-identity assertion
 before production code changes. Shared worker setup now quotes every libpq
 value and escapes literal quotes/backslashes, rather than allowing a decoded
-database name to override validated connection parameters. Actual corrected
-PostgreSQL validation and exact-tip publication/review remain required.
+database name to override validated connection parameters. Hosted41678029555
+confirms actual PostgreSQL step GREEN at b8f9b847; full hosted completion and
+refreshed review remain required.
+
+The subsequent login-boundary correction decodes URI usernames once, without
+altering raw/alternate password selection. The fixture now encodes each
+login in its actual URI and forwards the parsed login, not an expected
+replacement. Offline actual-parser RED/GREEN is established; corrected
+hosted database execution and exact-tip review remain pending.
 
 PR #267 review corrections bind the target application's effective database
 host, port and database name before any suspension/restore; subscription

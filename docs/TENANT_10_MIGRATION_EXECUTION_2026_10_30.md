@@ -9,6 +9,41 @@
 
 ## Executive summary
 
+### Fourth review: carry the parsed login through the actual boundary
+
+The independent review at `b8f9b847` confirms the libpq injection finding
+resolved, but identifies a Medium test/implementation gap: the PostgreSQL
+fixture encoded database names while hardcoding `postgres` in each URI, then
+overwrote the worker login with the expected special-character fixture login.
+Its GREEN proves literal worker handling, not encoded-login URI handling.
+The production parser also returned the percent-encoded username unchanged,
+so a real encoded special-character login could not authenticate.
+
+The new offline `userinfo` case extracts the actual parser and confirms
+`RED: production URI parser does not decode login identity exactly once.`
+Only then does the parser change to decode the username once, like the
+database name. The same case is now GREEN for ordinary names, whitespace,
+quotes, backslashes, encoded `@`/`:` and literal percent escapes. It separately
+locks the existing raw/alternate password contract; password behavior is not
+changed. This is the eleventh review case within the existing 11-script gate.
+
+The real PostgreSQL fixture now encodes each case's login in both URIs and
+passes only `sourceIdentity.User` / `targetIdentity.User` into the worker.
+No expected-value replacement bypasses production parsing. Corrected real
+database execution and full exact-tip publication/review remain pending.
+
+Type/severity: test correctness and URI identity, Medium. Root cause:
+expected fixture values were substituted after parsing, hiding an undecoded
+production username. Fix: normalize the username once and preserve the
+actual parsed value across the worker boundary. Why it works: libpq receives
+the intended login rather than its URI spelling, and a future parser
+regression can no longer be hidden by test environment replacement.
+Detection: independent review; earliest suitable detection is the new
+offline actual-parser assertion, followed by real parser-to-worker readback.
+Self-improvement is applied through both layers. Design disposition:
+accepted; the existing shared parser owns URI normalization, while the
+existing serializer owns libpq grammar. No new abstraction is required.
+
 ### Third review: literal libpq connection parameters
 
 **Actual behavioral RED:** `f3ad6852` passes all 29 protected gates in
@@ -22,8 +57,14 @@ using libpq single-quoted parameter syntax, escaping literal quotes and
 backslashes. Canonical parsing remains unchanged. One serializer in the
 shared setup protects both preflight and full-copy connections. The complete
 worker passes POSIX syntax validation, and an exact transformation control
-preserves spaces and escapes quotes/backslashes. Real PostgreSQL GREEN and
-corrected-tip publication/review are still required.
+preserves spaces and escapes quotes/backslashes. Hosted `41678029555` at
+`b8f9b847` confirms the actual PostgreSQL step GREEN at
+`2026-11-03T16:49:45Z`: the three source/target identity combinations, TERM
+release, extra-table rejection, 2,000-row manifest fidelity and concurrent
+write isolation complete successfully. Fixture ownership/tmpfs/removal
+assertions execute in the same step. The normal protected publication passes
+all 29 gates in 1,118.6 seconds; full hosted completion and refreshed
+independent review remain pending.
 
 Published `7f383242` passes all 29 protected gates in 1,144.8 seconds and
 hosted run `41660995714`, including image smoke and Trivy; CodeQL and freshness
@@ -110,7 +151,7 @@ It does not establish that the production connection correction is GREEN.
 
 | Issue | Type / severity | Mechanism and disposition | Detection / earliest suitable check |
 |---|---|---|---|
-| Decoded database name injects libpq parameters | Connection identity / High | Correct canonical decoding was followed by unquoted interpolation. Quote every downstream value and escape quotes/backslashes in shared worker setup; real GREEN pending | Independent review, then actual target-identity RED in hosted41674035838; parser-to-worker real identity readback is the earliest suitable integration check |
+| Decoded database name injects libpq parameters | Connection identity / High | Correct canonical decoding was followed by unquoted interpolation. Quote every downstream value and escape quotes/backslashes in shared worker setup; actual hosted41678029555 PostgreSQL step GREEN at b8f9b847 | Independent review, then actual target-identity RED in hosted41674035838; parser-to-worker real identity readback is the earliest suitable integration check |
 | Initial GraphQL thread query lacked a closing brace | Tooling / Low | Metadata lookup failed before any thread change; corrected multiline query succeeded and both addressed threads were resolved | GitHub parser; the same query execution |
 | Connection fixture used expression splatting | Harness / Low | `@environment + ...` is not a PowerShell expression; corrected to `$environment + ...` before any database run | PowerShell parser; local syntax check |
 | Identity query used `current_user()` | Test correctness / Medium | SQL keyword is not callable; remove parentheses and keep pre-readback errors distinct from identity mismatch. Actual query execution pending | Hosted real PostgreSQL; an earlier real SQL smoke was unavailable while local Docker was unresponsive |

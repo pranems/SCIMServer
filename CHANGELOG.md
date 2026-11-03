@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Decode URI usernames once and make special-login database tests encode
+  their actual input usernames and forward parsed values into the worker.
+  The new actual-parser case has RED/GREEN and preserves existing password
+  semantics. Eleven review cases now run within the 11-script offline gate;
+  corrected real database and full exact-tip publication/review are pending.
 - Quote every worker libpq connection value and escape quotes/backslashes
   without changing canonical identity parsing. Hosted41674035838 reproduces
   actual target redirection before this fix. POSIX syntax and exact escaping
-  controls pass; real PostgreSQL GREEN and full corrected-tip gates/review
-  remain required. Shared setup covers both preflight and full copy.
+  controls pass; hosted41678029555 confirms the actual PostgreSQL step GREEN
+  atb8f9b847, alongside all29 protected gates. Full hosted completion and
+  refreshed review remain required. Shared setup covers preflight/full copy.
 - Add actual parser-to-libpq database/login identity readback to the real
   PostgreSQL fixture and run that fixture in hosted validation. This is a
   RED-first regression for the third-review unquoted connection-parameter

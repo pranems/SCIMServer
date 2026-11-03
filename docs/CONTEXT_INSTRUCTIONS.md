@@ -2,12 +2,24 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.66
-> **Last Updated**: October 29, 2026
+> **Last Updated**: November 3, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**Latest PR267 boundary:** b8f9b847 passes29 protected gates and the actual
+PostgreSQL connection/snapshot step in41678029555. Review confirms literal
+libpq quoting fixed injection, but identifies URI login decoding hidden by
+fixture expected-value replacement. An actual-parser assertion has RED/GREEN
+for one-time username decoding with password semantics unchanged. The real
+fixture now encodes usernames in its URIs and forwards parsed usernames.
+Eleven review cases run within the existing11-script gate. Corrected full
+publication, real database execution and refreshed review remain required.
+PR268's bounded conditional CDF construction does not admit0.55.67; actual
+coverage assumptions remain unjustified. No release, target app deployment,
+final data carry, role cutover or customer-production change has occurred.
 
 **2026-11-03 tenant-rollover consolidation:** the
 [migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)

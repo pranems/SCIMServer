@@ -1,17 +1,17 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup')]
+    [ValidateSet('all', 'acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup', 'userinfo')]
     [string]$Case = 'all'
 )
 $ErrorActionPreference = 'Stop'
 if ($Case -eq 'all') {
     $failed = @()
-    foreach ($item in @('acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup')) {
+    foreach ($item in @('acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup', 'userinfo')) {
         & pwsh -NoProfile -File $PSCommandPath -Case $item
         if ($LASTEXITCODE -ne 0) { $failed += $item }
     }
     if ($failed.Count) { throw "Review regressions failed: $($failed -join ', ')" }
-    Write-Host 'PASS: all ten independent-review regression cases'
+    Write-Host 'PASS: all eleven independent-review regression cases'
     return
 }
 . (Join-Path $PSScriptRoot 'postgres-provisioning.ps1')
@@ -93,6 +93,30 @@ function global:az {
 }
 try {
     switch ($Case) {
+        'userinfo' {
+            $tokens = $null; $errors = $null
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                (Join-Path $PSScriptRoot 'rotate-tenant-data.ps1'), [ref]$tokens, [ref]$errors
+            )
+            if ($errors.Count) { throw ($errors | Out-String) }
+            $parser = $ast.Find({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                    $node.Name -eq 'Split-PgUri'
+            }, $true)
+            if (-not $parser) { throw 'Production URI parser is missing.' }
+            . ([scriptblock]::Create($parser.Extent.Text))
+            foreach ($login in @('postgres', "copy user'\path", 'copy@user:part', 'copy%20user')) {
+                $encodedUser = [Uri]::EscapeDataString($login)
+                $parsed = Split-PgUri -Uri "postgresql://${encodedUser}:synthetic%99@localhost/scimdb" -Which Fixture
+                if ($parsed.User -cne $login) {
+                    throw 'RED: production URI parser does not decode login identity exactly once.'
+                }
+                if ($parsed.Password -cne 'synthetic%99') {
+                    throw 'Login normalization changed the existing raw/alternate password contract.'
+                }
+            }
+        }
         'acl' {
             if ($IsWindows) {
                 function Set-Acl { Write-Error 'synthetic ACL failure' }

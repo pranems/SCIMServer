@@ -2,6 +2,29 @@
 
 **Last verified:** 2026-11-03
 
+### Latest review: preserve the complete login URI path
+
+Publishedb8f9b847 passes all29 protected gates in1118.6s and the real
+PostgreSQL step in hosted41678029555. The next independent review confirms
+the libpq connection-injection correction but finds a Medium login gap:
+the fixture passed expected usernames after bypassing URI username parsing.
+The new actual-parser userinfo assertion is RED before changing production,
+then GREEN after one-time username decoding. Ordinary/special usernames,
+encoded delimiters and literal percent escapes retain their intended values;
+existing raw/alternate password semantics remain unchanged.
+
+The real fixture now encodes each username in its URI and passes parsed
+source/target usernames into the worker. Eleven review cases are registered
+within the existing11-script gate. Corrected full publication, hosted real
+database execution and independent review remain required. Local Docker is
+unresponsive and was not restarted; local fixture allocation/absence remains
+unverified. Normal hosted integration is used instead.
+
+Requested0.55.67 is still not admitted. Bounded offline method PR268 produces
+a conditional whole-visit CDF calculation, not a justified fixed-budget
+qualification correction. No new campaign, serving target app, final source
+freeze/carry, role cutover or customer-production change is implied.
+
 ### Second review boundary hardening
 
 Hosted41651296099 passes at05adbacd and review confirms the original six
