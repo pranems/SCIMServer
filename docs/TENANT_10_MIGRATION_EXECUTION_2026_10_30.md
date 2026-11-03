@@ -2,12 +2,83 @@
 
 > **Started:** 2026-10-30
 > **Scope:** dev and canary only; customer production is excluded
-> **Requested release:** 0.55.67, subject to ordinary release and performance admission
+> **Requested release:** 0.55.67; a performance-admission exception is authorized for this dev-and-canary migration only. Performance remains unqualified. Every other gate remains mandatory.
 > **Execution worktree:** `SCIMServer-tenant10-migration-20261030`
 > **Branch:** `ops/tenant10-migration-20261030`
 > **Status:** foundations, both Ready databases, both full-source local replays and disposable Azure transfers pass. Local PostgreSQL browser acceptance passes 348 tests with zero skips, failures or flaky results. No target app is serving; release selection/admission, actual target acceptance and final carry/cutover remain pending.
 
 ## Executive summary
+
+### Authorized performance-admission exception (2026-11-03)
+
+**Decision ID:** `T10-0.55.67-PERF-EXCEPTION-2026-11-03`.
+
+The operator explicitly authorized:
+
+> I authorize a documented performance-admission exception for this 0.55.67 dev-and-canary migration only. Performance remains unqualified. Keep every other security, data-integrity, functional, browser and migration gate mandatory. Do not change customer production.
+
+This supersedes historical statements that no exception was authorized. It
+changes the release-path decision, not the failed qualification evidence.
+Performance remains **unqualified**, failed receipts remain failed, and skipped
+jobs must never be reported as passes.
+
+| Boundary | Authorized scope and mandatory evidence |
+|---|---|
+| Version and operation | Only 0.55.67 for this tenant 09 to tenant 10 dev-and-canary migration. No standing exception for later releases or unrelated deployments. |
+| Environments | Tenant 10 dev and canary only. Customer-production application, database, image, traffic and estate identity must not change. |
+| Performance | Preserve failed receipts, normal protocols, thresholds and qualification logic. No new measurement campaign is authorized by this decision. Record the admission exception explicitly, never as performance-qualified. |
+| Source and artifact | Pass every other applicable exact-tip gate and normal review, merge to master, then build and scan. Before deployment, bind this decision to the exact merged commit, product version and immutable image digest. Those final identities remain pending. |
+| Assurance | Security, dependency/image scans, response contracts, functional tests, persistence-backend parity, migration replay, live HTTP, browser and measured-layout checks remain mandatory. |
+| Data and cutover | Prove effective source-writer freeze, take a fresh consistent final carry, verify complete carried state and resource identities, and validate recovery before switching clients. No freeze or cutover is claimed. |
+| Target acceptance | Report every applicable numbered pipeline gate on the actual targets. Preserve required operator visual acceptance. Report target latency and operational failures separately; the exception does not make an unhealthy target acceptable. |
+| Promotion | Promote the same verified immutable digest from dev to canary through the existing safe process. No customer-production promotion is authorized. |
+
+#### Release-only delivery boundary
+
+Source integration `5823a225ea08b0a2d7af51e6dd7bc9cc3b5fc69e` combines
+held PR251 with reviewed master
+`a80fafb219c07628c7cd0b4fb67bed983570e7cf`. Against that master, the complete
+API/web trees differ only in four version-bearing files: each package manifest
+and its lockfile. Their existing 0.55.67 blobs have been imported unchanged,
+without regenerating a lockfile. The resulting complete API/web trees match
+the integrated candidate, not merely selected production files.
+
+Use the bounded branch `ops/tenant10-release-exception-20261103`, based on that
+reviewed master, for the four metadata changes, source-version documentation
+and this explicit exception. Keep qualification-method research in PR251
+draft. Its three campaign workflows explicitly run on `ready_for_review`;
+marking that research PR ready would allocate campaigns rather than advance
+only the migration release.
+
+The release-only branch changes no workflow, qualification program, threshold,
+runtime source, schema or dependency graph. This is a consciously authorized
+migration release under the exception, not an inferred source-equality waiver.
+Normal campaign behavior remains unchanged for future qualification work.
+
+Owned root and web restores completed successfully after dependency inventory
+failures, with manifest/lock hashes unchanged. Owned API Prisma generation and
+the complete lock provenance check passed. The provenance check reports
+157/684/395 sha512 entries across root/API/web, public registry hosts only.
+Ordinary protected publication and exact-tip hosted checks remain pending.
+No release artifact or target application exists yet.
+
+**Self-improvement disposition:** applied. Keep explicit authorization,
+unqualified performance, mandatory gates and pending exact-artifact binding
+together, and separate release metadata from diagnostic research.
+**Design/architecture disposition:** accepted. Reuse unchanged normal gates
+instead of introducing a general label, workflow bypass or runtime abstraction.
+
+#### Release preparation issues
+
+| Issue | Type / severity | Symptom and root cause | Fix and why it works | Detection / prevention |
+|---|---|---|---|---|
+| TR-1 | Dependency bootstrap / Low | Root and web `npm ls --depth=0` returned ELSPROBLEMS because the new owned worktree lacked its packages. | Owned `npm ci --ignore-scripts` restored both installations; before/after manifest and lock hashes are identical. API Prisma generation passed separately. No dependency borrowing or lock regeneration. | Dependency preflight caught this before publication. Keep the existing missing-dependency-first and owned-installation rules; no gate escape. |
+| TR-2 | Editing friction / Low | A multi-file patch applied its first file but rejected a session-memory anchor copied from the other branch. The current master has a different first checkpoint. | Inspect the current header and retry only the unapplied hunks against the shared document heading. The tool's partial-application report prevents overwriting the successful first edit. | Caught at patch application, the earliest possible stage. Read branch-specific context before using historical anchors. |
+| TR-3 | Documentation completeness / Low | Freshness `-Fix` updated version headers but F4 still rejected unchanged release notes. The existing header already said 0.55.67, so stamping alone could not document the new operational decision. | Add explicit migration-only release notes, including unqualified performance, mandatory gates and pending deployment. | F4 caught missing user-facing explanation before commit. A generated header is not a release explanation; retain the existing coupling check. |
+| TR-4 | Documentation completeness / Low | Protected Validate stopped after 323.9s at C13: README version badge claimed 0.55.66 while product metadata said 0.55.67. Freshness stamps the header, not this independent badge. Twelve preceding gates passed, including build/lint/type checks and diagram rendering. | Update the badge and README's current migration scope; require the actual content audit GREEN before retrying publication. The existing C13 check catches this precise second-claim drift. | C13 caught the mismatch before push. Earliest detection was the focused content audit after the version bump; use both freshness and content audits for release metadata. No runtime gate escaped and no new gate implementation is needed. |
+
+These entries use direct command results from this preparation. They do not
+claim that the full historical session transcript has been reconciled.
 
 ### Current handoff: tooling merged and postmerge validation passes
 

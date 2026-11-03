@@ -1,5 +1,24 @@
 ## SCIMServer - Condensed Session Memory
 
+**2026-11-03 authorized migration release:** the operator explicitly authorized
+`T10-0.55.67-PERF-EXCEPTION-2026-11-03` for this 0.55.67 tenant 10 dev/canary
+migration only. Performance remains unqualified; all other security,
+data-integrity, functional, browser and migration gates stay mandatory.
+Customer production must not change. The exact authorization and boundaries
+are recorded in `docs/TENANT_10_MIGRATION_EXECUTION_2026_10_30.md`.
+Release-only branch `ops/tenant10-release-exception-20261103` starts at reviewed
+mastera80fafb2 and imports the four existing 0.55.67 manifest/lock blobs.
+Its complete API/web trees match integrated candidate5823a225; no dependency
+graph, runtime source, schema, workflow or qualification rule changes.
+Keep PR251 research draft: ready_for_review explicitly starts its campaigns.
+Root/web restores, unchanged-lock checks, API Prisma generation and full
+lock provenance pass. Protected publication, reviewed merge and immutable
+artifact binding are pending. No target app, verified source-writer freeze,
+final carry or cutover is claimed. Historical no-waiver statements below are
+superseded, not failed benchmark receipts. Self-improvement applied: explicit
+scope/artifact binding and separate release/research units. Design disposition
+accepted: no general gate bypass or runtime abstraction is justified.
+
 **Last verified:** 2026-11-03
 
 ### Current handoff: tooling merged; release and deployment remain held

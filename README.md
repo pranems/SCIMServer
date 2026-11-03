@@ -1,13 +1,21 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.66`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.67`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
 **What's new and how to upgrade:** [User-facing release notes](docs/RELEASE_NOTES.md)
-cover 0.55.58 correction preparation, merged 0.55.57 source, the deployed 0.55.56 checkpoint,
-cumulative changes since 0.55.20, migration/rollback steps and known limits.
+cover the proposed 0.55.67 tenant 10 dev-and-canary migration, earlier correction
+history, cumulative changes since 0.55.20, migration/rollback steps and known limits.
 See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
+
+**0.55.67 migration release preparation:** the operator authorized a
+performance-admission exception for this dev-and-canary migration only.
+Performance remains unqualified; every other gate remains mandatory.
+Customer production must not change. The
+[migration execution record](docs/TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records the scope and pending final artifact, target acceptance and cutover.
+No deployed release is claimed.
 
 **Current Hono source integration:** [Actual Prisma parent qualification](docs/HONO_PRISMA_PARENT_QUALIFICATION.md)
 records proposed 0.55.66 integrating reviewed master after #259, #260 and
@@ -29,7 +37,7 @@ For actual supported shapes and integration limits, see
 Keep strict validation enabled for Entra; diagnose the request and effective
 schema before applying a targeted compatibility setting.
 
-[![Version](https://img.shields.io/badge/version-0.55.66-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.67-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()
