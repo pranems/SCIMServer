@@ -9,6 +9,19 @@
 
 ## Active Delivery Process
 
+**Authoritative current state:** PR267 is merged at84099293570af5ab06f7d8e2f93e7e6ae2c0236f.
+Reviewed883fb6c6 passes29 protected gates, and exact-tip5757623103 reports
+no open issues (COMMENTED, not formal APPROVED). Postmerge41696483989,
+CodeQL41696338523 and freshness41696488100 pass. The actual default fixture
+proves YAML/password/worker transport and real PostgreSQL identity, snapshot,
+signal, fidelity and isolation. Image smoke/Trivy pass. Current verified prov10
+provider reads show both PG17/B1ms servers Ready and zero target apps.
+Requested0.55.67 is still not admitted; the immutable tooling test image is
+not a replacement release. Source freeze/final carry, actual target/browser
+acceptance and role cutover remain pending. Earlier correction-time pending
+descriptions below are historical. The execution document is the detailed
+handoff, including exact evidence and unresolved recovery limitations.
+
 **Current sixth-review correction:** Medium4458623530 identified that default
 all mode skipped the optional distinct-password/worker-text assertions.
 Actual-default RED/GREEN is established without contacting Docker; both modes

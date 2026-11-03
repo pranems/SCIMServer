@@ -9,6 +9,89 @@
 
 ## Executive summary
 
+### Current handoff: tooling merged and postmerge validation passes
+
+PR #267 merged normally at `2026-11-03T18:42:17Z`, creating master
+`84099293570af5ab06f7d8e2f93e7e6ae2c0236f`. Reviewed source tip `883fb6c6`
+passed all 29 protected gates in 1,133.6 seconds and hosted `41694778191`.
+Independent exact-tip review `5757623103` reports no open issues and confirms
+the High YAML and Medium default-mode findings resolved. Its state is
+COMMENTED, not formal APPROVED. Every inline thread is resolved with evidence.
+No hook, branch protection or approval override was used.
+
+The subsequent read-only prov10 recheck verifies the approved deployment
+service principal, exact target tenant and subscription before resource calls.
+Both target application resource groups contain zero Container Apps.
+Dev `scimserver-pg-dev-m7j4rn` and canary `scimserver-pg-canary-n8r5vk` are
+both Ready, PostgreSQL 17, Standard_B1ms in Central US. These are current
+provider observations, not inferred from earlier provisioning or local tests.
+No resource was deployed, modified, restored or deleted by the recheck.
+
+Self-improvement applied: current-state handoffs explicitly supersede
+historical pending statements and distinguish tooling, release admission and
+live target acceptance, preventing a successful fixture from appearing to
+authorize a restore. Design disposition: accepted; this evidence-only update
+changes no responsibilities, dependency edges or runtime abstractions.
+
+| Authoritative postmerge evidence | Run | Result |
+|---|---|---|
+| Full validation, actual default PostgreSQL fixture, image build/push, container smoke, HIGH/CRITICAL Trivy gate | `41696483989` | PASS at exact merged master |
+| CodeQL | `41696338523` | PASS at exact merged master |
+| Documentation freshness | `41696488100` | PASS at exact merged master |
+
+The default PostgreSQL step proves all 14 environment values, distinct
+raw/alternate synthetic passwords and worker text at `18:44:03Z`, then
+identity, signal release, extra-table rejection, 2,000-row fidelity and
+concurrent-write isolation through `18:44:18Z`. This is actual generated
+YAML transport plus database evidence, not only an optional manual mode.
+The image boots/serves and its scan passes.
+
+Ordinary CI published the uniquely tagged tooling test image
+`ghcr.io/pranems/scimserver:test-tenant10-tooling-84099293570a`.
+Its pushed manifest and the smoke-test pull both identify:
+
+```text
+ghcr.io/pranems/scimserver@sha256:225ebe85030d76593dc1256f19e641f74ba3d886f53796443c6ca8dc68eed1e3
+```
+
+This is the merged-master tooling validation artifact at the unchanged
+product version, not an admitted 0.55.67 release or an authorized substitute.
+No release/performance/deployment workflow was started. Requested 0.55.67
+remains held: PR #268 does not establish admission. The operator was
+unavailable to choose an explicitly different admitted-image migration, so
+no substitution, waiver or new performance campaign was assumed.
+
+Next operational gates remain release admission, actual source/target
+provider bindings, source writer quiescence, a fresh frozen carry, target
+HTTP/auth/schema/data tests, measured target Playwright and operator visual
+acceptance, then registry cutover and revision pruning. Existing 348-test
+local browser acceptance is not target acceptance. No target app is deployed
+and customer production is untouched. Local interrupted Docker fixture
+absence, off-device recovery and full-transcript RCA reconciliation remain
+unverified. Earlier sections below are chronological preparation evidence.
+
+RCA type/severity: package-metadata permissions, Low. A separate GitHub
+Packages REST inventory request returned HTTP 403 because the current CLI
+token lacks `read:packages`. No permission elevation or authenticated-package
+inventory claim followed. Resolution: retain the already authorized CI
+producer log and independent smoke-pull output, which agree on the digest
+above; direct package REST inventory remains unavailable. Why that evidence
+is sufficient for the stated claim: it proves this run pushed and consumed
+that digest, not permanent retention or off-device image-backup recovery.
+Prevention: distinguish registry inventory permissions from Actions-log
+access and scope each evidence claim accordingly. Detection and earliest
+suitable detection are the failed read-only API call.
+
+RCA type/severity: shell tool discovery, Low. The first read-only check could
+not invoke `az` because the fresh process did not include Azure CLI in PATH.
+The existing installation was found at its standard Program Files path and
+invoked explicitly with the approved prov10 profile. Identity verification
+and all four resource reads then succeeded. No package installation, shared
+PATH change or account substitution was needed. Prevention: use the existing
+verified executable/profile in fresh processes rather than assume earlier
+shell state persists. Detection and earliest suitable detection are the
+failed command lookup; no cloud request was made by that failed invocation.
+
 ### Sixth review: include the assertion in the mode CI actually invokes
 
 Exact-tip independent review `5757233449`, submitted at
