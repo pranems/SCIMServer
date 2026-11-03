@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.66`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.67`
 
-> **Version:** 0.55.66 - **Updated:** 2026-10-21
+> **Version:** 0.55.67 - **Updated:** 2026-10-21
 > 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Unreleased preparation:** [endpoint token lifetime integration and original

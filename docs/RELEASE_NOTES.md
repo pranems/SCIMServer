@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.66`
+> **Status:** User-facing reference - **Last verified:** 2026-10-23 - **Product version:** `0.55.67`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -14,6 +14,25 @@ log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
 
 ## Unreleased
+
+### 0.55.67 tenant 10 dev-and-canary migration
+
+The operator authorized a performance-admission exception for this migration
+only. **Performance remains unqualified.** Every other security,
+data-integrity, functional, browser and migration gate remains mandatory.
+Customer production must not change.
+
+The [migration execution record](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+contains the exact authorization, decision scope and required final
+merged-source/image-digest binding. Release metadata advances from 0.55.66 to
+0.55.67 without changing runtime source, database schema or dependency graphs.
+Qualification-method research remains separate in draft #251; this exception
+does not change normal qualification protocols or turn failed evidence green.
+
+Protected validation, normal review, merged artifact publication and actual
+target acceptance are pending. The final source-writer freeze, fresh data carry
+and cutover are not complete. This is not a deployed-release announcement.
+Earlier unreleased preparation entries below are historical context.
 
 ### Current source consolidation: 0.55.66
 

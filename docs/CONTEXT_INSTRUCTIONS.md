@@ -1,13 +1,30 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.66
+> **Version**: 0.55.67
 > **Last Updated**: November 3, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**Current operator-authorized release path:** performance-admission exception
+`T10-0.55.67-PERF-EXCEPTION-2026-11-03` applies only to this 0.55.67 tenant 10
+dev/canary migration. Performance remains unqualified. Every other security,
+data-integrity, functional, browser and migration gate remains mandatory;
+customer production must not change. The existing migration execution document
+records the exact authorization, scope and required merged-commit/image-digest
+binding. Historical no-waiver holds below are superseded, not failed receipts.
+Use release-only branch `ops/tenant10-release-exception-20261103`; keep
+qualification research PR251 draft. Complete API/web trees match integrated
+candidate5823a225 after importing four unchanged version-bearing blobs.
+No runtime, schema, dependency graph, workflow or normal qualification logic
+changes. Root/web dependency restore, unchanged-lock verification, API Prisma
+generation and public-registry/sha512 provenance pass. Normal protected review,
+final immutable artifact, actual target acceptance, source freeze/final carry
+and cutover remain pending. Self-improvement applied: bounded authorization
+and honest pending evidence. Design disposition accepted: no general bypass.
 
 **Authoritative current state:** PR267 is merged at84099293570af5ab06f7d8e2f93e7e6ae2c0236f.
 Reviewed883fb6c6 passes29 protected gates, and exact-tip5757623103 reports

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.67 tenant 10 migration release under a scoped exception
+
+- Record explicit operator authorization
+  `T10-0.55.67-PERF-EXCEPTION-2026-11-03` for this dev-and-canary migration
+  only. Performance remains unqualified; every other gate is mandatory.
+  Customer production must not change. Failed qualification evidence and
+  normal qualification rules remain unchanged.
+- Import the existing 0.55.67 API/web manifests and lockfiles without
+  regeneration or dependency changes. Complete API/web trees match integrated
+  candidate5823a225; runtime source and schema are unchanged from reviewed
+  mastera80fafb2. Keep diagnostic research in draft PR251 rather than starting
+  campaigns through its ready-for-review event.
+- Root/web dependency restores, unchanged-lock checks, API Prisma generation
+  and complete lock provenance pass. Protected and hosted test counts,
+  reviewed merge, final artifact identity and actual dev/canary validation
+  are pending; no unchanged parent count is presented as a fresh run.
+- Self-improvement applied: record the bounded exception separately from
+  passing evidence and require final source/digest binding. Architecture
+  disposition accepted: no general gate bypass or runtime abstraction.
+
 ### Tenant rollover tooling consolidation
 
 - Record PR267's normal reviewed merge at84099293570a and authoritative
