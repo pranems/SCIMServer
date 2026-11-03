@@ -23,6 +23,12 @@ query and closes the transaction; the failed-copy release check and all three
 fidelity/isolation cases pass. Checks now cover each worker exit, including
 successful and concurrent-write copies. No unrelated source session is killed.
 
+Commit `579b2046` passed 26 protected gates, including 6,254 API unit tests
+and 2,514 HTTP tests (42 explicit skips), but publication stopped because
+Prisma lacked `DATABASE_URL` in the push shell. Code generation with a
+non-secret localhost placeholder now passes. The retry must set that input
+in the same shell and complete the normal protected matrix, with no bypass.
+
 Reviewed non-admitting warmup PR265 merged into held251 at0b6490f7.
 Actual Linux study41632439081 verifies49656 benchmark requests and32000
 measured values, resources, privacy, deadlines and cleanup. The1000-cycle

@@ -26,6 +26,21 @@ copy. Failed transfers never reactivate target writers.
 | Transfer error masked by cleanup | Error handling / Medium | Actual extracted lifecycle expected `fixture primary transfer failure` but received `fixture job cleanup failure` | Save the work error before finalization; collect/report cleanup errors separately and throw work error first | Five actual-lifecycle combinations now pass; caught at consolidation, earliest catch was a unit-level combined-failure fixture |
 | Missing ignored evidence directory | Tooling / Low | Test output redirection failed before the test ran | Create only the owned `test-results` directory, then run the test and confirm its assertion RED | Do not treat runner setup failure as behavioral RED |
 | Exported snapshot survived worker exit | PostgreSQL cleanup / Medium | Actual database fixture reported `completed copy worker left 1 source transactions holding its exported snapshot` | Interrupt the owned `psql` client instead of terminating it so the running sleep query is cancelled and its source transaction closes | Failed-copy fixture is GREEN with all three fidelity/isolation cases; permanent checks also cover successful and concurrent-write exits. Caught in integration consolidation; the original fidelity-only fixture could not detect source-session retention |
+| Protected publication lacked codegen URL | Environment / Low | First protected Validate push passed 26 gates, then Prisma reported `Cannot resolve environment variable: DATABASE_URL` | Supply the non-secret `postgresql://localhost:5432/scim_codegen?schema=public` in the same process as the protected push; isolated code generation now passes without database access | The earlier codegen shell's environment did not persist. Explicitly include this codegen-only input in the publication invocation. Caught by the hook; an environment prerequisite check before the hook could have caught it earlier |
+
+Consolidation commit `579b2046` passed API unit coverage (6,254 tests across
+216 suites) and inmemory HTTP coverage (2,514 passed, 42 explicit skips,
+118 passed suites) during its first protected push. That push remained
+blocked at code generation, so those results are not a completed publication.
+The source-release check subsequently covers all three worker exits and
+passes. No hook is bypassed; the corrected-environment push must complete
+the full remaining protected matrix and hosted exact-tip CI.
+
+For tooling publication, run the ordinary `PREPUSH_MODE=Validate` push with
+the explicit codegen-only `DATABASE_URL` set in that same shell. Do not copy
+a real source or target database credential into this prerequisite, assume
+an earlier shell's environment persists, or treat an isolated codegen success
+as a substitute for the protected push.
 
 The exported-snapshot fix was confirmed against real PostgreSQL, not client
 process absence. The old termination signal stopped the client while its
