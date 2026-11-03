@@ -18,11 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and finite-budget counterexamples. Retained data do not establish a sound
   replacement admission rule; freeze exact prerequisites rather than guess
   a sample increase, weaken10% or retry unchanged.
-- Focused precision/stability contracts: 8 to20 PASS after semantic RED,
+- Focused precision/stability contracts: 8 to21 PASS after semantic RED,
   including bounded-file, descriptor-replacement and original-estimator
   compatibility controls. Combined original performance/stability/precision:
-  81/81 PASS, zero skips/failures. Independent review: no actionable defects.
-  Existing application counts
+  initial 81/81 PASS, zero skips/failures. Initial independent review: no
+  actionable defects. Final specification scrutiny clarified that the
+  retained 1.10 ceiling is inclusive; an exact-boundary/ties guard remains
+  non-admitting, and 298/299-draw individual-bound controls distinguish the
+  dependence limitation from conservative simultaneous error allocation.
+  Initial protected publication: 30/30 Validate gates PASS at69fd8e5c.
+  Final-tip publication/CI and existing application counts
   and all other gate claims remain distinct.
 - No serving source, schema, browser, dependency, version, original protocol,
   deployment or customer-production change.

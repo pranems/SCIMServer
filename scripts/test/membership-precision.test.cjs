@@ -57,6 +57,8 @@ test('finite p99 upper bound needs 793 independent draws for the explicit simult
   const ranks = precision.quantileRanks(2000, 0.99, alpha);
   assert.ok(ranks.lowerRank < 1980);
   assert.ok(ranks.upperRank > 1980 && ranks.upperRank <= 2000);
+  assert.equal(precision.quantileRanks(298, 0.99, 0.05).upperRank, null);
+  assert.equal(precision.quantileRanks(299, 0.99, 0.05).upperRank, 299);
 });
 
 test('two independent visits cannot be counted as 2000 independent request draws', () => {
@@ -124,6 +126,23 @@ test('constant correlated visits have undefined correlation, not an independence
   assert.ok(report.visits[0].operations.add.lagCorrelations.every(c => c.correlation === null));
   assert.equal(report.independenceEstablished, false);
   assert.equal(report.status, 'UNRESOLVED');
+});
+
+test('ties at the inclusive 1.10 ceiling do not become diagnostic admission or evidence of independence', () => {
+  const { rows, protocol } = fixture();
+  for (const row of rows) {
+    for (const values of Object.values(row.samples)) values.fill(row.role === 'candidate' ? 1.1 : 1);
+  }
+  const report = precision.describePrecision(rows, protocol);
+  for (const comparison of report.comparisons) {
+    assert.equal(comparison.pointRatio, 1.1);
+    assert.equal(comparison.conditionalIidRatioBounds.upper, 1.1);
+    assert.equal(comparison.conditionalIidRatioBounds.lower, 1.1);
+    assert.equal(Object.hasOwn(comparison, 'passed'), false);
+  }
+  assert.equal(report.status, 'UNRESOLVED');
+  assert.equal(report.admissionEligible, false);
+  assert.equal(report.independenceEstablished, false);
 });
 
 test('incomplete, altered-quota, wrong-image, stripped-marker and malformed observations fail with their intended cause', () => {

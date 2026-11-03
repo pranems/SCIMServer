@@ -127,7 +127,9 @@ each component's sampling assumptions still must hold. This conservative
 allocation is explicit, not a claim that Bonferroni is the unique necessary
 test. An intersection-union test can control a global all-metrics pass without
 the same simultaneous-interval allocation; it still needs valid component
-tests and does not solve dependence or tail precision.
+tests and does not solve dependence or tail precision. Even an individual
+95% finite upper bound at p99 needs 299 independent draws in the same
+sample-maximum counterexample, not the available two.
 
 At `n = 2000`, the conditional lower/upper ranks are 924/1077 (p50),
 1865/1932 (p95), 1963/1994 (p99). For example, treatment remove p95 has
@@ -195,10 +197,14 @@ policy. Its finite current outcome is **UNRESOLVED / NO ALLOCATION**.
 4. Predeclare a finite sample count, all four schedules, original 100 warmups
    unless separately justified, exact source/image/runtime binding, shared
    error control and a prospective power calculation. Proposed target:
-   family false admission at most 5% if any required true ratio is at least
-   1.10, and at least 80% whole-campaign pass probability at ratios 1.00 under
+   family false admission at most 5% if any required true ratio is strictly
+   greater than 1.10, and at least 80% whole-campaign pass probability at ratios 1.00 under
    the declared nuisance model. These are unapproved design targets, not
    measured properties or a claim that 5% admits a real regression safely.
+   The original ceiling is inclusive: exactly 1.10 is not a breach. For ties,
+   an upper bound can equal the true ratio with positive probability, so
+   do not incorrectly claim a test of a null including equality from an
+   inclusive upper-bound decision.
    Account for A/A reciprocal equivalence as well as one-sided old/current
    comparisons. Demonstrate coverage/power analytically where possible;
    bounded simulations can falsify models but cannot prove arbitrary ones.
@@ -257,11 +263,15 @@ quota/image, stripped markers and OOM are explicit errors.
 
 Initial semantic RED: missing conditional quantile calculator, not merely
 a module-load error. Initial GREEN: 18/18 precision/stability contracts.
-Final focused `node --test` over precision, original performance and stability
+Initial combined `node --test` over precision, original performance and stability
 contracts: **81/81 PASS**, zero skips/failures, including bounded-input,
 descriptor-replacement and original-estimator compatibility controls.
-Independent code review found no actionable defects and explicitly retained
-the dependence/precision limitation. Full protected publication results are recorded separately;
+After the inclusive-margin clarification below, focused precision/stability
+contracts are **21/21 PASS**, including the new ties/boundary guard.
+Initial independent code review found no actionable defects and explicitly retained
+the dependence/precision limitation. Initial protected publication at `69fd8e5c`
+passed all **30/30 Validate gates**; final-tip publication and hosted CI
+receipts are separate from that initial receipt;
 application counts from older commits are not relabelled as this tip.
 The VS Code unit-test tool did not discover Node's built-in runner tests;
 the repository's native `node --test` commands run them directly.
@@ -278,6 +288,18 @@ value for Prisma generation, which does not connect. Supply a process-local
 non-serving loopback codegen placeholder for publication, not an inherited
 or shared database and not database-backed validation evidence. Preserve the
 failed push log; the corrected push must still pass every protected gate.
+**Execution issue / RCA (statistical specification, Medium):** the initial
+proposed error target included true ratio exactly 1.10 as a false admission,
+while the retained ceiling and proposed upper-bound condition are inclusive.
+For constant tied values an upper bound can equal that boundary with positive
+probability, so coverage does not prove that stronger null claim. Clarify
+the target as a true breach strictly above 1.10, preserving the original
+inclusive ceiling, and add an exact-boundary/ties regression proving the
+diagnostic still cannot admit anything. This was caught during final
+specification scrutiny after initial review and protected publication, before
+any method implementation or allocation. Earliest detection was the original
+mathematical review; this is a specification-review escape, not a deployment
+escape. Retain the initial publication receipt and require new-tip gates.
 **Provenance:** this analysis used bounded source/receipt reads and executable
 offline checks, not the 28 MB hosted log. `VSCODE_TARGET_SESSION_LOG` is unset;
 full-transcript RCA completeness is not claimed.
@@ -286,6 +308,9 @@ full-transcript RCA completeness is not claimed.
 enumeration, 792/793 p99 boundary, a perfect-dependence counterexample and
 same-point-ratio/wide-bound controls before another method can be called
 precise. Never treat a raw count or weak autocorrelation as independence.
+Add an exact-inclusive-margin/ties example and the 298/299 individual-bound
+boundary so neither null equality nor conservative multiplicity accounting
+can silently change the original ceiling or obscure the dependence blocker.
 **Design/architecture disposition: accepted.** One small offline analyzer
 and its contracts; no serving code, dependency, runner responsibility or
 speculative general-purpose experiment framework. No admission-policy

@@ -12,9 +12,11 @@ model and fixed-budget tail sufficiency remain unestablished. No admission
 policy is implemented and no new campaign allocated. Frozen prerequisites,
 alternatives and finite UNRESOLVED stop are in ENDPOINT_SNAPSHOT_REVISION.md.
 Keep .67, 10%, original0.5CPU/1GiB, failures and raw evidence. #251 stays
-draft; migration worktree untouched; customer prod excluded. Focused81/81
-PASS, zero skips/failures; independent review found no actionable defects.
-Protected exact-tip publication remains separate pending work.
+draft; migration worktree untouched; customer prod excluded. Initial combined
+81/81 PASS, independent review no actionable defects; protected publication
+30/30 Validate gates PASS at69fd8e5c. Final scrutiny clarified inclusive1.10
+versus a true breach and added a ties/boundary guard; focused21/21 PASS.
+Final-tip protected publication and hosted CI remain separate pending work.
 
 **2026-11-03 fixed-warmup diagnostic preparation:** isolated
 `fix/qualification-warmup-study-20261103` implements a bounded non-admitting
