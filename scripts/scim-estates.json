@@ -61,6 +61,23 @@
 
   "tenants": [
     {
+      "key": "proviam10",
+      "role": "next",
+      "tenantName": "Provisioning IAM Team 10",
+      "tenantDomain": "proviamtest10.onmicrosoft.com",
+      "tenantId": "ea9f551e-8155-4010-87a8-b6fa1459f882",
+      "subscriptionName": "Proviam-Subscription",
+      "subscriptionId": "71091610-e5bc-44a6-bed7-ca4113b6520a",
+      "deploySpName": "scimserver-deploy-proviam10",
+      "deploySpAppId": "307af53b-2ba3-459f-91c3-0ca9de9ba8b8",
+      "deploySpSecretExpiresUtc": "2027-10-31",
+      "directoryAccessGranted": true,
+      "configDir": "~/.azure-proviam10",
+      "userConfigDir": "~/.azure-proviam10-user",
+      "credFile": "~/.scimserver-deploy/proviam10.json",
+      "notes": "Target user access and deployment principal verified on 2026-10-31 UTC. Contributor is limited to scimserver-dev and scimserver-prod. Credential file is private to the capturing Windows user. Remains next until trial, data carry, release admission, validation and final cutover succeed; tenant 09 remains active."
+    },
+    {
       "key": "proviam09",
       "role": "active",
       "tenantName": "Provisioning IAM Team 09",
@@ -114,6 +131,42 @@
   ],
 
   "estates": [
+    {
+      "id": "dev-next",
+      "purpose": "dev",
+      "tenantKey": "proviam10",
+      "resourceGroup": "scimserver-dev",
+      "appName": "scimserver-dev",
+      "environmentName": "scimserver-env",
+      "environmentResourceGroup": "scimserver-prod",
+      "pgServerName": "scimserver-pg-dev-m7j4rn",
+      "pgResourceGroup": "scimserver-dev",
+      "pgLocation": "centralus",
+      "pgSkuName": "Standard_B1ms",
+      "location": "eastus",
+      "registry": "ghcr.io/pranems/scimserver",
+      "registryAuth": "anonymous",
+      "revisionKeep": 2,
+      "notes": "Next estate staging: PostgreSQL 17/B1ms is Ready in Central US with all four required extensions; shared environment is eastus. Synthetic Azure copy trial and real-source read-only connectivity passed. Full source/schema/credential replay and cross-region application latency acceptance remain pending. No app deployment or role cutover."
+    },
+    {
+      "id": "canary-prod-next",
+      "purpose": "canary-prod",
+      "tenantKey": "proviam10",
+      "resourceGroup": "scimserver-prod",
+      "appName": "scimserver",
+      "environmentName": "scimserver-env",
+      "environmentResourceGroup": "scimserver-prod",
+      "pgServerName": "scimserver-pg-canary-n8r5vk",
+      "pgResourceGroup": "scimserver-prod",
+      "pgLocation": "centralus",
+      "pgSkuName": "Standard_B1ms",
+      "location": "eastus",
+      "registry": "ghcr.io/pranems/scimserver",
+      "registryAuth": "anonymous",
+      "revisionKeep": 2,
+      "notes": "Next canary staging: PostgreSQL 17/B1ms is Ready in Central US with all four required extensions; shared eastus environment is Ready. Source canary recovery remains independent of dev. Deploy only the admitted requested release digest after trial/restore; no app deployment, cutover or customer-production target."
+    },
     {
       "id": "dev",
       "purpose": "dev",

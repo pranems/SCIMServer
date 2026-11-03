@@ -30,6 +30,41 @@
 
 SCIMServer deploys to Azure Container Apps with a managed PostgreSQL Flexible Server backend. The deployment is fully automated via PowerShell scripts and Azure Bicep templates.
 
+**Environment template review, 2026-10-31 UTC:** the
+[Container Apps environment template](../infra/containerapp-env.bicep) explicitly
+declares a single `Consumption` workload profile with the existing delegated
+infrastructure subnet and Log Analytics configuration. It does not select a
+paid dedicated workload profile. During
+[tenant-10 preparation](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md), the compiled
+contract and actual public-Azure deployment/readback both passed. Verify the
+target subscription, subnet, region capabilities and resulting profile before
+deploying applications. Environment readiness alone is not application,
+database, authentication or browser acceptance.
+
+PostgreSQL provisioning passes secure template parameters through a private
+temporary file and removes it on both success and failure. The template returns
+only server/database metadata; the deployment script constructs the encoded
+connection URI locally instead of reading a secret-bearing ARM output. Generated
+administrator passwords are not printed. The bootstrap installs the shared
+helper dependencies alongside the deployment script. Preserve credentials
+privately before provisioning, and require actual Ready state: an advertised
+regional SKU can still fail allocation.
+
+Use PowerShell 7.2+ for Azure deployment. The bootstrap checks `pwsh` and
+does not launch Windows PowerShell. Provisioning directly refuses an existing
+or unverifiable server and verifies a private server-scoped credential record
+before allocation under `~/.scimserver-deploy/postgres-<run>/`. Its immutable
+`credential.json` remains available after allocation failure; a separate
+`connection.json` is verified before extension setup. Protect and retain these
+local records; they are not an off-device backup.
+
+For an existing VNet, infrastructure subnet reuse requires the
+`Microsoft.App/environments` delegation. The deployment refuses an
+undelegated subnet rather than reaching a later environment-allocation
+failure; missing subnets request and verify the required delegation.
+Unix credential protection uses checked `chmod 600`, not .NET APIs newer
+than the declared PowerShell 7.2 minimum.
+
 ```mermaid
 flowchart LR
     subgraph Azure
@@ -99,7 +134,7 @@ Interactive prompts guide through:
 ### Prerequisites
 
 - Azure CLI (`az`) installed and logged in
-- PowerShell 7+
+- PowerShell 7.2+
 - Azure subscription with `Microsoft.App` and `Microsoft.ContainerService` providers registered
 
 ### Step-by-Step

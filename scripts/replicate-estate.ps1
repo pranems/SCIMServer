@@ -283,9 +283,8 @@ if ($doCutover) {
     }
     else {
         Write-Host "   a cutover is a ROLE REASSIGNMENT, not a find-and-replace:" -ForegroundColor Yellow
-        Write-Host "     Set-ScimEstateRole -TenantKey $($dst.Tenant.key) -Role active"
-        Write-Host "     Set-ScimEstateRole -TenantKey $($src.Tenant.key) -Role retiring"
-        Write-Host "   Both are validated before they are written, so the registry cannot be left"
+        Write-Host "     Set-ScimEstateRole -TenantKey $($dst.Tenant.key) -Role active -RetireTenantKey $($src.Tenant.key)"
+        Write-Host "   Both changes are validated in one write, so the registry cannot be left"
         Write-Host "   with zero or two active estates for a purpose."
         Add-Result 'cutover' 'INFO' 'commands printed; run them deliberately'
     }

@@ -1,3 +1,4 @@
+#requires -Version 7.2
 param(
     [string]$ResourceGroup,
     [string]$AppName,
@@ -379,15 +380,15 @@ if (-not $DatabaseUrl -and -not $ProvisionPostgres) {
 
 if ($ProvisionPostgres -and -not $DatabaseUrl) {
     if (-not $PgAdminPassword) {
-        $pgPwInput = Read-Host "Enter PostgreSQL admin password (leave blank to auto-generate)"
+        $pgPwInput = Read-Host "Enter PostgreSQL admin password (leave blank to auto-generate)" -MaskInput
         if ([string]::IsNullOrWhiteSpace($pgPwInput)) {
-            $PgAdminPassword = New-RandomSecret 24
-            Write-Host "Generated PG admin password: $PgAdminPassword" -ForegroundColor Yellow
+            $PgAdminPassword = 'Pg!' + (New-RandomSecret 24)
+            Write-Host "Generated PostgreSQL administrator password; its value is not logged." -ForegroundColor Yellow
         } else {
             $PgAdminPassword = $pgPwInput
         }
     }
-    # Will provision PG in Step 3/5. DatabaseUrl will be set from output.
+    # Provision in Step 3/5, then construct the URI locally from non-secret outputs.
 }
 
 Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret -DbUrl $DatabaseUrl
@@ -516,8 +517,10 @@ function GetOrCreate-VnetSubnetId {
         [string]$SubnetName,
         [string]$AddressPrefix,
         [bool]$DisablePrivateEndpointPolicies = $true,
-        [bool]$DisablePrivateLinkServicePolicies = $true
+        [bool]$DisablePrivateLinkServicePolicies = $true,
+        [string]$RequiredDelegation
     )
+    $ErrorActionPreference = 'Stop'
 
     $subnetJson = az network vnet subnet show `
         --resource-group $ResourceGroupName `
@@ -527,6 +530,9 @@ function GetOrCreate-VnetSubnetId {
 
     if ($LASTEXITCODE -eq 0 -and $subnetJson) {
         $subnet = $subnetJson | ConvertFrom-Json
+        if ($RequiredDelegation -and $RequiredDelegation -notin @($subnet.delegations.serviceName)) {
+            throw "Subnet '$SubnetName' must be delegated to '$RequiredDelegation' before deployment."
+        }
         return $subnet.id
     }
 
@@ -545,6 +551,7 @@ function GetOrCreate-VnetSubnetId {
     if ($DisablePrivateLinkServicePolicies) {
         $subnetArgs += @('--disable-private-link-service-network-policies','true')
     }
+    if ($RequiredDelegation) { $subnetArgs += @('--delegations', $RequiredDelegation) }
 
     $createJson = az @subnetArgs 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $createJson) {
@@ -553,6 +560,9 @@ function GetOrCreate-VnetSubnetId {
     }
 
     $createdSubnet = $createJson | ConvertFrom-Json
+    if ($RequiredDelegation -and $RequiredDelegation -notin @($createdSubnet.delegations.serviceName)) {
+        throw "Created subnet '$SubnetName' lacks required delegation '$RequiredDelegation'."
+    }
     return $createdSubnet.id
 }
 
@@ -573,7 +583,7 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
     $existingVnet = $existingVnetJson | ConvertFrom-Json
     Write-Host "   🔁 Reusing existing virtual network '$vnetName'" -ForegroundColor Green
 
-    $infrastructureSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedInfraSubnetName -AddressPrefix $infraPrefix
+    $infrastructureSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedInfraSubnetName -AddressPrefix $infraPrefix -RequiredDelegation 'Microsoft.App/environments'
     $workloadSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $runtimeSubnetName -AddressPrefix $runtimePrefix
     $privateEndpointSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedPeSubnetName -AddressPrefix $privateEndpointPrefix
 
@@ -630,25 +640,14 @@ if ($ProvisionPostgres -and -not $DatabaseUrl) {
     if ($pgServerName.Length -gt 63) { $pgServerName = $pgServerName.Substring(0,63) }
     Write-Host "   Server name: $pgServerName" -ForegroundColor Gray
 
-    $pgDeployName = "postgres-$(Get-Date -Format 'yyyyMMddHHmmss')"
-    $pgDeployOutput = az deployment group create `
-        --resource-group $ResourceGroup `
-        --name $pgDeployName `
-        --template-file "$PSScriptRoot/../infra/postgres.bicep" `
-        --parameters serverName=$pgServerName adminPassword=$PgAdminPassword location=$PgLocation `
-        --query properties.outputs `
-        --output json 2>$null
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "   ❌ PostgreSQL provisioning failed" -ForegroundColor Red
-        Write-Host $pgDeployOutput -ForegroundColor Red
-        Stop-Deployment -Message "PostgreSQL Flexible Server deployment failed."
-    }
-
-    $pgOutputs = $pgDeployOutput | ConvertFrom-Json
-    $DatabaseUrl = $pgOutputs.databaseUrl.value
+    . (Join-Path $PSScriptRoot 'postgres-provisioning.ps1')
+    $pgProvision = Invoke-ScimPostgresProvisioning -ServerName $pgServerName -ResourceGroup $ResourceGroup `
+        -Location $PgLocation -SubscriptionId $account.id -TenantId $account.tenantId `
+        -Password $PgAdminPassword -TemplatePath (Join-Path $PSScriptRoot '..\infra\postgres.bicep')
+    $DatabaseUrl = $pgProvision.DatabaseUrl
+    Write-Host "      Private PostgreSQL recovery record: $($pgProvision.RecoveryPath)" -ForegroundColor Gray
     Write-Host "   ✅ PostgreSQL Flexible Server provisioned: $pgServerName" -ForegroundColor Green
-    Write-Host "      FQDN: $($pgOutputs.serverFqdn.value)" -ForegroundColor Gray
+    Write-Host "      FQDN: $($pgProvision.ServerFqdn)" -ForegroundColor Gray
 
     # CRITICAL: Allow-list required PostgreSQL extensions used by Prisma baseline migration.
     # Azure Database for PostgreSQL Flexible Server requires extensions to be explicitly

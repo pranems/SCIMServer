@@ -11,6 +11,11 @@ current-master port from earlier isolated validation and deployed behavior.
 
 ### Start here
 
+**Pending dev/canary tenant rollover:** [Tenant 10 execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records verified target access, the protected source recovery points, registry
+and atomic-cutover tests, the 0.55.67 admission hold and all migration/browser
+acceptance phases. Tenant 09 remains active; customer production is excluded.
+
 **Pending actual-parent adapter remediation:** [Hono and real Prisma lifecycle qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
 records proposed 0.55.66, actual old/new lifecycle and exploit RED/GREEN,
 explicit cleanup boundaries, and a separate draft stacked on unmerged #261.

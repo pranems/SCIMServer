@@ -29,6 +29,32 @@ SCIMServer provides 3 ways to deploy to Azure - all ultimately call `scripts/dep
 
 All three auto-generate secrets (SCIM, JWT, OAuth) if not provided, and deploy a VNet-isolated Container App with PostgreSQL Flexible Server.
 
+PostgreSQL provisioning uses
+[the shared helper](scripts/postgres-provisioning.ps1) and
+[private-file/CLI checks](scripts/tenant-copy-safety.ps1). The bootstrap
+downloads these dependencies alongside the deployment script. Administrator
+passwords are supplied through a private temporary parameter file, not native
+arguments or ARM outputs; the encoded URI is constructed locally. Generated
+PostgreSQL passwords are not printed, and interactive entry is masked. Preserve
+credentials privately and verify actual server readiness, since advertised
+regional SKU support does not guarantee successful allocation.
+
+Azure deployment requires PowerShell 7.2 or newer (`pwsh`); bootstrap no
+longer falls back to Windows PowerShell. Provisioning refuses an existing
+or unverifiable server before deployment. Before allocating a new server,
+it writes and verifies an owner-restricted, server-scoped `credential.json`
+under `~/.scimserver-deploy/postgres-<run>/`. The original credential record
+is immutable; a separate `connection.json` is verified immediately after
+allocation, before extension configuration. Retain these records privately
+for failed-allocation recovery. Do not retry an existing name with a new
+password or confuse these local files with an off-device backup.
+
+When reusing a virtual network, the infrastructure subnet must already be
+delegated to `Microsoft.App/environments`; deployment rejects an undelegated
+subnet before environment allocation. Missing subnets are created with that
+delegation and the returned state is checked. Unix credential-file protection
+uses checked `chmod 600`, compatible with PowerShell 7.2's .NET runtime.
+
 ### One-Liner Bootstrap (No Git Clone Needed)
 
 ```powershell

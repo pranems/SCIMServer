@@ -2,12 +2,89 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.66
-> **Last Updated**: October 29, 2026
+> **Last Updated**: November 3, 2026
 > **Last verified:** 2026-10-29
 
 ---
 
 ## Active Delivery Process
+
+**Current sixth-review correction:** Medium4458623530 identified that default
+all mode skipped the optional distinct-password/worker-text assertions.
+Actual-default RED/GREEN is established without contacting Docker; both modes
+now share those assertions and only serialization returns early. The prior
+High YAML finding is independently confirmed resolved. Corrected protected
+publication, full hosted default PostgreSQL and fresh review remain pending.
+
+**Published correction evidence:** e3fbf7c4 passes29 protected gates in1133.1s
+and full hosted41689528595, including actual generated-YAML-to-PostgreSQL
+identity/snapshot/signal/fidelity/isolation, image smoke and Trivy. CodeQL and
+freshness pass. High4458211788 has an evidence reply and its exact thread is
+resolved. Fresh independent review remains pending. Earlier preparation-time
+pending descriptions below are historical. Requested0.55.67 remains held;
+the user was unavailable to authorize a different admitted-image migration.
+
+**Current correction pending publication:** fifth review High4458211788
+finds that generated double-quoted job YAML reinterprets connection values.
+All10 connection scalars now use JSON string serialization. Actual-generator
+RED/GREEN and a complete js-yaml round trip pass locally without Docker,
+preserving all14 environment values, distinct raw/alternate synthetic
+passwords and worker text. The real PostgreSQL fixture now consumes those
+actual YAML outputs; CI reuses API dependencies after npm ci. There are12
+review cases in11 offline scripts. Corrected protected publication, full
+hosted PostgreSQL/CI and independent review remain required.
+
+**Previous exact-tip evidence:** published7a938859 passes all29 protected
+gates in817.2s and full hosted41682922245: parsed-login PostgreSQL,
+validation, image build/push, container smoke and Trivy, plus CodeQL and
+freshness. The corrected login finding has actual RED/GREEN evidence and a
+resolved thread. Refreshed independent review remains pending. These tooling
+results do not admit0.55.67 or establish any target deployment/cutover.
+
+**Latest PR267 boundary:** b8f9b847 passes29 protected gates and the actual
+PostgreSQL connection/snapshot step in41678029555. Review confirms literal
+libpq quoting fixed injection, but identifies URI login decoding hidden by
+fixture expected-value replacement. An actual-parser assertion has RED/GREEN
+for one-time username decoding with password semantics unchanged. The real
+fixture now encodes usernames in its URIs and forwards parsed usernames.
+Eleven review cases run within the existing11-script gate. Corrected full
+publication, real database execution and refreshed review remain required.
+PR268's bounded conditional CDF construction does not admit0.55.67; actual
+coverage assumptions remain unjustified. No release, target app deployment,
+final data carry, role cutover or customer-production change has occurred.
+
+**2026-11-03 tenant-rollover consolidation:** the
+[migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records target foundations, protected recovery, source replay and local
+browser acceptance separately from pending release, serving target apps
+and final cutover. Eleven offline PowerShell contracts now run in both pre-push
+and hosted CI, including five actual combined-failure cleanup regressions.
+Original transfer errors survive secondary cleanup failures; failed transfers
+cannot reactivate target writers. No serving API/schema/browser/dependency
+or version change is part of this tooling boundary.
+Requested 0.55.67 remains held by its actual same-image performance failure.
+Reviewed diagnostic PR265/run41632439081 does not fix that repeatability
+gap and cannot admit the release; its full evidence is recovery-protected.
+The prospective method correction is a separate implementation/review unit.
+
+PR267 review found six integration defects despite green hosted CI:
+permissive ACL failure, unused absence guard, missing pre-allocation recovery,
+oversized delegated names, app/database mismatch and legacy-shell fallback.
+Actual-entry-point RED/GREEN controls now cover all six. Recovery records
+are private, server-scoped and verified before allocation; connection recovery
+precedes extensions. Require PowerShell7.2+. Corrected-tip protected gates,
+hosted CI and refreshed independent review remain pending.
+
+Second review confirms the original six fixed, but identifies canonical-port,
+Unix minimum-runtime, subnet-delegation, provisioning-cleanup, worker-signal,
+preflight-evidence and fixture-ownership gaps. Four more offline cases now
+pass with all eleven scripts. Numeric ports/database decoding are canonical;
+the subnet caller is wired and checked chmod supports PowerShell7.2.
+Source-snapshot lifetime is being changed from server-side sleep to idle
+client input with EOF rollback, explicit signal handling and owned FIFO
+cleanup. All four real termination/fidelity cases now pass, together with
+owned fixture/tmpfs/absence checks. Next publication/review remain pending.
+The Docker preflight runner is stubbed, not real PostgreSQL.
 
 **2026-10-30 current Hono integration:** #261 merged normally at
 `cffc64c8a188a721fabb85c37a80243d5e65a74f`, with all 28 protected gates,

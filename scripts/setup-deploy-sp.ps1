@@ -70,7 +70,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('proviam09', 'proviam', 'anandsa', 'all')]
+    [ValidateSet('proviam10', 'proviam09', 'proviam', 'anandsa', 'all')]
     [string]$Name = 'all',
     [int]$Years = 1,
     [string]$Role = 'Contributor',
@@ -91,13 +91,28 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
 
 function Protect-CredFile {
     param([string]$Path)
-    # Restrict the secret file to the current user only (Windows ACL).
-    try {
-        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
-            icacls $Path /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'Credential file does not exist.' }
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+        $existing = Get-Acl -LiteralPath $Path
+        if ($existing.AreAccessRulesProtected -and $existing.Access.Count -eq 1 -and
+            $existing.Access[0].IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid.Value -and
+            $existing.Access[0].AccessControlType -eq 'Allow' -and
+            ($existing.Access[0].FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq
+                [System.Security.AccessControl.FileSystemRights]::FullControl) { return }
+        $acl = [System.Security.AccessControl.FileSecurity]::new()
+        $acl.SetAccessRuleProtection($true, $false)
+        $acl.SetOwner($sid)
+        $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($sid, 'FullControl', 'Allow'))
+        Set-Acl -LiteralPath $Path -AclObject $acl
+        $actual = Get-Acl -LiteralPath $Path
+        if (-not $actual.AreAccessRulesProtected -or $actual.Access.Count -ne 1 -or
+            $actual.Access[0].IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) {
+            throw 'Credential-file private access could not be verified.'
         }
-    } catch {
-        Write-Host "WARN: could not harden ACL on $Path ($($_.Exception.Message))." -ForegroundColor Yellow
+    } else {
+        & chmod 600 $Path
+        if ($LASTEXITCODE -ne 0) { throw 'Credential-file private access could not be established.' }
     }
 }
 
@@ -117,12 +132,12 @@ function New-DeploySp {
     # -UseCurrentSession reuses whatever az profile is already active (no fresh login)
     # as long as it is a user account that can reach the target tenant's subscription.
     if ($UseCurrentSession) {
-        az account set --subscription $Entry.Subscription 2>$null | Out-Null
+        az account set --subscription $Entry.SubscriptionId 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: current session cannot select subscription '$($Entry.Subscription)'." -ForegroundColor Red
             Write-Host "       Drop -UseCurrentSession to do an interactive login for $($Entry.Key), or run" -ForegroundColor Yellow
             Write-Host "       'az login --tenant $($Entry.Tenant)' first." -ForegroundColor Yellow
-            return
+            throw 'Current user session cannot select the exact target subscription.'
         }
         $acct = az account show -o json 2>$null | ConvertFrom-Json
     } else {
@@ -130,15 +145,15 @@ function New-DeploySp {
     }
     if (-not $acct) {
         Write-Host "ERROR: could not sign in to $($Entry.Name) as a user; skipping." -ForegroundColor Red
-        return
+        throw 'Target user authentication failed.'
     }
-    if ($acct.tenantId -ne $Entry.Tenant) {
+    if ($acct.tenantId -ne $Entry.Tenant -or $acct.id -ne $Entry.SubscriptionId) {
         Write-Host "ERROR: active tenant is '$($acct.tenantId)', expected '$($Entry.Tenant)' for $($Entry.Key)." -ForegroundColor Red
-        return
+        throw 'Target tenant or subscription readback does not match the registry.'
     }
     if ($acct.user.type -ne 'user') {
         Write-Host "ERROR: active identity is '$($acct.user.type)', not a user. Creating an SP needs a user." -ForegroundColor Red
-        return
+        throw 'Deployment bootstrap requires the verified user identity.'
     }
 
     $subId  = $acct.id
@@ -169,7 +184,7 @@ function New-DeploySp {
         if ($exists -ne 'true') {
             Write-Host "ERROR: resource group '$rg' not found in $($Entry.Subscription)." -ForegroundColor Red
             Write-Host "       Fix the scope in Get-ScimTenantMap (az-tenant.ps1) or create the RG first." -ForegroundColor Yellow
-            return
+            throw "Required target resource group is unavailable: $rg"
         }
     }
 
@@ -183,7 +198,7 @@ function New-DeploySp {
     if ($LASTEXITCODE -ne 0 -or -not $spJson) {
         Write-Host "ERROR: 'az ad sp create-for-rbac' failed for $($Entry.Key)." -ForegroundColor Red
         Write-Host "       You likely lack app-registration or role-assignment rights in this tenant." -ForegroundColor Yellow
-        return
+        throw 'Deployment principal creation or scoped role assignment failed.'
     }
 
     $sp = $spJson | ConvertFrom-Json
@@ -202,8 +217,16 @@ function New-DeploySp {
         createdUtc   = (Get-Date).ToUniversalTime().ToString('o')
         expiresUtc   = (Get-Date).ToUniversalTime().AddYears($Years).ToString('o')
     }
-    $record | ConvertTo-Json | Set-Content -Path $Entry.CredFile -Encoding utf8
-    Protect-CredFile -Path $Entry.CredFile
+    $temporaryCredential = Join-Path $credRoot ('.credential-' + [guid]::NewGuid().ToString('N') + '.json')
+    try {
+        [IO.File]::WriteAllText($temporaryCredential, '')
+        Protect-CredFile -Path $temporaryCredential
+        $record | ConvertTo-Json | Set-Content -LiteralPath $temporaryCredential -Encoding utf8
+        Move-Item -LiteralPath $temporaryCredential -Destination $Entry.CredFile -Force
+        Protect-CredFile -Path $Entry.CredFile
+    } finally {
+        if (Test-Path -LiteralPath $temporaryCredential) { Remove-Item -LiteralPath $temporaryCredential }
+    }
 
     Write-Host "OK: service principal saved to $($Entry.CredFile)" -ForegroundColor Green
     Write-Host "    appId    = $($sp.appId)" -ForegroundColor Green

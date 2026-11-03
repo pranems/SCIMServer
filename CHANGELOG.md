@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tenant rollover tooling consolidation
+
+- Include distinct-password transport and worker-text assertions in the default
+  snapshot fixture path used by CI, not only its optional serialization mode.
+  Sixth review confirms the High YAML correction and identifies this Medium
+  coverage omission. An actual-default probe has RED/GREEN before intercepted
+  Docker allocation; focused serialization remains GREEN. Corrected protected,
+  full hosted PostgreSQL and independent review are pending.
+- Published YAML-transport correctione3fbf7c4 passes all29 protected gates in
+  1133.1s and full hosted41689528595. Actual YAML-to-PostgreSQL identity and
+  existing snapshot/signal/fidelity/isolation controls pass; CodeQL, freshness,
+  image smoke and Trivy also pass. The High thread is resolved with evidence.
+  Fresh independent review is pending; earlier preparation notes follow.
+- Serialize all10 connection environment values as JSON strings in generated
+  job YAML, preserving literal quotes/backslashes and string-valued ports.
+  Fifth-review High4458211788 has actual-generator RED/GREEN; the complete
+  existing js-yaml parser also verifies all14 environment values, distinct
+  raw/alternate synthetic passwords and worker text without Docker. The real
+  PostgreSQL fixture now consumes those actual YAML outputs. Its hosted step
+  follows API npm ci, without adding dependencies or changing lockfiles.
+  Twelve review cases run within11 offline scripts. Corrected protected
+  publication, full hosted PostgreSQL/CI and independent review are pending.
+- Decode URI usernames once and make special-login database tests encode
+  their actual input usernames and forward parsed values into the worker.
+  The new actual-parser case has RED/GREEN and preserves existing password
+  semantics. Eleven review cases now run within the 11-script offline gate;
+  hosted41682922245 confirms corrected real PostgreSQL GREEN at7a938859,
+  alongside29 protected gates and full hosted validation/image smoke/Trivy,
+  CodeQL and freshness. Refreshed independent review remains pending.
+- Quote every worker libpq connection value and escape quotes/backslashes
+  without changing canonical identity parsing. Hosted41674035838 reproduces
+  actual target redirection before this fix. POSIX syntax and exact escaping
+  controls pass; hosted41678029555 confirms the actual PostgreSQL step GREEN
+  atb8f9b847, alongside all29 protected gates. Full hosted completion and
+  refreshed review remain required. Shared setup covers preflight/full copy.
+- Add actual parser-to-libpq database/login identity readback to the real
+  PostgreSQL fixture and run that fixture in hosted validation. This is a
+  RED-first regression for the third-review unquoted connection-parameter
+  defect, not an already completed fix. Local Docker is unresponsive; normal
+  hosted CI is used without restarting shared services or changing release
+  admission. Production copy code is unchanged in this test-only step.
+- Second-review hardening normalizes numeric ports and decodes database
+  identities once, replaces unsupported Unix permission APIs with checked
+  `chmod`, validates infrastructure subnet delegation through the deployment
+  caller, and preserves provisioning failures across independent cleanup.
+  Ten focused review cases and all 11 offline scripts pass. The real snapshot
+  fixture verifies run ownership, tmpfs storage and exact cleanup, and passes
+  signal termination plus three fidelity/isolation cases. An idle input-held
+  source session replaces server-side sleep; explicit FIFO unlink prevents
+  consecutive-worker failure. Full publication/review remain pending. Stubbed preflight evidence
+  is explicitly classified as a shell contract, not real PostgreSQL.
+- Address six independent-review integration findings with actual RED/GREEN
+  controls: fail closed on ACL errors from permissive callers, invoke provider
+  absence before provisioning, retain verified pre-allocation credentials,
+  bound delegated transfer job names, bind app/database before suspension,
+  and require PowerShell 7.2+ instead of a Windows PowerShell fallback.
+  The expanded offline gate passes 11 scripts; five compiled PostgreSQL
+  provisioning outcomes verify private immutable credential and URI recovery.
+  Corrected-tip full gates and refreshed review remain pending.
+- Prepare the registered next tenant without changing active dev/canary roles
+  or customer production. Reuse existing deployment/carry entry points with
+  registry-derived identity, private provisioning parameters, snapshot-bound
+  fingerprint/dump verification, writer suspension and owned-job cleanup.
+- Preserve the original transfer failure when cleanup also fails. Five
+  actual-lifecycle regressions cover successful work, failed work, failed
+  reactivation and combined job-cleanup failures. Secondary failures remain
+  explicit and failed work cannot reactivate target writers.
+- Run ten isolated offline PowerShell contract scripts through the same
+  pre-push and hosted CI entry point. The combined focused gate passes;
+  complete consolidation gates and independent real PostgreSQL/Bicep evidence
+  are recorded separately, not implied by the offline result.
+- Release the exported source snapshot by interrupting its owned PostgreSQL
+  client. A real RED reproduced a source transaction surviving worker exit;
+  the corrected real database fixture retains all three fidelity/isolation
+  cases and checks transaction release rather than client process absence.
+- No serving API, browser, schema, dependency, lockfile or product-version
+  change. Requested 0.55.67 still requires independent release admission.
+- Self-improvement applied: combined-failure tests and continuous offline
+  rollover execution. Design accepted: retain the cohesive existing safety
+  seam and reuse one small runner at its two concrete gate callers.
+
 ### 0.55.66 reviewed-master integration (2026-10-30)
 
 - Normally integrate reviewed master `cffc64c8` after #259, #260 and #261

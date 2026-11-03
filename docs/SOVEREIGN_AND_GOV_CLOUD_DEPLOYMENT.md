@@ -35,7 +35,41 @@ SCIMServer is a standard Docker container running on Azure Container Apps with P
 2. **Choose an available region** within that cloud
 3. **(Optional)** Mirror the container image to a registry accessible from that cloud
 
-Everything else - the Bicep templates, deploy script, VNet isolation, and PostgreSQL configuration - works identically.
+The application configuration remains the same, but infrastructure templates
+must be validated against the selected cloud's actual service, region and API
+availability before deployment.
+
+The shared Azure deployment script requires PowerShell 7.2+; bootstrap no
+longer falls back to Windows PowerShell. New PostgreSQL provisioning refuses
+an existing or unverifiable server and retains an owner-restricted credential
+record before allocation, then a separate connection record before extension
+setup, under `~/.scimserver-deploy/postgres-<run>/`. Protect these local recovery
+files and verify the selected cloud's actual provider absence/error behavior.
+The automated provisioning fixtures establish public-template contracts,
+not sovereign-cloud deployment acceptance.
+
+Existing infrastructure subnets must advertise the required
+`Microsoft.App/environments` delegation before reuse; newly created subnets
+request and verify it. Confirm that delegation in the selected cloud instead
+of treating an existing subnet ID as sufficient. Unix credential protection
+uses checked `chmod 600` for compatibility with the PowerShell 7.2 minimum.
+
+**Environment template review, 2026-10-31 UTC:** the shared
+[environment template](../infra/containerapp-env.bicep) explicitly declares the
+`Consumption` workload profile for its delegated infrastructure subnet and
+retains Log Analytics. Its compiled-resource check and actual deployment were
+verified in public Azure during
+[tenant-10 preparation](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md), not in a
+government or sovereign cloud. Confirm that the selected cloud/region supports
+this profile, delegation and template API version, then validate the deployment
+there. Do not treat the public-Azure result as sovereign-cloud admission.
+
+The shared PostgreSQL provisioning path now uses a private temporary secure
+parameter file and non-secret ARM outputs, constructing the encoded URI locally.
+Keep the chosen cloud's actual server FQDN from its outputs; do not substitute a
+public-Azure database suffix. Optional availability-zone placement must use
+that subscription's supported zones. Private transport tests are not proof of
+allocation or deployment in any sovereign cloud.
 
 ---
 

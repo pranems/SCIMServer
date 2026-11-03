@@ -7,6 +7,135 @@
 
 ---
 
+## Pending tenant 10 migration
+
+The [tenant 10 migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records verified target account/permissions and the staged `next` estates.
+Tenant 09 remains active. No target application has been deployed or accepted.
+The new subscription now has six registered required providers and the
+eastus resource groups `scimserver-dev` and `scimserver-prod`. The target VNet
+and all three source-shaped subnets/delegations are deployed and readback
+verified. Shared environment `scimserver-env` and workspace `scimserver-logs`
+were deployed from the corrected existing template after ARM validation;
+actual Succeeded state, subnet, external topology, Consumption profile and
+Log Analytics readback passed. Both target PostgreSQL servers are now Ready
+in Central US; no application or registry instance has been deployed.
+The target deployment principal is verified with Contributor on those two
+resource groups only and one effective `Application.ReadWrite.OwnedBy` role.
+Three directory proof applications were recreated and acquired real target
+tokens; their issuer metadata follows actual v1 claims, not the v2 token
+endpoint's name. Credentials remain outside Git with private Windows-user
+access. This is directory readiness, not target SCIM deployment acceptance.
+Source ARM reads confirm VNet `10.40.0.0/16`, delegated `aca-infra`
+`10.40.0.0/21` and `aca-runtime` `10.40.8.0/21`, plus the undelegated
+`private-endpoints` subnet `10.40.16.0/24`. The source environment is external,
+non-zone-redundant, with one `Consumption` workload profile and Log Analytics.
+The existing [environment template](../infra/containerapp-env.bicep) now
+declares that profile explicitly instead of relying on an omitted value.
+Its compiled-resource regression passed after semantic RED. Target network
+and environment readiness/topology readbacks passed.
+
+The PostgreSQL template now exposes only non-secret server/database metadata.
+The deployment consumer constructs the URI locally and uses
+[the shared provisioning helper](../scripts/postgres-provisioning.ps1) to keep
+administrator passwords out of command-line arguments and ARM outputs.
+The default placement remains Azure-selected; an optional availability-zone
+parameter supports an explicitly recorded placement attempt. Eastus2 default
+and zone-1 B1ms, then both B2s allocations, failed despite advertised support.
+Both next-estate Central US/B1ms servers are Ready under fresh names, with
+PostgreSQL 17, all four extensions and independent location/state/SKU readbacks;
+failed-name recovery records remain intact. ARM rejected
+old-name cross-region reuse after an empty inventory, so the launcher now uses
+a direct absence guard with six regression decisions. No source data carry
+or application acceptance is inferred. The app environment stays eastus; cross-region database
+latency must be measured before migration acceptance.
+The requested 0.55.67 candidate is not yet a released/admitted artifact; its
+ordinary source checks do not satisfy the retained qualification hold.
+Migration lookup now derives from the registry rather than a second identity
+map, and paired retirement/activation has focused atomic-transition tests.
+
+The [offline tenant-rollover contracts](../scripts/test-tenant-rollover.ps1)
+run in both pre-push and the Build Test Image validation job. Eleven isolated
+PowerShell scripts cover registry/cutover, private credential storage,
+directory/proof metadata, provider absence, log transport, writer suspension
+and failure-safe cleanup without cloud or Docker access. Combined transfer
+and cleanup failures preserve the original error, report every secondary
+failure and still remove named secret scratch. Actual compiled templates,
+PostgreSQL replay and cloud/browser acceptance remain separate evidence.
+
+The Build Test Image validation job also invokes the real PostgreSQL copy
+fixture on its existing hosted runner. Its owned, network-isolated, tmpfs
+container checks the URI-parser-to-worker database/login identity boundary
+with encoded whitespace, quotes and backslashes, followed by source snapshot
+release, complete manifest fidelity and concurrent-write isolation. This is
+synthetic integration evidence, not a deployment or performance campaign.
+The step has a three-minute execution bound on the disposable hosted runner.
+It now follows the existing API dependency install so the fixture can reuse
+the installed js-yaml parser, without a new dependency or lockfile change.
+After fifth-review High4458211788, all10 connection scalars are JSON strings
+in job YAML. The fixture obtains all14 environment values, secret references
+and worker text from the actual generated and parsed job document before
+execution. Actual-generator RED/GREEN and a Docker-free complete YAML round
+trip pass; corrected hosted PostgreSQL/full CI and independent review remain
+pending. Run `pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1 -Case serialization`
+after API installation for that narrowly classified transport assertion.
+Sixth review confirms the High correction but finds optional-mode assertions
+were absent from the hosted default. The fixture now also runs distinct-password
+and worker-text assertions in `all`, proceeding to actual PostgreSQL afterward.
+Only `serialization` returns early. Actual-default RED/GREEN is established
+with Docker intercepted before allocation; corrected full hosted evidence is
+still required. The workflow retains its existing default command.
+The corrected real PostgreSQL fixture is now GREEN at published `e3fbf7c4`:
+hosted `41689528595` completes identity at `2026-11-03T18:00:41Z` and
+snapshot/signal/fidelity/isolation by `18:00:47Z`. All29 protected gates,
+full hosted validation/image smoke/Trivy, CodeQL and freshness also pass.
+The exact High thread is resolved with evidence; fresh independent review
+remains pending. Earlier pending wording above records preparation history.
+Hosted `41674035838` reproduces the third-review target-identity assertion
+before production code changes. Shared worker setup now quotes every libpq
+value and escapes literal quotes/backslashes, rather than allowing a decoded
+database name to override validated connection parameters. Hosted41678029555
+confirms actual PostgreSQL step GREEN at b8f9b847; full hosted completion and
+refreshed review remain required.
+
+The subsequent login-boundary correction decodes URI usernames once, without
+altering raw/alternate password selection. The fixture now encodes each
+login in its actual URI and forwards the parsed login, not an expected
+replacement. Offline actual-parser RED/GREEN is established; hosted41682922245
+confirms corrected real PostgreSQL GREEN at7a938859, alongside29 protected
+gates. Full hosted validation, image smoke/Trivy, CodeQL and freshness also
+pass at that exact tip. Refreshed review remains pending.
+
+PR #267 review corrections bind the target application's effective database
+host, port and database name before any suspension/restore; subscription
+membership alone is insufficient. Transfer prefixes are bounded before their
+unique suffix. Provisioning invokes its direct absence guard, fails closed
+on file/ACL errors even from permissive callers, and writes/verifies private
+server-scoped recovery credentials before allocation. The original password
+record survives failures; the returned URI is saved separately before extension
+work. Deployment and bootstrap require PowerShell 7.2+ rather than a legacy
+Windows PowerShell fallback. These are tooling guarantees, not deployed app
+or migration acceptance.
+
+The second review requires canonical numeric database ports and one-time
+database-name decoding before source/target or app-binding comparisons.
+Reused infrastructure subnets must have `Microsoft.App/environments`
+delegation; newly created subnets request and verify it. Provisioning preserves
+its primary failure while independently attempting parameter-file and
+directory cleanup. Unix credential files use checked `chmod 600`, avoiding
+APIs unavailable in PowerShell 7.2. The snapshot fixture now uses a uniquely
+named/run-labelled container with explicit tmpfs PGDATA, ownership-checked
+removal and exact-ID absence verification.
+
+Evidence classification: the Docker-hosted preflight runner uses stubbed
+`psql`; it is a shell decision contract, not real PostgreSQL integration.
+The snapshot fixture is real PostgreSQL, and Azure trial/preflight receipts
+are separate. The signal-termination and idle-session snapshot correction
+passes all four combined real database cases, including consecutive worker
+cleanup. The source read-only transaction is held by open client input,
+not server-side sleep, and source release is verified after each exit.
+Complete corrected-tip publication/review is still required.
+
 ## 0.55.56 candidate startup-output hardening
 
 The container entrypoint now reports database configuration presence only,
