@@ -1,6 +1,6 @@
 # Global navigation and workflow context
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-03 - **Product version:** `0.55.67`
 
 See [current release notes](RELEASE_NOTES.md) for deployment and acceptance
 boundaries. Endpoints now uses available window height, Dashboard uses compact
@@ -16,6 +16,13 @@ browser tests check `aria-expanded` before expanding it. WIF trust editing
 remains under each trust's More menu. See the
 [isolated integration checkpoint](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md#current-master-integration-preparation-2026-10-21);
 this is not a deployed navigation change.
+
+**Tested but unreleased Bulk layout repair (2026-11-03):** copying a result
+identifier, location or error detail does not navigate or change endpoint
+selection. Long values are bounded and retain their complete clipboard text.
+The change remains inside the URL-owned Bulk tab; global Back/Forward and
+workflow selection are unchanged. Built loopback frontend checks pass, but
+the corrected Azure image and operator visual acceptance remain pending.
 
 ## Purpose
 

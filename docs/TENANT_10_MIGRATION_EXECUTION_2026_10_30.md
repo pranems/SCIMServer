@@ -9,6 +9,111 @@
 
 ## Executive summary
 
+### Available-data deployment checkpoint (2026-11-03)
+
+The operator explicitly updated the migration scope at
+`2026-11-03T20:50:41Z`:
+
+> please proceed with whatever data is available. its alright of we do not have the latest . right now the main point is to have the dev and canary deployed and working
+
+This permits available point-in-time data rather than a synchronized latest-data
+cutover. No source-writer freeze or source mutation is performed, and later
+source changes may be omitted. Complete carried-snapshot fidelity, resource
+IDs, credentials/settings and all target acceptance gates remain mandatory.
+Customer production is untouched; performance remains unqualified under the
+separately documented migration-only exception.
+
+PR270 merged normally as
+`6102aff4a1687d2873b1349af3f95e68c3c6aeb5` after all exact-tip hosted checks
+passed. Independent review5759073624 reports no open issues, approval
+recommended, formal state COMMENTED. Protected Validate29/29 passes in935.5s.
+Authoritative merged-source41714210347 passes actual PostgreSQL copy/snapshot
+fixtures, build/push, smoke and HIGH/CRITICAL Trivy. Merged CodeQL41714183722
+and dependency-pins41714184178 pass.
+
+Decision `T10-0.55.67-PERF-EXCEPTION-2026-11-03` is publicly bound in PR270
+comment6614992034 to version0.55.67, that merged source and image
+`ghcr.io/pranems/scimserver@sha256:4a00b5421a8d5290506091fe856f3dbb4cc185e0bb799d272cb724651de9aeeb`.
+Producer and independent smoke-pull digests agree. The unique tag is
+`test-tenant10-release-0.55.67-6102aff4a168`; mutable `latest` was not promoted.
+
+Both actual target databases now pass complete nine-table content, schema,
+constraint and index equality against their carried read-only snapshots.
+Native PostgreSQL custom archives and logs are privately protected with
+Windows CurrentUser DPAPI. Dev retained all historical request logs in its
+760,214,637-byte archive rather than discarding them to shorten validation.
+The private receipts are `dev-carry.json` under
+`available-dev-aggregate-20261103` and `canary-prod-carry.json` under
+`available-canary-20261103T2050`, both below the existing protected tenant 10
+bootstrap directory. These are snapshot receipts, not freshest-data guarantees.
+
+Dev is created from the exact digest. Its initial environment transformation
+was corrected after semantic RED/GREEN, and all actual environment values and
+secret references now match the intended preserved configuration. The corrected
+revision is Healthy and the unhealthy initial owned revision was deactivated.
+Direct HTTP health returns200; the frontend opens its authentication dialog.
+Actual version/Prisma-backend preflight passes. Full dev live acceptance
+completed with 1,841 reported passing checks and zero failures across 169
+sections and 1,906 flow steps in 793.377s. Four reported passes are explicitly
+skipped placeholders for removed Admin Schema/ResourceType APIs (9m-A/B/C
+and 9y), not exercised checks. The orphan guard captured 76 pre-existing
+endpoints and reported no leaked endpoints. Full actual dev browser
+acceptance completed with 347 passes, one failure, zero skips, zero flakes
+and no runner errors in 1,037.046s. Its sole failure measured four result
+cells overflowing the Bulk card at a narrow viewport. The failure screenshot
+was inspected: this is an unintended layout defect, not intended visual drift.
+No visual baseline diff was produced and no baseline was regenerated.
+
+The default minimum width of `1fr` grid columns let long absolute resource
+URLs expand the result grid. A separate fix branch,
+`fix/tenant10-bulk-result-overflow-20261103`, bounds the two text columns
+with `minmax(0, 1fr)` and uses the existing copy/truncate primitive for result
+values. The component regression has RED/GREEN (9 to 10 tests), and a
+deterministic long-URL/error-message browser case reproduces RED against
+the unchanged Azure image. All five bulk/manual browser flows then pass on
+the patched, built loopback frontend proxied to migrated dev. They measure
+1440/900-pixel layouts, prove actual text overflow is clipped, verify complete
+clipboard values, and retain fixture cleanup. The GREEN screenshot was also
+inspected. This is tested but unreleased frontend work, not a corrected Azure
+image or completed target acceptance.
+
+Both added browser specs compile under a strict, explicitly owned type-root
+configuration. Full web type checking still has 66 diagnostics, including two
+production diagnostics. An executable virtual-HEAD comparison against
+6102aff4 verifies the same baseline and no added diagnostics without changing
+files or borrowing dependencies. The production build and all size budgets
+pass. Updated whole-web coverage passes 1,662 tests across 125 files in
+619.76s: statements83.06%, branches75.86%, functions75.53%, lines85.74%;
+the configured floors pass. Canary creation/acceptance, operator visual
+acceptance and registry cutover remain pending. No claim that dev is fully
+validated or ready for customer production is made.
+
+The independent web coverage gate also passed in the owned release worktree:
+1,661 tests across 125 files, with statements 83.06%, branches 75.89%,
+functions 75.53% and lines 85.74%. The configured floors passed. This is
+unit/coverage evidence, not browser layout or operator visual acceptance.
+
+#### Confirmed execution issues and prevention
+
+| ID | Type / severity | Symptom and mechanism | Resolution and why it works | Detection / earliest possible gate |
+|---|---|---|---|---|
+| AD-1 | Azure service / Medium | Two copy jobs reached Failed provisioning; executions API returned InternalServerError although the managed environment itself was Succeeded. | Stop only owned commands, delete only the two owned failed jobs and verify absence. Use direct native PostgreSQL clients without changing source state. Native carries pass complete fidelity/schema checks. | Actual provider/runtime check caught this; the first job readiness result was the earliest possible detection. No repeated blind allocation. |
+| AD-2 | Transfer scalability / Medium | Full-row JSON sorting transferred and sorted the large dev request-log corpus rather than using compact row fingerprints. The first attempt was stopped before target writes. | Reuse the existing production server-side nested-MD5 content fingerprint and hash-bind the combined manifest, while retaining full schema/constraint/index equality and the exported snapshot. | Actual dev transfer latency exposed this; corpus-size-aware manifest review could have caught it before execution. Preserve all logs, not a silently smaller data set. |
+| AD-3 | Orchestration budget / Low | The40-minute deployment receipt wait expired while the760MB dev transfer continued and progressed through dump/restore/final verification. | Extend only the receipt wait, not rerun the dump or restore. The existing transfer subsequently passes and creation proceeds from its verified receipt. | Wait deadline caught this; actual data-volume/phase budgeting was the earlier opportunity. A wait timeout is not proof that its dependency failed. |
+| AD-4 | Deployment configuration / High | PowerShell `switch` changed automatic `$_` from the environment entry to its name string. The default branch read `.value` from the string, emitting empty non-secret values, includingPORT. Ingress8080 therefore did not match dynamic listening port42145. | Capture the original entry before `switch`; preserve its value in the default branch. Actual-AST regression initially fails with `RED: actual deployment transformation did not preserve PORT`, then passes all preserved values, override and secret reference. Repair only the owned exact-image dev app and independently read back every environment value/reference. | Actual startup/health gate caught this. An actual-transformation preservation test before creation was the earliest possible gate and is now applied. Data restoration and secret references were unaffected. |
+| AD-5 | Client routing / Medium | Repaired revision was Healthy on8080, but proxy-routed health still timed out. Direct routing returnedHTTP200 in0.131s. | Scope direct routing to the acceptance process; restore request defaults afterwards. No machine-wide proxy or corporate registry setting changes. Actual version/backend preflight then passes and live tests start. | Actual HTTP comparison distinguished client routing from service health. A paired direct/proxy reachability preflight could have found it earlier. |
+| AD-6 | UI layout / High | Actual dev browser acceptance has one failure: four bulk-result cells exceed the card at900px. Short loopback URLs had passed earlier measured coverage, while Azure's longer URLs expose the intrinsic minimum width of fractional grid columns. | Unintended defect. Bound flexible tracks with minmax(0,1fr), compose existing CopyableField truncation, and keep placeholders non-copyable. Unit RED/GREEN and five built-frontend browser flows pass, including deterministic long values, two viewport bounds, actual clipping and exact clipboard contents. Review, immutable image production and actual Azure rerun remain pending. | Actual Azure bounded-layout assertion caught it. A deliberately long URL/error fixture in the earliest local browser run could have caught it before release; that fixture is now applied and the general pattern is recorded. |
+| AD-7 | Evidence tooling / Low | Parsing the combined line/JSON reporter output as one JSON document failed because a console summary followed the completed JSON envelope. Retry paths also had no distinct-attempt parameter. | Preserve the original protected log; parse its bounded complete envelope for the original outcome. Future runs use a dedicated JSON report, explicit attempt names, no-overwrite guards and encryption roundtrip hashes. Successful browser receipts require nonzero exercised tests and zero skips/failures/flakes/errors, and distinguish loopback preview from deployed-target scope. | Post-run outcome extraction caught it. A dedicated report file and immutable-attempt guard were the earlier opportunity; both are now applied. |
+| AD-8 | Validation configuration / Low | A per-session strict browser TypeScript config could not find node/vite type definitions because resolution started outside the owned web package. | Explicit owned @types root and Vite client declaration path give a strict browser-spec exit0. No package install, dependency borrowing or source-config weakening. Existing full-project errors remain explicitly non-green and are compared to HEAD through the compiler. | First focused compiler run caught the resolution issue; explicit config-relative type ownership could have prevented it. |
+| AD-9 | Tool selection / Low | A targeted npx ESLint invocation fetched a cached tool but failed because the web package has no eslint.config file. The chained size command therefore did not run. | Classify the existing unconfigured web lint gate as N/A, not PASS. Do not add unrelated lint tooling. Run the existing size command separately: all budgets pass. No source dependency manifests or locks changed. | Targeted lint invocation caught it; checking for the repository-required config before invoking a tool was the earliest opportunity. |
+
+These entries use retained command results and actual provider observations.
+They do not claim that the complete historical session transcript has been
+reconciled. Self-improvement is applied through the actual transformation
+regression and full provider readback, not a presence-only configuration test.
+Design disposition accepted: keep this recovery as scoped operational tooling;
+no runtime abstraction or general admission bypass is justified.
+
 ### Authorized performance-admission exception (2026-11-03)
 
 **Decision ID:** `T10-0.55.67-PERF-EXCEPTION-2026-11-03`.

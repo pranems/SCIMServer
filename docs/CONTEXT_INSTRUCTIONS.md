@@ -16,15 +16,32 @@ data-integrity, functional, browser and migration gate remains mandatory;
 customer production must not change. The existing migration execution document
 records the exact authorization, scope and required merged-commit/image-digest
 binding. Historical no-waiver holds below are superseded, not failed receipts.
-Use release-only branch `ops/tenant10-release-exception-20261103`; keep
-qualification research PR251 draft. Complete API/web trees match integrated
-candidate5823a225 after importing four unchanged version-bearing blobs.
-No runtime, schema, dependency graph, workflow or normal qualification logic
-changes. Root/web dependency restore, unchanged-lock verification, API Prisma
-generation and public-registry/sha512 provenance pass. Normal protected review,
-final immutable artifact, actual target acceptance, source freeze/final carry
-and cutover remain pending. Self-improvement applied: bounded authorization
-and honest pending evidence. Design disposition accepted: no general bypass.
+PR270 merged normally as6102aff4; authoritative41714210347 produced the
+scanned immutable image. Both actual target databases passed complete
+nine-table content/schema/constraint/index equality. The operator explicitly
+accepts available point-in-time data; no source freeze or synchronized
+zero-loss claim is required. Dev is deployed with corrected environment
+values/references, a Healthy revision and authenticated0.55.67/Prisma readback.
+Live acceptance reports1,841 passes/zero failures, including four explicit
+retired-API placeholders that are not exercised checks. Full dev browser
+acceptance has347 passes/one unintended Bulk layout failure, zero skips/flakes.
+
+Current repair branch `fix/tenant10-bulk-result-overflow-20261103` bounds the
+Bulk result grid and reuses existing copy/truncate fields. Unit RED/GREEN,
+five built-loopback frontend/browser flows with the migrated-dev backend,
+strict added-spec compilation and production build pass. Full web tsc remains
+non-green at66 diagnostics/two production diagnostics; executable HEAD
+comparison proves zero added diagnostics. Updated full coverage passes
+1,662 tests / 125 files, with statements83.06%, branches75.86%,
+functions75.53%, lines85.74%; all size budgets pass. Web ESLint remains N/A
+because no config exists. Protected publication, review, a corrected
+immutable image and actual target reruns
+remain mandatory. Canary application, operator visual confirmation and role
+cutover remain pending. No customer-production changes or performance campaign.
+Keep PR251 research draft. Self-improvement applied: deterministic long values,
+actual bounds/clipping/full clipboard assertions and immutable scoped reports.
+Design disposition accepted: existing primitive composition; no general bypass
+or speculative domain-service extraction.
 
 **Authoritative current state:** PR267 is merged at84099293570af5ab06f7d8e2f93e7e6ae2c0236f.
 Reviewed883fb6c6 passes29 protected gates, and exact-tip5757623103 reports
