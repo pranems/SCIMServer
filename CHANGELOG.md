@@ -9,11 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Serialize all10 connection environment values as JSON strings in generated
+  job YAML, preserving literal quotes/backslashes and string-valued ports.
+  Fifth-review High4458211788 has actual-generator RED/GREEN; the complete
+  existing js-yaml parser also verifies all14 environment values, distinct
+  raw/alternate synthetic passwords and worker text without Docker. The real
+  PostgreSQL fixture now consumes those actual YAML outputs. Its hosted step
+  follows API npm ci, without adding dependencies or changing lockfiles.
+  Twelve review cases run within11 offline scripts. Corrected protected
+  publication, full hosted PostgreSQL/CI and independent review are pending.
 - Decode URI usernames once and make special-login database tests encode
   their actual input usernames and forward parsed values into the worker.
   The new actual-parser case has RED/GREEN and preserves existing password
   semantics. Eleven review cases now run within the 11-script offline gate;
-  corrected real database and full exact-tip publication/review are pending.
+  hosted41682922245 confirms corrected real PostgreSQL GREEN at7a938859,
+  alongside29 protected gates and full hosted validation/image smoke/Trivy,
+  CodeQL and freshness. Refreshed independent review remains pending.
 - Quote every worker libpq connection value and escape quotes/backslashes
   without changing canonical identity parsing. Hosted41674035838 reproduces
   actual target redirection before this fix. POSIX syntax and exact escaping

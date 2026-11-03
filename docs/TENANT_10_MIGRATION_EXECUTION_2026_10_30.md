@@ -9,6 +9,56 @@
 
 ## Executive summary
 
+### Fifth review: test the generated YAML transport, not a bypass
+
+Independent bot review `5756727841` of `7a938859`, submitted at
+`2026-11-03T17:27:55Z`, confirms the login correction but reports High
+`4458211788`: parsed connection fields are interpolated unescaped into
+double-quoted Azure job YAML. A database named `copy\new` becomes a newline;
+other backslashes produce invalid YAML. Direct Docker `--env` arguments in
+the integration fixture skipped that real production boundary.
+
+The new offline `jobyaml` case extracts actual generation code and records
+`RED: generated job YAML changes a parsed connection value.` Only then are
+all ten source/target host, port, database, login and SSL-mode scalars encoded
+with the existing JSON serializer and an explicit string cast. The assertion
+is now GREEN for literal backslashes, quotes, whitespace and percent escapes.
+This is the twelfth review case within the existing eleven-script gate.
+
+The PostgreSQL fixture now extracts the actual generator, parses its complete
+output using the already installed API `js-yaml`, resolves actual secret
+references, rejects unknown/duplicate/missing or non-string environment values,
+and consumes the observed environment and worker text. URI parsing and
+alternate-password handling also come from actual production helpers.
+`pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1 -Case serialization`
+passes locally without Docker, proving all 14 environment values, distinct
+raw/alternate synthetic passwords and worker text survive the full YAML
+round trip. This is transport evidence, not actual database execution.
+Hosted PostgreSQL now follows existing API `npm ci`; no dependency, version
+or lockfile changes are introduced, and its three-minute bound is unchanged.
+Corrected protected publication, hosted PostgreSQL/full CI and fresh review
+remain pending. Prior exact-tip success at `7a938859` is not current evidence.
+
+RCA type/severity: serialization and test correctness, High. Root cause:
+validation and final-client tests omitted the intervening YAML serializer.
+Fix: destination-grammar string serialization plus a fixture traversing the
+real generation/parser boundary. Why it works: JSON string scalars are valid
+YAML strings and preserve escaped characters before libpq applies its own
+grammar. Detection: independent review; earliest suitable detection is the
+actual-generator offline assertion, followed by full-parser transport and
+real PostgreSQL readback. The missing-boundary escape was closed in-place
+and promoted to engineering lessons. Design disposition: accepted; reuse
+existing generator, serializer, dependency and fixture, with no new strategy
+or speculative abstraction.
+
+RCA type/severity: harness line-ending handling, Low. The first new assertion
+failed its coverage count because CRLF line endings remained in extracted
+tokens. Correcting only the assertion's line-ending handling exposed the
+actual scalar-value RED recorded above. The initial incomplete-coverage
+failure is not counted as behavioral RED. Detection and earliest suitable
+detection are both the focused local test. Full-transcript RCA reconciliation
+and local interrupted Docker fixture absence remain unverified.
+
 ### Fourth review: carry the parsed login through the actual boundary
 
 The independent review at `b8f9b847` confirms the libpq injection finding
@@ -30,7 +80,15 @@ changed. This is the eleventh review case within the existing 11-script gate.
 The real PostgreSQL fixture now encodes each case's login in both URIs and
 passes only `sourceIdentity.User` / `targetIdentity.User` into the worker.
 No expected-value replacement bypasses production parsing. Corrected real
-database execution and full exact-tip publication/review remain pending.
+database execution is GREEN: published `7a938859` passes all 29 protected
+gates in 817.2 seconds, and hosted `41682922245` confirms the PostgreSQL
+step succeeds at `2026-11-03T17:19:05Z`. Thus special-character usernames
+travel through actual URI decoding and worker serialization before independent
+database/login readback. The existing snapshot/signal/fidelity/isolation and
+owned-fixture cleanup assertions also complete. Full hosted `41682922245`
+passes validation, image build/push, container smoke and Trivy; CodeQL and
+freshness also pass at the exact same tip. Refreshed independent review
+remains pending.
 
 Type/severity: test correctness and URI identity, Medium. Root cause:
 expected fixture values were substituted after parsing, hiding an undecoded
@@ -43,6 +101,19 @@ offline actual-parser assertion, followed by real parser-to-worker readback.
 Self-improvement is applied through both layers. Design disposition:
 accepted; the existing shared parser owns URI normalization, while the
 existing serializer owns libpq grammar. No new abstraction is required.
+
+The superseded `b8f9b847` run `41678029555` was intentionally cancelled after
+review made it unmergeable and its web step did not complete. Its actual
+PostgreSQL step remains successful evidence for the earlier worker boundary,
+not the corrected username path or a full hosted pass. The available
+validation-job log is retained separately with SHA-256
+`556f243032e7a251ad638db233c3639f6757bea379abdb5e31a8802bfe5af35a`.
+It is 20,872,962 bytes and ends during API E2E output before the web step,
+so no web-failure root cause or complete web transcript is established.
+An entire-run CLI log request failed because a never-started dependent job
+has no log archive; selecting the exact executed validation job succeeds.
+This is Low tooling friction, not another application failure. The new
+`7a938859` run must complete the unchanged full matrix.
 
 ### Third review: literal libpq connection parameters
 

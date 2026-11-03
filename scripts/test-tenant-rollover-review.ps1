@@ -1,17 +1,17 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup', 'userinfo')]
+    [ValidateSet('all', 'acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup', 'userinfo', 'jobyaml')]
     [string]$Case = 'all'
 )
 $ErrorActionPreference = 'Stop'
 if ($Case -eq 'all') {
     $failed = @()
-    foreach ($item in @('acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup', 'userinfo')) {
+    foreach ($item in @('acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup', 'userinfo', 'jobyaml')) {
         & pwsh -NoProfile -File $PSCommandPath -Case $item
         if ($LASTEXITCODE -ne 0) { $failed += $item }
     }
     if ($failed.Count) { throw "Review regressions failed: $($failed -join ', ')" }
-    Write-Host 'PASS: all eleven independent-review regression cases'
+    Write-Host 'PASS: all twelve independent-review regression cases'
     return
 }
 . (Join-Path $PSScriptRoot 'postgres-provisioning.ps1')
@@ -93,7 +93,7 @@ function global:az {
 }
 try {
     switch ($Case) {
-        'userinfo' {
+        { $_ -in @('userinfo', 'jobyaml') } {
             $tokens = $null; $errors = $null
             $ast = [System.Management.Automation.Language.Parser]::ParseFile(
                 (Join-Path $PSScriptRoot 'rotate-tenant-data.ps1'), [ref]$tokens, [ref]$errors
@@ -106,6 +106,42 @@ try {
             }, $true)
             if (-not $parser) { throw 'Production URI parser is missing.' }
             . ([scriptblock]::Create($parser.Extent.Text))
+            if ($Case -eq 'jobyaml') {
+                $src = Split-PgUri -Uri 'postgresql://copy%20user%27%22%5Cpath:synthetic@localhost/copy%5Cnew?sslmode=disable' -Which Source
+                $dst = Split-PgUri -Uri 'postgresql://copy%2520user:synthetic@localhost/target%22%5Cpath?sslmode=disable' -Which Target
+                $srcPwAlt = $src.Password; $dstPwAlt = $dst.Password
+                $runId = 'synthetic-run'; $envId = '/synthetic/environment'; $script = 'echo synthetic'
+                $start = $ast.EndBlock.Statements | Where-Object { $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and $_.Left.Extent.Text -eq '$indented' } | Select-Object -First 1
+                $end = $ast.EndBlock.Statements | Where-Object { $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and $_.Left.Extent.Text -eq '$yaml' } | Select-Object -First 1
+                if (-not $start -or -not $end) { throw 'Actual job YAML generation boundary is missing.' }
+                $statements = $ast.EndBlock.Statements | Where-Object {
+                    $_.Extent.StartOffset -ge $start.Extent.StartOffset -and $_.Extent.EndOffset -le $end.Extent.EndOffset
+                } | ForEach-Object { $_.Extent.Text }
+                $yaml = & ([scriptblock]::Create(($statements -join "`n") + "`n" + 'return $yaml'))
+                $expected = @{
+                    SRC_HOST = $src.DbHost; SRC_PORT = [string]$src.Port; SRC_DB = $src.Database
+                    SRC_USER = $src.User; SRC_SSL = $src.SslMode
+                    DST_HOST = $dst.DbHost; DST_PORT = [string]$dst.Port; DST_DB = $dst.Database
+                    DST_USER = $dst.User; DST_SSL = $dst.SslMode
+                }
+                $observed = @{}
+                $key = $null
+                foreach ($rawLine in ($yaml -split "`n")) {
+                    $line = $rawLine.TrimEnd("`r")
+                    if ($line -match '^          - name: ([A-Z_]+)$') { $key = $Matches[1] }
+                    elseif ($key -and $line -match '^            value: (.+)$') {
+                        try { $value = ConvertFrom-Json -InputObject $Matches[1] -ErrorAction Stop }
+                        catch { throw 'RED: generated job YAML does not encode connection values as literal JSON strings.' }
+                        if (-not $expected.ContainsKey($key) -or $value -isnot [string] -or $value -cne $expected[$key]) {
+                            throw 'RED: generated job YAML changes a parsed connection value.'
+                        }
+                        $observed[$key] = $value
+                        $key = $null
+                    }
+                }
+                if ($observed.Count -ne $expected.Count) { throw 'Generated job YAML connection coverage is incomplete.' }
+                break
+            }
             foreach ($login in @('postgres', "copy user'\path", 'copy@user:part', 'copy%20user')) {
                 $encodedUser = [Uri]::EscapeDataString($login)
                 $parsed = Split-PgUri -Uri "postgresql://${encodedUser}:synthetic%99@localhost/scimdb" -Which Fixture

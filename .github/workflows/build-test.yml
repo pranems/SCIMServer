@@ -77,13 +77,13 @@ jobs:
       - name: Verify offline tenant rollover contracts
         run: pwsh -NoProfile -File scripts/test-tenant-rollover.ps1
 
-      - name: Verify PostgreSQL copy connections and snapshots
-        timeout-minutes: 3
-        run: pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1
-
       - name: Install API dependencies
         working-directory: api
         run: npm ci --no-audit --no-fund
+
+      - name: Verify PostgreSQL copy connections and snapshots
+        timeout-minutes: 3
+        run: pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1
 
       # Prisma client must be generated BEFORE lint so type-aware ESLint rules
       # (no-redundant-type-constituents, require-await) can resolve @prisma/client

@@ -9,6 +9,23 @@
 
 ## Active Delivery Process
 
+**Current correction pending publication:** fifth review High4458211788
+finds that generated double-quoted job YAML reinterprets connection values.
+All10 connection scalars now use JSON string serialization. Actual-generator
+RED/GREEN and a complete js-yaml round trip pass locally without Docker,
+preserving all14 environment values, distinct raw/alternate synthetic
+passwords and worker text. The real PostgreSQL fixture now consumes those
+actual YAML outputs; CI reuses API dependencies after npm ci. There are12
+review cases in11 offline scripts. Corrected protected publication, full
+hosted PostgreSQL/CI and independent review remain required.
+
+**Previous exact-tip evidence:** published7a938859 passes all29 protected
+gates in817.2s and full hosted41682922245: parsed-login PostgreSQL,
+validation, image build/push, container smoke and Trivy, plus CodeQL and
+freshness. The corrected login finding has actual RED/GREEN evidence and a
+resolved thread. Refreshed independent review remains pending. These tooling
+results do not admit0.55.67 or establish any target deployment/cutover.
+
 **Latest PR267 boundary:** b8f9b847 passes29 protected gates and the actual
 PostgreSQL connection/snapshot step in41678029555. Review confirms literal
 libpq quoting fixed injection, but identifies URI login decoding hidden by

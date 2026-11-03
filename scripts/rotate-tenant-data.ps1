@@ -418,29 +418,29 @@ properties:
 $indented
         env:
           - name: SRC_HOST
-            value: "$($src.DbHost)"
+            value: $(ConvertTo-Json -InputObject ([string]$src.DbHost) -Compress)
           - name: SRC_PORT
-            value: "$($src.Port)"
+            value: $(ConvertTo-Json -InputObject ([string]$src.Port) -Compress)
           - name: SRC_DB
-            value: "$($src.Database)"
+            value: $(ConvertTo-Json -InputObject ([string]$src.Database) -Compress)
           - name: SRC_USER
-            value: "$($src.User)"
+            value: $(ConvertTo-Json -InputObject ([string]$src.User) -Compress)
           - name: SRC_SSL
-            value: "$($src.SslMode)"
+            value: $(ConvertTo-Json -InputObject ([string]$src.SslMode) -Compress)
           - name: SRC_PW
             secretRef: srcpw
           - name: SRC_PW_ALT
             secretRef: srcpwalt
           - name: DST_HOST
-            value: "$($dst.DbHost)"
+            value: $(ConvertTo-Json -InputObject ([string]$dst.DbHost) -Compress)
           - name: DST_PORT
-            value: "$($dst.Port)"
+            value: $(ConvertTo-Json -InputObject ([string]$dst.Port) -Compress)
           - name: DST_DB
-            value: "$($dst.Database)"
+            value: $(ConvertTo-Json -InputObject ([string]$dst.Database) -Compress)
           - name: DST_USER
-            value: "$($dst.User)"
+            value: $(ConvertTo-Json -InputObject ([string]$dst.User) -Compress)
           - name: DST_SSL
-            value: "$($dst.SslMode)"
+            value: $(ConvertTo-Json -InputObject ([string]$dst.SslMode) -Compress)
           - name: DST_PW
             secretRef: dstpw
           - name: DST_PW_ALT

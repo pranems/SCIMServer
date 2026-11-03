@@ -2,7 +2,7 @@
 param(
     [string]$PgImage = 'postgres@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3',
     [switch]$Baseline,
-    [ValidateSet('all', 'connections')]
+    [ValidateSet('all', 'connections', 'serialization')]
     [string]$Case = 'all'
 )
 $ErrorActionPreference = 'Stop'
@@ -32,13 +32,72 @@ $setupText = if ($setup) { $setup.Extent.Text + "`n" } else { '' }
 $copy = & ([scriptblock]::Create($setupText + $assignment.Extent.Text + "`n" + 'return $fullCopy'))
 $copy = $copy.Replace("`r", '')
 $connectionSetup = & ([scriptblock]::Create($setupText + "`n" + 'return $connectionSetup'))
-$parser = $ast.Find({
-    param($node)
-    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $node.Name -eq 'Split-PgUri'
-}, $true)
-if (-not $parser) { throw 'Copy URI parser is missing.' }
-. ([scriptblock]::Create($parser.Extent.Text))
+foreach ($functionName in @('Split-PgUri', 'Get-DecodedOrSame')) {
+    $parser = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq $functionName
+    }, $true)
+    if (-not $parser) { throw "Copy input helper $functionName is missing." }
+    . ([scriptblock]::Create($parser.Extent.Text))
+}
+$yamlStart = $ast.EndBlock.Statements | Where-Object {
+    $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and $_.Left.Extent.Text -eq '$indented'
+} | Select-Object -First 1
+$yamlEnd = $ast.EndBlock.Statements | Where-Object {
+    $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and $_.Left.Extent.Text -eq '$yaml'
+} | Select-Object -First 1
+if (-not $yamlStart -or -not $yamlEnd) { throw 'Actual job YAML generation boundary is missing.' }
+$yamlStatements = $ast.EndBlock.Statements | Where-Object {
+    $_.Extent.StartOffset -ge $yamlStart.Extent.StartOffset -and $_.Extent.EndOffset -le $yamlEnd.Extent.EndOffset
+} | ForEach-Object { $_.Extent.Text }
+$yamlProgram = [scriptblock]::Create(($yamlStatements -join "`n") + "`n" + 'return $yaml')
+$apiRoot = Join-Path (Split-Path $PSScriptRoot) 'api'
+$yamlModule = Join-Path (Join-Path $apiRoot 'node_modules') 'js-yaml'
+function Get-JobFixture {
+    param($Source, $Target, [string]$Program)
+    $src = $Source; $dst = $Target; $script = $Program
+    $srcPwAlt = Get-DecodedOrSame $Source.Password
+    $dstPwAlt = Get-DecodedOrSame $Target.Password
+    $runId = 'synthetic-snapshot-run'; $envId = '/synthetic/environment'
+    $yaml = & $yamlProgram
+    $parseYaml = @'
+const fs = require('node:fs');
+const yaml = require(process.argv[1]);
+process.stdout.write(JSON.stringify(yaml.load(fs.readFileSync(0, 'utf8'))));
+'@
+    $document = $yaml | & node -e $parseYaml $yamlModule
+    if ($LASTEXITCODE -ne 0) { throw 'Actual generated job YAML could not be parsed with the existing API YAML dependency.' }
+    $job = $document | ConvertFrom-Json
+    $expectedNames = @(
+        'SRC_HOST', 'SRC_PORT', 'SRC_DB', 'SRC_USER', 'SRC_SSL', 'SRC_PW', 'SRC_PW_ALT',
+        'DST_HOST', 'DST_PORT', 'DST_DB', 'DST_USER', 'DST_SSL', 'DST_PW', 'DST_PW_ALT'
+    )
+    $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $arguments = [Collections.Generic.List[string]]::new()
+    $jobContainer = $job.properties.template.containers[0]
+    if ($jobContainer.command.Count -ne 2 -or ($jobContainer.command -join ' ') -cne '/bin/sh -c' -or
+        $jobContainer.args.Count -ne 1 -or $jobContainer.args[0] -isnot [string]) {
+        throw 'Generated job worker command is not the expected single POSIX program.'
+    }
+    foreach ($entry in $jobContainer.env) {
+        if ($entry.name -cnotin $expectedNames -or -not $names.Add($entry.name)) {
+            throw 'Generated job environment has unexpected or duplicate names.'
+        }
+        if ('value' -in $entry.PSObject.Properties.Name) {
+            $value = $entry.value
+        } elseif ('secretRef' -in $entry.PSObject.Properties.Name) {
+            $secret = @($job.properties.configuration.secrets | Where-Object name -CEQ $entry.secretRef)
+            if ($secret.Count -ne 1) { throw 'Generated job secret reference is missing or ambiguous.' }
+            $value = $secret[0].value
+        } else { throw 'Generated job environment has no value or secret reference.' }
+        if ($value -isnot [string]) { throw 'Generated job environment value is not a string.' }
+        $arguments.Add('--env')
+        $arguments.Add("$($entry.name)=$value")
+    }
+    if ($names.Count -ne $expectedNames.Count) { throw 'Generated job environment is incomplete.' }
+    return [pscustomobject]@{ Environment = $arguments.ToArray(); Program = $jobContainer.args[0] }
+}
 $container = $null
 $fixtureRun = [guid]::NewGuid().ToString('N')
 function Assert-SourceSnapshotReleased {
@@ -47,12 +106,34 @@ function Assert-SourceSnapshotReleased {
         throw "RED: completed copy worker left $holders source transactions holding its exported snapshot."
     }
 }
-$environment = @('--env', 'SRC_HOST=localhost', '--env', 'SRC_PORT=5432',
-    '--env', 'SRC_DB=copy_source', '--env', 'SRC_USER=postgres', '--env', 'SRC_SSL=disable',
-    '--env', 'SRC_PW=synthetic', '--env', 'SRC_PW_ALT=synthetic',
-    '--env', 'DST_HOST=localhost', '--env', 'DST_PORT=5432',
-    '--env', 'DST_DB=copy_target', '--env', 'DST_USER=postgres', '--env', 'DST_SSL=disable',
-    '--env', 'DST_PW=synthetic', '--env', 'DST_PW_ALT=synthetic')
+$fixtureSource = Split-PgUri -Uri 'postgresql://postgres:synthetic@localhost:5432/copy_source?sslmode=disable' -Which Source
+$fixtureTarget = Split-PgUri -Uri 'postgresql://postgres:synthetic@localhost:5432/copy_target?sslmode=disable' -Which Target
+$jobFixture = Get-JobFixture -Source $fixtureSource -Target $fixtureTarget -Program $copy
+$environment = $jobFixture.Environment
+$copy = $jobFixture.Program
+if ($Case -eq 'serialization') {
+    $src = Split-PgUri -Uri 'postgresql://copy%20user%27%22%5Cpath:source%25"\path@localhost/copy%5Cnew?sslmode=disable' -Which Source
+    $dst = Split-PgUri -Uri 'postgresql://copy%2520user:target%25''\path@localhost/target%22%5Cpath?sslmode=disable' -Which Target
+    $serialized = Get-JobFixture -Source $src -Target $dst -Program $copy
+    $expected = @{
+        SRC_HOST = $src.DbHost; SRC_PORT = [string]$src.Port; SRC_DB = $src.Database
+        SRC_USER = $src.User; SRC_SSL = $src.SslMode; SRC_PW = $src.Password; SRC_PW_ALT = (Get-DecodedOrSame $src.Password)
+        DST_HOST = $dst.DbHost; DST_PORT = [string]$dst.Port; DST_DB = $dst.Database
+        DST_USER = $dst.User; DST_SSL = $dst.SslMode; DST_PW = $dst.Password; DST_PW_ALT = (Get-DecodedOrSame $dst.Password)
+    }
+    for ($i = 0; $i -lt $serialized.Environment.Count; $i += 2) {
+        $pair = $serialized.Environment[$i + 1] -split '=', 2
+        if ($serialized.Environment[$i] -cne '--env' -or -not $expected.ContainsKey($pair[0]) -or
+            $pair[1] -cne $expected[$pair[0]]) {
+            throw 'Actual YAML round trip changed an environment value.'
+        }
+    }
+    if ($serialized.Program.Replace("`r", '').TrimEnd("`n") -cne $copy.Replace("`r", '').TrimEnd("`n")) {
+        throw 'Actual YAML round trip changed the worker program.'
+    }
+    Write-Host 'PASS: full generated YAML preserves all 14 environment values and worker program without Docker'
+    return
+}
 try {
     Write-Host "Allocating owned PostgreSQL fixture scim-snapshot-$fixtureRun"
     $container = & docker run --detach --rm --network none `
@@ -103,11 +184,9 @@ printf 'TARGET_IDENTITY=%s\n' "$identity"
         $targetUri = "postgresql://${encodedUser}:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.TargetDatabase))?sslmode=disable"
         $sourceIdentity = Split-PgUri -Uri $sourceUri -Which Source
         $targetIdentity = Split-PgUri -Uri $targetUri -Which Target
-        $identityEnvironment = $environment + @(
-            '--env', "SRC_DB=$($sourceIdentity.Database)", '--env', "DST_DB=$($targetIdentity.Database)",
-            '--env', "SRC_USER=$($sourceIdentity.User)", '--env', "DST_USER=$($targetIdentity.User)"
-        )
-        $output = $identityProbe | & docker exec -i @identityEnvironment $container sh -c 'tr -d "\r" | sh'
+        $identityFixture = Get-JobFixture -Source $sourceIdentity -Target $targetIdentity -Program $identityProbe
+        $identityEnvironment = $identityFixture.Environment
+        $output = $identityFixture.Program | & docker exec -i @identityEnvironment $container sh -c 'tr -d "\r" | sh'
         if ($LASTEXITCODE -ne 0) { throw 'Connection-identity probe failed before readback; inspect the PostgreSQL diagnostic.' }
         foreach ($endpoint in @('SOURCE', 'TARGET')) {
             $prefix = "${endpoint}_IDENTITY="

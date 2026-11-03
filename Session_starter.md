@@ -2,7 +2,31 @@
 
 **Last verified:** 2026-11-03
 
-### Latest review: preserve the complete login URI path
+### Latest review: preserve values across the generated job YAML
+
+Fifth independent review of7a938859 confirms the login correction but finds
+High4458211788: unescaped connection fields in double-quoted job YAML alter
+backslashes or fail parsing. Actual-generator jobyaml assertion is RED before
+the production fix and GREEN after JSON-string encoding all10 scalar fields.
+There are now12 review cases within11 offline scripts. A full js-yaml round
+trip also passes locally without Docker: all14 environment values, distinct
+raw/alternate synthetic passwords and the actual worker program are preserved.
+
+The real PostgreSQL fixture now consumes the actual generated YAML environment,
+secret references and worker text, not directly substituted expected inputs.
+It reuses the existing installed API js-yaml dependency; hosted execution is
+ordered after API npm ci and retains its three-minute bound. Corrected protected
+publication, hosted PostgreSQL/full CI and refreshed review remain pending.
+No release admission, target app, final carry or role transition is claimed.
+
+### Previous exact-tip evidence: complete login URI path
+
+Corrected published tip7a938859 now passes all29 protected gates in817.2s
+and full hosted41682922245, including actual parsed-login PostgreSQL,
+validation, image build/push, container smoke and Trivy. CodeQL and freshness
+also pass. Refreshed independent bot review is pending. The corrected login
+finding has actual evidence and a resolved thread; this does not replace
+the fresh review or release admission.
 
 Publishedb8f9b847 passes all29 protected gates in1118.6s and the real
 PostgreSQL step in hosted41678029555. The next independent review confirms

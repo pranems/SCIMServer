@@ -44,6 +44,21 @@ admit a release, prove the Azure image or replace operator visual approval.
 
 ## Tenant bootstrap must verify effects, not command labels (2026-10-31)
 
+Exercise every intervening serializer, not only the first parser and final
+client. Fifth review of PR #267 found that direct Docker environment arguments
+bypassed generated job YAML: a valid parsed `copy\new` database became a
+newline in a double-quoted YAML string, and other backslashes failed parsing.
+JSON-string encode each scalar using the existing serializer, including port
+strings. Extract the actual generator, parse the complete YAML with the
+existing installed parser, resolve its real secret references, and pass the
+observed environment and worker text into the database fixture. Keep an
+offline actual-generator scalar assertion for fast RED/GREEN, plus the full
+parser test and real PostgreSQL readback as distinct evidence. Include
+distinct raw/alternate synthetic passwords so transport cannot hide a swap.
+This closes a repeated missing-boundary test pattern without adding a package
+or a new abstraction. Full hosted evidence is still required after local
+transport GREEN.
+
 Canonical identity comparison and downstream connection serialization are
 separate safety boundaries. A correctly decoded database name can still
 inject libpq parameters if interpolated unquoted after validation. Quote
@@ -62,6 +77,8 @@ passed while URI username decoding remained broken. Encode each actual case
 in the input URI and forward the parser's output unchanged. An offline
 parser assertion catches one-time decoding errors quickly; the real database
 then proves the complete path without expected-value substitution.
+The corrected real PostgreSQL step is GREEN at `7a938859` in hosted
+`41682922245`, after actual-parser RED/GREEN and all 29 protected gates.
 
 Compare normalized database identities, not URI spellings: libpq treats
 zero-padded numeric ports as the same port, and percent-encoded database

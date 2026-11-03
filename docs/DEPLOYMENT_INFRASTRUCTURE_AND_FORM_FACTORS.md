@@ -70,6 +70,15 @@ with encoded whitespace, quotes and backslashes, followed by source snapshot
 release, complete manifest fidelity and concurrent-write isolation. This is
 synthetic integration evidence, not a deployment or performance campaign.
 The step has a three-minute execution bound on the disposable hosted runner.
+It now follows the existing API dependency install so the fixture can reuse
+the installed js-yaml parser, without a new dependency or lockfile change.
+After fifth-review High4458211788, all10 connection scalars are JSON strings
+in job YAML. The fixture obtains all14 environment values, secret references
+and worker text from the actual generated and parsed job document before
+execution. Actual-generator RED/GREEN and a Docker-free complete YAML round
+trip pass; corrected hosted PostgreSQL/full CI and independent review remain
+pending. Run `pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1 -Case serialization`
+after API installation for that narrowly classified transport assertion.
 Hosted `41674035838` reproduces the third-review target-identity assertion
 before production code changes. Shared worker setup now quotes every libpq
 value and escapes literal quotes/backslashes, rather than allowing a decoded
@@ -80,8 +89,10 @@ refreshed review remain required.
 The subsequent login-boundary correction decodes URI usernames once, without
 altering raw/alternate password selection. The fixture now encodes each
 login in its actual URI and forwards the parsed login, not an expected
-replacement. Offline actual-parser RED/GREEN is established; corrected
-hosted database execution and exact-tip review remain pending.
+replacement. Offline actual-parser RED/GREEN is established; hosted41682922245
+confirms corrected real PostgreSQL GREEN at7a938859, alongside29 protected
+gates. Full hosted validation, image smoke/Trivy, CodeQL and freshness also
+pass at that exact tip. Refreshed review remains pending.
 
 PR #267 review corrections bind the target application's effective database
 host, port and database name before any suspension/restore; subscription
