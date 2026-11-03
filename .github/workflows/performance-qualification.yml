@@ -32,11 +32,37 @@ jobs:
         timeout-minutes: 3
         run: node --test scripts/test/membership-performance.test.cjs
 
+      - name: Build and bind exact checkout image
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Exact checkout source unavailable.' }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Tracked checkout inputs were modified.' }
+          $directory = Join-Path $env:GITHUB_WORKSPACE 'test-results/performance-image'
+          New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
+          $version = (Get-Content api/package.json -Raw | ConvertFrom-Json).version
+          docker build --pull --label "org.opencontainers.image.revision=$source" `
+            --build-arg "IMAGE_TAG=$source" --iidfile (Join-Path $directory 'image-id.txt') .
+          if ($LASTEXITCODE -ne 0) { throw 'Exact-checkout image build failed.' }
+          $image = (Get-Content (Join-Path $directory 'image-id.txt') -Raw).Trim()
+          docker image inspect --format `
+            '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"sourceCommit":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}' `
+            $image | Set-Content (Join-Path $directory 'identity.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Exact-checkout image identity unavailable.' }
+          node scripts/performance/assess-membership.cjs --checkout-image `
+            scripts/performance/membership-protocol.json (Join-Path $directory 'identity.json') `
+            $source $version (Join-Path $directory 'protocol.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Current-image protocol binding failed.' }
+
       - name: Run fixed same-image controls before old/current comparisons
-        timeout-minutes: 65
+        timeout-minutes: 55
         shell: pwsh
         run: |
           ./scripts/performance/run-membership-qualification.ps1 `
+            -ProtocolPath (Join-Path $env:GITHUB_WORKSPACE 'test-results/performance-image/protocol.json') `
             -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'test-results/performance-qualification')
 
       - name: Retain all completed and failed evidence
@@ -45,6 +71,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: membership-qualification-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/performance-qualification/
+          path: |
+            test-results/performance-qualification/
+            test-results/performance-image/
           if-no-files-found: error
           retention-days: 14

@@ -5,6 +5,51 @@
 **Status:** Implemented and tested locally, not released or deployed.
 Performance admission and the independent release gates remain open.
 
+## Current-checkout image binding (2026-11-03, not released)
+
+The existing qualification still selected a pinned 0.55.58 candidate even
+after source/dependency reconciliation proposed 0.55.67. A passing historical
+image comparison could not qualify that new artifact. The new prospective
+workflow builds its exact checkout and generates a separate candidate protocol
+from the immutable local image ID, revision label and package version.
+The frozen historical manifest and every failed result remain unchanged.
+Current API/schema/browser source, dependencies, warmups, sample counts,
+resource limits, operation order and latency bounds are not modified.
+
+### Execution issues and prevention
+
+| Issue | Root cause, resolution and prevention | Detection and escape |
+|---|---|---|
+| Stale candidate image / High | Source revision changed while the protocol stayed pinned to 0.55.58. Bind the real checkout build and reject wrong source/version/revision before allocation. New contracts exercise actual preflight and both same-image/old-current role selection. | Release investigation; earliest possible check was a checkout-to-image preflight, now added. |
+| CLI argument count / Low | New flag plus five values was initially counted as nine process arguments rather than eight. The real CLI test failed, then passed after correction; it also rejects overwriting retained protocol evidence. | Focused actual CLI contract; no escape beyond its earliest gate. |
+| Build and cleanup budget / Medium | Adding a build inside the measurement step could consume reserved cleanup time. A separate ten-minute build step and 45/55-minute work/step caps preserve the 75-minute job budget. Actual deadline tests cover both historical and source-bound caps. | Focused workflow/deadline contract; corrected before workflow execution. |
+| Missing isolated-worktree pg dependency / Low | The broader Node tooling suite requires the API dependency set. Restore dependencies only in the new isolated worktree after MODULE_NOT_FOUND; no shared node_modules mutation or lock regeneration. | First complete tooling run; not a benchmark/application failure. |
+| Missing isolated root/web tooling / Low | The first chosen web build and documentation check failed on missing vite/jsdom. Restore each worktree-owned dependency set using npm ci only after its observed missing-dependency failure. The protected hook owns consolidated validation. | Prerequisite build/documentation checks; no shared dependency mutation or lock regeneration. |
+| Missing generated Prisma model types / Low | API dependencies were deliberately installed with scripts disabled, leaving the generated client absent. The API build exposed model-type errors; explicit Prisma generation succeeds with a codegen-only local URL and no database connection. The protected hook owns the subsequent full build/test verification. | First API build; normal code-generation prerequisite, not a production source defect. |
+| Stale mutable local base / Medium | The first local build reused Node 24.16.0 despite newer historical images. Require docker build --pull, retain the first image identity, and verify the refreshed runtime separately. | Actual built-image runtime readback; earliest possible gate is a fresh-base build plus runtime readback. |
+
+The initial source-binding test failed before implementation. The complete
+focused suite then passed 58/58, up from 51, with no skips. A separate real
+workflow assertion reproduced missing `--pull` as RED before that correction.
+Complete local tooling passes 227 cases with 8 explicit retained-fixture/opt-in
+skips and 0 failures. The refreshed exact-source image reports 0.55.67 on
+Node 24.22.2; its actual identity generates the separate immutable protocol.
+Manifest/lock bytes remain unchanged. No hosted qualification, final release
+or new performance PASS is claimed here.
+
+Reassessing the retained October 29 control with the updated evaluator
+produces an assessment structurally identical to the original: all 12 checks
+match, including the same three failures. This verifies preserved rejection
+of the historical evidence; it does not rerun or qualify the new image.
+
+**Self-improvement applied:** release qualification must bind source,
+dependency-bearing image and actual runtime, not merely a historical version
+string. **Design disposition: accepted.** Extend the existing protocol
+validator and runner with one small pure binding helper; no serving service,
+new framework, new paid host or speculative measurement strategy is added.
+Provenance is this continuation's exact-source build and focused RED/GREEN
+output, not a reconstruction of earlier full transcripts.
+
 ## Current reviewed-source union (2026-10-29)
 
 The preserved 0.55.65 performance candidate now normally integrates reviewed
