@@ -69,6 +69,7 @@ container checks the URI-parser-to-worker database/login identity boundary
 with encoded whitespace, quotes and backslashes, followed by source snapshot
 release, complete manifest fidelity and concurrent-write isolation. This is
 synthetic integration evidence, not a deployment or performance campaign.
+The step has a three-minute execution bound on the disposable hosted runner.
 The first hosted run of the new connection regression is expected to expose
 the third-review defect before production code is changed.
 

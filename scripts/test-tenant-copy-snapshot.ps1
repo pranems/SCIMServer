@@ -87,9 +87,9 @@ CREATE ROLE "$specialUser" LOGIN;
     $identitySeed | & docker exec -i $container psql -U postgres -v ON_ERROR_STOP=1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Could not create connection-identity fixtures.' }
     $identityProbe = $connectionSetup + "`n" + @'
-identity=$(PGPASSWORD="$SRC_USE" psql "$S" -XAt -v ON_ERROR_STOP=1 -c "SELECT json_build_object('database', current_database(), 'user', current_user())::text")
+identity=$(PGPASSWORD="$SRC_USE" psql "$S" -XAt -v ON_ERROR_STOP=1 -c "SELECT json_build_object('database', current_database(), 'user', current_user)::text")
 printf 'SOURCE_IDENTITY=%s\n' "$identity"
-identity=$(PGPASSWORD="$DST_USE" psql "$D" -XAt -v ON_ERROR_STOP=1 -c "SELECT json_build_object('database', current_database(), 'user', current_user())::text")
+identity=$(PGPASSWORD="$DST_USE" psql "$D" -XAt -v ON_ERROR_STOP=1 -c "SELECT json_build_object('database', current_database(), 'user', current_user)::text")
 printf 'TARGET_IDENTITY=%s\n' "$identity"
 '@
     $identityCases = @(
@@ -107,7 +107,7 @@ printf 'TARGET_IDENTITY=%s\n' "$identity"
             '--env', "SRC_USER=$($identityCase.User)", '--env', "DST_USER=$($identityCase.User)"
         )
         $output = $identityProbe | & docker exec -i @identityEnvironment $container sh -c 'tr -d "\r" | sh'
-        if ($LASTEXITCODE -ne 0) { throw 'RED: copy connection setup cannot preserve literal database/login characters.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Connection-identity probe failed before readback; inspect the PostgreSQL diagnostic.' }
         foreach ($endpoint in @('SOURCE', 'TARGET')) {
             $prefix = "${endpoint}_IDENTITY="
             $observations = @($output | Where-Object { $_.StartsWith($prefix) })

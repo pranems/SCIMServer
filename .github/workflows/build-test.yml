@@ -78,6 +78,7 @@ jobs:
         run: pwsh -NoProfile -File scripts/test-tenant-rollover.ps1
 
       - name: Verify PostgreSQL copy connections and snapshots
+        timeout-minutes: 3
         run: pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1
 
       - name: Install API dependencies

@@ -74,6 +74,33 @@ distinguish startup failures from assertion failures, and prove every missing
 file rather than treating partial counts as success. Design disposition:
 accepted; no unrelated Vitest configuration change is justified.
 
+#### Hosted regression harness correction
+
+The normal protected retry passes all 29 gates at `d70f983b` in 933.4 seconds,
+including all 1,661 web tests in 125 files with default concurrency. This
+resolves the publication interruption without altering web configuration.
+Hosted `41670773572` then reaches the real PostgreSQL fixture, but its new
+readback query incorrectly calls the SQL keyword `current_user` as a
+zero-argument function. PostgreSQL rejects that query before identity
+comparison. This is a harness failure, not the intended connection-identity
+RED; production remains unchanged.
+
+The query now uses `current_user` without parentheses. Query/setup failures
+are explicitly distinguished from identity assertion failures, and the hosted
+step has a three-minute bound rather than waiting indefinitely for Docker.
+The next actual database run must confirm the assertion failure.
+
+| Issue | Type / severity | Mechanism and disposition | Detection / earliest suitable check |
+|---|---|---|---|
+| Initial GraphQL thread query lacked a closing brace | Tooling / Low | Metadata lookup failed before any thread change; corrected multiline query succeeded and both addressed threads were resolved | GitHub parser; the same query execution |
+| Connection fixture used expression splatting | Harness / Low | `@environment + ...` is not a PowerShell expression; corrected to `$environment + ...` before any database run | PowerShell parser; local syntax check |
+| Identity query used `current_user()` | Test correctness / Medium | SQL keyword is not callable; remove parentheses and keep pre-readback errors distinct from identity mismatch. Actual query execution pending | Hosted real PostgreSQL; an earlier real SQL smoke was unavailable while local Docker was unresponsive |
+
+Self-improvement is applied through distinct probe/assertion diagnostics,
+pre-allocation fixture-name output and bounded hosted integration. Design
+disposition: accepted. Keep the existing fixture and do not change unrelated
+test-runner or application behavior to make the harness green.
+
 ### Second review: canonical identity and remaining cleanup boundaries
 
 Corrected tip `05adbacd` passed all 29 protected gates and hosted run
