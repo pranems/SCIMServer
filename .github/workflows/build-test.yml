@@ -77,6 +77,9 @@ jobs:
       - name: Verify offline tenant rollover contracts
         run: pwsh -NoProfile -File scripts/test-tenant-rollover.ps1
 
+      - name: Verify PostgreSQL copy connections and snapshots
+        run: pwsh -NoProfile -File scripts/test-tenant-copy-snapshot.ps1
+
       - name: Install API dependencies
         working-directory: api
         run: npm ci --no-audit --no-fund

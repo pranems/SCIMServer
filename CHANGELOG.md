@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Add actual parser-to-libpq database/login identity readback to the real
+  PostgreSQL fixture and run that fixture in hosted validation. This is a
+  RED-first regression for the third-review unquoted connection-parameter
+  defect, not an already completed fix. Local Docker is unresponsive; normal
+  hosted CI is used without restarting shared services or changing release
+  admission. Production copy code is unchanged in this test-only step.
 - Second-review hardening normalizes numeric ports and decodes database
   identities once, replaces unsupported Unix permission APIs with checked
   `chmod`, validates infrastructure subnet delegation through the deployment

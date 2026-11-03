@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$PgImage = 'postgres@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3',
-    [switch]$Baseline
+    [switch]$Baseline,
+    [ValidateSet('all', 'connections')]
+    [string]$Case = 'all'
 )
 $ErrorActionPreference = 'Stop'
 $tokens = $null; $errors = $null
@@ -29,6 +31,14 @@ $setup = $ast.Find({
 $setupText = if ($setup) { $setup.Extent.Text + "`n" } else { '' }
 $copy = & ([scriptblock]::Create($setupText + $assignment.Extent.Text + "`n" + 'return $fullCopy'))
 $copy = $copy.Replace("`r", '')
+$connectionSetup = & ([scriptblock]::Create($setupText + "`n" + 'return $connectionSetup'))
+$parser = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Split-PgUri'
+}, $true)
+if (-not $parser) { throw 'Copy URI parser is missing.' }
+. ([scriptblock]::Create($parser.Extent.Text))
 $container = $null
 $fixtureRun = [guid]::NewGuid().ToString('N')
 function Assert-SourceSnapshotReleased {
@@ -44,6 +54,7 @@ $environment = @('--env', 'SRC_HOST=localhost', '--env', 'SRC_PORT=5432',
     '--env', 'DST_DB=copy_target', '--env', 'DST_USER=postgres', '--env', 'DST_SSL=disable',
     '--env', 'DST_PW=synthetic', '--env', 'DST_PW_ALT=synthetic')
 try {
+    Write-Host "Allocating owned PostgreSQL fixture scim-snapshot-$fixtureRun"
     $container = & docker run --detach --rm --network none `
         --name "scim-snapshot-$fixtureRun" --label "scimserverSnapshotTest=$fixtureRun" `
         --tmpfs /var/lib/postgresql:rw,size=256m --env PGDATA=/var/lib/postgresql/snapshot-fixture-data `
@@ -65,6 +76,51 @@ try {
         & docker exec $container createdb -U postgres $db
         if ($LASTEXITCODE -ne 0) { throw 'Could not create copy-test database.' }
     }
+    $redirectDatabase = 'copy_target host=localhost dbname=copy_source'
+    $specialDatabase = "copy target'\path"
+    $specialUser = "copy user'\path"
+    $identitySeed = @"
+CREATE DATABASE "$redirectDatabase";
+CREATE DATABASE "$specialDatabase";
+CREATE ROLE "$specialUser" LOGIN;
+"@
+    $identitySeed | & docker exec -i $container psql -U postgres -v ON_ERROR_STOP=1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not create connection-identity fixtures.' }
+    $identityProbe = $connectionSetup + "`n" + @'
+identity=$(PGPASSWORD="$SRC_USE" psql "$S" -XAt -v ON_ERROR_STOP=1 -c "SELECT json_build_object('database', current_database(), 'user', current_user())::text")
+printf 'SOURCE_IDENTITY=%s\n' "$identity"
+identity=$(PGPASSWORD="$DST_USE" psql "$D" -XAt -v ON_ERROR_STOP=1 -c "SELECT json_build_object('database', current_database(), 'user', current_user())::text")
+printf 'TARGET_IDENTITY=%s\n' "$identity"
+'@
+    $identityCases = @(
+        @{ SourceDatabase = 'copy_source'; TargetDatabase = $redirectDatabase; User = 'postgres' },
+        @{ SourceDatabase = $specialDatabase; TargetDatabase = $redirectDatabase; User = $specialUser },
+        @{ SourceDatabase = $redirectDatabase; TargetDatabase = $specialDatabase; User = $specialUser }
+    )
+    foreach ($identityCase in $identityCases) {
+        $sourceUri = "postgresql://postgres:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.SourceDatabase))?sslmode=disable"
+        $targetUri = "postgresql://postgres:synthetic@localhost:5432/$([Uri]::EscapeDataString($identityCase.TargetDatabase))?sslmode=disable"
+        $sourceIdentity = Split-PgUri -Uri $sourceUri -Which Source
+        $targetIdentity = Split-PgUri -Uri $targetUri -Which Target
+        $identityEnvironment = $environment + @(
+            '--env', "SRC_DB=$($sourceIdentity.Database)", '--env', "DST_DB=$($targetIdentity.Database)",
+            '--env', "SRC_USER=$($identityCase.User)", '--env', "DST_USER=$($identityCase.User)"
+        )
+        $output = $identityProbe | & docker exec -i @identityEnvironment $container sh -c 'tr -d "\r" | sh'
+        if ($LASTEXITCODE -ne 0) { throw 'RED: copy connection setup cannot preserve literal database/login characters.' }
+        foreach ($endpoint in @('SOURCE', 'TARGET')) {
+            $prefix = "${endpoint}_IDENTITY="
+            $observations = @($output | Where-Object { $_.StartsWith($prefix) })
+            if ($observations.Count -ne 1) { throw 'Connection-identity readback is missing or ambiguous.' }
+            $observed = $observations[0].Substring($prefix.Length) | ConvertFrom-Json
+            $expectedDatabase = if ($endpoint -eq 'SOURCE') { $identityCase.SourceDatabase } else { $identityCase.TargetDatabase }
+            if ($observed.database -cne $expectedDatabase -or $observed.user -cne $identityCase.User) {
+                throw "RED: $endpoint libpq parameters redirected the validated database/login identity."
+            }
+        }
+    }
+    Write-Host 'PASS: encoded database parameters cannot redirect source/target identities; spaces, quotes and backslashes remain literal'
+    if ($Case -eq 'connections') { return }
     $seed = @'
 CREATE TABLE resource (id integer PRIMARY KEY, payload text);
 INSERT INTO resource SELECT g, md5(g::text) || md5((g * 2)::text) FROM generate_series(1, 2000) g;

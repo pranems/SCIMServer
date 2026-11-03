@@ -9,6 +9,43 @@
 
 ## Executive summary
 
+### Third review: literal libpq connection parameters
+
+Published `7f383242` passes all 29 protected gates in 1,144.8 seconds and
+hosted run `41660995714`, including image smoke and Trivy; CodeQL and freshness
+also pass. The exact-tip independent review confirms the two second-review
+inline fixes, but identifies a new High boundary defect. Decoding the database
+name is correct for identity comparison; interpolating that decoded name into
+unquoted libpq parameters is not. A name containing encoded whitespace can
+introduce another `host` or `dbname` parameter after the validated values.
+PR #267 remains draft. No source/target copy or deployment is authorized by
+these green checks.
+
+The new real PostgreSQL regression uses the actual URI parser and worker
+setup, then reads `current_database()` and `current_user` back from both
+connections. Synthetic database/login names include whitespace, quotes and
+backslashes; the first case would redirect to `copy_source` under the current
+worker. The fixture records its unique allocation name before invoking Docker.
+The existing hosted validation job now owns this real integration check as
+well as the distinct offline contracts.
+
+Local behavioral RED is not established. A test-harness splatting typo caused
+a parser failure and was corrected without editing production. The next run
+blocked before any output because Docker was unresponsive; a separate
+ten-second read-only inventory probe also timed out. The owned blocked test
+and probe processes were stopped. Local fixture allocation/absence remains
+unverified until Docker responds. The operator was unavailable to choose
+recovery, so use the existing hosted CI runner rather than restart shared
+Docker or allocate a different performance host. Production code remains
+unchanged until an actual identity assertion is RED.
+
+Detection: independent review; earliest suitable automated check is the real
+parser-to-libpq identity readback, not a parser-only comparison or stubbed
+`psql`. Test-gap closure is in progress through the new hosted integration
+step. Design disposition: accepted. Keep connection serialization in the
+existing shared worker setup used by preflight and full copy; no strategy
+framework is justified for this single boundary.
+
 ### Second review: canonical identity and remaining cleanup boundaries
 
 Corrected tip `05adbacd` passed all 29 protected gates and hosted run

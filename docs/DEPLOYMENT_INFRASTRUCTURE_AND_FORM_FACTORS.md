@@ -63,6 +63,15 @@ and cleanup failures preserve the original error, report every secondary
 failure and still remove named secret scratch. Actual compiled templates,
 PostgreSQL replay and cloud/browser acceptance remain separate evidence.
 
+The Build Test Image validation job also invokes the real PostgreSQL copy
+fixture on its existing hosted runner. Its owned, network-isolated, tmpfs
+container checks the URI-parser-to-worker database/login identity boundary
+with encoded whitespace, quotes and backslashes, followed by source snapshot
+release, complete manifest fidelity and concurrent-write isolation. This is
+synthetic integration evidence, not a deployment or performance campaign.
+The first hosted run of the new connection regression is expected to expose
+the third-review defect before production code is changed.
+
 PR #267 review corrections bind the target application's effective database
 host, port and database name before any suspension/restore; subscription
 membership alone is insufficient. Transfer prefixes are bounded before their
