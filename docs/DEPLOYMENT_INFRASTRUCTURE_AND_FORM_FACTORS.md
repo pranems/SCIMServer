@@ -55,13 +55,24 @@ Migration lookup now derives from the registry rather than a second identity
 map, and paired retirement/activation has focused atomic-transition tests.
 
 The [offline tenant-rollover contracts](../scripts/test-tenant-rollover.ps1)
-run in both pre-push and the Build Test Image validation job. Ten isolated
+run in both pre-push and the Build Test Image validation job. Eleven isolated
 PowerShell scripts cover registry/cutover, private credential storage,
 directory/proof metadata, provider absence, log transport, writer suspension
 and failure-safe cleanup without cloud or Docker access. Combined transfer
 and cleanup failures preserve the original error, report every secondary
 failure and still remove named secret scratch. Actual compiled templates,
 PostgreSQL replay and cloud/browser acceptance remain separate evidence.
+
+PR #267 review corrections bind the target application's effective database
+host, port and database name before any suspension/restore; subscription
+membership alone is insufficient. Transfer prefixes are bounded before their
+unique suffix. Provisioning invokes its direct absence guard, fails closed
+on file/ACL errors even from permissive callers, and writes/verifies private
+server-scoped recovery credentials before allocation. The original password
+record survives failures; the returned URI is saved separately before extension
+work. Deployment and bootstrap require PowerShell 7.2+ rather than a legacy
+Windows PowerShell fallback. These are tooling guarantees, not deployed app
+or migration acceptance.
 
 ## 0.55.56 candidate startup-output hardening
 

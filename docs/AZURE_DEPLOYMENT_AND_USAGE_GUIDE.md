@@ -50,6 +50,14 @@ helper dependencies alongside the deployment script. Preserve credentials
 privately before provisioning, and require actual Ready state: an advertised
 regional SKU can still fail allocation.
 
+Use PowerShell 7.2+ for Azure deployment. The bootstrap checks `pwsh` and
+does not launch Windows PowerShell. Provisioning directly refuses an existing
+or unverifiable server and verifies a private server-scoped credential record
+before allocation under `~/.scimserver-deploy/postgres-<run>/`. Its immutable
+`credential.json` remains available after allocation failure; a separate
+`connection.json` is verified before extension setup. Protect and retain these
+local records; they are not an off-device backup.
+
 ```mermaid
 flowchart LR
     subgraph Azure
@@ -119,7 +127,7 @@ Interactive prompts guide through:
 ### Prerequisites
 
 - Azure CLI (`az`) installed and logged in
-- PowerShell 7+
+- PowerShell 7.2+
 - Azure subscription with `Microsoft.App` and `Microsoft.ContainerService` providers registered
 
 ### Step-by-Step

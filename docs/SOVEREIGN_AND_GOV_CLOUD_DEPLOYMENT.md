@@ -39,6 +39,15 @@ The application configuration remains the same, but infrastructure templates
 must be validated against the selected cloud's actual service, region and API
 availability before deployment.
 
+The shared Azure deployment script requires PowerShell 7.2+; bootstrap no
+longer falls back to Windows PowerShell. New PostgreSQL provisioning refuses
+an existing or unverifiable server and retains an owner-restricted credential
+record before allocation, then a separate connection record before extension
+setup, under `~/.scimserver-deploy/postgres-<run>/`. Protect these local recovery
+files and verify the selected cloud's actual provider absence/error behavior.
+The automated provisioning fixtures establish public-template contracts,
+not sovereign-cloud deployment acceptance.
+
 **Environment template review, 2026-10-31 UTC:** the shared
 [environment template](../infra/containerapp-env.bicep) explicitly declares the
 `Consumption` workload profile for its delegated infrastructure subnet and

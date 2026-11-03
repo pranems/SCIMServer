@@ -13,7 +13,7 @@
 [migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
 records target foundations, protected recovery, source replay and local
 browser acceptance separately from pending release, serving target apps
-and final cutover. Ten offline PowerShell contracts now run in both pre-push
+and final cutover. Eleven offline PowerShell contracts now run in both pre-push
 and hosted CI, including five actual combined-failure cleanup regressions.
 Original transfer errors survive secondary cleanup failures; failed transfers
 cannot reactivate target writers. No serving API/schema/browser/dependency
@@ -22,6 +22,14 @@ Requested 0.55.67 remains held by its actual same-image performance failure.
 Reviewed diagnostic PR265/run41632439081 does not fix that repeatability
 gap and cannot admit the release; its full evidence is recovery-protected.
 The prospective method correction is a separate implementation/review unit.
+
+PR267 review found six integration defects despite green hosted CI:
+permissive ACL failure, unused absence guard, missing pre-allocation recovery,
+oversized delegated names, app/database mismatch and legacy-shell fallback.
+Actual-entry-point RED/GREEN controls now cover all six. Recovery records
+are private, server-scoped and verified before allocation; connection recovery
+precedes extensions. Require PowerShell7.2+. Corrected-tip protected gates,
+hosted CI and refreshed independent review remain pending.
 
 **2026-10-30 current Hono integration:** #261 merged normally at
 `cffc64c8a188a721fabb85c37a80243d5e65a74f`, with all 28 protected gates,

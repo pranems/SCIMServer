@@ -9,6 +9,47 @@
 
 ## Executive summary
 
+### Independent review corrections in PR #267
+
+Exact-tip hosted run `41645490136` passed validation, image build/push,
+container smoke and Trivy for `f440c9bc`; CodeQL and freshness also passed.
+Independent review nevertheless identified six real defects. The PR stays
+draft until corrected-tip protected gates, hosted CI and refreshed review
+complete. Green CI did not establish these previously unasserted outcomes.
+
+| Issue | Type / severity | RED evidence | Fix and why it works | Prevention / escape |
+|---|---|---|---|---|
+| Permissive caller continued after ACL failure | Credential protection / High | Mocked non-terminating Windows ACL failure was accepted from a `Continue` caller | Private-directory creation and provisioning establish local `Stop` preferences before file operations | Actual helper regression runs under a `Continue` caller; hosted review caught what the earlier `Stop`-only fixture could not |
+| Absence guard was not wired into provisioning | Destructive provisioning / High | Existing server received a deployment/password-reset request | Invoke direct provider absence verification before any credential persistence or deployment | Provisioning-level controls reject Ready, Dropping, empty, denied and transport-error states with zero deployments; the earlier helper-only fixture did not prove integration |
+| Allocated server credential could be lost | Recovery / High | Allocation began without a verified server-scoped recovery record | Write/read back a private immutable credential record before allocation and a separate verified connection record immediately after outputs, before caller extension work | Failed-allocation control proves the credential exists before Azure invocation; compiled-template fixtures verify returned-URI recovery and immutable credential retention |
+| Delegated job names exceeded Azure limits | Transfer integration / Medium | Actual copy prefix rejected `scim-replicate-dev-next` before Azure | Bound the prefix to 19 characters before adding its unique 12-character run suffix | Actual name-construction controls cover dev-next, canary-prod-next and existing canary-prod prefixes; earlier standalone transfer names missed delegated caller values |
+| App suspension did not bind to restored database | Writer safety / High | Dev app accepted a canary database restore in the same subscription | Resolve the app's effective DATABASE_URL, including secret references, and compare host, port and database before suspension or restore | Actual copy preflight rejects cross-estate, missing, wrong-port and wrong-database bindings, and accepts matching direct/secret bindings without target mutation; earlier subscription membership was too weak |
+| Bootstrap offered an unsupported legacy shell | Runtime compatibility / Medium | Missing `pwsh` launched the Windows PowerShell fallback | Require PowerShell 7.2+ in deployment and check `pwsh` before child launch | Missing-runtime regression proves no legacy child starts; deployment already uses PowerShell 7 syntax, so claiming Windows PowerShell compatibility would be misleading |
+
+All six behavioral REDs are now GREEN. The first app-binding extraction
+attempt failed because a dynamically created script had no `PSScriptRoot`;
+only the test harness was corrected to bind its actual script directory,
+then the real cross-estate acceptance RED was confirmed before production
+changes. That setup failure is not counted as behavioral RED.
+
+The expanded combined offline gate passes all 11 scripts. Actual PostgreSQL
+Bicep compilation and all five provisioning outcomes pass separately,
+including immediate connection-record readback and original credential
+preservation. Private recovery records are owner-restricted files, not
+off-device backups or an encrypted archive claim. They deliberately survive
+allocation/extension failures; temporary template parameters are removed.
+The helper returns the record path, never prints its password, and refuses
+existing or unverifiable target servers rather than trying password recovery
+by redeployment.
+
+Test/gate self-improvement: applied actual-entry-point regressions for caller
+error policy, delegated names, absence integration, credential timing and
+effective database identity. Design disposition: accepted. Keep these finite
+checks in the existing provisioning/copy safety seams; no new policy engine
+or speculative persistence abstraction is needed. The real source snapshot
+program is unchanged by these review corrections. Release qualification,
+target application acceptance, final source freeze and cutover remain separate.
+
 ### Migration implementation consolidation (2026-11-03)
 
 The qualification-method correction proceeds independently; migration tooling

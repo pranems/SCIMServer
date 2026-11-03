@@ -36,6 +36,42 @@ function Assert-CopyTargetWithoutApps {
     }
 }
 
+function Assert-CopyTargetDatabase {
+    param([string]$AppName, [string]$ResourceGroup, [string]$Subscription, [psobject]$Database)
+    $ErrorActionPreference = 'Stop'
+    $app = Invoke-CopyAzJson -Arguments @(
+        'containerapp', 'show', '-n', $AppName, '-g', $ResourceGroup, '--subscription', $Subscription
+    )
+    $bindings = @($app.properties.template.containers | ForEach-Object {
+        $_.env | Where-Object name -eq 'DATABASE_URL'
+    })
+    if ($bindings.Count -eq 0) { throw 'Target app database binding is unavailable; database identity cannot be matched.' }
+    $secrets = @()
+    if (@($bindings | Where-Object secretRef).Count) {
+        $secrets = @(Invoke-CopyAzJson -Arguments @(
+            'containerapp', 'secret', 'list', '-n', $AppName, '-g', $ResourceGroup,
+            '--subscription', $Subscription, '--show-values'
+        ))
+    }
+    foreach ($binding in $bindings) {
+        $value = $binding.value
+        if ($binding.secretRef) {
+            $secret = @($secrets | Where-Object name -eq $binding.secretRef)
+            if ($secret.Count -ne 1) { throw 'Target app database secret is unavailable; database identity cannot be matched.' }
+            $value = $secret[0].value
+        }
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            throw 'Target app database value is unavailable; database identity cannot be matched.'
+        }
+        $actual = Split-PgUri -Uri $value -Which 'Target app'
+        if ($actual.DbHost.TrimEnd('.') -ine $Database.DbHost.TrimEnd('.') -or
+            $actual.Port -ne $Database.Port -or
+            [Uri]::UnescapeDataString($actual.Database) -cne [Uri]::UnescapeDataString($Database.Database)) {
+            throw 'Target app database does not match the restore database; refusing writer suspension and restore.'
+        }
+    }
+}
+
 function Get-CopyTargetRevisionState {
     param([string]$AppName, [string]$ResourceGroup, [string]$Subscription)
     $revisions = @(Invoke-CopyAzJson -Arguments @(
@@ -97,6 +133,7 @@ function Resume-CopyTargetWriters {
 
 function Initialize-CopyPrivateDirectory {
         param([string]$Path)
+        $ErrorActionPreference = 'Stop'
         if (Test-Path -LiteralPath $Path) { throw 'Copy scratch directory already exists.' }
         $null = New-Item -ItemType Directory -Path $Path
         if ($IsWindows) {

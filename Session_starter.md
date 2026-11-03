@@ -2,6 +2,19 @@
 
 **Last verified:** 2026-11-03
 
+### PR267 independent review corrections
+
+First hosted exact-tip CI passed, but independent review found six real
+integration defects. Actual-entry-point REDs are now GREEN for permissive
+ACL errors, unused server-absence guard, missing pre-allocation credential
+recovery, oversized delegated names, cross-estate app/database mismatch and
+unsupported Windows PowerShell fallback. Eleven offline contracts and five
+compiled PostgreSQL provisioning outcomes pass. Original password recovery
+is immutable/private; returned URI recovery precedes extension work.
+PowerShell7.2+ is explicit. Corrected-tip protected publication, hosted CI
+and refreshed review remain pending; no deployment/cutover has occurred.
+RCA and test/design dispositions are recorded in the migration plan.
+
 ### Migration tooling consolidation (2026-11-03 UTC)
 
 The existing migration implementation is being consolidated independently of

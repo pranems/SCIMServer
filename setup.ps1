@@ -199,12 +199,13 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) { Write-Host 'Azure CLI
 try { az account show -o none 2>$null } catch { Write-Host 'Not logged in. Run: az login then re-run the one-liner.' -ForegroundColor Red; Write-Host 'Setup stopped (shell preserved).' -ForegroundColor Yellow; return }
 
 Write-Host 'Starting deployment...' -ForegroundColor Cyan
-# Prefer pwsh if available, otherwise fall back to current powershell
-if (Get-Command pwsh -ErrorAction SilentlyContinue) {
-	& pwsh -NoLogo -NoProfile -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
-} else {
-	& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
+# The deployment script uses PowerShell 7 syntax and APIs.
+if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+    throw 'PowerShell 7.2 or newer (pwsh) is required. Install it before running Azure deployment.'
 }
+& pwsh -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion -lt [version]"7.2") { exit 1 }'
+if ($LASTEXITCODE -ne 0) { throw 'PowerShell 7.2 or newer is required for Azure deployment.' }
+& pwsh -NoLogo -NoProfile -File $deployScript -ResourceGroup $ResourceGroup -AppName $AppName -Location $Location -ScimSecret $ScimSecret -ImageTag $ImageTag -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
 if ($LASTEXITCODE -ne 0) { Write-Host "Deployment failed (code $LASTEXITCODE). Shell left open for inspection." -ForegroundColor Red; return }
 
 # Try to retrieve FQDN (poll up to 90s) and echo final secret so user doesn't scroll

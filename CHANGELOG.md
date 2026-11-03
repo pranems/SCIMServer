@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Address six independent-review integration findings with actual RED/GREEN
+  controls: fail closed on ACL errors from permissive callers, invoke provider
+  absence before provisioning, retain verified pre-allocation credentials,
+  bound delegated transfer job names, bind app/database before suspension,
+  and require PowerShell 7.2+ instead of a Windows PowerShell fallback.
+  The expanded offline gate passes 11 scripts; five compiled PostgreSQL
+  provisioning outcomes verify private immutable credential and URI recovery.
+  Corrected-tip full gates and refreshed review remain pending.
 - Prepare the registered next tenant without changing active dev/canary roles
   or customer production. Reuse existing deployment/carry entry points with
   registry-derived identity, private provisioning parameters, snapshot-bound

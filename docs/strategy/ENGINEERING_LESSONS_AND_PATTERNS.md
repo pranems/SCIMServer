@@ -44,6 +44,19 @@ admit a release, prove the Azure image or replace operator visual approval.
 
 ## Tenant bootstrap must verify effects, not command labels (2026-10-31)
 
+Exercise guards through their production entry point, with the caller's
+actual error policy and delegated values. PR267 review found a tested absence
+guard that provisioning never called, private-file tests that only used
+`Stop` while the real caller used `Continue`, and job-name tests that omitted
+the longer delegated prefixes. Actual-entry-point fixtures now cover these
+boundaries. Subscription membership cannot bind an application to a database:
+resolve the application's effective direct/secret-backed connection and
+compare host, port and database before suspending writers. Persist and verify
+server-scoped credentials before allocation, not after optional extension
+steps; keep the original recovery record immutable while saving a URI
+separately. A successful provider allocation followed by a local failure
+must not lose the only credential.
+
 Client termination is not proof that its database transaction ended. The
 snapshot-copy fixture originally verified content but missed a server query
 still sleeping after its client exited. A real PostgreSQL regression now

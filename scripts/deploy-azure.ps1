@@ -1,3 +1,4 @@
+#requires -Version 7.2
 param(
     [string]$ResourceGroup,
     [string]$AppName,
@@ -635,6 +636,7 @@ if ($ProvisionPostgres -and -not $DatabaseUrl) {
         -Location $PgLocation -SubscriptionId $account.id -TenantId $account.tenantId `
         -Password $PgAdminPassword -TemplatePath (Join-Path $PSScriptRoot '..\infra\postgres.bicep')
     $DatabaseUrl = $pgProvision.DatabaseUrl
+    Write-Host "      Private PostgreSQL recovery record: $($pgProvision.RecoveryPath)" -ForegroundColor Gray
     Write-Host "   ✅ PostgreSQL Flexible Server provisioned: $pgServerName" -ForegroundColor Green
     Write-Host "      FQDN: $($pgProvision.ServerFqdn)" -ForegroundColor Gray
 

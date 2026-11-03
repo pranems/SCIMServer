@@ -3,6 +3,7 @@ param([Parameter(Mandatory)][string]$BicepPath)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot
 $compiled = Join-Path ([IO.Path]::GetTempPath()) ("scim-pg-template-" + [guid]::NewGuid().ToString('N') + '.json')
+$recoveryRoot = Join-Path ([IO.Path]::GetTempPath()) ('scim-pg-recovery-test-' + [guid]::NewGuid().ToString('N'))
 try {
     & $BicepPath build (Join-Path $root 'infra\postgres.bicep') --outfile $compiled
     if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL template compilation failed.' }
@@ -16,6 +17,10 @@ try {
         $global:LASTEXITCODE = 0
         if ($args[0] -eq 'account') {
             return '{"id":"test-subscription","tenantId":"test-tenant"}'
+        }
+        if ($args[0] -eq 'postgres') {
+            $global:LASTEXITCODE = 1
+            return '(ResourceNotFound) Synthetic PostgreSQL server is absent.'
         }
         if (($args -join ' ').Contains($global:pgProvisionTest.Secret)) {
             throw 'Secret entered native command-line arguments.'
@@ -49,9 +54,16 @@ try {
             $skuArguments = if ($mode -eq 'sku-success') { @{ SkuName = 'Standard_B2s' } } else { @{} }
             $result = Invoke-ScimPostgresProvisioning -ServerName fixture-pg -ResourceGroup fixture-rg -Location eastus2 `
                 -SubscriptionId test-subscription -TenantId test-tenant -Password $global:pgProvisionTest.Secret `
-                -TemplatePath (Join-Path $root 'infra\postgres.bicep') -AvailabilityZone $zone @skuArguments
+                -TemplatePath (Join-Path $root 'infra\postgres.bicep') -AvailabilityZone $zone `
+                -RecoveryRoot $recoveryRoot @skuArguments
             if ($mode -like '*success' -and $result.DatabaseUrl -notlike '*Synthetic%2540%3Apassword%21*') {
                 throw 'Password URI encoding changed its value.'
+            }
+            if ($mode -like '*success') {
+                $saved = Get-Content -LiteralPath (Join-Path (Split-Path $result.RecoveryPath) 'connection.json') -Raw | ConvertFrom-Json
+                if ($saved.databaseUrl -cne $result.DatabaseUrl) { throw 'Connection recovery was not saved before returning.' }
+                $credential = Get-Content -LiteralPath $result.RecoveryPath -Raw | ConvertFrom-Json
+                if ($credential.password -cne $global:pgProvisionTest.Secret) { throw 'Immutable credential recovery changed.' }
             }
         } catch {
             if ($_.Exception.Message -notmatch 'Azure deployment group failed|PostgreSQL deployment outputs are incomplete') { throw }
@@ -65,6 +77,7 @@ try {
     }
 } finally {
     if (Test-Path -LiteralPath $compiled) { Remove-Item -LiteralPath $compiled }
+    if (Test-Path -LiteralPath $recoveryRoot) { Remove-Item -LiteralPath $recoveryRoot -Recurse -Force }
     Remove-Item Function:\az -ErrorAction SilentlyContinue
     Remove-Variable pgProvisionTest -Scope Global -ErrorAction SilentlyContinue
 }

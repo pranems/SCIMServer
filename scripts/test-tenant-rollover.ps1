@@ -11,7 +11,8 @@ $checks = @(
     'test-tenant-copy-no-apps.ps1',
     'test-tenant-copy-log-transport.ps1',
     'test-tenant-copy-safety.ps1',
-    'test-tenant-copy-cleanup.ps1'
+    'test-tenant-copy-cleanup.ps1',
+    'test-tenant-rollover-review.ps1'
 )
 foreach ($check in $checks) {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot $check)

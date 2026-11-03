@@ -97,6 +97,7 @@ if ($AzureConfigDir) { $env:AZURE_CONFIG_DIR = $AzureConfigDir }
 . (Join-Path $PSScriptRoot 'scim-estates.ps1')
 . (Join-Path $PSScriptRoot 'tenant-copy-safety.ps1')
 $runId = [guid]::NewGuid().ToString('N')
+$JobName = $JobName.Substring(0, [Math]::Min(19, $JobName.Length)).TrimEnd('-')
 $JobName = "$JobName-$($runId.Substring(0, 12))"
 if ($JobName.Length -gt 32 -or $JobName -cnotmatch '^[a-z][a-z0-9-]+[a-z0-9]$') {
     throw 'Copy job prefix must produce a lowercase Azure job name of at most 32 characters.'
@@ -181,6 +182,10 @@ Say ("source db : " + $src.Database + " as " + $src.User + " (sslmode=" + $src.S
 Say ("target db : " + $dst.Database + " as " + $dst.User + " (sslmode=" + $dst.SslMode + ")")
 if ($ConfirmNoTargetApps -and $TargetAppName) {
     throw 'Specify either the target app or explicit absent-app proof, not both.'
+}
+if ($TargetAppName) {
+    $rgForApp = if ($TargetAppResourceGroup) { $TargetAppResourceGroup } else { $TargetResourceGroup }
+    Assert-CopyTargetDatabase -AppName $TargetAppName -ResourceGroup $rgForApp -Subscription $Subscription -Database $dst
 }
 if (-not $DryRun -and -not $TargetAppName) {
     if (-not $ConfirmNoTargetApps) {
