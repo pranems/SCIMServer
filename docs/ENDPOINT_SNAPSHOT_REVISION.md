@@ -20,7 +20,14 @@ tests on smaller sample sets.
 
 Focused RED reports the missing collector assertion before implementation;
 GREEN is **64/64**, comprising 58 existing contracts and six new cases.
-The actual current-image report reproduces every original failed comparison
+Independent review then found that summaries did not actually include the
+raw observations claimed above, and input hashes used a second pathname
+read. The corrected report includes each window's unsorted observations;
+percentiles use a separate sorted copy. Parsing and hashing now share the
+same once-read buffers. Both defects were reproduced before correction.
+Focused GREEN is now **66/66**, including chronological reconstruction and
+an actual CLI test that changes both input paths after their first read.
+The separately generated corrected current-image report reproduces every original failed comparison
 exactly and retains all 16,000 observations. In the baseline's second visit,
 populated-read p95 across its four windows is 4.574270, 30.201782,
 22.543207 and 16.514300 ms. The candidate's second visit is 2.465563,
@@ -86,6 +93,8 @@ resource limits, operation order and latency bounds are not modified.
 | Missing isolated root/web tooling / Low | The first chosen web build and documentation check failed on missing vite/jsdom. Restore each worktree-owned dependency set using npm ci only after its observed missing-dependency failure. The protected hook owns consolidated validation. | Prerequisite build/documentation checks; no shared dependency mutation or lock regeneration. |
 | Missing generated Prisma model types / Low | API dependencies were deliberately installed with scripts disabled, leaving the generated client absent. The API build exposed model-type errors; explicit Prisma generation succeeds with a codegen-only local URL and no database connection. The protected hook owns the subsequent full build/test verification. | First API build; normal code-generation prerequisite, not a production source defect. |
 | Stale mutable local base / Medium | The first local build reused Node 24.16.0 despite newer historical images. Require docker build --pull, retain the first image identity, and verify the refreshed runtime separately. | Actual built-image runtime readback; earliest possible gate is a fresh-base build plus runtime readback. |
+| Raw-observation retention claim / Medium | Window summaries retained counts and percentiles but omitted raw observations. Include the unsorted samples and prove all 16,000 can be reconstructed in original order from the report alone. Existing immutable reports remain unchanged; corrected output uses a new path. | Independent review; earliest possible focused test previously checked counts rather than reconstructability. The new outcome assertion closes that escape. |
+| Input-byte provenance race / Medium | Hashing reread mutable paths after parsing, allowing different bytes to identify the analysis. Read each input once and use that same buffer for parsing and hashing. An adversarial real CLI preload changes both files immediately after each read and verifies the hashes still identify the parsed bytes. | Independent review; earliest possible focused CLI test previously hashed only unchanged files. The deterministic replacement test closes that escape. |
 
 The initial source-binding test failed before implementation. The complete
 focused suite then passed 58/58, up from 51, with no skips. A separate real

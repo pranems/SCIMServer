@@ -15,7 +15,10 @@ four same-image comparisons, while functional66/privacy200/exact cleanup
 pass. No old/current comparison runs. #251 is draft again, not admitted.
 The new descriptive collector retains all64 chronological windows/16,000
 samples and hash-binds inputs without changing any original assessment,
-protocol or limit. Focused tooling64/64 PASS after RED. Numerical and actual
+protocol or limit. Focused tooling66/66 PASS after RED. Review exposed and
+closed missing raw observations and a second-read provenance race: output
+now reconstructs every original sample in order, and hashes share exactly
+the parsed input buffers. Numerical, adversarial input-replacement and actual
 CLI tests ensure the report cannot claim convergence or deployment admission.
 Review/prospective stabilization design remains separate; operator unavailable
 does not authorize hardware, gate waiver or deployment.

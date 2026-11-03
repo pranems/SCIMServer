@@ -52,16 +52,30 @@ test('all chronological windows retain exact boundaries and nearest-rank percent
   assert.equal(operation.windows.length, 4);
   assert.deepEqual(operation.windows[0], {
     startCycle: 0, endCycleExclusive: 250, sampleCount: 250,
+    samples: Array.from({ length: 250 }, (_, index) => index + 1),
     p50: 125, p95: 238, p99: 248,
   });
   assert.deepEqual(operation.windows[3], {
     startCycle: 750, endCycleExclusive: 1000, sampleCount: 250,
+    samples: Array.from({ length: 250 }, (_, index) => index + 751),
     p50: 875, p95: 988, p99: 998,
   });
   assert.equal(operation.lastToFirstP95Ratio, 988 / 238);
   for (const round of report.rounds) {
     for (const entry of Object.values(round.operations)) {
       assert.equal(entry.windows.reduce((sum, window) => sum + window.sampleCount, 0), 1000);
+    }
+  }
+});
+
+test('the report independently retains every raw observation in its original chronological order', () => {
+  const { rows, block, roles } = fixture();
+  for (const row of rows) row.samples.add.reverse();
+  const report = assessor.describeStability(rows, block, roles);
+  for (const [index, round] of report.rounds.entries()) {
+    for (const [operation, entry] of Object.entries(round.operations)) {
+      assert.deepEqual(entry.windows.flatMap(window => window.samples), rows[index].samples[operation],
+        'The report must contain all raw observations, not only summaries or their sorted order');
     }
   }
 });
@@ -131,4 +145,46 @@ test('actual descriptive CLI writes a non-admitting report and refuses overwrite
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('actual CLI hashes exactly the input bytes it parsed even if the input paths change after reading', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'membership-stability-input-race-'));
+  try {
+    const { rows, block } = fixture();
+    const protocolPath = path.join(directory, 'protocol.json');
+    const rowsPath = path.join(directory, 'rounds.json');
+    const output = path.join(directory, 'stability.json');
+    const preload = path.join(directory, 'replace-after-read.cjs');
+    const originalProtocol = Buffer.from(JSON.stringify(protocol));
+    const originalRows = Buffer.from(JSON.stringify(rows));
+    fs.writeFileSync(protocolPath, originalProtocol);
+    fs.writeFileSync(rowsPath, originalRows);
+    fs.writeFileSync(preload, `
+      const fs = require('node:fs');
+      const read = fs.readFileSync;
+      const targets = new Set([process.env.STABILITY_TEST_PROTOCOL, process.env.STABILITY_TEST_ROUNDS]);
+      fs.readFileSync = function(file, ...args) {
+        const content = read.call(this, file, ...args);
+        if (targets.has(file)) {
+          fs.writeFileSync(file, Buffer.concat([Buffer.from(content), Buffer.from('\\n')]));
+        }
+        return content;
+      };
+    `);
+    const result = spawnSync(process.execPath, [
+      '--require', preload, path.resolve(__dirname, '../performance/assess-membership.cjs'),
+      '--describe-stability', protocolPath, block.name, rowsPath, output,
+    ], { encoding: 'utf8', timeout: 10000, env: { ...process.env,
+      STABILITY_TEST_PROTOCOL: protocolPath, STABILITY_TEST_ROUNDS: rowsPath } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.notDeepEqual(fs.readFileSync(protocolPath), originalProtocol, 'Protocol mutation actually executed');
+    assert.notDeepEqual(fs.readFileSync(rowsPath), originalRows, 'Rounds mutation actually executed');
+    const report = JSON.parse(fs.readFileSync(output, 'utf8'));
+    const { createHash } = require('node:crypto');
+    assert.equal(report.inputHashes.protocol, createHash('sha256').update(originalProtocol).digest('hex'),
+      'Protocol hash must identify the parsed buffer, not a later pathname read');
+    assert.equal(report.inputHashes.rounds, createHash('sha256').update(originalRows).digest('hex'),
+      'Rounds hash must identify the parsed buffer, not a later pathname read');
+    assert.deepEqual(report.qualificationAssessment, assessor.assessBlock(rows, block, assessor.rolesFor(protocol, block)));
+  } finally { fs.rmSync(directory, { recursive: true }); }
 });

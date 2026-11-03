@@ -104,9 +104,11 @@ function describeStability(rows, block, roles) {
     operations: Object.fromEntries(operations.map(operation => {
       const windows = Array.from({ length: 4 }, (_, window) => {
         const startCycle = window * 250;
-        const values = row.samples[operation].slice(startCycle, startCycle + 250).sort((a, b) => a - b);
+        const samples = row.samples[operation].slice(startCycle, startCycle + 250);
+        const values = [...samples].sort((a, b) => a - b);
         return {
           startCycle, endCycleExclusive: startCycle + 250, sampleCount: values.length,
+          samples,
           p50: sortedPercentile(values, 50),
           p95: sortedPercentile(values, 95),
           p99: sortedPercentile(values, 99),
@@ -151,16 +153,18 @@ if (require.main === module) {
     } else if (process.argv[2] === '--describe-stability') {
       assert.equal(process.argv.length, 7, 'Explicit protocol, block, receipts and new output required');
       const [protocolPath, blockName, rowsPath, output] = process.argv.slice(3);
-      const protocol = JSON.parse(fs.readFileSync(protocolPath, 'utf8'));
+      const protocolBytes = fs.readFileSync(protocolPath);
+      const rowsBytes = fs.readFileSync(rowsPath);
+      const protocol = JSON.parse(protocolBytes.toString('utf8'));
       const block = protocol.blocks.find(item => item.name === blockName);
       assert.ok(block, 'Unknown preregistered block');
       const report = describeStability(
-        JSON.parse(fs.readFileSync(rowsPath, 'utf8')), block, rolesFor(protocol, block),
+        JSON.parse(rowsBytes.toString('utf8')), block, rolesFor(protocol, block),
       );
       const { createHash } = require('node:crypto');
       report.inputHashes = Object.fromEntries([
-        ['protocol', protocolPath], ['rounds', rowsPath],
-      ].map(([name, file]) => [name, createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
+        ['protocol', protocolBytes], ['rounds', rowsBytes],
+      ].map(([name, bytes]) => [name, createHash('sha256').update(bytes).digest('hex')]));
       fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
       console.log('Descriptive analysis complete; no stability or deployment admission.');
     } else {

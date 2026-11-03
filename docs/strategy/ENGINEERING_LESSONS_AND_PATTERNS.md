@@ -244,6 +244,14 @@ false-failure estimates or new admission criteria. Smaller windows are not
 independent replications and do not inherit pooled-sample limits. See the
 [current-image calibration prerequisite](../ENDPOINT_SNAPSHOT_REVISION.md#descriptive-calibration-prerequisite).
 
+Counts and percentiles are not retained observations. Reconstruct the complete
+chronological input from the report in a regression test, including unsorted
+values. Bind provenance to the exact buffers parsed, not a second read of
+the same pathname. A deterministic CLI test must replace or update the inputs
+after their first read and still obtain hashes of the analyzed bytes.
+Independent review caught both gaps in the descriptive collector; they are
+now closed in-place without changing any benchmark or acceptance result.
+
 ### Failure evidence needs its own completion budget and contract
 
 A failed measurement is not the same thing as an absent receipt. Preserve

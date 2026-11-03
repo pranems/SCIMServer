@@ -6,7 +6,11 @@ Actual source-bound Linux run41615647439 fails4/12 same-image checks;
 functional66/privacy200/exact cleanup PASS, later blocks not run. New
 non-admitting descriptive collector retains all16,000 samples in64 windows,
 hash-binds inputs and reproduces all original checks exactly. Focused tests
-64/64 PASS after semantic RED; no protocol, warmup, sample or limit changed.
+66/66 PASS after semantic RED, including review regressions for missing raw
+observations and a second-read hash race. Corrected output includes all
+unsorted samples and hashes exactly the once-read parsed buffers; all12
+original checks/four failures remain identical. No protocol, warmup, sample
+or limit changed.
 PR251 is draft again to avoid unchanged automatic retries while a prospective
 stability design is prepared. Operator unavailable is not hardware, gate-
 waiver or deployment approval. Latest failed evidence is protected separately
