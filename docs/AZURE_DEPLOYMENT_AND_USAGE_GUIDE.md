@@ -30,6 +30,26 @@
 
 SCIMServer deploys to Azure Container Apps with a managed PostgreSQL Flexible Server backend. The deployment is fully automated via PowerShell scripts and Azure Bicep templates.
 
+**Environment template review, 2026-10-31 UTC:** the
+[Container Apps environment template](../infra/containerapp-env.bicep) explicitly
+declares a single `Consumption` workload profile with the existing delegated
+infrastructure subnet and Log Analytics configuration. It does not select a
+paid dedicated workload profile. During
+[tenant-10 preparation](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md), the compiled
+contract and actual public-Azure deployment/readback both passed. Verify the
+target subscription, subnet, region capabilities and resulting profile before
+deploying applications. Environment readiness alone is not application,
+database, authentication or browser acceptance.
+
+PostgreSQL provisioning passes secure template parameters through a private
+temporary file and removes it on both success and failure. The template returns
+only server/database metadata; the deployment script constructs the encoded
+connection URI locally instead of reading a secret-bearing ARM output. Generated
+administrator passwords are not printed. The bootstrap installs the shared
+helper dependencies alongside the deployment script. Preserve credentials
+privately before provisioning, and require actual Ready state: an advertised
+regional SKU can still fail allocation.
+
 ```mermaid
 flowchart LR
     subgraph Azure

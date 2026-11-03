@@ -29,6 +29,16 @@ SCIMServer provides 3 ways to deploy to Azure - all ultimately call `scripts/dep
 
 All three auto-generate secrets (SCIM, JWT, OAuth) if not provided, and deploy a VNet-isolated Container App with PostgreSQL Flexible Server.
 
+PostgreSQL provisioning uses
+[the shared helper](scripts/postgres-provisioning.ps1) and
+[private-file/CLI checks](scripts/tenant-copy-safety.ps1). The bootstrap
+downloads these dependencies alongside the deployment script. Administrator
+passwords are supplied through a private temporary parameter file, not native
+arguments or ARM outputs; the encoded URI is constructed locally. Generated
+PostgreSQL passwords are not printed, and interactive entry is masked. Preserve
+credentials privately and verify actual server readiness, since advertised
+regional SKU support does not guarantee successful allocation.
+
 ### One-Liner Bootstrap (No Git Clone Needed)
 
 ```powershell

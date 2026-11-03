@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tenant rollover tooling consolidation
+
+- Prepare the registered next tenant without changing active dev/canary roles
+  or customer production. Reuse existing deployment/carry entry points with
+  registry-derived identity, private provisioning parameters, snapshot-bound
+  fingerprint/dump verification, writer suspension and owned-job cleanup.
+- Preserve the original transfer failure when cleanup also fails. Five
+  actual-lifecycle regressions cover successful work, failed work, failed
+  reactivation and combined job-cleanup failures. Secondary failures remain
+  explicit and failed work cannot reactivate target writers.
+- Run ten isolated offline PowerShell contract scripts through the same
+  pre-push and hosted CI entry point. The combined focused gate passes;
+  complete consolidation gates and independent real PostgreSQL/Bicep evidence
+  are recorded separately, not implied by the offline result.
+- Release the exported source snapshot by interrupting its owned PostgreSQL
+  client. A real RED reproduced a source transaction surviving worker exit;
+  the corrected real database fixture retains all three fidelity/isolation
+  cases and checks transaction release rather than client process absence.
+- No serving API, browser, schema, dependency, lockfile or product-version
+  change. Requested 0.55.67 still requires independent release admission.
+- Self-improvement applied: combined-failure tests and continuous offline
+  rollover execution. Design accepted: retain the cohesive existing safety
+  seam and reuse one small runner at its two concrete gate callers.
+
 ### 0.55.66 reviewed-master integration (2026-10-30)
 
 - Normally integrate reviewed master `cffc64c8` after #259, #260 and #261

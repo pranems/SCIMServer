@@ -1,0 +1,79 @@
+. (Join-Path $PSScriptRoot 'tenant-copy-safety.ps1')
+
+function Assert-ScimPostgresTargetAbsent {
+    param(
+        [Parameter(Mandatory)][string]$ServerName,
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$SubscriptionId
+    )
+    $result = & az postgres flexible-server show --resource-group $ResourceGroup --name $ServerName `
+        --subscription $SubscriptionId --output json --only-show-errors 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0) {
+        throw 'Target PostgreSQL exists or its read returned no explicit absence; refusing replacement or password reset.'
+    }
+    if (($result -join "`n") -notmatch '\(ResourceNotFound\)') {
+        throw "Target PostgreSQL absence could not be established: $($result -join "`n")"
+    }
+}
+
+function Invoke-ScimPostgresProvisioning {
+    param(
+        [Parameter(Mandatory)][string]$ServerName,
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$Location,
+        [Parameter(Mandatory)][string]$SubscriptionId,
+        [Parameter(Mandatory)][string]$TenantId,
+        [Parameter(Mandatory)][string]$Password,
+        [Parameter(Mandatory)][string]$TemplatePath,
+        [string]$AdminLogin = 'scimadmin',
+        [string]$DatabaseName = 'scimdb',
+        [string]$AvailabilityZone,
+        [string]$SkuName = 'Standard_B1ms',
+        [string]$SkuTier = 'Burstable'
+    )
+    $account = Invoke-CopyAzJson -Arguments @('account', 'show')
+    if ($account.id -ne $SubscriptionId -or $account.tenantId -ne $TenantId) {
+        throw 'PostgreSQL provisioning identity does not match the expected tenant/subscription.'
+    }
+    $directory = Join-Path ([IO.Path]::GetTempPath()) ('scim-pg-parameters-' + [guid]::NewGuid().ToString('N'))
+    $path = Join-Path $directory 'parameters.json'
+    try {
+        Initialize-CopyPrivateDirectory -Path $directory
+        $parameters = @{
+            '$schema' = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'
+            contentVersion = '1.0.0.0'
+            parameters = @{
+                serverName = @{ value = $ServerName }
+                adminLogin = @{ value = $AdminLogin }
+                adminPassword = @{ value = $Password }
+                databaseName = @{ value = $DatabaseName }
+                location = @{ value = $Location }
+                skuName = @{ value = $SkuName }
+                skuTier = @{ value = $SkuTier }
+            }
+        }
+        if ($AvailabilityZone) { $parameters.parameters.availabilityZone = @{ value = $AvailabilityZone } }
+        $parameters | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $path -Encoding utf8
+        $deployment = Invoke-CopyAzJson -Arguments @(
+            'deployment', 'group', 'create', '--resource-group', $ResourceGroup,
+            '--subscription', $SubscriptionId, '--name', ('postgres-' + [guid]::NewGuid().ToString('N')),
+            '--template-file', $TemplatePath, '--parameters', ('@' + $path)
+        )
+        $outputs = $deployment.properties.outputs
+        $fqdn = [string]$outputs.serverFqdn.value
+        if ($outputs.serverName.value -ne $ServerName -or $outputs.databaseName.value -ne $DatabaseName -or
+            [Uri]::CheckHostName($fqdn) -ne [UriHostNameType]::Dns) {
+            throw 'PostgreSQL deployment outputs are incomplete or do not match the expected server/database.'
+        }
+        [pscustomobject]@{
+            ServerFqdn = $fqdn
+            DatabaseUrl = 'postgresql://{0}:{1}@{2}:5432/{3}?sslmode=require' -f
+                [Uri]::EscapeDataString($AdminLogin), [Uri]::EscapeDataString($Password), $fqdn,
+                [Uri]::EscapeDataString($DatabaseName)
+        }
+    } finally {
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+        if (Test-Path -LiteralPath $directory) { Remove-Item -LiteralPath $directory -Force }
+    }
+}

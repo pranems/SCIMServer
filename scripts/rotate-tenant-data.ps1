@@ -50,13 +50,17 @@
     Isolated az CLI profile directory for the target tenant.
 
 .PARAMETER JobName
-    Name of the ephemeral job. Reused and overwritten between runs.
+    Prefix of the ephemeral job. A unique run suffix prevents overwriting jobs.
 
 .PARAMETER KeepJob
     Leave the job resource behind for inspection instead of deleting it.
 
 .PARAMETER DryRun
     Print what would happen and verify connectivity, but copy nothing.
+
+.PARAMETER ConfirmNoTargetApps
+    Permit a restore without TargetAppName only after verifying that the target
+    subscription has no Container Apps. Intended for a new tenant's isolated trial.
 
 .EXAMPLE
     pwsh scripts/rotate-tenant-data.ps1 `
@@ -84,11 +88,19 @@ param(
     # the JwksHostAllowlistEntry table came back with six freshly-seeded rows and
     # brand-new IDs instead of the seven carried rows, losing a manually-added host.
     [string]$TargetAppName,
-    [string]$TargetAppResourceGroup
+    [string]$TargetAppResourceGroup,
+    [switch]$ConfirmNoTargetApps
 )
 
 $ErrorActionPreference = 'Stop'
 if ($AzureConfigDir) { $env:AZURE_CONFIG_DIR = $AzureConfigDir }
+. (Join-Path $PSScriptRoot 'scim-estates.ps1')
+. (Join-Path $PSScriptRoot 'tenant-copy-safety.ps1')
+$runId = [guid]::NewGuid().ToString('N')
+$JobName = "$JobName-$($runId.Substring(0, 12))"
+if ($JobName.Length -gt 32 -or $JobName -cnotmatch '^[a-z][a-z0-9-]+[a-z0-9]$') {
+    throw 'Copy job prefix must produce a lowercase Azure job name of at most 32 characters.'
+}
 
 function Say { param([string]$m, [string]$c = 'Gray') Write-Host "  $m" -ForegroundColor $c }
 
@@ -103,9 +115,19 @@ Say ("target   : " + (HostOf $TargetConnectionString))
 Say ("job env  : $EnvironmentName in $TargetResourceGroup")
 Say ("dry run  : $DryRun")
 
-az account set --subscription $Subscription 2>$null | Out-Null
-$envId = az containerapp env show -n $EnvironmentName -g $TargetResourceGroup --query id -o tsv 2>$null
+Invoke-CopyAzAction -Arguments @('account', 'set', '--subscription', $Subscription)
+$account = Invoke-CopyAzJson -Arguments @('account', 'show')
+$tenant = @((Get-ScimEstateRegistry).tenants | Where-Object subscriptionId -eq $Subscription)
+if ($tenant.Count -ne 1 -or $account.id -ne $Subscription -or $account.tenantId -ne $tenant[0].tenantId -or $tenant[0].role -eq 'permanent') {
+    throw 'Copy target is not the expected registered non-customer tenant/subscription.'
+}
+$environment = Invoke-CopyAzJson -Arguments @(
+    'containerapp', 'env', 'show', '-n', $EnvironmentName, '-g', $TargetResourceGroup,
+    '--subscription', $Subscription
+)
+$envId = $environment.id
 if (-not $envId) { throw "Container Apps environment '$EnvironmentName' not found in '$TargetResourceGroup'." }
+Assert-CopyLogTransportAvailable
 
 # --------------------------------------------------------------------------
 # Decompose the connection strings into discrete PG* variables.
@@ -146,8 +168,26 @@ function Split-PgUri {
 
 $src = Split-PgUri -Uri $SourceConnectionString -Which 'Source'
 $dst = Split-PgUri -Uri $TargetConnectionString -Which 'Target'
+if ($src.DbHost.TrimEnd('.') -ieq $dst.DbHost.TrimEnd('.') -and $src.Port -eq $dst.Port -and $src.Database -ceq $dst.Database) {
+    throw 'Source and target identify the same database; copy is refused.'
+}
+$targetServers = @(Invoke-CopyAzJson -Arguments @(
+    'postgres', 'flexible-server', 'list', '--subscription', $Subscription
+))
+if (@($targetServers | Where-Object { $_.fullyQualifiedDomainName -ieq $dst.DbHost.TrimEnd('.') }).Count -ne 1) {
+    throw 'Target PostgreSQL host does not belong to the verified target subscription.'
+}
 Say ("source db : " + $src.Database + " as " + $src.User + " (sslmode=" + $src.SslMode + ")")
 Say ("target db : " + $dst.Database + " as " + $dst.User + " (sslmode=" + $dst.SslMode + ")")
+if ($ConfirmNoTargetApps -and $TargetAppName) {
+    throw 'Specify either the target app or explicit absent-app proof, not both.'
+}
+if (-not $DryRun -and -not $TargetAppName) {
+    if (-not $ConfirmNoTargetApps) {
+        throw 'Restore requires TargetAppName or explicit ConfirmNoTargetApps proof.'
+    }
+    Assert-CopyTargetWithoutApps -Subscription $Subscription
+}
 
 # --------------------------------------------------------------------------
 # A password taken from a postgresql:// URI is ambiguous, and the two SCIMServer
@@ -187,27 +227,10 @@ Say ("target password has an alternate percent-decoded form : " + ($dstPwAlt -ne
 # _prisma_migrations travels with the dump, so the application does not try to
 # re-apply migrations against an already-current database on next boot.
 # --------------------------------------------------------------------------
-$verifyOnly = @'
+$connectionSetup = @'
 set -eu
 S="host=$SRC_HOST port=$SRC_PORT dbname=$SRC_DB user=$SRC_USER sslmode=$SRC_SSL"
 D="host=$DST_HOST port=$DST_PORT dbname=$DST_DB user=$DST_USER sslmode=$DST_SSL"
-echo "=== source reachability ==="
-PGPASSWORD="$SRC_PW" psql "$S" -Atc "select 'source ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
-echo "=== target reachability ==="
-PGPASSWORD="$DST_PW" psql "$D" -Atc "select 'target ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
-echo "=== source row counts ==="
-PGPASSWORD="$SRC_PW" psql "$S" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
-  n=$(PGPASSWORD="$SRC_PW" psql "$S" -Atc "select count(*) from \"$t\"")
-  echo "  $t = $n"
-done
-echo "DRY RUN COMPLETE - nothing was written"
-'@
-
-$fullCopy = @'
-set -eu
-S="host=$SRC_HOST port=$SRC_PORT dbname=$SRC_DB user=$SRC_USER sslmode=$SRC_SSL"
-D="host=$DST_HOST port=$DST_PORT dbname=$DST_DB user=$DST_USER sslmode=$DST_SSL"
-
 # Pick whichever password form authenticates. See the note in the PowerShell
 # caller: a password taken out of a postgresql:// URI may be the raw string or
 # the percent-decoded one, and the two estates need opposite answers.
@@ -225,16 +248,68 @@ if ! DST_USE=$(pick_pw "$D" "$DST_PW" "$DST_PW_ALT"); then
   echo "FATAL: neither password form authenticates against the TARGET"; exit 92
 fi
 echo "credentials resolved for both endpoints"
+'@
 
-echo "=== source row counts BEFORE ==="
-PGPASSWORD="$SRC_USE" psql "$S" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
-  n=$(PGPASSWORD="$SRC_USE" psql "$S" -Atc "select count(*) from \"$t\"")
+$verifyOnly = $connectionSetup + "`n" + @'
+echo "=== source reachability ==="
+PGPASSWORD="$SRC_USE" psql "$S" -XAt -v ON_ERROR_STOP=1 -c "select 'source ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
+echo "=== target reachability ==="
+PGPASSWORD="$DST_USE" psql "$D" -XAt -v ON_ERROR_STOP=1 -c "select 'target ok, tables=' || count(*) from information_schema.tables where table_schema='public'"
+echo "=== source row counts ==="
+PGPASSWORD="$SRC_USE" psql "$S" -XAt -v ON_ERROR_STOP=1 -c "select table_name from information_schema.tables where table_schema='public' order by 1" > /tmp/source-tables.tsv
+while read -r t; do
+  n=$(PGPASSWORD="$SRC_USE" psql "$S" -XAt -v ON_ERROR_STOP=1 -c "select count(*) from \"$t\"")
   echo "  $t = $n"
-done
+done < /tmp/source-tables.tsv
+echo "DRY RUN COMPLETE - nothing was written"
+'@
 
-echo "=== dumping ==="
-PGPASSWORD="$SRC_USE" pg_dump --no-owner --no-acl --clean --if-exists --format=plain -d "$S" > /tmp/dump.sql
-BYTES=$(wc -c < /tmp/dump.sql)
+$fullCopy = $connectionSetup + "`n" + @'
+cat > /tmp/manifest.sql <<'MANIFEST_SQL'
+SET TIME ZONE 'UTC';
+DO $body$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
+  LOOP
+    EXECUTE format(
+      'INSERT INTO copy_manifest SELECT %L, count(*), md5(coalesce(string_agg(h, %L ORDER BY h), %L)) FROM (SELECT md5(to_jsonb(t)::text) AS h FROM %I.%I t) s',
+      r.tablename, '', '', r.schemaname, r.tablename
+    );
+  END LOOP;
+END
+$body$;
+SELECT table_name || E'\t' || row_count || E'\t' || payload_hash FROM copy_manifest ORDER BY table_name;
+MANIFEST_SQL
+
+PGPASSWORD="$SRC_USE" psql "$S" -XqAt -v ON_ERROR_STOP=1 > /tmp/snapshot.out 2>/tmp/snapshot.err <<'SNAPSHOT_SQL' &
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT pg_export_snapshot();
+SELECT pg_sleep(3600);
+ROLLBACK;
+SNAPSHOT_SQL
+snapshot_pid=$!
+trap 'kill -INT "$snapshot_pid" 2>/dev/null || true; wait "$snapshot_pid" 2>/dev/null || true' EXIT
+snapshot=''
+for attempt in $(seq 1 30); do
+  snapshot=$(head -n 1 /tmp/snapshot.out)
+  if printf '%s\n' "$snapshot" | grep -Eq '^[0-9A-F]+-[0-9A-F]+-[0-9]+$'; then break; fi
+  if ! kill -0 "$snapshot_pid" 2>/dev/null; then echo "FATAL: source snapshot could not be held"; exit 93; fi
+  sleep 1
+done
+if ! printf '%s\n' "$snapshot" | grep -Eq '^[0-9A-F]+-[0-9A-F]+-[0-9]+$'; then
+  echo "FATAL: source snapshot is unavailable"; exit 93
+fi
+{
+  printf 'CREATE TEMP TABLE copy_manifest (table_name text, row_count bigint, payload_hash text);\n'
+  printf "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET TRANSACTION SNAPSHOT '%s';\n" "$snapshot"
+  cat /tmp/manifest.sql
+  printf 'ROLLBACK;\n'
+} | PGPASSWORD="$SRC_USE" psql "$S" -XqAt -v ON_ERROR_STOP=1 > /tmp/source-manifest.tsv
+
+echo "=== dumping the fingerprinted snapshot ==="
+PGPASSWORD="$SRC_USE" pg_dump --snapshot "$snapshot" --no-owner --no-acl --format=custom -d "$S" --file /tmp/dump.archive
+BYTES=$(wc -c < /tmp/dump.archive)
 echo "dump bytes: $BYTES"
 
 # A failed pg_dump leaves an empty or truncated file, and restoring it then
@@ -247,14 +322,22 @@ if [ "$BYTES" -lt 10000 ]; then
 fi
 
 echo "=== restoring ==="
-PGPASSWORD="$DST_USE" psql "$D" -v ON_ERROR_STOP=1 -q -f /tmp/dump.sql
-
-echo "=== target row counts AFTER ==="
-PGPASSWORD="$DST_USE" psql "$D" -Atc "select table_name from information_schema.tables where table_schema='public' order by 1" | while read t; do
-  n=$(PGPASSWORD="$DST_USE" psql "$D" -Atc "select count(*) from \"$t\"")
-  echo "  $t = $n"
-done
-echo "COPY COMPLETE"
+if ! PGPASSWORD="$DST_USE" pg_restore --exit-on-error --clean --if-exists --no-owner --no-acl -d "$D" /tmp/dump.archive > /tmp/restore.out 2>/tmp/restore.err; then
+  echo "FATAL: restore failed; target must remain suspended"; exit 94
+fi
+{
+  printf 'CREATE TEMP TABLE copy_manifest (table_name text, row_count bigint, payload_hash text);\n'
+  cat /tmp/manifest.sql
+} | PGPASSWORD="$DST_USE" psql "$D" -XqAt -v ON_ERROR_STOP=1 > /tmp/target-manifest.tsv
+if ! cmp -s /tmp/source-manifest.tsv /tmp/target-manifest.tsv; then
+  echo "FATAL: source/target manifest mismatch; target must remain suspended"; exit 95
+fi
+invalid=$(PGPASSWORD="$DST_USE" psql "$D" -XqAt -v ON_ERROR_STOP=1 -c \
+  "SELECT (SELECT count(*) FROM pg_index WHERE NOT indisvalid) + (SELECT count(*) FROM pg_constraint WHERE NOT convalidated)")
+if [ "$invalid" != '0' ]; then echo "FATAL: target indexes or constraints are invalid"; exit 96; fi
+echo "COPY COMPLETE: snapshot manifest matches"
+echo "tables verified: $(wc -l < /tmp/target-manifest.tsv)"
+sha256sum /tmp/source-manifest.tsv /tmp/target-manifest.tsv
 '@
 
 $script = if ($DryRun) { $verifyOnly } else { $fullCopy }
@@ -266,10 +349,17 @@ $script = if ($DryRun) { $verifyOnly } else { $fullCopy }
 # indented DEEPER than the `-` sequence marker, otherwise the parser reads the
 # first script line as a new mapping key and fails with "could not find expected ':'".
 # `- |` sits at 10 spaces, so the body sits at 12.
-$yamlPath = Join-Path ([System.IO.Path]::GetTempPath()) ("scim-pgcopy-" + [guid]::NewGuid().ToString('N') + ".yaml")
+$yamlDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("scim-pgcopy-" + $runId)
+$yamlPath = Join-Path $yamlDirectory 'job.yaml'
 $indented = ($script -split "`n" | ForEach-Object { '            ' + $_.TrimEnd("`r") }) -join "`n"
+$srcPasswordJson = ConvertTo-Json -InputObject $src.Password -Compress
+$srcAlternateJson = ConvertTo-Json -InputObject $srcPwAlt -Compress
+$dstPasswordJson = ConvertTo-Json -InputObject $dst.Password -Compress
+$dstAlternateJson = ConvertTo-Json -InputObject $dstPwAlt -Compress
 
 $yaml = @"
+tags:
+  scimserverCopyRun: $runId
 properties:
   environmentId: $envId
   configuration:
@@ -281,17 +371,17 @@ properties:
       replicaCompletionCount: 1
     secrets:
       - name: srcpw
-        value: "$($src.Password)"
+        value: $srcPasswordJson
       - name: srcpwalt
-        value: "$srcPwAlt"
+        value: $srcAlternateJson
       - name: dstpw
-        value: "$($dst.Password)"
+        value: $dstPasswordJson
       - name: dstpwalt
-        value: "$dstPwAlt"
+        value: $dstAlternateJson
   template:
     containers:
       - name: pgcopy
-        image: postgres:17-alpine
+        image: postgres@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
         command:
           - /bin/sh
           - -c
@@ -332,50 +422,60 @@ $indented
           memory: 2Gi
 "@
 
+$jobCreated = $false
+$jobCreateAttempted = $false
+$copySucceeded = $false
+$targetState = $null
+$stopAttempted = $false
+$copyFailure = $null
+$cleanupFailures = [Collections.Generic.List[System.Management.Automation.ErrorRecord]]::new()
 try {
+    Initialize-CopyPrivateDirectory -Path $yamlDirectory
     Set-Content -Path $yamlPath -Value $yaml -Encoding UTF8
 
     # Quiesce the target application. Restoring underneath a live replica is a
     # race: the app re-seeds tables between the DROP and the COPY, and the result
     # passes every count check while holding the wrong rows.
-    $quiesced = $false
     if (-not $DryRun -and $TargetAppName) {
         $rgForApp = if ($TargetAppResourceGroup) { $TargetAppResourceGroup } else { $TargetResourceGroup }
         Write-Host ""
         Say "stopping target app '$TargetAppName' for the duration of the restore..." 'Yellow'
-        az containerapp update -n $TargetAppName -g $rgForApp --min-replicas 0 --max-replicas 0 -o none 2>&1 | Out-Null
-        # The CLI abandons its poll before ARM finishes, so confirm by reading state.
-        for ($i = 0; $i -lt 30; $i++) {
-            $running = az containerapp replica list -n $TargetAppName -g $rgForApp -o tsv --query "length(@)" 2>$null
-            if ($running -eq '0' -or [string]::IsNullOrWhiteSpace($running)) { break }
-            Start-Sleep -Seconds 10
-        }
-        $quiesced = $true
+        $targetState = Get-CopyTargetRevisionState -AppName $TargetAppName -ResourceGroup $rgForApp -Subscription $Subscription
+        Say "original active revisions: $($targetState.ActiveRevisions -join ', ')"
+        $stopAttempted = $true
+        Suspend-CopyTargetWriters -AppName $TargetAppName -ResourceGroup $rgForApp -Subscription $Subscription -State $targetState
         Say "target app stopped" 'Green'
     }
 
     Write-Host ""
     Say "creating ephemeral job '$JobName'..." 'Yellow'
-    az containerapp job delete -n $JobName -g $TargetResourceGroup --yes -o none 2>$null | Out-Null
-    $createOut = az containerapp job create -n $JobName -g $TargetResourceGroup --yaml $yamlPath 2>&1 | Out-String
-    $created = az containerapp job show -n $JobName -g $TargetResourceGroup --query name -o tsv 2>$null
-    if (-not $created) {
-        Write-Host $createOut -ForegroundColor Red
-        throw "Job creation failed - see the error above."
-    }
+    $jobCreateAttempted = $true
+    Invoke-CopyAzAction -Arguments @(
+        'containerapp', 'job', 'create', '-n', $JobName, '-g', $TargetResourceGroup,
+        '--yaml', $yamlPath, '--subscription', $Subscription
+    )
+    $jobCreated = $true
     Say "job created" 'Green'
 
     Say "starting execution..." 'Yellow'
-    $exec = az containerapp job start -n $JobName -g $TargetResourceGroup -o json 2>$null | ConvertFrom-Json
+    $exec = Invoke-CopyAzJson -Arguments @(
+        'containerapp', 'job', 'start', '-n', $JobName, '-g', $TargetResourceGroup,
+        '--subscription', $Subscription
+    )
     $execName = $exec.name
+    if (-not $execName) { throw 'Copy execution identity is missing.' }
     Say "execution: $execName"
 
     # Poll the execution rather than trusting any single command's exit code.
     $deadline = (Get-Date).AddMinutes(45)
     $status = ''
     while ((Get-Date) -lt $deadline) {
-        $status = az containerapp job execution show -n $JobName -g $TargetResourceGroup `
-            --job-execution-name $execName --query properties.status -o tsv 2>$null
+        $execution = Invoke-CopyAzJson -Arguments @(
+            'containerapp', 'job', 'execution', 'show', '-n', $JobName, '-g', $TargetResourceGroup,
+            '--job-execution-name', $execName, '--subscription', $Subscription
+        )
+        $status = $execution.properties.status
+        if (-not $status) { throw 'Copy execution status is unavailable.' }
         if ($status -in @('Succeeded', 'Failed', 'Stopped')) { break }
         Start-Sleep -Seconds 15
     }
@@ -384,25 +484,49 @@ try {
     Write-Host ""
     Write-Host "  ---- job output ----" -ForegroundColor Cyan
     az containerapp job logs show -n $JobName -g $TargetResourceGroup `
-        --execution $execName --container pgcopy --tail 300 2>$null
+        --execution $execName --container pgcopy --tail 300 --subscription $Subscription --only-show-errors
+    if ($LASTEXITCODE -ne 0) { throw 'Copy execution logs could not be retrieved.' }
 
     if ($status -ne 'Succeeded') { throw "Transfer did not succeed (status=$status). See output above." }
+    $copySucceeded = $true
+}
+catch {
+    $copyFailure = $_
 }
 finally {
-    Remove-Item $yamlPath -Force -ErrorAction SilentlyContinue
-    if (-not $KeepJob) {
-        az containerapp job delete -n $JobName -g $TargetResourceGroup --yes -o none 2>$null | Out-Null
-        Say "ephemeral job removed"
+    try {
+        if ($stopAttempted) {
+            if ($copySucceeded) {
+                Resume-CopyTargetWriters -AppName $TargetAppName -ResourceGroup $rgForApp -Subscription $Subscription -State $targetState
+                Say 'original target revisions reactivated; scale configuration preserved' 'Green'
+            } else {
+                Write-Warning "Copy failed. Target revisions remain suspended; reconcile data before reactivation."
+            }
+        }
+    } catch {
+        $cleanupFailures.Add($_)
     }
-    # Always bring the app back, including on failure - leaving it at zero
-    # replicas would turn a failed copy into an outage.
-    if ($quiesced) {
-        $rgForApp = if ($TargetAppResourceGroup) { $TargetAppResourceGroup } else { $TargetResourceGroup }
-        Say "restarting target app '$TargetAppName'..." 'Yellow'
-        az containerapp update -n $TargetAppName -g $rgForApp --min-replicas 1 --max-replicas 1 -o none 2>&1 | Out-Null
-        Say "target app restarted"
+    try {
+        if ($jobCreateAttempted -and -not $KeepJob) {
+            Remove-OwnedCopyJob -JobName $JobName -ResourceGroup $TargetResourceGroup -Subscription $Subscription -RunId $runId
+            Say 'owned ephemeral job absence verified'
+        }
+    } catch {
+        $cleanupFailures.Add($_)
+    }
+    try {
+        if (Test-Path -LiteralPath $yamlPath) { Remove-Item -LiteralPath $yamlPath -Force }
+        if (Test-Path -LiteralPath $yamlDirectory) { Remove-Item -LiteralPath $yamlDirectory }
+    } catch {
+        $cleanupFailures.Add($_)
     }
 }
+
+foreach ($failure in $cleanupFailures) {
+    Write-Warning "Copy cleanup failed: $($failure.Exception.Message)"
+}
+if ($copyFailure) { throw $copyFailure }
+if ($cleanupFailures.Count -gt 0) { throw $cleanupFailures[0] }
 
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green

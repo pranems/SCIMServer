@@ -311,6 +311,10 @@ Invoke-Gate -Name 'deploy: workflow run selector' -WorkingDir $repoRoot -Action 
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/select-github-workflow-run.contract.ps1') 2>&1 | Out-Host
 }
 
+Invoke-Gate -Name 'deploy: tenant rollover contracts' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test-tenant-rollover.ps1') 2>&1 | Out-Host
+}
+
 Invoke-Gate -Name 'copilot: agent skill contract' -WorkingDir $repoRoot -Action {
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/copilot-customizations.contract.ps1') -GitTree Head 2>&1 | Out-Host
 }

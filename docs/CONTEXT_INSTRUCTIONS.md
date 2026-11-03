@@ -9,6 +9,20 @@
 
 ## Active Delivery Process
 
+**2026-11-03 tenant-rollover consolidation:** the
+[migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records target foundations, protected recovery, source replay and local
+browser acceptance separately from pending release, serving target apps
+and final cutover. Ten offline PowerShell contracts now run in both pre-push
+and hosted CI, including five actual combined-failure cleanup regressions.
+Original transfer errors survive secondary cleanup failures; failed transfers
+cannot reactivate target writers. No serving API/schema/browser/dependency
+or version change is part of this tooling boundary.
+Requested 0.55.67 remains held by its actual same-image performance failure.
+Reviewed diagnostic PR265/run41632439081 does not fix that repeatability
+gap and cannot admit the release; its full evidence is recovery-protected.
+The prospective method correction is a separate implementation/review unit.
+
 **2026-10-30 current Hono integration:** #261 merged normally at
 `cffc64c8a188a721fabb85c37a80243d5e65a74f`, with all 28 protected gates,
 seven exact-head checks and separate technical review. Independent #262

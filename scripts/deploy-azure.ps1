@@ -379,15 +379,15 @@ if (-not $DatabaseUrl -and -not $ProvisionPostgres) {
 
 if ($ProvisionPostgres -and -not $DatabaseUrl) {
     if (-not $PgAdminPassword) {
-        $pgPwInput = Read-Host "Enter PostgreSQL admin password (leave blank to auto-generate)"
+        $pgPwInput = Read-Host "Enter PostgreSQL admin password (leave blank to auto-generate)" -MaskInput
         if ([string]::IsNullOrWhiteSpace($pgPwInput)) {
-            $PgAdminPassword = New-RandomSecret 24
-            Write-Host "Generated PG admin password: $PgAdminPassword" -ForegroundColor Yellow
+            $PgAdminPassword = 'Pg!' + (New-RandomSecret 24)
+            Write-Host "Generated PostgreSQL administrator password; its value is not logged." -ForegroundColor Yellow
         } else {
             $PgAdminPassword = $pgPwInput
         }
     }
-    # Will provision PG in Step 3/5. DatabaseUrl will be set from output.
+    # Provision in Step 3/5, then construct the URI locally from non-secret outputs.
 }
 
 Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret -DbUrl $DatabaseUrl
@@ -630,25 +630,13 @@ if ($ProvisionPostgres -and -not $DatabaseUrl) {
     if ($pgServerName.Length -gt 63) { $pgServerName = $pgServerName.Substring(0,63) }
     Write-Host "   Server name: $pgServerName" -ForegroundColor Gray
 
-    $pgDeployName = "postgres-$(Get-Date -Format 'yyyyMMddHHmmss')"
-    $pgDeployOutput = az deployment group create `
-        --resource-group $ResourceGroup `
-        --name $pgDeployName `
-        --template-file "$PSScriptRoot/../infra/postgres.bicep" `
-        --parameters serverName=$pgServerName adminPassword=$PgAdminPassword location=$PgLocation `
-        --query properties.outputs `
-        --output json 2>$null
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "   ❌ PostgreSQL provisioning failed" -ForegroundColor Red
-        Write-Host $pgDeployOutput -ForegroundColor Red
-        Stop-Deployment -Message "PostgreSQL Flexible Server deployment failed."
-    }
-
-    $pgOutputs = $pgDeployOutput | ConvertFrom-Json
-    $DatabaseUrl = $pgOutputs.databaseUrl.value
+    . (Join-Path $PSScriptRoot 'postgres-provisioning.ps1')
+    $pgProvision = Invoke-ScimPostgresProvisioning -ServerName $pgServerName -ResourceGroup $ResourceGroup `
+        -Location $PgLocation -SubscriptionId $account.id -TenantId $account.tenantId `
+        -Password $PgAdminPassword -TemplatePath (Join-Path $PSScriptRoot '..\infra\postgres.bicep')
+    $DatabaseUrl = $pgProvision.DatabaseUrl
     Write-Host "   ✅ PostgreSQL Flexible Server provisioned: $pgServerName" -ForegroundColor Green
-    Write-Host "      FQDN: $($pgOutputs.serverFqdn.value)" -ForegroundColor Gray
+    Write-Host "      FQDN: $($pgProvision.ServerFqdn)" -ForegroundColor Gray
 
     # CRITICAL: Allow-list required PostgreSQL extensions used by Prisma baseline migration.
     # Azure Database for PostgreSQL Flexible Server requires extensions to be explicitly

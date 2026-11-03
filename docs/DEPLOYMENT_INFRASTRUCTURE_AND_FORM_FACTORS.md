@@ -7,6 +7,62 @@
 
 ---
 
+## Pending tenant 10 migration
+
+The [tenant 10 migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records verified target account/permissions and the staged `next` estates.
+Tenant 09 remains active. No target application has been deployed or accepted.
+The new subscription now has six registered required providers and the
+eastus resource groups `scimserver-dev` and `scimserver-prod`. The target VNet
+and all three source-shaped subnets/delegations are deployed and readback
+verified. Shared environment `scimserver-env` and workspace `scimserver-logs`
+were deployed from the corrected existing template after ARM validation;
+actual Succeeded state, subnet, external topology, Consumption profile and
+Log Analytics readback passed. Both target PostgreSQL servers are now Ready
+in Central US; no application or registry instance has been deployed.
+The target deployment principal is verified with Contributor on those two
+resource groups only and one effective `Application.ReadWrite.OwnedBy` role.
+Three directory proof applications were recreated and acquired real target
+tokens; their issuer metadata follows actual v1 claims, not the v2 token
+endpoint's name. Credentials remain outside Git with private Windows-user
+access. This is directory readiness, not target SCIM deployment acceptance.
+Source ARM reads confirm VNet `10.40.0.0/16`, delegated `aca-infra`
+`10.40.0.0/21` and `aca-runtime` `10.40.8.0/21`, plus the undelegated
+`private-endpoints` subnet `10.40.16.0/24`. The source environment is external,
+non-zone-redundant, with one `Consumption` workload profile and Log Analytics.
+The existing [environment template](../infra/containerapp-env.bicep) now
+declares that profile explicitly instead of relying on an omitted value.
+Its compiled-resource regression passed after semantic RED. Target network
+and environment readiness/topology readbacks passed.
+
+The PostgreSQL template now exposes only non-secret server/database metadata.
+The deployment consumer constructs the URI locally and uses
+[the shared provisioning helper](../scripts/postgres-provisioning.ps1) to keep
+administrator passwords out of command-line arguments and ARM outputs.
+The default placement remains Azure-selected; an optional availability-zone
+parameter supports an explicitly recorded placement attempt. Eastus2 default
+and zone-1 B1ms, then both B2s allocations, failed despite advertised support.
+Both next-estate Central US/B1ms servers are Ready under fresh names, with
+PostgreSQL 17, all four extensions and independent location/state/SKU readbacks;
+failed-name recovery records remain intact. ARM rejected
+old-name cross-region reuse after an empty inventory, so the launcher now uses
+a direct absence guard with six regression decisions. No source data carry
+or application acceptance is inferred. The app environment stays eastus; cross-region database
+latency must be measured before migration acceptance.
+The requested 0.55.67 candidate is not yet a released/admitted artifact; its
+ordinary source checks do not satisfy the retained qualification hold.
+Migration lookup now derives from the registry rather than a second identity
+map, and paired retirement/activation has focused atomic-transition tests.
+
+The [offline tenant-rollover contracts](../scripts/test-tenant-rollover.ps1)
+run in both pre-push and the Build Test Image validation job. Ten isolated
+PowerShell scripts cover registry/cutover, private credential storage,
+directory/proof metadata, provider absence, log transport, writer suspension
+and failure-safe cleanup without cloud or Docker access. Combined transfer
+and cleanup failures preserve the original error, report every secondary
+failure and still remove named secret scratch. Actual compiled templates,
+PostgreSQL replay and cloud/browser acceptance remain separate evidence.
+
 ## 0.55.56 candidate startup-output hardening
 
 The container entrypoint now reports database configuration presence only,

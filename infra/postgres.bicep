@@ -31,6 +31,9 @@ param storageSizeMB int = 32768
 @allowed(['14', '15', '16', '17'])
 param postgresVersion string = '17'
 
+@description('Optional availability zone. Empty lets Azure choose placement.')
+param availabilityZone string = ''
+
 @description('Backup retention days (7–35)')
 param backupRetentionDays int = 7
 
@@ -41,7 +44,7 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
     name: skuName
     tier: skuTier
   }
-  properties: {
+  properties: union({
     administratorLogin: adminLogin
     administratorLoginPassword: adminPassword
     version: postgresVersion
@@ -64,7 +67,9 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
       activeDirectoryAuth: 'Disabled'
       passwordAuth: 'Enabled'
     }
-  }
+  }, empty(availabilityZone) ? {} : {
+    availabilityZone: availabilityZone
+  })
   tags: {
     project: 'scimserver'
   }
@@ -92,6 +97,3 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-0
 output serverFqdn string = server.properties.fullyQualifiedDomainName
 output serverName string = server.name
 output databaseName string = database.name
-// Construct the DATABASE_URL connection string for use in Container App secret
-#disable-next-line outputs-should-not-contain-secrets
-output databaseUrl string = 'postgresql://${adminLogin}:${adminPassword}@${server.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'

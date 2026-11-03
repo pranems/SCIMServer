@@ -51,7 +51,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [ValidateSet('proviam09', 'proviam', 'anandsa')]
+    [ValidateSet('proviam10', 'proviam09', 'proviam', 'anandsa')]
     [string]$Tenant = 'proviam09',
     [int]$SecretYears = 1,
     [string]$OutFile
@@ -60,6 +60,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'az-tenant.ps1')
+. (Join-Path $PSScriptRoot 'jwt-parts.ps1')
 
 $entry = (Get-ScimTenantMap)[$Tenant]
 if (-not $entry) { throw "Unknown SCIM tenant '$Tenant'." }
@@ -176,6 +177,27 @@ function ConvertFrom-JsonLoose {
     return $text.Substring($start) | ConvertFrom-Json
 }
 
+function Get-ProofTokenMetadata {
+    param([string]$Token, [string]$TenantId, [string]$AppId)
+    $parts = Get-JwtParts $Token
+    $claims = $parts.Payload
+    $v1 = $claims.ver -eq '1.0'
+    $issuer = if ($v1) { "https://sts.windows.net/$TenantId/" } else { "https://login.microsoftonline.com/$TenantId/v2.0" }
+    $client = if ($v1) { $claims.appid } else { $claims.azp }
+    if ($parts.Segments -ne 3 -or $parts.Header.alg -ne 'RS256' -or
+        $claims.ver -notin @('1.0', '2.0') -or $claims.tid -ne $TenantId -or
+        $claims.iss -ne $issuer -or $claims.aud -ne $AppId -or
+        $client -ne $AppId -or -not $claims.sub) {
+        throw 'Proof token has unexpected tenant, issuer, audience, client or subject metadata.'
+    }
+    [pscustomobject]@{
+        issuer = $claims.iss
+        jwksUri = if ($v1) { "https://login.microsoftonline.com/$TenantId/discovery/keys" } else { "https://login.microsoftonline.com/$TenantId/discovery/v2.0/keys" }
+        subject = $claims.sub
+        tokenVersion = $claims.ver
+    }
+}
+
 $results = @()
 foreach ($a in $apps) {
     Write-Host ""
@@ -225,8 +247,10 @@ foreach ($a in $apps) {
             spObjectId   = $spId
             tenantId     = $entry.Tenant
             clientSecret = $cred.password
-            issuer       = "https://login.microsoftonline.com/$($entry.Tenant)/v2.0"
-            jwksUri      = "https://login.windows.net/$($entry.Tenant)/discovery/v2.0/keys"
+            issuer       = $null
+            jwksUri      = $null
+            subject      = $null
+            tokenVersion = $null
         }
     }
 }
@@ -247,17 +271,26 @@ if ($results.Count -gt 0) {
         }
         $got = $false
         for ($i = 1; $i -le 8; $i++) {
+            $verificationPhase = 'token request'
             try {
                 $tok = Invoke-RestMethod -Method Post `
                     -Uri "https://login.microsoftonline.com/$($entry.Tenant)/oauth2/v2.0/token" `
                     -Body $body -ContentType 'application/x-www-form-urlencoded' -TimeoutSec 30
                 if ($tok.access_token) {
+                    $verificationPhase = 'token claim metadata'
+                    $metadata = Get-ProofTokenMetadata -Token $tok.access_token -TenantId $entry.Tenant -AppId $rr.appId
+                    $rr.issuer = $metadata.issuer
+                    $rr.jwksUri = $metadata.jwksUri
+                    $rr.subject = $metadata.subject
+                    $rr.tokenVersion = $metadata.tokenVersion
                     Write-Host ("   {0}: TOKEN OK (attempt {1})" -f $rr.name, $i) -ForegroundColor Green
                     $got = $true
                     break
                 }
             }
             catch {
+                Write-Warning ("{0}: {1} failed on attempt {2} ({3}); response bodies and tokens are not logged." -f
+                    $rr.name, $verificationPhase, $i, $_.Exception.GetType().Name)
                 if ($i -lt 8) { Start-Sleep -Seconds 8 }
             }
         }

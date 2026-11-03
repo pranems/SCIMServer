@@ -374,13 +374,15 @@ function Set-ScimEstateRole {
         instead of a repo-wide find-and-replace.
 
         Refuses to leave the registry invalid: the change is applied to an
-        in-memory copy, validated, and only then written.
+        in-memory copy, validated, and only then written. An activation may
+        retire the current active tenant in that same validated write.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string]$TenantKey,
         [Parameter(Mandatory)][ValidateSet('active', 'next', 'retiring', 'permanent', 'trial')][string]$Role,
-        [string]$Path
+        [string]$Path,
+        [string]$RetireTenantKey
     )
 
     $p = if ($Path) { $Path } else { $script:ScimEstateRegistryPath }
@@ -393,7 +395,20 @@ function Set-ScimEstateRole {
         throw "Refusing to move '$TenantKey' out of 'permanent'. That role marks customer-facing production."
     }
 
-    if ($PSCmdlet.ShouldProcess($TenantKey, "role $old -> $Role")) {
+    $action = "role $old -> $Role"
+    if ($RetireTenantKey) {
+        if ($Role -ne 'active' -or $old -ne 'next' -or $RetireTenantKey -eq $TenantKey) {
+            throw "Atomic cutover requires a distinct next tenant becoming active."
+        }
+        $source = $reg.tenants | Where-Object key -eq $RetireTenantKey
+        if (-not $source -or $source.role -ne 'active') {
+            throw "Only the current active tenant may be retired during cutover."
+        }
+        $action += "; retire $RetireTenantKey in the same write"
+    }
+
+    if ($PSCmdlet.ShouldProcess($TenantKey, $action)) {
+        if ($RetireTenantKey) { $source.role = 'retiring' }
         $t.role = $Role
         $tmp = [IO.Path]::GetTempFileName()
         ($reg | ConvertTo-Json -Depth 10) | Set-Content -Path $tmp -Encoding utf8
@@ -403,5 +418,6 @@ function Set-ScimEstateRole {
         }
         Move-Item -Force $tmp $p
         Write-Host "tenant '$TenantKey' role: $old -> $Role" -ForegroundColor Green
+        if ($RetireTenantKey) { Write-Host "tenant '$RetireTenantKey' role: active -> retiring" -ForegroundColor Green }
     }
 }

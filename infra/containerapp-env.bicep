@@ -36,7 +36,12 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
     vnetConfiguration: {
       infrastructureSubnetId: infrastructureSubnetId
     }
-    // Workload profiles omitted - environment uses default consumption model
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
     // Dapr instrumentation key intentionally omitted
   }
   tags: {

@@ -74,6 +74,9 @@ jobs:
       - name: Verify lockfile provenance
         run: node scripts/check-lockfile-provenance.mjs
 
+      - name: Verify offline tenant rollover contracts
+        run: pwsh -NoProfile -File scripts/test-tenant-rollover.ps1
+
       - name: Install API dependencies
         working-directory: api
         run: npm ci --no-audit --no-fund

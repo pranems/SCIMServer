@@ -14,6 +14,131 @@
 
 ---
 
+## Execute the control inventory before claiming coverage (2026-11-02)
+
+**Applied in:** [tenant 10 browser acceptance](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md).
+An initial manual inventory claimed 43 endpoint settings; later hand counts
+contradicted their own tables. Tests importing the actual definition arrays
+and registry establish 38 unique definitions and attach every key, type and
+numeric bound. Derive counts from the executed candidate, assert key uniqueness
+and retain that machine-readable inventory. Neither prose nor a matching
+substring is evidence of a declared or editable control.
+
+Definition, UI editability, persisted value and backend effect are separate
+claims. Fixed redaction policy must not be counted as an editable switch;
+authentication-managed controls must follow Connect; specialized lifetime
+editors need their actual commit semantics. All 16 numeric cases now prove
+valid browser commit, independent admin value readback and reload retention,
+then verify visible lower/upper validation with no invalid update requests.
+Bulk failure export coverage reads the downloaded CSV and excludes successful
+rows rather than asserting only that a download button exists.
+
+An exit-zero browser run with opt-out skips is not zero-skip acceptance.
+Enable fixture mutations, seeded-shape coverage and visual comparisons only
+on the owned disposable estate; preserve explicit snapshot-write prohibition.
+Keep earlier failed transport/environment runs separate, record the changed
+environment, and require one completed combined report for the final count.
+Archive both failed and passing evidence with source identity and protected
+per-file checksum verification. Local PostgreSQL acceptance still does not
+admit a release, prove the Azure image or replace operator visual approval.
+
+## Tenant bootstrap must verify effects, not command labels (2026-10-31)
+
+Client termination is not proof that its database transaction ended. The
+snapshot-copy fixture originally verified content but missed a server query
+still sleeping after its client exited. A real PostgreSQL regression now
+checks transaction absence after failed, successful and concurrent-write
+copies. Interrupt the owned client to cancel its active query before waiting
+for it; do not terminate unrelated source sessions to satisfy cleanup.
+
+Finalization has two separate claims: attempt all cleanup and preserve the
+original failure. Nested `finally` blocks alone do not prove the latter.
+An actual copy-lifecycle fixture reproduced a cleanup error masking the
+transfer failure. Save the original error, collect/report secondary failures,
+attempt the remaining owned cleanup, then propagate the original error first.
+Successful work with failed cleanup must still fail. Five combined-failure
+fixtures and the ten-script offline rollover gate now execute in both
+pre-push and hosted CI; manual-only fixture files are not continuous coverage.
+
+**Applied in:** [tenant 10 migration](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md).
+Azure worker evidence has two layers: transport records and their message
+content. Decode the CLI's actual JSONL `Log` strings before checking output
+boundaries. Reject malformed transport and non-string fields. Two equal
+hashes are insufficient unless one belongs to the source manifest and one
+to the target manifest. Lock these distinctions with negative controls:
+duplicate source, missing target, mismatched hashes and table count 90
+must not satisfy a nine-table gate. Eight actual-validator cases now pass.
+When a wrapper changes while an expensive immutable worker is running,
+validate its retained real evidence independently and record the adaptation;
+do not repeat an unchanged successful transfer just to obtain a green wrapper.
+
+Disposable-resource ownership starts before the create response. Verify the
+exact generated name is absent, persist its scoped creation intent, and
+clean that exact attempted creation even when the provider response is lost.
+Failed inventory is not absence, and an existing object is never owned by
+the new run. Six actual-block lifecycle decisions cover these boundaries.
+Preserve the primary failure when cleanup also fails, and report the latter
+explicitly rather than replacing the original cause or declaring success.
+The real dev worker passed despite the loaded wrapper's framing error;
+independent retained-log validation and exact cleanup readbacks admitted only
+that disposable-copy evidence. The corrected canary wrapper then passed.
+Neither result admits an application release or proves final cutover safety.
+
+The November 2 source expiration demonstrates why protected data-plane
+credentials must be captured before the directory is lost. Actual ARM fails
+with `AADSTS5000229` while cached account metadata still reports Enabled;
+neither cached state nor a timed-out HTTP health request establishes the
+database's availability. Direct read-only PostgreSQL capture and both full
+isolated restores still succeeded. Label retained control-plane metadata
+with its original capture date rather than presenting it as freshly read.
+
+Configuration carry must exclude generated outputs, not just old dumps.
+Copying an old archive TOC into a fresh recovery package caused the correct
+non-overwrite guard to reject a completed fresh dump. Ten actual-copy fixture
+cases now exclude dumps, TOCs and restored manifests while preserving genuine
+configuration. Retain the original failed receipt, checksum-bind the completed
+archive and require a complete isolated restore before admitting its reuse.
+Capture only the missing estate; do not repeat an expensive successful dump
+for a green wrapper. Compare all non-log table fingerprints with the earlier
+verified recovery to identify whether crypto/schema replay evidence changed.
+Final writer quiescence remains a separate claim when source ARM is unavailable.
+
+A release decision must not be collapsed into infrastructure availability.
+In the November 3 investigation, 251 had no production API/schema/browser
+delta from live master, while master had no verified public release artifact.
+A published older image still retained an operational hold. Check mergeability,
+correctness, publication, calibration and operational admission separately,
+using the actual publisher commit rather than a guessed tag or stale local
+branch. A dedicated measurement host proposed in a design record is not a
+coded migration prerequisite. Existing-source PostgreSQL recovery and a new
+application upgrade are separate claims; preserve both boundaries instead of
+blocking read-only recovery on an unrelated release choice or silently
+substituting an older image.
+
+A successful CLI exit does not establish an effective directory permission.
+Resolve the role from the target directory, assign only that role, verify
+the effective app-role assignment, and prove an owned object's update value
+and deletion. Reconcile repeated requested permissions without expanding the
+grant. Directory propagation requires bounded readback, not an immediate
+not-found interpretation or an unneeded wider permission.
+
+Likewise, a v2 OAuth token endpoint does not guarantee a v2 access token.
+Record issuer/key discovery from actual token claims, validate the intended
+tenant/client/audience/subject, and retain v1/v2 negative controls. Token
+decoding is diagnostics, not cryptographic authentication evidence.
+
+Read actual source topology before reusing an old deployment template. During
+tenant-10 preparation, the delegated subnet and explicit Consumption profile
+were present in ARM, while the template omitted the profile. Lock that shape
+in a compiled-resource assertion, then verify the actual target separately.
+Passing public-Azure deployment is not government-cloud qualification.
+
+For database carry, a count or successful clean restore cannot detect every
+orphan object or racing source write. Manifest every public table and dump
+from the same exported snapshot; prove extra-table rejection and a later
+write's exclusion separately. A failed restore must leave target writers
+suspended and report that state explicitly.
+
 ## Real-parent evidence for transitive major overrides (2026-10-29)
 
 **Applied in:** [Hono adapter qualification](../HONO_PRISMA_PARENT_QUALIFICATION.md).
@@ -621,6 +746,67 @@ Restrict extension discovery to the already-installed component required by
 the operation; do not change shared permissions or tooling to fix unrelated
 metadata. These session controls still require live proof on the next copy.
 
+2026-10-31 recurrence: core job execution worked while log retrieval required a
+missing Container Apps extension. The copier now checks its actual logs command
+before creating a job or suspending writers, temporarily disables automatic
+extension installation, restores the process preference and fails explicitly.
+Missing/present-command and preference-restoration regressions passed after RED.
+The private extension was installed only after the actual missing-tool failure;
+real seed/copy/verification and both source connectivity logs were then captured.
+
+### Historical checksum provenance is not current-file equality
+
+2026-11-01: a full restored dev database stopped before candidate replay because
+an applied April migration's checksum differed from the current file. The
+stored checksum exactly matched immutable ancestor
+`f9c6d3cddc4f121f63b60e3be6226654df915fc4`; the later file replaced unguarded
+cleanup/index statements with guarded equivalents. The candidate-ancestor
+relationship was also verified directly with Git.
+
+Never repair that evidence by changing deployed migration rows or pretending
+the current bytes match. Classify the known historical variant explicitly,
+reject unknown checksums and unavailable Git objects, preserve every original
+migration row, and independently prove pending-migration replay, data/ID
+fidelity and runtime compatibility. Six focused provenance controls pass;
+the complete dev rehearsal preserves all nine tables and authenticates/reveals
+24 retained envelopes with the original DEK and effective keys. That is not
+shipping-image admission or target Azure acceptance. Prefer checking migration
+metadata before an expensive full restore, while retaining the full restore
+as independent evidence.
+
+2026-11-01 source comparison: four canary retained envelopes fail under both
+the exact original image and candidate, while six decrypt/authenticate.
+Compare failure identities against actual source runtime before attributing
+an error to migration. Preserve the failure and require an explicit disposition,
+not a key rotation or silent acceptance. A diagnostic loop must also account
+for every item: first/last failures and an all-failed set caught a misplaced
+aggregation decision. Those three new tests pass after two semantic RED
+assertions, bringing the focused private probe controls to nine.
+The later lifecycle check finds all four failed records inactive on one test
+endpoint. Actual original/candidate controller fixtures preserve the same
+archived `retained:false` response and audit. Faithful migration must preserve
+that explicit source behavior, not invent a requirement to decrypt every
+revoked historical ciphertext. The acceptance predicate now requires verified
+source identity, exact failed-ID parity, strictly inactive failed records and
+at least one authenticated active retained credential. Any active/new failure,
+unmatched source identity or all-failed corpus still fails. Fourteen controls
+pass; both complete replays have empty schema-model diffs and preserve all
+original data/history. Record archive limitations explicitly rather than
+silently dropping records or claiming every retained envelope is healthy.
+
+### Container argument expansion precedes shell quoting
+
+2026-10-31: an Azure trial copied the correct manifest, but verification SQL
+`DO $$` arrived at PostgreSQL as `DO $` and failed. A quoted shell heredoc cannot
+protect text from an earlier command-argument expansion layer.
+[Kubernetes' expansion implementation](https://github.com/kubernetes/kubernetes/blob/master/third_party/forked/golang/expansion/expand.go)
+reduces a doubled dollar operator to one before invoking the command. A named
+SQL dollar quote avoided that sequence; the real Azure rerun verified all 2,000
+UUID/content rows, the singleton and four extensions. Trial SQL now rejects
+unsafe doubled-dollar arguments before any Azure call. For opaque SQL containing
+literal doubled dollars, use protected file-based transport rather than editing
+the data. Local Docker success alone does not prove this platform boundary.
+
 ### Cleanup dependencies and read permissions belong in creation preflight
 
 2026-10-17: a private DNS zone could not be deleted before its VNet link.
@@ -630,6 +816,12 @@ grant read access to a separately created provider infrastructure group.
 Verify each cleanup scope in advance. Forbidden is unknown, never absence;
 retain the cleanup obligation and obtain authorized verification rather than
 substituting accounts or deleting provider-managed infrastructure manually.
+
+2026-10-31: job deletion completed asynchronously and a generic inventory still
+reported the just-deleted job. The copy helper now uses provider inventory and
+bounded absence readback, retains other-run ownership protection and rejects
+timeout/unknown reads. Pending-deletion RED/GREEN and actual owned job/database
+cleanup prove different claims; neither substitutes for the other.
 
 ### Liveness cannot stand in for authenticated database readiness
 

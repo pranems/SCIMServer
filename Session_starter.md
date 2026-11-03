@@ -1,6 +1,263 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-30
+**Last verified:** 2026-11-03
+
+### Migration tooling consolidation (2026-11-03 UTC)
+
+The existing migration implementation is being consolidated independently of
+release qualification. Five actual-lifecycle cleanup combinations now pass
+after a real RED: job cleanup masked the primary transfer error. The fix
+preserves the original error, reports secondary failures and still attempts
+all named cleanup, without reactivating writers after failed work.
+Ten offline PowerShell contract scripts now run through the same pre-push
+and hosted CI entry point; the combined local run passes without Azure or
+Docker access. Real PostgreSQL snapshot/preflight and compiled Bicep evidence
+remain separate. All 29 changed PowerShell scripts parse and diff-check passes.
+Owned root/API/web dependencies were restored only after missing-tool failures;
+all six manifest/lock hashes remain unchanged and Prisma codegen succeeds
+without contacting a database. Complete protected publication remains pending.
+
+A second real PostgreSQL regression found one exported source transaction
+surviving copy-worker exit. Interrupting the owned client cancels its sleep
+query and closes the transaction; the failed-copy release check and all three
+fidelity/isolation cases pass. Checks now cover each worker exit, including
+successful and concurrent-write copies. No unrelated source session is killed.
+
+Reviewed non-admitting warmup PR265 merged into held251 at0b6490f7.
+Actual Linux study41632439081 verifies49656 benchmark requests and32000
+measured values, resources, privacy, deadlines and cleanup. The1000-cycle
+treatment does not establish repeatability (addp95ratio0.808043,
+removep95ratio1.171626). Its measured196000e5 source and complete evidence
+are encrypted/roundtrip-verified. A separate fresh context owns the prospective
+qualification-method correction. No original failure is waived, no alternative
+release selected, no target app deployed and no customer-production change.
+
+### Actual current-image Linux failure (2026-11-03 UTC)
+
+PR #263 merged into #251 at6f846cf8 with review and exact-tip CI green.
+Actual source-bound run41615647439 uses .67 image92cd5024 and synthetic
+checkoutbc60f7f3. First same-image block FAILS populated-read p95,
+remove p95, empty-read p95 and empty-read p99. All66 functional/200 private
+logging checks, capture and exact cleanup PASS. Later three blocks do not
+run; no admission, target app or cutover. Post-warmup samples retain large
+within/among-visit variation despite unchanged image/SQL call counts.
+Next step is prospectively reviewed calibration/stabilization, not lucky
+retries, speculative serving-code changes or relaxed bounds. The migration
+plan carries measured values, source identities and the merge/readiness
+event-race RCA. Checkpoint20261103T1005206612404Z preserves reviewed source
+and gates with two protected archive roundtrips; it predates the failure.
+
+### Current-image qualification implementation (2026-11-03 UTC)
+
+The isolated `SCIMServer-qualification-image-binding-20261103` worktree
+contains commits `f83eecfc` and `ba99530c`, based on exact .67 candidate
+`abdef720`. Qualification now binds the actual checkout image/source/version,
+not the frozen .58 candidate. Focused contracts 58 PASS; full tooling
+227 PASS / 8 explicit opt-in or retained-fixture skips / 0 FAIL. Historical
+control reassessment is structurally identical, retaining all three failures.
+Actual fresh-base local image reports .67 / Node 24.22.2 / Linux x64; its
+immutable identity generates a source-bound protocol. No latency limits,
+quotas, samples, serving source, dependencies or locks changed. Normal
+protected Validate push passes all 30 gates in 1,195s: API unit 6,254 PASS;
+inmemory E2E 2,514 PASS/42 explicit skips; web 1,661 PASS with no skips.
+PR #263 targets #251's branch at ba99530c; hosted run41613586343 and actual
+Copilot review-request event are established. No hosted qualification,
+release or deployment is claimed.
+The workflow is absent from master: review/integrate into #251 and use its
+normal ready-for-review trigger rather than assuming branch dispatch works.
+
+### Migration decision investigation (2026-11-03 UTC)
+
+Actual tenant08-to09 execution, not only its original plan, confirms that
+expired source ARM did not stop PostgreSQL or the old serving applications.
+The existing saved-connection-string database carry remains applicable, as
+this migration's actual Azure trials and November2 full recovery demonstrate.
+Source ARM restoration is not a prerequisite. At 08:44Z, read-only target
+ARM with the verified automation identity confirms both PG17 servers Ready
+and zero Container Apps. Roles remain active09/next10. Browser health probes
+against retained source hosts returned dev ERR_FAILED and canary30s timeout;
+no unique outage cause or new database loss is inferred. Preserve the release
+boundary separately: .67 is requested, but another verified existing release
+cannot silently replace it, and a dedicated benchmark host is a proposal,
+not part of the PostgreSQL carry mechanism. The PR251/.20 comparison is now
+complete in the existing migration plan's release decision brief. PR251 adds
+no production API/schema/browser-source changes against live master .66;
+its 91 changed paths are tooling/tests/docs/.67 metadata. The frozen first
+same-.58-image control failed three p95 comparisons; actual old/current and
+final-image qualification did not run. No public .66 artifact is established;
+published .60 retains the inherited holds and lacks later dependency fixes.
+Dedicated hardware is not a coded requirement. Continue diagnosis from
+retained evidence and existing resources without requiring new credentials
+or paid-host approval. No release, campaign, source write,
+deployment, final carry or customer-production change was performed.
+
+### Source tenant expiration confirmed (2026-11-02 UTC)
+
+Actual ARM now returns `AADSTS5000229` for tenant 09 expiration, despite
+cached subscription state Enabled. The active registry role is unchanged,
+not proof that source directory access remains usable. No alternate account,
+login, privilege change or source mutation was attempted.
+Fresh read-only data-plane recovery now PASS in
+`rollover-after-expiry-20261102T1259169094310Z`: both full network-isolated
+restores, nine tables each, zero invalid indexes/unvalidated constraints;
+30 verified checksums and 22 protected artifacts. All eight non-log table
+fingerprints per estate exactly match October30. Only RequestLog differs.
+Metadata is explicitly the retained October30 baseline. No plaintext dumps
+or restore containers remain.
+The first wrapper's stale-TOC collision remains FAILED in
+`rollover-after-expiry-20261102T1245358536637Z`; its completed encrypted dev
+archive was reused, not dumped again. Ten actual metadata-copy cases, three
+estate-selector cases and encryption/corruption self-test pass after RED.
+Earlier recovery points are untouched. Source HTTP requests timed out and
+are not treated as healthy; tenant10 actual ARM still verifies both servers
+Ready and no target app or role cutover. Release #251 remains draft/unadmitted,
+and the unavailable
+authorization response did not authorize paid qualification infrastructure.
+Post-expiry consolidated checkpoint `snapshot-20261102T1311214885406Z`
+verifies 147 checksums, 48 protected byte roundtrips, 21 protected JSON checks
+and 1,318 browser archive entries. It binds the separate fresh source package's
+checksums/outcome/provenance and preserves the updated recovery tools.
+Both full-history Git bundles verify. Earlier snapshots are unchanged.
+
+### Local browser acceptance continuation (2026-11-02 UTC)
+
+The isolated exact-candidate browser worktree now passes 319 seeded PostgreSQL
+production-preview tests with 13 visual opt-out skips; those 13 comparisons
+also pass separately after explicit visual opt-in without baseline writes.
+Sixteen new numeric-control cases pass persisted admin readback, reload and
+lower/upper rejection checks. Runtime registry inventory corrects the earlier
+manual count to 38 definitions: 20 boolean, 2 enum, 16 numeric. Bulk failure
+CSV download content is now asserted, not merely its button's existence.
+The combined all-opt-ins run passes 348 tests with zero skips, failures or
+flaky cases in 748.09 seconds, without baseline writes. These are owned
+local fixtures, not tenant-10 deployment or release admission.
+PR #251 remains draft at `abdef720`, with qualification skipped.
+New immutable recovery snapshot `snapshot-20261102T1237406669573Z` verifies
+140 checksums, 48 protected byte roundtrips, 21 protected JSON checks and
+1,318 protected browser archive entries. It retains both full-history Git
+bundles, browser source/evidence, all six source replay attempts, both Azure
+transfer trials and helper teardown proof. Local browser servers/database
+are removed and their three ports released; prior snapshots are untouched.
+See [the execution plan](docs/TENANT_10_MIGRATION_EXECUTION_2026_10_30.md).
+
+### Both actual Azure full-source trials passed (2026-11-01 UTC)
+
+Complete dev and canary sources were copied read-only into GUID-owned
+disposable databases on the existing next servers. Both workers Succeeded
+with nine-table fidelity and identical source/target manifest hashes.
+Dev dumped 761,016,535 bytes; canary 37,988,116 bytes. Canary's coordinator
+measured 202.61 seconds through evidence validation. Both exact jobs and
+disposable databases are absent, retained logs are protected-only, and no
+target SCIM application exists. No serving app, final carry, source routing
+change or role cutover has occurred.
+
+The earlier dev wrapper failed on JSONL framing after its worker succeeded.
+Independent corrected validation of its protected log and provider cleanup
+readbacks established the result; the original false-negative is preserved
+in an adaptation receipt. Dev was not repeated. Canary ran only once with
+the corrected coordinator. Eight strict manifest cases, six ownership/error/
+cleanup lifecycle cases, four changed private parsers and 27-document
+freshness pass. Snapshot inventory is recorded in the private integrity
+receipt. Follow [the execution plan](docs/TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+for actual target runtime/HTTP/browser gates and the unchanged release hold.
+
+### Pending tenant 10 migration (2026-10-31 UTC)
+
+Follow [the migration execution plan](docs/TENANT_10_MIGRATION_EXECUTION_2026_10_30.md).
+Tenant 09 remains active; tenant 10 is next; permanent customer production
+is excluded. Target account/permissions, two resource groups, deployment
+identity and its narrow effective directory grant are verified. Three retained
+auth-proof applications acquired real tokens, with actual v1 issuer/client/
+audience/subject metadata verified and saved privately. Eastus2 B1ms, explicit
+zone-1 B1ms and both B2s allocations failed. The next estates now select
+Central US/B1ms under fresh server names; both are Ready with PostgreSQL 17,
+all four extensions and independent actual-location readbacks.
+Empty generic inventory did not permit old-name cross-region reuse. A direct
+absence guard passed six RED/GREEN decisions; previous credential records
+remain intact and new backups are scoped by server name. No actual source
+data carry or app deployment has occurred. A disposable Azure copy trial
+passed after correcting CLI syntax, private logging-extension
+availability, asynchronous provider cleanup and SQL argument expansion.
+All 2,000 UUID/content rows, a singleton, four extensions and exact cleanup
+passed in Azure. Both real-source read-only connectivity probes also passed.
+Five absent-app decisions,
+immutable-image/preflight checks and 24 safety assertions pass after RED.
+Cross-region database latency remains an acceptance requirement. The source-shaped VNet,
+three subnets, shared Consumption environment and Log Analytics are deployed
+and actual readiness/topology readbacks passed. Six providers are registered.
+
+Focused registry, cutover, copy-safety, credential, directory and proof-metadata
+tests pass. The compiled environment profile regression passed after RED.
+Focused consolidation passed: 30-script parser, 27-document freshness,
+whitespace and 15/15 registry controls. Five private-provisioning cases remain GREEN.
+Three real PostgreSQL
+snapshot/fidelity/race cases passed separately.
+Source recoveries remain preserved; new target bootstrap material is separately
+DPAPI protected and roundtrip verified under the capturing Windows user.
+The consolidated immutable target snapshot retains 73 checksums and eight
+protected JSON roundtrips, including current registry, old/new allocation
+records, actual trial/connectivity receipts, working source, four session
+helpers, patch and verified base Git bundle. Earlier source/target snapshots
+remain untouched; independent off-device recovery is not proved.
+The requested 0.55.67 candidate remains draft/unadmitted. The synthetic Azure
+trial is complete; full pipeline, full source/schema/credential acceptance, measured browser acceptance,
+write freeze and final cutover remain
+pending. Do not run source-default AutoCanary or infer off-device recovery.
+
+### Replay and qualification continuation (2026-11-01 UTC)
+
+The initial isolated full dev restore stopped before Prisma on a stored/current
+checksum difference for `20260416025138_add_requestlog_perf_indexes`. Failure
+logs are protected and owned scratch was cleaned. The test-only probe now
+records a matching immutable candidate-ancestor variant explicitly, rejects
+unknown hashes/Git failures, and preserves every original migration row.
+Dev replay now passes with all original data/IDs and migration rows preserved,
+one pending snapshot-revision migration applied, and 24 retained envelopes
+authenticated/revealed under original keys. Nine provenance/complete-diagnostic
+controls pass after meaningful RED for an incomplete/all-failed tally.
+
+The canary investigation identifies all four failures as inactive credentials
+on one test endpoint. The actual original/candidate admin controllers preserve
+the same explicit archived `retained:false` response, reason and error audit;
+connection setup selects active credentials only. The revised faithful-replay
+gate requires identical original/candidate archive IDs, strictly inactive
+failure records and successful active retained authentication, rejecting any
+active/new failure or all-failed corpus. No archive is repaired or omitted.
+
+Both full local replays now pass, including empty strict Prisma schema-model
+diffs and original data/ID/history preservation. Dev verifies 24 envelopes
+(17 active), canary six active envelopes and four explicit preserved archive
+failures. Fourteen focused controls and both actual controller fixture cases
+pass. Exact owned containers/scratch were cleaned. This clears the local
+canary false block without claiming the four archives became decryptable.
+Actual target Azure HTTP/browser acceptance and release admission remain pending.
+
+PR #251 remains OPEN/DRAFT at `abdef720`; diagnose/profile/qualify are skipped.
+Operator-unavailable input does not authorize spending or a new campaign.
+Prepared a public indicative Dedicated Host option: Central US
+`Dadsv5_Type1`, USD 7.17/hour host-only. Quotas, allocation, all-in cost,
+guest/physical observability, owner and prospective protocol remain unapproved
+or unverified. Azure pricing MCP initialization failed with shared-cache
+`EBUSY`; official public pricing API succeeded without modifying that cache.
+No serving deployment, source carry, role cutover or paid runner allocation.
+Latest consolidation passes 35 PowerShell parsers, Node syntax, nine focused
+tests, 27-document freshness, static infrastructure C1/C2/C3 and whitespace.
+The new immutable snapshot includes all four failed/partial replay attempts,
+protected source comparison diagnostics, current working source and eight
+session tools. Its exact inventory is in the private latest-snapshot receipt;
+earlier immutable snapshots remain unchanged. These are not full application
+or target Azure acceptance gates.
+The later continuation adds lifecycle diagnosis and a complete successful
+two-estate replay with strict model diffs. The new immutable snapshot `snapshot-20261101T0604363097526Z` includes all six
+attempts and the actual archived-controller contract helper/receipt, with
+122 checksums, 44 protected byte roundtrips and 20 protected JSON checks.
+The runner authorization form again returned operator-unavailable text for
+owner, authorization and limits. No numeric ceiling or owner was approved;
+the safe no-provisioning disposition preserves the release hold.
+
+| Date | Summary |
+|---|---|
+| 2026-11-01 UTC | Dev full replay passes; prove four canary envelope failures also occur in the exact source image, add nine strict provenance/diagnostic controls and preserve release/canary holds with no-provisioning public runner estimate. |
 
 ### Current Hono reviewed-master integration (2026-10-30)
 

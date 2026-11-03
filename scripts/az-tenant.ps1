@@ -36,9 +36,11 @@
     env var back into your shell - dot-source it instead.
 #>
 
+. (Join-Path $PSScriptRoot 'scim-estates.ps1')
+
 function Get-ScimTenantMap {
     <#
-        Single source of truth for every tenant.
+        Resolve every tenant from the estate registry, the single source of truth.
 
         Every entry carries BOTH the human-readable NAME and the machine ID for
         the tenant and the subscription, plus the deployment service principal's
@@ -61,60 +63,37 @@ function Get-ScimTenantMap {
         by name is ambiguous and would silently route a deploy at the wrong
         tenant, so always resolve and select by ID.
     #>
-    $credRoot = Join-Path $HOME '.scimserver-deploy'
-    [ordered]@{
-        proviam09 = @{
-            Key            = 'proviam09'
-            Name           = 'ProvIAM 09 (ACTIVE - dev + canary prod)'
-            TenantName     = 'Provisioning IAM Team 09'
-            TenantDomain   = 'proviamtest09.onmicrosoft.com'
-            Tenant         = '9751e42f-78f3-42f4-8b8a-6e73845aceae'
-            Subscription   = 'ProvIAM_Subscription'
-            SubscriptionId = '8cb58fd6-cf6f-4334-9fe0-3b12f93a6596'
-            ConfigDir      = Join-Path $HOME '.azure-proviam09'
-            UserConfigDir  = Join-Path $HOME '.azure-proviam09-user'
-            CredFile       = Join-Path $credRoot 'proviam09.json'
-            SpName         = 'scimserver-deploy-proviam09'
-            SpAppId        = 'd36c0c84-09b8-4700-b07a-0a2b7605c292'
-            Scopes         = @('scimserver-dev', 'scimserver-prod')
-            Estates        = [ordered]@{ 'scimserver-dev' = 'scimserver-dev'; 'scimserver' = 'scimserver-prod' }
-            Status         = 'active'
-        }
-        proviam = @{
-            Key            = 'proviam'
-            Name           = 'ProvIAM 08 (RETIRING - kept intact, read-only)'
-            TenantName     = 'Provisioning IAM Team 08'
-            TenantDomain   = 'proviamtest08.onmicrosoft.com'
-            Tenant         = 'f08e6aff-ca0f-4f11-81fa-1ffd43323373'
-            Subscription   = 'ProvIAM_Subscription'
-            SubscriptionId = '5738ea6a-533b-4c0d-a18a-d322f2094475'
-            ConfigDir      = Join-Path $HOME '.azure-proviam'
-            UserConfigDir  = Join-Path $HOME '.azure-proviam-user'
-            CredFile       = Join-Path $credRoot 'proviam.json'
-            SpName         = 'scimserver-deploy-proviam'
-            SpAppId        = 'ef8921f1-653d-4cc8-af08-b695746e8a3f'
-            Scopes         = @('scimserver-dev', 'scimserver-prod')
-            Estates        = [ordered]@{ 'scimserver-dev' = 'scimserver-dev'; 'scimserver' = 'scimserver-prod' }
-            Status         = 'retiring'
-        }
-        anandsa = @{
-            Key            = 'anandsa'
-            Name           = 'AnandSa (customer-facing prod / calmsand - DO NOT DISTURB)'
-            TenantName     = 'AnandSa-Test-150 directory'
-            TenantDomain   = '(not captured - deployment SP has no directory read)'
-            Tenant         = '9de357c6-4488-4a8d-bd2f-14696f1af950'
-            Subscription   = 'AnandSa-Test-150'
-            SubscriptionId = 'e299a87a-9e41-4f3e-b17f-64cd123758a0'
-            ConfigDir      = Join-Path $HOME '.azure-anandsa'
-            UserConfigDir  = Join-Path $HOME '.azure-anandsa-user'
-            CredFile       = Join-Path $credRoot 'anandsa.json'
-            SpName         = 'scimserver-deploy-anandsa'
-            SpAppId        = 'b5bb52e6-f16b-4fc0-9c9f-c752e7174467'
-            Scopes         = @('scimserver-rg-prod')
-            Estates        = [ordered]@{ 'scimserver-prod' = 'scimserver-rg-prod' }
-            Status         = 'permanent'
+    [CmdletBinding()]
+    param([string]$Path)
+    $registry = Get-ScimEstateRegistry -Path $Path
+    $map = [ordered]@{}
+    foreach ($tenant in $registry.tenants) {
+        $estates = @($registry.estates | Where-Object tenantKey -eq $tenant.key)
+        $apps = [ordered]@{}
+        foreach ($estate in $estates) { $apps[$estate.appName] = $estate.resourceGroup }
+        $scopes = @($estates | ForEach-Object {
+            $_.resourceGroup
+            if ($_.environmentResourceGroup) { $_.environmentResourceGroup }
+        } | Sort-Object -Unique)
+        $map[$tenant.key] = @{
+            Key            = $tenant.key
+            Name           = "$($tenant.tenantName) [$($tenant.role)]"
+            TenantName     = $tenant.tenantName
+            TenantDomain   = $tenant.tenantDomain
+            Tenant         = $tenant.tenantId
+            Subscription   = $tenant.subscriptionName
+            SubscriptionId = $tenant.subscriptionId
+            ConfigDir      = $tenant.ConfigDirPath
+            UserConfigDir  = $tenant.UserConfigDirPath
+            CredFile       = $tenant.CredFilePath
+            SpName         = $tenant.deploySpName
+            SpAppId        = $tenant.deploySpAppId
+            Scopes         = $scopes
+            Estates        = $apps
+            Status         = $tenant.role
         }
     }
+    return $map
 }
 
 function Get-ScimPortalUrl {

@@ -35,7 +35,26 @@ SCIMServer is a standard Docker container running on Azure Container Apps with P
 2. **Choose an available region** within that cloud
 3. **(Optional)** Mirror the container image to a registry accessible from that cloud
 
-Everything else - the Bicep templates, deploy script, VNet isolation, and PostgreSQL configuration - works identically.
+The application configuration remains the same, but infrastructure templates
+must be validated against the selected cloud's actual service, region and API
+availability before deployment.
+
+**Environment template review, 2026-10-31 UTC:** the shared
+[environment template](../infra/containerapp-env.bicep) explicitly declares the
+`Consumption` workload profile for its delegated infrastructure subnet and
+retains Log Analytics. Its compiled-resource check and actual deployment were
+verified in public Azure during
+[tenant-10 preparation](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md), not in a
+government or sovereign cloud. Confirm that the selected cloud/region supports
+this profile, delegation and template API version, then validate the deployment
+there. Do not treat the public-Azure result as sovereign-cloud admission.
+
+The shared PostgreSQL provisioning path now uses a private temporary secure
+parameter file and non-secret ARM outputs, constructing the encoded URI locally.
+Keep the chosen cloud's actual server FQDN from its outputs; do not substitute a
+public-Azure database suffix. Optional availability-zone placement must use
+that subscription's supported zones. Private transport tests are not proof of
+allocation or deployment in any sovereign cloud.
 
 ---
 
