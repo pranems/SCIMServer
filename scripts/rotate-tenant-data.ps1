@@ -238,8 +238,13 @@ Say ("target password has an alternate percent-decoded form : " + ($dstPwAlt -ne
 # --------------------------------------------------------------------------
 $connectionSetup = @'
 set -eu
-S="host=$SRC_HOST port=$SRC_PORT dbname=$SRC_DB user=$SRC_USER sslmode=$SRC_SSL"
-D="host=$DST_HOST port=$DST_PORT dbname=$DST_DB user=$DST_USER sslmode=$DST_SSL"
+pg_value() {
+  printf "'"
+  printf '%s' "$1" | sed "s/['\\\\]/\\\\&/g"
+  printf "'"
+}
+S="host=$(pg_value "$SRC_HOST") port=$(pg_value "$SRC_PORT") dbname=$(pg_value "$SRC_DB") user=$(pg_value "$SRC_USER") sslmode=$(pg_value "$SRC_SSL")"
+D="host=$(pg_value "$DST_HOST") port=$(pg_value "$DST_PORT") dbname=$(pg_value "$DST_DB") user=$(pg_value "$DST_USER") sslmode=$(pg_value "$DST_SSL")"
 # Pick whichever password form authenticates. See the note in the PowerShell
 # caller: a password taken out of a postgresql:// URI may be the raw string or
 # the percent-decoded one, and the two estates need opposite answers.

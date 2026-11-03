@@ -70,8 +70,11 @@ with encoded whitespace, quotes and backslashes, followed by source snapshot
 release, complete manifest fidelity and concurrent-write isolation. This is
 synthetic integration evidence, not a deployment or performance campaign.
 The step has a three-minute execution bound on the disposable hosted runner.
-The first hosted run of the new connection regression is expected to expose
-the third-review defect before production code is changed.
+Hosted `41674035838` reproduces the third-review target-identity assertion
+before production code changes. Shared worker setup now quotes every libpq
+value and escapes literal quotes/backslashes, rather than allowing a decoded
+database name to override validated connection parameters. Actual corrected
+PostgreSQL validation and exact-tip publication/review remain required.
 
 PR #267 review corrections bind the target application's effective database
 host, port and database name before any suspension/restore; subscription

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Quote every worker libpq connection value and escape quotes/backslashes
+  without changing canonical identity parsing. Hosted41674035838 reproduces
+  actual target redirection before this fix. POSIX syntax and exact escaping
+  controls pass; real PostgreSQL GREEN and full corrected-tip gates/review
+  remain required. Shared setup covers both preflight and full copy.
 - Add actual parser-to-libpq database/login identity readback to the real
   PostgreSQL fixture and run that fixture in hosted validation. This is a
   RED-first regression for the third-review unquoted connection-parameter

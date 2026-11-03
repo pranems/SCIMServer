@@ -44,6 +44,17 @@ admit a release, prove the Azure image or replace operator visual approval.
 
 ## Tenant bootstrap must verify effects, not command labels (2026-10-31)
 
+Canonical identity comparison and downstream connection serialization are
+separate safety boundaries. A correctly decoded database name can still
+inject libpq parameters if interpolated unquoted after validation. Quote
+every discrete connection value with the destination library's grammar,
+including escaped quotes/backslashes. The regression must read the actual
+database/login identity through the production parser and worker, not merely
+compare parsed strings or stub a successful client. PR #267's third review
+and hosted `41674035838` establish this real assertion RED; the corrected
+serializer still requires hosted PostgreSQL GREEN. The existing hosted
+workflow now owns that independent real database check.
+
 Compare normalized database identities, not URI spellings: libpq treats
 zero-padded numeric ports as the same port, and percent-encoded database
 names must be decoded exactly once. Centralize that normalization in the

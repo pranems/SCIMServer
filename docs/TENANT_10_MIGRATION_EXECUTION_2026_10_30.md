@@ -11,6 +11,20 @@
 
 ### Third review: literal libpq connection parameters
 
+**Actual behavioral RED:** `f3ad6852` passes all 29 protected gates in
+970.8 seconds. Hosted `41674035838` then fails the intended real PostgreSQL
+assertion: `RED: TARGET libpq parameters redirected the validated
+database/login identity.` This is distinct from the earlier harness failures.
+The query executes successfully and reads a different target identity.
+
+The worker now quotes every host, port, database, login and SSL-mode value
+using libpq single-quoted parameter syntax, escaping literal quotes and
+backslashes. Canonical parsing remains unchanged. One serializer in the
+shared setup protects both preflight and full-copy connections. The complete
+worker passes POSIX syntax validation, and an exact transformation control
+preserves spaces and escapes quotes/backslashes. Real PostgreSQL GREEN and
+corrected-tip publication/review are still required.
+
 Published `7f383242` passes all 29 protected gates in 1,144.8 seconds and
 hosted run `41660995714`, including image smoke and Trivy; CodeQL and freshness
 also pass. The exact-tip independent review confirms the two second-review
@@ -90,8 +104,13 @@ are explicitly distinguished from identity assertion failures, and the hosted
 step has a three-minute bound rather than waiting indefinitely for Docker.
 The next actual database run must confirm the assertion failure.
 
+That subsequent run is `41674035838`: the query now executes and the intended
+target-identity assertion is RED. Thus the SQL harness correction is confirmed.
+It does not establish that the production connection correction is GREEN.
+
 | Issue | Type / severity | Mechanism and disposition | Detection / earliest suitable check |
 |---|---|---|---|
+| Decoded database name injects libpq parameters | Connection identity / High | Correct canonical decoding was followed by unquoted interpolation. Quote every downstream value and escape quotes/backslashes in shared worker setup; real GREEN pending | Independent review, then actual target-identity RED in hosted41674035838; parser-to-worker real identity readback is the earliest suitable integration check |
 | Initial GraphQL thread query lacked a closing brace | Tooling / Low | Metadata lookup failed before any thread change; corrected multiline query succeeded and both addressed threads were resolved | GitHub parser; the same query execution |
 | Connection fixture used expression splatting | Harness / Low | `@environment + ...` is not a PowerShell expression; corrected to `$environment + ...` before any database run | PowerShell parser; local syntax check |
 | Identity query used `current_user()` | Test correctness / Medium | SQL keyword is not callable; remove parentheses and keep pre-readback errors distinct from identity mismatch. Actual query execution pending | Hosted real PostgreSQL; an earlier real SQL smoke was unavailable while local Docker was unresponsive |
