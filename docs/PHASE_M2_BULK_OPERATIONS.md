@@ -1,8 +1,44 @@
 # Phase M2 - Bulk Operations UI
 
-> **Date:** 2026-05-15 - **Version:** 0.51.0-alpha.2 - **Predecessor:** v0.51.0-alpha.1 (Phase M1 SCIM Workbench)
+> **Original release:** 2026-05-15 - **Version:** 0.51.0-alpha.2 - **Predecessor:** v0.51.0-alpha.1 (Phase M1 SCIM Workbench)
 > **Origin:** [docs/UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md](UI_NEXT_GAPS_LATERAL_ANALYSIS_2026.md) S4.3
 > **Scope:** Frontend-only. New per-endpoint Bulk tab + 3 pure modules + 1 free-form mutation hook + the M1-deferred "Save as live-test" emitter wired to Workbench history rows. New live section `9z-AH` adds Bulk UI contract.
+
+---
+
+## Current layout repair: tested, not yet deployed
+
+Tenant 10 browser acceptance against 0.55.67 exposed result cells overflowing
+the card at a 900 px viewport. Long absolute resource locations expanded CSS
+Grid's `1fr` tracks because their minimum size was content-driven. This was
+an unintended defect; the failure screenshot was inspected and no visual
+baseline was regenerated.
+
+The repair keeps the identifier/status tracks at 80 px and bounds both text
+tracks with `minmax(0, 1fr)`. Result identifiers, actual locations and actual
+error details use [CopyableField](../web/src/components/primitives/CopyableField.tsx)
+with truncation. Full values remain available through tooltips and copying;
+missing locations and empty details retain non-copyable placeholders.
+Bulk request/response semantics, success/failure badges, CSV failure export
+and retry behavior are unchanged.
+
+| Claim | Verification |
+|---|---|
+| Complete DOM values and copy affordances | Component regression observed RED, then 10/10 component tests passed |
+| Bounded layout independent of hostname | Deterministic long URL/error fixture fails on unchanged Azure image, then passes on built loopback frontend at 1440 px and 900 px |
+| Actual truncation, not CSS presence alone | Browser asserts positive client width and scrollWidth greater than clientWidth on each truncation element |
+| Full values remain copyable | Browser reads clipboard and compares the entire location and error detail |
+| Execution and cleanup still work | Five bulk/manual browser flows pass with migrated-dev backend; real creation, duplicate, retry, CSV content and owned-fixture deletion remain asserted |
+
+The passing frontend is an owned loopback production build, not a repaired
+Azure deployment. Reviewed publication, a new immutable image and complete
+actual dev/canary acceptance remain mandatory. Performance remains unqualified
+under the migration-only exception; customer production is excluded.
+
+Self-improvement applied: deterministic long-value coverage catches the
+deployment-hostname gap before another migration. Design disposition accepted:
+reuse the existing primitive and keep rendering inside the cohesive Bulk tab;
+no new domain service, strategy or dependency is justified.
 
 ---
 

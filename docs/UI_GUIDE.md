@@ -273,6 +273,14 @@ These changes are being verified locally in Docker, not yet deployed.
 
 The cap is **1000 operations and a 1 MB payload**. Before submitting you get a preview of the first ten operations and a **Copy full envelope as JSON** button, so you can inspect exactly what will be sent. Afterwards, **failure rows are downloadable as CSV** carrying the per-operation `scimType` and `detail` - fix that file and re-submit it rather than re-deriving which rows failed.
 
+**Tested but unreleased tenant 10 layout repair:** result identifiers, resource
+locations and error details remain bounded at wide and narrow viewports.
+Long values use ellipsis, reveal their full text on hover and copy the entire
+value rather than the visible abbreviation. The CSV-input screenshot above
+does not illustrate this updated result layout. The repair has passed built
+loopback frontend tests with the migrated-dev backend; it is not yet a
+validated Azure deployment. See [bulk layout repair evidence](PHASE_M2_BULK_OPERATIONS.md#current-layout-repair-tested-not-yet-deployed).
+
 **Resource types** lists what this endpoint serves, creates custom ones beyond User and Group, and exposes the related discovery/enforcement settings in a collapsed pane above the inventory. An **Effective combined schemas** section flattens each type's core and extension attribute paths with their type, required, cardinality, and mutability characteristics.
 
 ![Resource types](screenshots/prod-12-endpoint-resource-types.png)

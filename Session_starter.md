@@ -1,5 +1,30 @@
 ## SCIMServer - Condensed Session Memory
 
+**Current tenant 10 checkpoint:** PR270 merged normally as6102aff4 and its
+authoritative scanned image is deployed on dev. Both actual database carries
+passed full nine-table fidelity/schema checks. Available-data authorization
+supersedes waiting for source freeze; performance remains unqualified.
+Dev environment repair has actual-AST RED/GREEN and complete Azure readback.
+Live acceptance reports1,841 passes/zero failures, including four explicitly
+skipped retired-API placeholders. Browser acceptance has347 passes/one
+unintended Bulk layout failure, zero skips/flakes. Canary app remains absent.
+
+Separate repair branch `fix/tenant10-bulk-result-overflow-20261103` uses
+bounded fractional grid tracks and existing CopyableField truncation.
+Deterministic long values reproduce RED on unchanged Azure image. Ten
+component tests, five built-loopback browser flows with migrated-dev backend,
+strict added-spec compilation and production build pass. Actual1440/900px
+bounds, clipping and complete clipboard values are asserted; failed and GREEN
+screenshots were inspected. No baseline regeneration. Virtual HEAD compiler
+comparison verifies unchanged66 errors/two production errors, no additions.
+Updated whole-web coverage passes1,662/125 files, with statements83.06%,
+branches75.86%, functions75.53%, lines85.74%; all size budgets pass.
+Web ESLint remains N/A because no config exists, not a passing lint run.
+Review, corrected-image publication,
+full actual target acceptance, operator visual confirmation and cutover remain
+pending. Customer production is untouched. Older no-app/source-freeze/pending
+release statements below are preparation history, not the current state.
+
 **2026-11-03 authorized migration release:** the operator explicitly authorized
 `T10-0.55.67-PERF-EXCEPTION-2026-11-03` for this 0.55.67 tenant 10 dev/canary
 migration only. Performance remains unqualified; all other security,

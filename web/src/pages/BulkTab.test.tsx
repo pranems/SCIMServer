@@ -170,6 +170,35 @@ describe('BulkTab (Phase M2)', () => {
 
   // ─── 7. Failure-rows-as-CSV download ───────────────────────────────
 
+  it('preserves complete long result values in copyable fields', async () => {
+    const location = `https://${'tenant'.repeat(20)}.example.invalid/Users/u1`;
+    const detail = `A resource with userName '${'resource'.repeat(40)}' already exists.`;
+    mockMutateAsync.mockResolvedValueOnce({
+      status: 200,
+      durationMs: 100,
+      body: {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkResponse'],
+        Operations: [
+          { bulkId: 'row-1', status: '201', location },
+          { bulkId: 'row-2', status: '409', response: { scimType: 'uniqueness', detail } },
+        ],
+      },
+    });
+    renderWithProviders(<BulkTab endpointId="ep-1" />);
+    const input = screen.getByTestId('bulk-csv-input');
+    Object.defineProperty(input, 'files', { value: [csvFile(sampleCsv)] });
+    fireEvent.change(input);
+    await waitFor(() => expect(screen.getByTestId('bulk-preview')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('bulk-submit'));
+    await waitFor(() => expect(screen.getByTestId('bulk-result')).toBeInTheDocument());
+
+    expect(screen.getByTestId('bulk-result-location-row-1')).toHaveTextContent(location);
+    expect(screen.getByTestId('bulk-result-detail-row-2')).toHaveTextContent(detail);
+    expect(screen.getByTestId('bulk-result-id-row-1')).toHaveTextContent('row-1');
+    expect(screen.getByTestId('bulk-result-location-row-1-copy-button')).toBeInTheDocument();
+    expect(screen.getByTestId('bulk-result-detail-row-2-copy-button')).toBeInTheDocument();
+  });
+
   it('Download failure rows triggers CSV with detail + scimType columns', async () => {
     mockMutateAsync.mockResolvedValueOnce({
       status: 200,

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tenant 10 Bulk result layout repair
+
+- Fix long resource locations and error details widening the Bulk result
+  grid at narrow viewports. Bound its flexible tracks with minmax(0,1fr)
+  and reuse CopyableField for clipped, tooltip-accessible, full-value copying.
+  Missing locations and empty details do not expose meaningless copy buttons.
+- Preserve actual bulk execution, duplicate rejection, failure CSV content,
+  corrected-row retry and owned-fixture cleanup. Add a deterministic
+  long-value regression with 1440 px / 900 px bounds, actual truncation and exact
+  clipboard checks, alongside bulk/manual execution coverage.
+- RED: actual Azure browser run 347/348, no skips/flakes, with one measured
+  layout failure; deterministic long-value case also fails on unchanged
+  Azure image. GREEN: Bulk component 9 to 10 tests, five built-loopback
+  browser flows, production build and strict added-spec type check.
+  Updated full web coverage passes 1,662 tests across 125 files (previously
+  1,661): statements 83.06%, branches 75.86%, functions 75.53%, lines 85.74%.
+  Configured floors pass; branch coverage was previously 75.89%.
+  Reviewed immutable-image publication remains pending. API unit/E2E
+  remain unchanged by this frontend-only delta; no
+  new API run count is claimed here.
+- Full web tsc is not green: executable virtual-HEAD comparison verifies
+  the same 66 diagnostics/two production diagnostics and zero added errors.
+  No visual baseline was regenerated. Version remains 0.55.67 for the
+  operator-authorized migration repair; performance remains unqualified
+  and customer production must not change.
+- Self-improvement applied: long-value fixtures catch environment-dependent
+  grid sizing before deployment. Design disposition accepted: existing
+  copy/truncate composition; no speculative service or strategy extraction.
+
 ### 0.55.67 tenant 10 migration release under a scoped exception
 
 - Record explicit operator authorization

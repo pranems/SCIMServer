@@ -14,6 +14,30 @@
 
 ---
 
+## Long-value fixtures must precede deployment qualification (2026-11-03)
+
+The tenant 10 dev run measured a Bulk layout defect even though an earlier
+loopback browser run had passed the same bounds assertion. The assertion
+was meaningful; the short local URL did not exercise the dangerous input.
+Long Azure resource locations let CSS Grid's `1fr` tracks retain their
+intrinsic minimum width and expand beyond the result card at 900 px.
+
+Use `minmax(0, 1fr)` for bounded flexible text tracks and compose the existing
+copy/truncate primitive. Do not rely on a particular deployment hostname to
+exercise overflow. A deterministic browser fixture should supply long
+absolute URLs and long unbroken error values, assert every cell's real bounds
+at both 1440 px and 900 px, measure actual truncation, and verify that copying
+still returns the full value. Keep real API execution/duplicate/retry checks
+separate from the fixture-driven layout check.
+
+This pattern is applied in
+[bulk-and-manual-execution.spec.ts](../../web/e2e/bulk-and-manual-execution.spec.ts);
+the issue and RED/GREEN provenance are in the
+[migration execution record](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md).
+The failure was unintended; failure and GREEN screenshots were inspected,
+and no baseline was rewritten. Loopback GREEN still does not prove the
+corrected Azure image or replace operator visual approval.
+
 ## Execute the control inventory before claiming coverage (2026-11-02)
 
 **Applied in:** [tenant 10 browser acceptance](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md).

@@ -51,7 +51,7 @@ import {
 } from '../utils/bulk-builder';
 import { toCsv, triggerCsvDownload } from '../utils/csv-export';
 import { ScimErrorMessage } from '../components/primitives/ScimErrorMessage';
-import { CopyableJsonBlock, CopyJsonButton } from '../components/primitives';
+import { CopyableField, CopyableJsonBlock, CopyJsonButton } from '../components/primitives';
 
 type BulkResource = 'Users' | 'Groups';
 
@@ -89,7 +89,7 @@ const useStyles = makeStyles({
   },
   resultRow: {
     display: 'grid',
-    gridTemplateColumns: '80px 80px 1fr 1fr',
+    gridTemplateColumns: '80px 80px minmax(0, 1fr) minmax(0, 1fr)',
     columnGap: '12px',
     padding: '6px 8px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
@@ -390,14 +390,26 @@ export const BulkTab: React.FC<BulkTabProps> = ({ endpointId }) => {
                 className={classes.resultRow}
                 data-testid={`bulk-result-row-${op.bulkId ?? 'unknown'}`}
               >
-                <Text style={{ fontFamily: tokens.fontFamilyMonospace }}>{op.bulkId ?? '-'}</Text>
+                <CopyableField
+                  value={op.bulkId ?? '-'}
+                  monospace
+                  truncate
+                  data-testid={`bulk-result-id-${op.bulkId ?? 'unknown'}`}
+                />
                 <Badge appearance="filled" color={statusBadgeColor(op.status)} size="small">
                   {op.status ?? '-'}
                 </Badge>
-                <Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>
-                  {op.location ?? '-'}
-                </Caption1>
-                <Caption1>{op.response?.detail ?? ''}</Caption1>
+                {op.location ? <CopyableField
+                  value={op.location}
+                  monospace
+                  truncate
+                  data-testid={`bulk-result-location-${op.bulkId ?? 'unknown'}`}
+                /> : <Caption1>-</Caption1>}
+                {op.response?.detail ? <CopyableField
+                  value={op.response.detail}
+                  truncate
+                  data-testid={`bulk-result-detail-${op.bulkId ?? 'unknown'}`}
+                /> : <Caption1 />}
               </div>
             ))}
           </div>
