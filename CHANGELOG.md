@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.67 prospective precision feasibility (2026-11-03, not admission)
+
+- Implement a bounded offline, hash-bound quantile-rank sensitivity report
+  over retained marked diagnostic blocks. Preserve all original operation/
+  percentile metrics, nearest-rank estimators, quotas, image identity and
+  evidence. Always report UNRESOLVED; no qualification or resource allocation.
+- Document measured drift, correlation, CPU-counter limits, all24 diagnostic
+  ratios, explicit conditional-IID assumptions, simultaneous-error accounting
+  and finite-budget counterexamples. Retained data do not establish a sound
+  replacement admission rule; freeze exact prerequisites rather than guess
+  a sample increase, weaken10% or retry unchanged.
+- Focused precision/stability contracts: 8 to21 PASS after semantic RED,
+  including bounded-file, descriptor-replacement and original-estimator
+  compatibility controls. Combined original performance/stability/precision:
+  initial 81/81 PASS, zero skips/failures. Initial independent review: no
+  actionable defects. Final specification scrutiny clarified that the
+  retained 1.10 ceiling is inclusive; an exact-boundary/ties guard remains
+  non-admitting, and 298/299-draw individual-bound controls distinguish the
+  dependence limitation from conservative simultaneous error allocation.
+  Initial protected publication: 30/30 Validate gates PASS at69fd8e5c.
+  Final-tip publication/CI and existing application counts
+  and all other gate claims remain distinct.
+- No serving source, schema, browser, dependency, version, original protocol,
+  deployment or customer-production change.
+
 ### 0.55.67 bounded warmup diagnostic (2026-11-03, proposed)
 
 - Implement a non-admitting fixed 100/1000-cycle study over two current/current

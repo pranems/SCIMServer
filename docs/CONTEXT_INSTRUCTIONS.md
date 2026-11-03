@@ -9,6 +9,23 @@
 
 ## Active Delivery Process
 
+**2026-11-03 method-precision implementation:** actual warmup diagnostic
+41632439081 is complete, source196000e5/image18901aded3,0.55.67/Node24.22.2,
+non-admitting. Offline sensitivity now computes all12 original point ratios,
+conditional binomial quantile ranks and chronological drift/correlation
+without changing any original protocol or receipt. Conditional IID bounds
+are not valid confidence coverage for the correlated traces. No dependence
+model, power or fixed-budget tail sufficiency is established; no honest
+replacement admission code or new campaign follows. Frozen prerequisites
+and finite UNRESOLVED outcome are in ENDPOINT_SNAPSHOT_REVISION.md.
+Preserve .67/10%/0.5CPU/1GiB and failed evidence. #251 stays draft. Migration
+worktree, deployments and customer production untouched. Initial combined
+81/81 PASS, independent review no actionable defects; initial protected
+publication30/30 Validate gates PASS at69fd8e5c. Final scrutiny clarified
+the inclusive1.10 ceiling versus a true breach; a ties/boundary guard keeps
+all diagnostics non-admitting. Focused21/21 PASS. Final-tip protected
+publication and hosted CI remain separate pending evidence.
+
 **2026-11-03 bounded warmup study:** implemented locally, not executed on a
 Linux host. One exact checkout image, two traced same-image BAAB blocks,
 fixed100 then1000 warmups and1000 measured cycles, original0.5CPU/1GiB.

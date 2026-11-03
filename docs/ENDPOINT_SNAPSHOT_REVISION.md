@@ -7,6 +7,333 @@ Performance admission and the independent release gates remain open.
 
 ## Current-checkout image binding (2026-11-03, not released)
 
+### Prospective precision feasibility and release hold (2026-11-03)
+
+**Executive conclusion:** keep actual 0.55.67, the original 10% limit and
+0.5 CPU/1 GiB. The retained experiment does not justify a replacement
+qualification method. Implemented below is an **offline, non-admitting
+precision feasibility check**, not a new pass rule or permission to rerun.
+Neither longer fixed warmup nor a guessed sample increase is supported.
+Release admission, dev/canary deployment and customer production remain
+separate; customer production is outside this work.
+
+The operator authorized autonomous implementation, review and ordinary CI,
+not weaker evidence. A mathematical/model-identification blocker is not a
+request for another generic authorization. Stop performance allocation here
+until the specific prospective prerequisites below have been met. Do not
+make draft parent #251 ready, merge it or retry its original campaign.
+The migration worktree and its canonical execution plan are not edited.
+
+#### Evidence and its limits
+
+The successful diagnostic `41632439081` used actual synthetic source
+`196000e518464c4b185f13217e308740ff57a345` (parents `ff0b3a46` and
+`991a9ce0`) and one Linux/amd64 Docker image:
+`sha256:18901aded38abfabd53b0a045f765d84396af71c51fd9ad81cc5fe6645a3b648`.
+This is a local image ID, not a published registry manifest digest.
+All eight visits reported 0.55.67 / Node 24.22.2. The audited artifact
+contains 49,656 checked requests, 32,000 chronological measured values,
+66 functional and 200 privacy assertions per block, original quotas,
+no OOM and verified exact cleanup. These are independent diagnostic
+claims, not untraced performance admission.
+
+The original untraced qualification `41615647439` remains FAILED, with
+four first-block same-image failures; later blocks were not executed.
+Original protocol, raw files, historical failures and recovery packages
+are unchanged. The encrypted CurrentUser-DPAPI checkpoint's verified
+37,343,782-byte payload is local recovery, not off-device recovery.
+Actual diagnostic image bytes are not retained or claimed recoverable.
+
+| Observed fact | What it supports | What it cannot establish |
+|---|---|---|
+| 100 and 1000 warmups were sequential treatments on the same host | Describe each treatment and visit separately | A causal warmup benefit, equal host conditions or independent treatments |
+| Remove last/first 250-cycle-window p95 ratios after 1000 warmups were 1.3880, 1.2635, 1.6806, 0.7623 | Drift is operation- and visit-dependent, not simply one initial cold window | A universal discard point, stationary tail or converged warmup count |
+| Per-operation autocorrelations at lags 1, 2, 4, 8, 16, 32 ranged from -0.07320 to 0.08461 (100) and -0.06837 to 0.13429 (1000) | Reproducible descriptive correlation summaries | Independence, a mixing-time bound, effective sample size or a significance test |
+| App throttled-period fractions across visits were 0.97156 to 0.98728 | Quota enforcement was active under the original 50,000/100,000 microsecond policy | Per-request time lost or CPU throttling as the sole cause |
+| Of 21 inclusive p99-tail populated reads per role, counter increases were observed inside 16/21 and 21/21 spans (100), then 13/21 and 16/21 (1000) | Temporal association with whole-app CPU counters | Causality, exact quota phase at request start or absence of throttling in other spans |
+| Observer maximum gaps were 4.77 to 6.19 ms | Finite monitor coverage and a limitation for short requests | Exact boundaries or a complete request-specific throttle trace |
+| A 2000-value role p99 is rank 1980; a 250-value window p99 is rank 248 | Few observations determine the empirical tails | Twenty or two independent tail events, or precise population p99 in milliseconds |
+
+Kernel bandwidth control replenishes quota periodically and can throttle
+the whole group until replenishment [S1]. Fixed sequential add/read/remove/
+read timing can therefore interact with quota phase and previous operations.
+The counter trace is consistent with that hypothesis but does not identify
+it: period counters are not an observed absolute quota-phase origin, the
+observer perturbs a shared host, and background work shares the group.
+Do not phase-lock, insert sleeps, randomize operation order, remove early
+samples or divide out throttled time: those would change the original
+continuous closed-loop load/latency estimand.
+
+The same-image pooled ratios remain descriptive and unchanged:
+
+| Operation / percentile | 100 warmups | 1000 warmups | Conditional IID upper ratio, 1000 |
+|---|---:|---:|---:|
+| Add p50 | 1.008934 | 0.980246 | 1.005567 |
+| Add p95 | 0.972758 | 0.808043 | 1.450608 |
+| Add p99 | 0.820053 | 0.949129 | 1.643089 |
+| Populated read p50 | 1.001208 | 0.980255 | 0.997536 |
+| Populated read p95 | 1.071455 | 1.045163 | 1.507881 |
+| Populated read p99 | 1.463256 | 0.942619 | 3.614257 |
+| Remove p50 | 1.005056 | 0.982949 | 1.009400 |
+| Remove p95 | 0.941338 | 1.171626 | 2.485493 |
+| Remove p99 | 0.958980 | 1.063493 | 2.015135 |
+| Empty read p50 | 1.006477 | 0.979293 | 0.995574 |
+| Empty read p95 | 0.947884 | 0.985668 | 1.435750 |
+| Empty read p99 | 1.109268 | 0.996035 | 8.105010 |
+
+**The last column is deliberately NOT a confidence statement about these
+data.** It is an assumption-sensitivity calculation described next. Even
+the optimistic IID model produces broad tail ranges, not noninferiority.
+The small lag correlations do not validate that model [S2].
+
+#### Executable correction: test precision before designing admission
+
+[membership-precision.cjs](../scripts/performance/membership-precision.cjs)
+reads a source-bound protocol and one complete four-visit calibration block,
+with a fixed 4 MiB cap per input. It requires the explicit diagnostic and
+calibration markers, original quotas, uniform treatment, exact same image,
+version, complete samples and no OOM. It reports every operation/percentile,
+per-visit drift/correlations and conditional quantile ranks. It never writes
+`passed`, always emits `UNRESOLVED` and `admissionEligible: false`, and is not
+wired into a resource allocator or admission workflow.
+
+It hashes the once-read descriptor bytes it actually parses, never rereads
+paths for provenance, refuses overwrite and leaves all raw inputs untouched.
+This proves binding to those retained files, not a new audit of the actual
+historical image, cloud host or every privacy/cleanup receipt.
+
+**Conditional calculation, not adopted policy:** suppose observations really
+were independent identically distributed (IID) draws from stable positive
+latency distributions. For percentile probability `p`, the count below the
+population quantile has a binomial distribution `K ~ Binomial(n,p)` for a
+continuous distribution. Ties give conservative coverage for the corresponding
+generalized quantile. Choose the largest lower rank `l` with
+`Pr(K < l) <= a` and smallest upper rank `u` with `Pr(K >= u) <= a`.
+Unattainable endpoints are `null` (unbounded), not the sample minimum or
+maximum disguised as coverage. This is a binomial-tail calculation, not a
+normal approximation or bootstrap over correlated windows [S3].
+
+For a candidate ratio upper bound use `U_candidate / L_baseline`;
+for a lower bound use `L_candidate / U_baseline`. Overlapping individual
+confidence intervals are never evidence of noninferiority. All twelve
+original nearest-rank point ratios are preserved [S4].
+
+For an illustrative **simultaneous** family covering the entire original
+four-block decision, reserve family error 0.05 across 144 one-sided component
+quantile bounds: two A/A blocks each require 12 metrics x 4 endpoints, two
+A/B blocks each require 12 x 2 endpoints. Thus `a = 0.05/144`.
+The union bound does not require independence between metrics [S5], but
+each component's sampling assumptions still must hold. This conservative
+allocation is explicit, not a claim that Bonferroni is the unique necessary
+test. An intersection-union test can control a global all-metrics pass without
+the same simultaneous-interval allocation; it still needs valid component
+tests and does not solve dependence or tail precision. Even an individual
+95% finite upper bound at p99 needs 299 independent draws in the same
+sample-maximum counterexample, not the available two.
+
+At `n = 2000`, the conditional lower/upper ranks are 924/1077 (p50),
+1865/1932 (p95), 1963/1994 (p99). For example, treatment remove p95 has
+point ratio 1.171626 but conditional ratio range 0.476727 to 2.485493.
+That is not a 10% precision result, even before accounting for dependence.
+
+More importantly, without any within-visit dependence restriction, a valid
+counterexample makes all 1000 observations in a visit the same random
+value. Two visits then provide only two draws per role; a finite sample-max
+upper bound on a continuous p99 covers it with probability only
+`1 - 0.99^2 = 0.0199`. Under the illustrative allocation, merely making
+that upper bound finite needs
+`ceil(log(0.05/144)/log(0.99)) = 793` independent draws per role.
+**793 is not an estimated effective sample size, a recommended visit count,
+a sufficient sample size for 10% precision or proof that all methods fail.**
+It demonstrates why adding correlated cycles cannot provide a general
+distribution-free guarantee. Independence between visits is itself unproven.
+
+#### Alternatives and finite budgets
+
+| Option | Benefit | Cost or unresolved assumption | Disposition |
+|---|---|---|---|
+| Change warmup to 1000 | Already measured, easy implementation | Same-image add p95 0.808043 and remove p95 1.171626 remain outside reciprocal limits; treatments confounded | Reject as an admission correction |
+| Increase measured cycles to a fixed larger count | More raw tail values if a stable short-memory model is valid | No justified dependence bound, power or count; can repeatedly sample the same visit-level effect | Do not implement or allocate |
+| Per-window IID/bootstrap intervals | Cheap resampling | Windows are not independent; wrong sampling unit; no coverage proof | Reject |
+| Independent-visit or cluster bootstrap | Can preserve within-visit order | Only two visits per role here; cross-visit independence unproven; averaging visit quantiles changes the pooled-quantile estimand | Candidate research only, no admission code |
+| Prospective blocked comparison with valid quantile-ratio bounds | Direct 10% noninferiority question, controls order/time | Requires a justified cluster/dependence model, fixed sample size, calibrated error and power within budget | Preferred direction if its missing premises can be supplied |
+| Existing point thresholds with an unchanged rerun | No code work | Original failure unresolved, no new method or error protection | Forbidden |
+
+Measured diagnostic block wall times, including their recorded lifecycle,
+are **132.061 seconds** (100) and **174.195 seconds** (1000).
+Four times those values is only an extrapolation, not an untraced full
+campaign measurement. Current checkout qualification has a 45-minute work,
+55-minute step and 75-minute job cap; diagnostics have separate 15-minute
+work caps. Cleanup/upload reserves must remain outside work time.
+
+To illustrate the counterexample's incompatibility with a casual visit-count
+increase, 1586 visits at 33 to 43.5 seconds per visit would take roughly
+14.5 to 19.2 hours **per block** before other costs. That is not an execution
+proposal, nor proof that a better justified dependent-data method cannot fit.
+Do not extend budgets, buy hosts or silently pool blocks to make it fit.
+More precise estimates near an exact 1.10 boundary do not guarantee a pass.
+No minimum density near p99 or sub-margin power alternative has been
+established by these receipts.
+
+#### Frozen prospective acceptance and implementation sequence
+
+This specification freezes **prerequisites**, not an executable admission
+policy. Its finite current outcome is **UNRESOLVED / NO ALLOCATION**.
+
+1. Keep original failures and raw evidence permanently; preserve original
+   protocol unchanged. Keep actual 0.55.67 and all four operations/p50/p95/p99,
+   both A/A orders, both old/current orders and separate per-block metrics.
+   No evidence marker removal, cross-block pooling, selective windows or
+   conversion of diagnostic success into a performance pass.
+2. Independently review the offline numerical implementation and this
+   specification. Run its numerical/CLI/negative contracts plus original
+   assessor/stability contracts. Complete protected normal publication and
+   exact-tip correctness CI without starting a performance campaign.
+3. Before any new performance work, supply a specific dependence model or
+   experimental unit that preserves the original **pooled operation latency
+   quantile** under uninterrupted original load. Explain stationarity,
+   cross-visit/host effects and how quota phase is represented. A nonsignificant
+   autocorrelation test is not a model validation.
+4. Predeclare a finite sample count, all four schedules, original 100 warmups
+   unless separately justified, exact source/image/runtime binding, shared
+   error control and a prospective power calculation. Proposed target:
+   family false admission at most 5% if any required true ratio is strictly
+   greater than 1.10, and at least 80% whole-campaign pass probability at ratios 1.00 under
+   the declared nuisance model. These are unapproved design targets, not
+   measured properties or a claim that 5% admits a real regression safely.
+   The original ceiling is inclusive: exactly 1.10 is not a breach. For ties,
+   an upper bound can equal the true ratio with positive probability, so
+   do not incorrectly claim a test of a null including equality from an
+   inclusive upper-bound decision.
+   Account for A/A reciprocal equivalence as well as one-sided old/current
+   comparisons. Demonstrate coverage/power analytically where possible;
+   bounded simulations can falsify models but cannot prove arbitrary ones.
+5. Add RED/GREEN executable controls for a genuine >10% regression in
+   **each** operation/percentile, neutral source, cross-operation dependence,
+   slow drift, common visit shocks, alternating quota-scale delays, ties,
+   missing observations, partial completion and all metadata/cleanup failures.
+   Verify the original point metric and proposed uncertainty decision,
+   not merely a successful CLI exit or overlapping intervals.
+6. Only after independent method review and exact-tip tests/CI freeze a
+   separately versioned prospective manifest and allocation receipt. Specify
+   a fixed maximum of one campaign, no data-dependent sample extension or
+   retry, current work/step/job ceilings and cleanup/upload headroom.
+   If required precision cannot fit, outcome is unresolved, not relaxed.
+7. Any future admitted result would require all original point checks plus
+   valid direct ratio upper bounds `<= 1.10` for every metric/block; A/A
+   would additionally require direct lower bounds `>= 1/1.10`. A/A fails
+   or unresolved bounds stop before old/current work. Invalid evidence is
+   INVALID; valid but insufficient precision is UNRESOLVED; a demonstrated
+   limit breach is FAIL. No one of these can authorize deployment.
+8. Re-establish the complete independent functional, privacy, backend,
+   migration, live HTTP, artifact and measured browser gates for the actual
+   release. Parent owns source-side late freeze/recovery and cloud deployment
+   after admission. Neither this tool nor this specification deploys anything.
+
+**Specific blocker:** the retained traces identify neither a justified
+independence/dependence model nor sample sufficiency for the original
+pooled p99 ratios inside the fixed budget. Therefore no honest
+qualification-admission implementation or new hosted run follows this
+offline correction. The next required input is a defensible model/precision
+argument, not generic deployment approval.
+
+#### Reproduction, validation and self-improvement
+
+From the owned worktree, use the actual retained treatment path, not a copied
+or marker-stripped qualification receipt. The output must be new:
+
+```powershell
+$study = 'test-results\warmup-study-41632439081\membership-warmup-diagnostic-41632439081-1'
+$treatment = Join-Path $study 'warmup-treatment-1000'
+node scripts\performance\membership-precision.cjs `
+  (Join-Path $treatment 'protocol.json') `
+  (Join-Path $treatment 'aa-baab\rounds.json') `
+  test-results\method-precision-treatment-1000.json
+```
+
+The actual control and treatment executions both emitted UNRESOLVED with
+the exact source/image above. Their rounds SHA-256 values are respectively
+`9ccb050649869e092eb71f81be85f046a76de6a8600b73cb4d76180efddd4f6c`
+and `93024126cd96bdd6592eb08799880f4a81578fa43306f8ebdb1b1cf6481388ed`;
+the common protocol hash is
+`09fc8cd0747f423888bdb4d6eb34d43f83e7690b8b4b9b92eb9c9880d616ef67`.
+Input binding and interpretation survive both paths being replaced after
+open. Inputs over the prospective 4 MiB cap, empty/partial data, altered
+quota/image, stripped markers and OOM are explicit errors.
+
+Initial semantic RED: missing conditional quantile calculator, not merely
+a module-load error. Initial GREEN: 18/18 precision/stability contracts.
+Initial combined `node --test` over precision, original performance and stability
+contracts: **81/81 PASS**, zero skips/failures, including bounded-input,
+descriptor-replacement and original-estimator compatibility controls.
+After the inclusive-margin clarification below, focused precision/stability
+contracts are **21/21 PASS**, including the new ties/boundary guard.
+Initial independent code review found no actionable defects and explicitly retained
+the dependence/precision limitation. Initial protected publication at `69fd8e5c`
+passed all **30/30 Validate gates**; final-tip publication and hosted CI
+receipts are separate from that initial receipt;
+application counts from older commits are not relabelled as this tip.
+The VS Code unit-test tool did not discover Node's built-in runner tests;
+the repository's native `node --test` commands run them directly.
+
+**Execution issue / RCA (test correctness, Low):** the first mixed-warmup
+negative changed visit one, causing the request-count validator to reject
+4407 versus 8007 before the intended uniformity check. Change visit two so
+the exact intended uniformity assertion is exercised. Detection and earliest
+possible gate are the same focused run; no publication/deployment escape.
+**Execution issue / RCA (environment, Low):** the first protected push stopped
+at its configuration preflight because this fresh process had no DATABASE_URL.
+No suite or hosted campaign ran. The existing runner explicitly requires the
+value for Prisma generation, which does not connect. Supply a process-local
+non-serving loopback codegen placeholder for publication, not an inherited
+or shared database and not database-backed validation evidence. Preserve the
+failed push log; the corrected push must still pass every protected gate.
+**Execution issue / RCA (statistical specification, Medium):** the initial
+proposed error target included true ratio exactly 1.10 as a false admission,
+while the retained ceiling and proposed upper-bound condition are inclusive.
+For constant tied values an upper bound can equal that boundary with positive
+probability, so coverage does not prove that stronger null claim. Clarify
+the target as a true breach strictly above 1.10, preserving the original
+inclusive ceiling, and add an exact-boundary/ties regression proving the
+diagnostic still cannot admit anything. This was caught during final
+specification scrutiny after initial review and protected publication, before
+any method implementation or allocation. Earliest detection was the original
+mathematical review; this is a specification-review escape, not a deployment
+escape. Retain the initial publication receipt and require new-tip gates.
+**Provenance:** this analysis used bounded source/receipt reads and executable
+offline checks, not the 28 MB hosted log. `VSCODE_TARGET_SESSION_LOG` is unset;
+full-transcript RCA completeness is not claimed.
+
+**Test/gate self-improvement: applied.** Add exhaustive small-n binomial
+enumeration, 792/793 p99 boundary, a perfect-dependence counterexample and
+same-point-ratio/wide-bound controls before another method can be called
+precise. Never treat a raw count or weak autocorrelation as independence.
+Add an exact-inclusive-margin/ties example and the 298/299 individual-bound
+boundary so neither null equality nor conservative multiplicity accounting
+can silently change the original ceiling or obscure the dependence blocker.
+**Design/architecture disposition: accepted.** One small offline analyzer
+and its contracts; no serving code, dependency, runner responsibility or
+speculative general-purpose experiment framework. No admission-policy
+implementation until the missing premises can be justified.
+
+**Authoritative sources (public methodology only; no private data submitted):**
+
+- **S1:** [Linux kernel CFS bandwidth control](https://docs.kernel.org/scheduler/sched-bwc.html).
+  Quota/period replenishment, group throttling and counter semantics.
+- **S2:** [NIST autocorrelation plot](https://www.itl.nist.gov/div898/handbook/eda/section3/autocopl.htm).
+  Autocorrelation addresses time dependence; its model-based reference bands
+  are not used here as an independence certificate.
+- **S3:** [NIST nonparametric tolerance intervals](https://www.itl.nist.gov/div898/handbook/prc/section2/prc264.htm).
+  Order-statistic coverage and potentially large tail-coverage sample needs.
+  The one-sided binomial derivation and 793 calculation above are explicit,
+  not NIST's different two-sided 473 example.
+- **S4:** [R sample quantile definitions](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/quantile.html).
+  The existing estimator is inverse empirical distribution, type 1, not the
+  default interpolated type 7. Do not silently change the estimator.
+- **S5:** [NIST Bonferroni simultaneous bounds](https://www.itl.nist.gov/div898/handbook/prc/section4/prc473.htm).
+  Simultaneous error allocation; no assumption of independence across
+  components can repair invalid within-component sampling assumptions.
+
 ### Bounded fixed-warmup study (implemented locally, not executed)
 
 **Question:** does a predeclared 1000-cycle warmup change the within-visit and

@@ -1,5 +1,23 @@
 ## SCIMServer - Condensed Session Memory
 
+**2026-11-03 prospective precision correction:** the reviewed diagnostic
+41632439081 is complete but NONADMITTING. Exact synthetic196000e5,
+image18901aded3, actual0.55.67/Node24.22.2; 49,656 checked requests and
+32,000 retained values. Longer warmup did not establish repeatability.
+New offline precision analyzer preserves all12 metrics, image/source/quota
+binding and chronological drift. Conditional IID sensitivity is explicitly
+not coverage for these data; even that model gives remove-p95 upper2.485493
+and empty-read-p99 upper8.105010 after1000warmups. Independence/dependence
+model and fixed-budget tail sufficiency remain unestablished. No admission
+policy is implemented and no new campaign allocated. Frozen prerequisites,
+alternatives and finite UNRESOLVED stop are in ENDPOINT_SNAPSHOT_REVISION.md.
+Keep .67, 10%, original0.5CPU/1GiB, failures and raw evidence. #251 stays
+draft; migration worktree untouched; customer prod excluded. Initial combined
+81/81 PASS, independent review no actionable defects; protected publication
+30/30 Validate gates PASS at69fd8e5c. Final scrutiny clarified inclusive1.10
+versus a true breach and added a ties/boundary guard; focused21/21 PASS.
+Final-tip protected publication and hosted CI remain separate pending work.
+
 **2026-11-03 fixed-warmup diagnostic preparation:** isolated
 `fix/qualification-warmup-study-20261103` implements a bounded non-admitting
 100/1000-cycle study on one exact checkout image. Original warmups, limits
