@@ -9,6 +9,17 @@
 
 ## Active Delivery Process
 
+**2026-11-03 exact-checkout qualification:** isolated implementation binds the
+actual .67 checkout image rather than treating frozen .58 performance as new
+artifact admission. Historical protocol/results and all latency/resource/sample
+bounds remain unchanged. Current source/version/revision and Linux/x64
+identity are verified before allocation; mutable bases are refreshed.
+Focused contracts pass58/58; full local tooling227 PASS /8 explicit skips
+/0 FAIL. Refreshed local image reports0.55.67/Node24.22.2 and a real
+source-bound protocol is generated. Hosted execution and normal reviewed
+publication remain independent. No performance PASS,
+paid capacity or target deployment is inferred.
+
 **2026-10-30 current performance reconciliation:** Hono #262 merged at
 `eb733f61e7f25d1d642fe746075e266c3b19ad60`, master 0.55.66. Proposed 0.55.67
 normally integrates it into held performance `ff2d2377`, preserving both

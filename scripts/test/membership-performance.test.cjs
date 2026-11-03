@@ -376,6 +376,106 @@ test('preregistered protocol rejects budget and schedule changes', () => {
   assert.throws(() => load().validateProtocol({ ...protocol, blocks: [...protocol.blocks].reverse() }));
 });
 
+test('checkout qualification binds the actual image to the exact source without changing the frozen protocol', () => {
+  const protocol = require('../performance/membership-protocol.json');
+  const original = JSON.stringify(protocol);
+  const source = 'a'.repeat(40);
+  const identity = { id: `sha256:${'b'.repeat(64)}`, os: 'linux', architecture: 'amd64', sourceCommit: source };
+  const current = load().checkoutProtocol(protocol, identity, source, '0.55.67');
+  assert.equal(JSON.stringify(protocol), original, 'Historical protocol must not be modified');
+  assert.deepEqual(current, {
+    ...protocol,
+    candidate: { image: identity.id, version: '0.55.67', sourceCommit: source },
+  });
+  load().validateProtocol(current);
+  assert.equal(load().rolesFor(current, current.blocks[0]).baseline.image, identity.id);
+  assert.equal(load().rolesFor(current, current.blocks[2]).baseline.image, protocol.baseline.image);
+  for (const [field, value] of [
+    ['id', 'candidate:latest'], ['id', 'sha256:abc'], ['os', 'windows'],
+    ['architecture', 'arm64'], ['sourceCommit', 'c'.repeat(40)],
+  ]) {
+    assert.throws(() => load().checkoutProtocol(protocol, { ...identity, [field]: value }, source, '0.55.67'));
+  }
+  assert.throws(() => load().checkoutProtocol(protocol, identity, 'short', '0.55.67'));
+  assert.throws(() => load().checkoutProtocol(protocol, identity, source, 'latest'));
+  const unbound = structuredClone(current);
+  delete unbound.candidate.sourceCommit;
+  assert.throws(() => load().validateProtocol(unbound), 'Local images require explicit source identity');
+  assert.throws(() => load().validateProtocol({
+    ...current, baseline: current.candidate,
+  }), 'The published baseline must not become an arbitrary local image');
+});
+
+test('checkout protocol CLI retains a new source-bound receipt and refuses to overwrite it', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-checkout-protocol-'));
+  try {
+    const source = 'a'.repeat(40);
+    const identity = path.join(directory, 'identity.json');
+    const output = path.join(directory, 'protocol.json');
+    fs.writeFileSync(identity, JSON.stringify({
+      id: `sha256:${'b'.repeat(64)}`, os: 'linux', architecture: 'amd64', sourceCommit: source,
+    }));
+    const args = [implementation, '--checkout-image',
+      path.resolve(__dirname, '../performance/membership-protocol.json'), identity, source, '0.55.67', output];
+    const result = spawnSync(process.execPath, args, { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = fs.readFileSync(output, 'utf8');
+    assert.equal(JSON.parse(receipt).candidate.sourceCommit, source);
+    const repeated = spawnSync(process.execPath, args, { encoding: 'utf8' });
+    assert.notEqual(repeated.status, 0, 'Existing protocol evidence must not be overwritten');
+    assert.equal(fs.readFileSync(output, 'utf8'), receipt);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+for (const scenario of ['success', 'wrong-source', 'git-failure', 'wrong-version', 'wrong-label']) {
+  test(`actual checkout preflight rejects unrelated runtime before allocation: ${scenario}`, () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-checkout-guard-'));
+    try {
+      fs.mkdirSync(path.join(directory, 'api'));
+      fs.writeFileSync(path.join(directory, 'api', 'package.json'),
+        JSON.stringify({ version: scenario === 'wrong-version' ? '0.55.58' : '0.55.67' }));
+      const runner = path.resolve(__dirname, '../performance/run-membership-qualification.ps1');
+      const result = spawnSync('pwsh', ['-NoProfile', '-Command', `
+        $ErrorActionPreference = 'Stop'
+        $root = '${directory.replaceAll("'", "''")}'
+        $scenario = '${scenario}'
+        $protocol = @{ candidate = @{ sourceCommit = ('a' * 40); version = '0.55.67'; image = ('sha256:' + ('b' * 64)) } }
+        $script:inspected = $false
+        function git {
+          if (($args -join ' ') -cne "-C $root rev-parse HEAD") { throw 'Unexpected source query' }
+          $global:LASTEXITCODE = if ($scenario -eq 'git-failure') { 1 } else { 0 }
+          if ($scenario -eq 'wrong-source') { return ('c' * 40) }
+          return ('a' * 40)
+        }
+        function Invoke-Docker {
+          if ($args[0] -cne 'image' -or $args[1] -cne 'inspect' -or
+              $args[-1] -cne $protocol.candidate.image) { throw 'Unexpected image operation' }
+          $script:inspected = $true
+          if ($scenario -eq 'wrong-label') { return ('c' * 40) }
+          return ('a' * 40)
+        }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+          '${runner.replaceAll("'", "''")}', [ref]$null, [ref]$null)
+        $guard = $ast.Find({ param($item)
+          $item -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+          $item.Name -eq 'Assert-CheckoutImage'
+        }, $true)
+        if (!$guard) { throw 'Missing actual checkout preflight' }
+        . ([scriptblock]::Create($guard.Extent.Text))
+        $failure = $null
+        try { Assert-CheckoutImage } catch { $failure = $_.Exception.Message }
+        if ($scenario -eq 'success' -and ($failure -or !$script:inspected)) { throw "Valid checkout rejected: $failure" }
+        if ($scenario -ne 'success' -and !$failure) { throw 'Unrelated checkout was accepted' }
+        if ($scenario -in @('wrong-source', 'git-failure', 'wrong-version') -and $script:inspected) {
+          throw 'Unrelated source reached Docker'
+        }
+        if ($failure -and $failure -notlike 'Candidate * differs from *') { throw $failure }
+      `], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+}
+
 for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-expired']) {
   for (const traced of ['success', 'corrupt-read'].includes(scenario) ? [false, true] : [false]) {
   test(`HTTP client retains explicit complete/partial evidence for ${scenario}${traced ? ' with diagnostic trace' : ''}`, async () => {
@@ -535,7 +635,11 @@ test('internal work deadline and shorter step cap reserve cleanup/upload before 
   const runner = path.resolve(__dirname, '..', 'performance', 'run-membership-qualification.ps1');
   const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'performance-qualification.yml'), 'utf8');
   assert.match(workflow, /^    timeout-minutes: 75$/m);
-  assert.match(workflow, /^      - name: Run fixed same-image controls before old\/current comparisons\r?\n        timeout-minutes: 65$/m);
+  assert.match(workflow, /^      - name: Build and bind exact checkout image\r?\n        timeout-minutes: 10$/m);
+  assert.match(workflow, /docker build --pull --label "org\.opencontainers\.image\.revision=\$source"/,
+    'Current-source qualification must refresh the mutable base instead of silently using an older cached runtime');
+  assert.match(workflow, /^      - name: Run fixed same-image controls before old\/current comparisons\r?\n        timeout-minutes: 55$/m);
+  assert.match(workflow, /-ProtocolPath \(Join-Path \$env:GITHUB_WORKSPACE 'test-results\/performance-image\/protocol\.json'\)/);
   const result = spawnSync('pwsh', ['-NoProfile', '-Command', `
     $ErrorActionPreference = 'Stop'
     $ast = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -545,10 +649,17 @@ test('internal work deadline and shorter step cap reserve cleanup/upload before 
     }, $true)
     if (!$guard) { throw 'Missing actual internal deadline guard' }
     . ([scriptblock]::Create($guard.Extent.Text))
+    $protocol = @{ candidate = @{} }
     $campaignClock = @{ Elapsed = [timespan]::FromMinutes(59) }
     Assert-WithinDeadline
     $campaignClock = @{ Elapsed = [timespan]::FromMinutes(60) }
     try { Assert-WithinDeadline; throw 'Expired work budget was accepted' }
+    catch { if ($_.Exception.Message -notlike '*work deadline*') { throw } }
+    $protocol.candidate.sourceCommit = 'a' * 40
+    $campaignClock = @{ Elapsed = [timespan]::FromMinutes(44) }
+    Assert-WithinDeadline
+    $campaignClock = @{ Elapsed = [timespan]::FromMinutes(45) }
+    try { Assert-WithinDeadline; throw 'Expired checkout work budget was accepted' }
     catch { if ($_.Exception.Message -notlike '*work deadline*') { throw } }
     exit 0
   `], { encoding: 'utf8' });

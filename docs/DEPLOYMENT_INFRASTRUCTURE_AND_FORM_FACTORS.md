@@ -7,20 +7,49 @@
 
 ---
 
+## Exact-checkout qualification image (2026-11-03 source change)
+
+The qualification workflow now builds its actual checkout, including current
+dependency fixes, instead of measuring the frozen 0.55.58 image and implying
+that the result qualifies 0.55.67. The original manifest and failed receipts
+remain unchanged. A separate generated protocol binds the candidate's immutable
+local image ID, exact checkout commit and package version. Image OS,
+architecture and revision are verified; unrelated checkout/version/revision
+values fail before benchmark resource allocation. The baseline remains the
+original immutable public image. No package is published by this workflow.
+
+The Docker build uses `--pull`: the first local build otherwise reused a
+cached Node 24.16.0 base, older than the recorded 0.55.20 image runtime.
+Building the requested source alone does not establish a current base.
+The refreshed base and actual final runtime must be measured independently.
+The source-bound lane reserves ten minutes for the image build, uses a
+45-minute cooperative measurement cap and a 55-minute measurement-step cap,
+and preserves the 75-minute job cap and four-minute artifact upload.
+Historical standalone protocol execution retains its original 60-minute
+work cap. Resource limits, samples, warmups, all twelve latency bounds and
+the four fail-stop blocks are unchanged. Generated identity/protocol evidence
+is uploaded alongside completed or failed measurement evidence.
+
+This is source-level workflow verification, not new Azure estate evidence
+or a passing performance result. Existing public GitHub-hosted Linux capacity
+is used; no dedicated Azure host, new paid resource or deployment is introduced.
+
 ## Prospective performance qualification runner (2026-10-22 source change)
 
 [performance-qualification.yml](../.github/workflows/performance-qualification.yml)
 uses the repository's existing public GitHub Actions service with an
 `ubuntu-24.04` runner. It provisions no Azure resource or new paid host, grants
 only `contents: read`, serializes qualification campaigns and permits no
-deployment or package publication. A 60-minute cooperative work deadline,
-65-minute qualification-step cap and 75-minute job cap reserve time for
-cleanup/upload. Checkout, contracts and upload have 2/3/4-minute caps.
+deployment or package publication. The current source-bound lane uses the
+45/55/75-minute work/step/job limits described above; the original frozen
+standalone campaign retains its 60-minute work limit. Checkout, contracts
+and upload have 2/3/4-minute caps.
 Completed/failed evidence is retained for 14 days. The workflow starts on
 relevant pull requests or explicit dispatch, not every application change.
 
-The [fixed manifest](../scripts/performance/membership-protocol.json) pins
-actual application/PostgreSQL images and the original app resource limits.
+The [fixed historical manifest](../scripts/performance/membership-protocol.json)
+pins the original application/PostgreSQL images and resource limits. Current
+checkout qualification generates a separate source-bound candidate protocol.
 Separate owned app/database processes are created per four-round block;
 each role's app/database is reused for its second visit, preserving the
 existing within-block history. Two A/A blocks must pass before the two A/B

@@ -1,6 +1,23 @@
 ## SCIMServer - Condensed Session Memory
 
-**Last verified:** 2026-10-30
+**Last verified:** 2026-11-03
+
+### Exact-checkout qualification implementation (2026-11-03)
+
+Isolated branch fix/qualification-image-binding-20261103 preserves the clean
+abdef720 candidate and its dependencies. The qualification workflow now builds
+the actual checkout, generates a separate immutable local-image protocol and
+rejects wrong source/version/revision before benchmark allocation. Original
+historical protocol, latency limits and failed receipts remain unchanged.
+Focused contracts pass 58/58 after semantic RED. Broad tooling initially
+required missing pg in this new worktree; isolated API npm ci restored it
+without changing any manifest/lock. Full tooling now227 PASS /8 explicit
+retained-fixture or opt-in skips /0 FAIL. First local .67 image revealed
+cached Node24.16.0; --pull rebuild passes and reports0.55.67/Node24.22.2.
+Actual image identity generates a source-bound protocol successfully.
+No shared dependencies, release, target
+deployment, paid host or admission waiver. Actual hosted qualification,
+reviewed publication and complete dev/canary target gates remain required.
 
 ### Current Hono-master performance reconciliation (2026-10-30)
 

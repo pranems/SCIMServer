@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.67 exact-checkout qualification image (2026-11-03, proposed)
+
+- Build and bind the actual qualification checkout rather than testing only
+  the frozen 0.55.58 artifact. Preserve the historical manifest/results;
+  generate a separate immutable candidate protocol with exact source,
+  package version, Linux/x64 architecture and revision verification.
+- Refresh mutable Docker bases, retain identity/protocol artifacts, reject
+  unrelated sources before allocation and reserve build/cleanup/upload time
+  within the existing 75-minute job cap. No latency/resource/sample limit,
+  serving source, dependency or lockfile change.
+- Qualification contract coverage increases 51 to 58 passing cases, zero
+  skips in the focused run. Complete local tooling: 227 PASS / 8 explicit
+  retained-fixture or opt-in skips / 0 FAIL. The refreshed image reports
+  0.55.67 on Node24.22.2 and generates a real source-bound protocol.
+  Hosted execution and release admission remain separate pending evidence.
+  Existing application test counts are not rerun or relabelled by this
+  tooling change. No deployment or performance PASS is claimed.
+
 ### 0.55.67 Hono-master performance reconciliation (2026-10-30, proposed)
 
 - Normally integrate reviewed master `eb733f61` after Hono #262 merged at

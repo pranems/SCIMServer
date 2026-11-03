@@ -21,10 +21,29 @@ function validateProtocol(protocol) {
     { name: 'ab-abba', sameImage: false, order: 'ABBA' },
   ]);
   for (const role of ['baseline', 'candidate']) {
-    assert.match(protocol[role].image, /^ghcr\.io\/pranems\/scimserver@sha256:[a-f0-9]{64}$/);
+    if (role === 'candidate' && protocol.candidate.sourceCommit !== undefined) {
+      assert.match(protocol.candidate.sourceCommit, /^[a-f0-9]{40}$/);
+      assert.match(protocol.candidate.image, /^sha256:[a-f0-9]{64}$/);
+    } else {
+      assert.match(protocol[role].image, /^ghcr\.io\/pranems\/scimserver@sha256:[a-f0-9]{64}$/);
+    }
     assert.match(protocol[role].version, /^\d+\.\d+\.\d+$/);
   }
   assert.match(protocol.postgres, /^postgres@sha256:[a-f0-9]{64}$/);
+}
+
+function checkoutProtocol(protocol, identity, sourceCommit, version) {
+  validateProtocol(protocol);
+  assert.match(sourceCommit, /^[a-f0-9]{40}$/, 'Exact checkout commit required');
+  assert.match(version, /^\d+\.\d+\.\d+$/, 'Exact package version required');
+  assert.match(identity.id, /^sha256:[a-f0-9]{64}$/, 'Immutable local image ID required');
+  assert.equal(identity.os, 'linux', 'Linux image required');
+  assert.equal(identity.architecture, 'amd64', 'Original x64 measurement architecture required');
+  assert.equal(identity.sourceCommit, sourceCommit, 'Image revision must match the checkout');
+  const current = structuredClone(protocol);
+  current.candidate = { image: identity.id, version, sourceCommit };
+  validateProtocol(current);
+  return current;
 }
 
 function rolesFor(protocol, block) {
@@ -72,19 +91,29 @@ function assessBlock(rows, block, roles) {
   return { block: block.name, sameImage: block.sameImage, passed: checks.every(check => check.passed), checks };
 }
 
-module.exports = { assessBlock, rolesFor, validateProtocol };
+module.exports = { assessBlock, checkoutProtocol, rolesFor, validateProtocol };
 
 if (require.main === module) {
   try {
-    const [protocolPath, blockName, rowsPath, output] = process.argv.slice(2);
-    assert.ok(protocolPath && blockName && rowsPath && output, 'Explicit protocol, block, receipts and output required');
-    const protocol = JSON.parse(fs.readFileSync(protocolPath, 'utf8'));
-    const block = protocol.blocks.find(item => item.name === blockName);
-    assert.ok(block, 'Unknown preregistered block');
-    const result = assessBlock(JSON.parse(fs.readFileSync(rowsPath, 'utf8')), block, rolesFor(protocol, block));
-    fs.writeFileSync(output, `${JSON.stringify(result, null, 2)}\n`);
-    console.table(result.checks);
-    if (!result.passed) process.exitCode = 1;
+    if (process.argv[2] === '--checkout-image') {
+      const [, protocolPath, identityPath, sourceCommit, version, output] = process.argv.slice(2);
+      assert.equal(process.argv.length, 8, 'Explicit protocol, identity, commit, version and new output required');
+      const current = checkoutProtocol(
+        JSON.parse(fs.readFileSync(protocolPath, 'utf8')),
+        JSON.parse(fs.readFileSync(identityPath, 'utf8')), sourceCommit, version,
+      );
+      fs.writeFileSync(output, `${JSON.stringify(current, null, 2)}\n`, { flag: 'wx' });
+    } else {
+      const [protocolPath, blockName, rowsPath, output] = process.argv.slice(2);
+      assert.ok(protocolPath && blockName && rowsPath && output, 'Explicit protocol, block, receipts and output required');
+      const protocol = JSON.parse(fs.readFileSync(protocolPath, 'utf8'));
+      const block = protocol.blocks.find(item => item.name === blockName);
+      assert.ok(block, 'Unknown preregistered block');
+      const result = assessBlock(JSON.parse(fs.readFileSync(rowsPath, 'utf8')), block, rolesFor(protocol, block));
+      fs.writeFileSync(output, `${JSON.stringify(result, null, 2)}\n`);
+      console.table(result.checks);
+      if (!result.passed) process.exitCode = 1;
+    }
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

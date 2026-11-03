@@ -1,12 +1,14 @@
 param(
     [string]$OutputDirectory,
+    [string]$ProtocolPath,
     [switch]$TraceDiagnostic,
     [switch]$ProfileDiagnostic
 )
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$protocolPath = Join-Path $PSScriptRoot 'membership-protocol.json'
+if (!$ProtocolPath) { $ProtocolPath = Join-Path $PSScriptRoot 'membership-protocol.json' }
+$ProtocolPath = (Resolve-Path -LiteralPath $ProtocolPath).Path
 $evaluator = Join-Path $PSScriptRoot 'assess-membership.cjs'
 $clientScript = Join-Path $PSScriptRoot 'benchmark-membership.cjs'
 $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
@@ -37,7 +39,8 @@ $summary = [ordered]@{
     AdmissionEligible = $false
 }
 $campaignClock = [System.Diagnostics.Stopwatch]::StartNew()
-$workMinutes = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 } else { 60 }
+$workMinutes = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 }
+    elseif ($protocol.candidate.sourceCommit) { 45 } else { 60 }
 $workDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes($workMinutes).ToUnixTimeMilliseconds()
 $summary['WorkDeadlineUtc'] = [DateTimeOffset]::FromUnixTimeMilliseconds($workDeadlineUtc).ToString('o')
 $envNames = @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET',
@@ -47,7 +50,8 @@ $priorEnvironment = @{}
 foreach ($key in $envNames) { $priorEnvironment[$key] = [Environment]::GetEnvironmentVariable($key) }
 
 function Assert-WithinDeadline {
-    $limit = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 } else { 60 }
+    $limit = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 }
+        elseif ($protocol.candidate.sourceCommit) { 45 } else { 60 }
     if ($campaignClock.Elapsed.TotalMinutes -ge $limit) {
         throw 'Campaign work deadline reached; cleanup and upload time is reserved, no admission.'
     }
@@ -57,6 +61,21 @@ function Invoke-Docker {
     $value = & docker @args
     if ($LASTEXITCODE -ne 0) { throw "Docker operation failed: $($args[0])" }
     return $value
+}
+
+function Assert-CheckoutImage {
+    if (!$protocol.candidate.sourceCommit) { return }
+    $checkout = (& git -C $root rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $checkout -cne $protocol.candidate.sourceCommit) {
+        throw 'Candidate source differs from the exact checkout.'
+    }
+    $package = Get-Content -LiteralPath (Join-Path $root 'api\package.json') -Raw | ConvertFrom-Json
+    if ($package.version -cne $protocol.candidate.version) {
+        throw 'Candidate version differs from the checkout package.'
+    }
+    $revision = (Invoke-Docker image inspect --format `
+        '{{index .Config.Labels "org.opencontainers.image.revision"}}' $protocol.candidate.image).Trim()
+    if ($revision -cne $checkout) { throw 'Candidate image revision differs from the checkout.' }
 }
 
 function Assert-Owned {
@@ -514,9 +533,15 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Host CPU identity unavailable.' }
     $null = Invoke-Docker info --format '{{json .}}' |
         Set-Content (Join-Path $OutputDirectory 'docker-info.json')
+    Assert-CheckoutImage
     foreach ($image in @($protocol.baseline.image, $protocol.candidate.image, $protocol.postgres)) {
         Assert-WithinDeadline
-        $null = Invoke-Docker pull $image
+        if ($image -eq $protocol.candidate.image -and $protocol.candidate.sourceCommit) {
+            $actualId = (Invoke-Docker image inspect --format '{{.Id}}' $image).Trim()
+            if ($actualId -cne $image) { throw 'Current candidate immutable image ID mismatch.' }
+        } else {
+            $null = Invoke-Docker pull $image
+        }
     }
     $identities = foreach ($role in @('baseline', 'candidate')) {
         $image = $protocol.$role.image
