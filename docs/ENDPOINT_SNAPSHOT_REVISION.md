@@ -7,6 +7,72 @@ Performance admission and the independent release gates remain open.
 
 ## Current-checkout image binding (2026-11-03, not released)
 
+### Descriptive calibration prerequisite
+
+The new `--describe-stability` mode reuses the actual original assessor and
+nearest-rank estimator. It describes all 64 chronological 250-sample windows
+in a complete four-round block, retains both visits and every measured
+sample, and records the source image roles plus SHA-256 hashes of the exact
+protocol/round files. It cannot change a protocol, overwrite a report or
+admit a release. Its output explicitly says uncertainty and warmup convergence
+are not established. Window ratios are descriptive, not new acceptance
+tests on smaller sample sets.
+
+Focused RED reports the missing collector assertion before implementation;
+GREEN is **64/64**, comprising 58 existing contracts and six new cases.
+Independent review then found that summaries did not actually include the
+raw observations claimed above, and input hashes used a second pathname
+read. The corrected report includes each window's unsorted observations;
+percentiles use a separate sorted copy. Parsing and hashing now share the
+same once-read buffers. Both defects were reproduced before correction.
+Focused GREEN is now **66/66**, including chronological reconstruction and
+an actual CLI test that changes both input paths after their first read.
+The separately generated corrected current-image report reproduces every original failed comparison
+exactly and retains all 16,000 observations. In the baseline's second visit,
+populated-read p95 across its four windows is 4.574270, 30.201782,
+22.543207 and 16.514300 ms. The candidate's second visit is 2.465563,
+3.469971, 3.396606 and 2.432962 ms. This is not explained simply by
+discarding the first cold window. No extra benchmark was run.
+
+**Test-correctness RCA (Low):** during RED, a broad negative `assert.throws`
+could succeed because the missing collector itself threw TypeError. Require
+the expected receipt-validation assertion messages, alongside the positive
+collector and real CLI contracts. This closes a false-green assertion class
+at the earliest focused test stage.
+
+**Next boundary:** a reviewed prospective study must distinguish within-visit
+and across-visit instability before selecting any changed warmup or
+measurement policy. The operator was unavailable for the design question;
+that is not approval for paid resources, relaxed bounds or deployment.
+The pragmatic continuation is non-admitting analysis on existing evidence,
+under the requested instruction to diagnose/fix issues.
+
+**Self-improvement applied:** test numerical windows and exact input/output
+identity, not the mere presence of an analysis file or a thrown exception.
+**Design disposition: accepted.** A small descriptive collector and shared
+nearest-rank helper extend the existing assessor. No new framework,
+production dependency, resource lifecycle or admission strategy is added.
+
+**Hosted follow-up:** reviewed prerequisite #263 is merged into #251 at
+`6f846cf8`. Current-image Linux run
+[41615647439](https://github.com/pranems/SCIMServer/actions/runs/41615647439)
+successfully builds and binds actual checkout `bc60f7f3` and the immutable
+0.55.67 image starting `92cd5024`. Its first same-image block fails four
+of twelve checks: populated-read p95 ratio 0.571817, remove p95 1.123033,
+empty-read p95 0.440720 and empty-read p99 0.844341. Faster out-of-range
+controls also fail repeatability. All 17,628 checked requests, 16,000 retained
+timings, 66 functional checks, 200 private-log checks, capture and exact
+cleanup complete. The opposite control and both old/current blocks do not
+run. No unchanged retry or new performance admission is claimed.
+
+The fixed 100 warmups do not establish stable observed timings: first-visit
+populated-read p95 falls from 6.355253/6.801990 ms in the first 250 measured
+samples to 2.652742/2.667220 ms in the last 250. App-cgroup CPU changes across
+visits while SQL counts stay 25,591-25,593. This demonstrates a measurement
+stability gap, not its unique cause. The next design requires prospective
+calibration and review, not speculative production-code removal or
+post-hoc selection of a favorable warmup count.
+
 The existing qualification still selected a pinned 0.55.58 candidate even
 after source/dependency reconciliation proposed 0.55.67. A passing historical
 image comparison could not qualify that new artifact. The new prospective
@@ -27,6 +93,8 @@ resource limits, operation order and latency bounds are not modified.
 | Missing isolated root/web tooling / Low | The first chosen web build and documentation check failed on missing vite/jsdom. Restore each worktree-owned dependency set using npm ci only after its observed missing-dependency failure. The protected hook owns consolidated validation. | Prerequisite build/documentation checks; no shared dependency mutation or lock regeneration. |
 | Missing generated Prisma model types / Low | API dependencies were deliberately installed with scripts disabled, leaving the generated client absent. The API build exposed model-type errors; explicit Prisma generation succeeds with a codegen-only local URL and no database connection. The protected hook owns the subsequent full build/test verification. | First API build; normal code-generation prerequisite, not a production source defect. |
 | Stale mutable local base / Medium | The first local build reused Node 24.16.0 despite newer historical images. Require docker build --pull, retain the first image identity, and verify the refreshed runtime separately. | Actual built-image runtime readback; earliest possible gate is a fresh-base build plus runtime readback. |
+| Raw-observation retention claim / Medium | Window summaries retained counts and percentiles but omitted raw observations. Include the unsorted samples and prove all 16,000 can be reconstructed in original order from the report alone. Existing immutable reports remain unchanged; corrected output uses a new path. | Independent review; earliest possible focused test previously checked counts rather than reconstructability. The new outcome assertion closes that escape. |
+| Input-byte provenance race / Medium | Hashing reread mutable paths after parsing, allowing different bytes to identify the analysis. Read each input once and use that same buffer for parsing and hashing. An adversarial real CLI preload changes both files immediately after each read and verifies the hashes still identify the parsed bytes. | Independent review; earliest possible focused CLI test previously hashed only unchanged files. The deterministic replacement test closes that escape. |
 
 The initial source-binding test failed before implementation. The complete
 focused suite then passed 58/58, up from 51, with no skips. A separate real

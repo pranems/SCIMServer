@@ -1,5 +1,21 @@
 ## SCIMServer - Condensed Session Memory
 
+**2026-11-03 calibration evidence:** branch
+`fix/qualification-calibration-20261103` is based on reviewed merge6f846cf8.
+Actual source-bound Linux run41615647439 fails4/12 same-image checks;
+functional66/privacy200/exact cleanup PASS, later blocks not run. New
+non-admitting descriptive collector retains all16,000 samples in64 windows,
+hash-binds inputs and reproduces all original checks exactly. Focused tests
+66/66 PASS after semantic RED, including review regressions for missing raw
+observations and a second-read hash race. Corrected output includes all
+unsorted samples and hashes exactly the once-read parsed buffers; all12
+original checks/four failures remain identical. No protocol, warmup, sample
+or limit changed.
+PR251 is draft again to avoid unchanged automatic retries while a prospective
+stability design is prepared. Operator unavailable is not hardware, gate-
+waiver or deployment approval. Latest failed evidence is protected separately
+in qualification-failure-20261103T1011035881166Z with verified roundtrip.
+
 **Last verified:** 2026-11-03
 
 ### Exact-checkout qualification implementation (2026-11-03)

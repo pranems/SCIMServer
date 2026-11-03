@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.67 descriptive stability evidence (2026-11-03, proposed)
+
+- Add a non-admitting, hash-bound report over all chronological windows in
+  retained complete qualification rounds. Reuse original validation and
+  nearest-rank percentiles; preserve all samples and original failed checks.
+- Add eight numerical/CLI/negative regression contracts. Focused tooling:
+  58 to 66 PASS, zero skips or failures. Negative tests require expected
+  validation errors rather than accepting unrelated exceptions.
+- Close two independent-review findings after reproducing both: retain the
+  actual unsorted observations, not only summaries, and hash the same
+  once-read buffers used for parsing. Reconstruct all 16,000 real observations
+  and preserve all twelve original checks/four failures in a separate
+  corrected report. The CLI regression changes both inputs after reading.
+- Actual current-image Linux qualification `41615647439` fails four first
+  same-image checks. Functional 66, privacy/logging 200 and exact cleanup
+  pass independently. No later block, protocol change or unchanged retry.
+  Existing application source, dependencies, version and lockfiles unchanged;
+  no new application count or deployment admission claimed.
+
 ### 0.55.67 exact-checkout qualification image (2026-11-03, proposed)
 
 - Build and bind the actual qualification checkout rather than testing only

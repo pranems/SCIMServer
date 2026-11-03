@@ -52,6 +52,10 @@ function rolesFor(protocol, block) {
   return { baseline: block.sameImage ? protocol.candidate : protocol.baseline, candidate: protocol.candidate };
 }
 
+function sortedPercentile(values, percentile) {
+  return values[Math.ceil(values.length * percentile / 100) - 1];
+}
+
 function assessBlock(rows, block, roles) {
   assert.ok(Object.hasOwn(schedules, block.order), 'Unknown round order');
   assert.equal(typeof block.sameImage, 'boolean');
@@ -78,9 +82,8 @@ function assessBlock(rows, block, roles) {
     const baseline = values('baseline');
     const candidate = values('candidate');
     return [50, 95, 99].map(percentile => {
-      const index = Math.ceil(2000 * percentile / 100) - 1;
-      const baselineMs = baseline[index];
-      const candidateMs = candidate[index];
+      const baselineMs = sortedPercentile(baseline, percentile);
+      const candidateMs = sortedPercentile(candidate, percentile);
       const ratio = candidateMs / baselineMs;
       return {
         operation, percentile, samplesPerRole: 2000, baselineMs, candidateMs, ratio,
@@ -91,7 +94,51 @@ function assessBlock(rows, block, roles) {
   return { block: block.name, sameImage: block.sameImage, passed: checks.every(check => check.passed), checks };
 }
 
-module.exports = { assessBlock, checkoutProtocol, rolesFor, validateProtocol };
+function describeStability(rows, block, roles) {
+  const qualificationAssessment = assessBlock(rows, block, roles);
+  const visits = { baseline: 0, candidate: 0 };
+  const rounds = rows.map((row, index) => ({
+    round: index + 1,
+    role: row.role,
+    visit: ++visits[row.role],
+    operations: Object.fromEntries(operations.map(operation => {
+      const windows = Array.from({ length: 4 }, (_, window) => {
+        const startCycle = window * 250;
+        const samples = row.samples[operation].slice(startCycle, startCycle + 250);
+        const values = [...samples].sort((a, b) => a - b);
+        return {
+          startCycle, endCycleExclusive: startCycle + 250, sampleCount: values.length,
+          samples,
+          p50: sortedPercentile(values, 50),
+          p95: sortedPercentile(values, 95),
+          p99: sortedPercentile(values, 99),
+        };
+      });
+      return [operation, {
+        windows,
+        lastToFirstP95Ratio: windows[3].p95 / windows[0].p95,
+      }];
+    })),
+  }));
+  return {
+    diagnosticOnly: true,
+    admissionEligible: false,
+    uncertaintyEstimated: false,
+    warmupConvergenceEstablished: false,
+    images: structuredClone(roles),
+    notes: [
+      'Chronological windows describe retained observations, not independent replications.',
+      'Cycle bounds are zero-based measured cycles after the protocol warmup.',
+      'Window ratios are not subject to the original pooled 2000-sample admission bounds.',
+      'No causal attribution, false-failure probability or acceptable warmup is inferred.',
+      'The original assessment and every sample are preserved without changing the protocol.',
+    ],
+    qualificationAssessment,
+    rounds,
+  };
+}
+
+module.exports = { assessBlock, checkoutProtocol, describeStability, rolesFor, validateProtocol };
 
 if (require.main === module) {
   try {
@@ -103,6 +150,23 @@ if (require.main === module) {
         JSON.parse(fs.readFileSync(identityPath, 'utf8')), sourceCommit, version,
       );
       fs.writeFileSync(output, `${JSON.stringify(current, null, 2)}\n`, { flag: 'wx' });
+    } else if (process.argv[2] === '--describe-stability') {
+      assert.equal(process.argv.length, 7, 'Explicit protocol, block, receipts and new output required');
+      const [protocolPath, blockName, rowsPath, output] = process.argv.slice(3);
+      const protocolBytes = fs.readFileSync(protocolPath);
+      const rowsBytes = fs.readFileSync(rowsPath);
+      const protocol = JSON.parse(protocolBytes.toString('utf8'));
+      const block = protocol.blocks.find(item => item.name === blockName);
+      assert.ok(block, 'Unknown preregistered block');
+      const report = describeStability(
+        JSON.parse(rowsBytes.toString('utf8')), block, rolesFor(protocol, block),
+      );
+      const { createHash } = require('node:crypto');
+      report.inputHashes = Object.fromEntries([
+        ['protocol', protocolBytes], ['rounds', rowsBytes],
+      ].map(([name, bytes]) => [name, createHash('sha256').update(bytes).digest('hex')]));
+      fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
+      console.log('Descriptive analysis complete; no stability or deployment admission.');
     } else {
       const [protocolPath, blockName, rowsPath, output] = process.argv.slice(2);
       assert.ok(protocolPath && blockName && rowsPath && output, 'Explicit protocol, block, receipts and output required');
