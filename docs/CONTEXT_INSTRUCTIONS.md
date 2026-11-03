@@ -9,6 +9,17 @@
 
 ## Active Delivery Process
 
+**2026-11-03 measured calibration gap:** #263 merged into #251 at6f846cf8;
+ordinary exact-tip CI passes. Actual source-bound Linux run41615647439 fails
+four same-image comparisons, while functional66/privacy200/exact cleanup
+pass. No old/current comparison runs. #251 is draft again, not admitted.
+The new descriptive collector retains all64 chronological windows/16,000
+samples and hash-binds inputs without changing any original assessment,
+protocol or limit. Focused tooling64/64 PASS after RED. Numerical and actual
+CLI tests ensure the report cannot claim convergence or deployment admission.
+Review/prospective stabilization design remains separate; operator unavailable
+does not authorize hardware, gate waiver or deployment.
+
 **2026-11-03 exact-checkout qualification:** isolated implementation binds the
 actual .67 checkout image rather than treating frozen .58 performance as new
 artifact admission. Historical protocol/results and all latency/resource/sample

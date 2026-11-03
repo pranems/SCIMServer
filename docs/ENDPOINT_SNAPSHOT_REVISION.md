@@ -7,6 +7,65 @@ Performance admission and the independent release gates remain open.
 
 ## Current-checkout image binding (2026-11-03, not released)
 
+### Descriptive calibration prerequisite
+
+The new `--describe-stability` mode reuses the actual original assessor and
+nearest-rank estimator. It describes all 64 chronological 250-sample windows
+in a complete four-round block, retains both visits and every measured
+sample, and records the source image roles plus SHA-256 hashes of the exact
+protocol/round files. It cannot change a protocol, overwrite a report or
+admit a release. Its output explicitly says uncertainty and warmup convergence
+are not established. Window ratios are descriptive, not new acceptance
+tests on smaller sample sets.
+
+Focused RED reports the missing collector assertion before implementation;
+GREEN is **64/64**, comprising 58 existing contracts and six new cases.
+The actual current-image report reproduces every original failed comparison
+exactly and retains all 16,000 observations. In the baseline's second visit,
+populated-read p95 across its four windows is 4.574270, 30.201782,
+22.543207 and 16.514300 ms. The candidate's second visit is 2.465563,
+3.469971, 3.396606 and 2.432962 ms. This is not explained simply by
+discarding the first cold window. No extra benchmark was run.
+
+**Test-correctness RCA (Low):** during RED, a broad negative `assert.throws`
+could succeed because the missing collector itself threw TypeError. Require
+the expected receipt-validation assertion messages, alongside the positive
+collector and real CLI contracts. This closes a false-green assertion class
+at the earliest focused test stage.
+
+**Next boundary:** a reviewed prospective study must distinguish within-visit
+and across-visit instability before selecting any changed warmup or
+measurement policy. The operator was unavailable for the design question;
+that is not approval for paid resources, relaxed bounds or deployment.
+The pragmatic continuation is non-admitting analysis on existing evidence,
+under the requested instruction to diagnose/fix issues.
+
+**Self-improvement applied:** test numerical windows and exact input/output
+identity, not the mere presence of an analysis file or a thrown exception.
+**Design disposition: accepted.** A small descriptive collector and shared
+nearest-rank helper extend the existing assessor. No new framework,
+production dependency, resource lifecycle or admission strategy is added.
+
+**Hosted follow-up:** reviewed prerequisite #263 is merged into #251 at
+`6f846cf8`. Current-image Linux run
+[41615647439](https://github.com/pranems/SCIMServer/actions/runs/41615647439)
+successfully builds and binds actual checkout `bc60f7f3` and the immutable
+0.55.67 image starting `92cd5024`. Its first same-image block fails four
+of twelve checks: populated-read p95 ratio 0.571817, remove p95 1.123033,
+empty-read p95 0.440720 and empty-read p99 0.844341. Faster out-of-range
+controls also fail repeatability. All 17,628 checked requests, 16,000 retained
+timings, 66 functional checks, 200 private-log checks, capture and exact
+cleanup complete. The opposite control and both old/current blocks do not
+run. No unchanged retry or new performance admission is claimed.
+
+The fixed 100 warmups do not establish stable observed timings: first-visit
+populated-read p95 falls from 6.355253/6.801990 ms in the first 250 measured
+samples to 2.652742/2.667220 ms in the last 250. App-cgroup CPU changes across
+visits while SQL counts stay 25,591-25,593. This demonstrates a measurement
+stability gap, not its unique cause. The next design requires prospective
+calibration and review, not speculative production-code removal or
+post-hoc selection of a favorable warmup count.
+
 The existing qualification still selected a pinned 0.55.58 candidate even
 after source/dependency reconciliation proposed 0.55.67. A passing historical
 image comparison could not qualify that new artifact. The new prospective

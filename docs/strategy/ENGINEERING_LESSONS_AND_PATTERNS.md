@@ -235,6 +235,15 @@ properties and runtime before adopting them. The narrow Linux qualification
 reuses the original lifecycle instead of building a new measurement framework.
 See [protocol and RCA](../ENDPOINT_SNAPSHOT_REVISION.md#prospective-linux-performance-qualification).
 
+A fixed warmup count is not evidence that observations have stabilized.
+Preserve chronological windows and distinguish within-visit drift from
+across-visit differences before attributing a failed identical-image control
+to production code. A descriptive report must preserve all original samples
+and assessments, bind its inputs, and explicitly avoid causal attribution,
+false-failure estimates or new admission criteria. Smaller windows are not
+independent replications and do not inherit pooled-sample limits. See the
+[current-image calibration prerequisite](../ENDPOINT_SNAPSHOT_REVISION.md#descriptive-calibration-prerequisite).
+
 ### Failure evidence needs its own completion budget and contract
 
 A failed measurement is not the same thing as an absent receipt. Preserve
