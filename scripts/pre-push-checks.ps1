@@ -8,6 +8,7 @@
     Three modes, from cheapest to most thorough:
 
       Fast (default for the hook)         ~9-10 min
+        - membership tooling unit regressions (serial; explicit local-evidence skips)
         - api npm run build (TS compile)
         - api npm run lint
         - web npx tsc --noEmit
@@ -26,7 +27,7 @@
         committed and pushed with every gate green.
 
       Validate (mirrors CI .github/workflows/build-test.yml validate job)
-                                          ~11-14 min
+                                          ~20 min local budget (host-dependent)
         - Everything in Fast, plus:
         - api npx prisma generate (required before lint + tests)
         - api migration linter (npx ts-node lint-migrations.ts)
@@ -158,12 +159,27 @@ function Show-Summary {
     }
 }
 
+# Validate configuration preflight
+if ($Mode -in @('Validate', 'Full')) {
+    Invoke-Gate -Name 'environment: Prisma codegen configuration' -Action {
+        if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
+            throw 'DATABASE_URL is required for Prisma client generation in Validate/Full mode. Set it explicitly for this process; generation does not connect to the database.'
+        }
+    }
+}
+
 # -------------------------------------------------------------------------
 # Fast gates (always run)
 # -------------------------------------------------------------------------
 
 Invoke-Gate -Name 'dependencies: ownership negative controls' -Action {
     pwsh -NoProfile -File (Join-Path $PSScriptRoot 'test' 'dependency-ownership.contract.ps1')
+}
+
+Invoke-Gate -Name 'tools: membership unit tests' -Action {
+    $membershipTests = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'test') -Filter 'membership-*.test.cjs' | Sort-Object Name | ForEach-Object FullName)
+    if ($membershipTests.Count -eq 0) { throw 'No membership tooling tests found' }
+    node --test --test-reporter=tap --test-concurrency=1 @membershipTests 2>&1 | Out-Host
 }
 
 Invoke-Gate -Name 'api: tsc build' -WorkingDir (Join-Path $repoRoot 'api') -Action {
@@ -359,6 +375,8 @@ Invoke-Gate -Name 'docs: RFC corpus current + intact' -WorkingDir $repoRoot -Act
 # database, no Docker and no network - it stays deterministic and works offline.
 
 Invoke-Gate -Name 'api: unit tests (jest)' -WorkingDir (Join-Path $repoRoot 'api') -Action {
+    # A real-timezone child deadline is not a failed timestamp assertion.
+    # Retain its elapsed/status/signal evidence; a focused pass is not this gate.
     npm test 2>&1 | Out-Host
 }
 
@@ -389,6 +407,9 @@ Invoke-Gate -Name 'api: e2e tests (inmemory, maxWorkers=2)' -WorkingDir (Join-Pa
 
 if ($Mode -in @('Validate', 'Full')) {
 
+    # Prisma's env('DATABASE_URL') throws during config load, even for codegen.
+    # Supply an explicit codegen-only URL in the caller when no DB is needed;
+    # a missing configuration must still block this gate.
     Invoke-Gate -Name 'api: prisma generate' -WorkingDir (Join-Path $repoRoot 'api') -Action {
         npx prisma generate 2>&1 | Out-Host
     }
@@ -398,7 +419,10 @@ if ($Mode -in @('Validate', 'Full')) {
     }
 
     Invoke-Gate -Name 'web: vitest' -WorkingDir (Join-Path $repoRoot 'web') -Action {
-        npm test 2>&1 | Out-Host
+        # A worker-startup error leaves files unexecuted even when every reported
+        # assertion passes. Preserve npm's failure exit; never admit partial counts.
+        # Focused or instrumented results do not replace a complete ordinary run.
+        npm test -- --maxWorkers=2 2>&1 | Out-Host
     }
 }
 

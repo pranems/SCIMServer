@@ -1,11 +1,133 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.54`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-28 - **Repo version at capture:** `api/package.json` = `0.55.54`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
 
 ---
+
+## Exact-checkout qualification image (2026-11-03 source change)
+
+The non-admitting
+[fixed-warmup diagnostic](../.github/workflows/membership-warmup-diagnostic.yml)
+now shares [the exact-image builder](../scripts/performance/build-membership-image.ps1)
+with qualification. It builds once and runs two same-image CPU-traced blocks,
+fixed at 100 then 1000 warmup cycles, with unchanged 1000 measured cycles and
+0.5 CPU / 1 GiB app limits. The job cap is 65 minutes: checkout 2, contracts 3,
+build 10, each diagnostic 20 and always-upload 4 minutes, leaving six minutes
+outside step caps. Each diagnostic retains the original 15-minute cooperative
+work stop and exact cleanup. Full/partial artifacts are retained for 14 days.
+The workflow only allocates on explicit readiness against the held performance
+branch or explicit dispatch; it does not mark #251 ready or retry qualification.
+It grants only contents-read, uses the existing serialized GitHub Linux host,
+does not publish an image and has no Azure/deployment authority.
+This is locally tested source, not a completed hosted study or new live estate.
+See the [study boundaries and stop rules](ENDPOINT_SNAPSHOT_REVISION.md#bounded-fixed-warmup-study-implemented-locally-not-executed).
+
+The qualification workflow now builds its actual checkout, including current
+dependency fixes, instead of measuring the frozen 0.55.58 image and implying
+that the result qualifies 0.55.67. The original manifest and failed receipts
+remain unchanged. A separate generated protocol binds the candidate's immutable
+local image ID, exact checkout commit and package version. Image OS,
+architecture and revision are verified; unrelated checkout/version/revision
+values fail before benchmark resource allocation. The baseline remains the
+original immutable public image. No package is published by this workflow.
+
+The Docker build uses `--pull`: the first local build otherwise reused a
+cached Node 24.16.0 base, older than the recorded 0.55.20 image runtime.
+Building the requested source alone does not establish a current base.
+The refreshed base and actual final runtime must be measured independently.
+The source-bound lane reserves ten minutes for the image build, uses a
+45-minute cooperative measurement cap and a 55-minute measurement-step cap,
+and preserves the 75-minute job cap and four-minute artifact upload.
+Historical standalone protocol execution retains its original 60-minute
+work cap. Resource limits, samples, warmups, all twelve latency bounds and
+the four fail-stop blocks are unchanged. Generated identity/protocol evidence
+is uploaded alongside completed or failed measurement evidence.
+
+This is source-level workflow verification, not new Azure estate evidence
+or a passing performance result. Existing public GitHub-hosted Linux capacity
+is used; no dedicated Azure host, new paid resource or deployment is introduced.
+
+## Prospective performance qualification runner (2026-10-22 source change)
+
+[performance-qualification.yml](../.github/workflows/performance-qualification.yml)
+uses the repository's existing public GitHub Actions service with an
+`ubuntu-24.04` runner. It provisions no Azure resource or new paid host, grants
+only `contents: read`, serializes qualification campaigns and permits no
+deployment or package publication. The current source-bound lane uses the
+45/55/75-minute work/step/job limits described above; the original frozen
+standalone campaign retains its 60-minute work limit. Checkout, contracts
+and upload have 2/3/4-minute caps.
+Completed/failed evidence is retained for 14 days. The workflow starts on
+relevant pull requests or explicit dispatch, not every application change.
+
+The [fixed historical manifest](../scripts/performance/membership-protocol.json)
+pins the original application/PostgreSQL images and resource limits. Current
+checkout qualification generates a separate source-bound candidate protocol.
+Separate owned app/database processes are created per four-round block;
+each role's app/database is reused for its second visit, preserving the
+existing within-block history. Two A/A blocks must pass before the two A/B
+blocks. This tests a fresh Linux execution environment, not the deployed
+Azure estate. Windows-hosted Docker is explicitly rejected for this lane.
+Failure stops later blocks and cannot authorize a deployment.
+
+Controlled client failures retain explicit partial FAIL receipts before
+container removal; these are never admitted. Disk persistence is outside
+the measured request window. Unexpected host loss or forced termination can
+still lose unflushed current-round memory; missing evidence is a failure,
+not permission to resume, retry automatically or infer a benchmark PASS.
+
+Only synthetic, labelled, exact-cleanup fixtures are used. No Azure
+credentials, gallery provisioning jobs or customer data are supplied.
+The public-runner path avoids provisioning new paid capacity; runner
+availability and noise still require the actual controls to pass. A shared
+physical host is possible even with an isolated runner VM. This source change
+does not itself prove qualification, update the live-estate inventory below,
+or replace remaining migration/live/browser/customer gates.
+
+The source-only [membership-cpu-diagnostic.yml](../.github/workflows/membership-cpu-diagnostic.yml)
+adds a separate diagnostic job on the same existing runner service and
+concurrency group. It runs one four-round same-image BAAB block with the
+original quota and workload, recording request spans and exact-owned cgroup
+CPU counter reads. It never calls the release evaluator or creates admission:
+both rows and results are explicitly diagnostic-only. Cooperative work is
+bounded to 15 minutes inside a 20-minute step and 30-minute job, with
+2/3/4-minute checkout/test/upload caps and 14-day complete/partial retention.
+The observer receives no inherited Linux environment, runs outside app quota
+and is stopped before app cleanup. Its CPU cost and sampling gaps are retained;
+shared-host perturbation and insufficient short-request sampling remain
+limitations. It has `contents: read` only and no cloud or deployment authority.
+See [ER-67](ENDPOINT_SNAPSHOT_REVISION.md#diagnostic-only-request-and-cpu-timeline-er-67).
+
+The source-only [membership-function-diagnostic.yml](../.github/workflows/membership-function-diagnostic.yml)
+uses the same read-only authority, concurrency group, public Linux service,
+15-minute cooperative budget, 20-minute step, 30-minute job and 14-day artifact
+retention. It selects one frozen old/current BAAB block, bypassing admission
+controls only because it cannot produce admission. Both application processes
+retain their first/second visits. Native profiling is applied only to the app
+Node command, not migrations or ordinary qualification; no inspector port,
+cloud credential, customer data, new host or quota increase is introduced.
+An explicit readonly bootstrap mount, environment opt-in and exact-owned
+profiler label authorize the diagnostic exit signal. Output uses the ordinary
+container writable layer, copied before removal rather than a disappearing
+tmpfs. Both role captures are attempted even if one fails, and partial receipts
+remain failures. Profiles include startup/idle/privacy work, and sample gaps
+are not CPU time. Linux execution of this new mode is not yet claimed.
+See [ER-68](ENDPOINT_SNAPSHOT_REVISION.md#native-function-profile-capture-assurance-er-68).
+
+All three participants explicitly use `queue: max` with
+`cancel-in-progress: false`. GitHub's default retains only one pending run
+and replaces it when a third arrives; that canceled the first native run
+before any job or measurement. The documented max queue retains up to 100
+pending runs while still allowing only one active benchmark. Queue saturation
+can still cancel additional arrivals and must not look like measured success.
+See [GitHub's concurrency queue documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
+The 2026-10-22 verification covers the source workflows above.
+The estate snapshots below retain their original capture dates; no fresh
+Azure inventory or serving change is claimed by this diagnostic work.
 
 ## 0.55.56 candidate startup-output hardening
 
@@ -61,6 +183,74 @@ removed; label-scoped absence was verified. This is local Docker evidence,
 not publication, local-node evidence or an Azure update. A depth-10 JSON
 diagnostic warning remains explicit; the parsed summary and 1,729 test
 entries agree with the console result.
+
+## Draft campaign execution boundary (2026-10-28 source change)
+
+The qualification, CPU timeline and native-function workflows retain their
+existing workloads, timeouts, shared concurrency group, permissions and
+admission limits. Only allocation during draft consolidation changes:
+
+| Invocation | Expensive campaign job | Ordinary correctness CI |
+|---|---|---|
+| Draft pull request opened, synchronized or reopened | Skipped before runner allocation | Still runs |
+| Non-draft pull request opened, synchronized or reopened | Runs as before | Still runs |
+| Draft marked ready for review | Runs through explicit `ready_for_review` event | Existing checks remain required |
+| Explicit workflow dispatch | Runs, including when a draft exists | Does not substitute for normal CI |
+
+This makes PR #251's preserved-history reconciliation possible without
+automatically repeating frozen failed experiments. A skipped draft job is
+not performance qualification and cannot clear the failed same-image control
+or authorize merge/deployment. Keep the PR draft until a reviewed measurement
+and release-admission route is ready. Explicit dispatch can allocate the
+campaign deliberately; no dispatch was performed for this change.
+
+The new source-boundary test evaluates all three actual job conditions for
+draft, non-draft and dispatch inputs. It also requires the ready event and
+confirms both ordinary validation jobs remain unconditionally active with
+the complete membership selector. The focused four-file aggregate passed
+116/116 after the missing-boundary RED; no workload or threshold changed.
+This verification updates source/workflow facts only, not live-estate claims.
+
+## Portable diagnostic test coverage (2026-10-24 source change)
+
+The ordinary branch/PR workflow (`build-test.yml`), tag/manual build workflow
+(`build-and-push.yml`) and default pre-push gates now discover every
+`scripts/test/membership-*.test.cjs` file and run them serially through Node's
+built-in test runner. CI runs this step after API dependency installation
+and Prisma generation. No package or lockfile change is required.
+
+These are unit regressions, not performance qualification or another
+experiment. Missing retained local evidence produces explicit skips only
+for the corresponding evidence comparisons; portable failure controls
+still run and runtime proof validation remains fail-closed. The real
+PostgreSQL probe remains separately opt-in. CI triggers, benchmark
+thresholds, publication tags and deployment behavior are unchanged.
+
+Both validation jobs check out complete Git history (`fetch-depth: 0`).
+The source-identity guard and historical negative controls require pinned
+ancestor objects; a default depth-one checkout cannot satisfy those inputs.
+An isolated shallow clone reproduced four failures, and fetching history
+alone made the same 38-test subset pass with its four explicit local-proof
+skips. The checks remain active rather than skipping missing ancestry.
+
+`membership-tool-gates.test.cjs` checks the active CI commands and default
+hook selector so ordinary application CI cannot silently omit this tooling.
+This source review does not refresh any live-estate observation below.
+
+Validate/Full pre-push now checks for an explicit `DATABASE_URL` before
+heavy suites, because Prisma's configuration loader requires it even for
+client generation. Fast mode retains its previous behavior. Generation
+does not require a live database: a caller can supply a non-connecting
+local code-generation URL in that process. The guard never invents a
+default connection string or prints an existing value.
+
+The complete web Vitest selector now uses `--maxWorkers=2` in pre-push and
+both build workflows. A local default-worker run lost 15 workers and left
+15 files unexecuted; the separate two-worker run completed all 124 files
+and 1,655 tests. No test filter, assertion, timeout, skip policy or
+performance threshold changed. The worker exits' native cause was not
+retained, so this is a measured capacity configuration, not proof of a
+historical memory failure. The existing API unit command is unchanged.
 
 ## Isolated Docker image handoff
 
@@ -1185,6 +1375,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-10-24 | Added the complete serial membership unit-test selector to ordinary branch/release CI and default pre-push. Kept experiments, performance admission, publication and deployment separate; no live infrastructure changed. |
 | 2026-10-16 | Verified dev/canary 0.55.54 on the same existing digest after the full no-skip db10b13e run: 40 PASS, zero FAIL/SKIPPED, nine reviewer PENDING. Refreshed actual serving revisions and two-revision retention; no customer-production operation or new image publication. |
 | 2026-10-16 | Added physical dependency ownership preflight before executing validation/deployment work, with actual runner refusal and command-sentinel negative controls. No topology, live deployment, publication or promotion behavior changed. |
 | 2026-10-14 | Migrated the Stage 3 reviewer-gate registrations in [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) from deleted prompt-file terminology to committed Agent Skill slash invocations. This is an orchestration-label and operator-guidance change only: executable deployment stages, image publication, estate resolution, Azure operations, and promotion behavior are unchanged. Re-reviewed the Section 10 drift register with no topology or live-estate fact change. |

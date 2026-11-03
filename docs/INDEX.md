@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.66`
+> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.67`
 
-> **Version:** 0.55.66 - **Updated:** 2026-10-21
+> **Version:** 0.55.67 - **Updated:** 2026-10-21
 > 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Unreleased preparation:** [endpoint token lifetime integration and original
@@ -485,7 +485,11 @@ These are the definitive source files for key aspects of the system:
 # Current Group membership correction
 
 - [Minimal imported Group membership correctness and execution RCA](GOOGLE_MINIMAL_GROUP_MEMBERSHIP.md)
+- [Unreleased local application-history diagnostic and execution RCA](MEMBERSHIP_HISTORY_DIAGNOSTIC.md)
+- [Low-disturbance observer and statement diagnostic](MEMBERSHIP_OBSERVER_AND_STATEMENT_DIAGNOSTIC.md) - DS-03 corrected-source study COMPLETE 8/8 in 1,071.628 seconds, with all-eight-role privacy, seven complete captures and independent cleanup. Absolute SQL/WAL, CPU, HTTP and fingerprint findings are descriptive only. Preserves DS-01 INVALID evidence, DS-02 84/84 source validation and earlier functional qualification; release-baseline adoption, admission and index changes remain held.
+- [Disposable URL GIN counterfactual](DISPOSABLE_URL_GIN_COUNTERFACTUAL.md) - COMPLETE 8/8 / 64,000 synthetic rows in 191.076 seconds including cleanup. One-index omission reduced measured full-cycle execution by 981.471 ms and WAL by 58.542228 MB, but worsened absent-URL reads from 0.163 ms to 10.945 ms. Source guards 39/39; retain production GIN, no admission.
 # Group reference preservation
+
 
 - [Accepted Group member references, migration and exact round-trip evidence](GROUP_MEMBER_REFERENCE_PRESERVATION.md).
 ## Responsive inventory layout

@@ -1,0 +1,78 @@
+function Save-NativeProfile {
+    param([string]$ContainerId, [string]$Directory, [string]$Role, [bool]$WorkComplete)
+    if ($ContainerId -cnotmatch '^[a-f0-9]{64}$' -or $Role -notin @('baseline', 'candidate')) {
+        throw 'Invalid owned native profile identity.'
+    }
+    $receipt = [ordered]@{
+        diagnosticOnly = $true; admissionEligible = $false; workComplete = $WorkComplete
+        captureStatus = 'FAIL'; failureStage = 'ownership'; exitCode = $null
+        filesCollected = $false; containerId = $ContainerId
+    }
+    $primaryFailure = $null
+    try {
+        Assert-Owned $ContainerId
+        $receipt.failureStage = 'initial-state'
+        $inspection = (Invoke-Docker inspect $ContainerId | ConvertFrom-Json)[0]
+        if ($inspection.Config.Labels.'scimserver.profile' -cne 'native-function') {
+            throw 'Owned container is not an opted-in native profiler.'
+        }
+        $state = $inspection.State
+        $stopped = !$state.Running
+        $captureFailure = $null
+        try {
+            if (!$stopped) {
+                $receipt.failureStage = 'flush-signal'
+                $null = Invoke-Docker kill --signal=USR2 $ContainerId
+                $receipt.failureStage = 'shutdown'
+                foreach ($attempt in 1..100) {
+                    $state = (Invoke-Docker inspect $ContainerId | ConvertFrom-Json)[0].State
+                    if (!$state.Running) { $stopped = $true; break }
+                    Start-Sleep -Milliseconds 100
+                }
+            }
+            if (!$stopped) { throw 'Owned native profile shutdown exceeded ten seconds.' }
+        } catch {
+            $captureFailure = $_
+            if ($receipt.failureStage -eq 'flush-signal') {
+                try {
+                    $state = (Invoke-Docker inspect $ContainerId | ConvertFrom-Json)[0].State
+                    $stopped = !$state.Running
+                } catch { $receipt.reinspectionFailed = $true }
+            }
+        }
+        if ($stopped) { $receipt.exitCode = $state.ExitCode }
+        if ($null -eq $captureFailure) { $receipt.failureStage = 'copy-profile' }
+        try {
+            $null = Invoke-Docker cp "${ContainerId}:/tmp/membership.cpuprofile" `
+                (Join-Path $Directory "profile-$Role.cpuprofile")
+        } catch {
+            if ($null -eq $captureFailure) { $captureFailure = $_ }
+        }
+        try {
+            $null = Invoke-Docker cp "${ContainerId}:/tmp/membership-profile-meta.json" `
+                (Join-Path $Directory "profile-$Role-meta.json")
+        } catch {
+            if ($null -eq $captureFailure) {
+                $receipt.failureStage = 'copy-metadata'
+                $captureFailure = $_
+            }
+        }
+        if ($null -ne $captureFailure) { throw $captureFailure }
+        $receipt.filesCollected = $true
+        $receipt.failureStage = 'exit-check'
+        if ($state.ExitCode -ne 0) { throw 'Owned native profile stopped with a failed exit; evidence retained.' }
+        $receipt.captureStatus = 'COMPLETE'
+        $receipt.failureStage = $null
+    } catch {
+        $primaryFailure = $_
+        throw
+    } finally {
+        try {
+            $receipt | ConvertTo-Json -Depth 5 |
+                Set-Content -LiteralPath (Join-Path $Directory "profile-$Role-status.json")
+        } catch {
+            if ($null -eq $primaryFailure) { throw }
+            Write-Warning 'Native profile status receipt write failed; primary capture error retained.'
+        }
+    }
+}

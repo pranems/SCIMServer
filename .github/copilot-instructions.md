@@ -194,6 +194,24 @@ Every URL-carried identifier and every SCIM attribute identifier is matched case
 
 Validation and deployment gates must never reuse a database because it is listening on a known port, and must never remove a container because it has a familiar fixed name. Each gate creates a uniquely named container with task and run labels, binds it to a Docker-assigned loopback port, uses tmpfs storage unless persistence is the behavior under test, passes the exact generated connection string to every database-backed lane, verifies labels before cleanup, removes only the captured full container ID, and verifies that exact ID is absent afterward. An inherited or shared database is not valid release evidence.
 
+## Complete Diagnostic Output and Native Cause Rule (added 2026-10-24)
+
+Long diagnostic console evidence must use prospectively fixed byte, frame,
+record, memory and absolute-deadline bounds. Do not replace a native
+maxBuffer failure by unbounded buffering or silently raise its budget.
+Complete-output proof requires both native pipes to finish, successful
+exit and all generated credential-role scans across real chunk boundaries;
+missing, empty, truncated, over-limit or failed input is INVALID.
+Keep uncertain container/tool attribution explicitly ambiguous.
+Every work and cleanup native failure must retain its first closed cause,
+finite allowlisted code, static operation/role/stage/command and available
+exit/signal/duration/phase through minimal receipt fallbacks. Unknown codes
+stay explicitly unrecognized; never persist raw stderr, arguments,
+exception messages or nested causes. Require real bounded Node/fake-CLI
+regressions for output volume and native failures before another runtime.
+Source-only tests do not reconstruct an unretained historical error or
+authorize another diagnostic invocation.
+
 ## Mutable Tag Registry Parity Rule (CRITICAL - added 2026-09-30)
 
 Every shipping tag replicated across GHCR and ACR must come from one authoritative CI build and resolve to the same manifest digest in every registry. Never assign `latest`, a semantic version, or a promotion tag to a separately rebuilt local image. Optional local validation images use only a visibly non-shipping `local-<sha>` tag. A no-cache local build must also use `--pull` when it claims current base-image parity because `--no-cache` alone can reuse a stale `FROM` image. Registry replication is incomplete until version and mutable tags exist and their digests equal the authoritative source digest.
@@ -568,6 +586,9 @@ Origin: 2026-06-19 operator request after the 11-step WIF authentication build -
 - **Structural-key assertion rule (live-test analog of R1).** Presence/absence-of-key assertions over a serialized payload MUST match the structural key form (`"<key>"`), never a bare substring - a bare-substring gate is simultaneously a false-positive and a false-negative generator (a loose `token` matched the legitimate `issuedTokenTtlSec`).
 - **Author-and-smoke-run-before-batch.** A new `scripts/live-test.ps1` section MUST be run against at least one live node in the same step it is authored, before deferring the rest of the live matrix to a batched checkpoint.
 - **Per-environment auth-value table.** OAuth secret / SCIM shared secret / base URL differ by form factor (Docker compose default `devscimclientsecret`; local node + dev Azure `changeme-oauth`). Pass the matching `-ClientSecret` per target; never assume the runner default fits every environment.
+- **Authorized diagnostic failure retention.** After ownership and diagnostic opt-in are verified, attempt every evidence file before cleanup even if signaling, shutdown, inspection or another copy fails. Preserve the first error/stage, record secondary inspection failure, and never mark incomplete capture successful. Include leaf status-receipt writers, not only caller finalizers: test combined capture/write failure and write-only failure, explicitly warn about a missing receipt, and assert retained contents after source cleanup. See ER-68m/o/ae in [the native diagnostic ledger](../docs/ENDPOINT_SNAPSHOT_REVISION.md).
+- **PowerShell environment restoration.** Preserve present, absent and empty states separately. When calling .NET string parameters, use `[NullString]::Value` to remove a previously absent variable; ordinary `$null` can bind as empty text on .NET 9+. Prove restoration and first-error precedence on the actual Linux runtime family before publication, not only Windows. See ER-68ad in the same ledger.
+- **Production-shaped correlation fixtures.** Verify the selected operation's category against the actual producer as well as its formatter. Include valid JSON/pretty records and wrong-domain/split-record negatives; a Group PATCH uses `scim.patch`, not `scim.group`. Before costly measurement, verify the changed guard through a bounded frozen-image contract probe without exporting raw logs or IDs. See ER-68ah in the same ledger.
 
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 
