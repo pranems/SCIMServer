@@ -477,8 +477,13 @@ for (const scenario of ['success', 'wrong-source', 'git-failure', 'wrong-version
 }
 
 for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-expired']) {
-  for (const traced of ['success', 'corrupt-read'].includes(scenario) ? [false, true] : [false]) {
-  test(`HTTP client retains explicit complete/partial evidence for ${scenario}${traced ? ' with diagnostic trace' : ''}`, async () => {
+  const variants = (['success', 'corrupt-read'].includes(scenario) ? [false, true] : [false])
+    .map(traced => ({ traced, warmup: 100, calibration: false }));
+  if (scenario === 'success') {
+    variants.push(...[100, 1000].map(warmup => ({ traced: true, warmup, calibration: true })));
+  }
+  for (const { traced, warmup, calibration } of variants) {
+  test(`HTTP client retains explicit complete/partial evidence for ${scenario}${traced ? ' with diagnostic trace' : ''}${calibration ? ` and ${warmup} calibration warmups` : ''}`, async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-client-contract-'));
     const receiptPath = path.join(directory, 'receipt.json');
     const token = randomUUID();
@@ -531,6 +536,8 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
           SCIM_BENCH_BASE_URL: `http://127.0.0.1:${server.address().port}`,
           SCIM_BENCH_TOKEN: token, SCIM_BENCH_VERSION: '0.55.58', SCIM_BENCH_OUTPUT: receiptPath,
           SCIM_BENCH_TRACE: traced ? '1' : undefined,
+          SCIM_BENCH_CALIBRATION_OWNER: calibration ? 'membership-warmup-calibration' : undefined,
+          SCIM_BENCH_WARMUP_ITERATIONS: calibration ? String(warmup) : undefined,
           SCIM_BENCH_DEADLINE_UTC: String(Date.now() + (scenario === 'deadline-expired' ? -1000 : 60000)) },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -549,7 +556,7 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
         assert.equal(receipt.diagnosticOnly, true, 'Instrumented data must never become release admission');
         assert.equal(receipt.traceClock, 'process.hrtime.bigint');
         assert.equal(receipt.spans.length, requests);
-        assert.equal(receipt.spans.filter(span => span.phase === 'warmup').length, 400);
+        assert.equal(receipt.spans.filter(span => span.phase === 'warmup').length, warmup * 4);
         assert.equal(receipt.spans.filter(span => span.phase === 'measured').length, scenario === 'success' ? 4000 : 10);
         let previousEnd = 0n;
         for (const [index, span] of receipt.spans.entries()) {
@@ -566,6 +573,7 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
         assert.equal(Object.hasOwn(receipt, 'diagnosticOnly'), false);
         assert.equal(Object.hasOwn(receipt, 'spans'), false);
       }
+      assert.equal(receipt.warmupCalibration, calibration ? true : undefined);
       if (scenario === 'corrupt-read') {
         assert.deepEqual(Object.fromEntries(Object.entries(receipt.samples).map(([key, values]) => [key, values.length])),
           { add: 3, populatedRead: 3, remove: 2, emptyRead: 2 });
@@ -581,9 +589,9 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
         assert.equal(receipt.cleanup.verified, false);
         assert.equal(receipt.failures[0].stage, 'cleanup');
       } else {
-        assert.equal(requests, 4407);
-        assert.equal(receipt.requestCount, 4407);
-        assert.equal(receipt.warmupIterations, 100);
+        assert.equal(requests, 4 * (warmup + 1000) + 7);
+        assert.equal(receipt.requestCount, 4 * (warmup + 1000) + 7);
+        assert.equal(receipt.warmupIterations, warmup);
         assert.ok(Object.values(receipt.samples).every(values =>
           values.length === 1000 && values.every(value => Number.isFinite(value) && value > 0)));
       }
@@ -595,6 +603,33 @@ for (const scenario of ['success', 'corrupt-read', 'cleanup-failure', 'deadline-
   });
   }
 }
+
+test('warmup calibration rejects unowned, untraced and unregistered settings before transport', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scim-calibration-rejection-'));
+  try {
+    for (const [owner, trace, warmup] of [
+      ['different-owner', '1', '1000'],
+      ['membership-warmup-calibration', undefined, '1000'],
+      ['membership-warmup-calibration', '1', '200'],
+      [undefined, '1', '1000'],
+    ]) {
+      const output = path.join(directory, 'must-not-exist.json');
+      const result = spawnSync(process.execPath,
+        [path.resolve(__dirname, '..', 'performance', 'benchmark-membership.cjs')], {
+          encoding: 'utf8',
+          env: { ...process.env,
+            SCIM_BENCH_BASE_URL: 'http://127.0.0.1:1',
+            SCIM_BENCH_TOKEN: randomUUID(), SCIM_BENCH_VERSION: '0.55.67',
+            SCIM_BENCH_OUTPUT: output, SCIM_BENCH_DEADLINE_UTC: String(Date.now() + 5000),
+            SCIM_BENCH_CALIBRATION_OWNER: owner, SCIM_BENCH_TRACE: trace,
+            SCIM_BENCH_WARMUP_ITERATIONS: warmup },
+        });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /Warmup calibration requires/);
+      assert.equal(fs.existsSync(output), false, 'Invalid configuration must fail before any request receipt');
+    }
+  } finally { fs.rmSync(directory, { recursive: true }); }
+});
 
 for (const unavailable of [false, true]) {
   test(`actual PostgreSQL readiness loop ${unavailable ? 'stays failed when final TCP listener never appears' : 'ignores socket-only initialization until final TCP readiness'}`, () => {
@@ -636,7 +671,9 @@ test('internal work deadline and shorter step cap reserve cleanup/upload before 
   const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'performance-qualification.yml'), 'utf8');
   assert.match(workflow, /^    timeout-minutes: 75$/m);
   assert.match(workflow, /^      - name: Build and bind exact checkout image\r?\n        timeout-minutes: 10$/m);
-  assert.match(workflow, /docker build --pull --label "org\.opencontainers\.image\.revision=\$source"/,
+  assert.match(workflow, /build-membership-image\.ps1/);
+  const builder = fs.readFileSync(path.resolve(__dirname, '..', 'performance', 'build-membership-image.ps1'), 'utf8');
+  assert.match(builder, /docker build --pull --label "org\.opencontainers\.image\.revision=\$source"/,
     'Current-source qualification must refresh the mutable base instead of silently using an older cached runtime');
   assert.match(workflow, /^      - name: Run fixed same-image controls before old\/current comparisons\r?\n        timeout-minutes: 55$/m);
   assert.match(workflow, /-ProtocolPath \(Join-Path \$env:GITHUB_WORKSPACE 'test-results\/performance-image\/protocol\.json'\)/);

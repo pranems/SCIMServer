@@ -252,6 +252,13 @@ after their first read and still obtain hashes of the analyzed bytes.
 Independent review caught both gaps in the descriptive collector; they are
 now closed in-place without changing any benchmark or acceptance result.
 
+When a shared validator accepts a new diagnostic shape, exercise every real
+caller. Populate fixtures with actual client metadata rather than weakening
+validation to accommodate an incomplete fixture. Evidence from a different
+experiment must be explicitly rejected by callers whose protocol did not
+change, even if its numerical shape matches. The warmup study adds a native
+CLI negative control for precisely that cross-diagnostic boundary.
+
 ### Failure evidence needs its own completion budget and contract
 
 A failed measurement is not the same thing as an absent receipt. Preserve

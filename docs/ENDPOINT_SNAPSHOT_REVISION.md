@@ -7,6 +7,91 @@ Performance admission and the independent release gates remain open.
 
 ## Current-checkout image binding (2026-11-03, not released)
 
+### Bounded fixed-warmup study (implemented locally, not executed)
+
+**Question:** does a predeclared 1000-cycle warmup change the within-visit and
+across-visit instability observed after 100 cycles? This is a diagnostic
+question, not a proposal to admit a release using more favorable samples.
+There is no established causal explanation or validated replacement protocol.
+
+The study builds one actual checkout image and binds its source, version,
+Linux/amd64 identity and revision using the same builder as qualification.
+The existing CPU-trace lifecycle runs exactly two current/current BAAB blocks
+on the same existing Linux host: control first, treatment second.
+
+| Property | Control | Treatment |
+|---|---|---|
+| Warmup cycles per round | 100 | 1000 |
+| Measured cycles per round | 1000 | 1000 |
+| Checked requests per round | 4407 | 8007 |
+| Four-round checked requests | 17,628 | 32,028 |
+| Retained measured timings | 16,000 | 16,000 |
+| App resources | 0.5 CPU, 1 GiB, quota/period 50,000/100,000 | Identical |
+| Cooperative work / workflow step | 15 / 20 minutes | Identical |
+| Admission authority | None | None |
+
+Both blocks retain every warmup and measured request span, all raw measured
+values, visit order, runtime/image identities, SQL and CPU counters, observer
+cost, privacy checks and exact cleanup. The maximum is 49,656 checked requests
+and 32,000 measured timings. The 65-minute job reserves separate 2-minute
+checkout, 3-minute contracts, 10-minute build, two 20-minute diagnostic steps
+and 4-minute always-upload caps, totalling 59 minutes.
+
+**Frozen stop rules:** stop on any client, functional, privacy, resource,
+deadline, capture or cleanup failure. Do not retry failed visits, adapt warmup,
+discard observations, change quotas, select a favorable window or run later
+qualification blocks. Descriptive instability itself is an observation, not
+permission to retry until green. Partial evidence is always uploaded.
+If the study does not clarify a reproducible regime, report that uncertainty
+and retain the release hold rather than chaining admission attempts.
+
+The workflow is deliberately limited to ready-for-review events against
+the held performance branch, plus explicit dispatch once available. It does
+not make #251 ready or start its unchanged qualification/native campaigns.
+Draft preparation and ordinary CI remain separate from this bounded allocation.
+It has read-only repository permissions, no Azure credentials, no image push
+and no deployment command.
+
+**Interpretation limits:** the two treatments occur sequentially. Host time,
+database/log history and the tenfold warmup change are not independently
+randomized. Tracing itself can perturb timing. Request windows are dependent,
+not independent replications. Neither this two-treatment study nor a favorable
+ratio establishes causality, convergence, an uncertainty estimate or an
+acceptable uninstrumented admission protocol. The original assessor and
+descriptive collector explicitly reject calibration-marked receipts, including
+when the ordinary diagnostic marker is removed. Native-function analysis also
+rejects them; the experiments cannot silently share admission or attribution.
+
+**Validation:** actual HTTP RED reproduced missing calibration identity and
+the unchanged 100-cycle execution. Orchestration RED reproduced absent
+preflight/builder/workflow and original diagnostic cardinality rejection.
+Focused GREEN: **137/137**, zero skips/failures, across client/orchestration,
+CPU timeline, descriptive evidence, warmup boundaries and native profiling.
+Real HTTP contracts prove both 4407 and 8007 requests, complete warmup spans,
+1000 timings per operation, failure evidence, exact cleanup and pre-transport
+rejection of unowned, untraced or unregistered warmup settings. The shared
+builder test executes its actual PowerShell and real binding CLI using
+explicitly mocked Git/Docker boundaries; it is not a real image-build claim.
+Complete publication gates, independent review and Linux execution remain
+pending.
+
+**Execution issues and RCA:**
+
+| Type / severity | Symptom and root cause | Resolution and why it works | Detection / earliest gate |
+|---|---|---|---|
+| Test correctness / Low | The native analyzer fixture omitted warmup/request metadata that real client receipts always contain. Tightening shared validation exposed it as `Original diagnostic warmup`, masking downstream assertions. | Populate the fixture with the actual 100/4407 metadata; run the shared validator's native caller as well as CPU tests. Existing complete native evidence passes again. | Focused downstream caller test / same focused compatibility stage; no deployment escape. |
+| Cross-diagnostic isolation / Medium | With explicit calibration supported by the shared validator, a calibration-marked receipt could be attributed as an ordinary native comparison. RED returned successful native analysis instead of rejection. | Native analysis rejects either calibration marker before the shared validator. A real CLI regression requires the specific rejection message. | Focused adversarial caller test / same stage; closed before publication or study allocation. |
+
+**Self-improvement applied:** test every real caller when broadening a shared
+receipt validator, and reject evidence from a different experiment even when
+its numerical shape is compatible. Negative tests require the intended
+validation message, not any unrelated exception.
+**Design disposition: accepted.** The already-large runner reuses its existing
+trace lifecycle with a finite guarded parameter, rather than adding a second
+resource orchestrator. Extracting the exact-image builder is justified by
+two real workflow callers. No application strategy, new dependency or
+speculative general-purpose experiment framework is added.
+
 ### Descriptive calibration prerequisite
 
 The new `--describe-stability` mode reuses the actual original assessor and

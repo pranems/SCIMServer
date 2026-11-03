@@ -36,26 +36,8 @@ jobs:
         timeout-minutes: 10
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $source = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0) { throw 'Exact checkout source unavailable.' }
-          git diff --exit-code
-          if ($LASTEXITCODE -ne 0) { throw 'Tracked checkout inputs were modified.' }
-          $directory = Join-Path $env:GITHUB_WORKSPACE 'test-results/performance-image'
-          New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
-          $version = (Get-Content api/package.json -Raw | ConvertFrom-Json).version
-          docker build --pull --label "org.opencontainers.image.revision=$source" `
-            --build-arg "IMAGE_TAG=$source" --iidfile (Join-Path $directory 'image-id.txt') .
-          if ($LASTEXITCODE -ne 0) { throw 'Exact-checkout image build failed.' }
-          $image = (Get-Content (Join-Path $directory 'image-id.txt') -Raw).Trim()
-          docker image inspect --format `
-            '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"sourceCommit":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}' `
-            $image | Set-Content (Join-Path $directory 'identity.json')
-          if ($LASTEXITCODE -ne 0) { throw 'Exact-checkout image identity unavailable.' }
-          node scripts/performance/assess-membership.cjs --checkout-image `
-            scripts/performance/membership-protocol.json (Join-Path $directory 'identity.json') `
-            $source $version (Join-Path $directory 'protocol.json')
-          if ($LASTEXITCODE -ne 0) { throw 'Current-image protocol binding failed.' }
+          ./scripts/performance/build-membership-image.ps1 `
+            -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'test-results/performance-image')
 
       - name: Run fixed same-image controls before old/current comparisons
         timeout-minutes: 55

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.67 bounded warmup diagnostic (2026-11-03, proposed)
+
+- Implement a non-admitting fixed 100/1000-cycle study over two current/current
+  traced blocks on one source-bound image. Preserve original qualification
+  warmups, samples, limits, failed results and admission. No study executed.
+- Reuse the existing trace resource lifecycle with a finite guarded parameter;
+  extract the exact-image builder for two real workflow callers. Bound the
+  job to 65 minutes with separate build, work, cleanup and upload time.
+- Add twelve regression cases across actual HTTP cardinality/cleanup,
+  configuration rejection, CPU evidence, original-assessor rejection,
+  actual shared builder, workflow caps and native cross-diagnostic isolation.
+  Focused coverage: 125 to 137 PASS, zero skips/failures. Complete application
+  counts remain historical until the protected publication gates run.
+- No serving API, browser source, migration, dependency, lockfile, release
+  version or Azure estate change.
+
 ### 0.55.67 descriptive stability evidence (2026-11-03, proposed)
 
 - Add a non-admitting, hash-bound report over all chronological windows in

@@ -180,18 +180,36 @@ function percentile(values, q) {
 }
 
 function validateDiagnosticRound(row, client) {
+  const calibration = Object.hasOwn(row, "warmupCalibration") ||
+    Object.hasOwn(client, "warmupCalibration");
+  if (calibration) {
+    assert.ok(row.warmupCalibration === true && client.warmupCalibration === true,
+      "Calibration markers must agree");
+    assert.ok([100, 1000].includes(row.warmupIterations), "Registered calibration warmup required");
+  } else {
+    assert.equal(row.warmupIterations, 100, "Original diagnostic warmup");
+  }
+  const warmup = row.warmupIterations;
+  assert.equal(client.warmupIterations, warmup, "Client warmup must match the registered round");
+  const requests = 4 * (warmup + 1000) + 7;
   assert.equal(row.diagnosticOnly, true);
   assert.equal(row.status, "PASS");
   assert.equal(row.complete, true);
   assert.equal(row.cpuMax, "50000 100000");
   assert.equal(row.cpuLimit, 0.5);
   assert.equal(row.memoryLimit, 1073741824);
-  assert.equal(row.requestCount, 4407);
+  assert.equal(row.requestCount, requests);
+  assert.equal(client.requestCount, requests);
   assert.equal(client.diagnosticOnly, true);
   assert.equal(client.traceClock, "process.hrtime.bigint");
   assert.equal(client.complete, true);
-  assert.equal(client.spans.length, 4407);
+  assert.equal(client.spans.length, requests);
   for (const operation of operations) {
+    const warmups = client.spans.filter(
+      (span) => span.operation === operation && span.phase === "warmup",
+    );
+    assert.deepEqual(warmups.map((span) => span.cycle),
+      Array.from({ length: warmup }, (_, i) => i), "Every warmup request must be retained");
     const measured = client.spans.filter(
       (span) => span.operation === operation && span.phase === "measured",
     );
@@ -240,6 +258,8 @@ function analyze(directory) {
     const client = load(`round-${index + 1}-${row.role}.json`);
     const cpu = load(`round-${index + 1}-${row.role}-cpu.json`);
     validateDiagnosticRound(row, client);
+    assert.equal(row.warmupIterations, rows[0].warmupIterations, "One fixed treatment per block");
+    assert.equal(row.warmupCalibration, rows[0].warmupCalibration, "One calibration mode per block");
     assert.equal(cpu.diagnosticOnly, true);
     assert.equal(cpu.admissionEligible, false);
     assert.equal(cpu.complete, true);
@@ -332,6 +352,8 @@ function analyze(directory) {
   const summary = {
     diagnosticOnly: true,
     admissionEligible: false,
+    warmupIterations: rows[0].warmupIterations,
+    warmupCalibration: rows[0].warmupCalibration === true,
     interpretation:
       "Temporal CPU-group counter association only; no request-specific causal delay or release admission.",
     comparisons,

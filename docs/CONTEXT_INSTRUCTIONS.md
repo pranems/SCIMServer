@@ -9,6 +9,15 @@
 
 ## Active Delivery Process
 
+**2026-11-03 bounded warmup study:** implemented locally, not executed on a
+Linux host. One exact checkout image, two traced same-image BAAB blocks,
+fixed100 then1000 warmups and1000 measured cycles, original0.5CPU/1GiB.
+Finite65-minute job,15-minute per-block cooperative stop, original cleanup,
+no retries/adaptive selection or admission authority. Focused tooling137/137
+PASS. Shared image builder has two actual workflow callers; actual HTTP and
+native-analysis isolation regressions pass. Normal review, publication and
+hosted execution remain pending; #251 remains draft and deployment held.
+
 **2026-11-03 measured calibration gap:** #263 merged into #251 at6f846cf8;
 ordinary exact-tip CI passes. Actual source-bound Linux run41615647439 fails
 four same-image comparisons, while functional66/privacy200/exact cleanup

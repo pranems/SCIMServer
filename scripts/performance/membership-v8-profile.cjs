@@ -231,6 +231,8 @@ function analyze(directory) {
       assert.equal(row.version, identity.version);
       assert.equal(row.appContainerId, capture.containerId);
       const client = load(`round-${index + 1}-${role}.json`);
+      assert.ok(!Object.hasOwn(row, "warmupCalibration") && !Object.hasOwn(client, "warmupCalibration"),
+        "Warmup calibration cannot enter native comparisons");
       validateDiagnosticRound(row, client);
       let previousEnd = start;
       for (const [spanIndex, span] of client.spans.entries()) {

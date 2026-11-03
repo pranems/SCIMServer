@@ -38,6 +38,13 @@ assert.ok(process.env.SCIM_BENCH_REQUIRE_MASKS === undefined ||
   (process.env.SCIM_BENCH_REQUIRE_MASKS === '1' && history),
   'Mask fixture policy requires the explicit diagnostic IPC owner');
 const requireMasks = process.env.SCIM_BENCH_REQUIRE_MASKS === '1';
+const warmupCalibration = process.env.SCIM_BENCH_CALIBRATION_OWNER !== undefined ||
+  process.env.SCIM_BENCH_WARMUP_ITERATIONS !== undefined;
+assert.ok(!warmupCalibration ||
+  (process.env.SCIM_BENCH_CALIBRATION_OWNER === 'membership-warmup-calibration' &&
+    tracing && !history && ['100', '1000'].includes(process.env.SCIM_BENCH_WARMUP_ITERATIONS)),
+  'Warmup calibration requires its explicit owner, trace mode, no history mode and 100 or 1000 cycles');
+const warmupIterations = warmupCalibration ? Number(process.env.SCIM_BENCH_WARMUP_ITERATIONS) : 100;
 async function boundary(name, extra = {}) {
   if (!history) return;
   await new Promise((resolve, reject) => {
@@ -99,8 +106,8 @@ async function request(method, pathname, body) {
       spans.push({
         requestIndex: requestCount,
         operation: stage,
-        phase: lifecycle ? 'lifecycle' : cycle < 100 ? 'warmup' : 'measured',
-        cycle: lifecycle ? null : cycle < 100 ? cycle : cycle - 100,
+        phase: lifecycle ? 'lifecycle' : cycle < warmupIterations ? 'warmup' : 'measured',
+        cycle: lifecycle ? null : cycle < warmupIterations ? cycle : cycle - warmupIterations,
         startNs: startNs.toString(),
         endNs: process.hrtime.bigint().toString(),
         ms: ms ?? performance.now() - start,
@@ -162,8 +169,8 @@ async function main() {
       })
     ).body;
     await boundary('warmup-before');
-    for (let index = 0; index < 1100; index++) {
-      if (index === 100) {
+    for (let index = 0; index < warmupIterations + 1000; index++) {
+      if (index === warmupIterations) {
         await boundary('warmup-after');
         await boundary('measured-before');
       }
@@ -175,10 +182,10 @@ async function main() {
           { op: 'add', path: 'members', value: [{ value: user.id }] },
         ],
       });
-      if (index >= 100) samples.add.push(add.ms);
+      if (index >= warmupIterations) samples.add.push(add.ms);
       stage = 'populatedRead';
       const populated = await request('GET', `${scoped}/Groups/${group.id}`);
-      if (index >= 100) samples.populatedRead.push(populated.ms);
+      if (index >= warmupIterations) samples.populatedRead.push(populated.ms);
       assert.deepEqual(
         populated.body.members.map((member) => member.value),
         [user.id],
@@ -188,10 +195,10 @@ async function main() {
         schemas: [patchSchema],
         Operations: [{ op: 'remove', path: `members[value eq "${user.id}"]` }],
       });
-      if (index >= 100) samples.remove.push(remove.ms);
+      if (index >= warmupIterations) samples.remove.push(remove.ms);
       stage = 'emptyRead';
       const empty = await request('GET', `${scoped}/Groups/${group.id}`);
-      if (index >= 100) samples.emptyRead.push(empty.ms);
+      if (index >= warmupIterations) samples.emptyRead.push(empty.ms);
       assert.equal((empty.body.members ?? []).length, 0);
     }
     await boundary('measured-after');
@@ -222,7 +229,7 @@ async function main() {
     }
     if (!failures.length) {
       try {
-        assert.equal(requestCount, 4407);
+        assert.equal(requestCount, 4 * (warmupIterations + 1000) + 7);
         assert.ok(
           Object.values(samples).every((values) => values.length === 1000),
         );
@@ -239,13 +246,14 @@ async function main() {
           version: expectedVersion,
           nodeVersion: process.version,
           measuredAt: new Date().toISOString(),
-          warmupIterations: 100,
+          warmupIterations,
           requestCount,
           samples,
           status: complete ? 'PASS' : 'FAIL',
           complete,
           failures,
           cleanup,
+          ...(warmupCalibration ? { warmupCalibration: true } : {}),
           ...(tracing
             ? {
                 diagnosticOnly: true,
