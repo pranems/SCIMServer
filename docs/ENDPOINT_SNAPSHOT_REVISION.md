@@ -271,6 +271,13 @@ negative changed visit one, causing the request-count validator to reject
 4407 versus 8007 before the intended uniformity check. Change visit two so
 the exact intended uniformity assertion is exercised. Detection and earliest
 possible gate are the same focused run; no publication/deployment escape.
+**Execution issue / RCA (environment, Low):** the first protected push stopped
+at its configuration preflight because this fresh process had no DATABASE_URL.
+No suite or hosted campaign ran. The existing runner explicitly requires the
+value for Prisma generation, which does not connect. Supply a process-local
+non-serving loopback codegen placeholder for publication, not an inherited
+or shared database and not database-backed validation evidence. Preserve the
+failed push log; the corrected push must still pass every protected gate.
 **Provenance:** this analysis used bounded source/receipt reads and executable
 offline checks, not the 28 MB hosted log. `VSCODE_TARGET_SESSION_LOG` is unset;
 full-transcript RCA completeness is not claimed.
