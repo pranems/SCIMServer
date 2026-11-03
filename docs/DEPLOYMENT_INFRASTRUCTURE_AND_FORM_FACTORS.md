@@ -9,6 +9,22 @@
 
 ## Exact-checkout qualification image (2026-11-03 source change)
 
+The non-admitting
+[fixed-warmup diagnostic](../.github/workflows/membership-warmup-diagnostic.yml)
+now shares [the exact-image builder](../scripts/performance/build-membership-image.ps1)
+with qualification. It builds once and runs two same-image CPU-traced blocks,
+fixed at 100 then 1000 warmup cycles, with unchanged 1000 measured cycles and
+0.5 CPU / 1 GiB app limits. The job cap is 65 minutes: checkout 2, contracts 3,
+build 10, each diagnostic 20 and always-upload 4 minutes, leaving six minutes
+outside step caps. Each diagnostic retains the original 15-minute cooperative
+work stop and exact cleanup. Full/partial artifacts are retained for 14 days.
+The workflow only allocates on explicit readiness against the held performance
+branch or explicit dispatch; it does not mark #251 ready or retry qualification.
+It grants only contents-read, uses the existing serialized GitHub Linux host,
+does not publish an image and has no Azure/deployment authority.
+This is locally tested source, not a completed hosted study or new live estate.
+See the [study boundaries and stop rules](ENDPOINT_SNAPSHOT_REVISION.md#bounded-fixed-warmup-study-implemented-locally-not-executed).
+
 The qualification workflow now builds its actual checkout, including current
 dependency fixes, instead of measuring the frozen 0.55.58 image and implying
 that the result qualifies 0.55.67. The original manifest and failed receipts

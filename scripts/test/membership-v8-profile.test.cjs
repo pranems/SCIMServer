@@ -78,6 +78,8 @@ function comparisonFixture(directory) {
       complete: true,
       diagnosticOnly: true,
       traceClock: "process.hrtime.bigint",
+      warmupIterations: 100,
+      requestCount: 4407,
       spans,
     });
     return {
@@ -92,6 +94,7 @@ function comparisonFixture(directory) {
       cpuLimit: 0.5,
       memoryLimit: 1073741824,
       requestCount: 4407,
+      warmupIterations: 100,
       appContainerId: (role === "baseline" ? "c" : "d").repeat(64),
       samples: Object.fromEntries(
         ["add", "populatedRead", "remove", "emptyRead"].map((op) => [
@@ -154,6 +157,7 @@ for (const scenario of [
   "clock-coverage",
   "missing-cleanup",
   "failed-privacy",
+  "calibration-receipt",
 ]) {
   test(`actual native comparison CLI enforces immutable provenance and non-admission: ${scenario}`, () => {
     const root = fs.mkdtempSync(
@@ -163,6 +167,13 @@ for (const scenario of [
     fs.mkdirSync(directory);
     try {
       const { save, rows } = comparisonFixture(directory);
+      if (scenario === "calibration-receipt") {
+        rows[0].warmupCalibration = true;
+        const client = JSON.parse(fs.readFileSync(path.join(directory, "round-1-candidate.json")));
+        client.warmupCalibration = true;
+        save("round-1-candidate.json", client);
+        save("rounds.json", rows);
+      }
       if (scenario === "wrong-image") {
         rows[0].image = rows[1].image;
         save("rounds.json", rows);
@@ -212,6 +223,9 @@ for (const scenario of [
       assert.equal(fs.existsSync(output), scenario === "complete");
       if (scenario === "wrong-image") {
         assert.match(result.stderr, /Round must use the pinned role image/);
+      }
+      if (scenario === "calibration-receipt") {
+        assert.match(result.stderr, /Warmup calibration cannot enter native comparisons/);
       }
       if (scenario === "complete") {
         const receipt = JSON.parse(fs.readFileSync(output));

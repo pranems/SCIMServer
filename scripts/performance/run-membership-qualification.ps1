@@ -2,7 +2,8 @@ param(
     [string]$OutputDirectory,
     [string]$ProtocolPath,
     [switch]$TraceDiagnostic,
-    [switch]$ProfileDiagnostic
+    [switch]$ProfileDiagnostic,
+    [ValidateSet(0, 100, 1000)][int]$WarmupCalibration = 0
 )
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -16,6 +17,12 @@ $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw 'Invalid preregistered protocol; no resources allocated.' }
 if (!$IsLinux) { throw 'Qualification requires a Linux host, not a Windows-hosted Docker VM.' }
 if ($TraceDiagnostic -and $ProfileDiagnostic) { throw 'Choose one diagnostic mode, never combined instrumentation.' }
+if ($WarmupCalibration -ne 0 -and (!$TraceDiagnostic -or $ProfileDiagnostic -or !$protocol.candidate.sourceCommit)) {
+    throw 'Warmup calibration requires current-checkout CPU trace mode.'
+}
+if ($env:SCIM_BENCH_CALIBRATION_OWNER -or $env:SCIM_BENCH_WARMUP_ITERATIONS) {
+    throw 'Inherited warmup calibration settings are not permitted.'
+}
 if (!$TraceDiagnostic -and !$ProfileDiagnostic -and $env:SCIM_BENCH_TRACE) { throw 'Diagnostic trace cannot enter qualification.' }
 if ($env:SCIM_BENCH_PROFILE -or $env:NODE_OPTIONS) { throw 'Inherited application profiling/options are not permitted.' }
 $cpuTrace = Join-Path $PSScriptRoot 'membership-cpu-trace.cjs'
@@ -34,10 +41,12 @@ $summary = [ordered]@{
     OriginalWindowsAdmission = 'FAIL/unresolved; not replaced retrospectively'
     StatisticalFalseFailureRate = 'Not estimated by this bounded qualification'
     Blocks = @()
-    Mode = $(if ($TraceDiagnostic) { 'CPU timeline diagnostic only' }
+    Mode = $(if ($WarmupCalibration) { 'Warmup calibration diagnostic only' }
+        elseif ($TraceDiagnostic) { 'CPU timeline diagnostic only' }
         elseif ($ProfileDiagnostic) { 'Native function diagnostic only' } else { 'Performance qualification' })
     AdmissionEligible = $false
 }
+if ($WarmupCalibration) { $summary['WarmupIterations'] = $WarmupCalibration }
 $campaignClock = [System.Diagnostics.Stopwatch]::StartNew()
 $workMinutes = if ($TraceDiagnostic -or $ProfileDiagnostic) { 15 }
     elseif ($protocol.candidate.sourceCommit) { 45 } else { 60 }
@@ -45,7 +54,8 @@ $workDeadlineUtc = [DateTimeOffset]::UtcNow.AddMinutes($workMinutes).ToUnixTimeM
 $summary['WorkDeadlineUtc'] = [DateTimeOffset]::FromUnixTimeMilliseconds($workDeadlineUtc).ToString('o')
 $envNames = @('POSTGRES_PASSWORD', 'SCIM_SHARED_SECRET', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET',
     'CREDENTIAL_KEK', 'DATABASE_URL', 'SCIM_BENCH_BASE_URL', 'SCIM_BENCH_TOKEN', 'SCIM_BENCH_VERSION',
-    'SCIM_BENCH_DEADLINE_UTC', 'SCIM_BENCH_TRACE')
+    'SCIM_BENCH_DEADLINE_UTC', 'SCIM_BENCH_TRACE',
+    'SCIM_BENCH_CALIBRATION_OWNER', 'SCIM_BENCH_WARMUP_ITERATIONS')
 $priorEnvironment = @{}
 foreach ($key in $envNames) { $priorEnvironment[$key] = [Environment]::GetEnvironmentVariable($key) }
 
@@ -240,13 +250,20 @@ function Invoke-Block {
                 $env:SCIM_BENCH_TOKEN = $env:SCIM_SHARED_SECRET
                 $env:SCIM_BENCH_VERSION = $roles[$role].version
                 $env:SCIM_BENCH_DEADLINE_UTC = [string]$workDeadlineUtc
+                $calibrationEnvironment = @()
+                if ($WarmupCalibration) {
+                    $env:SCIM_BENCH_CALIBRATION_OWNER = 'membership-warmup-calibration'
+                    $env:SCIM_BENCH_WARMUP_ITERATIONS = [string]$WarmupCalibration
+                    $calibrationEnvironment = @('--env', 'SCIM_BENCH_CALIBRATION_OWNER',
+                        '--env', 'SCIM_BENCH_WARMUP_ITERATIONS')
+                }
                 $receiptPath = Join-Path $directory "round-$round-$role.json"
                 $traceEnvironment = if ($TraceDiagnostic -or $ProfileDiagnostic) { @('--env', 'SCIM_BENCH_TRACE') } else { @() }
                 $client = (Invoke-Docker create --network host --no-healthcheck `
                     --label scimserver.owner=membership-qualification --label "scimserver.run=$run" `
                     --mount "type=bind,source=$clientScript,target=/tmp/benchmark.cjs,readonly" `
                     --env SCIM_BENCH_BASE_URL --env SCIM_BENCH_TOKEN --env SCIM_BENCH_VERSION --env SCIM_BENCH_DEADLINE_UTC `
-                    @traceEnvironment `
+                    @traceEnvironment @calibrationEnvironment `
                     --env SCIM_BENCH_OUTPUT=/tmp/receipt.json --entrypoint node `
                     $protocol.candidate.image /tmp/benchmark.cjs).Trim()
                 if ($client -notmatch '^[a-f0-9]{64}$') { throw 'Invalid owned client id.' }
@@ -274,6 +291,13 @@ function Invoke-Block {
                 }
                 if (($TraceDiagnostic -or $ProfileDiagnostic) -and $receipt.diagnosticOnly -ne $true) {
                     throw 'Diagnostic client omitted explicit non-admission marker.'
+                }
+                if ($WarmupCalibration) {
+                    if ($receipt.warmupCalibration -ne $true -or $receipt.warmupIterations -ne $WarmupCalibration) {
+                        throw 'Calibration client omitted its registered warmup and non-admission marker.'
+                    }
+                } elseif ($receipt.PSObject.Properties.Name -contains 'warmupCalibration') {
+                    throw 'Unexpected calibration client cannot enter another mode.'
                 }
                 if ($transportExit -ne 0 -or $clientExit -ne 0 -or $receipt.status -cne 'PASS' -or $receipt.complete -ne $true) {
                     throw 'Failed/partial client receipt retained; no admission or later round.'
@@ -347,10 +371,11 @@ function Invoke-Block {
                 peakCgroupBytes = $peak; nodeRssBytes = $rssBytes; oomKilled = $false
             }
             if ($TraceDiagnostic -or $ProfileDiagnostic) { $row | Add-Member -NotePropertyName diagnosticOnly -NotePropertyValue $true }
+            if ($WarmupCalibration) { $row | Add-Member -NotePropertyName warmupCalibration -NotePropertyValue $true }
             if ($ProfileDiagnostic) { $row | Add-Member -NotePropertyName appContainerId -NotePropertyValue $app.Id }
             $rows.Add($row)
             $rows.ToArray() | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $directory 'rounds.json')
-            Write-Host "Completed $($Block.name) round $round ${role}: 4407 checked requests."
+            Write-Host "Completed $($Block.name) round $round ${role}: $($receipt.requestCount) checked requests."
         }
         Assert-WithinDeadline
         . (Join-Path $root 'scripts\live-test-sections\minimal-group-members.ps1')

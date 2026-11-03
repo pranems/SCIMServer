@@ -290,6 +290,10 @@ for (const scenario of [
   'missing-cost',
   'failed-privacy',
   'missing-privacy',
+  'calibration-100',
+  'calibration-1000',
+  'calibration-marker-missing',
+  'calibration-warmup-mismatch',
 ]) {
   test(`actual diagnostic analyzer accepts only complete matching evidence: ${scenario}`, () => {
     implementation();
@@ -297,6 +301,9 @@ for (const scenario of [
       path.join(os.tmpdir(), 'scim-cpu-analysis-'),
     );
     try {
+      const calibrated = scenario.startsWith('calibration-');
+      const warmup = calibrated && scenario !== 'calibration-100' ? 1000 : 100;
+      const accepted = ['complete', 'calibration-100', 'calibration-1000'].includes(scenario);
       const roles = ['candidate', 'baseline', 'baseline', 'candidate'];
       const rows = roles.map((role) => ({
         role,
@@ -307,7 +314,9 @@ for (const scenario of [
         cpuMax: '50000 100000',
         cpuLimit: 0.5,
         memoryLimit: 1073741824,
-        requestCount: 4407,
+        warmupIterations: warmup,
+        requestCount: 4 * (warmup + 1000) + 7,
+        ...(calibrated && scenario !== 'calibration-marker-missing' ? { warmupCalibration: true } : {}),
         samples: Object.fromEntries(
           ['add', 'populatedRead', 'remove', 'emptyRead'].map((op) => [
             op,
@@ -333,18 +342,18 @@ for (const scenario of [
         };
         for (const op of ['version', 'fixture', 'fixture', 'fixture'])
           append(op, 'lifecycle');
-        for (let cycle = 0; cycle < 1100; cycle++) {
+        for (let cycle = 0; cycle < warmup + 1000; cycle++) {
           for (const op of ['add', 'populatedRead', 'remove', 'emptyRead']) {
             append(
               op,
-              cycle < 100 ? 'warmup' : 'measured',
-              cycle < 100 ? cycle : cycle - 100,
+              cycle < warmup ? 'warmup' : 'measured',
+              cycle < warmup ? cycle : cycle - warmup,
             );
           }
         }
         for (const op of ['finalVersion', 'cleanup', 'cleanup'])
           append(op, 'lifecycle');
-        const observations = [0, 4000000000, 9000000000].map((ns, i) => ({
+        const observations = [0, 4000000000, warmup === 1000 ? 17000000000 : 9000000000].map((ns, i) => ({
           ns: String(ns),
           readStartNs: String(ns),
           usage_usec: i * 100,
@@ -355,14 +364,25 @@ for (const scenario of [
         if (index === 0 && scenario === 'clock-gap')
           observations.at(-1).ns = '8000000000';
         if (index === 0 && scenario === 'changed-sample') spans[404].ms = 2;
-        fs.writeFileSync(
-          path.join(directory, `round-${index + 1}-${role}.json`),
-          JSON.stringify({
+        const client = {
             diagnosticOnly: true,
             traceClock: 'process.hrtime.bigint',
             complete: true,
+            warmupIterations: scenario === 'calibration-warmup-mismatch' ? 100 : warmup,
+            requestCount: 4 * (warmup + 1000) + 7,
+            ...(calibrated ? { warmupCalibration: true } : {}),
             spans,
-          }),
+        };
+        if (index === 0 && scenario === 'calibration-marker-missing') {
+          assert.throws(() => implementation().validateDiagnosticRound(rows[0], client),
+            /Calibration markers must agree/);
+        }
+        if (index === 0 && scenario === 'calibration-warmup-mismatch') {
+          assert.throws(() => implementation().validateDiagnosticRound(rows[0], client),
+            /Client warmup must match/);
+        }
+        fs.writeFileSync(
+          path.join(directory, `round-${index + 1}-${role}.json`), JSON.stringify(client),
         );
         const cpu = {
           diagnosticOnly: true,
@@ -400,15 +420,17 @@ for (const scenario of [
       );
       assert.equal(
         result.status,
-        scenario === 'complete' ? 0 : 1,
+        accepted ? 0 : 1,
         result.stdout + result.stderr,
       );
       const output = path.join(directory, 'cpu-attribution.json');
-      assert.equal(fs.existsSync(output), scenario === 'complete');
-      if (scenario === 'complete') {
+      assert.equal(fs.existsSync(output), accepted);
+      if (accepted) {
         const receipt = JSON.parse(fs.readFileSync(output, 'utf8'));
         assert.equal(receipt.diagnosticOnly, true);
         assert.equal(receipt.admissionEligible, false);
+        assert.equal(receipt.warmupIterations, warmup);
+        assert.equal(receipt.warmupCalibration, calibrated);
         assert.equal(receipt.comparisons.length, 8);
         assert.ok(
           receipt.comparisons.every(

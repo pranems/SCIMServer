@@ -1,0 +1,66 @@
+name: Membership fixed warmup diagnostic
+
+on:
+  pull_request:
+    branches: [fix/performance-qualification-20261022]
+    types: [ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: membership-performance-qualification
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  diagnose:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact diagnostic source
+        timeout-minutes: 2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify diagnostic and admission isolation contracts
+        timeout-minutes: 3
+        run: |
+          node --test scripts/test/membership-performance.test.cjs scripts/test/membership-cpu-trace.test.cjs scripts/test/membership-stability.test.cjs scripts/test/membership-warmup.test.cjs scripts/test/membership-v8-profile.test.cjs
+
+      - name: Build and bind one exact checkout image
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          ./scripts/performance/build-membership-image.ps1 `
+            -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'test-results/warmup-image')
+
+      - name: Observe fixed original 100-cycle warmup control
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          ./scripts/performance/run-membership-qualification.ps1 -TraceDiagnostic -WarmupCalibration 100 `
+            -ProtocolPath (Join-Path $env:GITHUB_WORKSPACE 'test-results/warmup-image/protocol.json') `
+            -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'test-results/warmup-control-100')
+
+      - name: Observe fixed 1000-cycle warmup treatment
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          ./scripts/performance/run-membership-qualification.ps1 -TraceDiagnostic -WarmupCalibration 1000 `
+            -ProtocolPath (Join-Path $env:GITHUB_WORKSPACE 'test-results/warmup-image/protocol.json') `
+            -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'test-results/warmup-treatment-1000')
+
+      - name: Retain every completed and partial diagnostic receipt
+        timeout-minutes: 4
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: membership-warmup-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/warmup-image/
+            test-results/warmup-control-100/
+            test-results/warmup-treatment-1000/
+          if-no-files-found: error
+          retention-days: 14

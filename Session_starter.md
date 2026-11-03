@@ -1,5 +1,15 @@
 ## SCIMServer - Condensed Session Memory
 
+**2026-11-03 fixed-warmup diagnostic preparation:** isolated
+`fix/qualification-warmup-study-20261103` implements a bounded non-admitting
+100/1000-cycle study on one exact checkout image. Original warmups, limits
+and admission stay unchanged; every calibration receipt is rejected by
+qualification and native comparisons. Focused tooling137/137 PASS after
+semantic RED. Actual HTTP requests4407/8007, complete spans and cleanup are
+asserted; shared image-builder execution and finite workflow budgets pass.
+No hosted study, review, publication, release admission or target deployment
+is claimed. #251 remains draft. Full protected publication gates are next.
+
 **2026-11-03 calibration evidence:** branch
 `fix/qualification-calibration-20261103` is based on reviewed merge6f846cf8.
 Actual source-bound Linux run41615647439 fails4/12 same-image checks;
