@@ -44,6 +44,28 @@ admit a release, prove the Azure image or replace operator visual approval.
 
 ## Tenant bootstrap must verify effects, not command labels (2026-10-31)
 
+Compare normalized database identities, not URI spellings: libpq treats
+zero-padded numeric ports as the same port, and percent-encoded database
+names must be decoded exactly once. Centralize that normalization in the
+parser and test source/target guards plus app binding, including a literal
+percent escape that must not be decoded twice.
+
+Declare the minimum PowerShell runtime against the APIs actually called.
+Testing on a newer host does not prove .NET API availability on that minimum.
+Use portable checked native permissions where the newer .NET convenience
+API is unavailable. Reused infrastructure needs the same delegation contract
+as fresh Bicep provisioning; test the caller wiring, not only a helper option.
+Label stubbed shell contracts as such rather than upgrading them to database
+evidence because the container image happens to contain PostgreSQL.
+
+An idle transaction held by an input-open client is safer than a long
+server-side sleep used as a lease. Closing input releases the client/session
+without waiting for a sleeping backend to observe disconnection. Test actual
+worker signals as well as success/error exits, and reuse the fixture worker
+to catch leftover FIFO pathnames. Label detached fixtures by unique run,
+put their data on tmpfs, verify ownership before deletion and verify exact-ID
+absence afterwards; `--rm` alone does not stop a detached process.
+
 Exercise guards through their production entry point, with the caller's
 actual error policy and delegated values. PR267 review found a tested absence
 guard that provisioning never called, private-file tests that only used

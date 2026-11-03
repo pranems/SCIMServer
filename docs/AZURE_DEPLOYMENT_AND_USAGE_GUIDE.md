@@ -58,6 +58,13 @@ before allocation under `~/.scimserver-deploy/postgres-<run>/`. Its immutable
 `connection.json` is verified before extension setup. Protect and retain these
 local records; they are not an off-device backup.
 
+For an existing VNet, infrastructure subnet reuse requires the
+`Microsoft.App/environments` delegation. The deployment refuses an
+undelegated subnet rather than reaching a later environment-allocation
+failure; missing subnets request and verify the required delegation.
+Unix credential protection uses checked `chmod 600`, not .NET APIs newer
+than the declared PowerShell 7.2 minimum.
+
 ```mermaid
 flowchart LR
     subgraph Azure

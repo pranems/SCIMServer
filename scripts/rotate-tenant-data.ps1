@@ -155,12 +155,16 @@ function Split-PgUri {
     $pass = $creds.Substring($ci + 1)
     if ($rest -notmatch '^([^:/]+)(?::(\d+))?/([^?]+)(?:\?(.*))?$') { throw "$Which connection string has an unparseable host/database part." }
     $h = $Matches[1]; $prt = $Matches[2]; $db = $Matches[3]; $qs = $Matches[4]
+    $port = 5432
+    if ($prt -and (-not [int]::TryParse($prt, [ref]$port) -or $port -lt 1 -or $port -gt 65535)) {
+        throw "$Which connection string has an invalid PostgreSQL port."
+    }
     $ssl = 'require'
     if ($qs -and $qs -match 'sslmode=([^&]+)') { $ssl = $Matches[1] }
     [pscustomobject]@{
         DbHost   = $h
-        Port     = if ($prt) { $prt } else { '5432' }
-        Database = $db
+        Port     = $port
+        Database = [Uri]::UnescapeDataString($db)
         User     = $user
         Password = $pass
         SslMode  = $ssl
@@ -287,14 +291,28 @@ $body$;
 SELECT table_name || E'\t' || row_count || E'\t' || payload_hash FROM copy_manifest ORDER BY table_name;
 MANIFEST_SQL
 
-PGPASSWORD="$SRC_USE" psql "$S" -XqAt -v ON_ERROR_STOP=1 > /tmp/snapshot.out 2>/tmp/snapshot.err <<'SNAPSHOT_SQL' &
-BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
-SELECT pg_export_snapshot();
-SELECT pg_sleep(3600);
-ROLLBACK;
-SNAPSHOT_SQL
+mkfifo -m 600 /tmp/snapshot-input
+PGPASSWORD="$SRC_USE" psql "$S" -XqAt -v ON_ERROR_STOP=1 < /tmp/snapshot-input > /tmp/snapshot.out 2>/tmp/snapshot.err &
 snapshot_pid=$!
-trap 'kill -INT "$snapshot_pid" 2>/dev/null || true; wait "$snapshot_pid" 2>/dev/null || true' EXIT
+exec 3> /tmp/snapshot-input
+release_snapshot() {
+  work_status=$?
+  trap - EXIT
+  exec 3>&-
+  if ! rm /tmp/snapshot-input; then
+    echo "FATAL: owned source snapshot input cleanup failed" >&2
+    if [ "$work_status" -eq 0 ]; then work_status=97; fi
+  fi
+  if wait "$snapshot_pid"; then exit "$work_status"; fi
+  echo "FATAL: source snapshot client did not close cleanly" >&2
+  if [ "$work_status" -eq 0 ]; then exit 97; fi
+  exit "$work_status"
+}
+trap release_snapshot EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
+printf 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT pg_export_snapshot();\n' >&3
 snapshot=''
 for attempt in $(seq 1 30); do
   snapshot=$(head -n 1 /tmp/snapshot.out)

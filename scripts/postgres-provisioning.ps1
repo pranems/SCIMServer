@@ -41,6 +41,8 @@ function Invoke-ScimPostgresProvisioning {
     Assert-ScimPostgresTargetAbsent -ServerName $ServerName -ResourceGroup $ResourceGroup -SubscriptionId $SubscriptionId
     $directory = Join-Path ([IO.Path]::GetTempPath()) ('scim-pg-parameters-' + [guid]::NewGuid().ToString('N'))
     $path = Join-Path $directory 'parameters.json'
+    $provisionFailure = $null
+    $cleanupFailures = [System.Collections.Generic.List[System.Management.Automation.ErrorRecord]]::new()
     try {
         Initialize-CopyPrivateDirectory -Path $directory
         $recoveryDirectory = Join-Path $RecoveryRoot ('postgres-' + [guid]::NewGuid().ToString('N'))
@@ -90,9 +92,18 @@ function Invoke-ScimPostgresProvisioning {
         if ((Get-Content -LiteralPath $connectionPath -Raw | ConvertFrom-Json).databaseUrl -cne $databaseUrl) {
             throw 'Private PostgreSQL connection recovery verification failed.'
         }
-        [pscustomobject]@{ ServerFqdn = $fqdn; DatabaseUrl = $databaseUrl; RecoveryPath = $recoveryPath }
+        $result = [pscustomobject]@{ ServerFqdn = $fqdn; DatabaseUrl = $databaseUrl; RecoveryPath = $recoveryPath }
+    } catch {
+        $provisionFailure = $_
     } finally {
-        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
-        if (Test-Path -LiteralPath $directory) { Remove-Item -LiteralPath $directory -Force }
+        foreach ($cleanupPath in @($path, $directory)) {
+            try {
+                if (Test-Path -LiteralPath $cleanupPath) { Remove-Item -LiteralPath $cleanupPath -Force }
+            } catch { $cleanupFailures.Add($_) }
+        }
     }
+    foreach ($failure in $cleanupFailures) { Write-Warning "PostgreSQL parameter cleanup failed: $($failure.Exception.Message)" }
+    if ($provisionFailure) { throw $provisionFailure }
+    if ($cleanupFailures.Count) { throw $cleanupFailures[0] }
+    return $result
 }

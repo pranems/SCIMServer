@@ -48,6 +48,12 @@ files and verify the selected cloud's actual provider absence/error behavior.
 The automated provisioning fixtures establish public-template contracts,
 not sovereign-cloud deployment acceptance.
 
+Existing infrastructure subnets must advertise the required
+`Microsoft.App/environments` delegation before reuse; newly created subnets
+request and verify it. Confirm that delegation in the selected cloud instead
+of treating an existing subnet ID as sufficient. Unix credential protection
+uses checked `chmod 600` for compatibility with the PowerShell 7.2 minimum.
+
 **Environment template review, 2026-10-31 UTC:** the shared
 [environment template](../infra/containerapp-env.bicep) explicitly declares the
 `Consumption` workload profile for its delegated infrastructure subnet and

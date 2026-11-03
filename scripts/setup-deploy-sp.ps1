@@ -111,7 +111,8 @@ function Protect-CredFile {
             throw 'Credential-file private access could not be verified.'
         }
     } else {
-        [IO.File]::SetUnixFileMode($Path, [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite)
+        & chmod 600 $Path
+        if ($LASTEXITCODE -ne 0) { throw 'Credential-file private access could not be established.' }
     }
 }
 

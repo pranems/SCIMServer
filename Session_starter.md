@@ -2,6 +2,22 @@
 
 **Last verified:** 2026-11-03
 
+### Second review boundary hardening
+
+Hosted41651296099 passes at05adbacd and review confirms the original six
+resolved, but seven further observations remain before merge. Four new
+offline RED/GREEN cases cover canonical database identity, Unix runtime
+compatibility, caller-wired subnet delegation and primary provisioning
+error preservation. All11 offline scripts and five compiled PostgreSQL
+provisioning outcomes pass. Fixture ownership/tmpfs metadata RED is confirmed.
+Actual TERM initially leaves one exported source transaction; replacing the
+server sleep with an idle input-held session makes TERM release pass.
+The first combined run then exposed an owned FIFO left for the next worker;
+explicit unlink fixes it. The combined database run now passes all four cases,
+including termination, fidelity/isolation, ownership/tmpfs and exact cleanup.
+Complete corrected-tip publication/review remain pending. The Docker preflight uses stubbed
+psql and is a shell contract, not real PostgreSQL. No deployment/cutover.
+
 ### PR267 independent review corrections
 
 First hosted exact-tip CI passed, but independent review found six real
@@ -24,7 +40,7 @@ preserves the original error, reports secondary failures and still attempts
 all named cleanup, without reactivating writers after failed work.
 Ten offline PowerShell contract scripts now run through the same pre-push
 and hosted CI entry point; the combined local run passes without Azure or
-Docker access. Real PostgreSQL snapshot/preflight and compiled Bicep evidence
+Docker access. Real PostgreSQL snapshot, stubbed Docker shell preflight and compiled Bicep evidence
 remain separate. All 29 changed PowerShell scripts parse and diff-check passes.
 Owned root/API/web dependencies were restored only after missing-tool failures;
 all six manifest/lock hashes remain unchanged and Prisma codegen succeeds

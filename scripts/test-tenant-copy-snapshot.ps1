@@ -30,6 +30,7 @@ $setupText = if ($setup) { $setup.Extent.Text + "`n" } else { '' }
 $copy = & ([scriptblock]::Create($setupText + $assignment.Extent.Text + "`n" + 'return $fullCopy'))
 $copy = $copy.Replace("`r", '')
 $container = $null
+$fixtureRun = [guid]::NewGuid().ToString('N')
 function Assert-SourceSnapshotReleased {
     $holders = & docker exec $container psql -U postgres -Atc "SELECT count(*) FROM pg_stat_activity WHERE datname = 'copy_source' AND xact_start IS NOT NULL"
     if ($LASTEXITCODE -ne 0 -or $holders -ne '0') {
@@ -43,8 +44,16 @@ $environment = @('--env', 'SRC_HOST=localhost', '--env', 'SRC_PORT=5432',
     '--env', 'DST_DB=copy_target', '--env', 'DST_USER=postgres', '--env', 'DST_SSL=disable',
     '--env', 'DST_PW=synthetic', '--env', 'DST_PW_ALT=synthetic')
 try {
-    $container = & docker run --detach --rm --network none --env POSTGRES_HOST_AUTH_METHOD=trust $PgImage
+    $container = & docker run --detach --rm --network none `
+        --name "scim-snapshot-$fixtureRun" --label "scimserverSnapshotTest=$fixtureRun" `
+        --tmpfs /var/lib/postgresql:rw,size=256m --env PGDATA=/var/lib/postgresql/snapshot-fixture-data `
+        --env POSTGRES_HOST_AUTH_METHOD=trust $PgImage
     if ($LASTEXITCODE -ne 0 -or -not $container) { throw 'Could not start isolated copy test.' }
+    $metadata = & docker inspect $container | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $metadata[0].Config.Labels.scimserverSnapshotTest -cne $fixtureRun -or
+        -not $metadata[0].HostConfig.Tmpfs.'/var/lib/postgresql') {
+        throw 'RED: detached PostgreSQL fixture lacks verified run ownership or tmpfs data storage.'
+    }
     $ready = $false
     for ($i = 0; $i -lt 30; $i++) {
         & docker exec $container pg_isready -U postgres | Out-Null
@@ -64,6 +73,13 @@ INSERT INTO resource SELECT g, md5(g::text) || md5((g * 2)::text) FROM generate_
     if ($LASTEXITCODE -ne 0) { throw 'Source fixture failed.' }
     & docker exec $container psql -U postgres -d copy_target -v ON_ERROR_STOP=1 -c 'CREATE TABLE orphan (id integer)' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Target extra-table fixture failed.' }
+    $marker = 'echo "=== dumping the fingerprinted snapshot ==="'
+    if (-not $copy.Contains($marker)) { throw 'Snapshot termination hook cannot locate the dump boundary.' }
+    $terminatedCopy = $copy.Replace($marker, 'kill -TERM $$')
+    $output = $terminatedCopy | & docker exec -i @environment $container sh -c 'tr -d "\r" | sh'
+    if ($LASTEXITCODE -ne 143) { throw 'Copy termination did not produce the expected signal exit.' }
+    Assert-SourceSnapshotReleased
+    Write-Host 'PASS: terminating a running copy releases its exported source transaction'
     $output = $copy | & docker exec -i @environment $container sh -c 'tr -d "\r" | sh'
     if ($LASTEXITCODE -eq 0) { throw 'RED: copy accepted a target with an extra table; size/count output is not fidelity proof' }
     if (($output -join "`n") -notmatch 'manifest mismatch') { throw 'Copy rejected the fixture for the wrong reason.' }
@@ -93,7 +109,11 @@ INSERT INTO resource SELECT g, md5(g::text) || md5((g * 2)::text) FROM generate_
     Write-Host 'PASS: a source write after fingerprinting does not change the carried snapshot'
 } finally {
     if ($container) {
+        $owner = & docker inspect --format '{{index .Config.Labels "scimserverSnapshotTest"}}' $container
+        if ($LASTEXITCODE -ne 0 -or $owner -cne $fixtureRun) { throw 'Snapshot fixture ownership cannot be verified; refusing removal.' }
         & docker rm --force --volumes $container | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'Copy-test container cleanup failed.' }
+        $remaining = @(& docker container ls --all --filter "id=$container" --format '{{.ID}}')
+        if ($LASTEXITCODE -ne 0 -or $remaining.Count -ne 0) { throw 'Owned snapshot fixture absence was not verified.' }
     }
 }

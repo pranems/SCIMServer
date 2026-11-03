@@ -9,6 +9,57 @@
 
 ## Executive summary
 
+### Second review: canonical identity and remaining cleanup boundaries
+
+Corrected tip `05adbacd` passed all 29 protected gates and hosted run
+`41651296099`, including actual offline contracts, image smoke and Trivy.
+The refreshed review confirms the original six findings resolved. It reports
+two new High findings and five previously missed Medium observations. The
+PR remains draft; these are not waived because the hosted matrix is green.
+
+| Issue | Type / severity | RED / observation | Correction and prevention |
+|---|---|---|---|
+| Zero-padded port bypasses source/target guard | Database identity / High | Actual copy preflight accepts identical host/database with source port `5432` and target `05432` | Parse/range-check numeric ports and decode the database once in the URI parser. Same-database controls cover both padded ports and encoded database names; GREEN |
+| Credential protection requires newer .NET | Runtime compatibility / High | Minimum-runtime contract identifies .NET 7 Unix APIs in the PowerShell 7.2 path | Checked `chmod 600` replaces the unsupported APIs; positive and failed-permission controls pass without assuming the host's .NET version proves the minimum |
+| Existing infrastructure subnet lacks delegation | Network integration / Medium | Actual subnet helper accepts an undelegated reused subnet | Infrastructure caller declares the required delegation; reused mismatches fail before allocation and created subnets request/verify it. Focused rejection control GREEN |
+| Provisioning cleanup masks the work error | Error handling / Medium | Real provisioning lifecycle loses its deployment error and skips directory cleanup after file removal fails | Preserve the work error, attempt both removals independently, report secondary failures and fail on cleanup-only errors. Combined-failure control GREEN |
+| Worker termination bypasses normal EXIT cleanup | PostgreSQL lifecycle / Medium | Actual TERM exit leaves one exported source transaction | Replace server-side sleep with an idle input-held session, close input on finalization, handle signals explicitly and verify source transaction release; combined real PostgreSQL run GREEN |
+| Stubbed preflight labelled as real database evidence | Evidence classification / Medium | `test-tenant-copy-preflight.ps1` replaces `psql`; it does not start PostgreSQL | Correct the PR and continuity label to a Docker-hosted shell contract. Actual PostgreSQL snapshot and earlier Azure trial evidence remain distinct |
+| Detached fixture lacks durable run ownership | Test resource hygiene / Medium | Actual inspected container has no expected run label or tmpfs data storage | Give the fixture a unique run-labelled name, explicit tmpfs PGDATA, ownership-checked removal and exact-ID absence readback; combined database validation GREEN |
+
+The four new offline cases now pass, together with the original six review
+cases. An initial misplaced test closing brace caused a parser failure; this
+is runner friction, not behavioral RED. After correcting only the harness,
+all four intended assertions failed before the production fixes and pass
+afterwards. The real-database ownership assertion likewise failed against
+actual container metadata before changing fixture allocation.
+
+The combined real PostgreSQL run now passes four cases: TERM cancellation,
+extra-target-table rejection, 2,000-row manifest fidelity and concurrent-write
+isolation. Every worker exit releases the source transaction, and the fixture
+checks run ownership, tmpfs storage and exact container absence. The source
+session stays idle in its read-only transaction instead of executing a
+one-hour sleep. Its private FIFO keeps client input open; closing that input
+lets the client disconnect and PostgreSQL roll back. TERM/INT/HUP have explicit
+exit handling. This removes the long active server query that could outlive
+a terminated client; it does not cancel unrelated sessions.
+
+The first signal-enabled run passed TERM release but exposed a new cleanup
+issue: the FIFO pathname survived, so the next worker failed with
+`mkfifo: cannot create fifo '/tmp/snapshot-input': File exists`. The trap now
+unlinks its owned FIFO, reports unlink/client-close failures and preserves
+the original worker exit status. The same combined fixture is now GREEN.
+Detection: real integration; earliest possible check was consecutive-worker
+reuse, now permanent in this fixture. This is separate from target writer
+quiescence and is not an Azure application acceptance claim.
+
+Self-improvement is applied through canonical-identity, minimum-runtime,
+caller-wired subnet and combined provisioning cleanup controls. Design
+disposition: accepted. Keep finite checks in existing helpers; normalization
+belongs in the shared parser, not duplicated at each guard. Signal/fixture
+integration validation is GREEN; complete corrected-tip publication/review
+remain pending. No target deployment, release admission or cutover is implied.
+
 ### Independent review corrections in PR #267
 
 Exact-tip hosted run `41645490136` passed validation, image build/push,

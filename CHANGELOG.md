@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Second-review hardening normalizes numeric ports and decodes database
+  identities once, replaces unsupported Unix permission APIs with checked
+  `chmod`, validates infrastructure subnet delegation through the deployment
+  caller, and preserves provisioning failures across independent cleanup.
+  Ten focused review cases and all 11 offline scripts pass. The real snapshot
+  fixture verifies run ownership, tmpfs storage and exact cleanup, and passes
+  signal termination plus three fidelity/isolation cases. An idle input-held
+  source session replaces server-side sleep; explicit FIFO unlink prevents
+  consecutive-worker failure. Full publication/review remain pending. Stubbed preflight evidence
+  is explicitly classified as a shell contract, not real PostgreSQL.
 - Address six independent-review integration findings with actual RED/GREEN
   controls: fail closed on ACL errors from permissive callers, invoke provider
   absence before provisioning, retain verified pre-allocation credentials,

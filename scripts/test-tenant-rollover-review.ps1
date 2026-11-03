@@ -1,17 +1,17 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'acl', 'absence', 'recovery', 'names', 'database', 'bootstrap')]
+    [ValidateSet('all', 'acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup')]
     [string]$Case = 'all'
 )
 $ErrorActionPreference = 'Stop'
 if ($Case -eq 'all') {
     $failed = @()
-    foreach ($item in @('acl', 'absence', 'recovery', 'names', 'database', 'bootstrap')) {
+    foreach ($item in @('acl', 'absence', 'recovery', 'names', 'database', 'bootstrap', 'ports', 'unix', 'subnet', 'cleanup')) {
         & pwsh -NoProfile -File $PSCommandPath -Case $item
         if ($LASTEXITCODE -ne 0) { $failed += $item }
     }
     if ($failed.Count) { throw "Review regressions failed: $($failed -join ', ')" }
-    Write-Host 'PASS: all six independent-review regression cases'
+    Write-Host 'PASS: all ten independent-review regression cases'
     return
 }
 . (Join-Path $PSScriptRoot 'postgres-provisioning.ps1')
@@ -47,6 +47,9 @@ function global:az {
     }
     if ($args[0] -eq 'deployment') {
         $state.Deployments++
+        if ($state.Case -eq 'cleanup' -and $state.WorkSuccess) {
+            return '{"properties":{"outputs":{"serverName":{"value":"fixture-pg"},"serverFqdn":{"value":"fixture-pg.postgres.database.azure.com"},"databaseName":{"value":"scimdb"}}}}'
+        }
         if ($state.Case -eq 'recovery') {
             $records = @(Get-ChildItem -LiteralPath $state.Fixture -Filter credential.json -Recurse)
             if ($records.Count -eq 1) {
@@ -62,6 +65,18 @@ function global:az {
     }
     if (($args -join ' ') -like 'containerapp env show*') { return '{"id":"fixture-environment"}' }
     if (($args -join ' ') -like 'containerapp job logs show*') { return }
+    if (($args -join ' ') -like 'containerapp list*') { return '[]' }
+    if (($args -join ' ') -like 'network vnet subnet show*') {
+        if ($state.SubnetMode -eq 'create') { $global:LASTEXITCODE = 1; return }
+        if ($state.SubnetMode -eq 'delegated') {
+            return '{"id":"fixture-subnet","delegations":[{"serviceName":"Microsoft.App/environments"}]}'
+        }
+        return '{"id":"fixture-subnet","delegations":[]}'
+    }
+    if (($args -join ' ') -like 'network vnet subnet create*') {
+        if (($args -join ' ') -notmatch '--delegations Microsoft.App/environments') { throw 'Required delegation was not requested.' }
+        return '{"id":"fixture-subnet","delegations":[{"serviceName":"Microsoft.App/environments"}]}'
+    }
     if (($args -join ' ') -like 'containerapp show*') {
         if ($state.BindingMode -eq 'missing') { return '{"properties":{"template":{"containers":[]}}}' }
         $binding = if ($state.BindingMode -eq 'secret') {
@@ -92,7 +107,7 @@ try {
                 if (-not $rejected) { throw 'RED: non-terminating ACL failure from a Continue caller was accepted.' }
             }
         }
-        { $_ -in @('absence', 'recovery') } {
+        { $_ -in @('absence', 'recovery', 'cleanup') } {
             $global:rolloverReview.Subscription = 'fixture-subscription'
             $global:rolloverReview.Tenant = 'fixture-tenant'
             $parameters = @{
@@ -103,6 +118,28 @@ try {
             }
             if ((Get-Command Invoke-ScimPostgresProvisioning).Parameters.ContainsKey('RecoveryRoot')) {
                 $parameters.RecoveryRoot = $fixture
+            }
+            if ($Case -eq 'cleanup') {
+                $script:cleanupPaths = @()
+                $script:allCleanupPaths = @()
+                function Remove-Item {
+                    param([string]$LiteralPath, [switch]$Force)
+                    $script:cleanupPaths += $LiteralPath
+                    $script:allCleanupPaths += $LiteralPath
+                    if ($LiteralPath -like '*parameters.json') { throw 'fixture parameter cleanup failure' }
+                }
+                foreach ($workSuccess in @($false, $true)) {
+                    $global:rolloverReview.WorkSuccess = $workSuccess
+                    $script:cleanupPaths = @()
+                    $failure = $null
+                    try { Invoke-ScimPostgresProvisioning @parameters | Out-Null }
+                    catch { $failure = $_ }
+                    $expected = if ($workSuccess) { 'fixture parameter cleanup failure' } else { 'Azure deployment group failed' }
+                    if ($failure.Exception.Message -notmatch $expected -or $script:cleanupPaths.Count -ne 2) {
+                        throw 'RED: provisioning cleanup masks the primary failure, skips directory cleanup or accepts cleanup-only failure.'
+                    }
+                }
+                break
             }
             $modes = if ($Case -eq 'absence') { @('ready', 'deleting', 'empty', 'denied', 'transport') } else { @('allocation-failure') }
             foreach ($mode in $modes) {
@@ -137,7 +174,7 @@ try {
                 }
             }
         }
-        'database' {
+        { $_ -in @('database', 'ports') } {
             . (Join-Path $PSScriptRoot 'scim-estates.ps1')
             $tenant = (Get-ScimEstateRegistry).tenants | Where-Object role -eq next
             $estates = @((Get-ScimEstateRegistry).estates | Where-Object tenantKey -eq $tenant.key)
@@ -153,12 +190,28 @@ try {
                 '$PSScriptRoot', ("'" + $PSScriptRoot.Replace("'", "''") + "'")
             ))
             $correct = "postgresql://fixture:synthetic@$($global:rolloverReview.TargetHost):5432/scimdb"
-            foreach ($mode in @('mismatch', 'matching', 'secret', 'missing', 'wrong-database', 'wrong-port')) {
+            if ($Case -eq 'ports') {
+                foreach ($target in @($correct.Replace(':5432/', ':05432/'), $correct.Replace('/scimdb', '/%73cimdb'))) {
+                    $rejected = $false
+                    try {
+                        & $program -SourceConnectionString $correct -TargetConnectionString $target `
+                            -TargetResourceGroup $dev.resourceGroup -Subscription $tenant.subscriptionId -ConfirmNoTargetApps
+                    } catch {
+                        if ($_.Exception.Message -notmatch 'same database') { throw }
+                        $rejected = $true
+                    }
+                    if (-not $rejected) { throw 'RED: equivalent encoded database identity bypasses source/target rejection.' }
+                }
+                break
+            }
+            foreach ($mode in @('mismatch', 'matching', 'matching-padded-port', 'secret', 'missing', 'wrong-database', 'wrong-port', 'wrong-encoded-database')) {
                 $global:rolloverReview.BindingMode = $mode
                 $global:rolloverReview.AppDatabase = switch ($mode) {
                     'mismatch' { "postgresql://fixture:synthetic@$($dev.pgServerName).postgres.database.azure.com:5432/scimdb" }
                     'wrong-database' { $correct.Replace('/scimdb', '/other') }
                     'wrong-port' { $correct.Replace(':5432/', ':5433/') }
+                    'matching-padded-port' { $correct.Replace(':5432/', ':05432/') }
+                    'wrong-encoded-database' { $correct.Replace('/scimdb', '/%2573cimdb') }
                     default { $correct }
                 }
                 $rejected = $false
@@ -170,7 +223,7 @@ try {
                     if ($_.Exception.Message -notmatch 'database.*match|match.*database') { throw }
                     $rejected = $true
                 }
-                if ($rejected -eq ($mode -in @('matching', 'secret'))) {
+                if ($rejected -eq ($mode -in @('matching', 'matching-padded-port', 'secret'))) {
                     throw "RED: app/database binding decision is incorrect for $mode."
                 }
             }
@@ -193,9 +246,75 @@ try {
                 throw 'RED: bootstrap falls back to unsupported Windows PowerShell when pwsh is absent.'
             }
         }
+        'unix' {
+                $tokens = $null; $errors = $null
+                $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                    (Join-Path $PSScriptRoot 'setup-deploy-sp.ps1'), [ref]$tokens, [ref]$errors)
+                $function = $ast.Find({ param($node)
+                    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Protect-CredFile'
+                }, $true)
+                if ($function.Extent.Text -match 'SetUnixFileMode|IO\.UnixFileMode') {
+                    throw 'RED: credential protection requires .NET 7 APIs unavailable on supported PowerShell 7.2.'
+                }
+                . ([scriptblock]::Create($function.Extent.Text.Replace(
+                    '$IsWindows -or $env:OS -eq ''Windows_NT''', '$false')))
+                $file = Join-Path $fixture 'credential.json'
+                [IO.File]::WriteAllText($file, '')
+                $script:chmodCalls = 0
+                $script:chmodFailure = $false
+                function chmod {
+                    $script:chmodCalls++
+                    if (($args -join ' ') -notlike '600 *') { throw 'Incorrect credential permissions requested.' }
+                    $global:LASTEXITCODE = if ($script:chmodFailure) { 1 } else { 0 }
+                }
+                Protect-CredFile -Path $file
+                $script:chmodFailure = $true
+                $rejected = $false
+                try { Protect-CredFile -Path $file } catch { $rejected = $true }
+                if (-not $rejected -or $script:chmodCalls -ne 2) { throw 'Unix permission failure was accepted.' }
+            }
+            'subnet' {
+                $tokens = $null; $errors = $null
+                $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+                    (Join-Path $PSScriptRoot 'deploy-azure.ps1'), [ref]$tokens, [ref]$errors)
+                $function = $ast.Find({ param($node)
+                    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'GetOrCreate-VnetSubnetId'
+                }, $true)
+                . ([scriptblock]::Create($function.Extent.Text))
+                $parameters = @{ ResourceGroupName = 'fixture'; VirtualNetworkName = 'fixture'; SubnetName = 'aca-infra' }
+                if ((Get-Command GetOrCreate-VnetSubnetId).Parameters.ContainsKey('RequiredDelegation')) {
+                    $parameters.RequiredDelegation = 'Microsoft.App/environments'
+                }
+                $caller = $ast.Find({ param($node)
+                    $node -is [System.Management.Automation.Language.CommandAst] -and
+                    $node.GetCommandName() -eq 'GetOrCreate-VnetSubnetId' -and
+                    $node.Extent.Text.Contains('$expectedInfraSubnetName')
+                }, $true)
+                if (-not $caller -or $caller.Extent.Text -notmatch '-RequiredDelegation ''Microsoft.App/environments''') {
+                    throw 'Infrastructure deployment caller does not request the required delegation.'
+                }
+                foreach ($mode in @('missing', 'delegated', 'create')) {
+                    $global:rolloverReview.SubnetMode = $mode
+                    $rejected = $false
+                    try {
+                        $id = GetOrCreate-VnetSubnetId @parameters
+                        if ($id -ne 'fixture-subnet') { throw 'Subnet identity was not returned.' }
+                    } catch { if ($_.Exception.Message -notmatch 'delegat') { throw }; $rejected = $true }
+                    if ($rejected -ne ($mode -eq 'missing')) { throw "Incorrect $mode subnet delegation decision." }
+                }
+            }
     }
     Write-Host "PASS: $Case independent-review regression"
 } finally {
+    Microsoft.PowerShell.Management\Remove-Item Function:\Remove-Item -ErrorAction SilentlyContinue
+    foreach ($path in @(@($script:allCleanupPaths) + @($script:cleanupPaths) | Select-Object -Unique)) {
+        if ($path -and (Test-Path -LiteralPath $path)) {
+            Microsoft.PowerShell.Management\Remove-Item -LiteralPath $path -Recurse -Force
+        }
+        if ($path -like '*parameters.json' -and (Test-Path -LiteralPath (Split-Path $path))) {
+            Microsoft.PowerShell.Management\Remove-Item -LiteralPath (Split-Path $path) -Force
+        }
+    }
     Remove-Item Function:\az
     Remove-Variable rolloverReview -Scope Global
     Remove-Item -LiteralPath $fixture -Recurse -Force

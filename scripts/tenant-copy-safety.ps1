@@ -66,7 +66,7 @@ function Assert-CopyTargetDatabase {
         $actual = Split-PgUri -Uri $value -Which 'Target app'
         if ($actual.DbHost.TrimEnd('.') -ine $Database.DbHost.TrimEnd('.') -or
             $actual.Port -ne $Database.Port -or
-            [Uri]::UnescapeDataString($actual.Database) -cne [Uri]::UnescapeDataString($Database.Database)) {
+            $actual.Database -cne $Database.Database) {
             throw 'Target app database does not match the restore database; refusing writer suspension and restore.'
         }
     }

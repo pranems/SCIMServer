@@ -517,8 +517,10 @@ function GetOrCreate-VnetSubnetId {
         [string]$SubnetName,
         [string]$AddressPrefix,
         [bool]$DisablePrivateEndpointPolicies = $true,
-        [bool]$DisablePrivateLinkServicePolicies = $true
+        [bool]$DisablePrivateLinkServicePolicies = $true,
+        [string]$RequiredDelegation
     )
+    $ErrorActionPreference = 'Stop'
 
     $subnetJson = az network vnet subnet show `
         --resource-group $ResourceGroupName `
@@ -528,6 +530,9 @@ function GetOrCreate-VnetSubnetId {
 
     if ($LASTEXITCODE -eq 0 -and $subnetJson) {
         $subnet = $subnetJson | ConvertFrom-Json
+        if ($RequiredDelegation -and $RequiredDelegation -notin @($subnet.delegations.serviceName)) {
+            throw "Subnet '$SubnetName' must be delegated to '$RequiredDelegation' before deployment."
+        }
         return $subnet.id
     }
 
@@ -546,6 +551,7 @@ function GetOrCreate-VnetSubnetId {
     if ($DisablePrivateLinkServicePolicies) {
         $subnetArgs += @('--disable-private-link-service-network-policies','true')
     }
+    if ($RequiredDelegation) { $subnetArgs += @('--delegations', $RequiredDelegation) }
 
     $createJson = az @subnetArgs 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $createJson) {
@@ -554,6 +560,9 @@ function GetOrCreate-VnetSubnetId {
     }
 
     $createdSubnet = $createJson | ConvertFrom-Json
+    if ($RequiredDelegation -and $RequiredDelegation -notin @($createdSubnet.delegations.serviceName)) {
+        throw "Created subnet '$SubnetName' lacks required delegation '$RequiredDelegation'."
+    }
     return $createdSubnet.id
 }
 
@@ -574,7 +583,7 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
     $existingVnet = $existingVnetJson | ConvertFrom-Json
     Write-Host "   🔁 Reusing existing virtual network '$vnetName'" -ForegroundColor Green
 
-    $infrastructureSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedInfraSubnetName -AddressPrefix $infraPrefix
+    $infrastructureSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedInfraSubnetName -AddressPrefix $infraPrefix -RequiredDelegation 'Microsoft.App/environments'
     $workloadSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $runtimeSubnetName -AddressPrefix $runtimePrefix
     $privateEndpointSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedPeSubnetName -AddressPrefix $privateEndpointPrefix
 

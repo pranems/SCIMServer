@@ -31,6 +31,17 @@ are private, server-scoped and verified before allocation; connection recovery
 precedes extensions. Require PowerShell7.2+. Corrected-tip protected gates,
 hosted CI and refreshed independent review remain pending.
 
+Second review confirms the original six fixed, but identifies canonical-port,
+Unix minimum-runtime, subnet-delegation, provisioning-cleanup, worker-signal,
+preflight-evidence and fixture-ownership gaps. Four more offline cases now
+pass with all eleven scripts. Numeric ports/database decoding are canonical;
+the subnet caller is wired and checked chmod supports PowerShell7.2.
+Source-snapshot lifetime is being changed from server-side sleep to idle
+client input with EOF rollback, explicit signal handling and owned FIFO
+cleanup. All four real termination/fidelity cases now pass, together with
+owned fixture/tmpfs/absence checks. Next publication/review remain pending.
+The Docker preflight runner is stubbed, not real PostgreSQL.
+
 **2026-10-30 current Hono integration:** #261 merged normally at
 `cffc64c8a188a721fabb85c37a80243d5e65a74f`, with all 28 protected gates,
 seven exact-head checks and separate technical review. Independent #262

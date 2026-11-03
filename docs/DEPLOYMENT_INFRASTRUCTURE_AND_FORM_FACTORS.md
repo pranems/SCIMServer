@@ -74,6 +74,25 @@ work. Deployment and bootstrap require PowerShell 7.2+ rather than a legacy
 Windows PowerShell fallback. These are tooling guarantees, not deployed app
 or migration acceptance.
 
+The second review requires canonical numeric database ports and one-time
+database-name decoding before source/target or app-binding comparisons.
+Reused infrastructure subnets must have `Microsoft.App/environments`
+delegation; newly created subnets request and verify it. Provisioning preserves
+its primary failure while independently attempting parameter-file and
+directory cleanup. Unix credential files use checked `chmod 600`, avoiding
+APIs unavailable in PowerShell 7.2. The snapshot fixture now uses a uniquely
+named/run-labelled container with explicit tmpfs PGDATA, ownership-checked
+removal and exact-ID absence verification.
+
+Evidence classification: the Docker-hosted preflight runner uses stubbed
+`psql`; it is a shell decision contract, not real PostgreSQL integration.
+The snapshot fixture is real PostgreSQL, and Azure trial/preflight receipts
+are separate. The signal-termination and idle-session snapshot correction
+passes all four combined real database cases, including consecutive worker
+cleanup. The source read-only transaction is held by open client input,
+not server-side sleep, and source release is verified after each exit.
+Complete corrected-tip publication/review is still required.
+
 ## 0.55.56 candidate startup-output hardening
 
 The container entrypoint now reports database configuration presence only,

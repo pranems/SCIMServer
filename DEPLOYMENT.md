@@ -49,6 +49,12 @@ allocation, before extension configuration. Retain these records privately
 for failed-allocation recovery. Do not retry an existing name with a new
 password or confuse these local files with an off-device backup.
 
+When reusing a virtual network, the infrastructure subnet must already be
+delegated to `Microsoft.App/environments`; deployment rejects an undelegated
+subnet before environment allocation. Missing subnets are created with that
+delegation and the returned state is checked. Unix credential-file protection
+uses checked `chmod 600`, compatible with PowerShell 7.2's .NET runtime.
+
 ### One-Liner Bootstrap (No Git Clone Needed)
 
 ```powershell
