@@ -65,6 +65,16 @@ PostgreSQL replay and cloud/browser acceptance remain separate evidence.
 
 The Build Test Image validation job also invokes the real PostgreSQL copy
 fixture on its existing hosted runner. Its owned, network-isolated, tmpfs
+fixture is now independently reviewed and merged in PR267 at master84099293570a.
+Authoritative postmerge41696483989 passes the default transport/password/worker
+checks and actual PostgreSQL identity/snapshot/signal/fidelity/isolation,
+followed by image smoke/Trivy; CodeQL and freshness also pass. A subsequent
+verified-identity read-only prov10 recheck confirms both PG17/B1ms servers
+Ready and zero target Container Apps. This is tooling/foundation evidence,
+not release0.55.67 admission or target acceptance. Pending statements in the
+chronological paragraphs below describe earlier preparation.
+
+The owned, network-isolated, tmpfs
 container checks the URI-parser-to-worker database/login identity boundary
 with encoded whitespace, quotes and backslashes, followed by source snapshot
 release, complete manifest fidelity and concurrent-write isolation. This is

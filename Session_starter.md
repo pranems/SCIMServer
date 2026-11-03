@@ -2,6 +2,27 @@
 
 **Last verified:** 2026-11-03
 
+### Current handoff: tooling merged; release and deployment remain held
+
+PR267 merged normally to master84099293570af5ab06f7d8e2f93e7e6ae2c0236f.
+Reviewed883fb6c6 passed29 protected gates; exact-tip bot5757623103 reports
+no open issues (COMMENTED, not formal APPROVED). Authoritative postmerge
+BuildTestImage41696483989, CodeQL41696338523 and freshness41696488100 pass.
+Default14-value/password/worker transport and real PostgreSQL identity,
+snapshot, signal, fidelity and isolation pass, along with image smoke/Trivy.
+
+The immutable tooling test image digest is
+225ebe85030d76593dc1256f19e641f74ba3d886f53796443c6ca8dc68eed1e3.
+It is not admitted0.55.67 or an authorized alternative release. A current
+read-only recheck verifies the approved prov10 identity/subscription, zero
+target apps in both resource groups, and both PG17/B1ms servers Ready.
+
+Requested0.55.67 remains held; user unavailable for a different-image decision.
+No source freeze/final carry, actual target acceptance, role cutover or
+customer-production change. The execution doc records exact source evidence,
+current foundations and recovery limitations. Earlier pending paragraphs
+below are chronological preparation notes, superseded by this handoff.
+
 ### Latest review: preserve values across the generated job YAML
 
 Sixth review5757233449 confirms the High fixed at e3fbf7c4, but identifies

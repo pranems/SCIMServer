@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tenant rollover tooling consolidation
 
+- Record PR267's normal reviewed merge at84099293570a and authoritative
+  postmerge validation41696483989, CodeQL41696338523 and freshness41696488100
+  PASS. Default transport/password/worker assertions and actual PostgreSQL
+  identity/snapshot/signal/fidelity/isolation, image smoke and Trivy pass.
+  Current read-only prov10 verification shows both PG17/B1ms servers Ready
+  and zero target apps. Tooling acceptance is not0.55.67 admission, a final
+  carry or deployment. Earlier pending entries are preparation history.
 - Include distinct-password transport and worker-text assertions in the default
   snapshot fixture path used by CI, not only its optional serialization mode.
   Sixth review confirms the High YAML correction and identifies this Medium

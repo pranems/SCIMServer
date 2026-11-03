@@ -19,6 +19,20 @@ the High YAML and Medium default-mode findings resolved. Its state is
 COMMENTED, not formal APPROVED. Every inline thread is resolved with evidence.
 No hook, branch protection or approval override was used.
 
+The subsequent read-only prov10 recheck verifies the approved deployment
+service principal, exact target tenant and subscription before resource calls.
+Both target application resource groups contain zero Container Apps.
+Dev `scimserver-pg-dev-m7j4rn` and canary `scimserver-pg-canary-n8r5vk` are
+both Ready, PostgreSQL 17, Standard_B1ms in Central US. These are current
+provider observations, not inferred from earlier provisioning or local tests.
+No resource was deployed, modified, restored or deleted by the recheck.
+
+Self-improvement applied: current-state handoffs explicitly supersede
+historical pending statements and distinguish tooling, release admission and
+live target acceptance, preventing a successful fixture from appearing to
+authorize a restore. Design disposition: accepted; this evidence-only update
+changes no responsibilities, dependency edges or runtime abstractions.
+
 | Authoritative postmerge evidence | Run | Result |
 |---|---|---|
 | Full validation, actual default PostgreSQL fixture, image build/push, container smoke, HIGH/CRITICAL Trivy gate | `41696483989` | PASS at exact merged master |
@@ -67,6 +81,16 @@ that digest, not permanent retention or off-device image-backup recovery.
 Prevention: distinguish registry inventory permissions from Actions-log
 access and scope each evidence claim accordingly. Detection and earliest
 suitable detection are the failed read-only API call.
+
+RCA type/severity: shell tool discovery, Low. The first read-only check could
+not invoke `az` because the fresh process did not include Azure CLI in PATH.
+The existing installation was found at its standard Program Files path and
+invoked explicitly with the approved prov10 profile. Identity verification
+and all four resource reads then succeeded. No package installation, shared
+PATH change or account substitution was needed. Prevention: use the existing
+verified executable/profile in fresh processes rather than assume earlier
+shell state persists. Detection and earliest suitable detection are the
+failed command lookup; no cloud request was made by that failed invocation.
 
 ### Sixth review: include the assertion in the mode CI actually invokes
 
