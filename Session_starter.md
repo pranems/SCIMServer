@@ -2467,7 +2467,7 @@ This dev box hosts TWO projects targeting TWO different Azure tenants. Cross-ten
 
 | Project | Tooling | Tenant | Tenant ID | Subscription |
 | --- | --- | --- | --- | --- |
-| **SCIMServer** (this VS Code window) | VS Code + integrated `pwsh` + `az` CLI | Provisioning IAM Team 09 (`proviamtest09.onmicrosoft.com`) | `9751e42f-78f3-42f4-8b8a-6e73845aceae` | `ProvIAM_Subscription` (`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`) |
+| **SCIMServer** (this VS Code window) | VS Code + integrated `pwsh` + `az` CLI | Provisioning IAM Team 10 (`proviamtest10.onmicrosoft.com`) | `ea9f551e-8155-4010-87a8-b6fa1459f882` | `Proviam-Subscription` (`71091610-e5bc-44a6-bed7-ca4113b6520a`) |
 | **Sync Fabric** (separate window) | Visual Studio + its own MSAL cache | TME Organization (AzureCloud) | `70a036f6-8e4d-4615-bad6-149c02e7720d` | AADSF TME Test Subscription |
 
 Tenant identity and estate roles are owned by [scim-estates.json](scripts/scim-estates.json).
@@ -2477,20 +2477,25 @@ CLI isolation is provided by [az-tenant.ps1](scripts/az-tenant.ps1), which assig
 **Bootstrap in any new integrated terminal used for dev or canary operations:**
 
 ```powershell
-. .\scripts\az-tenant.ps1
-Use-ProvIAM09
-az account show --query '{name:name, tenantId:tenantId, subId:id}' -o table
+. .\scripts\scim-estates.ps1
+$estate = Get-ScimEstate -Purpose dev
+$env:AZURE_CONFIG_DIR = $estate.Tenant.ConfigDirPath
+$env:AZURE_EXTENSION_DIR = Join-Path $env:AZURE_CONFIG_DIR 'cliextensions'
+az account show --query '{name:name, tenantId:tenantId, subId:id, principal:user}' -o json
 ```
 
-The expected tenant is `9751e42f-78f3-42f4-8b8a-6e73845aceae`; the expected subscription is
-`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`. `Use-ProvIAM09` reuses the isolated cache or the deployment
-service principal and selects the subscription by ID, avoiding the ambiguous
-`ProvIAM_Subscription` name shared with the retired Tenant 08.
+Verify the actual tenant, subscription and approved principal against the
+resolved estate before ARM calls. For this cutover the expected tenant is
+`ea9f551e-8155-4010-87a8-b6fa1459f882` and the subscription is
+`71091610-e5bc-44a6-bed7-ca4113b6520a`. The existing isolated target profile
+must already be authenticated; this snippet does not log in, select another
+account or authorize deployment. Resolve future generations from the
+registry rather than copying this table into scripts.
 
 **Pitfalls to avoid:**
-- NEVER deploy before dot-sourcing `az-tenant.ps1`, calling `Use-ProvIAM09`, and checking `az account show`.
+- NEVER deploy before resolving the active estate, selecting its isolated profile and checking the actual `az account show` identity.
 - NEVER pass `--tenant 70a036f6-...` (TME) from this workspace - that's the sync fabric tenant.
-- NEVER target Tenant 08 or Tenant 07 for dev/canary work; they are retired historical estates.
+- NEVER target Tenant 09, Tenant 08 or Tenant 07 for new dev/canary work; they are historical estates.
 - If an ARM lookup returns empty, verify tenant and subscription before debugging the caller.
 
 ### Recent Key Achievements (Chronological)
