@@ -14,9 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Cleanup uses the request context, checks DELETE status and verifies ID absence
   even before browser navigation. Add a blank-page cleanup outcome regression.
 - Both targets pass eleven focused shape/cleanup cases with no skips. The full
-  browser inventory changes from 349 to 350, then 351 tests in the same 52 files.
+  browser inventory changes from 349 to 350, 351, then 352 tests in the same 52 files.
   The separate 16-case numeric-settings persistence spec remains included;
-  complete target runs now pass 351/52 files on each app with zero failures,
+  complete target runs now pass 352/52 files on each app with zero failures,
   skips or flakes. Each live run reports 1,841 passes/zero failures, including
   four explicit retired-API placeholders rather than exercised checks.
 - Independent review exposed cleanup registration before ownership validation.
@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all eleven affected cases per target after the immutable full runs; new
   post-test original-state/credential proofs pass. Keep those receipts separate.
   Explicitly label retained tenant-09 infrastructure measurements as historical.
+- Protect shared fixture creation before settings/credential/user mutation,
+  with a safe routed existing-ID RED/GREEN case. All seventeen numeric/
+  ownership cases pass, followed by final full352 matrices on both apps with
+  strict types GREEN first and new original-state/active-credential proofs.
+  Preserve the unusually large non-test wall interval separately from summed
+  test durations; its cause is unverified and performance remains unqualified.
+- Require explicit tenant arguments for directory proof/grant bootstraps.
+  Remove generation-bound recovery recipe selectors; all 28 registry,
+  parameter-binding and recipe controls pass after observed REDs. No directory
+  operation or grant was run as part of this tooling correction.
 - Restore only diagnosed original target records and dev's two original
   membership IDs. Eight original non-log table fingerprints pass per target,
   retaining reviewed additive columns and original/appended migration history.

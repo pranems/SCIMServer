@@ -18,11 +18,14 @@ Original-data restoration passes eight non-log fingerprints on both databases,
 preserving original IDs/columns and reviewed migration history. Historical
 request logs remain archived; operational audit writes are separately recorded.
 Final live consolidation reports 1,841 passes/zero failures per app, including
-four explicit retired-API placeholders. Each full browser run passes 351
+four explicit retired-API placeholders. Each full browser run passes 352
 cases/52 files with zero failures, skips or flakes and immutable spec hashes.
-After those full runs, the final local-candidate type-flow refactor passes
-strict compilation and all eleven affected cases per target. Separate
-focused receipts retain that provenance; final state proofs follow both runs.
+Strict fixture compilation passed before these final full runs. Shared
+fixture ownership is checked before optional writes; the numeric file covers
+sixteen settings and a safe pre-existing-ID rejection case. Directory entry
+points require explicit tenant selection; 28 offline controls cover the
+bindings and generation-neutral rebuild recipe. The large non-test runner
+timing gap remains unexplained, not a service-performance claim.
 Independent post-test proof matches eight original non-log tables and verifies
 17 dev/six canary active retained encrypted credentials. Original inactive
 archived failures remain one/four, exactly matching original-image evidence.

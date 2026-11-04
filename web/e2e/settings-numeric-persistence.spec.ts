@@ -38,6 +38,34 @@ test.afterEach(async ({ page }) => {
   expect(body.endpoints.map((endpoint) => endpoint.id)).not.toContain(ownedId);
 });
 
+test('fixture creation rejects a pre-existing endpoint before mutation', async ({ page }) => {
+  const ownedId = endpointId;
+  if (!ownedId) throw new Error('The rejection probe requires a known-owned fixture');
+  const before = await configuredNumber(page, ownedId, 'MaxFilterDepth');
+  let mutations = 0;
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if ((request.method() === 'PATCH' && url.pathname === `/scim/admin/endpoints/${ownedId}`)
+      || (request.method() === 'POST' && (url.pathname === `/scim/admin/endpoints/${ownedId}/credentials`
+        || url.pathname.startsWith(`/scim/endpoints/${ownedId}/`)))) mutations++;
+  });
+  await page.route('**/scim/admin/endpoints', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: ownedId }) });
+    } else {
+      await route.continue();
+    }
+  });
+  await expect(createFixtureEndpoint(page, {
+    namePrefix: 'e2e-rejected-existing',
+    settings: { MaxFilterDepth: 3 },
+    credentials: ['bearer'],
+    users: 1,
+  })).rejects.toThrow('pre-existing endpoint ID');
+  expect(mutations, 'Rejected endpoint must receive no settings, credential or resource mutation').toBe(0);
+  expect(await configuredNumber(page, ownedId, 'MaxFilterDepth')).toBe(before);
+});
+
 for (const setting of NUMBER_SETTINGS) {
   test(`${setting.key} persists a valid number and rejects values outside its bounds`, async ({ page }) => {
     const definitions = [...BOOLEAN_FLAGS, ...ENUM_SETTINGS, ...NUMBER_SETTINGS];

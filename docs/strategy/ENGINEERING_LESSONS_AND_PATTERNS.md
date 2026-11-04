@@ -36,6 +36,10 @@ before their assertions. Resolve the active dev/canary pair through
 that role is the subject of the test. The complete eleven-contract rollover
 gate now passes with no cloud calls. Run both registry integrity and rollover
 consumer contracts against the proposed transition, not only one of them.
+Directory-mutating entry points must require an explicit tenant rather than
+defaulting to a former active generation. Generated recovery recipes must use
+an intentional selector too. The two bootstrap bindings and rebuild recipe
+now have observed RED/GREEN guards in the 28-assertion registry-resolution suite.
 
 ## Logical restoration is not original-state preservation (2026-11-04)
 
@@ -63,13 +67,17 @@ teardown still deletes it. A safe negative control must retain its known-owned
 handle in finally, exercise the actual registration path with an original
 ID, and prove that rejection leaves that handle unchanged and the original
 readable. This closes a failure-path gap that successful setup runs cannot expose.
+The same invariant belongs in the shared fixture creator before optional
+settings, credentials or users are seeded. Its routed negative control returns
+an already-known owned ID and proves zero writes reach it, without endangering
+carried records even during RED.
 
 Applied in [seeded-shape-coverage.spec.ts](../../web/e2e/seeded-shape-coverage.spec.ts).
 The [migration record](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md) records
 the ownership and rejected-original REDs, eleven passing owned/blank-page/
 rejection cases per target, and independent post-test preservation after
-full 351-case acceptance on each target. The subsequent local-candidate
-type-flow refactor has separate strict compilation and eleven-case receipts.
+full 352-case acceptance on each target. Strict fixture compilation is GREEN
+before these final matrices; seventeen numeric/shared-ownership cases also pass.
 No runtime behavior or visual baseline changed.
 
 ## Long-value fixtures must precede deployment qualification (2026-11-03)

@@ -27,12 +27,15 @@ fidelity; both final source manifests already contain member references,
 and reviewed startup migrations add endpoint snapshot UUIDs. Test-related original-record changes were
 transactionally restored, with eight non-log original fingerprints passing per
 target. Final live runs each report 1,841 passes/zero failures, including four
-retired-API placeholders; both browser runs pass 351 cases/52 files with no
+retired-API placeholders; both browser runs pass 352 cases/52 files with no
 failures, skips or flakes. Independent final original-state and active retained
 credential proofs pass.
-The final local-candidate fixture type-flow refactor separately passes strict
-compilation and all eleven affected browser cases on each app, followed by
-new original-state/credential proofs.
+Strict fixture compilation passes before the final full matrices, including
+shared-helper ownership rejection before any optional write. New independent
+original-state/credential proofs pass afterward. Raw elapsed time contains a
+large unexplained non-test interval and is not used as service latency.
+Directory proof/grant entry points require an explicit tenant before profile
+selection; generated recovery recipes no longer pin a former tenant.
 Both final source manifests already contain member
 references; only the added snapshot UUID column is projected out. Source
 later writes are not automatically merged.

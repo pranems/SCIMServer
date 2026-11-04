@@ -374,6 +374,8 @@ Do not rewrite preserved data to satisfy an assumed fixture population.
 Validate ownership before assigning any teardown target. Exercise rejection
 with an original ID and prove that failure cannot register or delete it;
 the negative control itself must retain a known-owned cleanup handle in finally.
+Shared fixture creators must reject IDs present in pre-create inventory before
+seeding settings, credentials or users, not only before returning to teardown.
 
 Cleanup MUST work before browser navigation, require a successful API status,
 and assert that the exact owned ID is absent. Never swallow cleanup failures.
@@ -898,6 +900,9 @@ Offline rollover consumers must also pass after activation when no `next`
 tenant exists. Resolve active fixtures by purpose, or construct an owned
 future tenant when needed; run the complete rollover contracts on a proposed
 role transition as well as the registry integrity self-test.
+Directory-mutating bootstrap entry points require an explicit tenant before
+profile selection. Generated recovery recipes must not pin a tenant generation;
+resolve the intended registry entry and verify actual identity before any write.
 
 **An expired tenant does not fail loudly - it returns EMPTY.** On 2026-08-19 `az account show` reported a perfectly healthy `ProvIAM_Subscription` while every ARM call silently returned nothing; `dev-deployment-pipeline.ps1` then built the URL `https:///scim/oauth/token` and failed Stage 0 with an unrelated-looking `Invalid URI` error. **When an ARM lookup returns empty, verify the tenant before debugging the caller.**
 

@@ -35,10 +35,14 @@ guards and strict changed-spec compilation pass.
 
 Final consolidation passes on both targets: each live run reports 1,841
 passes/zero failures, including four retired-API placeholders. Each browser
-run passes 351 cases/52 files with zero failures, skips or flakes and unchanged
-before/after spec hashes. A subsequent local-candidate type-flow refactor
-passes strict tsc and all eleven affected cases on both targets; its focused
-receipts are separate from the immutable full-run receipts. Final post-test
+run passes 352 cases/52 files with zero failures, skips or flakes and unchanged
+before/after spec hashes, after strict changed-fixture tsc. The shared creator
+rejects pre-existing IDs before settings/credential/user seeding. Sixteen
+numeric settings plus one safe shared-ownership negative control pass.
+Directory bootstrap entry points now require an explicit tenant; 28 registry,
+binding and recovery-recipe controls pass without cloud calls. The final
+browser wall interval includes a large unexplained non-test gap; raw timings
+are retained and are not performance qualification. Final post-test
 read-only proof matches all eight original
 non-log tables. Dev verifies 17 active retained encrypted credentials; canary
 verifies six. Exact original inactive archived failures remain one/four.

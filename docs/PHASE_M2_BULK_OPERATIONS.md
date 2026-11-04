@@ -35,7 +35,7 @@ image `sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93`
 now serves on both prov10 applications. Dev passed its first corrected
 349-test browser run and received explicit operator visual confirmation.
 Canary's initial six seeded-data failures were not Bulk layout failures.
-The repaired test-owned fixture suite and full 351-test/52-file acceptance
+The repaired test-owned fixture suite and full 352-test/52-file acceptance
 now pass on both targets, with zero failures, skips or flakes. Independent
 post-test original-state and retained active-credential proofs pass. Performance
 remains unqualified under the migration-only exception; customer production
