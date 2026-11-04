@@ -88,12 +88,21 @@ Assert-Case -Name 'R4 fires: unknown role keyword' -ExpectValid $false -Mutate {
 
 # R5a - no active dev estate (what a half-finished cutover looks like)
 Assert-Case -Name 'R5 fires: ZERO active estates for a purpose' -ExpectValid $false -Mutate {
-    param($r) ($r.tenants | Where-Object { $_.key -eq 'proviam09' }).role = 'next'
+    param($r)
+    foreach ($tenant in @($r.tenants | Where-Object { $_.role -eq 'active' })) {
+        $tenant.role = 'next'
+    }
 }
 
 # R5b - two active dev estates (what a forgotten cutover looks like)
 Assert-Case -Name 'R5 fires: TWO active estates for a purpose' -ExpectValid $false -Mutate {
-    param($r) ($r.tenants | Where-Object { $_.key -eq 'proviam' }).role = 'active'
+    param($r)
+    $devTenants = @($r.estates | Where-Object { $_.purpose -eq 'dev' } | ForEach-Object { $_.tenantKey })
+    $other = @($r.tenants | Where-Object {
+        $_.role -ne 'active' -and $_.role -ne 'permanent' -and $_.key -in $devTenants
+    })
+    if ($other.Count -eq 0) { throw 'The R5 duplicate-active fixture requires another ephemeral dev tenant.' }
+    $other[0].role = 'active'
 }
 
 # R6 - customer prod must never ride an ephemeral tenant

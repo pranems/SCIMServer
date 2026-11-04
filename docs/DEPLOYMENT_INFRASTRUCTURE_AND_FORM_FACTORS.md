@@ -1,13 +1,52 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-10-16 - **Repo version at capture:** `api/package.json` = `0.55.54`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-04 - **Repo version at capture:** `api/package.json` = `0.55.67`
 > **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
 
 ---
 
-## Pending tenant 10 migration
+## Tenant 10 deployments: accepted, role-controlled cutover
+
+The prov10 dev and canary apps now serve version 0.55.67 from reviewed merge
+`b87412b0ad5edac47bf19aaca92bb233c12304ed` and immutable digest
+`sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93`.
+The following is observed deployment state. Functional/browser/preservation
+acceptance passes. The registry cutover is published through protected review
+and normal merge, not an unreviewed local file.
+
+| Purpose | App / resource group | Healthy ready revision | Database / placement |
+|---|---|---|---|
+| Dev | `scimserver-dev` / `scimserver-dev` | `scimserver-dev--0000002` | `scimserver-pg-dev-m7j4rn`, PostgreSQL 17/B1ms, Central US |
+| Canary | `scimserver` / `scimserver-prod` | `scimserver--7n2txcr` | `scimserver-pg-canary-n8r5vk`, PostgreSQL 17/B1ms, Central US |
+
+Both apps use shared East US Consumption environment `scimserver-env`.
+Available point-in-time source data was restored with complete original-table
+fidelity; reviewed startup migrations add member references where previously
+absent and endpoint snapshot UUIDs. Test-related original-record changes were
+transactionally restored, with eight non-log original fingerprints passing per
+target. Final live runs each report 1,841 passes/zero failures, including four
+retired-API placeholders; both browser runs pass 350 cases/52 files with no
+failures, skips or flakes. Independent final original-state and active retained
+credential proofs pass. Both final source manifests already contain member
+references; only the added snapshot UUID column is projected out. Source
+later writes are not automatically merged.
+Live authenticated readback at `2026-11-04T02:35Z` confirms supported Node
+`v24.22.2`, version 0.55.67 and the Prisma backend on both apps. The live
+runtime check is scoped to dev/canary; customer production is not probed.
+
+Performance remains **UNQUALIFIED**, including cross-region database latency,
+under the operator's dev-and-canary-only exception
+`T10-0.55.67-PERF-EXCEPTION-2026-11-03`. The atomic prov10 `active`/prov09
+`retiring` update is staged for protected review/normal merge. Actual
+identity/digest and policy-resolved revision verification pass: dev retains
+two active revisions; canary's first deployment has one and recovers by
+roll-forward. Customer production has not changed. See the
+[migration execution record](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+for receipt scopes, measured outcomes, recovery limitations and open gates.
+
+### Historical foundation and tooling preparation (superseded)
 
 The [tenant 10 migration execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
 records verified target account/permissions and the staged `next` estates.

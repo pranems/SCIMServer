@@ -365,6 +365,27 @@ Whenever the agent observes a UI behavior - including a bug, a new feature, a fi
 
 The spec MUST be runnable via `npx playwright test --reporter=line` against all three deployment form factors: local dev server (`http://localhost:4000`), local Docker compose (`http://localhost:8080`), and Azure dev (`E2E_BASE_URL=https://scimserver-dev.purplecliff-91e4026d.eastus.azurecontainerapps.io`, `E2E_TOKEN=changeme-scim`). A change that ships without its Playwright spec is incomplete. The Stage 5.3 + 5.4 gates fail when any new web/ behavior in the diff lacks Playwright coverage.
 
+## Owned Live and Browser Fixtures (CRITICAL - added 2026-11-04)
+
+Existing synthetic or migrated records are carried data, not disposable test fixtures.
+Mutation tests MUST create a new endpoint, prove its ID was absent from the
+original inventory, and seed schema-valid resources through the real API.
+Do not rewrite preserved data to satisfy an assumed fixture population.
+
+Cleanup MUST work before browser navigation, require a successful API status,
+and assert that the exact owned ID is absent. Never swallow cleanup failures.
+Logical value restoration does not undo resource versions, timestamps or
+regenerated membership IDs: assert original-state outcomes after cleanup and
+retain an independent post-test database comparison before migration cutover.
+Handle reviewed additive columns, appended migration history and legitimate
+audit writes explicitly; never silently ignore a fingerprint mismatch.
+
+The blank-page cleanup regression and original-state assertions are in
+[seeded-shape-coverage.spec.ts](../web/e2e/seeded-shape-coverage.spec.ts).
+See the [tenant 10 execution record](../docs/TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+and [preservation pattern](../docs/strategy/ENGINEERING_LESSONS_AND_PATTERNS.md)
+for the confirmed false-green escape and transactional rollback evidence.
+
 ## Visual Layout + Self-Improvement Discipline (CRITICAL - added 2026-05-29 after Finding-D)
 
 Origin: 2026-05-29 P1 follow-up deploy. The `<span>`-based `TruncatedText` primitive applied `text-overflow:ellipsis + overflow:hidden + white-space:nowrap` but never set `display:inline-block`, so the CSS was inert and userNames rendered at full width on dev. Four separate gates (vitest layout assertions, Playwright `getComputedStyle` check, visual-regression PNG diff, operator's first manual look) all failed to flag it. The operator caught it after dev deploy by eye. The following rules are the standing fix for this whole class of "CSS applied but layout not achieved" failure.
@@ -794,7 +815,12 @@ pwsh scripts/prune-revisions.ps1 -ResourceGroup <rg> -AppName <app>   # keep res
 
 
 
-There are TWO live prod instances + one dev. The earlier 2026-05-29 doc-update incorrectly marked calmsand as RETIRED; it is in fact the customer-facing prod and was just promoted to v0.52.3 alongside the proudbush instance.
+The following deployment coordinates and commands are a historical 2026-08
+snapshot, not current ephemeral deployment targets. Resolve active estates
+from [the registry](../scripts/scim-estates.json) and verify actual ARM identity.
+The [living infrastructure record](../docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md)
+records current verified state. Customer production remains permanent and
+must never be included in an ephemeral dev/canary rollover.
 
 **CANONICAL SOURCE (added 2026-08-13): [scripts/scim-estates.json](scripts/scim-estates.json).** The table below is a human-readable snapshot; the registry is what tooling reads, and it is keyed by **role** (`active` / `next` / `retiring` / `permanent` / `trial`) rather than by name. **Prefer resolving an estate over hardcoding one:**
 
@@ -846,18 +872,35 @@ Get-ScimEstateBaseUrl -Purpose dev      # FQDN DERIVED from ARM, never stored
 
 ### Ephemeral Tenant Rollover Rule (CRITICAL - added 2026-08-13)
 
-**STANDING RULE (added 2026-08-20): dev and canary prod are ALWAYS deployed on the CURRENT ephemeral tenant, never the retiring one.** The migration to tenant **09** (`proviamtest09`, tenant id `9751e42f-78f3-42f4-8b8a-6e73845aceae`, subscription `8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`) is COMPLETE; tenant **08** is `retiring` and its subscription has **expired**. Before any deploy or promotion:
+**STANDING RULE:** dev and canary are deployed on the registry's CURRENT
+ephemeral tenant, never a hardcoded former generation. The reviewed prov10
+cutover makes prov10 active and prov09 retiring. Until normal merge, distinguish
+the desired branch registry from canonical master; never infer activation from
+a prepared file alone. Before a deploy or promotion:
 
 ```powershell
-. ./scripts/az-tenant.ps1; Use-ProvIAM09     # sets AZURE_CONFIG_DIR to the 09 automation profile
-az account show --query tenantId -o tsv      # MUST be 9751e42f-78f3-42f4-8b8a-6e73845aceae
+. .\scripts\scim-estates.ps1
+$estate = Get-ScimEstate -Purpose dev
+$env:AZURE_CONFIG_DIR = $estate.Tenant.ConfigDirPath
+$env:AZURE_EXTENSION_DIR = Join-Path $env:AZURE_CONFIG_DIR 'cliextensions'
+az account show --query "{tenantId:tenantId,subscriptionId:id,principal:user}" -o json
 ```
+
+Verify that output against the resolved tenant/subscription and approved
+principal before ARM calls. Use subscription IDs, not ambiguous names.
+Registry negative controls must mutate roles/purposes, not a former active
+tenant key; run them against the proposed transition. Actual cloud readback
+remains separate from offline registry validity.
 
 **An expired tenant does not fail loudly - it returns EMPTY.** On 2026-08-19 `az account show` reported a perfectly healthy `ProvIAM_Subscription` while every ARM call silently returned nothing; `dev-deployment-pipeline.ps1` then built the URL `https:///scim/oauth/token` and failed Stage 0 with an unrelated-looking `Invalid URI` error. **When an ARM lookup returns empty, verify the tenant before debugging the caller.**
 
 **The subscription NAME is ambiguous across 08 and 09** (both are `ProvIAM_Subscription`), so `promote-to-prod.ps1` must be given the subscription **id**, not the name, or it aborts with `ambiguous across 2 tenants`.
 
-**Customer-facing prod (calmsand) budget:** the MSDN subscription hit its spending limit and was disabled; **it resets 2026-08-21**, after which customer-prod promotion is available again. Until the reset, calmsand cannot be deployed to. It remains `revisionKeep: 1` (roll-forward recovery, no rollback target) and is NEVER auto-promoted.
+**Historical customer budget incident:** the August spending-limit reset is
+not a current availability assertion. Customer production remains
+`revisionKeep: 1` with roll-forward recovery, is never auto-promoted and is
+excluded from this migration. Verify current availability only when a
+separately approved customer-production operation needs it.
 
 Origin: two completed cross-tenant migrations, 2026-05-19 (07 -> 08) and 2026-08-12 (08 -> 09). The dev + canary-prod estates live on an **ephemeral** Azure AD tenant that expires roughly every 80 days, so this is a **scheduled recurring operation**, 4 to 5 times a year, not an incident. Full comparison and learnings: [docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md](docs/TENANT_MIGRATION_COMPARISON_AND_LEARNINGS.md).
 

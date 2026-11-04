@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tenant 10 acceptance isolation and preservation
+
+- Replace mutation of carried synthetic fixtures with newly owned endpoints,
+  schema-valid API-created users/groups and unchanged original-state assertions.
+  Cleanup uses the request context, checks DELETE status and verifies ID absence
+  even before browser navigation. Add a blank-page cleanup outcome regression.
+- Both targets pass ten focused shape/cleanup cases with no skips. The full
+  browser inventory changes from 349 to 350 tests in the same 52 files.
+  The separate 16-case numeric-settings persistence spec remains included;
+  complete target runs now pass 350/52 files on each app with zero failures,
+  skips or flakes. Each live run reports 1,841 passes/zero failures, including
+  four explicit retired-API placeholders rather than exercised checks.
+- Restore only diagnosed original target records and dev's two original
+  membership IDs. Eight original non-log table fingerprints pass per target,
+  retaining reviewed additive columns and original/appended migration history.
+  Original sources and customer production are not mutated; historical request
+  logs remain privately archived. Failed setup exposed fifteen owned temporary
+  endpoints; guarded restoration rolled back until their cleanup was verified.
+- Eight focused restoration/fingerprint guards and strict changed-spec types
+  pass. Application source, image digest, package versions and visual baselines
+  remain unchanged. Self-improvement is applied through ownership, cleanup and
+  post-test preservation assertions. Design disposition is accepted: cohesive
+  test/evidence corrections without a new runtime abstraction or gate bypass.
+- Final independent post-test comparison passes eight original non-log tables
+  per target. Dev verifies 17 active retained encrypted credentials, canary six;
+  exact original inactive archived failures remain one/four. Original migration
+  rows and settings values remain intact with the reviewed snapshot UUID
+  addition and explicitly separate operational audit writes.
+- Stage the existing atomic prov10-active/prov09-retiring registry transition,
+  preserving permanent customer entries. Correct a generation-bound R5
+  negative fixture: actual transition RED was 14/15; role/purpose-driven zero-
+  and two-active mutations now pass 15/15 without a validator change.
+  Verified target identity/digest and policy-resolved revision hygiene pass;
+  canary's first deployment has no predecessor and recovers by roll-forward.
+
 ### Tenant 10 Bulk result layout repair
 
 - Fix long resource locations and error details widening the Bulk result
@@ -24,7 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Updated full web coverage passes 1,662 tests across 125 files (previously
   1,661): statements 83.06%, branches 75.86%, functions 75.53%, lines 85.74%.
   Configured floors pass; branch coverage was previously 75.89%.
-  Reviewed immutable-image publication remains pending. API unit/E2E
+  Reviewed immutable-image publication is complete in PR271 and build41740133535;
+  both prov10 apps serve the corrected digest. API unit/E2E
   remain unchanged by this frontend-only delta; no
   new API run count is claimed here.
 - Full web tsc is not green: executable virtual-HEAD comparison verifies

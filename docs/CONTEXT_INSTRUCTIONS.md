@@ -2,12 +2,42 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.67
-> **Last Updated**: November 3, 2026
-> **Last verified:** 2026-10-29
+> **Last Updated**: November 4, 2026
+> **Last verified:** 2026-11-04
 
 ---
 
 ## Active Delivery Process
+
+**Latest checkpoint, 2026-11-04:** both prov10 apps are Healthy on the reviewed
+PR271 digest below. Dev's first corrected full browser run passed 349/52 files
+and received explicit operator visual confirmation. Canary's first full run
+passed 343 cases and failed six seeded-population expectations, with no skips
+or flakes. Ten repaired, test-owned shape/cleanup cases now pass on each target.
+Original-data restoration passes eight non-log fingerprints on both databases,
+preserving original IDs/columns and reviewed migration history. Historical
+request logs remain archived; operational audit writes are separately recorded.
+Final live consolidation reports 1,841 passes/zero failures per app, including
+four explicit retired-API placeholders. Each full browser run passes 350
+cases/52 files with zero failures, skips or flakes and immutable spec hashes.
+Independent post-test proof matches eight original non-log tables and verifies
+17 dev/six canary active retained encrypted credentials. Original inactive
+archived failures remain one/four, exactly matching original-image evidence.
+ARM identity/digest and registry-derived revision hygiene pass; dev retains
+two revisions, canary's first deployment has one and requires roll-forward.
+Prov10-active/prov09-retiring is included in the protected cutover change; permanent
+customer entries are unchanged. Role-driven R5 controls pass 15/15 after
+correcting their hardcoded former-active fixture. Canonical activation is
+the protected PR's normal merge, not a prepared file alone. Actual live Node
+v24.22.2/0.55.67/Prisma support checks pass. Two earlier dev profile-setting
+edits were restored, with no recurrence in final state proof, but their exact
+actor is still an open historical question. Full transcript reconciliation
+scanned 24,511 events; candidate regex matches are not bug counts.
+The detailed [migration record](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records the ownership, schema-input, hash-framing and blank-page cleanup RCAs.
+Performance remains unqualified; no customer-production change is authorized.
+The paragraphs below retain earlier release checkpoints and must not be read
+as the current app/carry/acceptance status.
 
 **Current operator-authorized release path:** performance-admission exception
 `T10-0.55.67-PERF-EXCEPTION-2026-11-03` applies only to this 0.55.67 tenant 10
@@ -34,16 +64,30 @@ non-green at66 diagnostics/two production diagnostics; executable HEAD
 comparison proves zero added diagnostics. Updated full coverage passes
 1,662 tests / 125 files, with statements83.06%, branches75.86%,
 functions75.53%, lines85.74%; all size budgets pass. Web ESLint remains N/A
-because no config exists. Protected publication, review, a corrected
-immutable image and actual target reruns
-remain mandatory. Canary application, operator visual confirmation and role
+because no config exists. PR271 passed29 protected gates and all exact-tip
+hosted checks; independent review5760950082 has no open issues (COMMENTED,
+not formal approval). Normal merge b87412b0ad5edac47bf19aaca92bb233c12304ed
+produced the corrected image in successful build41740133535; merged
+CodeQL41740131930 and HIGH/CRITICAL Trivy pass. Producer, hosted smoke pull
+and local anonymous pull agree on
+sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93.
+PR271 comment6618345332 binds the existing scoped exception.
+Dev now serves the exact Healthy/latestReady corrected revision0000002,
+without recopying its database. Corrected dev full live execution passes;
+complete349-test/52-file browser acceptance is running with pinned spec hashes.
+Owned isolated Prisma unit6254/216 and HTTP2612/122 pass without skips.
+Explicit inmemory unit6254/216 passes; merged CI provides the unchanged
+inmemory HTTP lane with its disclosed skips. Exact-image Docker/Prisma and
+matching-API local-node/inmemory full live runners each report1841 passes,
+zero failures, including four retired-API placeholders. Their owned fixtures
+and listeners are removed. Canary application, operator visual confirmation and role
 cutover remain pending. No customer-production changes or performance campaign.
 Keep PR251 research draft. Self-improvement applied: deterministic long values,
 actual bounds/clipping/full clipboard assertions and immutable scoped reports.
 Design disposition accepted: existing primitive composition; no general bypass
 or speculative domain-service extraction.
 
-**Authoritative current state:** PR267 is merged at84099293570af5ab06f7d8e2f93e7e6ae2c0236f.
+**Historical tooling checkpoint, superseded by the state above:** PR267 is merged at84099293570af5ab06f7d8e2f93e7e6ae2c0236f.
 Reviewed883fb6c6 passes29 protected gates, and exact-tip5757623103 reports
 no open issues (COMMENTED, not formal APPROVED). Postmerge41696483989,
 CodeQL41696338523 and freshness41696488100 pass. The actual default fixture

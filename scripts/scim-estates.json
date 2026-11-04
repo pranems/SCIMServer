@@ -56,13 +56,11 @@
     "estate may go below 2, because it is the one estate never auto-promoted - every",
     "deployment to it is a deliberate, supervised act."
   ],
-
   "version": 1,
-
   "tenants": [
     {
       "key": "proviam10",
-      "role": "next",
+      "role": "active",
       "tenantName": "Provisioning IAM Team 10",
       "tenantDomain": "proviamtest10.onmicrosoft.com",
       "tenantId": "ea9f551e-8155-4010-87a8-b6fa1459f882",
@@ -79,7 +77,7 @@
     },
     {
       "key": "proviam09",
-      "role": "active",
+      "role": "retiring",
       "tenantName": "Provisioning IAM Team 09",
       "tenantDomain": "proviamtest09.onmicrosoft.com",
       "tenantId": "9751e42f-78f3-42f4-8b8a-6e73845aceae",
@@ -129,7 +127,6 @@
       "notes": "Customer-facing production. Separate permanent tenant, so it cannot pull from the ProvIAM-tenant ACR and uses anonymous GHCR instead. Never auto-promoted. directoryAccessGranted is deliberately false - see grant-deploy-sp-directory-access.ps1, which refuses this tenant."
     }
   ],
-
   "estates": [
     {
       "id": "dev-next",

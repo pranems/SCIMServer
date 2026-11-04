@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { E2E_TOKEN, seedAuthToken } from './endpoint-fixture';
 
 interface ShapeEndpoint {
@@ -7,8 +7,12 @@ interface ShapeEndpoint {
   displayName?: string;
   profile: {
     settings?: Record<string, unknown>;
-    schemas: Array<{ id: string }>;
-    resourceTypes: Array<{ name: string; endpoint: string }>;
+    schemas: Array<{ id: string; attributes: Array<{ name: string }> }>;
+    resourceTypes: Array<{
+      name: string;
+      endpoint: string;
+      schemaExtensions?: Array<{ schema: string; required?: boolean }>;
+    }>;
   };
 }
 
@@ -21,26 +25,160 @@ const shapeNames = [
   'shape-per-endpoint-creds',
   'shape-custom-resource',
 ];
+let ownedShape: ShapeEndpoint | undefined;
+let sourceShape: ShapeEndpoint | undefined;
+let sourceState: Record<string, unknown> | undefined;
+let originalEndpointIds: string[] = [];
+let ownedBearerToken: string | undefined;
+
+async function readShapeState(page: Page, endpoint: ShapeEndpoint): Promise<Record<string, unknown>> {
+  const state: Record<string, unknown> = {};
+  for (const path of [
+    `/scim/admin/endpoints/${endpoint.id}`,
+    ...endpoint.profile.resourceTypes.map((type) => `/scim/endpoints/${endpoint.id}${type.endpoint}`),
+  ]) {
+    const response = await page.request.get(path, { headers });
+    expect(response.status(), `Original fixture read ${path}`).toBe(200);
+    state[path] = await response.json();
+  }
+  return state;
+}
 
 test.describe('seeded six-profile outcome matrix', () => {
   test.skip(
     process.env.E2E_SHAPE_COVERAGE !== '1',
-    'Opt-in: run seed-shape-coverage on an owned estate, then set E2E_SHAPE_COVERAGE=1.',
+    'Opt-in: set E2E_SHAPE_COVERAGE=1 to test owned copies of the six seeded profiles.',
   );
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
     await seedAuthToken(page);
+    ownedShape = undefined;
+    sourceShape = undefined;
+    sourceState = undefined;
+    ownedBearerToken = undefined;
+    const name = shapeNames.find((candidate) => testInfo.title.startsWith(`${candidate}:`))
+      ?? (testInfo.title.startsWith('strict Group') ? 'shape-rfc-strict' : 'shape-custom-resource');
+    const inventory = await page.request.get('/scim/admin/endpoints', { headers });
+    expect(inventory.status()).toBe(200);
+    const { endpoints } = await inventory.json() as { endpoints: ShapeEndpoint[] };
+    originalEndpointIds = endpoints.map((endpoint) => endpoint.id);
+    const template = endpoints.find((endpoint) => endpoint.name === name);
+    if (!template) throw new Error(`Missing seeded profile template ${name}`);
+    const detail = await page.request.get(`/scim/admin/endpoints/${template.id}`, { headers });
+    expect(detail.status()).toBe(200);
+    sourceShape = await detail.json() as ShapeEndpoint;
+    sourceState = await readShapeState(page, sourceShape);
+    const created = await page.request.post('/scim/admin/endpoints', {
+      headers,
+      data: {
+        name: `e2e-owned-${name}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+        profile: sourceShape.profile,
+      },
+    });
+    expect(created.status()).toBe(201);
+    ownedShape = await created.json() as ShapeEndpoint;
+    expect(originalEndpointIds, 'Every test must use a newly owned endpoint').not.toContain(ownedShape.id);
+    expect(ownedShape.profile).toEqual(sourceShape.profile);
+
+    const coreUser = 'urn:ietf:params:scim:schemas:core:2.0:User';
+    const hrExtension = 'urn:scimserver:devshapes:user:hr-extras:1.0';
+    const userType = sourceShape.profile.resourceTypes.find((type) => type.name === 'User');
+    const coreSchema = sourceShape.profile.schemas.find(({ id }) => id === coreUser);
+    if (!coreSchema) throw new Error('Owned shape must publish a core User schema');
+    const attributes = new Set(coreSchema.attributes.map(({ name }) => name));
+    const users: Array<{ id: string }> = [];
+    for (const [index, userName] of [
+      'u1.minimal@shape.dev', 'u2.rich@shape.dev', 'u3.edge@shape.dev',
+    ].entries()) {
+      const extensions = (userType?.schemaExtensions ?? []).filter(({ schema, required }) =>
+        (required ?? false) || (index === 1 && schema === hrExtension));
+      const extensionBodies: Record<string, unknown> = {};
+      for (const { schema } of extensions) {
+        const definition = sourceShape.profile.schemas.find(({ id }) => id === schema);
+        if (!definition) throw new Error(`Owned shape extension ${schema} must be published`);
+        const values: Record<string, string> = {
+          employeeNumber: `E-OWNED-${index}`, costCenter: 'CC-DEV', department: 'E2E',
+        };
+        const body = Object.fromEntries(definition.attributes
+          .filter(({ name }) => name in values).map(({ name }) => [name, values[name]]));
+        if (Object.keys(body).length === 0) throw new Error(`No supported fixture attributes for extension ${schema}`);
+        extensionBodies[schema] = body;
+      }
+      const values: Record<string, unknown> = {
+        userName, displayName: userName,
+        emails: [{ value: userName, type: 'work', primary: true }], active: index !== 2,
+      };
+      const response = await page.request.post(`/scim/endpoints/${ownedShape.id}/Users`, {
+        headers: { ...headers, 'Content-Type': 'application/scim+json' },
+        data: {
+          schemas: [coreUser, ...extensions.map(({ schema }) => schema)],
+          ...Object.fromEntries(Object.entries(values).filter(([key]) => attributes.has(key))),
+          ...extensionBodies,
+        },
+      });
+      expect(response.status(), `Owned user ${userName} must be created: ${await response.text()}`).toBe(201);
+      users.push(await response.json() as { id: string });
+    }
+    if (sourceShape.profile.resourceTypes.some((type) => type.name === 'Group')) {
+      for (const [displayName, members] of [
+        ['g1.multi', users.slice(0, 2)], ['g2.solo', users.slice(2)],
+      ] as const) {
+        const response = await page.request.post(`/scim/endpoints/${ownedShape.id}/Groups`, {
+          headers: { ...headers, 'Content-Type': 'application/scim+json' },
+          data: {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+            displayName,
+            members: members.map(({ id }) => ({ value: id })),
+          },
+        });
+        expect(response.status(), `Owned group ${displayName} must be created`).toBe(201);
+      }
+    }
+    if (name === 'shape-per-endpoint-creds') {
+      const response = await page.request.post(`/scim/admin/endpoints/${ownedShape.id}/credentials`, {
+        headers, data: { credentialType: 'bearer', label: 'owned shape credential' },
+      });
+      expect(response.status()).toBe(201);
+      const credential = await response.json() as { token: string };
+      expect(typeof credential.token).toBe('string');
+      ownedBearerToken = credential.token;
+    }
+  });
+
+  test.afterEach(async ({ page }) => {
+    try {
+      if (ownedShape) {
+        const cleanup = await page.request.delete(`/scim/admin/endpoints/${ownedShape.id}`, { headers });
+        expect([204, 404], 'Owned endpoint cleanup must succeed even before browser navigation')
+          .toContain(cleanup.status());
+        const inventory = await page.request.get('/scim/admin/endpoints', { headers });
+        expect(inventory.status()).toBe(200);
+        const { endpoints } = await inventory.json() as { endpoints: ShapeEndpoint[] };
+        expect(endpoints.map(({ id }) => id), 'Owned endpoint must be absent after cleanup')
+          .not.toContain(ownedShape.id);
+      }
+    } finally {
+      if (sourceShape && sourceState) {
+        expect(await readShapeState(page, sourceShape),
+          'Original profile, resources, versions and membership output must remain unchanged').toEqual(sourceState);
+      }
+      ownedShape = undefined;
+      ownedBearerToken = undefined;
+    }
+  });
+
+  test('owned fixture cleanup works before initial browser navigation', async ({ page }) => {
+    expect(page.url()).toBe('about:blank');
+    expect(ownedShape).toBeDefined();
+    expect(originalEndpointIds).not.toContain(ownedShape?.id);
   });
 
   for (const name of shapeNames) {
     test(`${name}: persisted rows, resource support, schemas and settings`, async ({ page }) => {
       test.setTimeout(120_000);
-      const inventory = await page.request.get('/scim/admin/endpoints', { headers });
-      expect(inventory.status()).toBe(200);
-      const { endpoints } = await inventory.json() as { endpoints: ShapeEndpoint[] };
-      const shape = endpoints.find((endpoint) => endpoint.name === name);
-      expect(shape, `Seeded endpoint ${name} must exist`).toBeDefined();
-      if (!shape) throw new Error(`Missing seeded endpoint ${name}`);
+      const shape = ownedShape;
+      if (!shape) throw new Error(`Missing owned endpoint ${name}`);
       const detail = await page.request.get(`/scim/admin/endpoints/${shape.id}`, { headers });
       expect(detail.status()).toBe(200);
       const endpoint = await detail.json() as ShapeEndpoint;
@@ -99,7 +237,7 @@ test.describe('seeded six-profile outcome matrix', () => {
 
       if (name === 'shape-per-endpoint-creds') {
         const credentialUsers = await page.request.get(`${base}/Users`, {
-          headers: { Authorization: ['Bearer', 'shape-dev-secret'].join(' ') },
+          headers: { Authorization: ['Bearer', ownedBearerToken].join(' ') },
         });
         expect(credentialUsers.status()).toBe(200);
         const credentialList = await credentialUsers.json() as { totalResults: number };
@@ -115,12 +253,10 @@ test.describe('seeded six-profile outcome matrix', () => {
   test('custom HR extension edits round-trip through the browser and independent GET', async ({ page }) => {
     test.setTimeout(120_000);
     test.skip(process.env.E2E_ALLOW_MUTATIONS !== '1', 'Requires an explicitly mutation-enabled estate.');
-    const inventory = await page.request.get('/scim/admin/endpoints', { headers });
-    expect(inventory.status()).toBe(200);
-    const { endpoints } = await inventory.json() as { endpoints: ShapeEndpoint[] };
-    const shape = endpoints.find((endpoint) => endpoint.name === 'shape-custom-resource');
-    expect(shape).toBeDefined();
-    if (!shape) throw new Error('Missing seeded custom extension endpoint');
+    const shape = ownedShape;
+    if (!shape) throw new Error('Missing owned custom extension endpoint');
+    expect(originalEndpointIds, 'Mutating tests must use a newly owned endpoint')
+      .not.toContain(shape.id);
     const urn = 'urn:scimserver:devshapes:user:hr-extras:1.0';
     const users = await page.request.get(`/scim/endpoints/${shape.id}/Users`, { headers });
     expect(users.status()).toBe(200);
@@ -181,11 +317,8 @@ test.describe('seeded six-profile outcome matrix', () => {
   test('strict Group edits reopen with refreshed values and restore with a current ETag', async ({ page }) => {
     test.setTimeout(120_000);
     test.skip(process.env.E2E_ALLOW_MUTATIONS !== '1', 'Requires an explicitly mutation-enabled estate.');
-    const inventory = await page.request.get('/scim/admin/endpoints', { headers });
-    expect(inventory.status()).toBe(200);
-    const { endpoints } = await inventory.json() as { endpoints: ShapeEndpoint[] };
-    const shape = endpoints.find((endpoint) => endpoint.name === 'shape-rfc-strict');
-    if (!shape) throw new Error('Missing seeded strict endpoint');
+    const shape = ownedShape;
+    if (!shape) throw new Error('Missing owned strict endpoint');
     const groups = await page.request.get(`/scim/endpoints/${shape.id}/Groups`, { headers });
     expect(groups.status()).toBe(200);
     const body = await groups.json() as {
@@ -240,12 +373,8 @@ test.describe('seeded six-profile outcome matrix', () => {
   test('custom Device browser CRUD preserves immutable serial and persisted model', async ({ page }) => {
     test.setTimeout(120_000);
     test.skip(process.env.E2E_ALLOW_MUTATIONS !== '1', 'Requires an explicitly mutation-enabled estate.');
-    const inventory = await page.request.get('/scim/admin/endpoints', { headers });
-    expect(inventory.status()).toBe(200);
-    const { endpoints } = await inventory.json() as { endpoints: ShapeEndpoint[] };
-    const shape = endpoints.find((endpoint) => endpoint.name === 'shape-custom-resource');
-    expect(shape).toBeDefined();
-    if (!shape) throw new Error('Missing seeded custom resource endpoint');
+    const shape = ownedShape;
+    if (!shape) throw new Error('Missing owned custom resource endpoint');
     const serial = `SHAPE-BROWSER-${Date.now()}`;
     let resourceId: string | undefined;
     try {
