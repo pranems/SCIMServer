@@ -29,9 +29,22 @@ try {
             Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } |
             ForEach-Object ValidValues)
         Assert-Resolution ($values -contains 'proviam10') "$($selector.file) accepts the target tenant key"
+        if ($selector.parameter -eq 'Tenant') {
+            $required = @($command.Parameters.Tenant.Attributes |
+                Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] -and $_.Mandatory })
+            Assert-Resolution ($required.Count -gt 0) "$($selector.file) requires an explicit tenant before profile selection or directory operations"
+        }
     }
     $setupSource = Get-Content (Join-Path $PSScriptRoot 'setup-deploy-sp.ps1') -Raw
     Assert-Resolution ($setupSource -match 'az account set --subscription \$Entry\.SubscriptionId\b') 'deployment bootstrap selects the exact subscription ID'
+    $recoverySource = Get-Content (Join-Path $PSScriptRoot 'export-recovery-sheet.ps1') -Raw
+    $rebuildStart = $recoverySource.IndexOf(' 6. REBUILDING FROM NOTHING')
+    Assert-Resolution ($rebuildStart -ge 0) 'recovery sheet has an explicit rebuild recipe'
+    $rebuild = $recoverySource.Substring($rebuildStart)
+    $pinned = @($registry.tenants | Where-Object {
+        $rebuild -match "(?<![A-Za-z0-9-])$([regex]::Escape($_.key))(?![A-Za-z0-9-])"
+    })
+    Assert-Resolution ($pinned.Count -eq 0) 'rebuild recipe cannot silently select a generation-bound tenant'
     $future = [pscustomobject]@{
         key = 'resolution-test'
         role = 'next'

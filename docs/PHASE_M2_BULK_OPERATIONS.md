@@ -6,7 +6,7 @@
 
 ---
 
-## Current layout repair: tested, not yet deployed
+## Current layout repair: deployed and accepted on prov10
 
 Tenant 10 browser acceptance against 0.55.67 exposed result cells overflowing
 the card at a 900 px viewport. Long absolute resource locations expanded CSS
@@ -30,10 +30,17 @@ and retry behavior are unchanged.
 | Full values remain copyable | Browser reads clipboard and compares the entire location and error detail |
 | Execution and cleanup still work | Five bulk/manual browser flows pass with migrated-dev backend; real creation, duplicate, retry, CSV content and owned-fixture deletion remain asserted |
 
-The passing frontend is an owned loopback production build, not a repaired
-Azure deployment. Reviewed publication, a new immutable image and complete
-actual dev/canary acceptance remain mandatory. Performance remains unqualified
-under the migration-only exception; customer production is excluded.
+PR271 merged as `b87412b0ad5edac47bf19aaca92bb233c12304ed`. The reviewed
+image `sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93`
+now serves on both prov10 applications. Dev passed its first corrected
+349-test browser run and received explicit operator visual confirmation.
+Canary's initial six seeded-data failures were not Bulk layout failures.
+The repaired test-owned fixture suite and full 352-test/52-file acceptance
+now pass on both targets, with zero failures, skips or flakes. Independent
+post-test original-state and retained active-credential proofs pass. Performance
+remains unqualified under the migration-only exception; customer production
+is excluded. The [migration record](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+separates deployed behavior, completed checks and remaining gates.
 
 Self-improvement applied: deterministic long-value coverage catches the
 deployment-hostname gap before another migration. Design disposition accepted:

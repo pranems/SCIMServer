@@ -3,11 +3,271 @@
 > **Started:** 2026-10-30
 > **Scope:** dev and canary only; customer production is excluded
 > **Requested release:** 0.55.67; a performance-admission exception is authorized for this dev-and-canary migration only. Performance remains unqualified. Every other gate remains mandatory.
-> **Execution worktree:** `SCIMServer-tenant10-migration-20261030`
-> **Branch:** `ops/tenant10-migration-20261030`
-> **Status:** foundations, both Ready databases, both full-source local replays and disposable Azure transfers pass. Local PostgreSQL browser acceptance passes 348 tests with zero skips, failures or flaky results. No target app is serving; release selection/admission, actual target acceptance and final carry/cutover remain pending.
+> **Historical implementation worktree:** `SCIMServer-tenant10-migration-20261030`
+> **Evidence consolidation branch:** `test/tenant10-acceptance-evidence-20261104`
+> **Status:** both applications serve the reviewed immutable 0.55.67 image. Final full browser acceptance passes 352 cases/52 files per target, with zero failures, skips or flakes, after strict changed-fixture compilation. Each full live run reports 1,841 passes/zero failures, including four explicit retired-API placeholders. Independent final post-test original-state and active-credential proofs pass. The atomic prov10-active/prov09-retiring registry change becomes canonical through protected review and normal merge, not a local file alone. Performance is UNQUALIFIED; customer production is excluded.
 
 ## Executive summary
+
+### Final measured acceptance and desired registry cutover (2026-11-04)
+
+Both targets passed against the same reviewed PR271 artifact:
+`sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93`,
+from merge `b87412b0ad5edac47bf19aaca92bb233c12304ed`. Neither a new
+application image nor a performance qualification is claimed by this
+test/evidence consolidation.
+
+| Independent claim | Dev | Canary |
+|---|---|---|
+| Full live HTTP/auth runner | 1,841 reported passes, zero failures; 881.3 seconds | 1,841 reported passes, zero failures; 826 seconds |
+| Live scope limitation | Four retired-API placeholders, not exercised checks | Same four explicit placeholders |
+| Full browser outcomes | 352 passed/52 files; zero skipped, failed or flaky | 352 passed/52 files; zero skipped, failed or flaky |
+| Timing provenance, not service performance | Runner elapsed 28,951.733 seconds; sum of test durations 1,149.844 seconds | Runner elapsed 28,910.438 seconds; sum of test durations 1,115.685 seconds |
+| Focused regressions before full freeze | Eleven shape cases and seventeen numeric/shared-ownership cases pass; strict changed-fixture types pass | Same exercised inventory, no skips |
+| Spec immutability | Before/after SHA-256 values match | Before/after SHA-256 values match |
+| Original non-log state after all tests | Eight table fingerprints match; original IDs, versions, memberships and settings preserved | Same eight original-state comparisons pass |
+| Retained encrypted credentials | 24 retained; 17 active verified; one original inactive archived failure | 10 retained; six active verified; four original inactive archived failures |
+| Actual ready revision | `scimserver-dev--0000002` | `scimserver--7n2txcr` |
+| Live runtime support | Node `v24.22.2`, supported LTS; actual 0.55.67/Prisma readback | Same supported runtime/version/backend |
+| Registry-derived retention | Limit two; two active revisions, including previous-image rollback target | Limit two; first deployment has one active revision, so recovery is roll-forward |
+
+Both final browser reports record one Chromium worker and zero report-level
+errors. Other browser engines and every possible settings combination are
+not inferred from this configured inventory.
+
+Final 352-case browser runs started at `2026-11-04T04:10:31.961Z` and
+`2026-11-04T04:10:31.787Z`, respectively, and retained immutable spec hashes
+through completion. Strict fixture compilation was GREEN before these runs.
+Both include the shared-helper rejection guard and final local-candidate
+type flow. Completion receipts are `12:13:06.921Z` and `12:12:25.687Z`.
+The large non-test timing gap is retained, not normalized away or attributed
+to the service; its cause is unverified. Every test result passed, no report
+errors occurred, and these reports do not qualify performance.
+
+After both full runs, independent read-only proofs pass in protected folders
+`post-state-dev-7ad39bd56b8d41938ebbf40446403534` and
+`post-state-canary-prod-c7f483597c524ccd842a170bb1ebf030`. Both confirm
+that current original source tables still match the saved snapshots and
+that neither source nor target was mutated by the proof.
+
+The final comparisons project out only the new `Endpoint.snapshotRevision`
+column. Both final source manifests already contain `ResourceMember.reference`.
+Original migration rows are exact: 33 for dev and 32 for canary. Each target
+has one verified appended `20261020160000_add_endpoint_snapshot_revision`
+migration. `ServerSetting.updatedAt` is explicitly operational audit metadata;
+original key/value content must match. Request-log history remains protected
+in the original archives; new operational log rows are not claimed identical.
+The preserved default dev/test KEK and exact original inactive archived
+failures remain disclosed limitations, not new private-at-rest qualification.
+
+The approved automation principal, actual tenant/subscription, ready revision,
+serving digest and registry-derived retention were independently read back
+from ARM at `02:21Z`. Revision hygiene found nothing to deactivate. The
+permanent customer registry entries remain byte-equivalent as parsed data.
+The existing atomic role helper prepares prov10 `active` and prov09 `retiring`;
+normal reviewed merge is still required before this is canonical.
+
+The operator's earlier visual acceptance remains bound to this unchanged
+dev UI/image. There is no separate claimed canary operator statement.
+Available point-in-time data is authorized, not synchronized zero loss.
+Later source writes are not merged automatically. Protected recovery is
+Windows CurrentUser DPAPI; independent off-device recovery remains unproven.
+External provisioning clients still using source URLs must be explicitly
+repointed within their own approved scope; no external/customer tenant change
+is inferred from hosting acceptance.
+
+#### Consolidation execution issues and escape analysis
+
+The four ownership/schema/fingerprint/cleanup issues below are joined by
+these confirmed consolidation issues:
+
+| Issue | Type / severity | Root cause, fix and why it works | Detection / earliest gate |
+|---|---|---|---|
+| T10-OPS-1 | Tool discovery / Low | ARM reads used the verified full Azure CLI path, but the existing prune child script resolves `az` through PATH. The tool-host process lacked that directory. A process-local PATH prefix makes both consumers use the same installed CLI without installation, global changes or another account. | Final retention invocation; earliest check is `Get-Command az` before invoking a child consumer. Corrected actual dev/canary hygiene passed. |
+| T10-OPS-2 | Consumer contract / Low | A one-off follow-up assumed an object-based `-Registry` validator returning `.Valid`; the actual API takes `-Path` and returns a Boolean. Use the existing signature and check its actual result. The atomic role helper had already validated its own write. | Offline follow-up binding failure; earliest check is command metadata before a new invocation shape. Corrected file-based validation and customer invariance pass. |
+| T10-HIST-1 | Evidence tooling / Low | The transcript indexer initially assumed function request arguments were JSON strings. They are structured objects in this event format, so descriptions were omitted. The corrected consumer accepts the actual object shape and keeps FREEFORM requests out of JSON parsing. No source event was changed. | Metadata readback; earliest gate is inspecting event shape before extraction. Final mapped index includes the tool descriptions and zero malformed event lines. |
+| T10-REG-1 | Gate fixture correctness / Medium | R5's zero-active negative control still changed hardcoded prov09 after prov10 became active, leaving the actual active tenant untouched and producing a false failure. Both zero/two-active controls now select by role and purpose. The production validator was not defective. | Staged-role offline self-test: 14 pass/one fail, expected false but got true. Earliest check is the same self-test on the proposed role transition. Corrected actual gate is 15/15; future active generation is no longer embedded in those controls. |
+| T10-DOC-1 | Context documentation / Medium | The updated status summary did not update the older active-bootstrap section in Session_starter. C14 correctly rejected the prov09 coordinates after the valid role transition. Replace that section with registry-resolved profile selection, actual-principal verification and current prov10 coordinates. | First protected push stopped at C14 before API test gates. Earliest detection is the same content audit immediately after changing roles; the earlier freshness audit checks a different claim and was insufficient. Actual C14 is now GREEN and all 23 content-audit controls pass, including the existing retired-bootstrap negative control. No gate was weakened; the operational bootstrap no longer calls a generation-bound alias. |
+| T10-REG-2 | Gate fixture correctness / Medium | Offline database/port review fixtures required a live-registry tenant with role next. A completed cutover validly has no next tenant, so both cases failed parameter binding before reaching their assertions. Resolve the active dev/canary pair through the existing purpose resolver; all Azure calls remain mocked. | Second protected push caught database/ports failures. Earliest detection is the complete offline rollover gate against the proposed role transition, not just registry integrity. All twelve review cases and all eleven offline rollover contracts now pass with no cloud/Docker calls. Promote this second lifecycle-fixture escape into the existing pattern/rule: fixtures cannot require an undeclared future tenant. |
+| T10-OWN-4 | Test failure-path ownership / High | The setup assigned the create response to its cleanup target before rejecting an ID from the original inventory. An unexpected server response could therefore fail ownership validation but still delete the rejected original during teardown. Register only after the actual ownership assertion succeeds. | Independent review5762712172 at a8e45218 caught this unexercised rejection path. A safe browser negative control restores its known-owned cleanup handle in finally even during RED, so it cannot delete the original. It observed `Rejected original must not replace the owned cleanup target`, then all eleven updated shape cases passed on dev and canary after the ordering fix. Earliest detection is this failure-path test before the full matrix. |
+| T10-DOC-2 | Context documentation / Medium | The refreshed infrastructure introduction did not scope retained Sections 4-6, whose tenant-09 identities, 0.55.54 revisions and network/database measurements still read as current under a November 4 header. Explicit historical labels now scope every retained section and the document header; actual prov10 measurements remain separate. | The same independent review caught this. Earliest check is scanning every changed document's retained current-state sections, not only refreshing its introduction/date. Preserve historical evidence without implying current/customer revalidation. |
+| T10-TYPE-1 | Static fixture typing / Medium | TypeScript does not propagate a helper's writes to a global variable into the caller's control-flow narrowing. After resetting the cleanup handle to undefined, a helper call plus non-null guard narrowed subsequent field access to never. Keep the actual create response in a typed local candidate, register it after ownership validation, and use that same local object for setup requests. No cast or new runtime branch is needed. | Strict changed-spec tsc caught four TS2339 errors; browser execution alone cannot detect them. The 351-case runs retained immutable files while finishing. After the local-candidate correction, strict tsc and all eleven affected browser cases pass on both targets, followed by new independent original-state/credential proofs. Earliest check is strict fixture compilation before freezing the full browser inventory, not in parallel with it. |
+| T10-OWN-5 | Shared fixture ownership / High | Numeric persistence relied on the shared fixture creator, which accepted any returned ID before settings, credentials or users were seeded. The shared creator now reads original inventory and rejects an existing ID before any optional mutation or return to teardown. | Review5763025420 caught the remaining surface. A routed negative control returns its own known-owned fixture ID, so even RED cannot affect carried data. RED reached a credential write and failed with 403 rather than the expected ownership rejection. After the guard, strict types and all seventeen numeric/ownership cases pass on both apps; no settings, credential or resource mutation reaches the rejected ID. The shared seam protects every caller rather than duplicating a numeric-only guard. |
+| T10-ID-1 | Tenant selection / Medium | Two directory bootstrap scripts still defaulted to prov09 and could override the operator's active profile after rollover. Both now require explicit Tenant at parameter binding; examples resolve the intended dev tenant, and generated rebuild instructions use an explicit placeholder instead of a former tenant. | Review5763025420 identified defaults; a focused metadata contract observed RED before profile selection. Tracing the same entry points found a generation-pinned recovery recipe, also observed RED. All 28 registry/binding/recipe controls now pass. No directory command was run and no grant, identity or customer tenant was changed. Existing explicit-tenant invocations remain valid; omitted arguments intentionally require operator input. |
+| T10-TIME-1 | Timing provenance / Low | The final runner wall interval is about eight hours, while the 352 per-test durations total about nineteen minutes and no individual test exceeds 41 seconds. This establishes a large non-test interval, not its cause. Host suspension, scheduling or clock behavior has not been independently proven. | Receipt reconciliation, not a functional failure. Preserve both raw elapsed and summed test durations, keep performance UNQUALIFIED, and do not call the wall interval service latency. Check host/execution timing evidence before using these reports for timing decisions. All 352 outcomes, zero report errors and final preservation proofs remain independently verified; no repeated performance campaign was authorized. |
+
+These charts cover the sixteen confirmed corrections/findings in this consolidation,
+not the number of regex hits or the entire historical migration issue count.
+
+```mermaid
+pie title Consolidation corrections by severity
+  "High - ownership and cleanup" : 4
+  "Medium - fixture, fingerprint, role, context, type and identity correctness" : 8
+  "Low - execution, evidence tooling and timing provenance" : 4
+```
+
+```mermaid
+pie title Consolidation corrections by type
+  "Fixture ownership, input and cleanup" : 5
+  "Evidence compatibility" : 1
+  "Registry gate fixture" : 2
+  "Context documentation" : 2
+  "Static fixture typing" : 1
+  "Tenant selection" : 1
+  "Timing provenance" : 1
+  "Execution and evidence tooling" : 3
+```
+
+**Transcript completeness provenance:** T10-DOC-1/2, T10-REG-2, T10-OWN-4
+and T10-TYPE-1, T10-OWN-5, T10-ID-1 and T10-TIME-1 occurred after the scan
+below and is recorded directly from protected-push output and confirmed
+focused GREEN, rather than represented as part of the earlier event count.
+A systematic signal-frequency and
+narration-phrase pass read all 24,511 events in the full session JSONL through
+the recorded scan, with zero malformed lines. The mapped index contains
+432 candidate events, including 177 failure-shaped candidates and 17 strong
+diagnostic narrations. These are not defect counts. Candidate operations and
+causal snippets were reconciled against the chronological corrections and
+issue tables, rather than only the compacted summary. Expected semantic RED,
+quoted/read/search echoes, optional absent-image probes, already-failed
+historical ARM records and positive outputs mentioning negative controls
+were dismissed as non-new incidents. Four initially unmatched candidates
+were the topology preflight, protected-push restart, already-recorded hosted
+probe syntax correction and historical failed-resource metadata.
+
+Some earliest native failures retain only a failed status in the transcript;
+no unique hidden stderr cause is invented for them. Later independent archive,
+PostgreSQL and complete fingerprint evidence remains the admission proof.
+The exact actor of two earlier dev profile-setting edits is still unresolved.
+Those edits were scoped-restored and did not recur in the final complete
+live/browser run: the independent post-test original-profile hashes match.
+New confirmed issues after this cutoff are captured in-place in the ledger.
+
+Self-improvement is applied: pre-write ownership, blank-page cleanup/absence,
+original-state comparison, exact producer framing and role-driven negative
+controls are executable; the high-severity ownership rule is promoted into
+workspace guidance. Design disposition is accepted: cohesive existing
+fixture/registry seams, no runtime dependency edge or speculative abstraction.
+
+### Historical integrity hold and owned-fixture repair (2026-11-04)
+
+The following checkpoint is retained failure history, superseded by the
+final measured results above.
+
+
+The corrected dev browser run passed 349 tests across 52 files with no skips,
+failures or flakes. The operator explicitly confirmed the Bulk layout,
+navigation and endpoint settings looked correct on the prov10 dev URL.
+Canary revision `scimserver--7n2txcr` is Healthy on the same immutable image;
+its live execution passed. Its full browser run exercised all 349 cases:
+343 passed and six failed, with no skips or flakes.
+
+Those six failures were seeded-data expectations, not visual-baseline
+differences. The preserved canary snapshot contains different synthetic user
+and membership populations from dev. Neither the snapshot nor screenshot
+baselines were rewritten to make those expectations pass.
+
+A separate read-only post-test comparison verified that the still-accessible
+original source tables exactly match the saved fingerprints before comparing
+target rows. It identified two edited dev resources and two replaced internal
+membership IDs. The seeded-shape tests edited existing HR/Group resources and
+then restored values through SCIM, which still changes versions, timestamps
+and membership row identities. Canary's HR test similarly changed one original
+resource. Public resource IDs and original row counts remain intact.
+Two dev endpoint profiles also contain earlier target-only authentication
+setting edits; their timestamps precede the corrected browser run. Their exact
+actor has not yet been established, and they are not attributed to the repaired
+shape suite. A server-setting value remains unchanged while its audit timestamp
+records test writes. Restoration and final preservation acceptance are pending.
+
+| Issue | Type / severity | Confirmed mechanism and correction | Detection / prevention |
+|---|---|---|---|
+| T10-OWN-1 | Test correctness / High | Ambient seeded resources were mutated and logically restored, but metadata and internal row IDs were not restored. The browser ownership assertion failed before a write. All nine cases now create and delete isolated endpoints, use new IDs, and assert that original profile/resource/version/membership output is unchanged. | The post-test row comparison caught what the earlier green browser suite did not. Earliest detection is a pre-write ownership guard plus before/after state assertions. Applied in the repaired spec; nine cases pass on each target. |
+| T10-OWN-2 | Fixture correctness / Medium | Seeded population and schema requirements vary between snapshots. Creating complete owned fixtures removes population dependence; input fields and required extensions come from the actual profile schema. Real HTTP rejections identified required displayName/emails and unsupported extension fields before correction. | Focused browser runs caught setup failures. Earlier detection is schema-valid API fixture creation rather than direct database seeding assumptions. Applied without changing original records or weakening validation. |
+| T10-FP-1 | Evidence correctness / Medium | The initial new canary post-state consumer guessed JSON aggregation framing. The original producer was recovered from the full transcript at `2026-11-03T21:04:17.307Z`: PostgreSQL JSON text ordered with C collation, with a newline after every row. Shared fingerprint logic now reproduces that exact format while retaining dev's sorted per-row MD5 format. | A focused serialization assertion was RED, then three controls passed. Both actual source comparisons match their saved snapshots. A plausible reserialization is not evidence compatibility. |
+
+Self-improvement applied: newly owned fixture IDs, cleanup, original-state
+outcome assertions and tested original fingerprint framing. Design disposition:
+accepted; the change is a cohesive test-fixture correction, not a runtime
+refactor or generic migration bypass. This entry captures confirmed fixes
+immediately; full historical issue reconciliation remains incomplete.
+
+#### Transactional restoration and cleanup correction
+
+The first guarded restoration attempts correctly failed their final inventory
+check and rolled back. Failed fixture setup had left seven new dev endpoints
+and eight new canary endpoints: the shared cleanup helper evaluated relative
+fetch on an un-navigated `about:blank` page and swallowed the resulting error.
+The new suite now uses the authenticated request context for cleanup, checks
+the DELETE status and verifies the exact owned ID is absent. A tenth regression
+case exercises cleanup before any browser navigation. All ten cases pass on
+both targets. Only the fifteen explicitly owned leftovers from the recorded
+failed-setup time window were deleted, with count, identity and absence checks.
+
+| Issue | Type / severity | Fix and why it works | Detection / prevention |
+|---|---|---|---|
+| T10-OWN-3 | Test cleanup / High | Relative page fetch cannot work before an origin exists, and the existing helper concealed that failure. The repaired suite deletes through the base-URL-aware request context and requires actual inventory absence. | The transaction's complete post-state check rejected the extra rows and rolled back. Earliest detection is cleanup status/absence on a blank page. The new tenth case closes that escape in-place. |
+
+Both scoped restoration transactions subsequently committed only after all
+eight original non-log fingerprints matched. Original columns and migration
+rows are preserved; the reviewed snapshot-revision/member-reference additions
+and appended migrations remain intact. The source was read-only, and customer
+production was untouched. Dev's two original membership row IDs were restored.
+Private receipts are `post-state-dev-e8d536ffc80d44929676fd8a64801162` and
+`post-state-canary-prod-734729a0a85b4d509025be3bf1f3e5a4`.
+Historical request-log archives remain protected separately; new operational
+logs are not claimed to be byte-identical to the source snapshot.
+
+Eight focused source/scope/identifier/configuration/customer-exclusion and
+fingerprint guards pass, and the changed specs compile under a strict targeted
+TypeScript check. The full browser inventory is now 350 tests in the same
+52 files: the earlier 349 plus the new blank-page cleanup outcome case.
+No application source, deployed image, performance threshold or visual
+baseline changed during this correction.
+
+### Reviewed repair and backend evidence (2026-11-04)
+
+PR271 passed29 protected gates and all exact-tip hosted checks. Independent
+review5760950082 reports no open issues (COMMENTED, not formal approval).
+Normal merge `b87412b0ad5edac47bf19aaca92bb233c12304ed` passed authoritative
+build41740133535 and merged CodeQL41740131930, including HIGH/CRITICAL Trivy.
+Producer, hosted smoke pull and local anonymous pull agree on
+`sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93`.
+PR271 comment6618345332 binds the existing migration-only exception to this
+source/version/digest. Performance remains UNQUALIFIED.
+
+Dev was rolled forward without recopying data. Seven actual-AST transition
+cases reject wrong app identity, prior image and prior source, preserve the
+same-image environment-repair path, and permit only the reviewed transition.
+The existing environment-preservation regression passes. Prior deployment
+evidence remains intact, and new evidence resides separately under
+`dev-bulk-rollforward-20261103` in the private bootstrap directory. Actual
+revision `scimserver-dev--0000002` is Healthy and latestReady equals latest.
+Corrected dev full live execution passes; complete browser execution is running.
+Its full inventory is pinned to349 tests/52 files, with before/after spec hashes.
+No operator visual acceptance or completed canary validation is claimed.
+
+| Independent lane | Result | Scope |
+|---|---|---|
+| Owned PostgreSQL unit | 6,254 tests / 216 suites PASS | Explicit Prisma backend; no source/customer data. |
+| Owned PostgreSQL HTTP E2E | 2,612 tests / 122 suites PASS, zero skips | Includes the suites skipped or excluded by ordinary inmemory CI. |
+| Explicit inmemory unit | 6,254 tests / 216 suites PASS | No database; unchanged reviewed API tree. |
+| Merged inmemory HTTP CI | 2,514 tests / 118 suites PASS;42 tests/2 suites explicitly skipped | Existing runner exclusions remain disclosed, not exercised checks. |
+| Exact-image Docker/Prisma live | 1,841 reported passes, zero failures | Four retired-API placeholders are not exercised checks. |
+| Matching-source local-node/inmemory live | 1,841 reported passes, zero failures | Same placeholder disclosure; compiled API tree matches merged source. |
+
+Owned test containers, network and listeners were removed. Test databases
+never pointed at carried dev/canary or customer production. The full local
+event transcript was streamed to a527-candidate signal index across22,726
+events; requests and user summaries were excluded. This is a candidate
+frequency/narration pass only, not completed issue-by-issue RCA reconciliation.
+Expected RED and search echoes still require classification.
+
+Self-improvement applied: immutable attempt evidence, exact prior-state
+guards before mutation, and a complete browser inventory/spec-hash guard
+rather than merely requiring a nonzero passing test count.
+Design disposition accepted: bounded migration-specific transition and
+owned validation harnesses; no generic bypass or new runtime abstraction.
 
 ### Available-data deployment checkpoint (2026-11-03)
 
@@ -1767,20 +2027,27 @@ and data-integrity verification. Canary approval is not customer-production
 approval. A FAIL, required SKIP, PARTIAL, missing receipt or unverifiable identity
 blocks cutover; no aggregate phrase such as "all tests passed" replaces the table.
 
-### Phase 6: final synchronized switch
+### Phase 6: authorized point-in-time switch
 
-1. Coordinate a source write-freeze window with other sessions and provisioning
-   clients. Freeze test writers on the new targets as well.
-2. Capture fresh final databases/configuration, restore the final delta and
-   repeat fidelity/upgrade checks. Do not use today's snapshot as zero-loss proof.
+The operator's November 3 available-data authorization supersedes the
+original synchronized-switch requirement for this migration only. It does
+not weaken fidelity or target-acceptance gates.
+
+1. Retain the accepted snapshot boundaries and original protected recovery
+   packages. Do not pause or mutate the old source writers.
+2. Verify the carried snapshot and post-test original-state outcomes. Do not
+   silently merge a later delta or represent these captures as zero-loss proof.
 3. Complete dev/canary acceptance and obtain operator visual verification for
    affected UI surfaces. Do not declare UI ready from automated green alone.
 4. Perform one validated atomic active/retiring registry write, preserving all
    source entries and the permanent customer tenant.
-5. Derive new URLs from target ARM. Update actual Entra provisioning client URLs,
-   proofs/callbacks and genuinely coupled CI settings using a private mapping.
+5. Derive new URLs from target ARM. Use the recreated owned directory proofs
+   and approved mappings. Record external provisioning-client URL changes
+   separately; do not infer that clients in other tenants were repointed.
 6. Verify public URLs, auth, real provisioning, user/group/custom-resource IDs,
-   memberships and settings after switch. Keep two revisions per dev/canary.
+   memberships and settings after switch. Resolve retention from the registry.
+   A first deployment with one revision has roll-forward recovery, not an
+   invented instant rollback target.
 7. Keep purplecliff intact until acceptance and the recovery decision. Routing
    back after new writes requires reconciliation; otherwise recover forward.
 

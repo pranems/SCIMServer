@@ -1,28 +1,82 @@
 ## SCIMServer - Condensed Session Memory
 
-**Current tenant 10 checkpoint:** PR270 merged normally as6102aff4 and its
-authoritative scanned image is deployed on dev. Both actual database carries
-passed full nine-table fidelity/schema checks. Available-data authorization
-supersedes waiting for source freeze; performance remains unqualified.
-Dev environment repair has actual-AST RED/GREEN and complete Azure readback.
-Live acceptance reports1,841 passes/zero failures, including four explicitly
-skipped retired-API placeholders. Browser acceptance has347 passes/one
-unintended Bulk layout failure, zero skips/flakes. Canary app remains absent.
+**Current tenant 10 checkpoint, 2026-11-04:** both dev and canary serve the
+reviewed 0.55.67 image from PR271 merge
+`b87412b0ad5edac47bf19aaca92bb233c12304ed`. Authoritative build41740133535,
+CodeQL41740131930 and HIGH/CRITICAL Trivy passed. The immutable digest is
+`sha256:302c85387b6ebd352ae88d9648578d22071dddb69c41d60982afb7dbacb5fe93`.
+The scoped performance exception is bound in PR271 comment6618345332;
+performance remains unqualified. Available point-in-time data is authorized.
+Customer production has not changed.
 
-Separate repair branch `fix/tenant10-bulk-result-overflow-20261103` uses
-bounded fractional grid tracks and existing CopyableField truncation.
-Deterministic long values reproduce RED on unchanged Azure image. Ten
-component tests, five built-loopback browser flows with migrated-dev backend,
-strict added-spec compilation and production build pass. Actual1440/900px
-bounds, clipping and complete clipboard values are asserted; failed and GREEN
-screenshots were inspected. No baseline regeneration. Virtual HEAD compiler
-comparison verifies unchanged66 errors/two production errors, no additions.
-Updated whole-web coverage passes1,662/125 files, with statements83.06%,
-branches75.86%, functions75.53%, lines85.74%; all size budgets pass.
-Web ESLint remains N/A because no config exists, not a passing lint run.
-Review, corrected-image publication,
-full actual target acceptance, operator visual confirmation and cutover remain
-pending. Customer production is untouched. Older no-app/source-freeze/pending
+Actual Healthy revisions are `scimserver-dev--0000002` and
+`scimserver--7n2txcr`. Both carries initially passed complete nine-table
+content/schema/constraint/index checks. Dev's corrected browser run passed
+349 tests in 52 files and received explicit operator visual confirmation.
+Canary's first full run had 343 passes and six seeded-fixture failures, with
+no skips or flakes. The preserved canary synthetic population differed from
+the assumptions in those tests.
+
+Post-test comparison found existing HR/Group edits whose logical restoration
+still changed versions and membership IDs. Both scoped restoration transactions
+now pass eight original non-log fingerprints, retaining reviewed additive
+columns and original migration rows. Two earlier dev authentication-setting
+edits were restored from the verified source; their exact actor remains an
+open historical RCA question. Historical logs remain privately archived.
+
+The shape suite now creates complete schema-valid, test-owned endpoints and
+asserts that original profile/resource/version/membership output is unchanged.
+Failed setup exposed a swallowed cleanup error on an un-navigated page.
+Only fifteen explicitly owned leftovers were removed. Cleanup now uses the
+request context and verifies ID absence, including a blank-page regression.
+All eleven focused cases pass on both targets, including rejected-original
+cleanup registration; eight restoration/fingerprint
+guards and strict changed-spec compilation pass.
+
+Final consolidation passes on both targets: each live run reports 1,841
+passes/zero failures, including four retired-API placeholders. Each browser
+run passes 352 cases/52 files with zero failures, skips or flakes and unchanged
+before/after spec hashes, after strict changed-fixture tsc. The shared creator
+rejects pre-existing IDs before settings/credential/user seeding. Sixteen
+numeric settings plus one safe shared-ownership negative control pass.
+Directory bootstrap entry points now require an explicit tenant; 28 registry,
+binding and recovery-recipe controls pass without cloud calls. The final
+browser wall interval includes a large unexplained non-test gap; raw timings
+are retained and are not performance qualification. Final post-test
+read-only proof matches all eight original
+non-log tables. Dev verifies 17 active retained encrypted credentials; canary
+verifies six. Exact original inactive archived failures remain one/four.
+Only the added snapshot UUID column and operational ServerSetting.updatedAt
+are excluded explicitly; original settings values and migration rows match.
+
+Verified-identity ARM/digest and revision hygiene pass: dev retains two
+revisions with a previous-image rollback; canary's first deployment has one
+revision and roll-forward recovery. The atomic prov10-active/prov09-retiring
+registry change is included in this consolidation, with permanent customer
+data unchanged. R5's
+hardcoded old-active negative fixture was RED after that valid transition;
+role/purpose-driven controls now pass 15/15. Confirm canonical activation
+from the protected PR's normal merge, not the prepared branch alone.
+Actual live Node v24.22.2/0.55.67/Prisma checks pass on both targets.
+Current documentation gates and
+strict changed-spec compilation pass. Full-transcript RCA reconciliation
+covers 24,511 events; the earlier profile-write actor remains unresolved,
+with no recurrence in the complete final run.
+
+Independent backend evidence is complete: Prisma unit 6,254/216 suites and
+HTTP E2E 2,612/122 suites, with no skips; explicit inmemory unit 6,254/216.
+The unchanged merged inmemory HTTP lane has 2,514 passes/118 suites and
+42 explicit skipped tests/two suites. Exact-image Docker/Prisma and matching
+local-node/inmemory live lanes each reported 1,841 passes, including four
+retired-API placeholders, not exercised checks. Owned local fixtures/listeners
+were removed. Web coverage is 1,662 tests/125 files. The unchanged full tsc
+baseline has 66 diagnostics/two production diagnostics; no web ESLint config.
+
+Self-improvement applied: original-state assertions, exact source fingerprints,
+pre-write scope/identity guards, transactional readback and cleanup absence.
+Design disposition accepted: cohesive migration/test corrections, with no
+new runtime abstraction, generic gate bypass or performance campaign.
+Older no-app/source-freeze/pending
 release statements below are preparation history, not the current state.
 
 **2026-11-03 authorized migration release:** the operator explicitly authorized
@@ -44,7 +98,7 @@ superseded, not failed benchmark receipts. Self-improvement applied: explicit
 scope/artifact binding and separate release/research units. Design disposition
 accepted: no general gate bypass or runtime abstraction is justified.
 
-**Last verified:** 2026-11-03
+**Last verified:** 2026-11-04
 
 ### Current handoff: tooling merged; release and deployment remain held
 
@@ -2421,7 +2475,7 @@ This dev box hosts TWO projects targeting TWO different Azure tenants. Cross-ten
 
 | Project | Tooling | Tenant | Tenant ID | Subscription |
 | --- | --- | --- | --- | --- |
-| **SCIMServer** (this VS Code window) | VS Code + integrated `pwsh` + `az` CLI | Provisioning IAM Team 09 (`proviamtest09.onmicrosoft.com`) | `9751e42f-78f3-42f4-8b8a-6e73845aceae` | `ProvIAM_Subscription` (`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`) |
+| **SCIMServer** (this VS Code window) | VS Code + integrated `pwsh` + `az` CLI | Provisioning IAM Team 10 (`proviamtest10.onmicrosoft.com`) | `ea9f551e-8155-4010-87a8-b6fa1459f882` | `Proviam-Subscription` (`71091610-e5bc-44a6-bed7-ca4113b6520a`) |
 | **Sync Fabric** (separate window) | Visual Studio + its own MSAL cache | TME Organization (AzureCloud) | `70a036f6-8e4d-4615-bad6-149c02e7720d` | AADSF TME Test Subscription |
 
 Tenant identity and estate roles are owned by [scim-estates.json](scripts/scim-estates.json).
@@ -2431,20 +2485,25 @@ CLI isolation is provided by [az-tenant.ps1](scripts/az-tenant.ps1), which assig
 **Bootstrap in any new integrated terminal used for dev or canary operations:**
 
 ```powershell
-. .\scripts\az-tenant.ps1
-Use-ProvIAM09
-az account show --query '{name:name, tenantId:tenantId, subId:id}' -o table
+. .\scripts\scim-estates.ps1
+$estate = Get-ScimEstate -Purpose dev
+$env:AZURE_CONFIG_DIR = $estate.Tenant.ConfigDirPath
+$env:AZURE_EXTENSION_DIR = Join-Path $env:AZURE_CONFIG_DIR 'cliextensions'
+az account show --query '{name:name, tenantId:tenantId, subId:id, principal:user}' -o json
 ```
 
-The expected tenant is `9751e42f-78f3-42f4-8b8a-6e73845aceae`; the expected subscription is
-`8cb58fd6-cf6f-4334-9fe0-3b12f93a6596`. `Use-ProvIAM09` reuses the isolated cache or the deployment
-service principal and selects the subscription by ID, avoiding the ambiguous
-`ProvIAM_Subscription` name shared with the retired Tenant 08.
+Verify the actual tenant, subscription and approved principal against the
+resolved estate before ARM calls. For this cutover the expected tenant is
+`ea9f551e-8155-4010-87a8-b6fa1459f882` and the subscription is
+`71091610-e5bc-44a6-bed7-ca4113b6520a`. The existing isolated target profile
+must already be authenticated; this snippet does not log in, select another
+account or authorize deployment. Resolve future generations from the
+registry rather than copying this table into scripts.
 
 **Pitfalls to avoid:**
-- NEVER deploy before dot-sourcing `az-tenant.ps1`, calling `Use-ProvIAM09`, and checking `az account show`.
+- NEVER deploy before resolving the active estate, selecting its isolated profile and checking the actual `az account show` identity.
 - NEVER pass `--tenant 70a036f6-...` (TME) from this workspace - that's the sync fabric tenant.
-- NEVER target Tenant 08 or Tenant 07 for dev/canary work; they are retired historical estates.
+- NEVER target Tenant 09, Tenant 08 or Tenant 07 for new dev/canary work; they are historical estates.
 - If an ARM lookup returns empty, verify tenant and subscription before debugging the caller.
 
 ### Recent Key Achievements (Chronological)

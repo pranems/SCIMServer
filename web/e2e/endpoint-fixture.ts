@@ -125,6 +125,15 @@ export async function createFixtureEndpoint(
         ...extra,
       });
 
+      const inventory = await fetch('/scim/admin/endpoints', { headers: json() });
+      if (!inventory.ok) {
+        return { id: null, users: [], error: `ownership inventory failed ${inventory.status}` };
+      }
+      const original = await inventory.json() as { endpoints?: Array<{ id: string }> };
+      if (!Array.isArray(original.endpoints)) {
+        return { id: null, users: [], error: 'ownership inventory returned no endpoint list' };
+      }
+      const originalIds = new Set(original.endpoints.map(({ id }) => id));
       const created = await fetch('/scim/admin/endpoints', {
         method: 'POST',
         headers: json(),
@@ -138,6 +147,9 @@ export async function createFixtureEndpoint(
       }
       const ep = (await created.json()) as { id?: string };
       if (!ep?.id) return { id: null, users: [], error: 'create returned no id' };
+      if (originalIds.has(ep.id)) {
+        return { id: null, users: [], error: 'create returned a pre-existing endpoint ID' };
+      }
 
       const seededUsers: Array<{ id: string; userName: string }> = [];
 

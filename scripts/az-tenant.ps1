@@ -370,7 +370,7 @@ function Connect-ScimUser {
 }
 
 function Use-ProvIAM09 {
-    <# ACTIVE dev + canary prod context (ephemeral tenant 09). #>
+    <# Historical tenant 09 context; use the estate registry for current roles. #>
     [CmdletBinding()] param([switch]$DeviceCode)
     Connect-ScimTenant -Name 'proviam09' -DeviceCode:$DeviceCode | Out-Null
     Show-AzTenant

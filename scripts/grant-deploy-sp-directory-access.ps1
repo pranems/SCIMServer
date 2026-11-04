@@ -35,7 +35,8 @@
     narrower ...OwnedBy is used here rather than Application.ReadWrite.All.
 
     RECOMMENDED SCOPE:
-      proviam09  YES - ephemeral dev + canary tenant, rebuilt every ~80 days,
+      active     YES - explicitly selected ephemeral dev + canary tenant,
+                       rebuilt every ~80 days,
                        and the setup work genuinely recurs. Convenience wins.
       anandsa    NO  - customer-facing production. Its deployment SP already
                        does everything the promotion path needs over ARM, with
@@ -44,7 +45,8 @@
                        a specific, written reason.
 
 .PARAMETER Tenant
-    SCIMServer tenant key (proviam09 / proviam / anandsa).
+    Required explicit SCIMServer tenant key from the registry. No implicit
+    profile or tenant selection is performed when the argument is omitted.
 
 .PARAMETER Permission
     Graph permission to assign. Default Application.ReadWrite.OwnedBy.
@@ -52,14 +54,17 @@
 .EXAMPLE
     # Requires ONE interactive sign-in as a Global Administrator or
     # Privileged Role Administrator. After it succeeds, no further sign-ins.
+    . ./scripts/scim-estates.ps1
     . ./scripts/az-tenant.ps1
-    Connect-ScimUser -Entry (Get-ScimTenantMap)['proviam09']
-    pwsh -File scripts/grant-deploy-sp-directory-access.ps1 -Tenant proviam09
+    $tenant = (Get-ScimEstate -Purpose dev).tenantKey
+    Connect-ScimUser -Entry (Get-ScimTenantMap)[$tenant]
+    pwsh -File scripts/grant-deploy-sp-directory-access.ps1 -Tenant $tenant
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
+    [Parameter(Mandatory)]
     [ValidateSet('proviam10', 'proviam09', 'proviam', 'anandsa')]
-    [string]$Tenant = 'proviam09',
+    [string]$Tenant,
     [ValidateSet('Application.ReadWrite.OwnedBy', 'Application.ReadWrite.All')]
     [string]$Permission = 'Application.ReadWrite.OwnedBy'
 )

@@ -23,7 +23,8 @@
     credential.
 
 .PARAMETER Tenant
-    SCIMServer tenant key from az-tenant.ps1 (proviam09 / proviam / anandsa).
+    Required explicit SCIMServer tenant key from the registry. There is no
+    default that can silently select a retiring tenant after rollover.
 
 .PARAMETER SecretYears
     Lifetime of the generated client secrets. Defaults to 1 year, which safely
@@ -43,16 +44,19 @@
     #    `az ad app create` returns "Insufficient privileges to complete the
     #    operation". Creating app registrations needs a user with the Application
     #    Developer (or Application Administrator) directory role.
+    . ./scripts/scim-estates.ps1
     . ./scripts/az-tenant.ps1
-    Connect-ScimUser -Name proviam09
+    $tenant = (Get-ScimEstate -Purpose dev).tenantKey
+    Connect-ScimUser -Entry (Get-ScimTenantMap)[$tenant]
 
     # 2. Create the three proof identities
-    pwsh -File scripts/setup-auth-proof-apps.ps1 -Tenant proviam09
+    pwsh -File scripts/setup-auth-proof-apps.ps1 -Tenant $tenant
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
+    [Parameter(Mandatory)]
     [ValidateSet('proviam10', 'proviam09', 'proviam', 'anandsa')]
-    [string]$Tenant = 'proviam09',
+    [string]$Tenant,
     [int]$SecretYears = 1,
     [string]$OutFile
 )

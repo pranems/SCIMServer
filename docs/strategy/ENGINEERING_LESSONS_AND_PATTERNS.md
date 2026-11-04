@@ -14,6 +14,72 @@
 
 ---
 
+## Negative controls must follow roles, not former generations (2026-11-04)
+
+After the valid prov10 activation, the R5 zero-active control still changed
+prov09's role. It no longer removed the actual active tenant, so the control
+reported an unexpected valid registry. The production validator was correct;
+the deliberately broken input was not actually broken.
+
+Select the active role and relevant purpose when constructing a negative
+control, and assert any fixture precondition explicitly. Run the existing
+self-test on the proposed role transition before canonical publication.
+Both zero/two-active cases in [test-scim-estates.ps1](../../scripts/test-scim-estates.ps1)
+now derive their targets from roles/purposes; the observed 14/15 RED becomes
+15/15 GREEN without changing the validator. A test fixture that encodes an
+expiring deployment identity is itself a scheduled defect.
+
+A second escape required a `next` tenant in offline database/port fixtures.
+After a valid cutover no next tenant exists, so those cases failed binding
+before their assertions. Resolve the active dev/canary pair through
+`Get-ScimEstate -Purpose`, or construct an owned future-tenant fixture when
+that role is the subject of the test. The complete eleven-contract rollover
+gate now passes with no cloud calls. Run both registry integrity and rollover
+consumer contracts against the proposed transition, not only one of them.
+Directory-mutating entry points must require an explicit tenant rather than
+defaulting to a former active generation. Generated recovery recipes must use
+an intentional selector too. The two bootstrap bindings and rebuild recipe
+now have observed RED/GREEN guards in the 28-assertion registry-resolution suite.
+
+## Logical restoration is not original-state preservation (2026-11-04)
+
+A browser test can restore a user's visible field or a Group's display name
+while still changing resource versions, timestamps and internal membership
+row IDs. The tenant 10 post-test comparison found this after a green browser
+run. Existing synthetic data is still carried data, not a per-test fixture.
+
+Create a new endpoint for mutation tests, configure it from the intended
+profile, seed through the real API and delete it after the test. Prove that
+the new ID was absent from the original inventory. Assert unchanged original
+profile, resource, version and membership output after cleanup; a successful
+restore response alone cannot establish preservation. Compare saved database
+fingerprints separately, accounting explicitly for reviewed additive columns
+and appended migration history rather than silently ignoring mismatches.
+
+Snapshot fixture populations also differ. Seed complete, schema-valid owned
+resources instead of requiring a historical snapshot to contain exactly the
+same test users and memberships as another estate. Required extensions and
+accepted fields must follow the published profile.
+
+Ownership validation must also precede cleanup registration. An assertion
+after assigning the returned endpoint can reject an original ID while
+teardown still deletes it. A safe negative control must retain its known-owned
+handle in finally, exercise the actual registration path with an original
+ID, and prove that rejection leaves that handle unchanged and the original
+readable. This closes a failure-path gap that successful setup runs cannot expose.
+The same invariant belongs in the shared fixture creator before optional
+settings, credentials or users are seeded. Its routed negative control returns
+an already-known owned ID and proves zero writes reach it, without endangering
+carried records even during RED.
+
+Applied in [seeded-shape-coverage.spec.ts](../../web/e2e/seeded-shape-coverage.spec.ts).
+The [migration record](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md) records
+the ownership and rejected-original REDs, eleven passing owned/blank-page/
+rejection cases per target, and independent post-test preservation after
+full 352-case acceptance on each target. Strict fixture compilation is GREEN
+before these final matrices; seventeen numeric/shared-ownership cases also pass.
+No runtime behavior or visual baseline changed.
+
 ## Long-value fixtures must precede deployment qualification (2026-11-03)
 
 The tenant 10 dev run measured a Bulk layout defect even though an earlier
