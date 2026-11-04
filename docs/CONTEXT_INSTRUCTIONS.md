@@ -13,13 +13,16 @@
 PR271 digest below. Dev's first corrected full browser run passed 349/52 files
 and received explicit operator visual confirmation. Canary's first full run
 passed 343 cases and failed six seeded-population expectations, with no skips
-or flakes. Ten repaired, test-owned shape/cleanup cases now pass on each target.
+or flakes. Eleven repaired, test-owned shape/cleanup cases now pass on each target.
 Original-data restoration passes eight non-log fingerprints on both databases,
 preserving original IDs/columns and reviewed migration history. Historical
 request logs remain archived; operational audit writes are separately recorded.
 Final live consolidation reports 1,841 passes/zero failures per app, including
-four explicit retired-API placeholders. Each full browser run passes 350
+four explicit retired-API placeholders. Each full browser run passes 351
 cases/52 files with zero failures, skips or flakes and immutable spec hashes.
+After those full runs, the final local-candidate type-flow refactor passes
+strict compilation and all eleven affected cases per target. Separate
+focused receipts retain that provenance; final state proofs follow both runs.
 Independent post-test proof matches eight original non-log tables and verifies
 17 dev/six canary active retained encrypted credentials. Original inactive
 archived failures remain one/four, exactly matching original-image evidence.

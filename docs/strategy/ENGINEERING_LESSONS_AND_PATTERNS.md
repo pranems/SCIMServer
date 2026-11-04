@@ -57,11 +57,20 @@ resources instead of requiring a historical snapshot to contain exactly the
 same test users and memberships as another estate. Required extensions and
 accepted fields must follow the published profile.
 
+Ownership validation must also precede cleanup registration. An assertion
+after assigning the returned endpoint can reject an original ID while
+teardown still deletes it. A safe negative control must retain its known-owned
+handle in finally, exercise the actual registration path with an original
+ID, and prove that rejection leaves that handle unchanged and the original
+readable. This closes a failure-path gap that successful setup runs cannot expose.
+
 Applied in [seeded-shape-coverage.spec.ts](../../web/e2e/seeded-shape-coverage.spec.ts).
 The [migration record](../TENANT_10_MIGRATION_EXECUTION_2026_10_30.md) records
-the pre-write ownership RED, ten passing owned/blank-page cases per target,
-and independent post-test preservation after full 350-case acceptance on
-each target. No runtime behavior or visual baseline changed.
+the ownership and rejected-original REDs, eleven passing owned/blank-page/
+rejection cases per target, and independent post-test preservation after
+full 351-case acceptance on each target. The subsequent local-candidate
+type-flow refactor has separate strict compilation and eleven-case receipts.
+No runtime behavior or visual baseline changed.
 
 ## Long-value fixtures must precede deployment qualification (2026-11-03)
 

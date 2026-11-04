@@ -31,6 +31,11 @@ let sourceState: Record<string, unknown> | undefined;
 let originalEndpointIds: string[] = [];
 let ownedBearerToken: string | undefined;
 
+function registerOwnedShape(candidate: ShapeEndpoint): void {
+  expect(originalEndpointIds, 'Every test must use a newly owned endpoint').not.toContain(candidate.id);
+  ownedShape = candidate;
+}
+
 async function readShapeState(page: Page, endpoint: ShapeEndpoint): Promise<Record<string, unknown>> {
   const state: Record<string, unknown> = {};
   for (const path of [
@@ -77,9 +82,9 @@ test.describe('seeded six-profile outcome matrix', () => {
       },
     });
     expect(created.status()).toBe(201);
-    ownedShape = await created.json() as ShapeEndpoint;
-    expect(originalEndpointIds, 'Every test must use a newly owned endpoint').not.toContain(ownedShape.id);
-    expect(ownedShape.profile).toEqual(sourceShape.profile);
+    const candidate = await created.json() as ShapeEndpoint;
+    registerOwnedShape(candidate);
+    expect(candidate.profile).toEqual(sourceShape.profile);
 
     const coreUser = 'urn:ietf:params:scim:schemas:core:2.0:User';
     const hrExtension = 'urn:scimserver:devshapes:user:hr-extras:1.0';
@@ -109,7 +114,7 @@ test.describe('seeded six-profile outcome matrix', () => {
         userName, displayName: userName,
         emails: [{ value: userName, type: 'work', primary: true }], active: index !== 2,
       };
-      const response = await page.request.post(`/scim/endpoints/${ownedShape.id}/Users`, {
+      const response = await page.request.post(`/scim/endpoints/${candidate.id}/Users`, {
         headers: { ...headers, 'Content-Type': 'application/scim+json' },
         data: {
           schemas: [coreUser, ...extensions.map(({ schema }) => schema)],
@@ -124,7 +129,7 @@ test.describe('seeded six-profile outcome matrix', () => {
       for (const [displayName, members] of [
         ['g1.multi', users.slice(0, 2)], ['g2.solo', users.slice(2)],
       ] as const) {
-        const response = await page.request.post(`/scim/endpoints/${ownedShape.id}/Groups`, {
+        const response = await page.request.post(`/scim/endpoints/${candidate.id}/Groups`, {
           headers: { ...headers, 'Content-Type': 'application/scim+json' },
           data: {
             schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
@@ -136,7 +141,7 @@ test.describe('seeded six-profile outcome matrix', () => {
       }
     }
     if (name === 'shape-per-endpoint-creds') {
-      const response = await page.request.post(`/scim/admin/endpoints/${ownedShape.id}/credentials`, {
+      const response = await page.request.post(`/scim/admin/endpoints/${candidate.id}/credentials`, {
         headers, data: { credentialType: 'bearer', label: 'owned shape credential' },
       });
       expect(response.status()).toBe(201);
@@ -172,6 +177,20 @@ test.describe('seeded six-profile outcome matrix', () => {
     expect(page.url()).toBe('about:blank');
     expect(ownedShape).toBeDefined();
     expect(originalEndpointIds).not.toContain(ownedShape?.id);
+  });
+
+  test('ownership rejection keeps original endpoint out of cleanup', async ({ page }) => {
+    const registered = ownedShape;
+    const original = sourceShape;
+    if (!registered || !original) throw new Error('Owned and original shapes must exist for rejection coverage');
+    try {
+      expect(() => registerOwnedShape(original)).toThrow('Every test must use a newly owned endpoint');
+      expect(ownedShape?.id, 'Rejected original must not replace the owned cleanup target').toBe(registered.id);
+    } finally {
+      ownedShape = registered;
+    }
+    const response = await page.request.get(`/scim/admin/endpoints/${original.id}`, { headers });
+    expect(response.status(), 'Original endpoint must remain readable after ownership rejection').toBe(200);
   });
 
   for (const name of shapeNames) {

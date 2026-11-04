@@ -1,7 +1,7 @@
 # Deployment Infrastructure and Form Factors
 
 > **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-04 - **Repo version at capture:** `api/package.json` = `0.55.67`
-> **Scope:** Every infrastructure element SCIMServer runs on, every deployment form factor, and the measured state of all three live Azure estates.
+> **Scope:** Infrastructure elements and deployment form factors. Current prov10 dev/canary observations are recorded below; Sections 4-6 retain explicitly historical tenant-09/customer measurements, not November 4 revalidation of those estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
 
@@ -23,13 +23,17 @@ and normal merge, not an unreviewed local file.
 
 Both apps use shared East US Consumption environment `scimserver-env`.
 Available point-in-time source data was restored with complete original-table
-fidelity; reviewed startup migrations add member references where previously
-absent and endpoint snapshot UUIDs. Test-related original-record changes were
+fidelity; both final source manifests already contain member references,
+and reviewed startup migrations add endpoint snapshot UUIDs. Test-related original-record changes were
 transactionally restored, with eight non-log original fingerprints passing per
 target. Final live runs each report 1,841 passes/zero failures, including four
-retired-API placeholders; both browser runs pass 350 cases/52 files with no
+retired-API placeholders; both browser runs pass 351 cases/52 files with no
 failures, skips or flakes. Independent final original-state and active retained
-credential proofs pass. Both final source manifests already contain member
+credential proofs pass.
+The final local-candidate fixture type-flow refactor separately passes strict
+compilation and all eleven affected browser cases on each app, followed by
+new original-state/credential proofs.
+Both final source manifests already contain member
 references; only the added snapshot UUID column is projected out. Source
 later writes are not automatically merged.
 Live authenticated readback at `2026-11-04T02:35Z` confirms supported Node
@@ -39,7 +43,7 @@ runtime check is scoped to dev/canary; customer production is not probed.
 Performance remains **UNQUALIFIED**, including cross-region database latency,
 under the operator's dev-and-canary-only exception
 `T10-0.55.67-PERF-EXCEPTION-2026-11-03`. The atomic prov10 `active`/prov09
-`retiring` update is staged for protected review/normal merge. Actual
+`retiring` update takes effect canonically through protected review/normal merge. Actual
 identity/digest and policy-resolved revision verification pass: dev retains
 two active revisions; canary's first deployment has one and recovers by
 roll-forward. Customer production has not changed. See the
@@ -710,6 +714,13 @@ Registry-auth selection logic in the template, in order:
 
 ## 4. Live estates - measured configuration
 
+> **Historical capture, not current prov10 inventory:** this section retains
+> tenant-09 and earlier estate observations through October 16, 2026. Its
+> tenant IDs, hosts, revisions, version 0.55.54 and earlier customer values
+> were not reverified on November 4. Use the prov10 acceptance table above
+> and the role-based registry for current dev/canary state. No customer
+> revalidation or old-estate liveness is implied by the document's header date.
+
 **Where the estates are declared: [scripts/scim-estates.json](../scripts/scim-estates.json).** Since 2026-08-13 that registry is the machine-readable source of truth for tenants and estates, and scripts address them by **role** (`active` / `next` / `retiring` / `permanent` / `trial`) rather than by hardcoded name. This section remains the human-readable measured record; the registry is what the tooling reads.
 
 **The registry deliberately stores no FQDN.** Azure assigns the Container Apps environment domain at creation time - `purplecliff-91e4026d` today, `proudbush-ae90986e` before it, and the now-**retired** `yellowsmoke-af7a3fff` before that - so it is unknowable until the environment exists and different on every rebuild. A stored FQDN is a value guaranteed to become false. `Get-ScimEstateFqdn` in [scripts/scim-estates.ps1](../scripts/scim-estates.ps1) derives it from ARM instead, which is why the Stage 1.11 **C4** live check now follows a tenant rollover automatically rather than needing to be edited.
@@ -811,6 +822,11 @@ Two structural facts stand out in that graph and are easy to miss:
 
 ## 5. Network topology
 
+> **Historical tenant-09 measurements:** the network diagram, addresses,
+> East US 2 placement and firewall table below describe the earlier capture,
+> not the prov10 estate. Current prov10 application/database placement is
+> recorded above; the old network measurements were not recaptured on November 4.
+
 Both VNets carry the identical address plan from [infra/networking.bicep](../infra/networking.bicep).
 
 ```mermaid
@@ -846,6 +862,11 @@ The tenant-09 servers carry **only** the Azure-services sentinel rule. The previ
 ---
 
 ## 6. Data plane - PostgreSQL Flexible Server
+
+> **Historical tenant-09 database capture:** the following server names,
+> settings and measurements are retained evidence, not current prov10
+> readback. The current prov10 servers are the Central US pair in the
+> acceptance table above. No unmeasured property is inherited from these old rows.
 
 | Property | Dev `scimserver-pg-dev-09` | Canary prod `scimserver-pg-09` | Declared default in Bicep |
 |---|---|---|---|

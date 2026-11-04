@@ -280,7 +280,7 @@ value rather than the visible abbreviation. The CSV-input screenshot above
 does not illustrate this updated result layout. The repair has passed built
 loopback frontend tests and the corrected dev full browser run, and the
 operator visually confirmed it on dev. Both prov10 apps serve the reviewed
-image; each full browser run now passes 350 cases/52 files without failures,
+image; each full browser run now passes 351 cases/52 files without failures,
 skips or flakes. Original-state proof passes independently. Registry
 publication follows the protected migration cutover. See
 [bulk layout repair evidence](PHASE_M2_BULK_OPERATIONS.md#current-layout-repair-deployed-and-accepted-on-prov10).

@@ -5,7 +5,7 @@
 > **Requested release:** 0.55.67; a performance-admission exception is authorized for this dev-and-canary migration only. Performance remains unqualified. Every other gate remains mandatory.
 > **Historical implementation worktree:** `SCIMServer-tenant10-migration-20261030`
 > **Evidence consolidation branch:** `test/tenant10-acceptance-evidence-20261104`
-> **Status:** both applications serve the reviewed immutable 0.55.67 image. Final full browser acceptance passes 350 cases/52 files per target, with zero failures, skips or flakes. Each full live run reports 1,841 passes/zero failures, including four explicit retired-API placeholders. Independent post-test original-state and active-credential proofs pass. The atomic prov10-active/prov09-retiring registry change becomes canonical through protected review and normal merge, not a local file alone. Performance is UNQUALIFIED; customer production is excluded.
+> **Status:** both applications serve the reviewed immutable 0.55.67 image. Full browser acceptance passes 351 cases/52 files per target, with zero failures, skips or flakes; all eleven shape cases also pass after the final local-candidate type-flow refactor. Each full live run reports 1,841 passes/zero failures, including four explicit retired-API placeholders. Independent final post-test original-state and active-credential proofs pass. The atomic prov10-active/prov09-retiring registry change becomes canonical through protected review and normal merge, not a local file alone. Performance is UNQUALIFIED; customer production is excluded.
 
 ## Executive summary
 
@@ -21,7 +21,8 @@ test/evidence consolidation.
 |---|---|---|
 | Full live HTTP/auth runner | 1,841 reported passes, zero failures; 881.3 seconds | 1,841 reported passes, zero failures; 826 seconds |
 | Live scope limitation | Four retired-API placeholders, not exercised checks | Same four explicit placeholders |
-| Full browser outcomes | 350 passed/52 files; zero skipped, failed or flaky; 1,027.741 seconds | 350 passed/52 files; zero skipped, failed or flaky; 999.745 seconds |
+| Full browser outcomes | 351 passed/52 files; zero skipped, failed or flaky; 1,027.574 seconds | 351 passed/52 files; zero skipped, failed or flaky; 990.772 seconds |
+| Final typed-fixture follow-up | All eleven shape cases pass; 68.307 seconds | All eleven shape cases pass; 66.891 seconds |
 | Spec immutability | Before/after SHA-256 values match | Before/after SHA-256 values match |
 | Original non-log state after all tests | Eight table fingerprints match; original IDs, versions, memberships and settings preserved | Same eight original-state comparisons pass |
 | Retained encrypted credentials | 24 retained; 17 active verified; one original inactive archived failure | 10 retained; six active verified; four original inactive archived failures |
@@ -33,11 +34,17 @@ Both final browser reports record one Chromium worker and zero report-level
 errors. Other browser engines and every possible settings combination are
 not inferred from this configured inventory.
 
-Final browser runs started at `2026-11-04T01:43:06.235Z` and
-`2026-11-04T01:42:34.887Z`, respectively. The separate post-test read-only
-checks completed at `02:02:19.343Z` and `02:02:59.691Z`. Protected receipt
-folders are `post-state-dev-3cd1b2919c65480ab176070f8923485a` and
-`post-state-canary-prod-0930e24b142c4c2280d3f85403cf78fc`. Both confirm
+Full 351-case browser runs started at `2026-11-04T03:22:13.636Z` and
+`2026-11-04T03:22:13.662Z`, respectively, and retained immutable spec hashes
+through completion. A subsequent local-candidate refactor fixes TypeScript
+control-flow narrowing without changing the ownership assertion or its
+registration order. Strict changed-spec compilation and all eleven affected
+browser cases then pass per target. These are separate receipts, not a claim
+that spec hashes match across an intentional refactor.
+
+After both follow-ups, independent read-only proofs pass in protected folders
+`post-state-dev-9918fd0507c5443a9bbaaf59a96180ac` and
+`post-state-canary-prod-0a354252b8354db4a554d972cc2c4c10`. Both confirm
 that current original source tables still match the saved snapshots and
 that neither source nor target was mutated by the proof.
 
@@ -80,27 +87,32 @@ these confirmed consolidation issues:
 | T10-REG-1 | Gate fixture correctness / Medium | R5's zero-active negative control still changed hardcoded prov09 after prov10 became active, leaving the actual active tenant untouched and producing a false failure. Both zero/two-active controls now select by role and purpose. The production validator was not defective. | Staged-role offline self-test: 14 pass/one fail, expected false but got true. Earliest check is the same self-test on the proposed role transition. Corrected actual gate is 15/15; future active generation is no longer embedded in those controls. |
 | T10-DOC-1 | Context documentation / Medium | The updated status summary did not update the older active-bootstrap section in Session_starter. C14 correctly rejected the prov09 coordinates after the valid role transition. Replace that section with registry-resolved profile selection, actual-principal verification and current prov10 coordinates. | First protected push stopped at C14 before API test gates. Earliest detection is the same content audit immediately after changing roles; the earlier freshness audit checks a different claim and was insufficient. Actual C14 is now GREEN and all 23 content-audit controls pass, including the existing retired-bootstrap negative control. No gate was weakened; the operational bootstrap no longer calls a generation-bound alias. |
 | T10-REG-2 | Gate fixture correctness / Medium | Offline database/port review fixtures required a live-registry tenant with role next. A completed cutover validly has no next tenant, so both cases failed parameter binding before reaching their assertions. Resolve the active dev/canary pair through the existing purpose resolver; all Azure calls remain mocked. | Second protected push caught database/ports failures. Earliest detection is the complete offline rollover gate against the proposed role transition, not just registry integrity. All twelve review cases and all eleven offline rollover contracts now pass with no cloud/Docker calls. Promote this second lifecycle-fixture escape into the existing pattern/rule: fixtures cannot require an undeclared future tenant. |
+| T10-OWN-4 | Test failure-path ownership / High | The setup assigned the create response to its cleanup target before rejecting an ID from the original inventory. An unexpected server response could therefore fail ownership validation but still delete the rejected original during teardown. Register only after the actual ownership assertion succeeds. | Independent review5762712172 at a8e45218 caught this unexercised rejection path. A safe browser negative control restores its known-owned cleanup handle in finally even during RED, so it cannot delete the original. It observed `Rejected original must not replace the owned cleanup target`, then all eleven updated shape cases passed on dev and canary after the ordering fix. Earliest detection is this failure-path test before the full matrix. |
+| T10-DOC-2 | Context documentation / Medium | The refreshed infrastructure introduction did not scope retained Sections 4-6, whose tenant-09 identities, 0.55.54 revisions and network/database measurements still read as current under a November 4 header. Explicit historical labels now scope every retained section and the document header; actual prov10 measurements remain separate. | The same independent review caught this. Earliest check is scanning every changed document's retained current-state sections, not only refreshing its introduction/date. Preserve historical evidence without implying current/customer revalidation. |
+| T10-TYPE-1 | Static fixture typing / Medium | TypeScript does not propagate a helper's writes to a global variable into the caller's control-flow narrowing. After resetting the cleanup handle to undefined, a helper call plus non-null guard narrowed subsequent field access to never. Keep the actual create response in a typed local candidate, register it after ownership validation, and use that same local object for setup requests. No cast or new runtime branch is needed. | Strict changed-spec tsc caught four TS2339 errors; browser execution alone cannot detect them. The 351-case runs retained immutable files while finishing. After the local-candidate correction, strict tsc and all eleven affected browser cases pass on both targets, followed by new independent original-state/credential proofs. Earliest check is strict fixture compilation before freezing the full browser inventory, not in parallel with it. |
 
-These charts cover the ten confirmed corrections in this consolidation,
+These charts cover the thirteen confirmed corrections in this consolidation,
 not the number of regex hits or the entire historical migration issue count.
 
 ```mermaid
 pie title Consolidation corrections by severity
-  "High - ownership and cleanup" : 2
-  "Medium - fixture, fingerprint, role and context correctness" : 5
+  "High - ownership and cleanup" : 3
+  "Medium - fixture, fingerprint, role, context and type correctness" : 7
   "Low - execution and evidence tooling" : 3
 ```
 
 ```mermaid
 pie title Consolidation corrections by type
-  "Fixture ownership, input and cleanup" : 3
+  "Fixture ownership, input and cleanup" : 4
   "Evidence compatibility" : 1
   "Registry gate fixture" : 2
-  "Context documentation" : 1
+  "Context documentation" : 2
+  "Static fixture typing" : 1
   "Execution and evidence tooling" : 3
 ```
 
-**Transcript completeness provenance:** T10-DOC-1 and T10-REG-2 occurred after the scan
+**Transcript completeness provenance:** T10-DOC-1/2, T10-REG-2, T10-OWN-4
+and T10-TYPE-1 occurred after the scan
 below and is recorded directly from protected-push output and confirmed
 focused GREEN, rather than represented as part of the earlier event count.
 A systematic signal-frequency and

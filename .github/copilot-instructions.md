@@ -371,6 +371,9 @@ Existing synthetic or migrated records are carried data, not disposable test fix
 Mutation tests MUST create a new endpoint, prove its ID was absent from the
 original inventory, and seed schema-valid resources through the real API.
 Do not rewrite preserved data to satisfy an assumed fixture population.
+Validate ownership before assigning any teardown target. Exercise rejection
+with an original ID and prove that failure cannot register or delete it;
+the negative control itself must retain a known-owned cleanup handle in finally.
 
 Cleanup MUST work before browser navigation, require a successful API status,
 and assert that the exact owned ID is absent. Never swallow cleanup failures.

@@ -29,13 +29,17 @@ asserts that original profile/resource/version/membership output is unchanged.
 Failed setup exposed a swallowed cleanup error on an un-navigated page.
 Only fifteen explicitly owned leftovers were removed. Cleanup now uses the
 request context and verifies ID absence, including a blank-page regression.
-All ten focused cases pass on both targets; eight restoration/fingerprint
+All eleven focused cases pass on both targets, including rejected-original
+cleanup registration; eight restoration/fingerprint
 guards and strict changed-spec compilation pass.
 
 Final consolidation passes on both targets: each live run reports 1,841
 passes/zero failures, including four retired-API placeholders. Each browser
-run passes 350 cases/52 files with zero failures, skips or flakes and unchanged
-before/after spec hashes. Post-test read-only proof matches all eight original
+run passes 351 cases/52 files with zero failures, skips or flakes and unchanged
+before/after spec hashes. A subsequent local-candidate type-flow refactor
+passes strict tsc and all eleven affected cases on both targets; its focused
+receipts are separate from the immutable full-run receipts. Final post-test
+read-only proof matches all eight original
 non-log tables. Dev verifies 17 active retained encrypted credentials; canary
 verifies six. Exact original inactive archived failures remain one/four.
 Only the added snapshot UUID column and operational ServerSetting.updatedAt

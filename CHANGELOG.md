@@ -13,12 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema-valid API-created users/groups and unchanged original-state assertions.
   Cleanup uses the request context, checks DELETE status and verifies ID absence
   even before browser navigation. Add a blank-page cleanup outcome regression.
-- Both targets pass ten focused shape/cleanup cases with no skips. The full
-  browser inventory changes from 349 to 350 tests in the same 52 files.
+- Both targets pass eleven focused shape/cleanup cases with no skips. The full
+  browser inventory changes from 349 to 350, then 351 tests in the same 52 files.
   The separate 16-case numeric-settings persistence spec remains included;
-  complete target runs now pass 350/52 files on each app with zero failures,
+  complete target runs now pass 351/52 files on each app with zero failures,
   skips or flakes. Each live run reports 1,841 passes/zero failures, including
   four explicit retired-API placeholders rather than exercised checks.
+- Independent review exposed cleanup registration before ownership validation.
+  Add a safe rejected-original RED/GREEN regression, validate before registering,
+  and preserve the known-owned cleanup handle even during the negative control.
+  The final local-candidate type-flow correction passes strict compilation and
+  all eleven affected cases per target after the immutable full runs; new
+  post-test original-state/credential proofs pass. Keep those receipts separate.
+  Explicitly label retained tenant-09 infrastructure measurements as historical.
 - Restore only diagnosed original target records and dev's two original
   membership IDs. Eight original non-log table fingerprints pass per target,
   retaining reviewed additive columns and original/appended migration history.
