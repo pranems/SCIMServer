@@ -29,6 +29,14 @@ now derive their targets from roles/purposes; the observed 14/15 RED becomes
 15/15 GREEN without changing the validator. A test fixture that encodes an
 expiring deployment identity is itself a scheduled defect.
 
+A second escape required a `next` tenant in offline database/port fixtures.
+After a valid cutover no next tenant exists, so those cases failed binding
+before their assertions. Resolve the active dev/canary pair through
+`Get-ScimEstate -Purpose`, or construct an owned future-tenant fixture when
+that role is the subject of the test. The complete eleven-contract rollover
+gate now passes with no cloud calls. Run both registry integrity and rollover
+consumer contracts against the proposed transition, not only one of them.
+
 ## Logical restoration is not original-state preservation (2026-11-04)
 
 A browser test can restore a user's visible field or a Group's display name

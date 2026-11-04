@@ -891,6 +891,10 @@ principal before ARM calls. Use subscription IDs, not ambiguous names.
 Registry negative controls must mutate roles/purposes, not a former active
 tenant key; run them against the proposed transition. Actual cloud readback
 remains separate from offline registry validity.
+Offline rollover consumers must also pass after activation when no `next`
+tenant exists. Resolve active fixtures by purpose, or construct an owned
+future tenant when needed; run the complete rollover contracts on a proposed
+role transition as well as the registry integrity self-test.
 
 **An expired tenant does not fail loudly - it returns EMPTY.** On 2026-08-19 `az account show` reported a perfectly healthy `ProvIAM_Subscription` while every ARM call silently returned nothing; `dev-deployment-pipeline.ps1` then built the URL `https:///scim/oauth/token` and failed Stage 0 with an unrelated-looking `Invalid URI` error. **When an ARM lookup returns empty, verify the tenant before debugging the caller.**
 

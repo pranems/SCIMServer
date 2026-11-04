@@ -236,10 +236,9 @@ try {
         }
         { $_ -in @('database', 'ports') } {
             . (Join-Path $PSScriptRoot 'scim-estates.ps1')
-            $tenant = (Get-ScimEstateRegistry).tenants | Where-Object role -eq next
-            $estates = @((Get-ScimEstateRegistry).estates | Where-Object tenantKey -eq $tenant.key)
-            $dev = $estates | Where-Object purpose -eq dev
-            $canary = $estates | Where-Object purpose -eq canary-prod
+            $dev = Get-ScimEstate -Purpose dev
+            $canary = Get-ScimEstate -Purpose canary-prod
+            $tenant = $dev.Tenant
             $global:rolloverReview.Subscription = $tenant.subscriptionId
             $global:rolloverReview.Tenant = $tenant.tenantId
             $global:rolloverReview.TargetHost = "$($canary.pgServerName).postgres.database.azure.com"

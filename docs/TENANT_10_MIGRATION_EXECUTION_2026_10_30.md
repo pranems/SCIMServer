@@ -79,14 +79,15 @@ these confirmed consolidation issues:
 | T10-HIST-1 | Evidence tooling / Low | The transcript indexer initially assumed function request arguments were JSON strings. They are structured objects in this event format, so descriptions were omitted. The corrected consumer accepts the actual object shape and keeps FREEFORM requests out of JSON parsing. No source event was changed. | Metadata readback; earliest gate is inspecting event shape before extraction. Final mapped index includes the tool descriptions and zero malformed event lines. |
 | T10-REG-1 | Gate fixture correctness / Medium | R5's zero-active negative control still changed hardcoded prov09 after prov10 became active, leaving the actual active tenant untouched and producing a false failure. Both zero/two-active controls now select by role and purpose. The production validator was not defective. | Staged-role offline self-test: 14 pass/one fail, expected false but got true. Earliest check is the same self-test on the proposed role transition. Corrected actual gate is 15/15; future active generation is no longer embedded in those controls. |
 | T10-DOC-1 | Context documentation / Medium | The updated status summary did not update the older active-bootstrap section in Session_starter. C14 correctly rejected the prov09 coordinates after the valid role transition. Replace that section with registry-resolved profile selection, actual-principal verification and current prov10 coordinates. | First protected push stopped at C14 before API test gates. Earliest detection is the same content audit immediately after changing roles; the earlier freshness audit checks a different claim and was insufficient. Actual C14 is now GREEN and all 23 content-audit controls pass, including the existing retired-bootstrap negative control. No gate was weakened; the operational bootstrap no longer calls a generation-bound alias. |
+| T10-REG-2 | Gate fixture correctness / Medium | Offline database/port review fixtures required a live-registry tenant with role next. A completed cutover validly has no next tenant, so both cases failed parameter binding before reaching their assertions. Resolve the active dev/canary pair through the existing purpose resolver; all Azure calls remain mocked. | Second protected push caught database/ports failures. Earliest detection is the complete offline rollover gate against the proposed role transition, not just registry integrity. All twelve review cases and all eleven offline rollover contracts now pass with no cloud/Docker calls. Promote this second lifecycle-fixture escape into the existing pattern/rule: fixtures cannot require an undeclared future tenant. |
 
-These charts cover the nine confirmed corrections in this consolidation,
+These charts cover the ten confirmed corrections in this consolidation,
 not the number of regex hits or the entire historical migration issue count.
 
 ```mermaid
 pie title Consolidation corrections by severity
   "High - ownership and cleanup" : 2
-  "Medium - fixture, fingerprint, role and context correctness" : 4
+  "Medium - fixture, fingerprint, role and context correctness" : 5
   "Low - execution and evidence tooling" : 3
 ```
 
@@ -94,12 +95,12 @@ pie title Consolidation corrections by severity
 pie title Consolidation corrections by type
   "Fixture ownership, input and cleanup" : 3
   "Evidence compatibility" : 1
-  "Registry gate fixture" : 1
+  "Registry gate fixture" : 2
   "Context documentation" : 1
   "Execution and evidence tooling" : 3
 ```
 
-**Transcript completeness provenance:** T10-DOC-1 occurred after the scan
+**Transcript completeness provenance:** T10-DOC-1 and T10-REG-2 occurred after the scan
 below and is recorded directly from protected-push output and confirmed
 focused GREEN, rather than represented as part of the earlier event count.
 A systematic signal-frequency and
