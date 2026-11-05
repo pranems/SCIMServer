@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### User-facing 0.55.67 cumulative release documentation
+
+- Replace the release landing page's obsolete pending-migration announcement
+  with cumulative user release notes against exact customer source6785200f
+  (0.55.20) and deployed sourceb87412b0 (0.55.67).
+- Explain existing versus newly improved capabilities, before/after outcomes,
+  request flows, synthetic PATCH/settings/lifetime examples, all eleven added
+  migrations (19 -> 30 SQL files), deprecations, upgrade and recovery boundaries.
+- Reconcile the documentation index with normally merged cutover759f243a.
+  Keep earlier preparation receipts explicitly historical and distinguish
+  final352/52-per-target browser evidence from skipped HTTP cases/placeholders,
+  unqualified performance and unchanged customer production.
+- Documentation only: no product version, dependency, runtime, schema, image,
+  cloud state or test count changes. Self-improvement applied through exact
+  baseline/artifact provenance and a single current release entry point.
+  Design disposition accepted: reuse existing release notes and freshness
+  gates, rather than add another drifting version ledger.
+
 ### Tenant 10 acceptance isolation and preservation
 
 - Replace mutation of carried synthetic fixtures with newly owned endpoints,

@@ -1,5 +1,19 @@
 ## SCIMServer - Condensed Session Memory
 
+**User release documentation, 2026-11-05:** the canonical
+[release notes](docs/RELEASE_NOTES.md#05567) now explain the complete
+0.55.20-to-0.55.67 upgrade, not only the tenant move. Exact baseline6785200f
+and deployedb87412b0 anchor the capability comparisons, eleven migration
+inventory, worked examples and acceptance limits. The documentation index's
+stale "pending" claims are replaced with actual cutover759f243a scope.
+This is documentation-only publication; no new application build, cloud
+mutation, production promotion or performance qualification is included.
+The existing unrelated visual-snapshot worktree change is left untouched.
+
+| Date | Summary |
+|---|---|
+| 2026-11-05 | Cumulative user release notes for 0.55.67, explanatory diagrams/examples and upgrade/recovery guidance; publication uses normal PR review and exact-tip gates. |
+
 **Current tenant 10 checkpoint, 2026-11-04:** both dev and canary serve the
 reviewed 0.55.67 image from PR271 merge
 `b87412b0ad5edac47bf19aaca92bb233c12304ed`. Authoritative build41740133535,
