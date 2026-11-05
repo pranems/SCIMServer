@@ -1,45 +1,42 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-21 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-05 - **Product version:** `0.55.67`
 
-> **Version:** 0.55.67 - **Updated:** 2026-10-21
-> 6 presets - **39 endpoint settings controls** in the unreleased lifetime port (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
+> **Version:** 0.55.67 - **Updated:** 2026-11-05
+> 6 presets - **39 endpoint settings controls** (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
-**Unreleased preparation:** [endpoint token lifetime integration and original
-TDD evidence](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md) distinguishes the
-current-master port from earlier isolated validation and deployed behavior.
+**Latest release:** [0.55.67 user release notes, cumulative since 0.55.20](RELEASE_NOTES.md#05567)
+explain capabilities, before/after behavior, request flows, worked examples,
+all eleven added migrations, upgrade/recovery steps and measured limits.
+Dev and canary are deployed; customer production remains on 0.55.20.
+Performance remains unqualified under the migration-only exception.
 
 ### Start here
 
-**Pending dev/canary tenant rollover:** [Tenant 10 execution plan](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
-records verified target access, the protected source recovery points, registry
-and atomic-cutover tests, the 0.55.67 admission hold and all migration/browser
-acceptance phases. Tenant 09 remains active; customer production is excluded.
+**Completed dev/canary tenant rollover:** [Tenant 10 execution record](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
+records recovery, actual carry and final 352-case browser acceptance per target.
+Reviewed #272 published the prov10-active/prov09-retiring registry transition.
+Customer production was not changed; later source writes and external-client
+repointing are not claimed.
 
-**Pending actual-parent adapter remediation:** [Hono and real Prisma lifecycle qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
-records proposed 0.55.66, actual old/new lifecycle and exploit RED/GREEN,
-explicit cleanup boundaries, and a separate draft stacked on unmerged #261.
+**Included token lifetimes:** [endpoint token lifetime integration and original
+TDD evidence](auth/ENDPOINT_TOKEN_LIFETIME_TDD_HANDOFF.md) retains the port and
+its preparation receipts. The current release notes describe shipped behavior.
 
-**Pending stacked API advisory remediation:** [Actual consumer compatibility and RCA](API_ADVISORY_CONSUMER_COMPATIBILITY.md)
-records proposed 0.55.64, five targeted advisory records and the unchanged
-Hono adapter blocker. Its draft base is unmerged #260, not master.
+**Included dependency remediations - historical implementation receipts:**
 
-**Pending independent inventory correction:** [API shared override context validity](API_OVERRIDE_CONTEXT_VALIDITY.md)
-records proposed 0.55.63, all real owners, full-tree RED/GREEN and the
-same-version root override correction. The current integration now inherits
-normally merged web #259; its earlier independent preparation is historical.
-**Independent web Seroval/Undici correction:** [Scope, actual owners and evidence](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md)
+- [Hono and actual Prisma parent qualification](HONO_PRISMA_PARENT_QUALIFICATION.md)
+  records lifecycle/compatibility and explicit cleanup boundaries.
+- [API consumer compatibility](API_ADVISORY_CONSUMER_COMPATIBILITY.md) and
+  [shared override context validity](API_OVERRIDE_CONTEXT_VALIDITY.md) explain
+  the reviewed #260/#261/#262 integration.
+- [Web Seroval/Undici correction](WEB_SEROVAL_UNDICI_SECURITY_REMEDIATION.md),
+  [request-body correction](REQUEST_BODY_SECURITY_REMEDIATION.md) and
+  [dormant ip-address override](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md) retain
+  patch scope and installed-graph evidence.
 
-**Pending request-body security correction:** [Implementation and evidence](REQUEST_BODY_SECURITY_REMEDIATION.md)
-records proposed 0.55.61, exact API patches, CI-only locks and distinct bootstrap
-versus installed-graph validation. No merge or deployment is authorized.
-
-**Pending security correction:** [Web ip-address override remediation](WEB_IP_ADDRESS_SECURITY_REMEDIATION.md)
-records the exact 10.7.4 dormant override, dependency inventory and CI-only
-lockfile proof for proposed 0.55.60. No deployment or performance acceptance.
-
-**Latest release:** [Release notes and upgrade guidance](RELEASE_NOTES.md)
-explain 0.55.57, changes since 0.55.20, migration/rollback and known limits.
+Their capture-time "pending" or draft statements are provenance, not current
+release status or a blanket advisory-clearance claim.
 [CHANGELOG.md](../CHANGELOG.md) retains detailed engineering history.
 
 | UI follow-up | Read |

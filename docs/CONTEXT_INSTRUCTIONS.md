@@ -2,12 +2,21 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.67
-> **Last Updated**: November 4, 2026
-> **Last verified:** 2026-11-04
+> **Last Updated**: November 5, 2026
+> **Last verified:** 2026-11-05
 
 ---
 
 ## Active Delivery Process
+
+**User-facing release reference, 2026-11-05:** share
+[0.55.67 cumulative release notes](RELEASE_NOTES.md#05567) for the upgrade
+from customer0.55.20. Source identities, before/after behavior, request flows,
+worked examples, all eleven added migrations and explicit acceptance limits
+are reconciled to deployedb87412b0 and cutover759f243a. Old preparation
+receipts remain historical, not current holds. Customer production is still
+unchanged and performance remains unqualified. This documentation publication
+does not rebuild/redeploy the admitted image or claim new test runs.
 
 **Latest checkpoint, 2026-11-04:** both prov10 apps are Healthy on the reviewed
 PR271 digest below. Dev's first corrected full browser run passed 349/52 files
