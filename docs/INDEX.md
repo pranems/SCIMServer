@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-05 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-05 - **Product version:** `0.55.68`
 
-> **Version:** 0.55.67 - **Updated:** 2026-11-05
+> **Version:** 0.55.68 - **Updated:** 2026-11-05
 > 6 presets - **39 endpoint settings controls** (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Latest release:** [0.55.67 user release notes, cumulative since 0.55.20](RELEASE_NOTES.md#05567)
@@ -12,6 +12,20 @@ Dev and canary are deployed; customer production remains on 0.55.20.
 Performance remains unqualified under the migration-only exception.
 
 ### Start here
+
+**Current Docker Desktop removal readiness:** [Authoritative acceptance
+dashboard and explanatory guide](CONTAINER_RUNTIME_REMOVAL_READINESS.md)
+separates current corrections, native package proof, GUI/image inspection and
+open final-source/Azure dev gates from the historical qualification below.
+Markdown is canonical; HTML is only an optional viewing companion.
+
+**Independent container runtime:** [Decision, real trials, preservation and
+operating runbook](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md) selects independent
+Docker Engine/WSL after Engine and Podman source-build/live trials, complete
+backend/browser qualification and original-data recovery/schema replay.
+Capture-time operational limits remain explicit; the current dashboard records
+their later corrections without overwriting the earlier receipts. This does not authorize removal
+of Docker Desktop or claim a new cloud deployment.
 
 **Completed dev/canary tenant rollover:** [Tenant 10 execution record](TENANT_10_MIGRATION_EXECUTION_2026_10_30.md)
 records recovery, actual carry and final 352-case browser acceptance per target.

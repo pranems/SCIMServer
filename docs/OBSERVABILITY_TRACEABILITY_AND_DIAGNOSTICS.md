@@ -1,6 +1,15 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.68`
+
+**Unreleased stream-lifecycle correction, November 19:** the log controller
+owns active stream cleanup and runs it before HTTP-server shutdown, removing
+subscriptions and keepalive timers and ending responses. It rejects new stream
+handlers once shutdown begins. This keeps a connected log viewer from holding
+application close open indefinitely; it changes neither request correlation
+nor persisted-log retention. Actual open-client shutdown and cleanup
+regressions pass locally. Publication/deployment remain separate gates in the
+[current readiness report](CONTAINER_RUNTIME_REMOVAL_READINESS.md).
 
 **Current operator presentation:** all absolute UI timestamps carry complete
 UTC date/time, milliseconds and timezone; invalid expiry values are explicit,

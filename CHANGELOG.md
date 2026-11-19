@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.68 consolidation
+
+- Target the normal next patch, 0.55.67 -> 0.55.68. Lockfiles are generated
+  only by the existing public-registry CI workflow, never regenerated locally.
+  Publication, exact-tip review/CI and Azure dev are not yet completed.
+- Make the actual standalone builder fail closed for API/web/production
+  installation, Prisma generation and web compilation. Remove the npm install
+  fallback that could rewrite a lockfile after npm ci failed. Five observed
+  RED/GREEN contract assertions protect those boundaries.
+- Actual clean-install proof: 660 API and 256 production packages, current web
+  build, unchanged lockfile hashes, all 30 migrations on a new owned tmpfs
+  database, 1,845 reported live passes/zero failures and one browser
+  user/group/reload/original-ID case. This package predates the version bump;
+  final release matrix counts remain pending and are not borrowed from it.
+- Reuse the existing browser fixture's pre-create inventory ownership guard.
+  Test/gate improvement applied; design disposition accepted because the
+  linear builder and shared fixture remain cohesive without new abstractions.
+
+### Current Docker Desktop removal readiness, November 19
+
+- Fix native in-memory cross-endpoint inventory by importing EndpointModule;
+  actual-module and HTTP regressions prove returned user/group values and
+  original IDs. Close active SSE subscriptions, timers and responses before
+  application shutdown; reject streams once shutdown begins.
+- Focused current-source evidence: four unit suites/103 tests, two HTTP
+  suites/three tests and API build pass. Standalone migration contracts add
+  54 assertions. Both real packaged backends pass 1,845 reported live checks
+  (1,841 -> 1,845, still four old placeholders) and the existing user browser
+  case expanded to groups, reload and original-ID readback.
+- Package/select Prisma 7 configuration in all four migration launchers;
+  stop before application startup on failure and clean up bundled PostgreSQL.
+  A fresh owned Engine PostgreSQL database accepts all 30 migrations through
+  the actual package before live/browser qualification.
+- Repair dispatch-publisher OCI labels and IMAGE_TAG propagation, retaining
+  version/full-SHA tags and the expected-SHA guard. Wire offline runtime,
+  standalone and metadata contracts into pre-push, dev Stage 1.14 and Windows CI.
+- Make Markdown the authoritative readiness report with diagrams, a GUI
+  comparison, retention policy and separately dated history. Remove the
+  competing Mermaid renderer; configure an isolated Container Tools workspace.
+  Actual GUI acceptance and corrected registry-label readback remain pending.
+- Product baseline remains 0.55.67 pending the separate normal consolidation,
+  version/CI/review and authorized dev-deployment phase. Final full-suite
+  counts are not inferred from focused runs. Desktop artifacts and production
+  are unchanged. Test/gate improvement applied: actual module, active-client,
+  packaged failure/success and automatic caller gates. Design disposition
+  accepted: existing exports, lifecycle ownership and metadata action, with
+  one small shared contract runner for three real delivery consumers.
+
+### Historical independent local container qualification, November 18
+
+- Select independent Docker Engine/Ubuntu WSL with native Windows Docker,
+  Compose and Buildx over pinned loopback SSH. Preserve Docker Desktop and
+  original artifacts; do not change global contexts or other editor windows.
+- Add process-scoped activation/provenance and conditional guards at four
+  pipeline boundaries. Add optional remote source/log binds without changing
+  ordinary public Compose defaults. Repair the compiled local validation
+  entry point and health route.
+- Qualify debug ports, API-owned inspector, migrations, isolated generated
+  clients and actual Windows source edits through host-side Compose watch.
+- New PowerShell contracts: 0 -> 54. Playwright inventory: 352 -> 353, with
+  final Engine 353/353 and all 13 pixel cases enabled, no baseline updates.
+  Existing application test inventory is unchanged: API units 6,254 per
+  backend; E2E Prisma 2,612 and in-memory 2,570 plus 42 skips; web 1,662.
+  Coverage: statements 83.06%, branches 75.86%, functions 75.53%, lines 85.74%.
+- Both exact source-built runtimes report 1,841 live passes, including four
+  existing retired-API placeholders. Engine backup/restore proves full
+  table/schema equality, unchanged source, original IDs/membership and actual
+  restored OAuth usability after draining persistent clients.
+- Carry 40 original Desktop volumes with SHA-256 content/POSIX metadata
+  equality. Recover an isolated original primary clone and replay all ten
+  outstanding Prisma migrations while preserving every original value in
+  nine tables. Both original VHDs and two configuration files match protected
+  backup hashes; all ten paths pass protected ACL checks. Distribution cold
+  start retains all 40 volume fingerprints. These remain separate proofs.
+- Keep known pre-existing SSE shutdown, in-memory inventory and packaged
+  migration-launcher defects explicit with owned follow-ups. Persistent
+  native standalone passes live/browser after an explicit repository
+  migration stage. No application behavior, product version, lockfile,
+  customer estate or deployment changes are included.
+- Self-improvement applied: real outcome gates for host access, bind paths,
+  source reload, schema readiness, original-state equality and credential use.
+  Design disposition accepted: small session/provenance and startup helpers,
+  no speculative multi-runtime framework.
+
 ### User-facing 0.55.67 cumulative release documentation
 
 - Replace the release landing page's obsolete pending-migration announcement

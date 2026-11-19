@@ -15,6 +15,11 @@
     launcher scripts or environment variables - nothing is hardcoded into
     the build.
 
+    Prisma generation requires DATABASE_URL during the build because its
+    configuration is evaluated before generation. A nonconnecting, build-only
+    loopback URL is sufficient; generation does not open a database connection.
+    Runtime launchers still require the intended database URL for migrations.
+
     Optionally bundles a portable Node.js binary so the target machine
     doesn't even need Node.js installed (-IncludeNode). The Node.js
     version is auto-detected from your local install or can be overridden.
@@ -118,13 +123,8 @@ New-Item -ItemType Directory -Path $OutPath -Force | Out-Null
 Write-Host "[2/7] Installing API dependencies..." -ForegroundColor Yellow
 Push-Location $ApiDir
 try {
-    # Try npm ci first; fall back to npm install if file locks prevent clean install
-    npm ci --no-audit --no-fund 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "       npm ci failed (file lock?), retrying with npm install..." -ForegroundColor Yellow
-        npm install --no-audit --no-fund 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
-    }
+    npm ci --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "API clean dependency installation failed (exit $LASTEXITCODE)" }
 } finally { Pop-Location }
 
 # ── Step 3: Generate Prisma client & build TypeScript ──
@@ -138,8 +138,9 @@ try {
     # crashes at runtime with "Cannot find module './modules/app/app.module'".
     Remove-Item -Force -ErrorAction SilentlyContinue 'tsconfig.build.tsbuildinfo'
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue 'dist'
-    npx prisma generate 2>&1 | Out-Null
-    npx tsc -p tsconfig.build.json 2>&1 | Out-Null
+    npx prisma generate
+    if ($LASTEXITCODE -ne 0) { throw "Prisma client generation failed (exit $LASTEXITCODE)" }
+    npx tsc -p tsconfig.build.json
     if ($LASTEXITCODE -ne 0) { throw "TypeScript compilation failed" }
 } finally { Pop-Location }
 
@@ -149,8 +150,10 @@ if (Test-Path (Join-Path $WebDir "package.json")) {
     Write-Host "[4/7] Building web frontend..." -ForegroundColor Yellow
     Push-Location $WebDir
     try {
-        npm ci --no-audit --no-fund 2>&1 | Out-Null
-        npm run build 2>&1 | Out-Null
+        npm ci --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { throw "Web clean dependency installation failed (exit $LASTEXITCODE)" }
+        npm run build
+        if ($LASTEXITCODE -ne 0) { throw "Web production build failed (exit $LASTEXITCODE)" }
     } finally { Pop-Location }
 } else {
     Write-Host "[4/7] Skipping web build (no web/ folder)" -ForegroundColor DarkGray
@@ -168,7 +171,8 @@ Copy-Item (Join-Path $ApiDir "package.json") (Join-Path $OutPath "package.json")
 Copy-Item (Join-Path $ApiDir "package-lock.json") (Join-Path $OutPath "package-lock.json") -ErrorAction SilentlyContinue
 Push-Location $OutPath
 try {
-    npm ci --omit=dev --no-audit --no-fund 2>&1 | Out-Null
+    npm ci --omit=dev --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "Standalone production dependency installation failed (exit $LASTEXITCODE)" }
     
     # Graft prisma CLI + engines from full install (needed for migrate deploy)
     $srcPrisma = Join-Path $ApiDir "node_modules" "prisma"
@@ -193,6 +197,7 @@ $prismaDir = Join-Path $ApiDir "prisma"
 if (Test-Path $prismaDir) {
     Copy-Item -Recurse $prismaDir (Join-Path $OutPath "prisma")
 }
+Copy-Item (Join-Path $ApiDir "prisma.config.ts") (Join-Path $OutPath "prisma.config.ts")
 
 # Copy generated Prisma client
 $generatedDir = Join-Path $ApiDir "src" "generated"
@@ -277,6 +282,7 @@ param(
     [switch]`$RunMigrations
 )
 
+`$ErrorActionPreference = "Stop"
 `$env:PORT = `$Port
 `$env:JWT_SECRET = `$JwtSecret
 `$env:SCIM_SHARED_SECRET = `$SharedSecret
@@ -296,8 +302,9 @@ if (-not (Test-Path `$nodeExe)) { `$nodeExe = "node" }
 # Run migrations if requested (prisma backend)
 if (`$RunMigrations -and `$Backend -eq "prisma") {
     Write-Host "Running Prisma migrations..." -ForegroundColor Yellow
-    `$schemaPath = Join-Path `$PSScriptRoot "prisma" "schema.prisma"
-    & `$nodeExe (Join-Path `$PSScriptRoot "node_modules" "prisma" "build" "index.js") migrate deploy --schema `$schemaPath
+    `$configPath = Join-Path `$PSScriptRoot "prisma.config.ts"
+    & `$nodeExe (Join-Path `$PSScriptRoot "node_modules" "prisma" "build" "index.js") migrate deploy --config `$configPath
+    if (`$LASTEXITCODE -ne 0) { throw "Prisma migrations failed (exit `$LASTEXITCODE). SCIMServer was not started." }
 }
 
 Write-Host ""
@@ -335,9 +342,13 @@ set NODE_ENV=production
 echo.
 echo  Running Prisma migrations...
 if exist "%~dp0node\node.exe" (
-    "%~dp0node\node.exe" "%~dp0node_modules\prisma\build\index.js" migrate deploy --schema "%~dp0prisma\schema.prisma"
+    "%~dp0node\node.exe" "%~dp0node_modules\prisma\build\index.js" migrate deploy --config "%~dp0prisma.config.ts"
 ) else (
-    npx prisma migrate deploy --schema "%~dp0prisma\schema.prisma"
+    node "%~dp0node_modules\prisma\build\index.js" migrate deploy --config "%~dp0prisma.config.ts"
+)
+if not "%ERRORLEVEL%"=="0" (
+    echo  ERROR: Prisma migrations failed. SCIMServer was not started.
+    exit /b 1
 )
 
 echo.
@@ -389,6 +400,14 @@ All settings can be configured via environment variables *before* running:
 
     set DATABASE_URL=postgresql://user:pass@host:5432/dbname
     start-postgres.bat
+
+The package includes ``prisma.config.ts``, which supplies Prisma 7 with its
+datasource URL and package-relative schema and migration paths. Migration
+launchers select this config explicitly and use the packaged CLI, even when
+started from another directory. Set ``DATABASE_URL`` before running migrations.
+If migrations fail, the launcher exits with an error without starting SCIMServer.
+The bundled PostgreSQL launchers also stop the database they started on this path.
+Plain ``start.bat`` and ``start.ps1`` without ``-RunMigrations`` do not migrate.
 $( if ($IncludePostgres) { @"
 
 ## Bundled PostgreSQL (Fully Airgapped)
@@ -421,6 +440,7 @@ To stop PostgreSQL separately: ``stop-postgres.bat``
     node_modules/      Production dependencies (pre-installed)
     public/            Web admin UI
     prisma/            Database schema & migrations (for PostgreSQL mode)
+    prisma.config.ts   Prisma CLI datasource and migration configuration
     start.bat          One-click launcher (in-memory mode)
     start.ps1          PowerShell launcher (configurable)
     start-postgres.bat PostgreSQL launcher$( if ($IncludeNode) { "`n    node/              Bundled Node.js v$NodeVersion" } )$( if ($IncludePostgres) { "`n    pgsql/             Bundled PostgreSQL v$PostgresVersion`n    pgdata/            PostgreSQL data directory (auto-initialized)`n    start-bundled-postgres.bat   One-click PostgreSQL + SCIMServer`n    start-bundled-postgres.ps1   PowerShell PostgreSQL + SCIMServer`n    stop-postgres.bat            Stop bundled PostgreSQL" } )
@@ -536,9 +556,14 @@ REM --- Run Prisma migrations ---
 echo.
 echo  Running database migrations...
 if exist "%~dp0node\node.exe" (
-    "%~dp0node\node.exe" "%~dp0node_modules\prisma\build\index.js" migrate deploy --schema "%~dp0prisma\schema.prisma"
+    "%~dp0node\node.exe" "%~dp0node_modules\prisma\build\index.js" migrate deploy --config "%~dp0prisma.config.ts"
 ) else (
-    npx prisma migrate deploy --schema "%~dp0prisma\schema.prisma"
+    node "%~dp0node_modules\prisma\build\index.js" migrate deploy --config "%~dp0prisma.config.ts"
+)
+if not "%ERRORLEVEL%"=="0" (
+    echo  ERROR: Prisma migrations failed. SCIMServer was not started.
+    "%PGDIR%\bin\pg_ctl.exe" stop -D "%PGDATA%" -m fast
+    exit /b 1
 )
 
 REM --- Start SCIMServer ---
@@ -598,6 +623,7 @@ param(
     [string]`$SharedSecret = (`$env:SCIM_SHARED_SECRET, 'changeme' | Where-Object { `$_ } | Select-Object -First 1)
 )
 
+`$ErrorActionPreference = "Stop"
 `$pgDir = Join-Path `$PSScriptRoot "pgsql"
 `$pgData = Join-Path `$PSScriptRoot "pgdata"
 `$pgUser = "scim"
@@ -661,8 +687,9 @@ try {
 
     # Run migrations
     Write-Host "Running database migrations..." -ForegroundColor Yellow
-    `$schemaPath = Join-Path `$PSScriptRoot "prisma" "schema.prisma"
-    & `$nodeExe (Join-Path `$PSScriptRoot "node_modules" "prisma" "build" "index.js") migrate deploy --schema `$schemaPath
+    `$configPath = Join-Path `$PSScriptRoot "prisma.config.ts"
+    & `$nodeExe (Join-Path `$PSScriptRoot "node_modules" "prisma" "build" "index.js") migrate deploy --config `$configPath
+    if (`$LASTEXITCODE -ne 0) { throw "Prisma migrations failed (exit `$LASTEXITCODE). SCIMServer was not started." }
 
     Write-Host ""
     Write-Host "SCIMServer v$ProjectVersion" -ForegroundColor Cyan

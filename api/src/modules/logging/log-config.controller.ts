@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpException,
   Res,
+  ServiceUnavailableException,
+  type BeforeApplicationShutdown,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ScimLogger } from './scim-logger.service';
@@ -33,11 +35,19 @@ import {
  * Routes: /scim/admin/log-config/*
  */
 @Controller('admin/log-config')
-export class LogConfigController {
+export class LogConfigController implements BeforeApplicationShutdown {
+  private readonly activeStreams = new Set<() => void>();
+  private shuttingDown = false;
+
   constructor(
     private readonly scimLogger: ScimLogger,
     private readonly loggingService: LoggingService,
   ) {}
+
+  beforeApplicationShutdown(): void {
+    this.shuttingDown = true;
+    for (const close of this.activeStreams) close();
+  }
 
   /**
    * GET /scim/admin/log-config
@@ -265,6 +275,10 @@ export class LogConfigController {
     @Query('endpointId') endpointId: string | undefined,
     @Res() res: Response,
   ) {
+    if (this.shuttingDown) {
+      throw new ServiceUnavailableException('Log streaming is unavailable during shutdown.');
+    }
+
     // SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -310,13 +324,18 @@ export class LogConfigController {
       res.write(`: ping ${new Date().toISOString()}\n\n`);
     }, 30_000);
 
-    // Cleanup on client disconnect
-    res.on('close', () => {
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      this.activeStreams.delete(close);
       unsubscribe();
       unsubscribeScim();
       clearInterval(keepAlive);
       res.end();
-    });
+    };
+    this.activeStreams.add(close);
+    res.on('close', close);
   }
 
   /**

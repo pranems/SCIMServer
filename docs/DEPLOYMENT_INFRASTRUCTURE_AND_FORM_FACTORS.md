@@ -1,11 +1,52 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-04 - **Repo version at capture:** `api/package.json` = `0.55.67`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-19 - **Repo version at capture:** `api/package.json` = `0.55.67`
 > **Scope:** Infrastructure elements and deployment form factors. Current prov10 dev/canary observations are recorded below; Sections 4-6 retain explicitly historical tenant-09/customer measurements, not November 4 revalidation of those estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
 
 ---
+
+## Local runtime update, November 18
+
+The independent Windows development route is Engine in Ubuntu WSL with native
+Windows Docker/Compose/Buildx clients over pinned, key-only loopback SSH.
+[Runtime evidence and operator workflow](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
+record the actual versions, comparison, preservation state and open checks.
+This update does not revalidate or change the historical cloud measurements
+below.
+
+Base and debug Compose accept an optional backend-visible
+`SCIM_CONTAINER_SOURCE_ROOT`; base Compose accepts an isolated
+`SCIM_CONTAINER_LOG_DIRECTORY`. Defaults still resolve the local checkout and
+its logs. The November 18 runtime change did not change Dockerfiles, schema,
+hosted builders or published cloud images.
+
+The [November 19 readiness corrections](CONTAINER_RUNTIME_REMOVAL_READINESS.md)
+also package Prisma 7 configuration and fail closed on standalone migration
+errors. The separate `publish-ghcr.yml` dispatch workflow now uses the same
+pinned metadata action as its sibling builders and supplies the existing
+`IMAGE_TAG` build argument. Version/SHA tags and the exact-source guard are
+preserved. These are local source corrections, not evidence that a corrected
+image has been published or deployed. The live tenant observations below
+remain dated historical evidence.
+
+The shared `scripts/test-container-runtime.ps1` gate runs seven offline
+regression suites at pre-push, dev Stage 1.14 and in `build-test.yml`'s
+Windows/Node 24 job. That workflow's image job depends on both application
+validation and the runtime-contract job. These are separate from daemon,
+live HTTP, browser and deployed-image checks.
+
+[Session activation](../scripts/independent-container-runtime.ps1) sets
+`SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME=1` only after provenance checks.
+The dev pipeline, full-validation Docker phase, Full-mode pre-push build and
+local ACR publication then validate independence before side effects.
+Remote ACR mode, daemon-free pre-push modes and manifest-only promotion retain
+their existing capability boundaries.
+[Foreground startup](../scripts/start-container-engine-wsl.ps1) keeps the
+WSL session alive without installing an unauthenticated daemon TCP listener.
+It requires the separately provisioned local SSH account and pinned host key.
+Docker Desktop artifacts are retained; removal is a separate operator action.
 
 ## Tenant 10 deployments: accepted, role-controlled cutover
 

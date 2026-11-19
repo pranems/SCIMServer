@@ -1,7 +1,18 @@
 # Local Docker build on a corporate-managed device
 
-**Last verified:** 2026-08-20
+**Last verified:** 2026-11-18
 **Status:** SOLVED. `docker build` works again locally; see [The fix](#the-fix).
+
+## Independent runtime verification, November 18
+
+The shipping root Dockerfile also built without cache through a separately
+installed Windows Docker client connected to Engine/WSL over pinned SSH.
+The same corporate registry build argument remains necessary; changing the
+runtime does not make containers inherit the host npm configuration.
+See the [runtime assessment](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md) for
+the exact route, source-build evidence, Linux bind-path handling and limits.
+The August measurements below remain historical, not newly repeated network
+benchmarks. Do not copy the host npm configuration or regenerate lockfiles.
 
 ## The symptom
 

@@ -1,5 +1,100 @@
 ## SCIMServer - Condensed Session Memory
 
+### Current Docker removal readiness, 2026-11-19
+
+Consolidation has resumed on the exact existing task branch. The actual clean
+standalone builder now passes after clean API/web/production installs, with
+unchanged source lockfile hashes. Its fresh owned tmpfs PostgreSQL accepts all
+30 migrations; the clean package passes 1,845 reported live checks and the
+user/group browser roundtrip. Five observed RED contracts close unsafe
+lockfile-regenerating fallback and unchecked native build-stage failures.
+The browser case now reuses the pre-create ownership guard.
+API/web manifests target the next patch, 0.55.68; CI-generated lockfiles,
+reviewed PR, exact-tip CI and merged-source dev remain pending. No shipping
+image or Azure estate has changed. GUI acceptance remains independent.
+
+[Current dashboard and execution ledger](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md)
+is authoritative; the November 18 assessment below is a dated qualification.
+Mermaid doctor passes after removing the obsolete marketplace renderer and
+its residual directory. Markdown is canonical; HTML was only a pre-rendered
+companion, not a replacement.
+
+Native inventory module wiring and active-SSE shutdown have observed RED/GREEN
+regressions: four unit suites/103 tests, two HTTP suites/three tests and API
+compilation pass. Standalone launchers now package/select Prisma 7 config and
+fail closed. The real package applies all 30 migrations to a fresh owned
+Engine PostgreSQL database. Both packaged backends pass 1,845 reported live
+checks/zero failures, with four old placeholders, and the user/group browser
+readback/reload case. These are focused current-source proofs, not a repeated
+full backend/browser matrix.
+
+The dispatch publisher now propagates established OCI metadata and IMAGE_TAG.
+Offline runtime/standalone/metadata contracts are wired into the standard
+pre-push, dev pipeline and a Windows CI job. A dedicated local VS Code
+Container Tools workspace selects the independent client/profile/SSH route;
+actual GUI inspection still needs acceptance. Five active image records do
+not require pruning; complete verified cold backups remain the recovery
+exception to active-cache retention.
+
+No product version/lockfile change, commit, push or cloud mutation has occurred.
+Next: finish focused validation/docs, then start the separate consolidation
+phase for version management, reviewed PR/exact-tip CI and the full ordered
+Azure dev pipeline. Do not bypass shipping-ref checks or promote production.
+Do not use the raw API's legacy api/public UI for current frontend validation.
+The original checkout's VS Code terminal settings name an old tenant; use
+the registry-resolved active automation profile in the isolated workspace.
+
+| Date | Summary |
+|---|---|
+| 2026-11-19 | Fixed Mermaid viewer conflict; added canonical current Markdown readiness guide; corrected native inventory, active SSE shutdown and failure-closed packaged migrations with real package/live/browser proofs; configured isolated GUI workspace and repaired dispatch image metadata. Final release/dev and GUI acceptance remain open. |
+
+### Historical container runtime assessment, 2026-11-18
+
+[Decision, measured evidence and operating runbook](docs/CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
+select independent Docker Engine in Ubuntu WSL with native Windows clients
+over pinned, key-only loopback SSH. The notice approves this runtime family;
+generated package-specific wording was not verified as native policy.
+No certificate sign-in or alternate corporate identity was used.
+
+Both source-built runtimes passed 1,841 reported live checks. Engine's full
+browser run passed 353 tests, with no failures/skips/flakes and all 13 pixel
+comparisons enabled, without baseline updates. All six backend/web modes
+passed: API units 6,254 per backend; E2E 2,612 Prisma / 2,570 in-memory
+with 42 backend skips; web 1,662 tests and all coverage thresholds. New
+runtime contracts total 54, with existing deployment contracts also passing.
+
+Session activation and four pipeline boundaries are wired. Debug mode now
+isolates ports/generated clients, migrates before startup and uses host-side
+Compose watch for actual Windows source edits. Native Node plus Engine
+PostgreSQL is the faster developer loop; full bootstrap restart takes minutes.
+Actual drained backup/restore passed schema/all-table equality, original
+IDs/membership, durable final logging and restored OAuth credential use.
+
+All 40 original Desktop volumes were copied read-only into Engine and matched
+by content/POSIX metadata hashes. An isolated original primary clone recovered
+and advanced from 20 to 30 Prisma migrations while preserving every original
+row/column value in nine tables. Both original VHDs and two configuration
+files now match protected backup hashes, with user/SYSTEM-only ACLs verified.
+A real distribution cold start retained all 40 volume fingerprints. This
+does not claim Windows host reboot or Desktop removal.
+
+Known pre-existing limits are explicit: live-SSE shutdown can exceed its
+deadline; in-memory Operations inventory has missing dependency wiring;
+packaged `-RunMigrations` lacks Prisma 7 configuration and does not fail closed.
+The persistent standalone passed all live checks plus browser roundtrip after
+an explicit repository migration stage. These are not silently marked fixed.
+The assessment assigns follow-up ownership and dates.
+
+Docker Desktop and every original artifact remain retained. Original dirty
+checkout, global Docker context/PATH, legacy optional MCP registration and
+other editor windows were not rewritten. Work is on
+`vprane/scimserver/containers-desktop-exit-20261118`. No commit, push, product
+version/lockfile change, cloud deployment or production promotion occurred.
+
+| Date | Summary |
+|---|---|
+| 2026-11-18 | Implemented independent Engine/WSL route and pipeline/session guards; 54 new contracts, six-mode matrix, 353-browser run, dual-runtime live checks, source-watch and restore qualification; carried 40 original volumes and verified original-schema replay. Desktop retained; operational limits remain explicit. |
+
 **User release documentation, 2026-11-05:** the canonical
 [release notes](docs/RELEASE_NOTES.md#05567) now explain the complete
 0.55.20-to-0.55.67 upgrade, not only the tenant move. Exact baseline6785200f

@@ -641,6 +641,11 @@ Test-Result -Success ($user.meta.location -like "*Users/$UserId") -Message "User
 Test-Result -Success ($null -ne $user.meta.created) -Message "User meta.created is present"
 Test-Result -Success ($null -ne $user.meta.lastModified) -Message "User meta.lastModified is present"
 
+$userInventory = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/users?search=$([Uri]::EscapeDataString($user.userName))" -Headers $headers
+$inventoryUsers = @($userInventory.users | Where-Object { $_.endpointId -eq $EndpointId -and $_.userName -eq $user.userName })
+Test-Result -Success (@($userInventory.PSObject.Properties.Name | Where-Object { $_ -notin @('users', 'pagination') }).Count -eq 0) -Message "User inventory contains only documented envelope keys"
+Test-Result -Success ($inventoryUsers.Count -eq 1 -and $inventoryUsers[0].active -eq $true) -Message "Cross-endpoint inventory returns the owned active SCIM user"
+
 # Test: Get user by ID
 Write-Host "`n--- Test: Get User by ID ---" -ForegroundColor Cyan
 $fetchedUser = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method GET -Headers $headers
@@ -1063,6 +1068,11 @@ Test-Result -Success ($group.meta.resourceType -eq "Group") -Message "Group meta
 Test-Result -Success ($null -ne $group.meta.location) -Message "Group meta.location is present"
 Test-Result -Success ($group.meta.location -like "*Groups/$GroupId") -Message "Group meta.location contains correct path"
 Test-Result -Success ($null -ne $group.meta.created) -Message "Group meta.created is present"
+
+$groupInventory = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/groups?search=$([Uri]::EscapeDataString($group.displayName))" -Headers $headers
+$inventoryGroups = @($groupInventory.groups | Where-Object { $_.endpointId -eq $EndpointId -and $_.displayName -eq $group.displayName })
+Test-Result -Success (@($groupInventory.PSObject.Properties.Name | Where-Object { $_ -notin @('groups', 'pagination') }).Count -eq 0) -Message "Group inventory contains only documented envelope keys"
+Test-Result -Success ($inventoryGroups.Count -eq 1 -and $inventoryGroups[0].memberCount -eq 0) -Message "Cross-endpoint inventory returns the owned empty SCIM group"
 
 # Test: Get group by ID
 Write-Host "`n--- Test: Get Group by ID ---" -ForegroundColor Cyan

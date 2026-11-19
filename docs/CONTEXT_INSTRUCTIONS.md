@@ -1,13 +1,53 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.67
-> **Last Updated**: November 5, 2026
-> **Last verified:** 2026-11-05
+> **Version**: 0.55.68
+> **Last Updated**: November 19, 2026
+> **Last verified:** 2026-11-19
 
 ---
 
 ## Active Delivery Process
+
+**Current removal readiness, 2026-11-19:** the
+[current Markdown dashboard](CONTAINER_RUNTIME_REMOVAL_READINESS.md) supersedes
+capture-time holds without erasing their historical evidence. Mermaid doctor
+passes with one built-in renderer. Native inventory and active-stream shutdown
+regressions pass (103 neighboring units, three focused HTTP tests); API builds.
+The corrected standalone applies 30 migrations to a fresh owned Engine database.
+Prisma and in-memory packages each pass 1,845 live checks, zero failures, and
+the actual user/group browser inventory/reload/readback case. Four old live
+placeholders remain disclosed. These are not final full-suite or cloud proofs.
+The dedicated Container Tools workspace is configured but actual GUI acceptance
+is pending. Dispatch image labels and automatic offline contract wiring are
+corrected in local source. Consolidation now targets patch 0.55.68; CI-generated
+lockfiles, reviewed exact-tip CI and merged-source dev remain open. The actual
+clean builder installs 660 API and 256 production packages and leaves both
+source lockfile hashes unchanged. That clean package applies all 30 migrations,
+passes 1,845 reported live checks and the owned user/group browser case.
+Five observed RED/GREEN builder assertions now reject unchecked native stages
+and lockfile-regenerating install fallback. No new deployment, Desktop removal
+or production promotion is claimed.
+
+**Historical local container qualification, 2026-11-18:** independent Engine in Ubuntu WSL,
+native Windows clients and pinned loopback SSH are the selected local route.
+See the [runtime decision and runbook](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md).
+Process-scoped activation guards applicable local pipeline boundaries without
+changing public defaults or global Docker contexts. Source-built Engine and
+Podman each passed 1,841 reported live checks; Engine passed 353 browser cases
+including all pixel comparisons, and all six backend/web modes passed.
+Fifty-four new contracts guard provenance, rollback, binds, startup and
+pipeline boundaries. All 40 original Desktop volume directories were carried
+and hash-matched; an isolated primary clone recovered and replayed 20 -> 30
+migrations with every original row/column value retained. Both VHD backups
+and two configurations hash-match, protected ACLs pass, and all 40 carried
+volumes retain their fingerprints after a distribution cold start. Actual
+application backup/restore also proved original IDs and restored OAuth use.
+Desktop is not uninstalled, cloud facts below are not revalidated by these
+local checks, and no product version or lockfile changed. Existing live-SSE
+shutdown, native in-memory inventory and packaged migration-switch defects
+are recorded, not claimed fixed. Use PostgreSQL plus an explicit repository
+migration stage for the qualified persistent native route.
 
 **User-facing release reference, 2026-11-05:** share
 [0.55.67 cumulative release notes](RELEASE_NOTES.md#05567) for the upgrade

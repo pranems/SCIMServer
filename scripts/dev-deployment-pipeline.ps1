@@ -258,10 +258,13 @@ function Test-PrereqOrExit {
         Write-Host "Missing prerequisites: $($missing -join ', ')" -ForegroundColor Red
         exit 2
     }
-    # docker daemon up?
+    if ($env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME -eq '1') {
+        . (Join-Path $PSScriptRoot 'independent-container-runtime.ps1')
+        Assert-IndependentContainerRuntime | Out-Null
+    }
     docker version --format '{{.Server.Version}}' > $null 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Docker daemon not reachable. Start Docker Desktop." -ForegroundColor Red
+        Write-Host "Container server not reachable. Start the intended runtime and verify its selected endpoint; see docs/CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md." -ForegroundColor Red
         exit 2
     }
     # az logged in?
@@ -467,6 +470,10 @@ Invoke-Gate '1.12' 'Docs freshness (user-facing set)' {
 # routes and reason codes are compared against the source they describe.
 Invoke-Gate '1.13' 'Docs content matches source' {
     node (Join-Path $PSScriptRoot 'audit-doc-content.mjs')
+} | Out-Null
+
+Invoke-Gate '1.14' 'Independent runtime and standalone contracts' {
+    pwsh -NoProfile -File (Join-Path $PSScriptRoot 'test-container-runtime.ps1')
 } | Out-Null
 
 # =============================================================================

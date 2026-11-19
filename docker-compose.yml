@@ -13,7 +13,7 @@ services:
       - "${BIND_HOST_IP:-0.0.0.0}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./scripts/init-pg-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+      - ${SCIM_CONTAINER_SOURCE_ROOT:-.}/scripts/init-pg-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U scim -d scimdb"]
       interval: 5s
@@ -49,7 +49,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./logs:/app/logs
+      - ${SCIM_CONTAINER_LOG_DIRECTORY:-./logs}:/app/logs
     logging:
       driver: json-file
       options:

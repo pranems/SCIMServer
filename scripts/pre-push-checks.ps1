@@ -311,6 +311,10 @@ Invoke-Gate -Name 'deploy: workflow run selector' -WorkingDir $repoRoot -Action 
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/select-github-workflow-run.contract.ps1') 2>&1 | Out-Host
 }
 
+Invoke-Gate -Name 'runtime: independent engine and standalone contracts' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -File (Join-Path $PSScriptRoot 'test-container-runtime.ps1') 2>&1 | Out-Host
+}
+
 Invoke-Gate -Name 'deploy: tenant rollover contracts' -WorkingDir $repoRoot -Action {
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test-tenant-rollover.ps1') 2>&1 | Out-Host
 }
@@ -413,6 +417,10 @@ if ($Mode -in @('Validate', 'Full')) {
 if ($Mode -eq 'Full') {
 
     Invoke-Gate -Name 'docker: build image (linux/amd64)' -Action {
+        if ($env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME -eq '1') {
+            . (Join-Path $PSScriptRoot 'independent-container-runtime.ps1')
+            Assert-IndependentContainerRuntime | Out-Null
+        }
         $tag = "scimserver:prepush-$(Get-Date -Format 'yyyyMMddHHmmss')"
         $env:_PREPUSH_DOCKER_TAG = $tag
         docker build -t $tag -f Dockerfile . 2>&1 | Out-Host

@@ -1,16 +1,15 @@
-version: '3.8'
-
 services:
   api:
     image: node:24
-    container_name: scimserver-api-dev
+    container_name: ${API_CONTAINER_NAME:-scimserver-api-dev}
     working_dir: /usr/src/app
     volumes:
-      - ./api:/usr/src/app:rw
+      - ${SCIM_CONTAINER_SOURCE_ROOT:-.}/api:/usr/src/app:rw
       - /usr/src/app/node_modules
-    ports:
-      - "3000:3000"    # SCIM API port
-      - "9229:9229"    # Node debugger inspector
+      - /usr/src/app/src/generated
+    ports: !override
+      - "${BIND_HOST_IP:-127.0.0.1}:${DEBUG_API_HOST_PORT:-3000}:3000"
+      - "${BIND_HOST_IP:-127.0.0.1}:${DEBUG_INSPECTOR_HOST_PORT:-9229}:9229"
     environment:
       NODE_ENV: development
       PORT: 3000
@@ -19,8 +18,16 @@ services:
       JWT_SECRET: changeme-jwt
       OAUTH_CLIENT_SECRET: changeme-oauth
       OAUTH_CLIENT_ID: scimserver-client
-      # Enable the Node inspector on all interfaces so the host can attach
-      NODE_OPTIONS: "--inspect=0.0.0.0:9229"
-    command: bash -lc "npm ci && npx prisma generate && npm run start:dev"
+      NPM_CONFIG_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    command: bash -lc "npm ci --no-audit --no-fund && npx prisma generate && npx prisma migrate deploy && exec node --watch --inspect=0.0.0.0:9229 --require ts-node/register/transpile-only src/main.ts"
+    develop:
+      watch:
+        - action: restart
+          path: ./api/src
+          ignore:
+            - generated/
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/scim/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      start_period: 300s
     tty: true
     stdin_open: true

@@ -1,6 +1,15 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.68`
+
+**Unreleased restart behavior, November 19:** local source explicitly ends
+active log-stream responses and clears their subscriptions/keepalive timers
+during application shutdown. The operator need not close a live log viewer
+before stopping the server. Reconnect after the replacement listener passes
+`GET /scim/health`; an HTTP 503 from a still-running shutdown handler or a refused
+connection from a stopped listener is not proof of permanent data loss.
+Real open-client shutdown passes locally; this is not yet a deployed correction.
+See [current readiness and release boundaries](CONTAINER_RUNTIME_REMOVAL_READINESS.md).
 
 > **Version:** 3.2 - **Source-verified against:** v0.55.36 - **Updated:** 2026-10-01
 > Request-history identity and authenticated stream transport re-verified against v0.55.36 on 2026-10-01; the full line-by-line pass dates from v0.53.0.
