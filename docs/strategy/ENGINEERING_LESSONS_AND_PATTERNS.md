@@ -34,6 +34,13 @@ check. A native migration failure can be negative. Compare the status with
 zero and exercise both positive and negative failures before claiming a
 generated batch launcher fails closed.
 
+The actual clean standalone builder needs the same failure-closed discipline:
+never retry failed npm ci with a lockfile-regenerating install, and check
+generation, web build and production installation independently. A real fresh
+production install is distinct from assembling previously installed files.
+Read Docker-assigned ports again after container restart; a captured container
+ID remains its ownership handle, but its host-port lease can change.
+
 Before browser acceptance, identify the SPA actually served by the selected
 form factor. The raw compiled API served legacy public assets while the current
 standalone contained the current web build; replacing pixel baselines would

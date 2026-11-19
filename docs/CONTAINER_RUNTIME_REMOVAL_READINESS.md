@@ -62,6 +62,7 @@ November 19 application correction or a new Azure deployment.
 | API/backend/web matrix | PASS, November 18 source | Units 6,254 each backend; E2E 2,612 Prisma / 2,570 in-memory, 42 backend skips; web 1,662. Not fresh final-source counts. |
 | Native in-memory inventory | CORRECTED, local source | Actual-module and HTTP regressions reproduced zero rows before the fix. EndpointModule import restores endpoint enumeration. |
 | Active log-stream shutdown | CORRECTED, local source | Real open HTTP stream blocked the three-second deadline before the fix; lifecycle cleanup now closes it without client-first disconnect. |
+| Actual container active-stream shutdown | PASS, consolidation source 45885140 | A genuinely connected SSE client ends without client-first disconnect when Docker sends SIGTERM. Stop completes in 1,035 ms with exit 0 and no OOM kill; the final correlated request has one durable database log row. Restart preserves the original user ID/value. Owned endpoint deletion/status/absence and exact full-container-ID cleanup pass. This is a local nonshipping image, not Azure dev evidence. |
 | Neighboring native unit coverage | PASS, November 19 | Four suites, 103 tests including inventory wiring and stream cleanup. |
 | Focused native HTTP coverage | PASS, November 19 | Two suites, three tests: user/group inventory and active-stream application close. |
 | API compilation | PASS, November 19 | `npm run build`. |
@@ -340,6 +341,8 @@ They do not change the earlier receipt or imply that release/dev gates passed.
 | R20 | Packaging / High | The real builder could retry failed npm ci with npm install, potentially rewriting lockfiles locally, and did not check Prisma generation, web installation/build or production-install status. A failed stage could therefore produce a success-shaped package. | Five new assertions first fail, then pass after removing the fallback and guarding every native stage. The actual clean builder succeeds with 660 API and 256 production packages, current web build and unchanged source lockfile hashes. Earliest gate: failure-closed checks for the real builder as well as generated launchers. |
 | R21 | Build environment / Low | The first clean build stopped at PrismaConfigEnvError because Prisma 7 evaluates DATABASE_URL even for generate, which never connects. Earlier assembled artifacts had hidden this prerequisite. | Supply a deliberately nonconnecting, build-only loopback datasource for generation, matching the existing Dockerfile convention. The complete clean builder then succeeds; runtime migrations separately apply all 30 migrations to the owned real database. Earliest gate: explicit build environment before invoking the clean builder. No production connection string or authentication is needed. |
 | R22 | Fixture ownership / Medium | The new runtime browser case created a unique name but had not proved that its returned endpoint ID was absent before assigning a teardown target. A unique name alone is not ownership evidence. | Reuse the established createFixtureEndpoint pre-create inventory guard before seeding, and retain API-request cleanup with successful status and exact-ID absence assertions. The real clean-package browser case passes user/group values, reload and original-ID readback. Earliest gate: fixture ownership review before running against carried dev data. |
+| R23 | Release metadata / Low | The first normal Validate pre-push stopped at content check C13: the version-header fixer does not update the README version badge, which still said 0.55.67. | Update the badge to the target 0.55.68; the same content gate passes for all 27 documents. The blocked push is retained, not bypassed. Earliest gate: verify badges with content audit after header repair; header freshness alone is not complete version-reference evidence. |
+| R24 | Integration harness / Low | The first container proof passed active-client SIGTERM, exit 0 and durable logging, then its added restart probe timed out because it reused the old automatically assigned host port. Docker reassigned that port on restart. | Read the actual published port again after start. The unchanged image then passes stream end, 1,035 ms clean stop, durable log, original-ID/value readback, owned endpoint cleanup and exact container removal. The initial failed receipt remains archived. Earliest gate: treat an assigned endpoint as lifecycle-local, not permanent across stop/start. |
 
 Consolidation receipts are `test-results/release-clean-standalone-build-green.txt`,
 `release-clean-package-health.json`, `release-clean-package-live.txt` and
@@ -349,6 +352,10 @@ The browser result is one passed case, not a complete browser matrix.
 The disposable database receipt records a new full container ID, task/run
 labels, tmpfs storage and Docker-assigned loopback port. No original Desktop
 artifact, volume or cold backup is a validation database.
+`release-container-active-sse-shutdown.json` captures the actual container
+signal, stream end, exit state, final durable request log, restarted original-ID
+readback and exact cleanup. The failed first restart receipt is retained
+separately rather than rewritten as a pass.
 
 **Test/gate self-improvement: applied.** The clean builder now fails at the
 actual failing native stage without silently regenerating a lockfile; the
