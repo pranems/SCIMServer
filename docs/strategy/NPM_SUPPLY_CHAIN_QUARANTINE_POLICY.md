@@ -9,6 +9,36 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-11-20 Effect recovery bootstrap and final dependency evidence
+
+Effect 3.22.1 was published 2026-07-30T04:29:21.637Z and is already outside
+quarantine. Trivy HIGH CVE-2026-121707 / GHSA-7589-6fvf-x4pw blocks draft
+PR #275; the maintainer rates it Medium. Neither rating waives the gate.
+
+The existing full-tree guard can reject an old installation after an exact
+override changes, while npm ci rejects the old lock/new-manifest mismatch.
+The parent-authorized bootstrap moved only the owned API lock temporarily
+outside resolution and restored its exact SHA-256 afterward. Manifest-only
+`npm install --package-lock=false --ignore-scripts --no-audit --no-fund`
+through the unchanged approved proxy, with the seven-day `--before` cutoff,
+changed one installed package and preserved Prisma 7.8.0.
+Do not supply a package argument or assume any re-resolved bootstrap is final
+evidence: an earlier explicit Effect install advanced unrelated dependencies
+and the normal hook correctly blocked it. Run all existing actual-consumer
+and complete-tree guards together. No existing guard or hook was changed.
+
+The normal Fast bootstrap then passed at `712ddcc7`; API-only public CI run
+`44800892630` produced authenticated artifact `14660962893`.
+Only the Effect lock entry changed. All 684 API entries retain public
+URLs/SHA-512, and the imported lock remains byte-identical after fresh owned
+npm ci. Permanent exact pin, advisory boundary, lock and installed-owner
+regressions now pass with the existing consumer guards (67 tests).
+See [the complete receipts and RCA](../CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+**Self-improvement: applied.** Preserve bootstrap versus final evidence and
+verify the whole graph, not two passing pin specs.
+**Design disposition: accepted.** Reuse the exact override and CI artifact
+route; no new dependency abstraction or policy exception is needed.
+
 ### 2026-10-29 request-body exact patches (#256)
 
 body-parser 2.4.0 was published 2026-10-22T11:39:38Z and multer 2.5.0

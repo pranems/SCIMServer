@@ -1,5 +1,38 @@
 ## SCIMServer - Condensed Session Memory
 
+### Effect security recovery, 2026-11-20
+
+Recovery branch `vprane/scimserver/containers-desktop-exit-cve-20261120`
+starts at `87fcbdc153e1e2ba2d13f4fe3af3d8adb519d559`. PR #275 image run
+44791352333 failed Trivy on Effect 3.20.0, CVE-2026-121707 /
+GHSA-7589-6fvf-x4pw (HIGH in Trivy; Medium in the maintainer advisory).
+The existing exact override moves to 3.22.1. Its approved-proxy publication
+is 2026-07-30T04:29:21Z, eligible 2026-08-06T04:29:21Z.
+The permanent manifest regression was observed RED on 3.20.0.
+The old installation is rejected by the unchanged full npm-tree guard after
+the manifest edit. Temporary owned no-save/package-lock=false resolution was
+also rejected by the normal Fast hook: 25 static gates passed, but unrelated
+Prisma/qs/mime-types drift caused 5 failed API tests (6,256 passed).
+Clean npm ci with the new manifest and old lock fails EUSAGE on Effect.
+No branch was published. Owned baseline Prisma 7.8.0/Effect 3.20.0 was restored
+using the temporarily restored original manifest, then the intended 3.22.1
+manifest was reinstated. Every tracked lock remains unchanged.
+Permanent lock and installed-owner guards are now RED on actual 3.20.0.
+The parent-authorized manifest-only install with the old API lock temporarily
+outside resolution then changed one package, kept Prisma 7.8.0 and installed
+Effect 3.22.1. Exact lock byte identity was verified. All three existing
+complete-tree/advisory-consumer/Hono-parent specs pass 34 tests.
+Normal Fast bootstrap passed all 27 gates at exact `712ddcc7` in 652.7 seconds:
+218 API suites/6,261 tests, reduced HTTP 2,517 passes/42 known skips.
+API-only CI lock run `44800892630` succeeded at that source; authenticated
+artifact `14660962893` changes only Effect. Fresh owned npm ci preserves
+the imported lock bytes. Reapplied exact lock/owner tests and all existing
+consumer guards pass 4 suites/67 tests. Normal final Validate and nonshipping
+image validation remain pending; no guard, hook or quarantine control changed.
+Keep the unshipped 0.55.68 candidate; a second unreleased version is unnecessary.
+No merge, deployment, Desktop removal or runtime/configuration changes are authorized.
+See [current receipts and RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
 ### Current Docker removal readiness, 2026-11-20
 
 The normal complete Validate hook and exact-ref push PASS at

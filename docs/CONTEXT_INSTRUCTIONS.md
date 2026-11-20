@@ -9,6 +9,17 @@
 
 ## Active Delivery Process
 
+**Effect recovery, 2026-11-20:** draft PR #275 image run 44791352333 failed
+Trivy on Effect 3.20.0. Isolated recovery retains candidate 0.55.68 and changes
+only the existing exact override to 3.22.1 plus regressions/current receipts.
+Bootstrap installation is not final locked dependency evidence. The normal
+Fast bootstrap passed all 27 gates at `712ddcc7`; API-only CI lock run
+`44800892630` changes only Effect. Authenticated import and fresh owned restore
+pass all four focused suites/67 tests with the actual graph guards.
+Normal final Validate and nonshipping exact-ref image remain required.
+Original branch, merge and deployment are parent-owned.
+See [recovery receipts](CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
 **Latest runner boundary, 2026-11-20:** subsequent normal hooks remain blocked
 by fork-start timeouts despite unchanged focused passes. The operator directed
 autonomous continuation. A Windows-only supported thread-pool mitigation now
