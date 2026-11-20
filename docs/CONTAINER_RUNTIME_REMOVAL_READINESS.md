@@ -55,10 +55,11 @@ ignore or security-gate weakening is needed.
 | Recovery boundary | Current evidence |
 |---|---|
 | Permanent manifest guard | RED: expected 3.22.1, received 3.20.0 before the manifest edit. |
-| Permanent graph guards | RED on the actual lock and every installed owner: expected 3.22.1, received 3.20.0. |
-| Bootstrap | Authorized manifest-only no-lock route corrected the owned installation with one package change. Existing consumer guards pass 34 tests. Normal publication still pending. |
-| CI-generated API lock | Pending normal bootstrap publication and the existing `regen-lockfile.yml` API selection. |
-| Fresh installed tree | Pending unchanged artifact import and approved-proxy npm ci. |
+| Permanent graph guards | Actual lock and installed owner each reproduced 3.20.0 RED. Unchanged tests now GREEN after CI artifact import and fresh npm ci. |
+| Bootstrap | Normal Fast explicit-ref push passed all 27 gates in 652.7 seconds at `712ddcc7c8a0d4e19b1b463328004ebecef99c27`: 218 API suites / 6,261 tests; reduced HTTP 2,517 passes / 42 known skips. Not final locked dependency evidence. |
+| CI-generated API lock | API-only run `44800892630` SUCCESS at exact bootstrap head. Authenticated artifact `14660962893`; only Effect changed. |
+| Fresh installed tree | Approved-proxy npm ci installed 660 packages and preserved CI lock bytes. Four focused suites pass 67 tests in 8.525 seconds, including full npm-tree validity and actual Effect owner resolution. |
+| Final normal Validate push | Pending complete hook at the recovery tip. |
 | Exact recovery image | Pending nonshipping Build Test Image; no local Docker or shipping publication. |
 | Parent integration | Separate reviewed stacked PR and original exact-tip CI; not performed here. |
 
@@ -70,6 +71,27 @@ merge/deployment. The earliest deterministic regression boundary is the pin
 test; the existing scheduled advisory watcher remains the earlier discovery
 control. Updating the existing override and verifying actual locked, installed
 and imaged packages removes that dependency version, rather than hiding it.
+
+**Confirmed dependency fix:** public-registry CI lock run
+[44800892630](https://github.com/pranems/SCIMServer/actions/runs/44800892630)
+used exact bootstrap source `712ddcc7c8a0d4e19b1b463328004ebecef99c27`
+and unchanged workflow/API-only input. Artifact `14660962893` ZIP SHA-256
+`8e1c96c56606757d37a821c176464f9ada6433517eed246891b6c87b928ba8f2`
+matched GitHub's authenticated digest before extraction.
+Structural comparison across the complete package union proves exactly one
+changed entry, `node_modules/effect`: version, public URL and SHA-512 change;
+its dependencies and all other package/root metadata remain identical.
+All 684 API package entries retain public provenance/SHA-512; root and web
+locks remain unchanged. CI publication-age evidence records
+2026-07-30T04:29:21.637Z, 113.617 days old at regeneration.
+Imported API lock SHA-256 is
+`8539d1cd316ee2f8e9315bb60e02c2cf4075c40a35666a2e819abb2317a1abf2`,
+unchanged after fresh npm ci. Actual ownership is
+`prisma@7.8.0 -> @prisma/config@7.8.0 -> effect@3.22.1 overridden`.
+The restored exact graph-test drafts and all existing actual-consumer
+contracts pass together (4 suites / 67 tests). This resolves the version
+and bootstrap failures without admitting unrelated package drift.
+Image security verification remains a separate required claim.
 
 **Execution friction (tooling, LOW):** fresh checkout Jest/Vitest were absent,
 confirmed by the first focused validation commands. Owned baseline npm ci

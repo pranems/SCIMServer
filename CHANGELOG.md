@@ -18,9 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The first normal bootstrap hook blocked an unaccepted temporary graph; clean
   npm ci rejects the manifest/old-lock mismatch. The authorized manifest-only
   no-lock preparation changes only installed Effect and retains the old lock.
-  CI lock regeneration, fresh installed-tree and nonshipping image validation
-  are pending the normal bootstrap and verified CI artifact, not inherited from
-  older green receipts. Retain the already
+  Normal Fast bootstrap at `712ddcc7` passed all 27 gates (218 API suites /
+  6,261 tests, HTTP 2,517 / 42 known skips). API-only CI lock run `44800892630`
+  changes only Effect; authenticated artifact `14660962893` was imported
+  unchanged. Fresh owned npm ci and four focused suites pass all 67 tests,
+  including actual-lock/installed-owner guards and the complete npm tree.
+  Pin tests increase from 29 to 33. Final normal Validate and nonshipping image
+  validation remain pending, not inherited from older receipts. Retain the already
   pending 0.55.68 candidate rather than inventing a second unreleased bump.
   See [recovery evidence](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
 

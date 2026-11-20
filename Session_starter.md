@@ -22,8 +22,13 @@ The parent-authorized manifest-only install with the old API lock temporarily
 outside resolution then changed one package, kept Prisma 7.8.0 and installed
 Effect 3.22.1. Exact lock byte identity was verified. All three existing
 complete-tree/advisory-consumer/Hono-parent specs pass 34 tests.
-Normal bootstrap publication and final CI lock evidence remain pending;
-no hook, guard, lock policy or quarantine control was bypassed.
+Normal Fast bootstrap passed all 27 gates at exact `712ddcc7` in 652.7 seconds:
+218 API suites/6,261 tests, reduced HTTP 2,517 passes/42 known skips.
+API-only CI lock run `44800892630` succeeded at that source; authenticated
+artifact `14660962893` changes only Effect. Fresh owned npm ci preserves
+the imported lock bytes. Reapplied exact lock/owner tests and all existing
+consumer guards pass 4 suites/67 tests. Normal final Validate and nonshipping
+image validation remain pending; no guard, hook or quarantine control changed.
 Keep the unshipped 0.55.68 candidate; a second unreleased version is unnecessary.
 No merge, deployment, Desktop removal or runtime/configuration changes are authorized.
 See [current receipts and RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
