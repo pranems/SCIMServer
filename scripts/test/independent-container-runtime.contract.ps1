@@ -10,7 +10,8 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $temporary = Join-Path ([IO.Path]::GetTempPath()) "scim-runtime-contract-$([guid]::NewGuid().ToString('N'))"
 $null = New-Item -ItemType Directory -Path $temporary
 $previous = @{}
-foreach ($key in @('DOCKER_CONFIG', 'DOCKER_HOST', 'DOCKER_CONTEXT')) {
+foreach ($key in @('DOCKER_CONFIG', 'DOCKER_HOST', 'DOCKER_CONTEXT',
+    'SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME', 'SCIM_CONTAINER_SOURCE_ROOT', 'SCIM_CONTAINER_LOG_DIRECTORY')) {
     $previous[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
     Set-Item -LiteralPath "Env:$key" -Value $null
 }
@@ -190,6 +191,67 @@ try {
             $failures.Add('Explicit DOCKER_CONTEXT was not inspected.')
         }
     }
+    $settingsCases = @(
+        @{ Name = 'GUI commands are bare independent executable paths'; Accept = $true },
+        @{ Name = 'GUI settings require explicit activation'; Change = { $env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME = $null }; Error = 'Enable-IndependentContainerRuntime' },
+        @{ Name = 'GUI settings reject context drift'; Change = { $env:DOCKER_CONTEXT = 'desktop-linux' }; Error = 'Enable-IndependentContainerRuntime' },
+        @{ Name = 'GUI settings reject Desktop executable'; Change = { $state.ClientPath = 'C:\Program Files\Docker\Docker\resources\bin\docker.exe' }; Error = 'Desktop executable' },
+        @{ Name = 'GUI settings reject unreachable Engine'; Change = { $state.ServerFailure = $true }; Error = 'server is unreachable' },
+        @{ Name = 'GUI settings reject broken Compose'; Change = { $state.ComposeFailure = $true }; Error = 'Compose plugin failed' }
+    )
+    if (-not (Test-Path -LiteralPath 'Function:\Get-IndependentContainerToolsSettings')) {
+        $failures.Add('Container Tools settings generator missing: PATH alone does not pin GUI task executables.')
+        Write-Host "FAIL: $($failures[-1])"
+    } else {
+        foreach ($case in $settingsCases) {
+            $state.BuildxFailure = $false
+            $state.ServerFailure = $false
+            $state.ComposeFailure = $false
+            $state.ClientPath = 'C:\Independent Tools\docker.exe'
+            $state.Calls.Clear()
+            $env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME = '1'
+            $env:DOCKER_CONTEXT = $null
+            $env:DOCKER_HOST = 'ssh://owned-engine'
+            $env:SCIM_CONTAINER_SOURCE_ROOT = '/owned/source'
+            $env:SCIM_CONTAINER_LOG_DIRECTORY = '/owned/logs'
+            if ($case.Change) { & $case.Change }
+            $accepted = $false
+            $failure = $null
+            try {
+                $settings = Get-IndependentContainerToolsSettings
+                foreach ($key in @('containers.containerCommand', 'containers.composeCommand')) {
+                    if ($settings[$key] -cne $state.ClientPath) {
+                        throw "$key must be the bare executable path without quoting, flags or a compose suffix."
+                    }
+                }
+                foreach ($key in @('containers.environment', 'terminal.integrated.env.windows')) {
+                    $environment = $settings[$key]
+                    if ($environment.DOCKER_HOST -cne $env:DOCKER_HOST -or
+                        $environment.DOCKER_CONFIG -cne $env:DOCKER_CONFIG -or
+                        $environment.DOCKER_CONTEXT -cne '' -or
+                        $environment.PATH -cne $env:PATH -or
+                        $environment.SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME -cne '1' -or
+                        $environment.SCIM_CONTAINER_SOURCE_ROOT -cne '/owned/source' -or
+                        $environment.SCIM_CONTAINER_LOG_DIRECTORY -cne '/owned/logs') {
+                        throw "$key did not preserve the activated runtime and Compose mount environment."
+                    }
+                }
+                foreach ($command in @('info --format {{json .}}', 'compose version', 'buildx version')) {
+                    if (-not $state.Calls.Contains($command)) { throw "GUI settings bypassed runtime preflight: $command" }
+                }
+                $accepted = $true
+            } catch {
+                $failure = $_.Exception.Message
+            }
+            if ($accepted -ne ($case.Accept -eq $true) -or
+                (-not $case.Accept -and $failure -notmatch [regex]::Escape($case.Error))) {
+                $failures.Add("$($case.Name): acceptance=$accepted, error=$failure")
+                Write-Host "FAIL: $($failures[-1])"
+            } else {
+                Write-Host "PASS: $($case.Name)"
+            }
+        }
+    }
 } finally {
     foreach ($entry in $previous.GetEnumerator()) {
         Set-Item -LiteralPath "Env:$($entry.Key)" -Value $entry.Value
@@ -204,4 +266,4 @@ if ($failures.Count) {
     $failures | ForEach-Object { Write-Error $_ -ErrorAction Continue }
     exit 1
 }
-Write-Host "All $($cases.Count) independent-runtime contracts passed; no real runtime was invoked."
+Write-Host "All $($cases.Count) independent-runtime and $($settingsCases.Count) Container Tools settings contracts passed; no real runtime was invoked."

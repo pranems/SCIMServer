@@ -19,8 +19,14 @@ next hook; that hook then stopped at 65 Vitest worker-start timeouts.
 Three representative web files/209 tests pass with supported
 VITEST_MAX_WORKERS=2; the owning complete hook still must pass.
 Actual GUI View Logs selected a Desktop executable despite the correct Engine
-tree. Parent is correcting official command overrides; independence is not
-accepted. Actual local active-SSE SIGTERM exits 0 in 1,035 ms, with durable
+tree. Corrected bare command overrides now pass actual GUI Start/logs;
+Get-IndependentContainerToolsSettings reuses shared activation/preflight and
+carries Compose mount roots to both environments. Six new settings contracts
+and 34 existing runtime cases pass, plus read-only real Engine generation.
+The prior in-flight hook was cancelled for this material source correction;
+the complete updated-tip hook must run normally. Final parent-owned
+reload/Compose/cleanup acceptance remains open. Actual local active-SSE SIGTERM
+exits 0 in 1,035 ms, with durable
 final logging and restarted original-ID readback. Azure identity/ARM readback
 passes using the existing registry-selected principal; no cloud writes.
 

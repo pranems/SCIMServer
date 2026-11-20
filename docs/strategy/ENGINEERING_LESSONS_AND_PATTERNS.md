@@ -46,8 +46,13 @@ the intended Engine while its terminal-backed actions still use an
 auto-detected Docker Desktop executable. Environment PATH does not pin the
 extension SDK's executable discovery. Configure its official container and
 Compose command overrides explicitly, then inspect an actual generated task
-command after editor reload. Correct daemon identity and useful logs alone
-are not proof that Desktop removal is safe.
+command after editor reload. For Container Tools 2.5.3 both values are only
+the executable path: extra quoting/flags become an invalid executable, and a
+compose suffix triggers its legacy-Compose rejection. Host/config/context and
+daemon-side Compose roots belong in both extension and terminal environments.
+Generate these through the existing independent-runtime helper after shared
+preflight, rather than maintaining a second GUI runtime selector. Correct
+daemon identity and useful logs alone are not proof that Desktop removal is safe.
 
 Before browser acceptance, identify the SPA actually served by the selected
 form factor. The raw compiled API served legacy public assets while the current

@@ -28,6 +28,14 @@ passes 1,845 reported live checks and the owned user/group browser case.
 Five observed RED/GREEN builder assertions now reject unchecked native stages
 and lockfile-regenerating install fallback. No new deployment, Desktop removal
 or production promotion is claimed.
+Actual GUI qualification then exposed an independent executable boundary:
+Container Tools tasks still chose Desktop despite the correct Engine tree.
+Bare independent command overrides now pass actual Start/logs. The shared
+runtime helper generates both command settings and container/terminal
+environments after fresh preflight, retaining Compose bind/log roots.
+Six new settings contracts plus the existing 34 runtime cases and read-only
+real Engine generation pass. Final GUI reload/Compose/cleanup, full updated-tip
+hook, CI lockfiles, reviewed PR and merged-source dev remain open.
 
 **Historical local container qualification, 2026-11-18:** independent Engine in Ubuntu WSL,
 native Windows clients and pinned loopback SSH are the selected local route.

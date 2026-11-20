@@ -24,6 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reuse the existing browser fixture's pre-create inventory ownership guard.
   Test/gate improvement applied; design disposition accepted because the
   linear builder and shared fixture remain cohesive without new abstractions.
+- Correct the actual Container Tools terminal executable boundary: a correct
+  Engine tree/PATH still allowed Desktop's binary. Generate bare independent
+  container/Compose command paths and both environments through the existing
+  activation/preflight helper. Six new RED/GREEN settings contracts pass
+  alongside 34 existing runtime cases; real Engine generation passes read-only.
+  GUI Start/logs prove the independent executable, while final parent-owned
+  reload/Compose/cleanup acceptance remains open.
+- Preserve failed consolidation gates: the full hook's API units now pass
+  6,259 tests/218 suites; its existing reduced in-memory HTTP lane passes 2,517
+  tests with 42 skips. The web worker-start failure is not a full web pass.
+  Three representative files/209 tests pass with supported two-worker
+  concurrency. The owning complete updated-tip hook and final merged-source
+  matrix remain required; no test, timeout or threshold was weakened.
 
 ### Current Docker Desktop removal readiness, November 19
 

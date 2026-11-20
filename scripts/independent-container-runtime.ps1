@@ -42,6 +42,33 @@ function Enable-IndependentContainerRuntime {
     }
 }
 
+function Get-IndependentContainerToolsSettings {
+    [CmdletBinding()]
+    param()
+
+    if ($env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME -cne '1' -or
+        [string]::IsNullOrWhiteSpace($env:DOCKER_HOST) -or
+        [string]::IsNullOrWhiteSpace($env:DOCKER_CONFIG) -or $env:DOCKER_CONTEXT) {
+        throw 'Run Enable-IndependentContainerRuntime before generating Container Tools settings.'
+    }
+    $runtime = Assert-IndependentContainerRuntime
+    $environment = [ordered]@{
+        PATH = $env:PATH
+        DOCKER_HOST = $env:DOCKER_HOST
+        DOCKER_CONFIG = $env:DOCKER_CONFIG
+        DOCKER_CONTEXT = ''
+        SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME = '1'
+        SCIM_CONTAINER_SOURCE_ROOT = [string]$env:SCIM_CONTAINER_SOURCE_ROOT
+        SCIM_CONTAINER_LOG_DIRECTORY = [string]$env:SCIM_CONTAINER_LOG_DIRECTORY
+    }
+    [ordered]@{
+        'containers.containerCommand' = $runtime.ClientPath
+        'containers.composeCommand' = $runtime.ClientPath
+        'containers.environment' = $environment
+        'terminal.integrated.env.windows' = $environment
+    }
+}
+
 function Assert-IndependentContainerRuntime {
     [CmdletBinding()]
     param()
