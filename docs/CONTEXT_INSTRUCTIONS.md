@@ -9,6 +9,15 @@
 
 ## Active Delivery Process
 
+**Latest runner boundary, 2026-11-20:** subsequent normal hooks remain blocked
+by fork-start timeouts despite unchanged focused passes. The operator directed
+autonomous continuation. A Windows-only supported thread-pool mitigation now
+has two observed RED/GREEN policy tests, with explicit isolation and unchanged
+deadlines/coverage thresholds. Linux retains forks. The normal complete hook
+must prove 126 files/1,664 tests; focused comparisons are not full-run recovery.
+The parent has verified its owned bridge listener closed and both processes
+absent. Transport is intentionally offline; no Engine/WSL/data/Desktop change.
+
 **Current consolidation, 2026-11-20:** normal Validate push at 2cea0267 passes
 all gates: 6,259 API units/218 suites, 2,517 reduced-lane HTTP passes/42 skips,
 125 web files/1,662 tests and zero worker errors. The supported one-worker,

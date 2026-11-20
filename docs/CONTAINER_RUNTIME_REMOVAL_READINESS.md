@@ -497,6 +497,70 @@ required. Existing complete-inventory/zero-worker-error enforcement caught
 the recurrence and remains unchanged. Design disposition: accepted; changing
 pool isolation, deadlines or gate orchestration is not justified by these data.
 
+R35 subsequent recurrence, November 20 15:20 UTC: the normal 75aa9555 hook
+again passed static/API gates but failed eight fork startups. The web result
+was 117 files/1,474 passes and eight errors, not a complete pass. The causal
+receipt is release-push-1795183855482.txt/json. No owned worktree Node workers
+remained afterward. The exact eight unstarted files then passed unchanged
+under both supported explicit pools with one worker and compile cache
+disabled: 188 tests each, exit zero. Receipts are
+release-web-threads-diagnostic-1795188041536.json and
+release-web-forks-diagnostic-1795188209202.json. These bounded comparisons
+do not establish a pool, cache or operating-system root cause and cannot
+replace a complete gate. Blind complete retries stopped. A Windows-only
+supported thread-pool proposal needs an explicit scope decision before any
+repository configuration change; Linux CI, isolation, deadlines, complete
+inventory and coverage thresholds must not be weakened. Self-improvement:
+applied the bounded identical-input comparison and stopped the unproductive
+retry loop. Design disposition: accepted pending that decision; no speculative
+runner abstraction or application change was made.
+
+R35 runner mitigation, November 20 15:28 UTC: after the operator explicitly
+directed autonomous continuation, choose the supported thread pool only on
+Windows and retain forks on other platforms. Explicitly keep isolation true.
+Two new policy assertions were observed failing before the config edit and
+passing afterward. No deadline, test selector, assertion or coverage threshold
+was relaxed. Both preceding focused pool comparisons passed, so this is not
+proof that threads address the underlying OS-level cause. The next normal
+complete hook owns the mitigation and must execute 126 files/1,664 tests with
+zero worker errors; until then recovery remains pending. The standalone type
+check has 66 existing errors, below the 96 hook ceiling, with no error in the
+changed test/config. The editor test tool discovered no tests; direct Vitest
+execution supplied the actual RED/GREEN evidence. Self-improvement: applied
+an executable pool/isolation policy check rather than a private runner shim.
+Design disposition: accepted; two config properties use the existing runner
+and avoid a new abstraction, hook bypass or dependency change.
+
+R39, test harness / Low: directly importing the Vite config from the new
+source-tree policy test pulled tooling-only imports into the application
+TypeScript project. The first check had 68 errors, including two new
+module-resolution errors in the imported config. Replace that import with
+an anchored source-declaration contract for this static policy. The final
+focused run passes both tests and type-check returns to 66 existing errors,
+zero in the changed files. This fixes the test boundary, not application
+types. Earliest and actual detection: focused type-check before commit.
+The first summary of zero changed-file errors was corrected against the
+actual output before consolidation; a count below the legacy ceiling alone
+is not sufficient for a newly added file.
+
+Consolidation transcript reconciliation now includes the full 5,521-event
+boundary: 305 signal/narration candidates, zero missing result envelopes.
+The prior 4,792-event reconciliation is retained; all 46 subsequent candidates
+are classified as R35 recurrence/diagnostics, expected policy RED, editor
+test-discovery failure, type-check evidence or source/search/narration echoes.
+The PostgreSQL cleanup warning explicitly says fixture parameter cleanup
+failure and is followed by its passing regression; it is not an unclassified
+live cleanup. R39 was subsequently captured at its confirmed focused repair.
+Later hook/deployment events will need a new boundary before final signoff.
+
+Parent bridge cleanup is now separately verified: only the owned attached
+bridge shell was stopped after exact ownership checks. TCP port 22222 closed
+at 15:27:37.518 UTC and both recorded processes were absent at
+15:27:38.158 UTC. A bounded 19-probe wait took 4,661 ms; this is observed
+cleanup waiting, not an isolated relay-component latency. Engine, WSL,
+project containers, images, volumes and Desktop were not shut down or changed.
+The transport endpoint is intentionally offline until coordinated restart.
+
 ### Actual GUI execution issues and prevention
 
 These are the parent's separately reconciled GUI issues, not additional

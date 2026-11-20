@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 0.55.68 consolidation
 
+- Mitigate recurring Windows Vitest fork-start failures with the supported
+  thread pool on Windows only; retain forks elsewhere and explicitly keep
+  file isolation enabled. Two observed RED/GREEN policy tests increase the
+  expected complete inventory from 125 files/1,662 tests to 126/1,664.
+  Complete normal-hook recovery remains pending. No deadline, assertion or
+  coverage threshold changed; no OS-level root cause is claimed.
 - Target the normal next patch, 0.55.67 -> 0.55.68. Lockfiles are generated
   only by the existing public-registry CI workflow, never regenerated locally.
   Run 44663499790 generated the imported API/web bytes at exact source 2cea0267;

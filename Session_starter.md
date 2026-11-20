@@ -2,6 +2,26 @@
 
 ### Current Docker removal readiness, 2026-11-20
 
+Following the operator's direction to proceed autonomously, Windows now uses
+Vitest's supported thread pool; other platforms explicitly retain forks.
+Isolation is explicitly true. Two policy assertions fail before the change
+and pass afterward. No test deadline, selector or coverage threshold changed.
+This is a bounded runner mitigation, not an established OS-level diagnosis;
+the complete normal hook must still prove all 126 files/1,664 tests. The
+standalone type check reports 66 existing errors, below the hook's 96 ceiling,
+with none in the changed test/config. Parent verified its bridge listener
+closed and both owned processes absent at 15:27:38 UTC. No restart is requested.
+
+The next normal Validate push at 75aa9555 also failed: all static/API gates
+passed, but eight fork handshakes failed and only 117 web files/1,474 tests
+executed. No owned workers remained afterward. The exact eight files pass
+unchanged with both explicit forks and threads, one worker and compile cache
+disabled: 188 tests in each focused diagnostic. Neither focused pass proves
+full-run recovery or isolates a pool/cache/OS cause. Blind complete retries
+have stopped. The subsequent autonomous runner decision is recorded above.
+No PR or Azure write
+has occurred; remote remains 2cea0267.
+
 The latest complete retry at 9ca103f2 passed every static/API gate but failed
 three Vitest fork handshakes: 122 files/1,458 tests executed. All three exact
 unstarted files subsequently pass unchanged, 204 tests and exit zero. Supported
