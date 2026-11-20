@@ -483,6 +483,20 @@ status. Design disposition: accepted; no production change or new abstraction
 is justified by this execution interruption. The next normal complete hook
 owns the final source tip; PR, exact-tip CI and merged-source dev remain open.
 
+R35 recurrence, November 20 14:06 UTC: the normal 9ca103f2 hook passed every
+static gate, 218 API suites/6,259 tests and the reduced HTTP lane (2,517 passes,
+42 skips), but three fork handshakes failed. Only 122 web files/1,458 tests ran.
+The exact missing user-facing-copy, LogsPage and DiscoveryExplorerPage files
+then passed unchanged: three files/204 tests, exit zero, receipt
+release-web-workers-recurrence-1795183750583.json. This is not a complete web
+pass or proof the cache prevents recurrence. A post-run aggregate sample had
+28,140 MiB free RAM and 32 percent CPU load, which cannot explain historical
+handshake latency or prove a cause. No owned workers remained. Retain the full
+release-push-1795180429087.txt/json failure; another normal owning hook is
+required. Existing complete-inventory/zero-worker-error enforcement caught
+the recurrence and remains unchanged. Design disposition: accepted; changing
+pool isolation, deadlines or gate orchestration is not justified by these data.
+
 ### Actual GUI execution issues and prevention
 
 These are the parent's separately reconciled GUI issues, not additional

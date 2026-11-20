@@ -2,6 +2,12 @@
 
 ### Current Docker removal readiness, 2026-11-20
 
+The latest complete retry at 9ca103f2 passed every static/API gate but failed
+three Vitest fork handshakes: 122 files/1,458 tests executed. All three exact
+unstarted files subsequently pass unchanged, 204 tests and exit zero. Supported
+single-worker/cache settings helped previous runs but do not prevent recurrence.
+The host-level cause remains unproven; do not sum partial runs as full evidence.
+
 The subsequent lock/document commit bbcd6791 is not yet pushed. Its normal
 hook was interrupted across a logged 31,738.516-second wall-clock gap, then
 query-semantics HTTP cleanup rejected an expired token and 31 tests failed.
@@ -14,8 +20,8 @@ The complete normal Validate push now passes at 2cea0267: API 6,259 tests
 in 218 suites, the existing reduced HTTP lane 2,517 passes/42 skips, and
 all 125 web files/1,662 tests with zero worker errors. All hook gates are green.
 The exact remote task ref and upstream match. Supported single-worker execution
-and verified Node 24 compile-cache activation solved the non-coverage push
-startup problem without changing deadlines, isolation, assertions or thresholds.
+and verified Node 24 compile-cache activation allowed that non-coverage push
+to pass without changing deadlines, isolation, assertions or thresholds.
 Disable the compile cache for precise V8 coverage. CI run
 [44663499790](https://github.com/pranems/SCIMServer/actions/runs/44663499790)
 generated both 0.55.68 lockfiles at that exact SHA. Imported bytes are verified
