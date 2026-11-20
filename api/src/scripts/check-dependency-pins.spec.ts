@@ -31,6 +31,90 @@ import {
 import fs from 'fs/promises';
 import { dirname, resolve } from 'node:path';
 
+describe('Effect security remediation (GHSA-7589-6fvf-x4pw)', () => {
+  const vulnerableRange = '<= 3.22.0';
+
+  it('recognizes the affected boundary and recommends the minimal exact patch', () => {
+    expect(satisfiesGhsaRange('3.20.0', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('3.22.0', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('3.22.1', vulnerableRange)).toBe(false);
+    const advisory: PackageAdvisory = {
+      packageName: 'effect',
+      ghsaId: 'GHSA-7589-6fvf-x4pw',
+      cveId: 'CVE-2026-121707',
+      severity: 'high',
+      summary: 'TemplateLiteral matching can cause excessive backtracking on untrusted input',
+      vulnerableRanges: [vulnerableRange],
+      firstPatchedVersions: ['3.22.1'],
+    };
+    const findings = evaluatePins({ effect: '3.20.0' }, [advisory]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].recommendedVersion).toBe('3.22.1');
+    expect(evaluatePins({ effect: '3.22.1' }, [advisory])).toEqual([]);
+  });
+
+  it('pins the existing API override to the exact patched release', async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: Record<string, string>; dependencies: Record<string, string> };
+    expect(manifest.overrides.effect).toBe('3.22.1');
+    expect(manifest.dependencies.effect).toBeUndefined();
+  });
+
+  it('locks every actual Effect occurrence to the exact patch with public provenance', async () => {
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, { version: string; resolved?: string; integrity?: string }>;
+    };
+    const entries = Object.entries(lock.packages).filter(([path]) =>
+      /(?:^|\/)node_modules\/effect$/.test(path),
+    );
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [, entry] of entries) {
+      expect(entry.version).toBe('3.22.1');
+      expect(satisfiesGhsaRange(entry.version, vulnerableRange)).toBe(false);
+      expect(entry.resolved).toBe('https://registry.npmjs.org/effect/-/effect-3.22.1.tgz');
+      expect(entry.integrity).toMatch(/^sha512-[A-Za-z0-9+/]+=*$/);
+    }
+  });
+
+  it('resolves every real Effect owner to the installed patch without relying on dependency flags', async () => {
+    const lock = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package-lock.json'), 'utf8'),
+    ) as {
+      packages: Record<string, {
+        dependencies?: Record<string, string>;
+        optionalDependencies?: Record<string, string>;
+        peerDependencies?: Record<string, string>;
+      }>;
+    };
+    const owners = Object.entries(lock.packages).flatMap(([path, entry]) =>
+      ['dependencies', 'optionalDependencies', 'peerDependencies'].flatMap(kind => {
+        const range = entry[kind as keyof typeof entry]?.effect;
+        return range ? [{ path, kind, range }] : [];
+      }),
+    );
+    expect(owners).toEqual([
+      { path: 'node_modules/@prisma/config', kind: 'dependencies', range: '3.20.0' },
+    ]);
+    for (const { path, kind, range } of owners) {
+      const ownerPath = resolve(__dirname, '../..', path, 'package.json');
+      const owner = JSON.parse(await fs.readFile(ownerPath, 'utf8')) as {
+        dependencies?: Record<string, string>;
+        optionalDependencies?: Record<string, string>;
+        peerDependencies?: Record<string, string>;
+      };
+      expect(owner[kind as keyof typeof owner]?.effect).toBe(range);
+      const installedPath = require.resolve('effect/package.json', { paths: [dirname(ownerPath)] });
+      expect(installedPath).toBe(resolve(__dirname, '../../node_modules/effect/package.json'));
+      const installed = JSON.parse(await fs.readFile(installedPath, 'utf8')) as { version: string };
+      expect(installed.version).toBe('3.22.1');
+      expect(satisfiesGhsaRange(installed.version, vulnerableRange)).toBe(false);
+    }
+  });
+});
+
 describe('request-body security remediation (#256)', () => {
   it('gives every compatible iconv-lite owner one exact shared override context', async () => {
     const manifest = JSON.parse(

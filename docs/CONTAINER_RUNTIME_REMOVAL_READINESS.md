@@ -28,6 +28,150 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### Effect security recovery, 2026-11-20
+
+The isolated recovery branch
+`vprane/scimserver/containers-desktop-exit-cve-20261120` starts at
+`87fcbdc153e1e2ba2d13f4fe3af3d8adb519d559`. The original release-owner
+branch and draft PR #275 remain unchanged. The existing unshipped 0.55.68
+candidate is retained: this dependency correction completes that candidate,
+not a second unreleased version.
+
+**Confirmed blocker:** Build Test Image run 44791352333 passed validation
+and Windows runtime contracts but failed Trivy on Effect 3.20.0,
+CVE-2026-121707 / GHSA-7589-6fvf-x4pw, rated HIGH by that scanner.
+The [maintainer advisory](https://github.com/Effect-TS/effect/security/advisories/GHSA-7589-6fvf-x4pw)
+rates it Medium, affects versions <=3.22.0 and fixes it in 3.22.1.
+Its stated impact is excessive backtracking when untrusted input is decoded
+by a template with multiple String spans. The patch uses linear matching.
+This is not a claim that SCIMServer exposes that specific upstream path.
+
+Approved-proxy npm metadata verifies 3.22.1 publication
+2026-07-30T04:29:21Z and seven-day eligibility 2026-08-06T04:29:21Z.
+The [stable GitHub release](https://github.com/Effect-TS/effect/releases/tag/effect%403.22.1)
+was published 2026-07-30T04:29:42Z. No quarantine exception, registry change,
+ignore or security-gate weakening is needed.
+
+| Recovery boundary | Current evidence |
+|---|---|
+| Permanent manifest guard | RED: expected 3.22.1, received 3.20.0 before the manifest edit. |
+| Permanent graph guards | Actual lock and installed owner each reproduced 3.20.0 RED. Unchanged tests now GREEN after CI artifact import and fresh npm ci. |
+| Bootstrap | Normal Fast explicit-ref push passed all 27 gates in 652.7 seconds at `712ddcc7c8a0d4e19b1b463328004ebecef99c27`: 218 API suites / 6,261 tests; reduced HTTP 2,517 passes / 42 known skips. Not final locked dependency evidence. |
+| CI-generated API lock | API-only run `44800892630` SUCCESS at exact bootstrap head. Authenticated artifact `14660962893`; only Effect changed. |
+| Fresh installed tree | Approved-proxy npm ci installed 660 packages and preserved CI lock bytes. Four focused suites pass 67 tests in 8.525 seconds, including full npm-tree validity and actual Effect owner resolution. |
+| Final normal Validate push | Pending complete hook at the recovery tip. |
+| Exact recovery image | Pending nonshipping Build Test Image; no local Docker or shipping publication. |
+| Parent integration | Separate reviewed stacked PR and original exact-tip CI; not performed here. |
+
+**Execution RCA (security, HIGH):** the frozen exact override for Effect
+remained 3.20.0, so normal resolution could not float to the newly required
+patch. This repeats the already documented frozen-pin pattern, not a new
+application architecture defect. Trivy caught it at image validation before
+merge/deployment. The earliest deterministic regression boundary is the pin
+test; the existing scheduled advisory watcher remains the earlier discovery
+control. Updating the existing override and verifying actual locked, installed
+and imaged packages removes that dependency version, rather than hiding it.
+
+**Confirmed dependency fix:** public-registry CI lock run
+[44800892630](https://github.com/pranems/SCIMServer/actions/runs/44800892630)
+used exact bootstrap source `712ddcc7c8a0d4e19b1b463328004ebecef99c27`
+and unchanged workflow/API-only input. Artifact `14660962893` ZIP SHA-256
+`8e1c96c56606757d37a821c176464f9ada6433517eed246891b6c87b928ba8f2`
+matched GitHub's authenticated digest before extraction.
+Structural comparison across the complete package union proves exactly one
+changed entry, `node_modules/effect`: version, public URL and SHA-512 change;
+its dependencies and all other package/root metadata remain identical.
+All 684 API package entries retain public provenance/SHA-512; root and web
+locks remain unchanged. CI publication-age evidence records
+2026-07-30T04:29:21.637Z, 113.617 days old at regeneration.
+Imported API lock SHA-256 is
+`8539d1cd316ee2f8e9315bb60e02c2cf4075c40a35666a2e819abb2317a1abf2`,
+unchanged after fresh npm ci. Actual ownership is
+`prisma@7.8.0 -> @prisma/config@7.8.0 -> effect@3.22.1 overridden`.
+The restored exact graph-test drafts and all existing actual-consumer
+contracts pass together (4 suites / 67 tests). This resolves the version
+and bootstrap failures without admitting unrelated package drift.
+Image security verification remains a separate required claim.
+
+**Execution friction (tooling, LOW):** fresh checkout Jest/Vitest were absent,
+confirmed by the first focused validation commands. Owned baseline npm ci
+is the approved bootstrap prerequisite. One attempted log redirection used
+an invalid absolute destination and failed before installation; the corrected
+explicit session-artifact destination worked. No shared checkout was mutated.
+Both issues were caught at their first command, with no detection escape.
+
+**Bootstrap prerequisite (tooling, HIGH false-green risk):** the existing full-tree npm guard
+correctly rejects old installed Effect 3.20.0 after the manifest becomes
+3.22.1. The historical old-install bootstrap recipe predates this guard.
+No test was disabled or changed. An owned `npm install --no-save
+--package-lock=false --ignore-scripts --no-audit --no-fund`, with a seven-day
+`--before` cutoff and exact Effect 3.22.1 through the approved proxy, attempted
+the bootstrap without writing any tracked lock. It re-resolved the temporary
+installation (74 added, 46 removed, 605 changed), so it is explicitly not
+final graph evidence. Both existing pin and complete-tree suites then pass
+40 tests, but that was insufficient: the normal Fast push rejected the wider
+graph. All 25 static gates passed; API units reported 215 passing suites and
+3 failing suites, 6,256 passed / 5 failed of 6,261 tests, in 35.191 seconds.
+The entire blocked hook took 542.6 seconds and did not run the subsequent
+HTTP gate. Unrelated Prisma advanced 7.8.0 -> 7.10.1, the superagent qs owner
+range changed ^6.14.1 -> ^6.17.1, and the full tree contained invalid
+mime-types 3.0.2. No branch was published.
+
+The next clean npm ci with the new manifest stopped at EUSAGE:
+`Invalid: lock file's effect@3.20.0 does not satisfy effect@3.22.1`.
+The local attempted bootstrap commit is
+`67d20333711c825400f455d70625dd080da4d9c2`.
+The temporary installation was discarded by owned npm ci against the
+temporarily restored original manifest; the intended 3.22.1 manifest was
+then reinstated. Baseline Prisma 7.8.0 and Effect 3.20.0 are installed, and
+all three tracked locks remain unchanged. Permanent actual-lock and
+installed-owner tests each now fail explicitly on 3.20.0 (2 failed,
+2 passed Effect cases; other cases intentionally unselected).
+
+**Observed circularity:** publishing the changed manifest requires a valid owned
+graph, but the sanctioned CI lock workflow requires that manifest to have
+been normally published first. The historical bootstrap recipe predates the
+complete-tree guard. An approved bootstrap prerequisite is needed; changing
+the guard, filtering these failures, editing a lock locally or directly
+writing the remote ref is not an acceptable resolution. The first full
+unit gate caught the drift. The earliest possible gate was the complete
+advisory-consumer/Prisma-parent focused set, not just the two initially
+selected pin/context suites. Include that set in bootstrap preflight.
+Final acceptance still requires the minimal CI lock artifact, clean owned
+npm ci, complete normal Validate and fresh nonshipping image Trivy evidence.
+
+**Authorized distinct prerequisite:** the parent explicitly allowed moving
+only this worktree's existing API lock outside npm resolution scope and
+restoring it byte-identically. The manifest-only command
+`npm install --package-lock=false --ignore-scripts --no-audit --no-fund`,
+retaining the seven-day `--before` cutoff and the approved proxy, changed
+one package in 22 seconds. No explicit package argument was supplied.
+The restored API lock SHA-256 is
+`e1d38857578890934d3c19db56d672633ae8d362c55f7d99056e5e927844bb57`.
+Actual Prisma remains 7.8.0 and Effect becomes 3.22.1; no direct Effect
+dependency was added. The unchanged complete-tree, API advisory-consumer and
+Hono-parent specs pass all 34 tests across three suites in 6.621 seconds.
+This verifies the owned bootstrap prerequisite, not the final CI lock.
+The earlier command's existing-lock influence is not proven: it also supplied
+an explicit Effect package argument, so the two attempts differ in both respects.
+
+**Test/gate self-improvement: applied.** Add permanent advisory-boundary,
+exact manifest and actual graph regressions in the existing pin spec, without
+disabling a failing test during bootstrap. The rejected bootstrap demonstrates
+why existing actual-consumer guards must run together before another full
+hook attempt. **Design disposition: accepted.**
+The existing exact override, watcher and CI artifact route are sufficient;
+another dependency abstraction would be speculative.
+
+**Staged test delivery:** the exact manifest regression is committed and
+active during bootstrap, as are all previously committed complete-tree and
+consumer guards. Two prematurely authored, uncommitted graph-test drafts
+already produced exact 3.20.0 RED receipts. They are retained unchanged with
+that output for the final CI-artifact stage, not used to certify bootstrap.
+No existing guard, hook selector or configuration changes. The final change
+must reapply both tests, import the authenticated lock and freshly restore
+the installation before any locked/installed dependency GREEN claim.
+
 | Evidence boundary | Date | Meaning |
 |---|---|---|
 | Initial closing addendum | Earlier November 18 trial | Historical receipt, not the current readiness decision. |
