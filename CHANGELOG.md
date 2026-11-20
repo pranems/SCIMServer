@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Target the normal next patch, 0.55.67 -> 0.55.68. Lockfiles are generated
   only by the existing public-registry CI workflow, never regenerated locally.
+  Run 44663499790 generated the imported API/web bytes at exact source 2cea0267;
+  verification proves version metadata only, public registry and sha512.
   Publication, exact-tip review/CI and Azure dev are not yet completed.
 - Make the actual standalone builder fail closed for API/web/production
   installation, Prisma generation and web compilation. Remove the npm install
@@ -33,15 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reload, individual lifecycle/logs and Windows-created Compose lifecycle
   pass; fixtures and isolated GUI/CDP are cleaned up. Linux-created group
   paths retain their explicit Windows limitation. Generic GUI Up/build/watch,
-  cold bridge startup and operator visual acceptance are not claimed.
+  and operator visual acceptance are not claimed. A later actual cold-transport
+  GUI startup passes: absent listener/failed tree, real startup task, same
+  daemon/image and recovered repository, then listener/GUI/CDP cleanup.
+  This does not claim cold WSL/Engine reboot.
 - Preserve failed consolidation gates: the full hook's API units now pass
   6,259 tests/218 suites; its existing reduced in-memory HTTP lane passes 2,517
   tests with 42 skips. The web worker-start failure is not a full web pass.
   The two-worker full attempt passes 118 files/1,370 tests but still has seven
   bootstrap errors. All exact seven files/292 tests pass sequentially.
-  The owning complete single-worker hook and final merged-source matrix remain
-  required; no test, bootstrap timeout or threshold was weakened. The private
-  outer Git orchestration budget is corrected separately.
+  A subsequent one-worker attempt still had one startup error; its 90 missing
+  tests were not counted as passed. The complete normal hook at 2cea0267 then
+  passes all 125 files/1,662 web tests with verified Node 24 compile-cache
+  activation and zero unhandled errors. No test, bootstrap timeout, isolation
+  or threshold was weakened. The cache is private non-coverage optimization;
+  disable it for precise V8 coverage. The private outer Git orchestration
+  budget is corrected separately. Final merged-source matrix remains open.
+- Remove only the exact uniquely labelled tmpfs qualification PostgreSQL ID
+  after clean exit zero; verify absence. Preserve all originals and backups.
+  Test/gate improvement applied: full inventory/error counts and explicit
+  feature activation, not summed partial runs. Design disposition accepted:
+  reuse existing workflow, runtime helper and foreground task without new
+  runtime selection or service abstractions.
 
 ### Current Docker Desktop removal readiness, November 19
 

@@ -73,7 +73,7 @@ November 19 application correction or a new Azure deployment.
 | Graphical management | PASS for measured scope, November 20 | Actual image/OCI-label inspection, all 49 volume names and read-only metadata, individual lifecycle/logs, exact independent emitted executable, real-repository reload, and new Windows-created Compose Start/healthy, Logs/ready, Stop/refreshed Exited(0) pass. All GUI fixtures and the isolated GUI/CDP process were removed. Historical Linux-created group commands remain a documented Windows-cwd limitation; generic GUI Up/build/watch and registry publication are not qualified. |
 | Image metadata and retention | CORRECTED, local source | Ten metadata/caller checks pass after reproducing the dispatch-publisher omission and absent automatic contract execution. The pre-consolidation inventory had five records; the added nonshipping local qualification image is retained. No repository needed pruning. New authoritative publication/label/digest readback remains pending. |
 | Automatic offline runtime gate | PASS, consolidation source 17ac92ef | The complete hook passes all seven offline suites, including the six new GUI-settings cases. Pre-push, dev Stage 1.14 and Windows/Node 24 CI call the common runner; CI image publication depends on that job. Hosted CI execution itself remains pending. |
-| Normal startup/reconnect workflow | PARTIAL | Actual GUI reload reconnects to the real repository with no connection-warning placeholder. Cold GUI bridge-startup-task and explicit operator visual acceptance remain open; the shared bridge was intentionally not interrupted. |
+| Normal startup/reconnect workflow | PASS for measured transport/GUI scope | Actual cold transport starts from verified listener absence and failed GUI tree; the real startup task restores the exact repository and same daemon/image. Owned GUI task/listener/GUI/CDP cleanup passes. Not a WSL/Engine reboot; explicit operator visual acceptance remains open. |
 | Documentation | PASS, focused November 19 | Freshness/coupling: all 27 docs; infrastructure: all 13 elements covered; 55 literal JSON blocks parse; links/style pass. New report diagrams render in strict light/dark Chromium. |
 | Final ordered pipeline | OPEN | Must record each applicable gate and consolidate changed-source evidence. |
 | Azure dev | OPEN | Existing registry-selected service-principal session verified; no certificate sign-in initiated. Deploy only at the proper reviewed-source gate. |
@@ -199,6 +199,9 @@ not CLI substitutes. Final parent-owned reload/Compose/volume/cleanup receipts n
 bounded scope below. They do not establish cold bridge startup or operator
 visual acceptance.
 
+The later coordinated cold-transport test below supersedes only the earlier
+cold-start hold. Explicit operator visual acceptance remains open.
+
 ### Actual GUI completion and host-path boundary, November 20
 
 | Measured outcome | Result and evidence |
@@ -227,15 +230,38 @@ not generic SCIM Compose Up/build/watch. Continue to activate the project
 runtime preflight and approved daemon-side source/log roots for the application.
 The read-only settings-generation receipt used the existing workspace without
 mount overrides; it is not evidence that GUI application bind mounts work.
-Registry authentication/publication, cold bridge startup, final release/dev and
+Registry authentication/publication, final release/dev and
 explicit operator visual acceptance remain separate gates.
 
 In that window use **Terminal > Run Task > SCIMServer: start independent
 Engine bridge**, then open the **Containers** view. The task runs the existing
 foreground startup helper in a dedicated terminal, permits only one instance,
 and does not install an autostart/system-wide service. Keep that terminal open
-while using the SSH route. Actual Explorer/reload acceptance above passes;
-cold bridge-startup-task acceptance remains pending.
+while using the SSH route. Actual Explorer/reload acceptance above passes.
+
+### Actual cold-transport startup, November 20, 01:55-02:02 UTC
+
+During a coordinated container-work pause, the parent stopped only its old
+bridge and proved loopback 22222 absent. Isolated GUI 91852 then displayed a
+real failed-connect tree. Actual Tasks: Run Task selected the existing
+`SCIMServer: start independent Engine bridge` task. Its terminal reported
+listening on 127.0.0.1:22222 and the Images view recovered the exact
+`scimserver-exit` repository without a failure placeholder.
+
+Independent readback retained daemon
+`68f34f63-05bc-488a-b093-402808b594b2`, Ubuntu 24.04.5/Engine 29.1.3 and image
+`sha256:e5b02bc608cd6caca71577d344e56ce71f026e44d737823c34c925b47dbdfe52`.
+The verified GUI-owned task was closed through terminal UI, its listener was
+proved absent, and GUI 91852/CDP 19333 were verified closed. The parent restored
+its separately owned attached bridge for release work; coordinate before
+stopping it. This proves cold transport/GUI, not cold WSL/Engine reboot or a
+SCIM application restart. No original project/container/data changed.
+
+Receipts include `container-tools-bridge-offline.*`,
+`container-tools-bridge-task-start.*`, `container-tools-bridge-reconnect.*` and
+`container-tools-bridge-task-stop.*` under the ignored screenshot directory,
+the private `readiness-gui-cold-bridge.json`, and
+`test-results/readiness-post-cold-gui-bridge.txt`.
 
 The earlier owned `scim-readiness-pg` comparison container was stopped cleanly
 after qualification; its volume is retained. New GUI acceptance used fresh
@@ -444,6 +470,9 @@ They do not change the earlier receipt or imply that release/dev gates passed.
 | R31 | Reconciliation harness / Low | The first private transcript scanner assumed every tool completion had a result and threw on matchAll. The rejected message instead carried an error envelope. | Scan result OR error, explicitly inventory unavailable envelopes and require zero unexplained omissions. The corrected two-pass scan covers all tool types and assistant narration. Earliest gate: validate heterogeneous transcript envelopes before claiming completeness. |
 | R32 | Evidence harness / Low | A generic process receipt reused the semantic GUI-settings receipt filename and replaced its richer evidence. | Use distinct process and semantic filenames, rerun the small read-only check, and retain both artifacts. Real Engine generation passes without writing the workspace. Earliest gate: give evidence producers unique output identities rather than inferring semantic proof from exit status. |
 | R33 | Outer orchestration / Low | The private runner killed Git at its arbitrary 30-minute orchestration deadline while the unchanged child hook was still running. The hook later failed its seven web startups after 1,853.7 seconds. | Waited for the existing child hook to finish and retained both process-timeout and late failed-hook receipts; no overlapping suite or successful push was claimed. Increase only the private whole-push budget to two hours. No repository gate, individual test deadline or Vitest's fixed bootstrap timeout changes. Earliest gate: budget the aggregate owning command separately from its component test deadlines. |
+| R34 | Cleanup harness / Low | A valid tmpfs destination had an empty option string; a truthiness guard incorrectly rejected it before deletion. | Check key presence with Object.hasOwn while retaining exact full ID, both task/run labels, no persistent mounts and post-removal absence. Exact owned PostgreSQL stopped at exit zero and was removed. Earliest detection was the fail-closed pre-delete guard; no destructive escape occurred. Receipt: release-owned-pg-cleanup.json. |
+| R35 | Worker startup / Medium, recovered | Complete one-worker hook passed 124 files/1,572 tests but one fork never started its 90 tests within the unchanged handshake limit. Exact OS cause is not established. | Supported Node 24 compile cache was explicitly activated; the focused 90 pass, then the complete normal hook passes all 125 files/1,662 tests with zero unhandled errors. No deadline, isolation, selector or threshold changed. Earliest prevention: require complete inventory and zero worker errors, never sum partial runs. Disable compile cache for precise V8 coverage. |
+| R36 | Harness environment / Low | Empty NODE_DISABLE_COMPILE_CACHE still disabled activation; the pre-test probe refused to run. | Omit the disabling variable and require getCompileCacheDir to return the owned cache directory. Focused 90 and complete hook pass. Earliest gate: explicit activation before claiming an optimization; absent and empty environment values are not interchangeable. |
 
 ### Actual GUI execution issues and prevention
 
@@ -464,12 +493,15 @@ unclassified application defects. G1/G2 also explain R26 above.
 | G10 | Acceptance strength / Medium | Backend exit zero preceded a stale healthy GUI row. | Await refreshed healthy/Exited(0) GUI outcomes; repeat with a fresh isolated fixture and inspect the final screenshot. |
 | G11 | Tool transport / Low | Complex shell calls sometimes returned empty exit zero; cause remains unknown. | Existing Node driver plus explicit sentinels/receipts; do not invent a transport root cause. |
 | G12 | Coordination/lookup / Low | Wrong host-chat URI, accumulated milestones, an incorrect failure suffix and a broad glob obscured evidence. | Use the actual returned URI, one consolidated handoff and deterministic capture paths; cancel only owned pending messages. |
+| G13 | Teardown timing / Low | Two immediate port probes raced asynchronous relay teardown after GUI-task termination. | Private harness now waits boundedly for the unchanged real listener-absence criterion. Actual closure passes. The delaying component and latency were not isolated or measured; do not infer synchronous cleanup from a kill request. |
 
-Parent GUI provenance: the final full-event reconciliation contains 9,560
-events, phase start 7,313, 64 GUI-driver attempts and 22 execution-error signals,
-all mapped to G1-G12. The earlier detailed prose snapshot contained 9,505
-events. These are attempts/signals, not passed requirements or independent
-defect counts. The separate narration pass found no matching prose; actual
+Parent GUI provenance: the final machine-readable full-event reconciliation
+contains 10,072 events, 70 GUI-driver attempts, 27 execution signals and one
+narration signal, all classified across G1-G13 or explicit non-issues.
+Earlier 9,560/64/22 and detailed 10,044-event snapshots are dated boundaries,
+not the final counts. G5 also covers cold view activation; G8 covers a
+scrolled-away bridge-task header. These are attempts/signals, not passed
+requirements or independent defect counts. Actual
 successful-looking output/captures were also reviewed for G1/G2/G4/G10 because
 an error-word scan cannot catch those false greens. Source/history/search
 echoes, line-wrapped readiness and initial inventory lag are explicitly
@@ -507,6 +539,32 @@ then pass sequentially, 292 tests; complete single-worker hook evidence is
 still required. An E2E worker forced-exit warning is retained rather than
 misrepresented as proof of clean test-worker teardown.
 
+The later complete normal Validate push at
+`2cea026769d74153d555d6d0bb39de8fd3bc6a0b` passes every gate: API 218 suites/
+6,259 tests; existing reduced HTTP lane 2,517 passes/42 skips; web all 125 files/
+1,662 tests and zero unhandled errors. Receipt
+`test-results/release-push-1795140499130.txt` ends All gates GREEN and process
+status zero. Explicit remote task-ref/upstream readback matches that SHA.
+Private one-worker/cache activation changes no repository test settings.
+
+CI-only [lockfile generation 44663499790](https://github.com/pranems/SCIMServer/actions/runs/44663499790)
+completed successfully on that exact head. Download provenance, public-registry/
+sha512 checks, empty dependency/publication-age delta and deep version-only
+comparison pass before importing both 0.55.68 lockfiles. No local generation.
+This subsequent lock/doc commit requires its own normal hook and exact-tip CI.
+Reviewed PR/merge, immutable publication and Azure dev remain open.
+
+The disposable qualification PostgreSQL full ID
+`781a3a24d2555fc7aa3e9bb5015eb020efe73033f31ed2312c446a2ed8a295d0`
+was verified owned/tmpfs, stopped at exit zero, removed by exact ID and proved
+absent. No original data or bridge was removed.
+
+Cross-chat coordination is now verified through the actual parent route and
+steering acknowledgments. Earlier accepted queued messages did not establish
+timely delivery; obsolete owned pending messages were cancelled. Retain the
+queue-versus-active-steering distinction rather than repeatedly enqueueing
+milestones behind a running turn.
+
 Independent read-only source review of 17ac92ef against master
 3bee7a3c22992af9a08fde8e36fc398fc37b2b48 reports no significant findings.
 It inspected the changed runtime/build/publisher/test surfaces, did not run
@@ -521,6 +579,15 @@ the scanner's own echo. No tool-result/error envelope was omitted. The private
 candidate index preserves event numbers and bounded excerpts. Later GUI,
 push, CI and deployment events still require their own final reconciliation;
 this is not a claim that the release is complete.
+
+**Extended consolidation reconciliation:** the full available 4,114-event
+transcript was scanned in both signal and narration passes; all 212 candidates
+were reviewed through this boundary, with zero missing result/error envelopes.
+New causal results map to R34-R36; source/dependency reads, prior-report echoes,
+expected negative controls, retained test diagnostics and self-search output
+are dismissed explicitly rather than counted as new failures. The full
+successful hook is a separate receipt, not a relabelled partial run. Later
+commit/CI/deployment events still need reconciliation before final signoff.
 
 **Test/gate self-improvement: applied.** The clean builder now fails at the
 actual failing native stage without silently regenerating a lockfile; the

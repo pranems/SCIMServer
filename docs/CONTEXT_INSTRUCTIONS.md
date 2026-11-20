@@ -2,12 +2,28 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.68
-> **Last Updated**: November 19, 2026
-> **Last verified:** 2026-11-19
+> **Last Updated**: November 20, 2026
+> **Last verified:** 2026-11-20
 
 ---
 
 ## Active Delivery Process
+
+**Current consolidation, 2026-11-20:** normal Validate push at 2cea0267 passes
+all gates: 6,259 API units/218 suites, 2,517 reduced-lane HTTP passes/42 skips,
+125 web files/1,662 tests and zero worker errors. The supported one-worker,
+verified Node compile-cache setup changes no test deadlines or thresholds;
+disable that cache for precise V8 coverage. CI run
+[44663499790](https://github.com/pranems/SCIMServer/actions/runs/44663499790)
+generated both 0.55.68 lockfiles at the exact pushed SHA; verified imported
+bytes change only version metadata, not dependency content. No local generation.
+Actual GUI cold-transport startup now passes through the existing startup task
+from an absent listener and failed tree to the same daemon/image and recovered
+repository, then owned GUI/task cleanup. This is not a WSL/Engine cold reboot.
+The replacement shared bridge remains parent-owned. The exact disposable
+qualification database was removed and verified absent. Reviewed PR/exact-tip
+CI, merged-source matrix, immutable publication, Azure dev and explicit operator
+visual acceptance remain open. Earlier paragraphs below are dated history.
 
 **Current removal readiness, 2026-11-19:** the
 [current Markdown dashboard](CONTAINER_RUNTIME_REMOVAL_READINESS.md) supersedes
