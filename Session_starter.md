@@ -9,11 +9,21 @@ GHSA-7589-6fvf-x4pw (HIGH in Trivy; Medium in the maintainer advisory).
 The existing exact override moves to 3.22.1. Its approved-proxy publication
 is 2026-07-30T04:29:21Z, eligible 2026-08-06T04:29:21Z.
 The permanent manifest regression was observed RED on 3.20.0.
-The old-lock npm ci installation was rejected by the unchanged full npm-tree
-guard after the manifest edit. A temporary owned, no-save installation with
-package-lock writing disabled prepares the bootstrap; tracked locks remain
-unchanged. This re-resolved bootstrap is not final locked dependency evidence.
-Final CI-lock npm ci and nonshipping image evidence remain pending.
+The old installation is rejected by the unchanged full npm-tree guard after
+the manifest edit. Temporary owned no-save/package-lock=false resolution was
+also rejected by the normal Fast hook: 25 static gates passed, but unrelated
+Prisma/qs/mime-types drift caused 5 failed API tests (6,256 passed).
+Clean npm ci with the new manifest and old lock fails EUSAGE on Effect.
+No branch was published. Owned baseline Prisma 7.8.0/Effect 3.20.0 was restored
+using the temporarily restored original manifest, then the intended 3.22.1
+manifest was reinstated. Every tracked lock remains unchanged.
+Permanent lock and installed-owner guards are now RED on actual 3.20.0.
+The parent-authorized manifest-only install with the old API lock temporarily
+outside resolution then changed one package, kept Prisma 7.8.0 and installed
+Effect 3.22.1. Exact lock byte identity was verified. All three existing
+complete-tree/advisory-consumer/Hono-parent specs pass 34 tests.
+Normal bootstrap publication and final CI lock evidence remain pending;
+no hook, guard, lock policy or quarantine control was bypassed.
 Keep the unshipped 0.55.68 candidate; a second unreleased version is unnecessary.
 No merge, deployment, Desktop removal or runtime/configuration changes are authorized.
 See [current receipts and RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).

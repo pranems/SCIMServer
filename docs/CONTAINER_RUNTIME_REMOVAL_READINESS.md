@@ -55,8 +55,9 @@ ignore or security-gate weakening is needed.
 | Recovery boundary | Current evidence |
 |---|---|
 | Permanent manifest guard | RED: expected 3.22.1, received 3.20.0 before the manifest edit. |
-| Bootstrap | Old tracked lock retained. Temporary owned no-save installation only; not final locked dependency GREEN. |
-| CI-generated API lock | Pending through the existing `regen-lockfile.yml` API selection. |
+| Permanent graph guards | RED on the actual lock and every installed owner: expected 3.22.1, received 3.20.0. |
+| Bootstrap | Authorized manifest-only no-lock route corrected the owned installation with one package change. Existing consumer guards pass 34 tests. Normal publication still pending. |
+| CI-generated API lock | Pending normal bootstrap publication and the existing `regen-lockfile.yml` API selection. |
 | Fresh installed tree | Pending unchanged artifact import and approved-proxy npm ci. |
 | Exact recovery image | Pending nonshipping Build Test Image; no local Docker or shipping publication. |
 | Parent integration | Separate reviewed stacked PR and original exact-tip CI; not performed here. |
@@ -77,24 +78,77 @@ an invalid absolute destination and failed before installation; the corrected
 explicit session-artifact destination worked. No shared checkout was mutated.
 Both issues were caught at their first command, with no detection escape.
 
-**Bootstrap prerequisite (tooling, Medium):** the existing full-tree npm guard
+**Bootstrap prerequisite (tooling, HIGH false-green risk):** the existing full-tree npm guard
 correctly rejects old installed Effect 3.20.0 after the manifest becomes
 3.22.1. The historical old-install bootstrap recipe predates this guard.
 No test was disabled or changed. An owned `npm install --no-save
 --package-lock=false --ignore-scripts --no-audit --no-fund`, with a seven-day
-`--before` cutoff and exact Effect 3.22.1 through the approved proxy, prepares
-the bootstrap without writing any tracked lock. It re-resolves the temporary
+`--before` cutoff and exact Effect 3.22.1 through the approved proxy, attempted
+the bootstrap without writing any tracked lock. It re-resolved the temporary
 installation (74 added, 46 removed, 605 changed), so it is explicitly not
 final graph evidence. Both existing pin and complete-tree suites then pass
-40 tests. Final acceptance still requires the minimal CI lock artifact and
-a clean owned npm ci. This separates bootstrap installation from the artifact
-that will be reviewed and shipped; it does not waive quarantine or graph checks.
+40 tests, but that was insufficient: the normal Fast push rejected the wider
+graph. All 25 static gates passed; API units reported 215 passing suites and
+3 failing suites, 6,256 passed / 5 failed of 6,261 tests, in 35.191 seconds.
+The entire blocked hook took 542.6 seconds and did not run the subsequent
+HTTP gate. Unrelated Prisma advanced 7.8.0 -> 7.10.1, the superagent qs owner
+range changed ^6.14.1 -> ^6.17.1, and the full tree contained invalid
+mime-types 3.0.2. No branch was published.
+
+The next clean npm ci with the new manifest stopped at EUSAGE:
+`Invalid: lock file's effect@3.20.0 does not satisfy effect@3.22.1`.
+The local attempted bootstrap commit is
+`67d20333711c825400f455d70625dd080da4d9c2`.
+The temporary installation was discarded by owned npm ci against the
+temporarily restored original manifest; the intended 3.22.1 manifest was
+then reinstated. Baseline Prisma 7.8.0 and Effect 3.20.0 are installed, and
+all three tracked locks remain unchanged. Permanent actual-lock and
+installed-owner tests each now fail explicitly on 3.20.0 (2 failed,
+2 passed Effect cases; other cases intentionally unselected).
+
+**Observed circularity:** publishing the changed manifest requires a valid owned
+graph, but the sanctioned CI lock workflow requires that manifest to have
+been normally published first. The historical bootstrap recipe predates the
+complete-tree guard. An approved bootstrap prerequisite is needed; changing
+the guard, filtering these failures, editing a lock locally or directly
+writing the remote ref is not an acceptable resolution. The first full
+unit gate caught the drift. The earliest possible gate was the complete
+advisory-consumer/Prisma-parent focused set, not just the two initially
+selected pin/context suites. Include that set in bootstrap preflight.
+Final acceptance still requires the minimal CI lock artifact, clean owned
+npm ci, complete normal Validate and fresh nonshipping image Trivy evidence.
+
+**Authorized distinct prerequisite:** the parent explicitly allowed moving
+only this worktree's existing API lock outside npm resolution scope and
+restoring it byte-identically. The manifest-only command
+`npm install --package-lock=false --ignore-scripts --no-audit --no-fund`,
+retaining the seven-day `--before` cutoff and the approved proxy, changed
+one package in 22 seconds. No explicit package argument was supplied.
+The restored API lock SHA-256 is
+`e1d38857578890934d3c19db56d672633ae8d362c55f7d99056e5e927844bb57`.
+Actual Prisma remains 7.8.0 and Effect becomes 3.22.1; no direct Effect
+dependency was added. The unchanged complete-tree, API advisory-consumer and
+Hono-parent specs pass all 34 tests across three suites in 6.621 seconds.
+This verifies the owned bootstrap prerequisite, not the final CI lock.
+The earlier command's existing-lock influence is not proven: it also supplied
+an explicit Effect package argument, so the two attempts differ in both respects.
 
 **Test/gate self-improvement: applied.** Add permanent advisory-boundary,
 exact manifest and actual graph regressions in the existing pin spec, without
-disabling a failing test during bootstrap. **Design disposition: accepted.**
+disabling a failing test during bootstrap. The rejected bootstrap demonstrates
+why existing actual-consumer guards must run together before another full
+hook attempt. **Design disposition: accepted.**
 The existing exact override, watcher and CI artifact route are sufficient;
 another dependency abstraction would be speculative.
+
+**Staged test delivery:** the exact manifest regression is committed and
+active during bootstrap, as are all previously committed complete-tree and
+consumer guards. Two prematurely authored, uncommitted graph-test drafts
+already produced exact 3.20.0 RED receipts. They are retained unchanged with
+that output for the final CI-artifact stage, not used to certify bootstrap.
+No existing guard, hook selector or configuration changes. The final change
+must reapply both tests, import the authenticated lock and freshly restore
+the installation before any locked/installed dependency GREEN claim.
 
 | Evidence boundary | Date | Meaning |
 |---|---|---|

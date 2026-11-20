@@ -14,8 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GHSA-7589-6fvf-x4pw. Trivy rated it HIGH and blocked image run 44791352333
   before merge/deployment; the maintainer advisory rates it Medium.
   The permanent pin regression was RED before the manifest change.
+  Permanent actual-lock and installed-owner guards also reproduce 3.20.0 RED.
+  The first normal bootstrap hook blocked an unaccepted temporary graph; clean
+  npm ci rejects the manifest/old-lock mismatch. The authorized manifest-only
+  no-lock preparation changes only installed Effect and retains the old lock.
   CI lock regeneration, fresh installed-tree and nonshipping image validation
-  are pending, not inherited from older green receipts. Retain the already
+  are pending the normal bootstrap and verified CI artifact, not inherited from
+  older green receipts. Retain the already
   pending 0.55.68 candidate rather than inventing a second unreleased bump.
   See [recovery evidence](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
 
