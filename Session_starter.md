@@ -2,6 +2,14 @@
 
 ### Current Docker removal readiness, 2026-11-20
 
+The subsequent lock/document commit bbcd6791 is not yet pushed. Its normal
+hook was interrupted across a logged 31,738.516-second wall-clock gap, then
+query-semantics HTTP cleanup rejected an expired token and 31 tests failed.
+Host sleep is not proven. The unchanged exact suite now passes all 42 tests
+with exit zero in a fresh focused run. No application/token/test setting changed.
+The failed full run and outer timeout remain evidence; a new normal complete
+Validate push is required. The remote still points to 2cea0267.
+
 The complete normal Validate push now passes at 2cea0267: API 6,259 tests
 in 218 suites, the existing reduced HTTP lane 2,517 passes/42 skips, and
 all 125 web files/1,662 tests with zero worker errors. All hook gates are green.
