@@ -29,14 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   container/Compose command paths and both environments through the existing
   activation/preflight helper. Six new RED/GREEN settings contracts pass
   alongside 34 existing runtime cases; real Engine generation passes read-only.
-  GUI Start/logs prove the independent executable, while final parent-owned
-  reload/Compose/cleanup acceptance remains open.
+  Actual GUI image labels, all 49 volume names/metadata, exact repository
+  reload, individual lifecycle/logs and Windows-created Compose lifecycle
+  pass; fixtures and isolated GUI/CDP are cleaned up. Linux-created group
+  paths retain their explicit Windows limitation. Generic GUI Up/build/watch,
+  cold bridge startup and operator visual acceptance are not claimed.
 - Preserve failed consolidation gates: the full hook's API units now pass
   6,259 tests/218 suites; its existing reduced in-memory HTTP lane passes 2,517
   tests with 42 skips. The web worker-start failure is not a full web pass.
-  Three representative files/209 tests pass with supported two-worker
-  concurrency. The owning complete updated-tip hook and final merged-source
-  matrix remain required; no test, timeout or threshold was weakened.
+  The two-worker full attempt passes 118 files/1,370 tests but still has seven
+  bootstrap errors. All exact seven files/292 tests pass sequentially.
+  The owning complete single-worker hook and final merged-source matrix remain
+  required; no test, bootstrap timeout or threshold was weakened. The private
+  outer Git orchestration budget is corrected separately.
 
 ### Current Docker Desktop removal readiness, November 19
 

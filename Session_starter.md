@@ -25,7 +25,18 @@ carries Compose mount roots to both environments. Six new settings contracts
 and 34 existing runtime cases pass, plus read-only real Engine generation.
 The prior in-flight hook was cancelled for this material source correction;
 the complete updated-tip hook must run normally. Final parent-owned
-reload/Compose/cleanup acceptance remains open. Actual local active-SSE SIGTERM
+reload/Compose/cleanup acceptance now passes in the measured GUI scope:
+all 49 volume names/metadata, image labels, exact real-repository reconnect,
+individual lifecycle/logs and Windows-created Compose Start/healthy,
+Logs/ready and Stop/refreshed Exited(0). Linux-created group commands retain
+a Windows-cwd limitation; generic GUI Up/build/watch, cold bridge startup
+and explicit operator visual acceptance are not claimed. The isolated GUI/CDP
+and all its fixtures are removed; the shared bridge stays available.
+Source review at 17ac92ef reports no significant findings.
+The complete two-worker hook still has seven web bootstrap errors despite
+118 files/1,370 tests passing. All exact seven files/292 tests pass with one
+worker. The next normal complete hook uses that supported budget and a longer
+private whole-push budget, not changed test deadlines. Actual local active-SSE SIGTERM
 exits 0 in 1,035 ms, with durable
 final logging and restarted original-ID readback. Azure identity/ARM readback
 passes using the existing registry-selected principal; no cloud writes.

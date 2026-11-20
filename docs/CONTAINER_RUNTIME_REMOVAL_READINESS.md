@@ -1,6 +1,6 @@
 # Docker Desktop removal readiness
 
-**Last verified:** 2026-11-19
+**Last verified:** 2026-11-20
 **Status:** In progress. Local corrections are tested; consolidated release and Azure dev gates remain open.
 **Product baseline:** 0.55.67
 **Deadline from the supplied notice:** December 2, 2026
@@ -70,10 +70,10 @@ November 19 application correction or a new Azure deployment.
 | Packaged migration/configuration | PASS, focused November 19 qualification | Four launchers select the packaged Prisma 7 configuration and stop on migration failure. The actual Prisma package applies all 30 migrations to a fresh owned Engine database, starts successfully, passes 1,845 live checks and the user/group browser roundtrip. Failure-path contracts have 54 assertions. |
 | Clean standalone installation | PASS, November 19 consolidation | Actual builder installs 660 API and 256 production packages, builds the current web application and produces a 445.9 MB package. Both source lockfile hashes remain unchanged. The clean package applies all 30 migrations to a new uniquely labelled tmpfs Engine database on an assigned loopback port, passes 1,845 reported live checks and the owned user/group browser roundtrip. The package still identifies the 0.55.67 pre-version-bump source; this is clean-install proof, not a published 0.55.68 artifact. |
 | Current packaged browser | PASS, Prisma and in-memory | Each mode passes the user/group inventory, reload, actual displayed row values and original SCIM-ID readback regression. This is not a new complete 353-case run. |
-| Graphical management | BLOCKED pending executable-override requalification | The real Container Tools tree reached Engine and View Logs worked, but its terminal task selected the Docker Desktop docker.EXE despite the configured PATH. The parent is correcting the machine-local official containerCommand/composeCommand settings and requalifying actual commands, reload and reconnect. Earlier tree/log success is not Desktop-independence acceptance. |
-| Image metadata and retention | CORRECTED, local source | Ten metadata/caller checks pass after reproducing the dispatch-publisher omission and absent automatic contract execution. Five independent Engine image records need no pruning. Publishing the corrected workflow is still pending. |
-| Automatic offline runtime gate | PASS, November 19 | The common runner executes all seven suites, 118 assertions plus the standalone suite summary; exit 0. Pre-push, dev Stage 1.14 and Windows/Node 24 CI call it; CI image publication depends on that job. Hosted CI execution itself remains pending. |
-| Normal startup/reconnect workflow | OPEN | Prove fresh-session CLI and GUI selection without global Desktop dependencies. |
+| Graphical management | PASS for measured scope, November 20 | Actual image/OCI-label inspection, all 49 volume names and read-only metadata, individual lifecycle/logs, exact independent emitted executable, real-repository reload, and new Windows-created Compose Start/healthy, Logs/ready, Stop/refreshed Exited(0) pass. All GUI fixtures and the isolated GUI/CDP process were removed. Historical Linux-created group commands remain a documented Windows-cwd limitation; generic GUI Up/build/watch and registry publication are not qualified. |
+| Image metadata and retention | CORRECTED, local source | Ten metadata/caller checks pass after reproducing the dispatch-publisher omission and absent automatic contract execution. The pre-consolidation inventory had five records; the added nonshipping local qualification image is retained. No repository needed pruning. New authoritative publication/label/digest readback remains pending. |
+| Automatic offline runtime gate | PASS, consolidation source 17ac92ef | The complete hook passes all seven offline suites, including the six new GUI-settings cases. Pre-push, dev Stage 1.14 and Windows/Node 24 CI call the common runner; CI image publication depends on that job. Hosted CI execution itself remains pending. |
+| Normal startup/reconnect workflow | PARTIAL | Actual GUI reload reconnects to the real repository with no connection-warning placeholder. Cold GUI bridge-startup-task and explicit operator visual acceptance remain open; the shared bridge was intentionally not interrupted. |
 | Documentation | PASS, focused November 19 | Freshness/coupling: all 27 docs; infrastructure: all 13 elements covered; 55 literal JSON blocks parse; links/style pass. New report diagrams render in strict light/dark Chromium. |
 | Final ordered pipeline | OPEN | Must record each applicable gate and consolidate changed-source evidence. |
 | Azure dev | OPEN | Existing registry-selected service-principal session verified; no certificate sign-in initiated. Deploy only at the proper reviewed-source gate. |
@@ -195,19 +195,54 @@ terminal command names the independent LocalAppData executable and exact full
 fixture ID `dc47d605d27c17336df539a4cdbe30c592931b77a15c6517a8c74cd61f98c1ba`;
 see `test-results/ui-screenshots/container-tools-independent-command.txt` and
 `container-tools-terminal-command-proof.*`. These are real GUI command proofs,
-not CLI substitutes. Remaining parent-owned reload/Compose/volume/cleanup
-acceptance is still open until its final receipts are reconciled.
+not CLI substitutes. Final parent-owned reload/Compose/volume/cleanup receipts now pass within the
+bounded scope below. They do not establish cold bridge startup or operator
+visual acceptance.
+
+### Actual GUI completion and host-path boundary, November 20
+
+| Measured outcome | Result and evidence |
+|---|---|
+| Carried release image | GUI inspector shows revision `b87412b0ad5edac47bf19aaca92bb233c12304ed`, source repository and actual version label `master`. This is not a new patch-release label. |
+| Volume inventory and metadata | All 49 GUI names exactly match the stable Engine inventory; read-only inspection confirms the selected volume Name and driver `local`. No preserved volume was mounted writable. |
+| Individual lifecycle/logs | Owned isolated tmpfs PostgreSQL reaches healthy, exposes actual ready text and independent terminal command, then stops with exit zero. |
+| Reload reconnect | After real window reload, require the exact `scimserver-exit` repository and reject connection-warning placeholders. Presence of any tree item alone is insufficient. |
+| Windows-created Compose group | Actual GUI Start plus healthy row, Logs plus ready text, and Stop plus refreshed `Exited (0)` row pass. Command scrollback proves independent `docker.exe compose`, the Windows fixture path and exact owned project. Closing only the log-follow terminal leaves the service healthy. |
+| Historical Linux-created Compose group | Group Logs fails before client launch because its Linux working-directory/configuration labels are not Windows paths. Preserve the project; use native CLI or individual-container operations. Do not rewrite labels, recreate originals or add a compatibility junction. |
+| Cleanup | All three owned networkless/tmpfs fixture instances are removed after ID/label/isolation/stopped/exit checks. GUI PID 89160 is absent and loopback CDP 19333 is closed. The shared SSH bridge remains available for release work. |
+
+Primary local receipts are under `test-results/ui-screenshots`:
+`container-tools-verify-release-labels.*`,
+`container-tools-verified-volume-names.json`, `container-tools-volumes.*`,
+`container-tools-reload-window.*`,
+`container-tools-independent-compose-command.txt`,
+`container-tools-compose-fixture-start.*`,
+`container-tools-compose-fixture-logs-proof.*`,
+`container-tools-compose-fixture-stop.*` and
+`container-tools-owned-fixture-cleanup.json`.
+Screenshots are ignored qualification artifacts, not new committed UI baselines.
+
+The Windows-created fixture proves that Compose Start/Logs/Stop command path,
+not generic SCIM Compose Up/build/watch. Continue to activate the project
+runtime preflight and approved daemon-side source/log roots for the application.
+The read-only settings-generation receipt used the existing workspace without
+mount overrides; it is not evidence that GUI application bind mounts work.
+Registry authentication/publication, cold bridge startup, final release/dev and
+explicit operator visual acceptance remain separate gates.
 
 In that window use **Terminal > Run Task > SCIMServer: start independent
 Engine bridge**, then open the **Containers** view. The task runs the existing
 foreground startup helper in a dedicated terminal, permits only one instance,
 and does not install an autostart/system-wide service. Keep that terminal open
-while using the SSH route. Actual task/Explorer acceptance remains pending.
+while using the SSH route. Actual Explorer/reload acceptance above passes;
+cold bridge-startup-task acceptance remains pending.
 
-The owned `scim-readiness-pg` comparison container was stopped cleanly after
-qualification; its volume is retained. Start only that owned test container
-when a running-target GUI check is needed, compare its image ID with the
-terminal, then use **Inspect** to examine actual image/configuration JSON.
+The earlier owned `scim-readiness-pg` comparison container was stopped cleanly
+after qualification; its volume is retained. New GUI acceptance used fresh
+networkless/tmpfs fixtures and removed only their verified full IDs. Reuse
+that isolated-fixture pattern for later checks; do not mutate a preserved
+original or target its volume for cleanup. Compare the fixture image ID with
+the terminal, then use **Inspect** for actual image/configuration JSON.
 The next checklist is not marked passed merely because settings/tasks exist.
 
 1. Select the independent endpoint and compare Engine, image and container IDs
@@ -401,13 +436,44 @@ They do not change the earlier receipt or imply that release/dev gates passed.
 | R23 | Release metadata / Low | The first normal Validate pre-push stopped at content check C13: the version-header fixer does not update the README version badge, which still said 0.55.67. | Update the badge to the target 0.55.68; the same content gate passes for all 27 documents. The blocked push is retained, not bypassed. Earliest gate: verify badges with content audit after header repair; header freshness alone is not complete version-reference evidence. |
 | R24 | Integration harness / Low | The first container proof passed active-client SIGTERM, exit 0 and durable logging, then its added restart probe timed out because it reused the old automatically assigned host port. Docker reassigned that port on restart. | Read the actual published port again after start. The unchanged image then passes stream end, 1,035 ms clean stop, durable log, original-ID/value readback, owned endpoint cleanup and exact container removal. The initial failed receipt remains archived. Earliest gate: treat an assigned endpoint as lifecycle-local, not permanent across stop/start. |
 | R25 | Validation environment / Low, diagnosis bounded | The next normal pre-push passed static/contracts but stopped in the real installed-tree unit: its child Node npm ls process exceeded the unchanged 60-second timeout. The remaining 6,258 tests passed. | The unchanged focused file passes all nine tests, and the next owning-hook API unit run passes all 6,259 tests in 218 suites. No timeout or assertion changed. Resource contention is plausible but not established as the sole cause. That hook later stops in web worker startup, so it is not an overall green push. Earliest gate: preserve the causal timeout and distinguish focused/unit recovery from a complete green run. |
-| R26 | GUI executable provenance / High, corrected with remaining acceptance open | Actual Container Tools View Logs selected Desktop despite an independent Engine tree/PATH. Provisional command-string flags caused ENOENT; a Compose suffix caused an unsupported V1 error. | Both overrides must be bare independent docker.exe paths; host/config/context and Compose roots belong in both environments. Actual GUI Start/logs now prove the independent executable. The shared settings generator has observed RED/GREEN and six contracts, including preflight rejection and exact command/environment values. Reload/Compose/cleanup remain separate parent receipts. Earliest gate: inspect generated GUI tasks, not just daemon identity. |
-| R27 | Test-worker environment / Low | The next owning hook passed units and in-memory HTTP but Vitest reported 65 fork-worker startup timeouts. Only 60 files/525 tests executed; useful passing assertions were not a complete suite. | The installed Vitest supports VITEST_MAX_WORKERS. Set it to 2 for the same unchanged command/configuration; all three previously unstarted representative files pass, 209 tests. The next normal Validate hook must still run every web test. No startup timeout, assertion, coverage threshold or test selector is weakened. Earliest gate: use a bounded worker budget on this host and require complete inventory plus zero worker errors, not only passing-test counts. |
+| R26 | GUI executable provenance / High, corrected | Actual Container Tools View Logs selected Desktop despite an independent Engine tree/PATH. Provisional command-string flags caused ENOENT; a Compose suffix caused an unsupported V1 error. | Both overrides are bare independent docker.exe paths; host/config/context and Compose roots belong in both environments. The generator has six RED/GREEN contracts. Actual GUI commands, reload and Windows-created Compose lifecycle pass with separate receipts. Cold startup/operator acceptance remain open. Earliest gate: inspect generated GUI tasks, not just daemon identity. |
+| R27 | Test-worker environment / Low, full recovery pending | Default concurrency left 65 fork-worker startup errors and only 60 files/525 tests executed. A two-worker hook improved to 118 files/1,370 tests but still had seven startup errors. | Two-worker focused three-file/209-test success was insufficient. All seven exact unstarted files pass sequentially, 292 tests. Next run uses supported VITEST_MAX_WORKERS=1 for the complete unchanged hook. The fixed 60-second worker bootstrap limit and every test/assertion/threshold remain unchanged. Contention during startup/import is consistent with the results, not a fully established OS-level cause. Earliest gate: require complete file/test inventory and zero worker errors. |
 | R28 | Shell transport / Low, bounded diagnosis | Some terminal invocations returned empty exit-0 output; one health probe printed its response before the shell exited -1073740791. | The OS/harness cause is not established. Reliable Node-owned runners persist subprocess status, complete logs and semantic receipts with explicit sentinels. An empty exit 0 is not evidence; subsequent real build/live/browser receipts establish their own outcomes. Earliest gate: check persisted outcome and process status separately. |
 | R29 | Diagnostic tooling / Low | Optional-path discovery yielded exit 1; two searches timed out; a requested view range and an assumed test path were invalid. | Correct the exact path/range or narrow the search and inspect the bounded result. These are discovery/argument failures, not failing application assertions. Do not retry through alternate access routes after a policy denial; none occurred here. Earliest gate: distinguish a tool error from a searched-for defect. |
 | R30 | Cross-chat routing / Low, delivery unverified | The requested parent session URI was rejected as unknown. | Session discovery exposed a different available migration-chat URI, which accepted queued milestones. Queuing is not verified receipt by the originally named parent. Parent updates arriving as user turns remain authoritative. Earliest gate: record the actual route/result and never claim delivery from a rejected request. |
 | R31 | Reconciliation harness / Low | The first private transcript scanner assumed every tool completion had a result and threw on matchAll. The rejected message instead carried an error envelope. | Scan result OR error, explicitly inventory unavailable envelopes and require zero unexplained omissions. The corrected two-pass scan covers all tool types and assistant narration. Earliest gate: validate heterogeneous transcript envelopes before claiming completeness. |
 | R32 | Evidence harness / Low | A generic process receipt reused the semantic GUI-settings receipt filename and replaced its richer evidence. | Use distinct process and semantic filenames, rerun the small read-only check, and retain both artifacts. Real Engine generation passes without writing the workspace. Earliest gate: give evidence producers unique output identities rather than inferring semantic proof from exit status. |
+| R33 | Outer orchestration / Low | The private runner killed Git at its arbitrary 30-minute orchestration deadline while the unchanged child hook was still running. The hook later failed its seven web startups after 1,853.7 seconds. | Waited for the existing child hook to finish and retained both process-timeout and late failed-hook receipts; no overlapping suite or successful push was claimed. Increase only the private whole-push budget to two hours. No repository gate, individual test deadline or Vitest's fixed bootstrap timeout changes. Earliest gate: budget the aggregate owning command separately from its component test deadlines. |
+
+### Actual GUI execution issues and prevention
+
+These are the parent's separately reconciled GUI issues, not additional
+unclassified application defects. G1/G2 also explain R26 above.
+
+| ID | Type / severity | Observed cause and correction | Detection and prevention |
+|---|---|---|---|
+| G1 | Runtime independence / High | Correct Engine inventory concealed Desktop task auto-detection. Pin both base executable settings and inspect actual emitted commands. | Actual GUI Logs caught it; six source settings contracts and emitted-command evidence now cover the separate boundary. |
+| G2 | Version-specific configuration / Medium | Stale descriptions suggested command strings. Flags caused ENOENT and a compose suffix triggered the V1 rejection. Use base path only in 2.5.3. | Actual command execution, not configuration prose, is authoritative; exact bare-path assertions prevent recurrence. |
+| G3 | Cross-host paths / Medium | Linux-created Compose working-directory/configuration labels cannot serve a Windows GUI task. | Actual group Logs caught the unsupported combination. Preserve history and use native CLI/individual operations; qualify Windows-created projects separately. |
+| G4 | Harness correctness / High | A presence-only reconnect check accepted a connection-warning placeholder. | Require the real repository and absence of connection errors after reload; strengthened assertion passes. |
+| G5 | Harness interaction / Low | Focus, stale overlays, collapsed sections and virtualized rows selected wrong or absent actions. | Control the owned window/overlays/expansion and visible row bounds; do not misclassify locator failures as runtime defects. |
+| G6 | Picker model / Low | Grouped container selection, checkbox roles and recent-command suffixes differed from assumptions. | Capture the actual picker and constrain group/checkbox selection to the exact owned fixture. |
+| G7 | Metadata/editor model / Low | The inspector omitted empty Labels and used Monaco EditContext rather than an assumed textarea. | Assert actual JSON/editor behavior with whole-document Find; do not invent a null property. |
+| G8 | Terminal model / Low | Accessibility exposes the viewport, with line-wrapped commands/readiness text. | Scroll through real GUI history and join visual wraps before matching full command/ready text. |
+| G9 | Tool UX / Low | A second Compose Logs action met the still-running follow task's terminate picker. | Observe/close only the owned log-follow terminal; separately prove the service remains healthy. |
+| G10 | Acceptance strength / Medium | Backend exit zero preceded a stale healthy GUI row. | Await refreshed healthy/Exited(0) GUI outcomes; repeat with a fresh isolated fixture and inspect the final screenshot. |
+| G11 | Tool transport / Low | Complex shell calls sometimes returned empty exit zero; cause remains unknown. | Existing Node driver plus explicit sentinels/receipts; do not invent a transport root cause. |
+| G12 | Coordination/lookup / Low | Wrong host-chat URI, accumulated milestones, an incorrect failure suffix and a broad glob obscured evidence. | Use the actual returned URI, one consolidated handoff and deterministic capture paths; cancel only owned pending messages. |
+
+Parent GUI provenance: the final full-event reconciliation contains 9,560
+events, phase start 7,313, 64 GUI-driver attempts and 22 execution-error signals,
+all mapped to G1-G12. The earlier detailed prose snapshot contained 9,505
+events. These are attempts/signals, not passed requirements or independent
+defect counts. The separate narration pass found no matching prose; actual
+successful-looking output/captures were also reviewed for G1/G2/G4/G10 because
+an error-word scan cannot catch those false greens. Source/history/search
+echoes, line-wrapped readiness and initial inventory lag are explicitly
+classified rather than counted as new Engine defects.
 
 Consolidation receipts are `test-results/release-clean-standalone-build-green.txt`,
 `release-clean-package-health.json`, `release-clean-package-live.txt` and
@@ -434,6 +500,17 @@ from the runner's process receipt. This does not substitute for GUI acceptance.
 The two-worker Validate push was explicitly cancelled when the new GUI source
 correction became necessary. It is an interrupted run, not a successful push
 or final-source suite. The next complete normal hook owns updated-tip evidence.
+That hook on 17ac92ef again passes 6,259 units/218 suites and the existing
+reduced HTTP lane's 2,517 tests/42 skips. Its web result is 118 files/1,370
+tests plus seven bootstrap errors, not a complete pass. All seven exact files
+then pass sequentially, 292 tests; complete single-worker hook evidence is
+still required. An E2E worker forced-exit warning is retained rather than
+misrepresented as proof of clean test-worker teardown.
+
+Independent read-only source review of 17ac92ef against master
+3bee7a3c22992af9a08fde8e36fc398fc37b2b48 reports no significant findings.
+It inspected the changed runtime/build/publisher/test surfaces, did not run
+tests and does not replace exact-tip CI or the merged-source matrix.
 
 **Interim consolidation transcript reconciliation:** the full available
 1,780-event transcript was scanned with error/signal and diagnosis-narration

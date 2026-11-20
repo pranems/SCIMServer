@@ -34,8 +34,15 @@ Bare independent command overrides now pass actual Start/logs. The shared
 runtime helper generates both command settings and container/terminal
 environments after fresh preflight, retaining Compose bind/log roots.
 Six new settings contracts plus the existing 34 runtime cases and read-only
-real Engine generation pass. Final GUI reload/Compose/cleanup, full updated-tip
-hook, CI lockfiles, reviewed PR and merged-source dev remain open.
+real Engine generation pass. Actual GUI image labels, all 49 volume names and
+metadata, real-repository reload, individual lifecycle/logs and Windows-created
+Compose Start/healthy, Logs/ready, Stop/refreshed Exited(0) now pass. Fixtures
+and isolated GUI/CDP are cleaned up. Historical Linux-created group paths are
+not Windows-task compatible; generic GUI Up/build/watch, cold bridge startup
+and explicit operator visual acceptance remain unqualified. The full updated-tip
+hook, CI lockfiles, reviewed PR and merged-source dev remain open. Two-worker
+Vitest still leaves seven startup errors; all exact seven files/292 tests pass
+sequentially. No test/bootstrap timeout or assertion was changed.
 
 **Historical local container qualification, 2026-11-18:** independent Engine in Ubuntu WSL,
 native Windows clients and pinned loopback SSH are the selected local route.
