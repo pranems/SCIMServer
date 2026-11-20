@@ -12,6 +12,17 @@ The browser case now reuses the pre-create ownership guard.
 API/web manifests target the next patch, 0.55.68; CI-generated lockfiles,
 reviewed PR, exact-tip CI and merged-source dev remain pending. No shipping
 image or Azure estate has changed. GUI acceptance remains independent.
+Commits 45885140 and c9d040df preserve the coherent source and dated receipts.
+Normal Validate pushes remain blocked, not bypassed: badge C13 was corrected;
+the transient npm-tree timeout recovered with 6,259/218 units passing on the
+next hook; that hook then stopped at 65 Vitest worker-start timeouts.
+Three representative web files/209 tests pass with supported
+VITEST_MAX_WORKERS=2; the owning complete hook still must pass.
+Actual GUI View Logs selected a Desktop executable despite the correct Engine
+tree. Parent is correcting official command overrides; independence is not
+accepted. Actual local active-SSE SIGTERM exits 0 in 1,035 ms, with durable
+final logging and restarted original-ID readback. Azure identity/ARM readback
+passes using the existing registry-selected principal; no cloud writes.
 
 [Current dashboard and execution ledger](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md)
 is authoritative; the November 18 assessment below is a dated qualification.

@@ -41,6 +41,14 @@ production install is distinct from assembling previously installed files.
 Read Docker-assigned ports again after container restart; a captured container
 ID remains its ownership handle, but its host-port lease can change.
 
+GUI provenance has two independent boundaries. Container Tools can display
+the intended Engine while its terminal-backed actions still use an
+auto-detected Docker Desktop executable. Environment PATH does not pin the
+extension SDK's executable discovery. Configure its official container and
+Compose command overrides explicitly, then inspect an actual generated task
+command after editor reload. Correct daemon identity and useful logs alone
+are not proof that Desktop removal is safe.
+
 Before browser acceptance, identify the SPA actually served by the selected
 form factor. The raw compiled API served legacy public assets while the current
 standalone contained the current web build; replacing pixel baselines would

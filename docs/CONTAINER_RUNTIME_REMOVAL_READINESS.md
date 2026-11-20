@@ -70,7 +70,7 @@ November 19 application correction or a new Azure deployment.
 | Packaged migration/configuration | PASS, focused November 19 qualification | Four launchers select the packaged Prisma 7 configuration and stop on migration failure. The actual Prisma package applies all 30 migrations to a fresh owned Engine database, starts successfully, passes 1,845 live checks and the user/group browser roundtrip. Failure-path contracts have 54 assertions. |
 | Clean standalone installation | PASS, November 19 consolidation | Actual builder installs 660 API and 256 production packages, builds the current web application and produces a 445.9 MB package. Both source lockfile hashes remain unchanged. The clean package applies all 30 migrations to a new uniquely labelled tmpfs Engine database on an assigned loopback port, passes 1,845 reported live checks and the owned user/group browser roundtrip. The package still identifies the 0.55.67 pre-version-bump source; this is clean-install proof, not a published 0.55.68 artifact. |
 | Current packaged browser | PASS, Prisma and in-memory | Each mode passes the user/group inventory, reload, actual displayed row values and original SCIM-ID readback regression. This is not a new complete 353-case run. |
-| Graphical management | CONFIGURED; actual UI acceptance pending | Existing Microsoft VS Code Container Tools has a dedicated local workspace selecting the independent client, profile and SSH endpoint. Actual Explorer inspection remains an explicit acceptance check. |
+| Graphical management | BLOCKED pending executable-override requalification | The real Container Tools tree reached Engine and View Logs worked, but its terminal task selected the Docker Desktop docker.EXE despite the configured PATH. The parent is correcting the machine-local official containerCommand/composeCommand settings and requalifying actual commands, reload and reconnect. Earlier tree/log success is not Desktop-independence acceptance. |
 | Image metadata and retention | CORRECTED, local source | Ten metadata/caller checks pass after reproducing the dispatch-publisher omission and absent automatic contract execution. Five independent Engine image records need no pruning. Publishing the corrected workflow is still pending. |
 | Automatic offline runtime gate | PASS, November 19 | The common runner executes all seven suites, 118 assertions plus the standalone suite summary; exit 0. Pre-push, dev Stage 1.14 and Windows/Node 24 CI call it; CI image publication depends on that job. Hosted CI execution itself remains pending. |
 | Normal startup/reconnect workflow | OPEN | Prove fresh-session CLI and GUI selection without global Desktop dependencies. |
@@ -141,12 +141,25 @@ Sources checked November 19, 2026:
 The dedicated local workspace is
 `%LOCALAPPDATA%\SCIMServer\SCIMServer-Independent-Engine.code-workspace`.
 It was opened in a new VS Code window. Its `containers.environment` and
-terminal environment select the independent Windows Docker client directory,
+terminal environment name the independent Windows Docker client directory,
 the independent Docker configuration, and `ssh://scimserver-engine-wsl-trial`.
 `DOCKER_CONTEXT` is cleared so a context cannot override that endpoint.
 Its Azure configuration directory is resolved from the active estate registry,
 not copied from an old tenant. No global setting or original checkout setting
 was changed. This generated machine-specific file is intentionally not committed.
+
+**Actual acceptance finding:** environment PATH is insufficient. The installed
+Container Tools 2.5.3 rendered the independent Engine tree and fetched real
+logs, but its generated View Logs task invoked the executable under Docker
+Desktop. Uninstalling Desktop would break that action. The correction must
+set the extension's official machine-overridable `containers.containerCommand`
+and `containers.composeCommand` to the quoted absolute independent executable,
+explicit `--config` directory and `--host` SSH endpoint, with `compose` appended
+for the latter setting. Keep the environment settings for child processes,
+but do not treat them as executable-selection proof. The machine-local
+workspace correction and actual requalification are owned by the parent;
+no acceptance is claimed until the generated task command is inspected.
+No separate repository workspace generator currently exists to update.
 
 In that window use **Terminal > Run Task > SCIMServer: start independent
 Engine bridge**, then open the **Containers** view. The task runs the existing
@@ -164,10 +177,14 @@ The next checklist is not marked passed merely because settings/tasks exist.
    with the terminal.
 2. Inspect an image's actual `Config.Labels`, tags, architecture and digest.
 3. Inspect a container's configured image, actual health state and recent logs.
+   Inspect the generated terminal command too: its executable and flags must
+   name the independent client/profile/host, never a Desktop installation.
 4. Confirm volume names without opening preserved originals writable.
 5. Inspect a published registry reference separately. A Buildx `--push` image
    is not necessarily loaded into the local image store.
 6. Reconnect after a normal runtime restart without requiring Desktop.
+   Reload the editor and repeat an actual terminal-backed action to prove the
+   executable override persists; a healthy Explorer tree alone is insufficient.
 
 ## 5. Image retention and publication
 
@@ -177,9 +194,11 @@ containers, the current verified release/rollback image and any explicitly
 needed database-major recovery image. Record each exception and remove only
 explicitly identified image IDs. Never treat a volume as an image-cleanup target.
 
-The independent Engine currently has five image records in total: the source
+Before consolidation, the independent Engine had five image records in total: the source
 SCIMServer image, a carried release image, Node 24 and two PostgreSQL records.
-There is no over-five family requiring deletion in that store. The full cold
+Consolidation adds a nonshipping `scimserver-exit:local-45885140` validation
+image with explicit source/version labels. This does not create an over-five
+version family requiring deletion. The full cold
 Desktop disk backup is a deliberate recovery artifact, not an active image
 cache. Selectively changing it would invalidate the preservation receipt.
 
@@ -343,6 +362,9 @@ They do not change the earlier receipt or imply that release/dev gates passed.
 | R22 | Fixture ownership / Medium | The new runtime browser case created a unique name but had not proved that its returned endpoint ID was absent before assigning a teardown target. A unique name alone is not ownership evidence. | Reuse the established createFixtureEndpoint pre-create inventory guard before seeding, and retain API-request cleanup with successful status and exact-ID absence assertions. The real clean-package browser case passes user/group values, reload and original-ID readback. Earliest gate: fixture ownership review before running against carried dev data. |
 | R23 | Release metadata / Low | The first normal Validate pre-push stopped at content check C13: the version-header fixer does not update the README version badge, which still said 0.55.67. | Update the badge to the target 0.55.68; the same content gate passes for all 27 documents. The blocked push is retained, not bypassed. Earliest gate: verify badges with content audit after header repair; header freshness alone is not complete version-reference evidence. |
 | R24 | Integration harness / Low | The first container proof passed active-client SIGTERM, exit 0 and durable logging, then its added restart probe timed out because it reused the old automatically assigned host port. Docker reassigned that port on restart. | Read the actual published port again after start. The unchanged image then passes stream end, 1,035 ms clean stop, durable log, original-ID/value readback, owned endpoint cleanup and exact container removal. The initial failed receipt remains archived. Earliest gate: treat an assigned endpoint as lifecycle-local, not permanent across stop/start. |
+| R25 | Validation environment / Low, diagnosis bounded | The next normal pre-push passed static/contracts but stopped in the real installed-tree unit: its child Node npm ls process exceeded the unchanged 60-second timeout. The remaining 6,258 tests passed. | The unchanged focused file passes all nine tests, and the next owning-hook API unit run passes all 6,259 tests in 218 suites. No timeout or assertion changed. Resource contention is plausible but not established as the sole cause. That hook later stops in web worker startup, so it is not an overall green push. Earliest gate: preserve the causal timeout and distinguish focused/unit recovery from a complete green run. |
+| R26 | GUI executable provenance / High, open | Actual Container Tools View Logs selected the Docker Desktop executable even though its tree and environment PATH addressed the independent Engine. CLI selection and successful GUI output did not prove the extension's task executable was independent. | Parent is configuring official containerCommand/composeCommand overrides with the absolute independent executable and explicit config/host flags. Require actual task-command provenance, logs/inspection and editor reload/reconnect before acceptance. No source runtime guard is weakened and earlier GUI passes remain insufficient. Earliest gate: inspect every GUI-generated terminal command, not only the daemon identity and tree output. |
+| R27 | Test-worker environment / Low | The next owning hook passed units and in-memory HTTP but Vitest reported 65 fork-worker startup timeouts. Only 60 files/525 tests executed; useful passing assertions were not a complete suite. | The installed Vitest supports VITEST_MAX_WORKERS. Set it to 2 for the same unchanged command/configuration; all three previously unstarted representative files pass, 209 tests. The next normal Validate hook must still run every web test. No startup timeout, assertion, coverage threshold or test selector is weakened. Earliest gate: use a bounded worker budget on this host and require complete inventory plus zero worker errors, not only passing-test counts. |
 
 Consolidation receipts are `test-results/release-clean-standalone-build-green.txt`,
 `release-clean-package-health.json`, `release-clean-package-live.txt` and
