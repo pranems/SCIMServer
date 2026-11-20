@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### PostgreSQL inventory qualification fixtures
+
+- Correct only the cross-endpoint inventory E2E fixture isolation. Worker-local
+  counter names repeat across retained PostgreSQL endpoints; the merged-source
+  full HTTP lane exposed two failures (2,613 passes/zero skips). A separate
+  owned real-API collision seed reproduced both expected-one/received-two
+  failures before the fix. UUID search values retain the original total-one
+  checks, while two new shared-name controls require both matching endpoints
+  and total two. Focused inventory coverage increases from two to four tests,
+  passing on PostgreSQL with retained collisions and on InMemory. Cleanup
+  verifies exact endpoint absence. Production behavior, version 0.55.68,
+  manifests, locks, runners and thresholds are unchanged. Normal review,
+  full merged qualification and deployment remain open. See
+  [execution RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#merged-source-postgresql-qualification-blocker-2026-11-20).
+
 ### 0.55.68 consolidation
 
 - Effect security recovery for draft PR #275: update the existing exact API

@@ -28,6 +28,47 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### Merged-source PostgreSQL qualification blocker, 2026-11-20
+
+PR #275 merged at `9ee2a72d91ad1fc9cdee00782d18f1d84e481104`.
+The independent Engine route and fresh 30-migration PostgreSQL replay passed.
+The complete merged-source HTTP run then returned 2,613 passes, two failures
+and zero skips on PostgreSQL. Publication and dev deployment remain blocked;
+no shipping image or Azure write has occurred in this execution.
+
+The two failures were in
+[Cross-endpoint database inventory](../api/test/e2e/database-inventory.e2e-spec.ts).
+Its generic worker-counter names repeat across test files. PostgreSQL retains
+those files' different endpoints until global teardown, whereas each InMemory
+app starts fresh. Global inventory correctly found 322 Users and 33 Groups
+matching the searched names, contradicting the fixture's total-one assumption.
+This was a test-isolation defect, not evidence that production search ignored
+its filter.
+
+A separate uniquely named database inside the exact labelled, tmpfs-backed
+qualification container reproduced the failure through real API seeding:
+both unchanged tests expected one and received two. UUID-based search values
+then passed four focused tests on PostgreSQL with the retained collisions and
+four on InMemory. Two new controls deliberately share a name across two owned
+endpoints and require both matching rows, correct values and total two.
+The original total-one checks remain unchanged. Endpoint cleanup requires
+successful deletion and exact-ID absence.
+
+| Execution issue | Root cause, resolution and prevention |
+|---|---|
+| Test correctness, High | Endpoint-local factory counters were treated as global identifiers. Use UUID search values only in this inventory spec; preserve global search with two-endpoint User and Group controls. No production query, factory, timeout, threshold or runner change. |
+| Detection-stage escape | Full real-PostgreSQL HTTP found the defect. A focused retained-collision HTTP test could have caught it when the inventory spec was introduced; isolated InMemory and an empty database cannot discriminate this condition. |
+| Tooling friction, Low | Targeting ESLint directly at this E2E file exposed unsafe raw response access, including existing accesses outside the normal source lint glob. Explicit transport-body types retain runtime value/shape assertions without disabling rules. Final strict lint passes with zero errors/warnings; both final focused backend runs remain four/four GREEN. |
+| Test/gate improvement | Applied: duplicate-across-endpoints controls protect against incorrectly narrowing the production search to hide fixture collisions. Full merged-source PostgreSQL qualification is still required after normal review and merge. |
+| Design/architecture disposition | Accepted: the correction stays in one small inventory spec. Production search, repository seams and shared fixture factories remain unchanged; a new abstraction would be speculative. |
+
+This is tested but unreleased correction evidence, not completed qualification.
+The six-mode run, immutable shipping, actual host/container/browser lanes,
+dev preservation and deployment, native gallery matrix and operator visual
+acceptance remain separate gates. The detailed execution report is under
+`test-results/dev-deploy-2026-11-20-150000.md`; capture-time sections below
+remain historical.
+
 ### Effect security recovery, 2026-11-20
 
 The isolated recovery branch

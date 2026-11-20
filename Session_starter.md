@@ -1,5 +1,26 @@
 ## SCIMServer - Condensed Session Memory
 
+### Merged-source deployment qualification, 2026-11-20
+
+PR #275 is merged at `9ee2a72d91ad1fc9cdee00782d18f1d84e481104`.
+The new independently owned WSL bridge is online against the verified Engine;
+original volumes and Desktop artifacts remain untouched. Static qualification,
+eight runtime suites, 261 preservation assertions and fresh replay of all 30
+migrations passed. Both API unit backends pass 218 suites/6,263 tests.
+Full HTTP InMemory passes 2,573 with 42 PostgreSQL-only skips; full PostgreSQL
+returns 2,613 passes/two inventory-fixture failures/zero skips.
+
+The inventory spec wrongly assumed endpoint-local worker-counter names were
+globally unique. A separate owned database reproduces both expected-one/
+received-two failures. The test-only correction uses UUID search values and
+adds two deliberately shared-name cross-endpoint controls. Focused PostgreSQL
+with retained collisions and InMemory each pass four tests, previously two.
+Normal review/merge and renewed authoritative qualification remain required.
+See [the current RCA and finite status](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#merged-source-postgresql-qualification-blocker-2026-11-20).
+No shipping image, Azure write, production operation or uninstall occurred.
+Native gallery prerequisites and later operator visual acceptance remain open.
+Earlier boundaries below retain capture-time history.
+
 ### Latest verified consolidation boundary, 2026-11-20
 
 Reviewed stacked PR #276 merged the Effect repair into the migration branch
