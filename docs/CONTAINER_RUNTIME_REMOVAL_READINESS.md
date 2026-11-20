@@ -28,6 +28,74 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### Effect security recovery, 2026-11-20
+
+The isolated recovery branch
+`vprane/scimserver/containers-desktop-exit-cve-20261120` starts at
+`87fcbdc153e1e2ba2d13f4fe3af3d8adb519d559`. The original release-owner
+branch and draft PR #275 remain unchanged. The existing unshipped 0.55.68
+candidate is retained: this dependency correction completes that candidate,
+not a second unreleased version.
+
+**Confirmed blocker:** Build Test Image run 44791352333 passed validation
+and Windows runtime contracts but failed Trivy on Effect 3.20.0,
+CVE-2026-121707 / GHSA-7589-6fvf-x4pw, rated HIGH by that scanner.
+The [maintainer advisory](https://github.com/Effect-TS/effect/security/advisories/GHSA-7589-6fvf-x4pw)
+rates it Medium, affects versions <=3.22.0 and fixes it in 3.22.1.
+Its stated impact is excessive backtracking when untrusted input is decoded
+by a template with multiple String spans. The patch uses linear matching.
+This is not a claim that SCIMServer exposes that specific upstream path.
+
+Approved-proxy npm metadata verifies 3.22.1 publication
+2026-07-30T04:29:21Z and seven-day eligibility 2026-08-06T04:29:21Z.
+The [stable GitHub release](https://github.com/Effect-TS/effect/releases/tag/effect%403.22.1)
+was published 2026-07-30T04:29:42Z. No quarantine exception, registry change,
+ignore or security-gate weakening is needed.
+
+| Recovery boundary | Current evidence |
+|---|---|
+| Permanent manifest guard | RED: expected 3.22.1, received 3.20.0 before the manifest edit. |
+| Bootstrap | Old tracked lock retained. Temporary owned no-save installation only; not final locked dependency GREEN. |
+| CI-generated API lock | Pending through the existing `regen-lockfile.yml` API selection. |
+| Fresh installed tree | Pending unchanged artifact import and approved-proxy npm ci. |
+| Exact recovery image | Pending nonshipping Build Test Image; no local Docker or shipping publication. |
+| Parent integration | Separate reviewed stacked PR and original exact-tip CI; not performed here. |
+
+**Execution RCA (security, HIGH):** the frozen exact override for Effect
+remained 3.20.0, so normal resolution could not float to the newly required
+patch. This repeats the already documented frozen-pin pattern, not a new
+application architecture defect. Trivy caught it at image validation before
+merge/deployment. The earliest deterministic regression boundary is the pin
+test; the existing scheduled advisory watcher remains the earlier discovery
+control. Updating the existing override and verifying actual locked, installed
+and imaged packages removes that dependency version, rather than hiding it.
+
+**Execution friction (tooling, LOW):** fresh checkout Jest/Vitest were absent,
+confirmed by the first focused validation commands. Owned baseline npm ci
+is the approved bootstrap prerequisite. One attempted log redirection used
+an invalid absolute destination and failed before installation; the corrected
+explicit session-artifact destination worked. No shared checkout was mutated.
+Both issues were caught at their first command, with no detection escape.
+
+**Bootstrap prerequisite (tooling, Medium):** the existing full-tree npm guard
+correctly rejects old installed Effect 3.20.0 after the manifest becomes
+3.22.1. The historical old-install bootstrap recipe predates this guard.
+No test was disabled or changed. An owned `npm install --no-save
+--package-lock=false --ignore-scripts --no-audit --no-fund`, with a seven-day
+`--before` cutoff and exact Effect 3.22.1 through the approved proxy, prepares
+the bootstrap without writing any tracked lock. It re-resolves the temporary
+installation (74 added, 46 removed, 605 changed), so it is explicitly not
+final graph evidence. Both existing pin and complete-tree suites then pass
+40 tests. Final acceptance still requires the minimal CI lock artifact and
+a clean owned npm ci. This separates bootstrap installation from the artifact
+that will be reviewed and shipped; it does not waive quarantine or graph checks.
+
+**Test/gate self-improvement: applied.** Add permanent advisory-boundary,
+exact manifest and actual graph regressions in the existing pin spec, without
+disabling a failing test during bootstrap. **Design disposition: accepted.**
+The existing exact override, watcher and CI artifact route are sufficient;
+another dependency abstraction would be speculative.
+
 | Evidence boundary | Date | Meaning |
 |---|---|---|
 | Initial closing addendum | Earlier November 18 trial | Historical receipt, not the current readiness decision. |

@@ -1,5 +1,23 @@
 ## SCIMServer - Condensed Session Memory
 
+### Effect security recovery, 2026-11-20
+
+Recovery branch `vprane/scimserver/containers-desktop-exit-cve-20261120`
+starts at `87fcbdc153e1e2ba2d13f4fe3af3d8adb519d559`. PR #275 image run
+44791352333 failed Trivy on Effect 3.20.0, CVE-2026-121707 /
+GHSA-7589-6fvf-x4pw (HIGH in Trivy; Medium in the maintainer advisory).
+The existing exact override moves to 3.22.1. Its approved-proxy publication
+is 2026-07-30T04:29:21Z, eligible 2026-08-06T04:29:21Z.
+The permanent manifest regression was observed RED on 3.20.0.
+The old-lock npm ci installation was rejected by the unchanged full npm-tree
+guard after the manifest edit. A temporary owned, no-save installation with
+package-lock writing disabled prepares the bootstrap; tracked locks remain
+unchanged. This re-resolved bootstrap is not final locked dependency evidence.
+Final CI-lock npm ci and nonshipping image evidence remain pending.
+Keep the unshipped 0.55.68 candidate; a second unreleased version is unnecessary.
+No merge, deployment, Desktop removal or runtime/configuration changes are authorized.
+See [current receipts and RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
 ### Current Docker removal readiness, 2026-11-20
 
 The normal complete Validate hook and exact-ref push PASS at

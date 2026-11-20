@@ -31,6 +31,37 @@ import {
 import fs from 'fs/promises';
 import { dirname, resolve } from 'node:path';
 
+describe('Effect security remediation (GHSA-7589-6fvf-x4pw)', () => {
+  const vulnerableRange = '<= 3.22.0';
+
+  it('recognizes the affected boundary and recommends the minimal exact patch', () => {
+    expect(satisfiesGhsaRange('3.20.0', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('3.22.0', vulnerableRange)).toBe(true);
+    expect(satisfiesGhsaRange('3.22.1', vulnerableRange)).toBe(false);
+    const advisory: PackageAdvisory = {
+      packageName: 'effect',
+      ghsaId: 'GHSA-7589-6fvf-x4pw',
+      cveId: 'CVE-2026-121707',
+      severity: 'high',
+      summary: 'TemplateLiteral matching can cause excessive backtracking on untrusted input',
+      vulnerableRanges: [vulnerableRange],
+      firstPatchedVersions: ['3.22.1'],
+    };
+    const findings = evaluatePins({ effect: '3.20.0' }, [advisory]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].recommendedVersion).toBe('3.22.1');
+    expect(evaluatePins({ effect: '3.22.1' }, [advisory])).toEqual([]);
+  });
+
+  it('pins the existing API override to the exact patched release', async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { overrides: Record<string, string>; dependencies: Record<string, string> };
+    expect(manifest.overrides.effect).toBe('3.22.1');
+    expect(manifest.dependencies.effect).toBeUndefined();
+  });
+});
+
 describe('request-body security remediation (#256)', () => {
   it('gives every compatible iconv-lite owner one exact shared override context', async () => {
     const manifest = JSON.parse(

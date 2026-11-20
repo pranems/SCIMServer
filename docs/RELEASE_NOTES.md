@@ -35,6 +35,12 @@ public SCIM response-shape change is introduced.
 - The dispatch publisher carries the same source/version labels as the
   other established image builders. Read actual registry labels and digests
   after publication; a local build is not a shipping artifact.
+- The existing Effect dependency override is being corrected from 3.20.0
+  to exact 3.22.1 for CVE-2026-121707 / GHSA-7589-6fvf-x4pw.
+  The image security gate blocked draft PR #275 before merge/deployment.
+  Patched lock, installed-tree and nonshipping image receipts are tracked in
+  the readiness report; historical application test passes do not prove this
+  security correction. This remains the same unshipped 0.55.68 candidate.
 
 The [canonical readiness report](CONTAINER_RUNTIME_REMOVAL_READINESS.md)
 separates clean-install/live/browser and container-shutdown evidence from
