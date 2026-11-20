@@ -1,5 +1,264 @@
 ## SCIMServer - Condensed Session Memory
 
+### Latest verified consolidation boundary, 2026-11-20
+
+Reviewed stacked PR #276 merged the Effect repair into the migration branch
+at `2c1c74cfdae84d267755cf0b4d2719d6b5303a53`, not master. Its exact recovery
+head `1d4e4bc294bff3f0b7bb39ff3fdc6a6eb5c4465b` passed the normal Validate
+hook, all 30 gates: API 218 suites/6,263 tests, reduced HTTP 2,517 passes/
+42 known skips and web 126 files/1,664 tests. Exact-head image run 44806899588
+passed validation, Windows contracts, smoke and Trivy. Read-only inspection
+verified actual Effect 3.22.1 in the immutable nonshipping image.
+
+The separately reviewed preservation correction is in stacked PR #277.
+Its original implementation `67789d16` passed all 27 normal Fast gates,
+including 261 new PowerShell assertions, API 218/6,259 and HTTP 2,517/42 skips.
+Both real read-only dev snapshots covered 76 endpoint IDs and equal
+per-endpoint stored totals, summing to 1,175 Users and 428 Groups. This is
+pre-release evidence, not deployment preservation proof or resource-content
+comparison. See [the exact finite claim](docs/DEPLOYMENT_PRESERVATION_VERIFIER.md).
+The branch has now merged the reviewed Effect target without rewriting history;
+the combined tip still requires its own normal push and CI.
+
+Bridge remains offline. Draft #275, merged-master shipping, full dev matrix,
+gallery provisioning and operator visual verification remain open. No Desktop
+uninstall, production operation or backup deletion occurred. Earlier sections
+below preserve capture-time history rather than superseding this boundary.
+
+### Effect security recovery, 2026-11-20
+
+Recovery branch `vprane/scimserver/containers-desktop-exit-cve-20261120`
+starts at `87fcbdc153e1e2ba2d13f4fe3af3d8adb519d559`. PR #275 image run
+44791352333 failed Trivy on Effect 3.20.0, CVE-2026-121707 /
+GHSA-7589-6fvf-x4pw (HIGH in Trivy; Medium in the maintainer advisory).
+The existing exact override moves to 3.22.1. Its approved-proxy publication
+is 2026-07-30T04:29:21Z, eligible 2026-08-06T04:29:21Z.
+The permanent manifest regression was observed RED on 3.20.0.
+The old installation is rejected by the unchanged full npm-tree guard after
+the manifest edit. Temporary owned no-save/package-lock=false resolution was
+also rejected by the normal Fast hook: 25 static gates passed, but unrelated
+Prisma/qs/mime-types drift caused 5 failed API tests (6,256 passed).
+Clean npm ci with the new manifest and old lock fails EUSAGE on Effect.
+No branch was published. Owned baseline Prisma 7.8.0/Effect 3.20.0 was restored
+using the temporarily restored original manifest, then the intended 3.22.1
+manifest was reinstated. Every tracked lock remains unchanged.
+Permanent lock and installed-owner guards are now RED on actual 3.20.0.
+The parent-authorized manifest-only install with the old API lock temporarily
+outside resolution then changed one package, kept Prisma 7.8.0 and installed
+Effect 3.22.1. Exact lock byte identity was verified. All three existing
+complete-tree/advisory-consumer/Hono-parent specs pass 34 tests.
+Normal Fast bootstrap passed all 27 gates at exact `712ddcc7` in 652.7 seconds:
+218 API suites/6,261 tests, reduced HTTP 2,517 passes/42 known skips.
+API-only CI lock run `44800892630` succeeded at that source; authenticated
+artifact `14660962893` changes only Effect. Fresh owned npm ci preserves
+the imported lock bytes. Reapplied exact lock/owner tests and all existing
+consumer guards pass 4 suites/67 tests. Normal final Validate and nonshipping
+image validation remain pending; no guard, hook or quarantine control changed.
+Keep the unshipped 0.55.68 candidate; a second unreleased version is unnecessary.
+No merge, deployment, Desktop removal or runtime/configuration changes are authorized.
+See [current receipts and RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
+### Current Docker removal readiness, 2026-11-20
+
+The normal complete Validate hook and exact-ref push PASS at
+1f0daafa5bc4dc395378a96059e13dea21917d8f, completed 16:14:35 UTC:
+218 API suites/6,259 tests, reduced HTTP 2,517 passes/42 known skips,
+all 126 web files/1,664 tests and zero worker errors. Every hook gate passes;
+remote/upstream exact SHA is independently verified. Windows threads,
+isolation true and disabled compile cache produced this complete run, not
+an established OS-level root-cause fix. The following documentation-only
+receipt update uses the normal default Fast hook; no unchanged full suite
+is manually rerun. Exact-tip PR CI and merged-source deployment remain open.
+
+Final parent machine-local evidence is separately bounded: bridge cleanup
+verified, metadata-only original/backup preservation recheck passed, and
+independent Docker/wincred/OpenSSH resolution passed in Desktop-excluded
+probe PATHs. No new hashes, restore, credential operation or uninstall
+acceptance is claimed. Optional assistant Docker MCP gateway is still
+Desktop-owned and not independently migrated. Do not claim all machine
+developer tooling Desktop-free.
+
+Following the operator's direction to proceed autonomously, Windows now uses
+Vitest's supported thread pool; other platforms explicitly retain forks.
+Isolation is explicitly true. Two policy assertions fail before the change
+and pass afterward. No test deadline, selector or coverage threshold changed.
+This is a bounded runner mitigation, not an established OS-level diagnosis;
+the complete normal hook must still prove all 126 files/1,664 tests. The
+standalone type check reports 66 existing errors, below the hook's 96 ceiling,
+with none in the changed test/config. Parent verified its bridge listener
+closed and both owned processes absent at 15:27:38 UTC. No restart is requested.
+
+The next normal Validate push at 75aa9555 also failed: all static/API gates
+passed, but eight fork handshakes failed and only 117 web files/1,474 tests
+executed. No owned workers remained afterward. The exact eight files pass
+unchanged with both explicit forks and threads, one worker and compile cache
+disabled: 188 tests in each focused diagnostic. Neither focused pass proves
+full-run recovery or isolates a pool/cache/OS cause. Blind complete retries
+have stopped. The subsequent autonomous runner decision is recorded above.
+No PR or Azure write
+has occurred; remote remains 2cea0267.
+
+The latest complete retry at 9ca103f2 passed every static/API gate but failed
+three Vitest fork handshakes: 122 files/1,458 tests executed. All three exact
+unstarted files subsequently pass unchanged, 204 tests and exit zero. Supported
+single-worker/cache settings helped previous runs but do not prevent recurrence.
+The host-level cause remains unproven; do not sum partial runs as full evidence.
+
+The subsequent lock/document commit bbcd6791 is not yet pushed. Its normal
+hook was interrupted across a logged 31,738.516-second wall-clock gap, then
+query-semantics HTTP cleanup rejected an expired token and 31 tests failed.
+Host sleep is not proven. The unchanged exact suite now passes all 42 tests
+with exit zero in a fresh focused run. No application/token/test setting changed.
+The failed full run and outer timeout remain evidence; a new normal complete
+Validate push is required. The remote still points to 2cea0267.
+
+The complete normal Validate push now passes at 2cea0267: API 6,259 tests
+in 218 suites, the existing reduced HTTP lane 2,517 passes/42 skips, and
+all 125 web files/1,662 tests with zero worker errors. All hook gates are green.
+The exact remote task ref and upstream match. Supported single-worker execution
+and verified Node 24 compile-cache activation allowed that non-coverage push
+to pass without changing deadlines, isolation, assertions or thresholds.
+Disable the compile cache for precise V8 coverage. CI run
+[44663499790](https://github.com/pranems/SCIMServer/actions/runs/44663499790)
+generated both 0.55.68 lockfiles at that exact SHA. Imported bytes are verified
+public-registry/sha512, version-metadata-only changes with no dependency delta.
+No local lockfile generation occurred. The next normal hook owns this lock/doc
+commit; reviewed PR, exact-tip CI, merged-source matrix and Azure dev remain open.
+
+Parent actual GUI cold-transport startup also passes: no listener, real failed
+connection, actual startup task, recovered exact repository, same daemon/image,
+GUI-task listener closure and isolated GUI/CDP cleanup. This is not a WSL reboot.
+The replacement bridge remains parent-owned and must not be stopped without
+coordination. Final GUI reconciliation covers 10,072 events and all 70 attempts,
+27 execution signals and one narration signal. Qualification PostgreSQL was
+stopped at exit zero and its exact owned full ID removed/verified absent.
+Original Desktop artifacts, volumes, backups and production remain unchanged.
+
+The following paragraphs retain the earlier November 19 consolidation boundary.
+
+Consolidation has resumed on the exact existing task branch. The actual clean
+standalone builder now passes after clean API/web/production installs, with
+unchanged source lockfile hashes. Its fresh owned tmpfs PostgreSQL accepts all
+30 migrations; the clean package passes 1,845 reported live checks and the
+user/group browser roundtrip. Five observed RED contracts close unsafe
+lockfile-regenerating fallback and unchecked native build-stage failures.
+The browser case now reuses the pre-create ownership guard.
+API/web manifests target the next patch, 0.55.68; CI-generated lockfiles,
+reviewed PR, exact-tip CI and merged-source dev remain pending. No shipping
+image or Azure estate has changed. GUI acceptance remains independent.
+Commits 45885140 and c9d040df preserve the coherent source and dated receipts.
+Normal Validate pushes remain blocked, not bypassed: badge C13 was corrected;
+the transient npm-tree timeout recovered with 6,259/218 units passing on the
+next hook; that hook then stopped at 65 Vitest worker-start timeouts.
+Three representative web files/209 tests pass with supported
+VITEST_MAX_WORKERS=2; the owning complete hook still must pass.
+Actual GUI View Logs selected a Desktop executable despite the correct Engine
+tree. Corrected bare command overrides now pass actual GUI Start/logs;
+Get-IndependentContainerToolsSettings reuses shared activation/preflight and
+carries Compose mount roots to both environments. Six new settings contracts
+and 34 existing runtime cases pass, plus read-only real Engine generation.
+The prior in-flight hook was cancelled for this material source correction;
+the complete updated-tip hook must run normally. Final parent-owned
+reload/Compose/cleanup acceptance now passes in the measured GUI scope:
+all 49 volume names/metadata, image labels, exact real-repository reconnect,
+individual lifecycle/logs and Windows-created Compose Start/healthy,
+Logs/ready and Stop/refreshed Exited(0). Linux-created group commands retain
+a Windows-cwd limitation; generic GUI Up/build/watch, cold bridge startup
+and explicit operator visual acceptance are not claimed. The isolated GUI/CDP
+and all its fixtures are removed; the shared bridge stays available.
+Source review at 17ac92ef reports no significant findings.
+The complete two-worker hook still has seven web bootstrap errors despite
+118 files/1,370 tests passing. All exact seven files/292 tests pass with one
+worker. The next normal complete hook uses that supported budget and a longer
+private whole-push budget, not changed test deadlines. Actual local active-SSE SIGTERM
+exits 0 in 1,035 ms, with durable
+final logging and restarted original-ID readback. Azure identity/ARM readback
+passes using the existing registry-selected principal; no cloud writes.
+
+[Current dashboard and execution ledger](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md)
+is authoritative; the November 18 assessment below is a dated qualification.
+Mermaid doctor passes after removing the obsolete marketplace renderer and
+its residual directory. Markdown is canonical; HTML was only a pre-rendered
+companion, not a replacement.
+
+Native inventory module wiring and active-SSE shutdown have observed RED/GREEN
+regressions: four unit suites/103 tests, two HTTP suites/three tests and API
+compilation pass. Standalone launchers now package/select Prisma 7 config and
+fail closed. The real package applies all 30 migrations to a fresh owned
+Engine PostgreSQL database. Both packaged backends pass 1,845 reported live
+checks/zero failures, with four old placeholders, and the user/group browser
+readback/reload case. These are focused current-source proofs, not a repeated
+full backend/browser matrix.
+
+The dispatch publisher now propagates established OCI metadata and IMAGE_TAG.
+Offline runtime/standalone/metadata contracts are wired into the standard
+pre-push, dev pipeline and a Windows CI job. A dedicated local VS Code
+Container Tools workspace selects the independent client/profile/SSH route;
+actual GUI inspection still needs acceptance. Five active image records do
+not require pruning; complete verified cold backups remain the recovery
+exception to active-cache retention.
+
+No product version/lockfile change, commit, push or cloud mutation has occurred.
+Next: finish focused validation/docs, then start the separate consolidation
+phase for version management, reviewed PR/exact-tip CI and the full ordered
+Azure dev pipeline. Do not bypass shipping-ref checks or promote production.
+Do not use the raw API's legacy api/public UI for current frontend validation.
+The original checkout's VS Code terminal settings name an old tenant; use
+the registry-resolved active automation profile in the isolated workspace.
+
+| Date | Summary |
+| 2026-11-20 | Reviewed Effect repair merged through #276 after exact-tip Validate/image GREEN. Preservation #277 adds 261 fail-closed contracts and passes a real 76-endpoint read-only stored-count comparison; combined-tip CI and release remain open. |
+|---|---|
+| 2026-11-20 | Complete normal Validate push passed; imported exact CI-only 0.55.68 metadata lockfiles; integrated actual cold-transport GUI evidence and exact disposable database cleanup. PR, merged-source dev and operator acceptance remain open. |
+| 2026-11-19 | Fixed Mermaid viewer conflict; added canonical current Markdown readiness guide; corrected native inventory, active SSE shutdown and failure-closed packaged migrations with real package/live/browser proofs; configured isolated GUI workspace and repaired dispatch image metadata. Final release/dev and GUI acceptance remain open. |
+
+### Historical container runtime assessment, 2026-11-18
+
+[Decision, measured evidence and operating runbook](docs/CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
+select independent Docker Engine in Ubuntu WSL with native Windows clients
+over pinned, key-only loopback SSH. The notice approves this runtime family;
+generated package-specific wording was not verified as native policy.
+No certificate sign-in or alternate corporate identity was used.
+
+Both source-built runtimes passed 1,841 reported live checks. Engine's full
+browser run passed 353 tests, with no failures/skips/flakes and all 13 pixel
+comparisons enabled, without baseline updates. All six backend/web modes
+passed: API units 6,254 per backend; E2E 2,612 Prisma / 2,570 in-memory
+with 42 backend skips; web 1,662 tests and all coverage thresholds. New
+runtime contracts total 54, with existing deployment contracts also passing.
+
+Session activation and four pipeline boundaries are wired. Debug mode now
+isolates ports/generated clients, migrates before startup and uses host-side
+Compose watch for actual Windows source edits. Native Node plus Engine
+PostgreSQL is the faster developer loop; full bootstrap restart takes minutes.
+Actual drained backup/restore passed schema/all-table equality, original
+IDs/membership, durable final logging and restored OAuth credential use.
+
+All 40 original Desktop volumes were copied read-only into Engine and matched
+by content/POSIX metadata hashes. An isolated original primary clone recovered
+and advanced from 20 to 30 Prisma migrations while preserving every original
+row/column value in nine tables. Both original VHDs and two configuration
+files now match protected backup hashes, with user/SYSTEM-only ACLs verified.
+A real distribution cold start retained all 40 volume fingerprints. This
+does not claim Windows host reboot or Desktop removal.
+
+Known pre-existing limits are explicit: live-SSE shutdown can exceed its
+deadline; in-memory Operations inventory has missing dependency wiring;
+packaged `-RunMigrations` lacks Prisma 7 configuration and does not fail closed.
+The persistent standalone passed all live checks plus browser roundtrip after
+an explicit repository migration stage. These are not silently marked fixed.
+The assessment assigns follow-up ownership and dates.
+
+Docker Desktop and every original artifact remain retained. Original dirty
+checkout, global Docker context/PATH, legacy optional MCP registration and
+other editor windows were not rewritten. Work is on
+`vprane/scimserver/containers-desktop-exit-20261118`. No commit, push, product
+version/lockfile change, cloud deployment or production promotion occurred.
+
+| Date | Summary |
+|---|---|
+| 2026-11-18 | Implemented independent Engine/WSL route and pipeline/session guards; 54 new contracts, six-mode matrix, 353-browser run, dual-runtime live checks, source-watch and restore qualification; carried 40 original volumes and verified original-schema replay. Desktop retained; operational limits remain explicit. |
+
 **User release documentation, 2026-11-05:** the canonical
 [release notes](docs/RELEASE_NOTES.md#05567) now explain the complete
 0.55.20-to-0.55.67 upgrade, not only the tenant move. Exact baseline6785200f

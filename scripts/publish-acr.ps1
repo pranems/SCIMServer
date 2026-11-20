@@ -54,6 +54,10 @@ $fullName = "$Registry.azurecr.io/scimserver:$Tag"
 Write-Info "Image will be pushed as $fullName"
 
 # Ensure resource group exists
+if (-not $UseRemoteBuild -and $env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME -eq '1') {
+  . (Join-Path $PSScriptRoot 'independent-container-runtime.ps1')
+  Assert-IndependentContainerRuntime | Out-Null
+}
 Write-Info "Ensuring resource group '$ResourceGroup' exists"
 az group show -n $ResourceGroup 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {

@@ -7,6 +7,168 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.55.68 consolidation
+
+- Effect security recovery for draft PR #275: update the existing exact API
+  override from 3.20.0 to 3.22.1 for CVE-2026-121707 /
+  GHSA-7589-6fvf-x4pw. Trivy rated it HIGH and blocked image run 44791352333
+  before merge/deployment; the maintainer advisory rates it Medium.
+  The permanent pin regression was RED before the manifest change.
+  Permanent actual-lock and installed-owner guards also reproduce 3.20.0 RED.
+  The first normal bootstrap hook blocked an unaccepted temporary graph; clean
+  npm ci rejects the manifest/old-lock mismatch. The authorized manifest-only
+  no-lock preparation changes only installed Effect and retains the old lock.
+  Normal Fast bootstrap at `712ddcc7` passed all 27 gates (218 API suites /
+  6,261 tests, HTTP 2,517 / 42 known skips). API-only CI lock run `44800892630`
+  changes only Effect; authenticated artifact `14660962893` was imported
+  unchanged. Fresh owned npm ci and four focused suites pass all 67 tests,
+  including actual-lock/installed-owner guards and the complete npm tree.
+  Pin tests increase from 29 to 33. Exact recovery head `1d4e4bc2` passed
+  normal Validate, all 30 gates: API 218 suites/6,263 tests (was 6,259),
+  HTTP 2,517 passes/42 existing skips, web 126 files/1,664 tests unchanged.
+  Exact-head image run 44806899588 passed validation, Windows contracts,
+  smoke and Trivy; read-only layer inspection verified actual Effect 3.22.1.
+  Reviewed stacked PR #276 merged into the migration branch, not master.
+  Retain the already
+  pending 0.55.68 candidate rather than inventing a second unreleased bump.
+  See [recovery evidence](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
+- Make deployment-preservation verification fail closed on incomplete endpoint
+  inventory, failed/malformed stored totals and missing/incompatible baselines.
+  Reuse ID-based admin statistics with explicit `stored-user-group-v1` semantics;
+  SCIM publication policy does not define stored data. A User-only regression
+  fixture retains four measured stored Groups. New offline coverage is
+  261 assertions, all passing and wired into the existing runtime gate.
+  The original isolated correction passed all 27 normal Fast gates; API,
+  HTTP and web application counts were unchanged by this helper-only change.
+  Two actual read-only dev runs compared all 76 endpoint IDs and equal
+  per-endpoint totals, summing to 1,175 Users and 428 Groups. These counts do
+  not prove resource IDs/content or post-deployment preservation.
+  See [semantics, coverage and RCA](docs/DEPLOYMENT_PRESERVATION_VERIFIER.md).
+
+- Mitigate recurring Windows Vitest fork-start failures with the supported
+  thread pool on Windows only; retain forks elsewhere and explicitly keep
+  file isolation enabled. Two observed RED/GREEN policy tests increase the
+  expected complete inventory from 125 files/1,662 tests to 126/1,664.
+  The complete normal Validate hook at 1f0daafa now passes all 126 files/1,664
+  tests with zero worker errors; all static/API gates and exact-ref push pass.
+  No deadline, assertion or
+  coverage threshold changed; no OS-level root cause is claimed.
+- Target the normal next patch, 0.55.67 -> 0.55.68. Lockfiles are generated
+  only by the existing public-registry CI workflow, never regenerated locally.
+  Run 44663499790 generated the imported API/web bytes at exact source 2cea0267;
+  verification proves version metadata only, public registry and sha512.
+  Publication, exact-tip review/CI and Azure dev are not yet completed.
+- Make the actual standalone builder fail closed for API/web/production
+  installation, Prisma generation and web compilation. Remove the npm install
+  fallback that could rewrite a lockfile after npm ci failed. Five observed
+  RED/GREEN contract assertions protect those boundaries.
+- Actual clean-install proof: 660 API and 256 production packages, current web
+  build, unchanged lockfile hashes, all 30 migrations on a new owned tmpfs
+  database, 1,845 reported live passes/zero failures and one browser
+  user/group/reload/original-ID case. This package predates the version bump;
+  final release matrix counts remain pending and are not borrowed from it.
+- Reuse the existing browser fixture's pre-create inventory ownership guard.
+  Test/gate improvement applied; design disposition accepted because the
+  linear builder and shared fixture remain cohesive without new abstractions.
+- Correct the actual Container Tools terminal executable boundary: a correct
+  Engine tree/PATH still allowed Desktop's binary. Generate bare independent
+  container/Compose command paths and both environments through the existing
+  activation/preflight helper. Six new RED/GREEN settings contracts pass
+  alongside 34 existing runtime cases; real Engine generation passes read-only.
+  Actual GUI image labels, all 49 volume names/metadata, exact repository
+  reload, individual lifecycle/logs and Windows-created Compose lifecycle
+  pass; fixtures and isolated GUI/CDP are cleaned up. Linux-created group
+  paths retain their explicit Windows limitation. Generic GUI Up/build/watch,
+  and operator visual acceptance are not claimed. A later actual cold-transport
+  GUI startup passes: absent listener/failed tree, real startup task, same
+  daemon/image and recovered repository, then listener/GUI/CDP cleanup.
+  This does not claim cold WSL/Engine reboot.
+- Preserve failed consolidation gates: the full hook's API units now pass
+  6,259 tests/218 suites; its existing reduced in-memory HTTP lane passes 2,517
+  tests with 42 skips. The web worker-start failure is not a full web pass.
+  The two-worker full attempt passes 118 files/1,370 tests but still has seven
+  bootstrap errors. All exact seven files/292 tests pass sequentially.
+  A subsequent one-worker attempt still had one startup error; its 90 missing
+  tests were not counted as passed. The complete normal hook at 2cea0267 then
+  passes all 125 files/1,662 web tests with verified Node 24 compile-cache
+  activation and zero unhandled errors. No test, bootstrap timeout, isolation
+  or threshold was weakened. The cache is private non-coverage optimization;
+  disable it for precise V8 coverage. The private outer Git orchestration
+  budget is corrected separately. Final merged-source matrix remains open.
+- Remove only the exact uniquely labelled tmpfs qualification PostgreSQL ID
+  after clean exit zero; verify absence. Preserve all originals and backups.
+  Test/gate improvement applied: full inventory/error counts and explicit
+  feature activation, not summed partial runs. Design disposition accepted:
+  reuse existing workflow, runtime helper and foreground task without new
+  runtime selection or service abstractions.
+
+### Current Docker Desktop removal readiness, November 19
+
+- Fix native in-memory cross-endpoint inventory by importing EndpointModule;
+  actual-module and HTTP regressions prove returned user/group values and
+  original IDs. Close active SSE subscriptions, timers and responses before
+  application shutdown; reject streams once shutdown begins.
+- Focused current-source evidence: four unit suites/103 tests, two HTTP
+  suites/three tests and API build pass. Standalone migration contracts add
+  54 assertions. Both real packaged backends pass 1,845 reported live checks
+  (1,841 -> 1,845, still four old placeholders) and the existing user browser
+  case expanded to groups, reload and original-ID readback.
+- Package/select Prisma 7 configuration in all four migration launchers;
+  stop before application startup on failure and clean up bundled PostgreSQL.
+  A fresh owned Engine PostgreSQL database accepts all 30 migrations through
+  the actual package before live/browser qualification.
+- Repair dispatch-publisher OCI labels and IMAGE_TAG propagation, retaining
+  version/full-SHA tags and the expected-SHA guard. Wire offline runtime,
+  standalone and metadata contracts into pre-push, dev Stage 1.14 and Windows CI.
+- Make Markdown the authoritative readiness report with diagrams, a GUI
+  comparison, retention policy and separately dated history. Remove the
+  competing Mermaid renderer; configure an isolated Container Tools workspace.
+  Actual GUI acceptance and corrected registry-label readback remain pending.
+- Product baseline remains 0.55.67 pending the separate normal consolidation,
+  version/CI/review and authorized dev-deployment phase. Final full-suite
+  counts are not inferred from focused runs. Desktop artifacts and production
+  are unchanged. Test/gate improvement applied: actual module, active-client,
+  packaged failure/success and automatic caller gates. Design disposition
+  accepted: existing exports, lifecycle ownership and metadata action, with
+  one small shared contract runner for three real delivery consumers.
+
+### Historical independent local container qualification, November 18
+
+- Select independent Docker Engine/Ubuntu WSL with native Windows Docker,
+  Compose and Buildx over pinned loopback SSH. Preserve Docker Desktop and
+  original artifacts; do not change global contexts or other editor windows.
+- Add process-scoped activation/provenance and conditional guards at four
+  pipeline boundaries. Add optional remote source/log binds without changing
+  ordinary public Compose defaults. Repair the compiled local validation
+  entry point and health route.
+- Qualify debug ports, API-owned inspector, migrations, isolated generated
+  clients and actual Windows source edits through host-side Compose watch.
+- New PowerShell contracts: 0 -> 54. Playwright inventory: 352 -> 353, with
+  final Engine 353/353 and all 13 pixel cases enabled, no baseline updates.
+  Existing application test inventory is unchanged: API units 6,254 per
+  backend; E2E Prisma 2,612 and in-memory 2,570 plus 42 skips; web 1,662.
+  Coverage: statements 83.06%, branches 75.86%, functions 75.53%, lines 85.74%.
+- Both exact source-built runtimes report 1,841 live passes, including four
+  existing retired-API placeholders. Engine backup/restore proves full
+  table/schema equality, unchanged source, original IDs/membership and actual
+  restored OAuth usability after draining persistent clients.
+- Carry 40 original Desktop volumes with SHA-256 content/POSIX metadata
+  equality. Recover an isolated original primary clone and replay all ten
+  outstanding Prisma migrations while preserving every original value in
+  nine tables. Both original VHDs and two configuration files match protected
+  backup hashes; all ten paths pass protected ACL checks. Distribution cold
+  start retains all 40 volume fingerprints. These remain separate proofs.
+- Keep known pre-existing SSE shutdown, in-memory inventory and packaged
+  migration-launcher defects explicit with owned follow-ups. Persistent
+  native standalone passes live/browser after an explicit repository
+  migration stage. No application behavior, product version, lockfile,
+  customer estate or deployment changes are included.
+- Self-improvement applied: real outcome gates for host access, bind paths,
+  source reload, schema readiness, original-state equality and credential use.
+  Design disposition accepted: small session/provenance and startup helpers,
+  no speculative multi-runtime framework.
+
 ### User-facing 0.55.67 cumulative release documentation
 
 - Replace the release landing page's obsolete pending-migration announcement

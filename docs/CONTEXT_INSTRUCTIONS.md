@@ -1,13 +1,129 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.67
-> **Last Updated**: November 5, 2026
-> **Last verified:** 2026-11-05
+> **Version**: 0.55.68
+> **Last Updated**: November 20, 2026
+> **Last verified:** 2026-11-20
 
 ---
 
 ## Active Delivery Process
+
+**Latest reviewed boundary, 2026-11-20:** Effect PR #276 merged into the migration
+branch at `2c1c74cf`, not master. Exact recovery head `1d4e4bc2` passed all 30
+normal Validate gates, API 218/6,263, reduced HTTP 2,517/42 known skips and web
+126/1,664. Exact-head image run 44806899588 passed smoke and Trivy, with actual
+Effect 3.22.1 read from verified image layers. Preservation PR #277 has 261
+passing offline contracts and two successful read-only 76-endpoint comparisons
+of per-endpoint stored totals (1,175 Users/428 Groups). Its original isolated
+tip passed all 27 Fast gates. The combined branch now includes the reviewed
+Effect target and still requires its own push/CI. See the
+[finite preservation claim](DEPLOYMENT_PRESERVATION_VERIFIER.md).
+Bridge is offline. Main draft PR #275, reviewed master merge, immutable shipping,
+full dev matrix, gallery and operator visual acceptance remain open. The
+capture-time paragraphs below are historical, not newer acceptance receipts.
+
+**Effect recovery, 2026-11-20:** draft PR #275 image run 44791352333 failed
+Trivy on Effect 3.20.0. Isolated recovery retains candidate 0.55.68 and changes
+only the existing exact override to 3.22.1 plus regressions/current receipts.
+Bootstrap installation is not final locked dependency evidence. The normal
+Fast bootstrap passed all 27 gates at `712ddcc7`; API-only CI lock run
+`44800892630` changes only Effect. Authenticated import and fresh owned restore
+pass all four focused suites/67 tests with the actual graph guards.
+Normal final Validate and nonshipping exact-ref image remain required.
+Original branch, merge and deployment are parent-owned.
+See [recovery receipts](CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
+**Latest runner boundary, 2026-11-20:** subsequent normal hooks remain blocked
+by fork-start timeouts despite unchanged focused passes. The operator directed
+autonomous continuation. A Windows-only supported thread-pool mitigation now
+has two observed RED/GREEN policy tests, with explicit isolation and unchanged
+deadlines/coverage thresholds. Linux retains forks. The normal complete hook
+must prove 126 files/1,664 tests; focused comparisons are not full-run recovery.
+The parent has verified its owned bridge listener closed and both processes
+absent. Transport is intentionally offline; no Engine/WSL/data/Desktop change.
+
+**Complete recovery, 2026-11-20 16:14 UTC:** the normal complete Validate hook
+and exact-ref push at 1f0daafa pass every gate: API 218 suites/6,259 tests,
+reduced HTTP 2,517 passes/42 skips and all 126 web files/1,664 tests with zero
+worker errors. Remote/upstream exact SHA is verified. Windows threads with
+isolation and cache disabled establish this run, not an OS-level diagnosis.
+The receipt-only follow-up uses the normal default Fast hook; exact-tip PR CI
+and the fresh merged-source DEV matrix still remain open. Parent's final
+metadata/static closure leaves originals and verified backups untouched.
+Optional assistant Docker MCP gateway is still Desktop-dependent; independent
+helper PATH lookup does not prove credential-store or registry operations.
+
+**Current consolidation, 2026-11-20:** normal Validate push at 2cea0267 passes
+all gates: 6,259 API units/218 suites, 2,517 reduced-lane HTTP passes/42 skips,
+125 web files/1,662 tests and zero worker errors. The supported one-worker,
+verified Node compile-cache setup changes no test deadlines or thresholds;
+disable that cache for precise V8 coverage. CI run
+[44663499790](https://github.com/pranems/SCIMServer/actions/runs/44663499790)
+generated both 0.55.68 lockfiles at the exact pushed SHA; verified imported
+bytes change only version metadata, not dependency content. No local generation.
+Actual GUI cold-transport startup now passes through the existing startup task
+from an absent listener and failed tree to the same daemon/image and recovered
+repository, then owned GUI/task cleanup. This is not a WSL/Engine cold reboot.
+The replacement shared bridge remains parent-owned. The exact disposable
+qualification database was removed and verified absent. Reviewed PR/exact-tip
+CI, merged-source matrix, immutable publication, Azure dev and explicit operator
+visual acceptance remain open. Earlier paragraphs below are dated history.
+
+**Current removal readiness, 2026-11-19:** the
+[current Markdown dashboard](CONTAINER_RUNTIME_REMOVAL_READINESS.md) supersedes
+capture-time holds without erasing their historical evidence. Mermaid doctor
+passes with one built-in renderer. Native inventory and active-stream shutdown
+regressions pass (103 neighboring units, three focused HTTP tests); API builds.
+The corrected standalone applies 30 migrations to a fresh owned Engine database.
+Prisma and in-memory packages each pass 1,845 live checks, zero failures, and
+the actual user/group browser inventory/reload/readback case. Four old live
+placeholders remain disclosed. These are not final full-suite or cloud proofs.
+The dedicated Container Tools workspace is configured but actual GUI acceptance
+is pending. Dispatch image labels and automatic offline contract wiring are
+corrected in local source. Consolidation now targets patch 0.55.68; CI-generated
+lockfiles, reviewed exact-tip CI and merged-source dev remain open. The actual
+clean builder installs 660 API and 256 production packages and leaves both
+source lockfile hashes unchanged. That clean package applies all 30 migrations,
+passes 1,845 reported live checks and the owned user/group browser case.
+Five observed RED/GREEN builder assertions now reject unchecked native stages
+and lockfile-regenerating install fallback. No new deployment, Desktop removal
+or production promotion is claimed.
+Actual GUI qualification then exposed an independent executable boundary:
+Container Tools tasks still chose Desktop despite the correct Engine tree.
+Bare independent command overrides now pass actual Start/logs. The shared
+runtime helper generates both command settings and container/terminal
+environments after fresh preflight, retaining Compose bind/log roots.
+Six new settings contracts plus the existing 34 runtime cases and read-only
+real Engine generation pass. Actual GUI image labels, all 49 volume names and
+metadata, real-repository reload, individual lifecycle/logs and Windows-created
+Compose Start/healthy, Logs/ready, Stop/refreshed Exited(0) now pass. Fixtures
+and isolated GUI/CDP are cleaned up. Historical Linux-created group paths are
+not Windows-task compatible; generic GUI Up/build/watch, cold bridge startup
+and explicit operator visual acceptance remain unqualified. The full updated-tip
+hook, CI lockfiles, reviewed PR and merged-source dev remain open. Two-worker
+Vitest still leaves seven startup errors; all exact seven files/292 tests pass
+sequentially. No test/bootstrap timeout or assertion was changed.
+
+**Historical local container qualification, 2026-11-18:** independent Engine in Ubuntu WSL,
+native Windows clients and pinned loopback SSH are the selected local route.
+See the [runtime decision and runbook](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md).
+Process-scoped activation guards applicable local pipeline boundaries without
+changing public defaults or global Docker contexts. Source-built Engine and
+Podman each passed 1,841 reported live checks; Engine passed 353 browser cases
+including all pixel comparisons, and all six backend/web modes passed.
+Fifty-four new contracts guard provenance, rollback, binds, startup and
+pipeline boundaries. All 40 original Desktop volume directories were carried
+and hash-matched; an isolated primary clone recovered and replayed 20 -> 30
+migrations with every original row/column value retained. Both VHD backups
+and two configurations hash-match, protected ACLs pass, and all 40 carried
+volumes retain their fingerprints after a distribution cold start. Actual
+application backup/restore also proved original IDs and restored OAuth use.
+Desktop is not uninstalled, cloud facts below are not revalidated by these
+local checks, and no product version or lockfile changed. Existing live-SSE
+shutdown, native in-memory inventory and packaged migration-switch defects
+are recorded, not claimed fixed. Use PostgreSQL plus an explicit repository
+migration stage for the qualified persistent native route.
 
 **User-facing release reference, 2026-11-05:** share
 [0.55.67 cumulative release notes](RELEASE_NOTES.md#05567) for the upgrade

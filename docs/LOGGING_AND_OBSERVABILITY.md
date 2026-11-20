@@ -1,6 +1,15 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-16 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.68`
+
+**Unreleased shutdown correction, November 19:** local source now closes active
+log-stream responses, subscriptions and keepalive timers before the HTTP server
+closes. A client no longer has to disconnect first. The stream handler rejects
+new streams with HTTP 503 after shutdown begins; a stopped listener instead
+refuses the connection. Real active-client HTTP shutdown and idempotent cleanup
+regressions pass. This does not claim that a new image has been deployed or that
+all global Jest open handles are resolved. See the
+[current readiness evidence](CONTAINER_RUNTIME_REMOVAL_READINESS.md).
 
 **Current UI presentation:** absolute timestamps in Logs, Activity, Operations
 and live/detail drawers include full UTC date/time and milliseconds. Copy

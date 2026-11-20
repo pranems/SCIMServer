@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-05 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.68`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -12,6 +12,48 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). These notes are 
 user-facing companion, not a second independent version ledger or a raw commit
 log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
+
+## 0.55.68
+
+**Status: release candidate under consolidation, not yet published or deployed.**
+
+This patch qualifies the local Windows development route without Docker
+Desktop: independent Docker Engine in Ubuntu WSL, independently installed
+Windows Docker/Compose/Buildx clients and pinned key-only loopback SSH.
+Existing public Compose defaults remain available. No database migration or
+public SCIM response-shape change is introduced.
+
+- Native in-memory cross-endpoint inventory now returns the users and groups
+  already created through SCIM instead of an empty inventory caused by missing
+  module wiring.
+- An active browser log stream no longer prevents application shutdown.
+  The server closes its streams and subscriptions before closing HTTP.
+- Standalone packages include and select their Prisma 7 configuration.
+  Migration or clean-build failures stop explicitly rather than starting an
+  application against an unprepared database or reporting a partial package
+  as successful.
+- The dispatch publisher carries the same source/version labels as the
+  other established image builders. Read actual registry labels and digests
+  after publication; a local build is not a shipping artifact.
+- The existing Effect dependency override is corrected from 3.20.0
+  to exact 3.22.1 for CVE-2026-121707 / GHSA-7589-6fvf-x4pw.
+  The image security gate blocked draft PR #275 before merge/deployment.
+  The authenticated CI lock changes only Effect, and fresh installed-tree
+  checks pass. Final hook and nonshipping image receipts are tracked in
+  the readiness report; historical application test passes do not prove this
+  security correction. This remains the same unshipped 0.55.68 candidate.
+
+The [canonical readiness report](CONTAINER_RUNTIME_REMOVAL_READINESS.md)
+separates clean-install/live/browser and container-shutdown evidence from
+pending reviewed-source release, Azure dev and actual graphical acceptance.
+The installed VS Code Container Tools extension must pin its official
+container/Compose command overrides; PATH alone was observed selecting a
+Docker Desktop executable for terminal actions.
+
+All original Docker Desktop artifacts, volumes and verified cold backups
+remain retained. Desktop uninstall, Intune consent, canary and customer
+production changes are not part of this release authorization. The earlier
+0.55.67 performance exception does not qualify this new release.
 
 ## 0.55.67
 

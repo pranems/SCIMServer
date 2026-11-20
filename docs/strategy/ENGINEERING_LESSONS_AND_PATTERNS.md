@@ -14,6 +14,90 @@
 
 ---
 
+## Qualify the assembled workflow and its callers (2026-11-19)
+
+The [removal-readiness corrections](../CONTAINER_RUNTIME_REMOVAL_READINESS.md)
+exposed three different false greens. A manually supplied EndpointService mock
+did not prove the real module imported its provider. Repository Prisma success
+did not prove packaged configuration or failure-closed launchers. Passing new
+contracts manually did not prove pre-push, CI or deployment invoked them.
+
+Use actual module wiring when optional injection can otherwise return an empty
+result. Exercise generated launchers against both native failure codes and a
+real fresh database. Add new regression suites to the real delivery callers,
+then run that shared entry point. Preserve distinct claims: API compilation,
+full live checks, browser values/reload and original-ID readback are not
+interchangeable.
+
+On Windows, `if errorlevel 1` is a positive-threshold check, not an all-failure
+check. A native migration failure can be negative. Compare the status with
+zero and exercise both positive and negative failures before claiming a
+generated batch launcher fails closed.
+
+The actual clean standalone builder needs the same failure-closed discipline:
+never retry failed npm ci with a lockfile-regenerating install, and check
+generation, web build and production installation independently. A real fresh
+production install is distinct from assembling previously installed files.
+Read Docker-assigned ports again after container restart; a captured container
+ID remains its ownership handle, but its host-port lease can change.
+
+GUI provenance has two independent boundaries. Container Tools can display
+the intended Engine while its terminal-backed actions still use an
+auto-detected Docker Desktop executable. Environment PATH does not pin the
+extension SDK's executable discovery. Configure its official container and
+Compose command overrides explicitly, then inspect an actual generated task
+command after editor reload. For Container Tools 2.5.3 both values are only
+the executable path: extra quoting/flags become an invalid executable, and a
+compose suffix triggers its legacy-Compose rejection. Host/config/context and
+daemon-side Compose roots belong in both extension and terminal environments.
+Generate these through the existing independent-runtime helper after shared
+preflight, rather than maintaining a second GUI runtime selector. Correct
+daemon identity and useful logs alone are not proof that Desktop removal is safe.
+
+Before browser acceptance, identify the SPA actually served by the selected
+form factor. The raw compiled API served legacy public assets while the current
+standalone contained the current web build; replacing pixel baselines would
+have hidden the target mistake. Network waits must follow the actual query
+lifecycle, not assume a cached tab switch issues a new request.
+
+**Disposition: applied.** Actual-module, active-client and generated-launcher
+regressions plus the common seven-suite delivery runner close the observed
+gaps. No new speculative container abstraction is needed.
+**Design disposition: accepted.** Reuse the module export, controller lifecycle
+and pinned metadata action; share only the small runner used by three real
+delivery consumers.
+
+## Runtime replacement needs boundary and original-state proofs (2026-11-18)
+
+The [container migration](../CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
+exposed several false-green boundaries: container health without Windows HTTP,
+API health without schema, a running inspector without observed source edits,
+and live API checks without a correct browser inventory. Existing outcome-gate
+rules apply at each boundary independently, not only to the overall suite.
+
+Preservation has three distinct proofs: raw bytes/POSIX metadata, database
+recoverability and schema-upgrade value preservation. The trial copied 40
+read-only original volumes, deliberately corrupted only a disposable clone
+to prove rejection, then replayed actual migrations while comparing every
+original column/row. Compare additive schemas through original-column
+projection and retain old migration rows, rather than expecting expanded
+row JSON to hash identically.
+
+Session selection must preserve absent versus empty environment values and
+verify executable/helper provenance, not only a Docker-compatible version.
+An independent daemon reached through a Desktop client or credential helper
+is not an independent installation. Real activation and rollback contracts
+now enforce those boundaries.
+
+**Disposition: applied.** The runtime contracts and browser outcome spec
+operationalize existing outcome-first rules. At this November 18 boundary,
+pre-existing in-memory inventory, packaged migration and live-SSE shutdown
+defects remained separately owned. Their later explicit RED/GREEN corrections
+are recorded in the November 19 readiness guide, not retroactively claimed here.
+**Design disposition: accepted.** Keep one small provenance/session helper
+and one foreground startup helper; a configurable multi-engine framework
+would add speculative complexity.
+
 ## Negative controls must follow roles, not former generations (2026-11-04)
 
 After the valid prov10 activation, the R5 zero-active control still changed

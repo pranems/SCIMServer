@@ -1,8 +1,8 @@
 # Docker Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-10-09 - **Product version:** `0.55.67`
+> **Status:** User-facing reference - **Last verified:** 2026-11-18 - **Product version:** `0.55.68`
 
-> **Version:** 0.55.67 - **Updated:** June 3, 2026
+> **Version:** 0.55.68 - **Updated:** June 3, 2026
 > **Source of truth:** [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml)
 
 ---
@@ -26,6 +26,16 @@
 
 ## Quick Start
 
+Docker Desktop is optional, not required. On the managed Windows development
+host, use the independent Engine/WSL
+[operator workflow](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md) first.
+It preserves native PowerShell/Compose/Buildx, validates the selected client
+and server, and supplies explicit Linux paths for remote binds. The
+`SCIM_CONTAINER_SOURCE_ROOT` and `SCIM_CONTAINER_LOG_DIRECTORY` variables are
+optional; ordinary local defaults remain unchanged. Podman native builds need
+Docker image format to retain this Dockerfile's healthcheck; a successful OCI
+build alone is not equivalent qualification.
+
 ```bash
 # Clone and start
 git clone https://github.com/your-org/SCIMServer.git
@@ -33,7 +43,7 @@ cd SCIMServer
 docker compose up --build -d
 
 # Verify
-curl http://localhost:8080/health
+curl http://localhost:8080/scim/health
 # {"status":"ok","uptime":5,"timestamp":"2026-04-24T10:00:00.000Z"}
 
 # Create an endpoint and start using SCIM

@@ -62,7 +62,7 @@ $headers = @{ Authorization = "Bearer $token" }
 | OAuth Secret | `devscimclientsecret` |
 | Shared Secret | `devscimsharedsecret` |
 | JWT Secret | `devjwtsecretkey123456` |
-| Cost | **$0** (local Docker Desktop) |
+| Cost | **$0** runtime license (independent Docker Engine/WSL or approved Podman; host resources still have a cost) |
 
 **Manage:**
 ```powershell
@@ -283,7 +283,10 @@ Enterprise → Connection limits + write amplification (need pgBouncer + read re
 
 - Local and Docker have **no cost** but share your machine's resources
 - For Medium+, ensure PostgreSQL has ≥4 GB `shared_buffers` and `work_mem=64MB`
-- Docker default memory limit is 2 GB - increase via Docker Desktop settings for Large
+- Runtime memory limits depend on the Engine/WSL or Podman configuration.
+  Inspect effective resources rather than assuming a requested VM limit was
+  enforced. Follow the [independent-runtime guide](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
+  before running Large sizing profiles.
 - Local can handle Large if your machine has ≥16 GB RAM and SSD storage
 
 ---

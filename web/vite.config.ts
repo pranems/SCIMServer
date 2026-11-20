@@ -40,6 +40,8 @@ export default defineConfig({
     }
   },
   test: {
+    pool: process.platform === 'win32' ? 'threads' : 'forks',
+    isolate: true,
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

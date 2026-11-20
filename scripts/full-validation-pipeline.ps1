@@ -165,13 +165,13 @@ if (-not $SkipLocal) {
     # Step 4: Start local instance
     Write-Phase 1 4 "Start Local Instance (port $localPort)"
     try {
-        # Start dev server in background
+        # Use the artifact already built above, without downloading a runner.
         $env:PORT = $localPort
-        $localProc = Start-Process -FilePath "npx" -ArgumentList "ts-node-dev --respawn --transpile-only src/main.ts" `
+        $localProc = Start-Process -FilePath "node" -ArgumentList "dist/main.js" `
             -WorkingDirectory $apiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput "$apiDir\local-server.log" -RedirectStandardError "$apiDir\local-server-err.log"
         Write-Host "  Local server PID: $($localProc.Id)" -ForegroundColor Yellow
 
-        $ready = Wait-ForEndpoint $localBaseUrl 60 "local instance"
+        $ready = Wait-ForEndpoint "$localBaseUrl/scim/health" 60 "local instance"
         if (-not $ready) { throw "Local instance did not start" }
         Write-Result "Local instance running on port $localPort" $true
     } catch {
@@ -218,6 +218,10 @@ if (-not $SkipLocal) {
 # PHASE 2 - Docker Build & Validation
 # ══════════════════════════════════════════════════════════════
 if (-not $SkipDocker) {
+    if ($env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME -eq '1') {
+        . (Join-Path $PSScriptRoot 'independent-container-runtime.ps1')
+        Assert-IndependentContainerRuntime | Out-Null
+    }
     Write-Host "`n╔══════════════════════════════════════════╗" -ForegroundColor White
     Write-Host   "║    PHASE 2 - DOCKER BUILD & VALIDATION   ║" -ForegroundColor White
     Write-Host   "╚══════════════════════════════════════════╝" -ForegroundColor White

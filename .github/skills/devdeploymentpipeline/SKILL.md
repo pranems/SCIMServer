@@ -59,6 +59,7 @@ A change that ships without its Playwright spec is incomplete. Stage 5.3 below f
 1.6. **Web size-limit** (`cd web; npm run size`) - all budgets pass. **If any budget fails, the gate fails.** No "pre-existing baseline" excuse - fix the config or fix the bundle.
 1.7. `bundlebudgetaudit` - every new lazy route under `web/src/routes/` has a `size-limit` entry in `web/package.json`.
 1.8. `prismamigrationaudit` - when `api/prisma/` is touched, schema + migrations + InMemory repos in lockstep.
+1.14. **Independent runtime and standalone contracts** (`pwsh -NoProfile -File scripts\test-container-runtime.ps1`) - all seven offline suites pass. Covers client/server provenance, activation rollback, WSL startup, bind paths, pipeline boundaries, failure-closed packaged migrations and publisher metadata. The same runner executes at pre-push and in Windows CI; it does not start a daemon or replace the live/container/browser gates.
 
 ### Stage 2 - Local test gates
 
