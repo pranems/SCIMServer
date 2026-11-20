@@ -9,6 +9,20 @@
 
 ## Active Delivery Process
 
+**Latest reviewed boundary, 2026-11-20:** Effect PR #276 merged into the migration
+branch at `2c1c74cf`, not master. Exact recovery head `1d4e4bc2` passed all 30
+normal Validate gates, API 218/6,263, reduced HTTP 2,517/42 known skips and web
+126/1,664. Exact-head image run 44806899588 passed smoke and Trivy, with actual
+Effect 3.22.1 read from verified image layers. Preservation PR #277 has 261
+passing offline contracts and two successful read-only 76-endpoint comparisons
+of per-endpoint stored totals (1,175 Users/428 Groups). Its original isolated
+tip passed all 27 Fast gates. The combined branch now includes the reviewed
+Effect target and still requires its own push/CI. See the
+[finite preservation claim](DEPLOYMENT_PRESERVATION_VERIFIER.md).
+Bridge is offline. Main draft PR #275, reviewed master merge, immutable shipping,
+full dev matrix, gallery and operator visual acceptance remain open. The
+capture-time paragraphs below are historical, not newer acceptance receipts.
+
 **Effect recovery, 2026-11-20:** draft PR #275 image run 44791352333 failed
 Trivy on Effect 3.20.0. Isolated recovery retains candidate 0.55.68 and changes
 only the existing exact override to 3.22.1 plus regressions/current receipts.

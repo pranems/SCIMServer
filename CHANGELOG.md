@@ -23,10 +23,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes only Effect; authenticated artifact `14660962893` was imported
   unchanged. Fresh owned npm ci and four focused suites pass all 67 tests,
   including actual-lock/installed-owner guards and the complete npm tree.
-  Pin tests increase from 29 to 33. Final normal Validate and nonshipping image
-  validation remain pending, not inherited from older receipts. Retain the already
+  Pin tests increase from 29 to 33. Exact recovery head `1d4e4bc2` passed
+  normal Validate, all 30 gates: API 218 suites/6,263 tests (was 6,259),
+  HTTP 2,517 passes/42 existing skips, web 126 files/1,664 tests unchanged.
+  Exact-head image run 44806899588 passed validation, Windows contracts,
+  smoke and Trivy; read-only layer inspection verified actual Effect 3.22.1.
+  Reviewed stacked PR #276 merged into the migration branch, not master.
+  Retain the already
   pending 0.55.68 candidate rather than inventing a second unreleased bump.
   See [recovery evidence](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#effect-security-recovery-2026-11-20).
+
+- Make deployment-preservation verification fail closed on incomplete endpoint
+  inventory, failed/malformed stored totals and missing/incompatible baselines.
+  Reuse ID-based admin statistics with explicit `stored-user-group-v1` semantics;
+  SCIM publication policy does not define stored data. A User-only regression
+  fixture retains four measured stored Groups. New offline coverage is
+  261 assertions, all passing and wired into the existing runtime gate.
+  The original isolated correction passed all 27 normal Fast gates; API,
+  HTTP and web application counts were unchanged by this helper-only change.
+  Two actual read-only dev runs compared all 76 endpoint IDs and equal
+  per-endpoint totals, summing to 1,175 Users and 428 Groups. These counts do
+  not prove resource IDs/content or post-deployment preservation.
+  See [semantics, coverage and RCA](docs/DEPLOYMENT_PRESERVATION_VERIFIER.md).
 
 - Mitigate recurring Windows Vitest fork-start failures with the supported
   thread pool on Windows only; retain forks elsewhere and explicitly keep

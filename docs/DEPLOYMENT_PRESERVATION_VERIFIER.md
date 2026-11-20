@@ -194,3 +194,33 @@ Offline contracts and real dev read-only self-comparison pass. Normal complete
 hook, reviewed integration, exact-tip CI and publication remain parent-owned.
 No push, deployment, registry change, credential recovery or Desktop operation
 is authorized or performed by this change.
+
+### Later parent consolidation
+
+The handoff above describes the isolated implementer's boundary. Parent
+subsequently reviewed the committed correction and completed the normal Fast
+explicit-ref push at `67789d16`: all 27 gates passed in 1041.8 seconds. The
+normal runtime runner executed all 261 preservation assertions; API units
+passed 218 suites/6,259 tests and reduced HTTP passed 2,517 tests with 42
+existing skips. No new application test or skip was introduced by this helper.
+Stacked PR #277 targets the migration branch, not master.
+
+The target's reviewed Effect fix was then merged into the preservation branch
+without rewriting history. Its CI-generated lock is unchanged after a fresh
+API `npm ci`; Prisma remains 7.8.0 and actual Effect resolves to 3.22.1.
+The combined tip requires a new normal push and exact-tip CI. The earlier
+isolated hook is not presented as evidence for that changed dependency graph.
+Parent also updated the shared readiness, changelog and context documents.
+
+| Parent execution issue | Type / severity | Root cause, confirmed correction and prevention | Detection / earliest possible |
+|---|---|---|---|
+| Fresh worktree API build lacked generated client | Setup friction / Low | Root/API/web dependencies were absent and restored with `npm ci`, preserving all lock bytes. The ignored Prisma client was still absent, so the first push stopped at compilation. Existing `npm run prisma:generate` generated 7.8.0 using a nonconnecting build URL, then the unchanged normal hook passed. Check both installations and generated client before a fresh-worktree hook. | First API compile / fresh-worktree prerequisite preparation |
+| Coordination message limit | Tooling friction / Low | The service rejected messages after its 100-message process cap. Both actors' persisted ownership boundaries were explicit: Effect released local Node ownership and preservation retained no-push/no-Node. Parent therefore ran the next hook directly, without creating a competing actor or bypassing the messaging limit. Batch coordination and preserve explicit ownership receipts. | Message rejection / coordination budget awareness |
+
+These parent issues are appended from confirmed command output. They are not
+part of the implementer's earlier 813-record reconciliation claim. The final
+release ledger still requires reconciliation against the later parent
+transcript. Test/gate disposition: accepted for setup friction because the
+existing build blocked publication and the documented prerequisite now precedes
+the retry. Design disposition: accepted; no application or orchestration
+abstraction is justified by a missing generated build artifact.
