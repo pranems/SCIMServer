@@ -2,6 +2,24 @@
 
 ### Current Docker removal readiness, 2026-11-20
 
+The normal complete Validate hook and exact-ref push PASS at
+1f0daafa5bc4dc395378a96059e13dea21917d8f, completed 16:14:35 UTC:
+218 API suites/6,259 tests, reduced HTTP 2,517 passes/42 known skips,
+all 126 web files/1,664 tests and zero worker errors. Every hook gate passes;
+remote/upstream exact SHA is independently verified. Windows threads,
+isolation true and disabled compile cache produced this complete run, not
+an established OS-level root-cause fix. The following documentation-only
+receipt update uses the normal default Fast hook; no unchanged full suite
+is manually rerun. Exact-tip PR CI and merged-source deployment remain open.
+
+Final parent machine-local evidence is separately bounded: bridge cleanup
+verified, metadata-only original/backup preservation recheck passed, and
+independent Docker/wincred/OpenSSH resolution passed in Desktop-excluded
+probe PATHs. No new hashes, restore, credential operation or uninstall
+acceptance is claimed. Optional assistant Docker MCP gateway is still
+Desktop-owned and not independently migrated. Do not claim all machine
+developer tooling Desktop-free.
+
 Following the operator's direction to proceed autonomously, Windows now uses
 Vitest's supported thread pool; other platforms explicitly retain forks.
 Isolation is explicitly true. Two policy assertions fail before the change

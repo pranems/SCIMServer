@@ -531,6 +531,19 @@ an executable pool/isolation policy check rather than a private runner shim.
 Design disposition: accepted; two config properties use the existing runner
 and avoid a new abstraction, hook bypass or dependency change.
 
+R35 complete-run outcome, November 20 16:14:35 UTC: the normal complete
+Validate hook and push at 1f0daafa5bc4dc395378a96059e13dea21917d8f PASS.
+All 126 web files/1,664 tests execute with zero worker errors. Static gates,
+218 API suites/6,259 tests and the reduced HTTP lane's 2,517 passes/42 known
+skips also pass. Git exits zero and the remote exact ref/upstream are
+independently verified. Receipt: release-push-1795188745675.txt/json.
+The web gate took 1,626.5 seconds. This is a complete observed recovery
+under the Windows thread-pool mitigation with cache disabled, not proof
+of the underlying OS cause or a permanent guarantee. Preserve all failed
+runs. Linux forks and the full merged-source matrix require their own
+evidence. Documentation-only receipt consolidation uses the ordinary
+default Fast hook; the unchanged full suite is not manually repeated.
+
 R39, test harness / Low: directly importing the Vite config from the new
 source-tree policy test pulled tooling-only imports into the application
 TypeScript project. The first check had 68 errors, including two new
@@ -593,6 +606,44 @@ successful-looking output/captures were also reviewed for G1/G2/G4/G10 because
 an error-word scan cannot catch those false greens. Source/history/search
 echoes, line-wrapped readiness and initial inventory lag are explicitly
 classified rather than counted as new Engine defects.
+
+Later parent machine-local closure extends that historical GUI boundary:
+10,733 full transcript events, 70 GUI attempts, 30 execution signals and one
+narration signal, all classified. G14 records reuse of a private cleanup
+receipt key; separate original-GUI and final-shared-bridge checkpoints were
+restored from exact earlier evidence. G15 records a private timestamp
+comparison false failure corrected with string-preserving JSON date parsing.
+G16 records an optional-null probe false failure. G17 records an unexplained
+inline command-discovery rejection/empty diagnostic, replaced by explicit
+Windows where.exe receipts. These are private evidence-tool issues, not
+application, runtime or credential-protocol failures.
+
+The metadata-only preservation recheck passes ten file records, eight
+protected ACL paths and exactly 40 original volume identities across the
+existing offline inventory/fingerprints. Original and verified-backup VHD
+lengths and the Desktop executable length match original metadata; config
+and protected backup existence was checked without content reads. The
+unverified early backup candidate remains explicitly unverified. No current
+hashing, remount, restore or fresh integrity claim is made; prior cryptographic
+verification remains 2026-11-19T02:13:57.6478005Z.
+
+Static helper resolution passes in both generated workspace environments,
+including probe-process PATHs with two Desktop entries removed. Independent
+Docker, wincred, native Windows OpenSSH and PowerShell remain resolvable;
+Compose/Buildx are ordinary independent profile-local files. The independent
+wincred helper is an ordinary 2,964,992-byte file and resolves first in both
+workspace scopes. An unactivated shell still resolves Desktop. No helper
+protocol, credential-store operation, registry sign-in, global PATH change
+or actual post-uninstall runtime acceptance was exercised.
+
+Optional assistant MCP gateway remains an explicit Desktop dependency:
+global Copilot configuration declares bare docker plus mcp gateway, while
+the independent profile has no docker-mcp.exe. The standard plugin is a
+48,361,904-byte NTFS hardlink to Desktop's plugin. Neither gateway startup nor
+independent migration is qualified. This does not invalidate the separately
+tested SCIMServer/Container Tools route, but all machine developer tooling
+must not be described as Desktop-free. No gateway configuration or credential
+operation was changed as part of this evidence.
 
 Consolidation receipts are `test-results/release-clean-standalone-build-green.txt`,
 `release-clean-package-health.json`, `release-clean-package-live.txt` and

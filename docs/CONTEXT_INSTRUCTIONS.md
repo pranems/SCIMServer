@@ -18,6 +18,17 @@ must prove 126 files/1,664 tests; focused comparisons are not full-run recovery.
 The parent has verified its owned bridge listener closed and both processes
 absent. Transport is intentionally offline; no Engine/WSL/data/Desktop change.
 
+**Complete recovery, 2026-11-20 16:14 UTC:** the normal complete Validate hook
+and exact-ref push at 1f0daafa pass every gate: API 218 suites/6,259 tests,
+reduced HTTP 2,517 passes/42 skips and all 126 web files/1,664 tests with zero
+worker errors. Remote/upstream exact SHA is verified. Windows threads with
+isolation and cache disabled establish this run, not an OS-level diagnosis.
+The receipt-only follow-up uses the normal default Fast hook; exact-tip PR CI
+and the fresh merged-source DEV matrix still remain open. Parent's final
+metadata/static closure leaves originals and verified backups untouched.
+Optional assistant Docker MCP gateway is still Desktop-dependent; independent
+helper PATH lookup does not prove credential-store or registry operations.
+
 **Current consolidation, 2026-11-20:** normal Validate push at 2cea0267 passes
 all gates: 6,259 API units/218 suites, 2,517 reduced-lane HTTP passes/42 skips,
 125 web files/1,662 tests and zero worker errors. The supported one-worker,
