@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-19 - **Repo version at capture:** `api/package.json` = `0.55.67`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-20 - **Repo version at capture:** `api/package.json` = `0.55.67`
 > **Scope:** Infrastructure elements and deployment form factors. Current prov10 dev/canary observations are recorded below; Sections 4-6 retain explicitly historical tenant-09/customer measurements, not November 4 revalidation of those estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -1138,7 +1138,29 @@ rejects it as ambiguous.
 
 ### 8.4 Verification - `verify-deployment.ps1`
 
-Runs, in order: health probe; a **data and ID inventory snapshot** (`/scim/admin/endpoints?count=200` then per-endpoint `Users?count=1` and `Groups?count=1` for `totalResults`) written to `test-results/inventory-<label>.json`; an optional before/after diff that fails on endpoint-count delta, any missing ID, or any per-endpoint count **regression**; the live SCIM suite via `live-test.ps1`; and optionally Playwright with `--grep-invert 'Visual regression|Visual Snapshots'` (pixel baselines are data-coupled and would falsely abort a healthy flip).
+Validates any requested baseline first (missing, malformed or incompatible
+count-basis evidence exits 2),
+then runs the health probe and a complete endpoint UUID/count snapshot.
+`/scim/admin/endpoints` is currently unpaged; its endpoint array must match the
+reported integer `totalResults` and contain unique valid UUIDs. Each canonical
+`/scim/admin/endpoints/{endpointId}/stats` request must succeed and return
+`users.total` and `groups.total` as nonnegative integers, including valid zero.
+These are stored User/Group resources, independent of SCIM ResourceType
+publication and visibility. User-only endpoints remain measurable without
+inventing a visible Group count. The snapshot's `stored-user-group-v1`
+count-basis marker rejects legacy visible-count or unmarked baselines.
+Only a completely measured snapshot is written to
+`test-results/inventory-<label>.json`. A requested comparison rejects endpoint
+ID-set changes and either direction of per-endpoint User/Group count change.
+This proves only endpoint UUID and per-endpoint stored User/Group count equality,
+not resource UUIDs, content, custom resource families or all database rows.
+SCIM visibility and aggregate global statistics are independent claims.
+
+The live SCIM suite via `live-test.ps1` and optional Playwright with
+`--grep-invert 'Visual regression|Visual Snapshots'` retain their existing
+selection and failure behavior (pixel baselines are data-coupled).
+See the [finite preservation contract and RCA](DEPLOYMENT_PRESERVATION_VERIFIER.md)
+for executable offline evidence, limitations and the shared normal runner.
 
 ---
 
@@ -1428,6 +1450,7 @@ Per the standing R7 (test/gate self-improvement) and Design & Architecture gate 
 
 | Date | Change |
 |---|---|
+| 2026-11-20 | Closed verifier false greens for failed/malformed stored-resource totals, incomplete endpoint inventory and missing/invalid/mixed-basis baselines. Canonical ID-based admin statistics and exact stored-count equality replace name-path SCIM lists and null-tolerant comparisons. User-only profiles are covered without fabricating a Group total from 404. Added executable offline regressions to the existing normal runtime/pre-push/CI runner; actual dev read-only baseline and self-comparison pass across 76 endpoints. No new deployment or complete resource-ID/content preservation claim. See [preservation verifier and RCA](DEPLOYMENT_PRESERVATION_VERIFIER.md). |
 | 2026-10-16 | Verified dev/canary 0.55.54 on the same existing digest after the full no-skip db10b13e run: 40 PASS, zero FAIL/SKIPPED, nine reviewer PENDING. Refreshed actual serving revisions and two-revision retention; no customer-production operation or new image publication. |
 | 2026-10-16 | Added physical dependency ownership preflight before executing validation/deployment work, with actual runner refusal and command-sentinel negative controls. No topology, live deployment, publication or promotion behavior changed. |
 | 2026-10-14 | Migrated the Stage 3 reviewer-gate registrations in [dev-deployment-pipeline.ps1](../scripts/dev-deployment-pipeline.ps1) from deleted prompt-file terminology to committed Agent Skill slash invocations. This is an orchestration-label and operator-guidance change only: executable deployment stages, image publication, estate resolution, Azure operations, and promotion behavior are unchanged. Re-reviewed the Section 10 drift register with no topology or live-estate fact change. |

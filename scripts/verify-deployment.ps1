@@ -6,11 +6,11 @@
     Runs the complete verification suite against one deployed target FQDN:
 
       1. Health probe (/scim/health)
-      2. Data/ID inventory snapshot (endpoints + per-endpoint resource counts)
+      2. Complete endpoint ID inventory + per-endpoint stored resource counts
       3. Live SCIM contract suite (scripts/live-test.ps1)
       4. (optional) Playwright browser verification cycle (E2E_BASE_URL=<target>)
       5. (optional) Before/after inventory diff - hard-fails on ANY non-zero
-         data delta (lost endpoints, changed IDs, dropped resource counts)
+         measured delta (endpoint ID set or stored User/Group counts)
 
     This is the reusable verification building block invoked by:
       - scripts/promote-to-prod.ps1 -BlueGreen -RunVerification (green soak + post-flip)
@@ -21,9 +21,9 @@
       1 - a check failed (health, live tests, Playwright, or data delta)
       2 - prerequisite / argument error
 
-    DATA SAFETY: a deploy is an image swap only - the database (endpoints,
-    users, groups, IDs) MUST be identical before and after. Any delta the diff
-    surfaces is treated as a hard stop, never auto-remediated.
+    DATA SAFETY: this finite proof measures endpoint IDs and admin stored
+    User/Group totals, not resource IDs, content or all database rows.
+    Any measured delta is a hard stop, never auto-remediated.
 
 .PARAMETER BaseUrl
     Target instance base URL (e.g. https://scimserver---green.<env>.azurecontainerapps.io).
@@ -48,7 +48,8 @@
 
 .PARAMETER BeforeSnapshot
     Path to a previously-captured inventory JSON. When supplied, the new
-    snapshot is diffed against it and any data/ID delta fails the run.
+    snapshot is diffed against it and any measured ID/count delta fails the run.
+    Missing or invalid requested baselines are prerequisite errors (exit 2).
 
 .PARAMETER SnapshotOnly
     Capture the inventory snapshot and exit (no live tests / Playwright).
@@ -85,6 +86,7 @@ param(
 $ErrorActionPreference = 'Continue'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $BaseUrl = $BaseUrl.TrimEnd('/')
+$countBasis = 'stored-user-group-v1'
 
 if ([string]::IsNullOrWhiteSpace($ReportDir)) {
     $ReportDir = Join-Path $repoRoot 'test-results'
@@ -105,6 +107,54 @@ function Get-AccessToken {
     $body = @{ grant_type = 'client_credentials'; client_id = $Id; client_secret = $Secret } | ConvertTo-Json
     $resp = Invoke-RestMethod -Uri "$Url/scim/oauth/token" -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 20
     return $resp.access_token
+}
+
+function Assert-InventoryCount($Value, [string]$Context) {
+    if (($Value -isnot [int] -and $Value -isnot [long]) -or $Value -lt 0) {
+        throw "$Context must be a nonnegative JSON integer."
+    }
+}
+
+function Assert-EndpointInventory($Endpoints, $Total, [switch]$WithResourceCounts) {
+    Assert-InventoryCount $Total 'endpointCount/totalResults'
+    if ($Endpoints -isnot [array] -or $Endpoints.Count -ne $Total) {
+        throw 'Incomplete endpoint inventory: endpoints must be an array matching endpointCount/totalResults.'
+    }
+    $ids = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($endpoint in $Endpoints) {
+        $parsedId = [guid]::Empty
+        if ($endpoint.id -isnot [string] -or
+            -not [guid]::TryParseExact($endpoint.id, 'D', [ref]$parsedId) -or
+            -not $ids.Add($endpoint.id)) {
+            throw 'Endpoint inventory requires valid, unique UUID IDs.'
+        }
+        if ($WithResourceCounts) {
+            Assert-InventoryCount $endpoint.userCount "Endpoint $($endpoint.id) userCount"
+            Assert-InventoryCount $endpoint.groupCount "Endpoint $($endpoint.id) groupCount"
+        }
+    }
+}
+
+$before = $null
+if ($PSBoundParameters.ContainsKey('BeforeSnapshot')) {
+    try {
+        if ([string]::IsNullOrWhiteSpace($BeforeSnapshot) -or
+            -not (Test-Path -LiteralPath $BeforeSnapshot -PathType Leaf)) {
+            throw 'Requested baseline file does not exist.'
+        }
+        $before = Get-Content -LiteralPath $BeforeSnapshot -Raw -ErrorAction Stop |
+            ConvertFrom-Json -NoEnumerate -ErrorAction Stop
+        if ($before -isnot [pscustomobject]) {
+            throw 'Requested baseline must be a JSON object.'
+        }
+        if ($before.countBasis -cne $countBasis) {
+            throw "Requested baseline countBasis must be $countBasis; legacy visible counts cannot be reinterpreted as stored totals."
+        }
+        Assert-EndpointInventory $before.endpoints $before.endpointCount -WithResourceCounts
+    } catch {
+        Write-Host "Invalid BeforeSnapshot: $($_.Exception.Message)" -ForegroundColor Red
+        exit 2
+    }
 }
 
 # =========================================================================
@@ -130,84 +180,84 @@ try {
 Write-Section "2. Data/ID inventory snapshot ($Label)"
 $snapshotPath = Join-Path $ReportDir "inventory-$Label.json"
 $snapshot = $null
+$measurement = 'OAuth token request'
 try {
     $token = Get-AccessToken -Url $BaseUrl -Id $ClientId -Secret $ClientSecret
     $headers = @{ Authorization = "Bearer $token" }
-    $eps = (Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints?count=200" -Headers $headers -TimeoutSec 30).endpoints
+    $measurement = 'endpoint inventory request'
+    $inventory = Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints" -Headers $headers -TimeoutSec 30 -ErrorAction Stop
+    Assert-EndpointInventory $inventory.endpoints $inventory.totalResults
+    $eps = $inventory.endpoints
 
     $epInventory = @()
     foreach ($ep in $eps) {
-        $userCount = $null
-        $groupCount = $null
-        try {
-            $u = Invoke-RestMethod -Uri "$BaseUrl/scim/$($ep.name)/Users?count=1" -Headers $headers -TimeoutSec 30 -ErrorAction Stop
-            $userCount = $u.totalResults
-        } catch { }
-        try {
-            $g = Invoke-RestMethod -Uri "$BaseUrl/scim/$($ep.name)/Groups?count=1" -Headers $headers -TimeoutSec 30 -ErrorAction Stop
-            $groupCount = $g.totalResults
-        } catch { }
+        $measurement = "$($ep.id) stored User/Group statistics"
+        $stats = Invoke-RestMethod -Uri "$BaseUrl/scim/admin/endpoints/$($ep.id)/stats" -Headers $headers -TimeoutSec 30 -ErrorAction Stop
+        if ($stats -isnot [pscustomobject] -or $stats.users -isnot [pscustomobject] -or $stats.groups -isnot [pscustomobject]) {
+            throw 'Stored statistics must contain users and groups objects.'
+        }
+        Assert-InventoryCount $stats.users.total "Endpoint $($ep.id) stored User total"
+        Assert-InventoryCount $stats.groups.total "Endpoint $($ep.id) stored Group total"
         $epInventory += [ordered]@{
             id         = $ep.id
             name       = $ep.name
             preset     = $ep.profilePreset
-            userCount  = $userCount
-            groupCount = $groupCount
+            userCount  = $stats.users.total
+            groupCount = $stats.groups.total
         }
     }
 
     $snapshot = [ordered]@{
+        countBasis    = $countBasis
         timestamp     = (Get-Date).ToString('o')
         baseUrl       = $BaseUrl
         label         = $Label
         endpointCount = $eps.Count
         endpoints     = $epInventory
     }
-    $snapshot | ConvertTo-Json -Depth 8 | Out-File -FilePath $snapshotPath -Encoding utf8
+    $measurement = 'snapshot file write'
+    $snapshot | ConvertTo-Json -Depth 8 | Out-File -LiteralPath $snapshotPath -Encoding utf8 -ErrorAction Stop
     Write-Host "   ✅ Captured $($eps.Count) endpoints -> $snapshotPath" -ForegroundColor Green
 } catch {
-    Write-Host "   ❌ Inventory snapshot failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "   ❌ Inventory snapshot failed ($measurement): $($_.Exception.Message)" -ForegroundColor Red
     $failures += "inventory snapshot failed"
 }
 
 # =========================================================================
 # 2b. Before/after diff (hard stop on any data/ID delta)
 # =========================================================================
-if ($BeforeSnapshot -and (Test-Path $BeforeSnapshot) -and $snapshot) {
+if ($before -and $snapshot) {
     Write-Section "2b. Before/after data integrity diff"
     try {
-        $before = Get-Content $BeforeSnapshot -Raw | ConvertFrom-Json
         $countDelta = $snapshot.endpointCount - $before.endpointCount
         $idsBefore = @($before.endpoints | ForEach-Object { $_.id })
         $idsAfter = @($snapshot.endpoints | ForEach-Object { $_.id })
         $missingIds = @($idsBefore | Where-Object { $idsAfter -notcontains $_ })
         $newIds = @($idsAfter | Where-Object { $idsBefore -notcontains $_ })
 
-        # Per-endpoint resource-count regression (a drop is a data-loss signal).
-        $countRegressions = @()
+        # Exact equality is required; growth can hide replacement just as loss can.
+        $countChanges = @()
         foreach ($b in $before.endpoints) {
             $a = $snapshot.endpoints | Where-Object { $_.id -eq $b.id } | Select-Object -First 1
             if ($a) {
-                if ($null -ne $b.userCount -and $null -ne $a.userCount -and $a.userCount -lt $b.userCount) {
-                    $countRegressions += "$($b.name): users $($b.userCount)->$($a.userCount)"
+                if ($a.userCount -ne $b.userCount) {
+                    $countChanges += "$($b.id): users $($b.userCount)->$($a.userCount)"
                 }
-                if ($null -ne $b.groupCount -and $null -ne $a.groupCount -and $a.groupCount -lt $b.groupCount) {
-                    $countRegressions += "$($b.name): groups $($b.groupCount)->$($a.groupCount)"
+                if ($a.groupCount -ne $b.groupCount) {
+                    $countChanges += "$($b.id): groups $($b.groupCount)->$($a.groupCount)"
                 }
             }
         }
 
-        if ($countDelta -eq 0 -and $missingIds.Count -eq 0 -and $countRegressions.Count -eq 0) {
-            Write-Host "   ✅ Data integrity intact: $($before.endpointCount) endpoints, 0 missing IDs, 0 count regressions" -ForegroundColor Green
-            if ($newIds.Count -gt 0) {
-                Write-Host "   ℹ️  New endpoint IDs since before-snapshot (expected if created mid-run): $($newIds -join ', ')" -ForegroundColor Gray
-            }
+        if ($countDelta -eq 0 -and $missingIds.Count -eq 0 -and $newIds.Count -eq 0 -and $countChanges.Count -eq 0) {
+            Write-Host "   ✅ Measured preservation: $($before.endpointCount) endpoint IDs unchanged; STORED User/Group counts equal. SCIM visibility and resource IDs/content not measured." -ForegroundColor Green
         } else {
             Write-Host "   ❌ DATA DELTA DETECTED - hard stop:" -ForegroundColor Red
             Write-Host "      endpoint count delta : $countDelta" -ForegroundColor Red
             Write-Host "      missing IDs          : $($missingIds -join ', ')" -ForegroundColor Red
-            Write-Host "      count regressions    : $($countRegressions -join '; ')" -ForegroundColor Red
-            $failures += "DATA DELTA (count=$countDelta missing=$($missingIds.Count) regressions=$($countRegressions.Count))"
+            Write-Host "      new IDs              : $($newIds -join ', ')" -ForegroundColor Red
+            Write-Host "      count changes        : $($countChanges -join '; ')" -ForegroundColor Red
+            $failures += "DATA DELTA (count=$countDelta missing=$($missingIds.Count) new=$($newIds.Count) changes=$($countChanges.Count))"
         }
     } catch {
         Write-Host "   ❌ Diff failed: $($_.Exception.Message)" -ForegroundColor Red

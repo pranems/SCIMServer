@@ -6,7 +6,8 @@ $contracts = @(
     'compose-bind-paths',
     'container-pipeline-preflight',
     'standalone-migrations',
-    'container-image-metadata'
+    'container-image-metadata',
+    'verify-deployment'
 )
 foreach ($contract in $contracts) {
     Write-Host "Running $contract"

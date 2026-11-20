@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-05 - **Product version:** `0.55.68`
+> **Status:** User-facing reference - **Last verified:** 2026-11-20 - **Product version:** `0.55.68`
 
-> **Version:** 0.55.68 - **Updated:** 2026-11-05
+> **Version:** 0.55.68 - **Updated:** 2026-11-20
 > 6 presets - **39 endpoint settings controls** (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Latest release:** [0.55.67 user release notes, cumulative since 0.55.20](RELEASE_NOTES.md#05567)
@@ -12,6 +12,11 @@ Dev and canary are deployed; customer production remains on 0.55.20.
 Performance remains unqualified under the migration-only exception.
 
 ### Start here
+
+**Deployment preservation proof:** [Verifier behavior, finite claim and
+execution RCA](DEPLOYMENT_PRESERVATION_VERIFIER.md) covers fail-closed endpoint
+UUID and stored User/Group count measurement. It does not claim SCIM visibility, resource-ID,
+content or complete database preservation.
 
 **Current Docker Desktop removal readiness:** [Authoritative acceptance
 dashboard and explanatory guide](CONTAINER_RUNTIME_REMOVAL_READINESS.md)
