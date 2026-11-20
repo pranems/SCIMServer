@@ -1,5 +1,30 @@
 ## SCIMServer - Condensed Session Memory
 
+### Latest verified consolidation boundary, 2026-11-20
+
+Reviewed stacked PR #276 merged the Effect repair into the migration branch
+at `2c1c74cfdae84d267755cf0b4d2719d6b5303a53`, not master. Its exact recovery
+head `1d4e4bc294bff3f0b7bb39ff3fdc6a6eb5c4465b` passed the normal Validate
+hook, all 30 gates: API 218 suites/6,263 tests, reduced HTTP 2,517 passes/
+42 known skips and web 126 files/1,664 tests. Exact-head image run 44806899588
+passed validation, Windows contracts, smoke and Trivy. Read-only inspection
+verified actual Effect 3.22.1 in the immutable nonshipping image.
+
+The separately reviewed preservation correction is in stacked PR #277.
+Its original implementation `67789d16` passed all 27 normal Fast gates,
+including 261 new PowerShell assertions, API 218/6,259 and HTTP 2,517/42 skips.
+Both real read-only dev snapshots covered 76 endpoint IDs and equal
+per-endpoint stored totals, summing to 1,175 Users and 428 Groups. This is
+pre-release evidence, not deployment preservation proof or resource-content
+comparison. See [the exact finite claim](docs/DEPLOYMENT_PRESERVATION_VERIFIER.md).
+The branch has now merged the reviewed Effect target without rewriting history;
+the combined tip still requires its own normal push and CI.
+
+Bridge remains offline. Draft #275, merged-master shipping, full dev matrix,
+gallery provisioning and operator visual verification remain open. No Desktop
+uninstall, production operation or backup deletion occurred. Earlier sections
+below preserve capture-time history rather than superseding this boundary.
+
 ### Effect security recovery, 2026-11-20
 
 Recovery branch `vprane/scimserver/containers-desktop-exit-cve-20261120`
@@ -182,6 +207,7 @@ The original checkout's VS Code terminal settings name an old tenant; use
 the registry-resolved active automation profile in the isolated workspace.
 
 | Date | Summary |
+| 2026-11-20 | Reviewed Effect repair merged through #276 after exact-tip Validate/image GREEN. Preservation #277 adds 261 fail-closed contracts and passes a real 76-endpoint read-only stored-count comparison; combined-tip CI and release remain open. |
 |---|---|
 | 2026-11-20 | Complete normal Validate push passed; imported exact CI-only 0.55.68 metadata lockfiles; integrated actual cold-transport GUI evidence and exact disposable database cleanup. PR, merged-source dev and operator acceptance remain open. |
 | 2026-11-19 | Fixed Mermaid viewer conflict; added canonical current Markdown readiness guide; corrected native inventory, active SSE shutdown and failure-closed packaged migrations with real package/live/browser proofs; configured isolated GUI workspace and repaired dispatch image metadata. Final release/dev and GUI acceptance remain open. |

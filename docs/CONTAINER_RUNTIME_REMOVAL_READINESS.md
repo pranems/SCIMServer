@@ -33,7 +33,8 @@ editor window has refreshed.
 The isolated recovery branch
 `vprane/scimserver/containers-desktop-exit-cve-20261120` starts at
 `87fcbdc153e1e2ba2d13f4fe3af3d8adb519d559`. The original release-owner
-branch and draft PR #275 remain unchanged. The existing unshipped 0.55.68
+branch received the reviewed recovery through stacked PR #276; draft PR #275
+remains open. The existing unshipped 0.55.68
 candidate is retained: this dependency correction completes that candidate,
 not a second unreleased version.
 
@@ -59,9 +60,40 @@ ignore or security-gate weakening is needed.
 | Bootstrap | Normal Fast explicit-ref push passed all 27 gates in 652.7 seconds at `712ddcc7c8a0d4e19b1b463328004ebecef99c27`: 218 API suites / 6,261 tests; reduced HTTP 2,517 passes / 42 known skips. Not final locked dependency evidence. |
 | CI-generated API lock | API-only run `44800892630` SUCCESS at exact bootstrap head. Authenticated artifact `14660962893`; only Effect changed. |
 | Fresh installed tree | Approved-proxy npm ci installed 660 packages and preserved CI lock bytes. Four focused suites pass 67 tests in 8.525 seconds, including full npm-tree validity and actual Effect owner resolution. |
-| Final normal Validate push | Pending complete hook at the recovery tip. |
-| Exact recovery image | Pending nonshipping Build Test Image; no local Docker or shipping publication. |
-| Parent integration | Separate reviewed stacked PR and original exact-tip CI; not performed here. |
+| Final normal Validate push | PASS at `1d4e4bc294bff3f0b7bb39ff3fdc6a6eb5c4465b`, 30/30 gates: API 218/6,263; reduced HTTP 2,517/42 known skips; web 126/1,664, zero worker errors. |
+| Exact recovery image | Nonshipping run [44806899588](https://github.com/pranems/SCIMServer/actions/runs/44806899588) PASS at that exact head: validate, Windows contracts, smoke and Trivy. Verified image-layer readback found actual Effect 3.22.1. No local container started. |
+| Parent integration | Reviewed stacked [PR #276](https://github.com/pranems/SCIMServer/pull/276) merged into migration branch at `2c1c74cfdae84d267755cf0b4d2719d6b5303a53`; original final-tip CI and master merge remain separate gates. |
+
+### Deployment preservation correction, 2026-11-20
+
+Stacked [PR #277](https://github.com/pranems/SCIMServer/pull/277) corrects the
+existing verifier, not the application API. Its complete 261-assertion offline
+contract is now invoked by the normal runtime runner. Original helper RED
+included silent failed requests, null totals, incomplete endpoint inventory
+and missing requested baselines. All now fail closed; valid zero remains valid.
+
+Real read-only qualification on deployed 0.55.67 captured and compared all
+76 endpoint IDs, with equal per-endpoint stored User/Group totals summing to
+1,175/428. A legitimate User-only profile caused the original Group404:
+SCIM-visible collections cannot establish complete stored inventory. The
+replacement uses existing admin statistics and an explicit compatible count
+basis, never 404-to-zero. This measures endpoint IDs and stored totals only,
+not resource IDs/content, memberships or a transactional database snapshot.
+See [architecture, coverage and execution RCA](DEPLOYMENT_PRESERVATION_VERIFIER.md).
+
+The original isolated `67789d16` passed all 27 normal Fast gates, including the
+261 assertions, API 218/6,259 and reduced HTTP 2,517/42 known skips. The current
+branch merges the already-reviewed Effect target and requires its own normal
+push/CI before merge. Bridge remains offline; no source or image is deployed.
+Test/gate disposition: applied through executable negative and positive
+controls. Design disposition: accepted; reuse the existing statistics API
+and cohesive verifier rather than introduce a generic framework.
+
+### Effect execution RCA and historical bootstrap checkpoints
+
+The following checkpoints retain the evidence available during repair.
+The successful final-hook/image and reviewed-integration rows above supersede
+their then-pending status without deleting the original failures.
 
 **Execution RCA (security, HIGH):** the frozen exact override for Effect
 remained 3.20.0, so normal resolution could not float to the newly required

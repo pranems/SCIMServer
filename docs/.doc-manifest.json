@@ -213,6 +213,15 @@
       "maxAgeDays": 180
     },
     {
+      "path": "docs/DEPLOYMENT_PRESERVATION_VERIFIER.md",
+      "title": "Deployment endpoint ID and stored-count preservation proof",
+      "sources": [
+        "scripts/verify-deployment.ps1",
+        "scripts/test/verify-deployment.contract.ps1"
+      ],
+      "maxAgeDays": 90
+    },
+    {
       "path": "docs/DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md",
       "title": "Canonical infrastructure reference",
       "sources": [],
