@@ -9,6 +9,20 @@
 
 ## Active Delivery Process
 
+**Merged-source execution, 2026-11-20:** PR #275 merged at `9ee2a72d`.
+Static/runtime qualification and fresh 30-migration replay passed; each API
+unit backend passes 218/6,263. Full PostgreSQL HTTP found two inventory-test
+fixture collisions: 2,613 passes/two failures/zero skips. Separate owned,
+real-API seeded reproduction confirms expected one/received two. UUID search
+fixtures and two shared-name cross-endpoint controls pass four focused tests
+on each backend, including retained PostgreSQL collisions. This correction
+is test-only and still requires normal review/merge and authoritative
+qualification. The new owned independent runtime bridge is online.
+No shipping publication or Azure write occurred. Native gallery prerequisites
+and later operator visual acceptance remain open. See
+[current execution RCA](CONTAINER_RUNTIME_REMOVAL_READINESS.md#merged-source-postgresql-qualification-blocker-2026-11-20).
+The following boundaries are historical.
+
 **Latest reviewed boundary, 2026-11-20:** Effect PR #276 merged into the migration
 branch at `2c1c74cf`, not master. Exact recovery head `1d4e4bc2` passed all 30
 normal Validate gates, API 218/6,263, reduced HTTP 2,517/42 known skips and web
