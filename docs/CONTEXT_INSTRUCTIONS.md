@@ -1,7 +1,7 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.68
+> **Version**: 0.55.69
 > **Last Updated**: November 20, 2026
 > **Last verified:** 2026-11-20
 
@@ -15,8 +15,16 @@ is eligible, but unchanged-manifest CI regeneration retains 4.4.3.
 An isolated correction supplies exact optional dependency/product inputs to
 the existing CI workflow, generates selected manifests and locks together,
 and rejects unrelated package changes. All 22 focused controls pass after
-RED; actual CI artifacts, normal source merge and remediation are still
-required. No production manifest, lock or product version changed locally.
+RED, and all 27 normal Fast push gates pass on the generator-only source.
+Exact-source run `44855811919` then succeeded at `ee56eb0d`; its
+five-file candidate artifact was byte/digest checked, compared to exact source,
+and imported without local generation. Only eligible Zod 4.6.6 and API/web
+version metadata changed. Current source is the unreleased 0.55.69 candidate;
+locked installation preserves imported bytes and installs 4.6.6. Web audit has
+zero High/Critical findings and no Zod advisory, with three Moderate
+development-tool findings remaining. Reviewed merge and deployment remain open.
+Candidate web tests pass 126 files/1,664 tests; coverage remains
+85.74/75.86/75.53/83.06 against unchanged 82/70/69/78 floors.
 The deployment-owned fixtures and bridge were cleaned exactly; original
 containers, volumes, archives and Desktop artifacts remain untouched.
 See [usage and RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).

@@ -631,6 +631,32 @@ metadata to change. Import the unmodified artifacts, install with locked
 review and merge. A local pure-contract pass does not satisfy these remote,
 installed-package or release claims.
 
+### Verified targeted candidate artifact
+
+Run [44855811919](https://github.com/pranems/SCIMServer/actions/runs/44855811919)
+succeeded from exact generator source
+`ee56eb0d9c14f4ecc3b50e8d0ffa80569b785812` with `workspace=both`,
+`targetZodVersion=4.6.6` and `productVersion=0.55.69`.
+Artifact `14686944345`, `regenerated-lockfiles`, has independently verified
+ZIP digest
+`sha256:f250625984b6b64f2900b932ac44c30635d5549388b5f36a73b8e76ba8d3577b`.
+This is a dependency-input archive, **not a shipping OCI image digest**.
+GitHub retention is seven days; retaining the identifier does not promise
+permanent download availability.
+
+All five archive entries match the downloaded extracted bytes. The four
+selected manifests/locks match the requested exact state. No unrelated
+package, root metadata or repository tooling version changed. Zod 4.6.6
+was published `2026-10-11T16:18:23.878Z`, 40.42 days before the CI check,
+above the unchanged seven-day floor. The imported files are generated CI
+bytes, not locally generated or hand-spliced locks. Approved-proxy `npm ci
+--ignore-scripts` preserves the imported web lock's SHA256 and installs 4.6.6.
+The complete parsed web audit has zero High/Critical findings and no Zod
+advisory. Three Moderate development-tool findings remain in `vitest`,
+`@vitest/mocker` and `@vitest/coverage-v8`; this is not a zero-vulnerability
+claim. Reviewed source merge and release qualification remain independent
+requirements.
+
 ### Execution issues and prevention
 
 | Issue | Type / severity | Root cause and confirmed correction | Detection / earliest gate |
@@ -639,6 +665,8 @@ installed-package or release claims.
 | Fresh contract run could not load `js-yaml` | Dependency restoration / Low | The new worktree had no installed locked API tooling. Restore used approved-proxy `npm ci`; the next run reached the five actual RED assertions, without changing locks. | Contract module load / locked dependency prerequisite |
 | Web build and diagram renderer could not start | Dependency restoration / Low | The fresh worktree lacked Vite and matching web Playwright. Both commands failed explicitly before execution; locked approved-proxy `npm ci` restored 364 packages with locks unchanged. Subsequent normal-hook gates remain separate evidence. | Web build / locked dependency prerequisite |
 | Workflow help still required prior manifest edits | Published guidance / Low | The old HOW TO USE comments described only the former procedure. An explicit help-text assertion was RED before correction and GREEN afterward, protecting the supported targeted path from documentation drift. | Source readback / emitted-help contract |
+| ZIP-entry comparison falsely rejected matching names | Private verification / Low | An inline PowerShell join/comparison expression had ambiguous operator grouping. Independent actual/expected projections were equal. Named intermediate strings now make the exact comparison explicit; missing, extra and case-changed entry controls reject, and all five extracted SHA256 comparisons pass. No artifact was imported before this corrected byte admission passed. | Artifact admission / positive and negative exact-entry controls |
+| Candidate API audit reached the configured proxy's request quota | Environment / Low | The API audit returned HTTP 429 with `Retry-After: 952`, not vulnerability metadata. Strict result-shape admission rejected it instead of reporting zero findings. One targeted retry is scheduled after the server deadline; no authentication, registry substitution or full-suite retry is involved. API audit qualification remains pending until a complete result is received. | Audit execution / complete-result shape admission, no escape |
 
 Test improvement **applied**: permanent exact-output, no-mutation, invalid-input,
 unrelated-package, CI-only and workflow-binding controls accompany existing

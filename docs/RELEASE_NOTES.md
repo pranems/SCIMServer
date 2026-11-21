@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.68`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.69`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -12,6 +12,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). These notes are 
 user-facing companion, not a second independent version ledger or a raw commit
 log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
+
+## 0.55.69
+
+**Status: source candidate with verified dependency artifacts, not published or deployed.**
+
+The existing read-only CI workflow now prepares eligible targeted dependency
+updates and API/web versions together, without a local lockfile generation or
+a deliberately mismatched source push. The candidate updates web Zod from
+4.4.3 to 4.6.6; no other package entry changes. The generated archive, exact
+manifests, lock metadata and seven-day publication evidence were independently
+verified before import. Locked installation preserves those bytes and installs
+4.6.6. The web audit has no High/Critical findings or Zod advisory; three
+Moderate development-tool findings remain. Source review and final deployment
+qualification remain separate requirements. See
+[the provenance record](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#verified-targeted-candidate-artifact).
 
 ## 0.55.68
 

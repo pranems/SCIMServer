@@ -689,8 +689,13 @@ Seven workflows build, validate or audit; none of them deploy. The first three b
 **Targeted generation source verification, 2026-11-21 UTC:** the existing
 workflow can now prepare an eligible dependency update without first pushing
 a deliberately mismatched manifest/lock pair. The 22 focused contracts pass
-after RED. Actual remote artifact generation and installation remain separate
-claims; this source verification does not recertify the captured Azure estate.
+after RED, and all 27 normal Fast push gates pass at `ee56eb0d`. Exact-source
+CI run `44855811919` produced the verified 0.55.69 candidate archive. Its
+immutable ZIP digest, extracted bytes and publication evidence pass admission;
+locked installation retains those bytes and the web audit has zero
+High/Critical findings and no Zod advisory. Three Moderate development-tool
+findings remain. None of these results recertifies the captured Azure estate
+or supplies an OCI shipping artifact.
 See [targeted usage and RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
 
 **Why the last two are scheduled rather than commit-triggered.** Both watch for a change that happens **upstream while this repository sits still**, so no commit can trigger them: a new RFC starting to update one we depend on (RFC 7643 was updated by RFC 9865 and RFC 9967), a verified erratum changing what the text means without changing a mirrored byte, or a CVE-exception entry going stale. A commit-triggered gate is structurally incapable of finding any of them. The pre-push gate `docs: RFC corpus current + intact` runs only the **offline** half so pre-push stays deterministic and works without network; the online half runs on the clock here. A failure of this job is a reading assignment, not a build break - the workflow's own failure step spells out the read-assess-update-then-`-Update` sequence and explicitly forbids running `-Update` to silence it.
