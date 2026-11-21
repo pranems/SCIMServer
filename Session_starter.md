@@ -1,5 +1,20 @@
 ## SCIMServer - Condensed Session Memory
 
+### Targeted artifact generation correction, 2026-11-21 UTC
+
+Reviewed PR #278 is merged at `554f42023fdde30918ef378987cc8f3135e4ed3a`.
+The completed web audit identifies High Zod GHSA-mrhx-c7xc-m3w5 in 4.4.3;
+fixed 4.6.6 is seven-day eligible. Existing CI regeneration run 44847989228
+retained 4.4.3 because the unchanged manifest still requests that version.
+The isolated correction adds supported optional targeted inputs to the
+existing read-only workflow, preserving quarantine and rejecting unrelated
+dependency changes. Its 22 focused controls pass after RED. Actual CI artifacts,
+normal reviewed merge, security remediation and deployment remain unproved.
+The deployment-owned temporary fixtures were removed exactly and its bridge
+is offline; do not reuse former fixture IDs. Source version remains 0.55.68.
+See [workflow usage and RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
+Earlier qualification statements below remain capture-time history.
+
 ### Merged-source deployment qualification, 2026-11-20
 
 PR #275 is merged at `9ee2a72d91ad1fc9cdee00782d18f1d84e481104`.

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Targeted CI dependency artifacts
+
+- Extend the existing read-only lockfile workflow with optional exact
+  `targetZodVersion` and API/web `productVersion` inputs. Generate selected
+  manifests and locks together on the existing Linux CI runner, reject
+  unrelated package changes, retain public-registry/sha512 checks, and require
+  the existing seven-day publication age before changing a manifest.
+  Inputs pass through environment variables rather than shell interpolation.
+  Focused artifact contracts increase from 17 to 22 passing controls after
+  assertion-level RED. Production manifests, locks and version 0.55.68 are
+  unchanged in this source correction. No artifact generation, advisory
+  remediation, shipping or deployment is claimed from local contracts.
+  See [usage and execution RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
+
 ### PostgreSQL inventory qualification fixtures
 
 - Correct only the cross-endpoint inventory E2E fixture isolation. Worker-local

@@ -9,6 +9,18 @@
 
 ## Active Delivery Process
 
+**Targeted CI artifact correction, 2026-11-21 UTC:** PR #278 is merged at
+`554f4202`. The web audit identifies High Zod GHSA-mrhx-c7xc-m3w5; fixed 4.6.6
+is eligible, but unchanged-manifest CI regeneration retains 4.4.3.
+An isolated correction supplies exact optional dependency/product inputs to
+the existing CI workflow, generates selected manifests and locks together,
+and rejects unrelated package changes. All 22 focused controls pass after
+RED; actual CI artifacts, normal source merge and remediation are still
+required. No production manifest, lock or product version changed locally.
+The deployment-owned fixtures and bridge were cleaned exactly; original
+containers, volumes, archives and Desktop artifacts remain untouched.
+See [usage and RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
+
 **Merged-source execution, 2026-11-20:** PR #275 merged at `9ee2a72d`.
 Static/runtime qualification and fresh 30-migration replay passed; each API
 unit backend passes 218/6,263. Full PostgreSQL HTTP found two inventory-test

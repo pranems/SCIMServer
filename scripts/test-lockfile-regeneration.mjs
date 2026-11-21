@@ -25,6 +25,17 @@ try {
   check('workflow accepts root selection', () => {
     assert.ok(workflow.on.workflow_dispatch.inputs.workspace.options.includes('root'));
   });
+  check('workflow supports targeted CI-only Zod and product artifacts without shell interpolation', () => {
+    assert.equal(workflow.on.workflow_dispatch.inputs.targetZodVersion.type, 'string');
+    assert.equal(workflow.on.workflow_dispatch.inputs.productVersion.type, 'string');
+    assert.equal(workflow.jobs.regen.env.REGEN_ZOD_VERSION, '${{ inputs.targetZodVersion }}');
+    assert.equal(workflow.jobs.regen.env.REGEN_PRODUCT_VERSION, '${{ inputs.productVersion }}');
+    const commands = workflow.jobs.regen.steps.filter(step => step.run).map(step => step.run).join('\n');
+    assert.match(commands, /prepare-targeted/);
+    assert.match(commands, /verify-targeted/);
+    assert.doesNotMatch(commands, /\$\{\{ inputs\.(?:targetZodVersion|productVersion)/);
+    assert.match(commands, /cp --parents "\$d\/package.json" "\$d\/package-lock.json"/);
+  });
   check('workflow executes shared root-aware validation and selected artifacts', () => {
     const steps = workflow.jobs.regen.steps;
     const commands = steps.filter((step) => step.run).map((step) => step.run).join('\n');
@@ -51,6 +62,62 @@ try {
     check('validation module exists', () => { throw error; });
   }
   if (mod) {
+    const product = { name: 'web', version: '0.55.68',
+      dependencies: { zod: '^4.4.3', react: '^19.2.0' }, scripts: { test: 'vitest' } };
+    check('targeted manifest pins only Zod and product version without mutating its source', () => {
+      const original = structuredClone(product);
+      assert.deepEqual(mod.prepareManifest(product, 'web', '4.6.6', '0.55.69'), {
+        ...product, version: '0.55.69', dependencies: { ...product.dependencies, zod: '4.6.6' },
+      });
+      assert.deepEqual(product, original);
+      assert.deepEqual(mod.prepareManifest(product, 'api', '4.6.6', '0.55.69'),
+        { ...product, version: '0.55.69' });
+      assert.deepEqual(mod.prepareManifest(product, 'web', '', ''), product);
+    });
+    check('targeted versions reject ranges and shell-shaped input', () => {
+      for (const version of ['^4.6.6', 'latest', '04.6.6', '4.6.6-beta.1',
+        '4.6.6; echo invalid', '$(echo invalid)']) {
+        assert.throws(() => mod.prepareManifest(product, 'web', version, ''), /stable version/);
+        assert.throws(() => mod.prepareManifest(product, 'web', '', version), /stable version/);
+      }
+      assert.throws(() => mod.prepareManifest({ dependencies: {} }, 'web', '4.6.6', ''), /Zod/);
+    });
+    check('targeted artifact validation rejects unrelated changes and wrong Zod versions', () => {
+      const before = { packages: {
+        '': { version: '0.55.68' }, 'node_modules/zod': { version: '4.4.3' },
+        'node_modules/react': { version: '19.2.0' },
+        'node_modules/parent/node_modules/zod': { version: '4.4.3' },
+      } };
+      const after = structuredClone(before);
+      after.packages[''].version = '0.55.69';
+      after.packages['node_modules/zod'].version = '4.6.6';
+      assert.doesNotThrow(() => mod.verifyTargetedPackages(before, after, 'web', '4.6.6'));
+      assert.throws(() => mod.verifyTargetedPackages(before, before, 'web', '4.6.6'), /Zod/);
+      after.packages['node_modules/react'].version = '19.3.0';
+      assert.throws(() => mod.verifyTargetedPackages(before, after, 'web', '4.6.6'), /Unrelated/);
+      assert.throws(() => mod.verifyTargetedPackages(before, after, 'api', '4.6.6'), /Unrelated/);
+      for (const mutation of [
+        value => { delete value.packages['node_modules/react']; },
+        value => { value.packages['node_modules/unrequested'] = { version: '1.0.0' }; },
+        value => { value.packages['node_modules/parent/node_modules/zod'].version = '4.6.6'; },
+      ]) {
+        const candidate = structuredClone(before);
+        candidate.packages['node_modules/zod'].version = '4.6.6';
+        mutation(candidate);
+        assert.throws(() => mod.verifyTargetedPackages(before, candidate, 'web', '4.6.6'), /Unrelated/);
+      }
+    });
+    check('targeted artifact preparation cannot mutate manifests outside CI', () => {
+      const original = JSON.stringify(product);
+      writeFileSync(join(scratch, 'package.json'), original);
+      const result = spawnSync(process.execPath, [script, 'prepare-targeted', 'both'], {
+        cwd: scratch, encoding: 'utf8', env: { ...process.env, GITHUB_ACTIONS: 'false',
+          REGEN_ZOD_VERSION: '4.6.6', REGEN_PRODUCT_VERSION: '0.55.69' },
+      });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /CI only/);
+      assert.equal(readFileSync(join(scratch, 'package.json'), 'utf8'), original);
+    });
     const entry = { version: '1.0.0', resolved: 'https://registry.npmjs.org/example/-/example-1.0.0.tgz',
       integrity: 'sha512-YQ==' };
     const lock = (value) => ({ packages: { '': { name: 'fixture' }, 'node_modules/example': value } });
