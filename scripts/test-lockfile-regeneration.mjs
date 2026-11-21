@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const yaml = require('../api/node_modules/js-yaml');
-const workflow = yaml.load(readFileSync(new URL('../.github/workflows/regen-lockfile.yml', import.meta.url), 'utf8'));
+const workflowSource = readFileSync(new URL('../.github/workflows/regen-lockfile.yml', import.meta.url), 'utf8');
+const workflow = yaml.load(workflowSource);
 const script = fileURLToPath(new URL('./lockfile-regeneration.mjs', import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), 'lockfile-regen-'));
 let failures = 0;
@@ -30,6 +31,8 @@ try {
     assert.equal(workflow.on.workflow_dispatch.inputs.productVersion.type, 'string');
     assert.equal(workflow.jobs.regen.env.REGEN_ZOD_VERSION, '${{ inputs.targetZodVersion }}');
     assert.equal(workflow.jobs.regen.env.REGEN_PRODUCT_VERSION, '${{ inputs.productVersion }}');
+    assert.match(workflowSource, /Use targetZodVersion and productVersion/);
+    assert.match(workflowSource, /without first pushing mismatched manifests and locks/);
     const commands = workflow.jobs.regen.steps.filter(step => step.run).map(step => step.run).join('\n');
     assert.match(commands, /prepare-targeted/);
     assert.match(commands, /verify-targeted/);

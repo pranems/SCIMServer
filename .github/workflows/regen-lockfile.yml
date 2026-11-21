@@ -18,10 +18,12 @@ name: Regenerate lockfile
 # is always a reviewed human action.
 #
 # HOW TO USE
-#   1. Edit package.json, api/package.json or web/package.json on your branch - add the
-#      override / bump the dep.
-#   2. Run this workflow against that branch (Actions tab, or `gh workflow run`).
-#   3. Download the `regenerated-lockfiles` artifact, drop the lockfile in, commit.
+#   1. Use targetZodVersion and productVersion for supported targeted changes
+#      without first pushing mismatched manifests and locks. Other dependency
+#      changes retain the existing reviewed manifest preparation procedure.
+#   2. Run against the exact reviewed source ref (Actions tab or `gh workflow run`).
+#   3. Verify the run source and publication-age receipt. Download selected
+#      manifests and locks together, then commit through normal gates and review.
 #
 # QUARANTINE NOTE
 # Nothing here bypasses the corporate Minimum Release control. This runner is
