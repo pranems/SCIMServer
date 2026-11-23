@@ -13,6 +13,11 @@ Performance remains unqualified under the migration-only exception.
 
 ### Start here
 
+**Live fixture safety:** [Endpoint ownership correction and remaining global
+mutation blockers](LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md) documents complete original
+UUID capture, registered response-ID cleanup, mock lifecycle evidence and the
+unstarted preserved-dev live boundary.
+
 **Deployment preservation proof:** [Verifier behavior, finite claim and
 execution RCA](DEPLOYMENT_PRESERVATION_VERIFIER.md) covers fail-closed endpoint
 UUID and stored User/Group count measurement. It does not claim SCIM visibility, resource-ID,

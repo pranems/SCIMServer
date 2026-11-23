@@ -9,6 +9,23 @@
 
 ## Active Delivery Process
 
+**Offline fixture correction, 2026-11-20:** The existing
+`vprane/scimserver/containers-live-fixture-ownership-20261121` branch at base
+`554f42023fdde30918ef378987cc8f3135e4ed3a` has an uncommitted endpoint ownership
+correction with 133 passing mock lifecycle assertions (previously 104) and passing shared pure
+contracts. Actual pinned baseline sweep/reconciliation reproduce unsafe deletes
+with mocks. Complete original inventory and exact new response IDs replace
+name/difference deletion. Preserved-dev live execution has not started; global
+settings/log/JWKS effects and separate evidence-redaction work remain open.
+No network, runtime, auth, dependency, commit/push/PR or deployment operation
+was performed. Product version and product-suite counts are unchanged. See
+[bounded results and RCA](LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+Independent review closed unowned POST/PUT/PATCH admission and armed inventory
+replacement with actual pre-fix RED controls. Only two checked, single-use
+all-zero-UUID POST rejection probes preserve their original HTTP 404 assertions;
+they require a known-owned active cleanup handle and cannot admit arbitrary UUIDs.
+Historical runtime statements below are not current authority.
+
 **Merged-source execution, 2026-11-20:** PR #275 merged at `9ee2a72d`.
 Static/runtime qualification and fresh 30-migration replay passed; each API
 unit backend passes 218/6,263. Full PostgreSQL HTTP found two inventory-test

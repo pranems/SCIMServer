@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Live endpoint fixture ownership
+
+- Capture complete original endpoint UUID inventory before live fixture creation.
+  Register only successful new response IDs before recording, seeding or caller
+  teardown assignment. Replace name sweeps and inventory-difference deletion
+  with retained owned handles; require successful DELETE and exact-ID absence.
+  Cleanup failures remain fatal even after a later successful retry. The new
+  default PowerShell contract passes 133 assertions (previously 104) and reproduces both actual
+  unsafe baseline lifecycles with mocks. Shared gate/customization contracts pass.
+  Product version, dependencies, API/web suites and live counts are unchanged.
+  No full live runner, network or deployment was executed. Preserved-dev execution
+  remains blocked by independent global-state and evidence-redaction work. See
+  [scope, remaining risks and execution RCA](docs/LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+- Independent review found that non-original UUIDs could still admit unowned
+  POST/PUT/PATCH and that an armed baseline could be replaced before any fixture
+  existed. Both have confirmed pre-fix RED controls and are now closed. Only the
+  two actual all-zero-UUID schema/resource-type POST rejection probes have
+  explicit single-use admission after exact 404 preflight, with an active owned
+  cleanup handle and unchanged HTTP 404 assertions and transport forwarding.
+
 ### PostgreSQL inventory qualification fixtures
 
 - Correct only the cross-endpoint inventory E2E fixture isolation. Worker-local

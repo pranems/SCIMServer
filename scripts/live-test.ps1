@@ -35,7 +35,10 @@ $script:lastLinkedFlowStepId = 0
 $script:currentSection = "Setup"
 $script:preexistingEndpointIds = @()
 $script:orphanGuardArmed = $false
-$script:orphanReconciled = $false
+$script:ownedEndpointHandles = @{}
+$script:endpointCleanupFailures = @()
+$script:endpointRejectionProbe = $null
+. "$PSScriptRoot\live-endpoint-ownership.ps1"
 
 function Write-VerboseLog {
     param([string]$Label, $Data)
@@ -163,10 +166,13 @@ function Invoke-RestMethod {
     }
     $restResponseHeaders = $null
     $restStatusCode = 0
+    $endpointRequest = Get-LiveEndpointRequest -Uri $Uri -Method $m
     try {
         $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters -AllowInsecureRedirect -ResponseHeadersVariable restResponseHeaders -StatusCodeVariable restStatusCode
+        Complete-LiveEndpointRequest -Request $endpointRequest -StatusCode $restStatusCode -Response $result
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $restStatusCode -ResponseHeaders $restResponseHeaders -ResponseBody $result -ErrorMessage $null
     } catch {
+        if ($endpointRequest -and $endpointRequest.Delete) { $script:endpointCleanupFailures.Add($endpointRequest.Id) }
         $errorStatus = 0
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
             try { $errorStatus = [int]$_.Exception.Response.StatusCode } catch { $errorStatus = 0 }
@@ -210,10 +216,16 @@ function Invoke-WebRequest {
             Write-Host "    📋   Body: $bs" -ForegroundColor DarkGray
         }
     }
+    $endpointRequest = Get-LiveEndpointRequest -Uri $Uri -Method $m
     try {
         $result = Microsoft.PowerShell.Utility\Invoke-WebRequest @PSBoundParameters -AllowInsecureRedirect
+        $endpointResponse = if ($endpointRequest -and $endpointRequest.Create -and $result.StatusCode -ge 200 -and $result.StatusCode -lt 300) {
+            $result.Content | ConvertFrom-Json -ErrorAction Stop
+        } else { $null }
+        Complete-LiveEndpointRequest -Request $endpointRequest -StatusCode $result.StatusCode -Response $endpointResponse
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $result.StatusCode -ResponseHeaders $result.Headers -ResponseBody $result.Content -ErrorMessage $null
     } catch {
+        if ($endpointRequest -and $endpointRequest.Delete) { $script:endpointCleanupFailures.Add($endpointRequest.Id) }
         $errorStatus = 0
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
             try { $errorStatus = [int]$_.Exception.Response.StatusCode } catch { $errorStatus = 0 }
@@ -353,39 +365,6 @@ function Get-HttpErrorContentType {
     } catch { return $null }
 }
 
-function Invoke-OrphanReconciliation {
-    # Belt-and-suspenders leak sweep. Deletes every endpoint that exists now but
-    # did NOT exist when the run started (i.e. created by this run and never
-    # cleaned up). Naming-independent, so it catches leaks from ANY section - not
-    # only the ones whose name matches a known prefix like the old live-test-*
-    # sweep did (that filter is exactly why the 5/14 run leaked live-entra-* etc).
-    # Self-contained: never throws, never counts as a test, idempotent. Acts only
-    # when the startup snapshot armed the guard, so a failed snapshot (empty
-    # baseline) can never trigger a mass-delete of every endpoint on the target.
-    if (-not $script:orphanGuardArmed) { return }
-    if ($script:orphanReconciled) { return }
-    $script:orphanReconciled = $true
-    try {
-        $live = @((Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?count=500" -Headers $headers -ErrorAction Stop).endpoints)
-        $leaked = @($live | Where-Object { $script:preexistingEndpointIds -notcontains $_.id })
-        if ($leaked.Count -gt 0) {
-            Write-Host "`n🧹 Orphan reconciliation: $($leaked.Count) endpoint(s) leaked this run - deleting:" -ForegroundColor Yellow
-            foreach ($ep in $leaked) {
-                try {
-                    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ep.id)" -Method DELETE -Headers $headers -ErrorAction Stop | Out-Null
-                    Write-Host "   deleted $($ep.name) ($($ep.id))" -ForegroundColor DarkGray
-                } catch {
-                    Write-Host "   FAILED to delete $($ep.name) ($($ep.id)): $($_.Exception.Message)" -ForegroundColor Red
-                }
-            }
-        } else {
-            Write-Host "`n🧹 Orphan reconciliation: no leaked endpoints (clean run)" -ForegroundColor DarkGray
-        }
-    } catch {
-        Write-Host "⚠️  Orphan reconciliation skipped (could not list endpoints): $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-}
-
 if ($VerboseMode) {
     Write-Host "🔍 VERBOSE MODE ENABLED -- request/response details will be shown" -ForegroundColor Magenta
     Write-Host ""
@@ -406,23 +385,11 @@ $script:startTime = Get-Date
 
 # ============================================
 # ORPHAN-ENDPOINT SAFETY NET (arm)
-# Snapshot the endpoints that already exist so the reconciliation sweep - which
-# runs on the normal-exit path (explicit call before the summary) AND on the
-# error path (the trap below) - can delete anything THIS run creates but fails to
-# clean up. That is exactly how the 5/14 section-9z run leaked 6 endpoints: a
-# test threw before the section's cleanup line, and the end-of-run sweep only
-# matched live-test-* names so it missed live-entra/minimal/rfc/useronly/inline/
-# patch-*. The sweep here is naming-independent (diffs live-vs-snapshot).
-# ARM only if the snapshot succeeds; otherwise an empty baseline would make the
-# sweep delete every endpoint on the target.
+# Capture every original UUID before creation. Inventory validates completeness;
+# only new response UUIDs enter the retained ownership registry, never names or
+# concurrent additions observed by a later inventory read.
 # ============================================
-try {
-    $script:preexistingEndpointIds = @((Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?count=500" -Headers $headers -ErrorAction Stop).endpoints | ForEach-Object { $_.id })
-    $script:orphanGuardArmed = $true
-    Write-Host "🧹 Orphan guard armed: snapshotted $($script:preexistingEndpointIds.Count) pre-existing endpoint(s)" -ForegroundColor DarkGray
-} catch {
-    Write-Host "⚠️  Orphan guard NOT armed (endpoint snapshot failed: $($_.Exception.Message)); leak sweep disabled for safety" -ForegroundColor Yellow
-}
+Initialize-LiveEndpointOwnership
 
 # On any UNHANDLED terminating error anywhere below, reconcile (delete this run's
 # leaked endpoints) BEFORE the script stops. `break` re-throws so the exit code
@@ -2562,7 +2529,7 @@ $configAfterEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method
 Test-Result -Success ($configAfterEp.endpointLevels.$EndpointId -eq "TRACE") -Message "Endpoint override reflected in GET config"
 
 # DELETE endpoint override
-$deleteEpResponse = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config/endpoint/$EndpointId" -Method DELETE -Headers $headers
+$deleteEpResponse = Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config/endpoint/$EndpointId" -Method DELETE -Headers $headers
 Test-Result -Success ($deleteEpResponse.StatusCode -eq 204) -Message "DELETE endpoint override returns 204"
 
 # Verify removed
@@ -3377,9 +3344,8 @@ try {
 
 # --- Test 9m-A.4: 404 for non-existent endpoint ---
 Write-Host "`n--- Test 9m-A.4: 404 for non-existent endpoint ---" -ForegroundColor Cyan
-$fakeEndpointId = "00000000-0000-0000-0000-000000000000"
 try {
-    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$fakeEndpointId/schemas" -Method POST -Headers $headers -Body $customUserExtBody -ContentType "application/json"
+    $null = Invoke-LiveEndpointRejectionProbe -Route schemas -OwnedEndpointId $SchExtEndpointId -Headers $headers -Body $customUserExtBody -ContentType "application/json"
     Test-Result -Success $false -Message "9m-A.4 Should have returned 404"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
@@ -3815,9 +3781,8 @@ try {
 
 # --- Test 9m-B.8: 404 for non-existent endpoint ---
 Write-Host "`n--- Test 9m-B.8: 404 for non-existent endpoint ---" -ForegroundColor Cyan
-$fakeEndpointId = "00000000-0000-0000-0000-000000000000"
 try {
-    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$fakeEndpointId/resource-types" -Method POST -Headers $headers -Body $deviceSchema
+    $null = Invoke-LiveEndpointRejectionProbe -Route resource-types -OwnedEndpointId $G8bEndpointId -Headers $headers -Body $deviceSchema
     Test-Result -Success $false -Message "9m-B.8 Should have returned 404"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
@@ -16304,11 +16269,14 @@ Write-Host "========================================" -ForegroundColor Yellow
 
 function Remove-TestResource {
     param ([string]$Uri, [string]$Name)
+    $request = Get-LiveEndpointRequest -Uri $Uri -Method DELETE
+    if ($request -and $request.Delete -and $script:ownedEndpointHandles[$request.Id].Deleted) { return }
     try {
         Invoke-RestMethod -Uri $Uri -Method DELETE -Headers $headers -ErrorAction Stop | Out-Null
         Write-Host "  ✅ Deleted $Name" -ForegroundColor Green
     } catch {
         Write-Host "  ⚠️ Could not delete $Name" -ForegroundColor Yellow
+        throw
     }
 }
 
@@ -16329,37 +16297,7 @@ if ($ComboEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/
 if ($StrictComboEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$StrictComboEndpointId" -Name "Strict Schema Combo Endpoint (9m-C)" }
 
 # ============================================
-# SWEEP: Delete ALL remaining live-test-* endpoints
-# Catches any orphaned endpoints from interrupted test runs.
-# Preserves ISV and manually-created endpoints (non live-test-* names).
-# ============================================
-Write-Host "`n--- Sweep: Delete ALL remaining live-test-* endpoints ---" -ForegroundColor Cyan
-try {
-    $allEndpoints = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Headers $headers -ErrorAction Stop
-    $testEndpoints = $allEndpoints.endpoints | Where-Object { $_.name -like "live-test-*" }
-    if ($testEndpoints.Count -gt 0) {
-        Write-Host "  Found $($testEndpoints.Count) orphaned live-test-* endpoint(s) to clean up:" -ForegroundColor Yellow
-        foreach ($ep in $testEndpoints) {
-            Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$($ep.id)" -Name "$($ep.name) ($($ep.id))"
-        }
-    } else {
-        Write-Host "  ✅ No orphaned live-test-* endpoints found" -ForegroundColor Green
-    }
-    # Report preserved endpoints
-    $preserved = $allEndpoints.endpoints | Where-Object { $_.name -notlike "live-test-*" }
-    if ($preserved.Count -gt 0) {
-        Write-Host "  Preserved $($preserved.Count) non-test endpoint(s):" -ForegroundColor Cyan
-        foreach ($ep in $preserved) {
-            Write-Host "    🔒 $($ep.name) ($($ep.id))" -ForegroundColor DarkCyan
-        }
-    }
-} catch {
-    Write-Host "  ⚠️ Could not list endpoints for sweep cleanup: $_" -ForegroundColor Yellow
-}
-
-# Naming-independent belt: catch anything the name-based sweep above missed
-# (e.g. live-entra-*, cache-live-*, g8h-*-test-*, audit-test-* ... any endpoint
-# this run created under a non live-test-* name and did not delete).
+# Reconcile only retained, registered owned handles.
 Invoke-OrphanReconciliation
 
 # ============================================

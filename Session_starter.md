@@ -1,5 +1,28 @@
 ## SCIMServer - Condensed Session Memory
 
+### Offline endpoint fixture ownership, 2026-11-20
+
+| Date | Summary |
+|---|---|
+| 2026-11-20 | Applied an uncommitted, offline-only ownership correction on `vprane/scimserver/containers-live-fixture-ownership-20261121`, base `554f42023fdde30918ef378987cc8f3135e4ed3a`, no upstream. |
+
+- [x] ✅ COMPLETED: Complete original UUID capture, register-before-recorder
+  creation, retained owned cleanup, exact-ID absence and fatal cleanup evidence.
+- [x] ✅ COMPLETED: Focused mock contract GREEN, 133 assertions (previously 104); actual pinned
+  unsafe sweeps reproduce RED. Shared pure gate/customization contracts pass.
+- [x] ✅ COMPLETED: Independent-review RED controls close concurrent unknown
+  POST/PUT/PATCH admission and armed-baseline replacement. The two actual sentinel
+  rejection probes retain their HTTP 404 assertions through checked single-use
+  admission with a known-owned handle; no broad unknown-ID permission remains.
+- [ ] Review separate global mutation and evidence-redaction outcomes before
+  any preserved-dev live execution. Full live execution has not started.
+
+Runtime is offline for this task. No network, runtime, authentication,
+dependency, commit/push/PR or deployment operations were authorized or performed.
+The separate uncommitted redaction worktree was not copied. See
+[ownership behavior, integration notes and confirmed RCA](docs/LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+Historical runtime qualification below does not describe this task's authority.
+
 ### Merged-source deployment qualification, 2026-11-20
 
 PR #275 is merged at `9ee2a72d91ad1fc9cdee00782d18f1d84e481104`.
