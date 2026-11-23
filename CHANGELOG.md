@@ -46,6 +46,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correction, with original values, idempotence and all earlier controls
   preserved. The existing evidence pattern and RCA now cover these boundaries.
 
+### Targeted CI dependency artifacts
+
+- Extend the existing read-only lockfile workflow with optional exact
+  `targetZodVersion` and API/web `productVersion` inputs. Generate selected
+  manifests and locks together on the existing Linux CI runner, reject
+  unrelated package changes, retain public-registry/sha512 checks, and require
+  the existing seven-day publication age before changing a manifest.
+  Inputs pass through environment variables rather than shell interpolation.
+  Focused artifact contracts increase from 17 to 22 passing controls after
+  assertion-level RED. The generator-only source retained version 0.55.68 and
+  passed all 27 normal Fast push gates. Exact-source CI run 44855811919 then
+  produced the 0.55.69 candidate manifests/locks with only Zod 4.4.3 -> 4.6.6
+  and API/web version metadata changed. The immutable ZIP digest, exact five
+  files, extracted bytes, root metadata and 40.42-day publication age were
+  independently verified before import. Locked installation retains exact
+  imported bytes and installs 4.6.6. The complete web audit has zero
+  High/Critical findings and no Zod advisory; three Moderate development-tool
+  findings remain. Candidate web tests retain 126 files/1,664 passing tests.
+  Coverage remains lines 85.74%, branches 75.86%, functions 75.53% and
+  statements 83.06%, above unchanged 82/70/69/78 floors. The source helper
+  retains 22 passing groups; generator-only API units retain 218/6,263 and
+  reduced HTTP 120 suites/2,519 passes/42 skips. Final reviewed source,
+  shipping and deployment remain open.
+  See [usage and execution RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
+
 ### PostgreSQL inventory qualification fixtures
 
 - Correct only the cross-endpoint inventory E2E fixture isolation. Worker-local

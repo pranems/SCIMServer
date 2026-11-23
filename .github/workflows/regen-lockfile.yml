@@ -18,10 +18,12 @@ name: Regenerate lockfile
 # is always a reviewed human action.
 #
 # HOW TO USE
-#   1. Edit package.json, api/package.json or web/package.json on your branch - add the
-#      override / bump the dep.
-#   2. Run this workflow against that branch (Actions tab, or `gh workflow run`).
-#   3. Download the `regenerated-lockfiles` artifact, drop the lockfile in, commit.
+#   1. Use targetZodVersion and productVersion for supported targeted changes
+#      without first pushing mismatched manifests and locks. Other dependency
+#      changes retain the existing reviewed manifest preparation procedure.
+#   2. Run against the exact reviewed source ref (Actions tab or `gh workflow run`).
+#   3. Verify the run source and publication-age receipt. Download selected
+#      manifests and locks together, then commit through normal gates and review.
 #
 # QUARANTINE NOTE
 # Nothing here bypasses the corporate Minimum Release control. This runner is
@@ -38,6 +40,14 @@ on:
         default: 'api'
         type: choice
         options: [api, web, both, root]
+      targetZodVersion:
+        description: 'Optional exact stable Zod version; requires web or both and seven-day publication age'
+        required: false
+        type: string
+      productVersion:
+        description: 'Optional exact stable API/web product version; requires both'
+        required: false
+        type: string
   push:
     branches:
       - 'chore/regen-lockfile*'
@@ -49,6 +59,10 @@ jobs:
   regen:
     name: regen
     runs-on: ubuntu-latest
+    env:
+      REGEN_WORKSPACE: ${{ inputs.workspace || 'both' }}
+      REGEN_ZOD_VERSION: ${{ inputs.targetZodVersion }}
+      REGEN_PRODUCT_VERSION: ${{ inputs.productVersion }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -66,10 +80,13 @@ jobs:
             *) echo "::error::Unexpected registry '$reg'. This job only produces a committable lockfile against registry.npmjs.org."; exit 1 ;;
           esac
 
+      - name: Prepare optional targeted manifests on this CI runner
+        run: node scripts/lockfile-regeneration.mjs prepare-targeted "$REGEN_WORKSPACE"
+
       - name: Regenerate lockfiles
         run: |
           set -euo pipefail
-          ws="${{ inputs.workspace || 'both' }}"
+          ws="$REGEN_WORKSPACE"
           for d in $(node scripts/lockfile-regeneration.mjs workspaces "$ws"); do
             test -f "$d/package.json"
             echo "::group::npm install --package-lock-only ($d)"
@@ -95,19 +112,20 @@ jobs:
       - name: Verify the lockfile is not contaminated
         run: |
           set -euo pipefail
-          node scripts/lockfile-regeneration.mjs verify "${{ inputs.workspace || 'both' }}"
+          node scripts/lockfile-regeneration.mjs verify "$REGEN_WORKSPACE"
+          node scripts/lockfile-regeneration.mjs verify-targeted "$REGEN_WORKSPACE"
 
       - name: Report publish age of every changed package
         run: |
           set -euo pipefail
           mkdir -p regenerated-lockfiles
-          node scripts/lockfile-regeneration.mjs ages "${{ inputs.workspace || 'both' }}" regenerated-lockfiles/publish-ages.json
+          node scripts/lockfile-regeneration.mjs ages "$REGEN_WORKSPACE" regenerated-lockfiles/publish-ages.json
 
-      - name: Stage only selected lockfiles
+      - name: Stage only selected manifests and lockfiles
         run: |
           set -euo pipefail
-          for d in $(node scripts/lockfile-regeneration.mjs workspaces "${{ inputs.workspace || 'both' }}"); do
-            cp --parents "$d/package-lock.json" regenerated-lockfiles/
+          for d in $(node scripts/lockfile-regeneration.mjs workspaces "$REGEN_WORKSPACE"); do
+            cp --parents "$d/package.json" "$d/package-lock.json" regenerated-lockfiles/
           done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

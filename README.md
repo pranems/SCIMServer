@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-18 - **Product version:** `0.55.68`
+> **Status:** User-facing reference - **Last verified:** 2026-11-18 - **Product version:** `0.55.69`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -8,6 +8,12 @@
 cover the proposed 0.55.67 tenant 10 dev-and-canary migration, earlier correction
 history, cumulative changes since 0.55.20, migration/rollback steps and known limits.
 See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
+
+**0.55.69 source candidate:** exact CI-generated manifests and locks update
+web Zod to eligible 4.6.6 without changing other dependencies. This is not a
+published image or deployed release. Normal review, remaining runtime
+qualification and dev acceptance remain required. See
+[artifact provenance and safeguards](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#verified-targeted-candidate-artifact).
 
 **Windows without Docker Desktop:** the selected local migration route uses
 independent Docker Engine in WSL, a separately installed Windows client and
@@ -48,7 +54,7 @@ For actual supported shapes and integration limits, see
 Keep strict validation enabled for Entra; diagnose the request and effective
 schema before applying a targeted compatibility setting.
 
-[![Version](https://img.shields.io/badge/version-0.55.68-blue)]()
+[![Version](https://img.shields.io/badge/version-0.55.69-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-24-green)]()
 [![NestJS](https://img.shields.io/badge/NestJS-11.1-red)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)]()

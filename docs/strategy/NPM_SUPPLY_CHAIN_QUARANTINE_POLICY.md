@@ -579,6 +579,107 @@ Recorded in agent memory at `/memories/corp-security-policies.md` with today's m
 
 ---
 
+## Targeted CI artifacts, 2026-11-21
+
+### Why the supported workflow needs targeted inputs
+
+The completed web audit reports High Zod GHSA-mrhx-c7xc-m3w5 in installed
+4.4.3. Fixed 4.6.6 was published on 2026-10-11 and is seven-day eligible.
+The existing exact-master regeneration run `44847989228` succeeded but kept
+4.4.3 because it consumed the unchanged manifest. A successful regeneration
+is not proof of remediation.
+
+The normal hook rejects a manifest/lock mismatch. This workflow therefore
+accepts optional exact `targetZodVersion` and `productVersion` inputs, prepares
+the selected manifests on the existing Linux CI runner, and returns manifests
+and locks together. No local lock generation, Codespace, account substitution,
+new write permission or hook bypass is needed.
+
+| Input | Meaning and safeguards |
+|---|---|
+| `workspace` | Existing selection: `api`, `web`, `both` or `root`. |
+| `targetZodVersion` | Optional exact stable version for the single declared web Zod dependency. Requires `web` or `both`; publication age is checked before writing. |
+| `productVersion` | Optional exact stable product version for API and web together. Requires `both`; the repository tooling version is untouched. |
+
+Inputs are passed as environment values, not interpolated into shell source.
+The shared helper rejects ranges and shell-shaped input, preserves unrelated
+manifest fields, validates both manifest/lock version locations, and rejects
+any changed, added or removed dependency entry outside the requested top-level
+web Zod package. Default regeneration with empty optional inputs retains its
+existing behavior. All selected artifacts still require public registry URLs,
+sha512 integrity and the existing changed-package publication-age report.
+
+### Operator sequence
+
+Run against the exact reviewed correction ref once it is available remotely:
+
+```powershell
+gh workflow run regen-lockfile.yml `
+  --repo pranems/SCIMServer `
+  --ref <reviewed-correction-ref> `
+  -f workspace=both `
+  -f targetZodVersion=4.6.6 `
+  -f productVersion=0.55.69
+```
+
+This is a schematic command: replace the ref with the verified exact source
+revision. Check the resulting run's `headSha`, conclusion and artifact identity.
+Download `regenerated-lockfiles`, independently compare the selected manifests
+and locks to that exact baseline, and require only Zod plus API/web version
+metadata to change. Import the unmodified artifacts, install with locked
+`npm ci`, rerun the advisory gate and applicable validation, then use normal
+review and merge. A local pure-contract pass does not satisfy these remote,
+installed-package or release claims.
+
+### Verified targeted candidate artifact
+
+Run [44855811919](https://github.com/pranems/SCIMServer/actions/runs/44855811919)
+succeeded from exact generator source
+`ee56eb0d9c14f4ecc3b50e8d0ffa80569b785812` with `workspace=both`,
+`targetZodVersion=4.6.6` and `productVersion=0.55.69`.
+Artifact `14686944345`, `regenerated-lockfiles`, has independently verified
+ZIP digest
+`sha256:f250625984b6b64f2900b932ac44c30635d5549388b5f36a73b8e76ba8d3577b`.
+This is a dependency-input archive, **not a shipping OCI image digest**.
+GitHub retention is seven days; retaining the identifier does not promise
+permanent download availability.
+
+All five archive entries match the downloaded extracted bytes. The four
+selected manifests/locks match the requested exact state. No unrelated
+package, root metadata or repository tooling version changed. Zod 4.6.6
+was published `2026-10-11T16:18:23.878Z`, 40.42 days before the CI check,
+above the unchanged seven-day floor. The imported files are generated CI
+bytes, not locally generated or hand-spliced locks. Approved-proxy `npm ci
+--ignore-scripts` preserves the imported web lock's SHA256 and installs 4.6.6.
+The complete parsed web audit has zero High/Critical findings and no Zod
+advisory. Three Moderate development-tool findings remain in `vitest`,
+`@vitest/mocker` and `@vitest/coverage-v8`; this is not a zero-vulnerability
+claim. Reviewed source merge and release qualification remain independent
+requirements.
+
+### Execution issues and prevention
+
+| Issue | Type / severity | Root cause and confirmed correction | Detection / earliest gate |
+|---|---|---|---|
+| Successful unchanged regeneration did not remediate Zod | Workflow capability / Medium | Existing input selected a workspace but could not express the eligible desired version. Five new contract groups were RED, then all 22 groups passed after targeted preparation and output checks. Actual CI generation remains required. | Installed audit and artifact inspection / desired-versus-generated artifact assertion |
+| Fresh contract run could not load `js-yaml` | Dependency restoration / Low | The new worktree had no installed locked API tooling. Restore used approved-proxy `npm ci`; the next run reached the five actual RED assertions, without changing locks. | Contract module load / locked dependency prerequisite |
+| Web build and diagram renderer could not start | Dependency restoration / Low | The fresh worktree lacked Vite and matching web Playwright. Both commands failed explicitly before execution; locked approved-proxy `npm ci` restored 364 packages with locks unchanged. Subsequent normal-hook gates remain separate evidence. | Web build / locked dependency prerequisite |
+| Workflow help still required prior manifest edits | Published guidance / Low | The old HOW TO USE comments described only the former procedure. An explicit help-text assertion was RED before correction and GREEN afterward, protecting the supported targeted path from documentation drift. | Source readback / emitted-help contract |
+| ZIP-entry comparison falsely rejected matching names | Private verification / Low | An inline PowerShell join/comparison expression had ambiguous operator grouping. Independent actual/expected projections were equal. Named intermediate strings now make the exact comparison explicit; missing, extra and case-changed entry controls reject, and all five extracted SHA256 comparisons pass. No artifact was imported before this corrected byte admission passed. | Artifact admission / positive and negative exact-entry controls |
+| Candidate API audit reached the configured proxy's request quota | Environment / Low | The API audit returned HTTP 429 with `Retry-After: 952`, not vulnerability metadata. Strict result-shape admission rejected it instead of reporting zero findings. One targeted retry after the server deadline succeeded: zero High/Critical and 22 Moderate findings. No authentication, registry substitution or full-suite retry was involved. | Audit execution / complete-result shape admission, no escape |
+| Version formatter updated the README header but not its badge | Documentation / Low | Candidate push failed C13 because the visible badge still said 0.55.68 while manifests and header said 0.55.69. The badge now matches the candidate. Existing C13 stale/missing/malformed/duplicate/matching controls are the permanent prevention; run the content audit as well as freshness after version formatting. No source hook was bypassed. | Normal pre-push content audit / focused content audit before commit |
+
+Test improvement **applied**: permanent exact-output, no-mutation, invalid-input,
+unrelated-package, CI-only and workflow-binding controls accompany existing
+registry, integrity and publication-age controls. Design disposition
+**accepted**: the existing shared generator owns manifest preparation and
+artifact verification; the workflow remains a thin read-only orchestrator.
+No speculative package-update framework was introduced.
+
+The issue record covers the observed local correction and prior immutable
+run receipt. It is not a claim that the complete deployment transcript has
+been reconciled or that the security advisory has been remediated.
+
 ## 9. Open questions that need the internal docs
 
 Unanswered because the source pages are not readable from here. **Not guessed at.**

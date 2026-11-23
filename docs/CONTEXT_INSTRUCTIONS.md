@@ -1,13 +1,21 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.68
+> **Version**: 0.55.69
 > **Last Updated**: November 20, 2026
 > **Last verified:** 2026-11-20
 
 ---
 
 ## Active Delivery Process
+
+**Current integration boundary:** the evidence correction is committed at
+`62440b1d`, including actual-helper nested-script state RED/GREEN coverage
+(nine Jest tests and the independent 213 PowerShell assertions pass).
+It integrates reviewed artifact PR #279 at `8b6335f1`; product version remains
+the unreleased 0.55.69 candidate. Normal full hook, combined ownership
+qualification, global-state preservation and deployment remain open.
+The source-stage records below retain their original scope and dates.
 
 **Unreleased source correction, 2026-11-21:** The dedicated live evidence fix
 keeps authentication material in real HTTP inputs/responses but removes it
@@ -32,6 +40,26 @@ The existing evidence boundary now registers auth text and decoded Basic
 passwords, exempts only the exact canonical marker, and keeps password-free
 authority accounts out of the material set. All 213 focused assertions pass;
 the prior trap, input preservation and ownership-blocker scope are retained.
+
+**Targeted CI artifact correction, 2026-11-21 UTC:** PR #278 is merged at
+`554f4202`. The web audit identifies High Zod GHSA-mrhx-c7xc-m3w5; fixed 4.6.6
+is eligible, but unchanged-manifest CI regeneration retains 4.4.3.
+An isolated correction supplies exact optional dependency/product inputs to
+the existing CI workflow, generates selected manifests and locks together,
+and rejects unrelated package changes. All 22 focused controls pass after
+RED, and all 27 normal Fast push gates pass on the generator-only source.
+Exact-source run `44855811919` then succeeded at `ee56eb0d`; its
+five-file candidate artifact was byte/digest checked, compared to exact source,
+and imported without local generation. Only eligible Zod 4.6.6 and API/web
+version metadata changed. Current source is the unreleased 0.55.69 candidate;
+locked installation preserves imported bytes and installs 4.6.6. Web audit has
+zero High/Critical findings and no Zod advisory, with three Moderate
+development-tool findings remaining. Reviewed merge and deployment remain open.
+Candidate web tests pass 126 files/1,664 tests; coverage remains
+85.74/75.86/75.53/83.06 against unchanged 82/70/69/78 floors.
+The deployment-owned fixtures and bridge were cleaned exactly; original
+containers, volumes, archives and Desktop artifacts remain untouched.
+See [usage and RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
 
 **Merged-source execution, 2026-11-20:** PR #275 merged at `9ee2a72d`.
 Static/runtime qualification and fresh 30-migration replay passed; each API
