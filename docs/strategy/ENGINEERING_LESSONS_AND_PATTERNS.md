@@ -37,6 +37,13 @@ redaction. URI and decoded Basic credential pairs share one real discovery
 boundary, while password-free account names remain metadata. These claims
 are now exercised by 213 passing pure PowerShell assertions, retaining the
 complete prior trap and evidence controls. No ownership redesign is included.
+The normal API hook subsequently exposed an extracted helper harness that had
+not loaded the new redactor. Loading the actual dependency revealed a real
+nested-script state escape: PowerShell `$script:` resolves against the calling
+child script. A shared run registry must use the same explicitly owned root
+scope as its collector. The strengthened nested-flow test proves step order,
+redacted evidence, retained metadata and unchanged original values with the
+real dependency. Helper-only GREEN is not evidence about nested callers.
 
 > **What this is.** The **central, continually-updated** knowledge base of cross-cutting engineering patterns learned from real issues on this codebase. It is a *living* doc: it is **appended to** every time a fix is confirmed to resolve an issue that generalizes, and it is **reviewed and re-pruned** on the Stage X audit cadence. It is the layer between raw per-build issue ledgers and hard standing rules:
 >

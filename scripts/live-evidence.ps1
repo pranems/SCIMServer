@@ -1,9 +1,10 @@
 # Evidence copies only. The HTTP runner retains the original bodies and responses.
 function Initialize-LiveEvidence {
     param([string[]]$Secrets = @())
-    $script:liveEvidenceSecrets = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    # Nested script calls change $script scope; share the root flow's run state.
+    $global:__ScimServerLiveEvidenceSecrets = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($secret in $Secrets) {
-        if ($secret) { $null = $script:liveEvidenceSecrets.Add($secret) }
+        if ($secret) { $null = $global:__ScimServerLiveEvidenceSecrets.Add($secret) }
     }
 }
 
@@ -17,7 +18,7 @@ function Add-LiveEvidenceSecret {
     param($Value)
     if ($Value -is [string]) {
         if (-not $Value -or $Value -ceq '[REDACTED]') { return }
-        $null = $script:liveEvidenceSecrets.Add($Value)
+        $null = $global:__ScimServerLiveEvidenceSecrets.Add($Value)
         if ($Value -match '^(?:Bearer|Basic)\s+(.+)$') {
             Add-LiveEvidenceSecret $Matches[1]
         }
@@ -83,7 +84,7 @@ function Convert-LiveEvidenceText {
         }
         return '[REDACTED]'
     })
-    foreach ($secret in @($script:liveEvidenceSecrets | Sort-Object Length -Descending)) {
+    foreach ($secret in @($global:__ScimServerLiveEvidenceSecrets | Sort-Object Length -Descending)) {
         foreach ($variant in @($secret, [Uri]::EscapeDataString($secret), [System.Net.WebUtility]::UrlEncode($secret), (ConvertTo-Json -InputObject $secret -Compress).Trim('"'))) {
             if ($variant.Contains('%')) {
                 $pattern = [regex]::Replace([regex]::Escape($variant), '%[0-9A-Fa-f]{2}', {
@@ -154,7 +155,7 @@ function Copy-LiveEvidenceValue {
 
 function ConvertTo-LiveEvidence {
     param($Value)
-    if ($null -eq $script:liveEvidenceSecrets) { throw 'Live evidence redaction is not initialized.' }
+    if ($null -eq $global:__ScimServerLiveEvidenceSecrets) { throw 'Live evidence redaction is not initialized.' }
     # Discover all material before copying again: an earlier diagnostic can echo
     # a secret declared in a later sibling, without mutating the caller's object.
     $null = Copy-LiveEvidenceValue $Value ([System.Collections.Generic.List[object]]::new())

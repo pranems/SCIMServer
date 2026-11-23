@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   RED first reproduced raw body leakage. Node, browser,
   complete live, backend and deployment counts are unchanged and were not
   rerun in this fix worktree. No dependency, version or lockfile changes.
+- The normal API unit hook caught a missing extracted-helper dependency.
+  Loading the real helper then reproduced nested script state loss. Evidence
+  state now follows the root flow's explicitly named run-global ownership.
+  The existing nested-flow Jest suite passes nine tests, retaining step order
+  and proving sanitized copies, nonsecret metadata and unchanged originals.
+  The complete normal hook remains required after this focused correction.
 - Document [policy, confirmed root causes and review obligations](docs/LIVE_EVIDENCE_REDACTION.md).
 - Consolidate fatal handling into one authoritative trap that attempts
   reconciliation, protects cleanup and original failures, and exits 1.
