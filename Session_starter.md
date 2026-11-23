@@ -17,7 +17,7 @@ combined lifecycle/evidence qualification remain required.
 
 - [x] ✅ COMPLETED: Complete original UUID capture, register-before-recorder
   creation, retained owned cleanup, exact-ID absence and fatal cleanup evidence.
-- [x] ✅ COMPLETED: Focused mock/JSON contract GREEN, 184 assertions (previously 133; initially 104); actual pinned
+- [x] ✅ COMPLETED: Focused mock/JSON/child contract GREEN, 206 assertions (previously 184/133; initially 104); actual pinned
   unsafe sweeps reproduce RED. Shared pure gate/customization contracts pass.
 - [x] ✅ COMPLETED: Independent-review RED controls close concurrent unknown
   POST/PUT/PATCH admission and armed-baseline replacement. The two actual sentinel
@@ -25,6 +25,12 @@ combined lifecycle/evidence qualification remain required.
   admission with a known-owned handle; no broad unknown-ID permission remains.
 - [ ] Review separate global mutation and evidence-redaction outcomes before
   any preserved-dev live execution. Full live execution has not started.
+
+An actual ampersand-invoked child reproduced root ownership state loss missed
+by the dot-sourced helper proxy. The shared run registry now passes both child
+transport lifecycles, negative original/unknown controls and parent-visible
+sticky cleanup failure checks. The old normal push was cancelled rather than
+publishing that known-bad source; the corrected tip still needs normal gates.
 
 Runtime is offline for this task. No network, runtime, authentication,
 dependency, commit/push/PR or deployment operations were authorized or performed.

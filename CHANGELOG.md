@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   teardown assignment. Replace name sweeps and inventory-difference deletion
   with retained owned handles; require successful DELETE and exact-ID absence.
   Cleanup failures remain fatal even after a later successful retry. The new
-  default PowerShell contract passes 184 assertions (previously 133; initially 104) and reproduces both actual
+  default PowerShell contract passes 206 assertions (previously 184/133; initially 104) and reproduces both actual
   unsafe baseline lifecycles with mocks. Shared gate/customization contracts pass.
   Product version, dependencies, API/web suites and live counts are unchanged.
   No full live runner, network or deployment was executed. Preserved-dev execution
@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transport mismatch missed by Int32 mock literals. Both native integral types
   remain bounded, nonnegative and equal to the full array length; Boolean,
   string, floating-point, oversized and mismatched counts fail before creation.
+- An actual `& child.ps1` lifecycle reproduces loss of initialized script-scoped
+  ownership state. One root-owned registry now retains original IDs, owned
+  handles, rejection-probe admission and sticky cleanup failures across both
+  wrappers and nested callers. Real child tests require valid create/update/
+  delete/readback, reject original/unknown mutations, block reinitialization,
+  and preserve child failure evidence after exact parent cleanup.
 
 ### Targeted CI dependency artifacts
 

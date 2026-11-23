@@ -19,7 +19,7 @@ their original authority, not a prohibition on subsequent normal source review.
 **Offline fixture correction, 2026-11-20:** The existing
 `vprane/scimserver/containers-live-fixture-ownership-20261121` branch at base
 `554f42023fdde30918ef378987cc8f3135e4ed3a` has an uncommitted endpoint ownership
-correction with 184 passing mock/JSON lifecycle assertions (previously 133; initially 104) and passing shared pure
+correction with 206 passing mock/JSON/child lifecycle assertions (previously 184/133; initially 104) and passing shared pure
 contracts. Actual pinned baseline sweep/reconciliation reproduce unsafe deletes
 with mocks. Complete original inventory and exact new response IDs replace
 name/difference deletion. Preserved-dev live execution has not started; global
@@ -32,6 +32,12 @@ replacement with actual pre-fix RED controls. Only two checked, single-use
 all-zero-UUID POST rejection probes preserve their original HTTP 404 assertions;
 they require a known-owned active cleanup handle and cannot admit arbitrary UUIDs.
 Historical runtime statements below are not current authority.
+
+Actual `& child.ps1` fixture creation also reproduced loss of initialized
+script-scoped ownership state. One root-owned run registry now covers both
+wrappers, original inventory, retained handles, single-use rejection admission
+and sticky cleanup failures. Real child lifecycle and parent cleanup controls
+pass; normal publication of that corrected tip remains required.
 
 **Targeted CI artifact correction, 2026-11-21 UTC:** PR #278 is merged at
 `554f4202`. The web audit identifies High Zod GHSA-mrhx-c7xc-m3w5; fixed 4.6.6

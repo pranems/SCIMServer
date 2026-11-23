@@ -33,11 +33,14 @@ $global:__ScimServerLiveTestFlowSteps = [System.Collections.Generic.List[object]
 $script:flowSteps = $global:__ScimServerLiveTestFlowSteps
 $script:lastLinkedFlowStepId = 0
 $script:currentSection = "Setup"
-$script:preexistingEndpointIds = @()
-$script:orphanGuardArmed = $false
-$script:ownedEndpointHandles = @{}
-$script:endpointCleanupFailures = @()
-$script:endpointRejectionProbe = $null
+# One run-owned registry shared by inherited functions in & child.ps1 callers.
+$global:__ScimServerLiveEndpointOwnership = [pscustomobject]@{
+    preexistingEndpointIds = @()
+    orphanGuardArmed = $false
+    ownedEndpointHandles = @{}
+    endpointCleanupFailures = @()
+    endpointRejectionProbe = $null
+}
 . "$PSScriptRoot\live-endpoint-ownership.ps1"
 
 function Write-VerboseLog {
@@ -172,7 +175,7 @@ function Invoke-RestMethod {
         Complete-LiveEndpointRequest -Request $endpointRequest -StatusCode $restStatusCode -Response $result
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $restStatusCode -ResponseHeaders $restResponseHeaders -ResponseBody $result -ErrorMessage $null
     } catch {
-        if ($endpointRequest -and $endpointRequest.Delete) { $script:endpointCleanupFailures.Add($endpointRequest.Id) }
+        if ($endpointRequest -and $endpointRequest.Delete) { $global:__ScimServerLiveEndpointOwnership.endpointCleanupFailures.Add($endpointRequest.Id) }
         $errorStatus = 0
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
             try { $errorStatus = [int]$_.Exception.Response.StatusCode } catch { $errorStatus = 0 }
@@ -225,7 +228,7 @@ function Invoke-WebRequest {
         Complete-LiveEndpointRequest -Request $endpointRequest -StatusCode $result.StatusCode -Response $endpointResponse
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $result.StatusCode -ResponseHeaders $result.Headers -ResponseBody $result.Content -ErrorMessage $null
     } catch {
-        if ($endpointRequest -and $endpointRequest.Delete) { $script:endpointCleanupFailures.Add($endpointRequest.Id) }
+        if ($endpointRequest -and $endpointRequest.Delete) { $global:__ScimServerLiveEndpointOwnership.endpointCleanupFailures.Add($endpointRequest.Id) }
         $errorStatus = 0
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
             try { $errorStatus = [int]$_.Exception.Response.StatusCode } catch { $errorStatus = 0 }
@@ -16270,7 +16273,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 function Remove-TestResource {
     param ([string]$Uri, [string]$Name)
     $request = Get-LiveEndpointRequest -Uri $Uri -Method DELETE
-    if ($request -and $request.Delete -and $script:ownedEndpointHandles[$request.Id].Deleted) { return }
+    if ($request -and $request.Delete -and $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$request.Id].Deleted) { return }
     try {
         Invoke-RestMethod -Uri $Uri -Method DELETE -Headers $headers -ErrorAction Stop | Out-Null
         Write-Host "  ✅ Deleted $Name" -ForegroundColor Green

@@ -43,6 +43,14 @@ function Expect-Failure([scriptblock]$action, [string]$message) {
     Assert $failed $message
 }
 function Reset-Mock {
+    $global:__ScimServerLiveEndpointOwnership = [pscustomobject]@{
+        preexistingEndpointIds = @()
+        orphanGuardArmed = $false
+        ownedEndpointHandles = @{}
+        endpointCleanupFailures = @()
+        endpointRejectionProbe = $null
+    }
+    # Legacy script state is retained only for the pinned -BaselineRed replay.
     $script:ownedEndpointHandles = @{}
     $script:orphanGuardArmed = $false
     $script:inventory = [pscustomobject]@{ totalResults = 1; endpoints = @([pscustomobject]@{ id = $original; name = 'live-test-original' }) }
@@ -125,7 +133,7 @@ if ($BaselineRed) {
 Reset-Mock
 Initialize-LiveEndpointOwnership
 $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
-$knownCleanupHandle = $script:ownedEndpointHandles[$owned]
+$knownCleanupHandle = $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned]
 $script:inventory.endpoints += [pscustomobject]@{ id = $unknown; name = 'concurrent-unowned' }
 $script:inventory.totalResults = 2
 $admitted = [System.Collections.Generic.List[string]]::new()
@@ -152,25 +160,25 @@ Assert (@($script:calls | Where-Object { $_.Uri -match $unknown -and $_.Method -
 
 Reset-Mock
 Initialize-LiveEndpointOwnership
-$baseline = $script:preexistingEndpointIds
+$baseline = $global:__ScimServerLiveEndpointOwnership.preexistingEndpointIds
 $script:inventory = [pscustomobject]@{ totalResults = 0; endpoints = @() }
 Expect-Failure { Initialize-LiveEndpointOwnership } 'An armed baseline must reject reinitialization even before any owned handle exists.'
-Assert ([object]::ReferenceEquals($baseline, $script:preexistingEndpointIds) -and $script:preexistingEndpointIds.Contains($original) -and $script:orphanGuardArmed) 'Reinitialization must never erase or disarm the original baseline.'
+Assert ([object]::ReferenceEquals($baseline, $global:__ScimServerLiveEndpointOwnership.preexistingEndpointIds) -and $global:__ScimServerLiveEndpointOwnership.preexistingEndpointIds.Contains($original) -and $global:__ScimServerLiveEndpointOwnership.orphanGuardArmed) 'Reinitialization must never erase or disarm the original baseline.'
 
 Reset-Mock
 Initialize-LiveEndpointOwnership
-Assert $script:orphanGuardArmed 'A complete inventory must arm creation.'
+Assert $global:__ScimServerLiveEndpointOwnership.orphanGuardArmed 'A complete inventory must arm creation.'
 $response = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body '{"name":"owned"}' -ContentType 'application/json' -ErrorAction Stop
 Assert ($response.id -eq $owned) 'Creation response must be unchanged.'
-Assert ($script:ownedEndpointHandles.ContainsKey($owned.ToUpperInvariant())) 'UUID identity must be case-insensitive.'
-$handle = $script:ownedEndpointHandles[$owned]
+Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.ContainsKey($owned.ToUpperInvariant())) 'UUID identity must be case-insensitive.'
+$handle = $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned]
 $script:createId = $original.ToUpperInvariant()
 try {
     Expect-Failure { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers } 'Original response ID must be rejected before assignment.'
     $script:cleanupId = $owned
     Expect-Failure { $script:cleanupId = (Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers).Content } 'Web original response must reject before teardown assignment.'
     Assert ($script:cleanupId -eq $owned) 'Failed original-ID registration must not alter the caller cleanup target.'
-    Assert ([object]::ReferenceEquals($handle, $script:ownedEndpointHandles[$owned])) 'Rejected registration must retain the prior cleanup handle.'
+    Assert ([object]::ReferenceEquals($handle, $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned])) 'Rejected registration must retain the prior cleanup handle.'
     Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$original" -Method DELETE -Headers $headers } 'Original DELETE must be rejected.'
     Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$unknown" -Method DELETE -Headers $headers } 'Concurrent unowned DELETE must be rejected.'
     Expect-Failure { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$original" -Method PATCH -Headers $headers -Body '{}' } 'Original endpoint mutation must be rejected.'
@@ -192,10 +200,10 @@ Assert (@($script:calls | Where-Object { $_.Method -eq 'DELETE' }).Count -eq 1) 
 Reset-Mock
 $script:inventory = [pscustomobject]@{ totalResults = 0; endpoints = @() }
 Initialize-LiveEndpointOwnership
-Assert $script:orphanGuardArmed 'An explicitly complete empty inventory is valid.'
+Assert $global:__ScimServerLiveEndpointOwnership.orphanGuardArmed 'An explicitly complete empty inventory is valid.'
 $script:createId = $owned.ToUpperInvariant()
 $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
-Assert ($script:ownedEndpointHandles[$owned].Id -eq $owned) 'Registration must normalize UUID casing.'
+Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Id -eq $owned) 'Registration must normalize UUID casing.'
 Expect-Failure { Initialize-LiveEndpointOwnership } 'Reinitialization must not discard retained handles.'
 $script:createId = $owned
 Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers } 'Duplicate owned registration must reject without replacing its handle.'
@@ -209,10 +217,10 @@ foreach ($json in @(
     $script:inventory = $json | ConvertFrom-Json -ErrorAction Stop
     Assert ($script:inventory.totalResults -is [long]) 'JSON inventory counts must exercise native Int64 deserialization.'
     Initialize-LiveEndpointOwnership
-    Assert $script:orphanGuardArmed 'Complete JSON-deserialized inventory must arm ownership.'
-    Assert ($script:preexistingEndpointIds.Count -eq $script:inventory.endpoints.Count) 'JSON inventory must retain every original UUID.'
+    Assert $global:__ScimServerLiveEndpointOwnership.orphanGuardArmed 'Complete JSON-deserialized inventory must arm ownership.'
+    Assert ($global:__ScimServerLiveEndpointOwnership.preexistingEndpointIds.Count -eq $script:inventory.endpoints.Count) 'JSON inventory must retain every original UUID.'
     if ($script:inventory.totalResults -eq 1) {
-        Assert ($script:preexistingEndpointIds.Contains($original)) 'JSON inventory must retain the exact original UUID.'
+        Assert ($global:__ScimServerLiveEndpointOwnership.preexistingEndpointIds.Contains($original)) 'JSON inventory must retain the exact original UUID.'
     }
 }
 
@@ -227,7 +235,7 @@ foreach ($countJson in @(
         ',"endpoints":[{"id":"' + $original + '"}]}'
     ) | ConvertFrom-Json -ErrorAction Stop
     Expect-Failure { Initialize-LiveEndpointOwnership } 'Invalid JSON count must fail closed.'
-    Assert (-not $script:orphanGuardArmed) 'Invalid JSON count must leave ownership unarmed.'
+    Assert (-not $global:__ScimServerLiveEndpointOwnership.orphanGuardArmed) 'Invalid JSON count must leave ownership unarmed.'
     Expect-Failure {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
     } 'Invalid JSON count must block fixture creation.'
@@ -239,7 +247,7 @@ foreach ($badId in @($null, '', 'malformed', [guid]::Empty.ToString())) {
     Initialize-LiveEndpointOwnership
     $script:createId = $badId
     Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers } 'Malformed create response must not assign a teardown target.'
-    Assert ($script:ownedEndpointHandles.Count -eq 0) 'Malformed create response cannot register ownership.'
+    Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.Count -eq 0) 'Malformed create response cannot register ownership.'
 }
 
 foreach ($bad in @(
@@ -266,7 +274,7 @@ foreach ($transport in @('Rest', 'Web')) {
         Initialize-LiveEndpointOwnership
         $script:createId = $owned
         $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body '{"name":"owned"}' -ContentType 'application/json' -SkipHttpErrorCheck
-        $handle = $script:ownedEndpointHandles[$owned]
+        $handle = $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned]
         switch ($failure) {
             'delete-status' { $script:deleteStatus = 500 }
             'still-present' { $script:absenceStatus = 200 }
@@ -296,7 +304,7 @@ Assert ($call.Body -eq '{"name":"owned"}' -and $call.ContentType -eq 'applicatio
 Assert ($call.Headers['X-Sentinel'] -eq 'forwarded' -and $call.ErrorAction -eq 'Stop' -and $call.Redirect) 'Headers, common parameters and redirect forwarding must be unchanged.'
 $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$owned" -Method PATCH -Headers $headers -Body '{}' -ContentType 'application/json' -SkipHttpErrorCheck -ErrorAction Stop
 Assert $script:calls[-1].Skip 'Web SkipHttpErrorCheck forwarding must be unchanged.'
-$forwardingHandle = $script:ownedEndpointHandles[$owned]
+$forwardingHandle = $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned]
 foreach ($route in @('schemas', 'resource-types')) {
     $probeParameters = @{ Route = $route; OwnedEndpointId = $owned; Headers = $headers; Body = '{}'; ErrorAction = 'Stop' }
     if ($route -eq 'schemas') { $probeParameters.ContentType = 'application/json' }
@@ -307,8 +315,8 @@ foreach ($route in @('schemas', 'resource-types')) {
     Assert ($probeCall.Uri -eq "$baseUrl/scim/admin/endpoints/00000000-0000-0000-0000-000000000000/$route" -and $probeCall.Method -eq 'POST') 'Explicit probe admission must forward only the exact sentinel URI and POST method.'
     Assert ($probeCall.Body -eq '{}' -and $probeCall.Headers['X-Sentinel'] -eq 'forwarded' -and $probeCall.ErrorAction -eq 'Stop') 'Probe body, headers and common parameters must forward unchanged.'
     Assert ($probeCall.HasContentType -eq ($route -eq 'schemas')) 'Probe content type presence must remain identical to its actual caller.'
-    Assert ($script:probeReuseRejected -and $script:probeUnknownRejected -and $null -eq $script:endpointRejectionProbe) 'Probe admission must be single-use, deny concurrent unknown mutations, and clear in finally.'
-    Assert ([object]::ReferenceEquals($forwardingHandle, $script:ownedEndpointHandles[$owned])) 'A negative HTTP probe must retain the exact known-owned cleanup handle.'
+    Assert ($script:probeReuseRejected -and $script:probeUnknownRejected -and $null -eq $global:__ScimServerLiveEndpointOwnership.endpointRejectionProbe) 'Probe admission must be single-use, deny concurrent unknown mutations, and clear in finally.'
+    Assert ([object]::ReferenceEquals($forwardingHandle, $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned])) 'A negative HTTP probe must retain the exact known-owned cleanup handle.'
 }
 Expect-Failure { Invoke-LiveEndpointRejectionProbe -Route schemas -OwnedEndpointId $original -Headers $headers -Body '{}' } 'An original ID cannot act as the rejection probe cleanup handle.'
 Expect-Failure { Invoke-LiveEndpointRejectionProbe -Route credentials -OwnedEndpointId $owned -Headers $headers -Body '{}' } 'Probe admission cannot expand to another route.'
@@ -325,11 +333,11 @@ Invoke-OrphanReconciliation
 Reset-Mock
 Initialize-LiveEndpointOwnership
 $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
-$probeCleanupHandle = $script:ownedEndpointHandles[$owned]
+$probeCleanupHandle = $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned]
 $script:probeStatus = 201
 try {
     Expect-Failure { Invoke-LiveEndpointRejectionProbe -Route schemas -OwnedEndpointId $owned -Headers $headers -Body '{}' } 'Unexpected successful rejection probe must fail.'
-    Assert ($null -eq $script:endpointRejectionProbe -and [object]::ReferenceEquals($probeCleanupHandle, $script:ownedEndpointHandles[$owned])) 'Unexpected probe outcome must clear admission without replacing the owned cleanup handle.'
+    Assert ($null -eq $global:__ScimServerLiveEndpointOwnership.endpointRejectionProbe -and [object]::ReferenceEquals($probeCleanupHandle, $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned])) 'Unexpected probe outcome must clear admission without replacing the owned cleanup handle.'
 } finally {
     Expect-Failure { Invoke-OrphanReconciliation } 'Unexpected probe success must remain sticky through owned cleanup.'
 }
@@ -342,13 +350,13 @@ $script:deleteStatus = 500
 Expect-Failure { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$owned" -Name 'failed cleanup' } 'Final cleanup helper must propagate failure.'
 $script:deleteStatus = 204
 Expect-Failure { Invoke-OrphanReconciliation } 'A later successful retry cannot erase prior cleanup failure evidence.'
-Assert $script:ownedEndpointHandles[$owned].Deleted 'Reconciliation must still attempt owned cleanup before propagating earlier failure.'
+Assert $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted 'Reconciliation must still attempt owned cleanup before propagating earlier failure.'
 
 Reset-Mock
 $baseUrl = 'http://fixture.invalid/prefix'
 Initialize-LiveEndpointOwnership
 $null = Invoke-RestMethod -Uri "$baseUrl/SCIM/ADMIN/ENDPOINTS" -Method POST -Headers $headers
-Assert ($script:ownedEndpointHandles.ContainsKey($owned)) 'Base-path and mixed-case creation must retain ownership.'
+Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.ContainsKey($owned)) 'Base-path and mixed-case creation must retain ownership.'
 Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/SCIM/ADMIN/ENDPOINTS/$($original.ToUpperInvariant())" -Method DELETE -Headers $headers } 'Base-path and mixed-case original deletion must reject.'
 Invoke-OrphanReconciliation
 $baseUrl = 'http://fixture.invalid'
@@ -357,13 +365,13 @@ Reset-Mock
 Initialize-LiveEndpointOwnership
 $script:createStatus = 400
 $rejection = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -SkipHttpErrorCheck
-Assert ($rejection.StatusCode -eq 400 -and $script:ownedEndpointHandles.Count -eq 0) 'HTTP rejection must remain unchanged and cannot register an owned handle.'
+Assert ($rejection.StatusCode -eq 400 -and $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.Count -eq 0) 'HTTP rejection must remain unchanged and cannot register an owned handle.'
 $script:createStatus = 201
 $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
 $normalReconciliation = @($ast.EndBlock.Statements | Where-Object { $_.Extent.Text -eq 'Invoke-OrphanReconciliation' })
 Assert ($normalReconciliation.Count -eq 1) 'The actual runner must have one normal-exit reconciliation invocation.'
 . ([scriptblock]::Create($normalReconciliation[0].Extent.Text))
-Assert $script:ownedEndpointHandles[$owned].Deleted 'The actual normal-exit reconciliation invocation must clean owned handles.'
+Assert $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted 'The actual normal-exit reconciliation invocation must clean owned handles.'
 
 Reset-Mock
 Initialize-LiveEndpointOwnership
@@ -378,7 +386,83 @@ $script:helperResults = [System.Collections.Generic.List[bool]]::new()
     Invoke-EndpointSnapshotContract -BaseUrl $baseUrl -Headers $headers -SharedSecret 'mock-only'
 }
 Assert ($script:helperResults.Count -eq 2 -and -not $script:helperResults[0] -and $script:helperResults[1]) 'Actual nested helper must observe the injected interruption and still verify cleanup.'
-Assert ($script:ownedEndpointHandles.ContainsKey($owned) -and $script:ownedEndpointHandles[$owned].Deleted) 'Actual nested dot-sourced helper must retain and finish the same owned registry handle.'
+Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.ContainsKey($owned) -and $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted) 'Actual nested dot-sourced helper must retain and finish the same owned registry handle.'
+
+# Unlike dot-sourcing, invoking a real .ps1 file introduces a script scope.
+foreach ($transport in @('Rest', 'Web')) {
+    Reset-Mock
+    Initialize-LiveEndpointOwnership
+    $boundary = @{
+        Calls = [System.Collections.Generic.List[object]]::new()
+        CreateId = $owned
+        DeleteStatus = 204
+        Inventory = $script:inventory
+    }
+    & {
+        function Add-FlowStep { }
+        function Invoke-MockRest {
+            [CmdletBinding()]
+            param($Uri, $Method, $Headers, $Body, $ContentType,
+                [switch]$AllowInsecureRedirect, $ResponseHeadersVariable, $StatusCodeVariable)
+            $m = if ($Method) { "$Method".ToUpperInvariant() } else { 'GET' }
+            $boundary.Calls.Add([pscustomobject]@{ Method = $m; Uri = $Uri })
+            $status = if ($m -eq 'POST') { 201 } elseif ($m -eq 'DELETE') { $boundary.DeleteStatus } else { 200 }
+            if ($StatusCodeVariable) { Set-Variable -Name $StatusCodeVariable -Value $status -Scope 1 }
+            if ($ResponseHeadersVariable) { Set-Variable -Name $ResponseHeadersVariable -Value @{} -Scope 1 }
+            if ($m -eq 'GET') { return $boundary.Inventory }
+            if ($m -eq 'POST') { return [pscustomobject]@{ id = $boundary.CreateId } }
+        }
+        function Invoke-MockWeb {
+            [CmdletBinding()]
+            param($Uri, $Method, $Headers, $Body, $ContentType,
+                [switch]$AllowInsecureRedirect, [switch]$SkipHttpErrorCheck)
+            $m = if ($Method) { "$Method".ToUpperInvariant() } else { 'GET' }
+            $boundary.Calls.Add([pscustomobject]@{ Method = $m; Uri = $Uri })
+            $status = if ($m -eq 'POST') { 201 } elseif ($m -eq 'DELETE') { $boundary.DeleteStatus } elseif ($m -eq 'GET') { 404 } else { 200 }
+            [pscustomobject]@{
+                StatusCode = $status
+                Headers = @{}
+                Content = if ($m -eq 'POST') { @{ id = $boundary.CreateId } | ConvertTo-Json } else { '' }
+            }
+        }
+
+        $child = Join-Path $root 'scripts\test\fixtures\live-endpoint-ownership-child.ps1'
+        $rejected = & $child -Mode Reject -BaseUrl $baseUrl -Headers $headers `
+            -OriginalId $original -UnknownId $unknown
+        Assert ($rejected -eq 16) 'Actual child must reject both wrappers and every original/unknown mutation method.'
+        Assert ($boundary.Calls.Count -eq 0) 'Actual child original/unknown rejection must precede transport.'
+
+        $childId = & $child -Mode Lifecycle -Transport $transport -BaseUrl $baseUrl -Headers $headers
+        $state = $global:__ScimServerLiveEndpointOwnership
+        Assert ($childId -eq $owned -and $state.ownedEndpointHandles[$owned].Deleted) 'Actual child must share registration, mutation and verified deletion with its parent.'
+        Assert (($boundary.Calls.Method -join ',') -eq 'POST,PATCH,DELETE,GET') 'Actual child lifecycle must use creation, mutation, exact deletion and absence readback.'
+
+        $before = $boundary.Calls.Count
+        Expect-Failure {
+            & $child -Mode Reinitialize -BaseUrl $baseUrl -Headers $headers
+        } 'Actual child must not replace the armed parent inventory.'
+        Assert ($boundary.Calls.Count -eq $before -and
+            [object]::ReferenceEquals($state, $global:__ScimServerLiveEndpointOwnership) -and
+            $state.preexistingEndpointIds.Contains($original)) 'Child reinitialization must reject before inventory transport and retain the original registry.'
+
+        $boundary.CreateId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+        $boundary.DeleteStatus = 500
+        Expect-Failure {
+            & $child -Mode Lifecycle -Transport $transport -BaseUrl $baseUrl -Headers $headers
+        } 'Actual child cleanup failure must propagate.'
+        $pending = $state.ownedEndpointHandles[$boundary.CreateId]
+        Assert ($null -ne $pending -and -not $pending.Deleted -and
+            $state.endpointCleanupFailures.Count -eq 1) 'Child failure must retain its parent-visible handle and sticky cleanup evidence.'
+
+        $boundary.DeleteStatus = 204
+        Expect-Failure { Invoke-OrphanReconciliation } 'Parent cleanup must preserve the earlier child cleanup failure.'
+        Assert ($pending.Deleted -and $state.endpointCleanupFailures.Count -eq 1) 'Parent must finish child cleanup without erasing its failure.'
+        Assert ($boundary.Calls[-2].Method -eq 'DELETE' -and
+            $boundary.Calls[-1].Method -eq 'GET' -and
+            $boundary.Calls[-2].Uri -eq "$baseUrl/scim/admin/endpoints/$($pending.Id)" -and
+            $boundary.Calls[-1].Uri -eq "$baseUrl/scim/admin/endpoints/$($pending.Id)") 'Parent retry must delete and verify only the exact pending child UUID.'
+    }
+}
 
 # Execute the full actual trap topology after a successful creation, including
 # a failure before a caller assigns the returned ID.
