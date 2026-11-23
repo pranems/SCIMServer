@@ -23,14 +23,32 @@ Fresh InMemory also completes 1,845/1,845 assertions with outer/child exit zero
 and exact cleanup. No parent fixture remains; shipping and deployment remain
 blocked by separate acceptance requirements.
 The initial root tooling graph separately reported a Markdown-it High.
-Separate #284 now has an authenticated CI lock, zero High/Critical locally
-and all 29 final normal Fast gates plus all six exact-tip PR checks passing.
-Independent review remains pending because Copilot review quota is exhausted.
-This harness rollback unit changes no dependencies or locks and makes no
-all-security-green claim. Direct consolidation review found no new
-high-confidence production defect; normal harness gates/integration remain open.
+Separate #284 normally merged at `36d07884`, with an authenticated CI lock,
+zero High/Critical root audit, 29 final normal Fast gates, all six exact-tip
+checks and a recorded source self-review. Original harness tip `a1f00397`
+also passes 29 normal Fast gates and all six PR checks. The integration
+preserves both changes and must pass normal gates and exact new-tip CI before
+its own merge. The harness changes no dependencies; the merged root repair
+supplies its own authenticated lock. Direct review found no unresolved defect.
+No independent approval or all-security-green claim is made. The actual
+repository policy/protection requires green exact-tip CI and resolved review
+findings, not an external approval or a specific review service. Copilot
+quota exhaustion is retained as a service limitation, not an extra merge gate.
 Application version 0.55.70, token lifetimes, HTTP values and assertions remain
 unchanged. See [RCA and qualification limits](LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+
+**Merged root-tooling security recovery:** `markdown-it` manifest floor
+is `^14.3.3` after observed manifest/lock RED/GREEN. Authenticated root-only
+CI run45275004952 artifact is imported unchanged; fresh npm ci preserves its
+bytes. Two focused units and 23 artifact/installed-tree controls pass; root
+audit now has zero High/Critical, one Moderate and two Low. Final normal Fast
+passes all29 gates, API220/6274 and reduced HTTP2519/45 known skips. All six
+exact-tip checks pass, including web126/1664, test image/smoke and gated Trivy.
+Source self-review is recorded as COMMENTED, not independent approval.
+Normal PR284 merged at `36d07884`; shipping and deployment remain separate.
+API/web dependencies and application version
+0.55.70 remain unchanged. See
+[root-tooling RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
 
 **Current source-reviewed performance correction:** successful POST User now uses
 explicit READ COMMITTED startup options in the existing pool, scalar-FK

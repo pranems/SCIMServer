@@ -38,18 +38,52 @@ profile cleanup now clears a successfully deleted local handle rather than
 issuing a duplicate DELETE in `finally`. Actual failure-path controls retain
 the UUID for retry and preserve sticky cleanup failure evidence.
 The initial root tooling audit separately reported a Markdown-it High. Separate
-#284 has a CI-authenticated patched lock, zero High/Critical locally and all
-29 normal Fast gates plus all six exact-tip PR checks passing. Independent
-review remains pending because Copilot review quota is exhausted. This
-harness rollback unit changes no dependencies or locks. Direct consolidation
-review found no new high-confidence production defect; normal hook/CI and
-reviewed integration remain pending. No shipping or all-security-green claim.
+#284 normally merged at `36d07884` after its CI-authenticated patched lock,
+zero High/Critical root audit, 29 normal Fast gates, six exact-tip checks and
+recorded source self-review. No independent approval is claimed. Repository
+protection requires strict CI checks, not an external approval; unavailable
+Copilot review quota is not an extra merge gate. The original harness tip
+`a1f00397` also passed all 29 normal Fast gates and six exact-tip checks.
+This harness rollback unit changes no dependencies; the integration imports
+the already-merged root lock and preserves both documentation histories.
+Direct consolidation review found no new high-confidence production defect.
+The combined tip still requires its own normal hook and exact-tip CI before
+merge. No shipping or all-security-green claim.
 See
 [the current evidence boundary](docs/LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
 
 | Date | Summary |
 |---|---|
-| 2026-11-23 | Redaction 255 PASS, nested wiring nine PASS, ownership 224 PASS. Repaired byte admission and duplicate profile deletion. Complete PostgreSQL and InMemory live each 1,845/1,845 PASS with exact cleanup; PostgreSQL private timestamp-verifier failure reconciled separately. Direct consolidation review complete; normal harness gates/integration pending. Separate tooling #284 is locally locked GREEN but not merged; no shipping or cloud acceptance. |
+| 2026-11-23 | Redaction 255 PASS, nested wiring nine PASS, ownership 224 PASS. Complete PostgreSQL and InMemory live each 1,845/1,845 PASS with exact cleanup; original PostgreSQL outer failure separately reconciled. Harness a1f00397 passes 29 normal Fast/six PR checks. Integrating normally merged tooling #284 at 36d07884; combined-tip gates remain required. No shipping or cloud acceptance. |
+
+### Root Markdown tooling security recovery, 2026-11-23
+
+Separate c52-based tooling-only rollback unit. Root `markdown-it` floor moves
+from `^14.3.0` to `^14.3.3` after observed manifest RED/GREEN. Patched release
+is older than seven days. Existing baseline seeding prepares owned packages
+without lock writing; all installed identities are unchanged except Markdown
+14.3.0 to 14.3.3, with unchanged Mermaid parser 1.2.1 ownership after hoisting.
+Actual root `npm ls --all` and 23 artifact contracts pass. Original
+unseeded graph drift was rejected and all tracked locks remain unchanged.
+Normal bootstrap all 29 Fast gates passed at 8d9eebdc in 738.9 seconds:
+220 API suites/6,273 tests, reduced HTTP 120 suites/2,519 tests and 45 known
+skips. Root-only CI run 45275004952 produced authenticated artifact14865984488;
+complete package-map review admits only Markdown and exact parser relocation.
+Fresh locked root installation preserves SHA-256
+80a519be2009bd87db82fcdd5f6cff09dcb0bd9ceec2eb9fd8f178a674f75bc4.
+Two Markdown unit tests pass; root audit now has zero High/Critical,
+one Moderate and two Low. Final normal Fast passes all 29 gates, API
+220 suites/6,274 tests and reduced HTTP 2,519 passes/45 known skips. All six
+exact-tip PR checks pass, including web 126 files/1,664 tests, image smoke and
+gated Trivy. Recorded source self-review found no unresolved defect; normal
+PR #284 merged at `36d07884`. No independent approval is claimed.
+Application version/source,
+API/web locks, runtime fixtures, Docker Desktop and other worktrees unchanged.
+See [root tooling recovery and RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Root Markdown manifest/lock RED/GREEN, 23 tooling contracts and authenticated CI lock. Final Fast 29/29 and exact-tip PR six/six PASS; normal reviewed-source merge #284 at 36d07884. Zero High/Critical root audit, with Moderate/Low retained. Not shipping acceptance. |
 
 ### POST User correction in qualification, 2026-11-23
 

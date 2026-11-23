@@ -56,6 +56,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and source hashes; it is not hidden as a successful original outer exit.
 - This script-only follow-up changes no application version or dependency
   lock. See [RCA and qualification limits](docs/LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+- Original harness tip `a1f00397`: all 29 normal Fast gates and six exact-tip
+  PR checks PASS, API219/6272, reduced HTTP2519/45 known skips and web126/1664.
+  Integration preserves normally merged tooling PR284 and both documentation
+  histories. The combined tip requires its own normal checks before merge;
+  no shipping or deployment acceptance is inferred.
+
+### Root documentation tooling security recovery
+
+- Raise the root-only `markdown-it` floor from `^14.3.0` to `^14.3.3`,
+  retaining Mermaid 11.17.0 and all API/web dependencies and application
+  version 0.55.70.
+- Add observed RED/GREEN manifest and lock regressions (two focused unit
+  tests PASS) and an actual installed root-tree contract (23 tooling controls
+  PASS). Root-only CI run 45275004952 produces the authenticated lock:
+  all 157 entries public/SHA-512, only Markdown version plus exact unchanged
+  Mermaid parser relocation. Fresh npm ci preserves imported bytes.
+- Root audit moves from one High/one Moderate/two Low to zero High/one
+  Moderate/two Low. Normal bootstrap Fast: 220 API suites/6,273 tests and
+  reduced HTTP 120 suites/2,519 tests, 45 known skips. Final normal Fast:
+  all 29 gates, API220/6274 and reduced HTTP2519/45 known skips. All six
+  exact-tip PR checks PASS, web126/1664, test image/smoke and gated Trivy.
+  Normal PR284 merged at `36d07884` after recorded source self-review; no
+  independent approval or final shipping acceptance is claimed.
+- Document rejected unseeded dependency drift, semantic parser-hoist
+  verification and unchanged tracked locks in the
+  [supply-chain RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
 
 ### POST User query-budget correction, 0.55.69 to 0.55.70 candidate
 

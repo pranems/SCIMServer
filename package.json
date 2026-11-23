@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "jsdom": "^26.1.0",
-    "markdown-it": "^14.3.0",
+    "markdown-it": "^14.3.3",
     "mermaid": "11.17.0"
   }
 }

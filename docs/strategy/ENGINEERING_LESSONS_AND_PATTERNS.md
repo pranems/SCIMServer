@@ -603,6 +603,20 @@ source lock. Compare installed identities against the qualified lock after
 every dependency operation; `npm ls --all` exiting 0 is not that comparison.
 Use clean CI-generated source locks and `npm ci` for final assurance.
 
+The 2026-11-23 Markdown tooling recovery reproduced the same drift without
+an explicit package argument: plain no-lock installation still advanced
+unrelated root ranges. Reuse the existing baseline `seedManifest` logic for
+owned bootstrap preparation and require the complete package identity
+multiset plus actual owner resolution, not merely `npm ls` success.
+Record physical hoists explicitly: moving unchanged parser 1.2.1 from
+Mermaid's nested directory to the root does not change its package or owner.
+The authenticated CI artifact must still receive a complete path-union
+review, public/SHA-512 validation and changed-entry publication ages.
+Permanent root installed-tree checks belong in the root tooling contract;
+placing them in API-only units would add an unnecessary root-install
+dependency to CI. See
+[the root tooling receipts and RCA](NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
+
 ## 1. The self-improvement loop (how this doc is fed and used)
 
 ### A parent-compatible dependency patch needs actual consumer evidence
