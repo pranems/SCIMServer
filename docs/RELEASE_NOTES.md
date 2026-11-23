@@ -25,9 +25,9 @@ an atomic repository responsibility; duplicate usernames keep their existing
 
 The existing application connection pool explicitly selects READ COMMITTED
 at connection startup. Database- or role-level defaults no longer choose the
-application's default isolation. Existing `DATABASE_URL` startup options and
-`PGOPTIONS` are preserved, but the application isolation option is appended
-last. Explicit stronger isolation requested through Prisma's transaction API
+application's default isolation. Existing `DATABASE_URL` startup options take
+precedence; otherwise `PGOPTIONS` is preserved. The application isolation option
+is appended last. Explicit stronger isolation requested through Prisma's transaction API
 still works. Pool capacity, acquisition deadlines, ordered locks and the fresh
 post-lock snapshot are unchanged.
 

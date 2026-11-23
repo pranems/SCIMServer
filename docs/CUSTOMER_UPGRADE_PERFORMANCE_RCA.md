@@ -166,6 +166,21 @@ isolation tests must be counted as skips in the reduced InMemory hook.
 Normal commit, master integration, push hook and exact-tip CI remain required.
 No live host, database, Engine, Azure or shipping-image operation is authorized.
 
+Consolidation friction is retained separately from runtime defects:
+
+- **Tooling, Low:** the installed Vitest rejected `--minWorkers` before
+  execution. The supported command retains threads, isolation,
+  `--maxWorkers=1` and disabled cache without changing the runner or any
+  threshold. CLI argument validation caught this at the earliest stage;
+  the failed invocation is not test evidence.
+- **Git/documentation, Low:** normal master integration conflicted in four
+  documentation surfaces because both branches prepended handoff records.
+  Merge `db38d776` preserves both histories and identifies reviewed master
+  `9d25558d`, including normally merged ownership PR #281. Capture-time
+  publication-pending statements remain historical, not current blockers.
+  No production conflict occurred. Git caught the overlap before push;
+  checking both current and historical scope prevents a misleading handoff.
+
 ## Historical POST User four-call source blocker, 2026-11-23
 
 **Historical status before the correction above: blocked, not admission.** The
