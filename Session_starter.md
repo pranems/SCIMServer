@@ -1,5 +1,29 @@
 ## SCIMServer - Condensed Session Memory
 
+### Targeted artifact generation correction, 2026-11-21 UTC
+
+Reviewed PR #278 is merged at `554f42023fdde30918ef378987cc8f3135e4ed3a`.
+The completed web audit identifies High Zod GHSA-mrhx-c7xc-m3w5 in 4.4.3;
+fixed 4.6.6 is seven-day eligible. Existing CI regeneration run 44847989228
+retained 4.4.3 because the unchanged manifest still requests that version.
+The isolated correction adds supported optional targeted inputs to the
+existing read-only workflow, preserving quarantine and rejecting unrelated
+dependency changes. Its 22 focused controls pass after RED and all 27 normal
+Fast push gates pass at `ee56eb0d`. CI run `44855811919` succeeded from that exact
+source. Its five-file artifact was independently checked by immutable ZIP
+digest, extracted-byte parity, exact manifests/lock metadata, unchanged other
+dependencies and publication age before importing the 0.55.69 candidate.
+Locked installation preserves exact imported bytes and installs 4.6.6. Web
+audit has zero High/Critical findings and no Zod advisory; three Moderate
+development-tool findings remain. Reviewed merge and deployment remain open.
+Candidate web coverage passes 126 files/1,664 tests, with unchanged coverage
+85.74/75.86/75.53/83.06 above unchanged 82/70/69/78 floors.
+The deployment-owned temporary fixtures were removed exactly and its bridge
+is offline; do not reuse former fixture IDs. Initial generator source retained
+0.55.68; current artifact-imported source is the unreleased 0.55.69 candidate.
+See [workflow usage and RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
+Earlier qualification statements below remain capture-time history.
+
 ### Merged-source deployment qualification, 2026-11-20
 
 PR #275 is merged at `9ee2a72d91ad1fc9cdee00782d18f1d84e481104`.

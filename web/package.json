@@ -1,7 +1,7 @@
 {
   "name": "scimserver-web",
   "private": true,
-  "version": "0.55.68",
+  "version": "0.55.69",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,7 +25,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^3.9.0",
-    "zod": "^4.4.3",
+    "zod": "4.6.6",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
