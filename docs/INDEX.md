@@ -13,6 +13,10 @@ Performance remains unqualified under the migration-only exception.
 
 ### Start here
 
+**Unreleased live-test evidence correction:** [Redaction boundary and RCA](LIVE_EVIDENCE_REDACTION.md)
+documents the source-only protection of console and durable evidence while
+preserving real authentication and administrator assertions.
+
 **Deployment preservation proof:** [Verifier behavior, finite claim and
 execution RCA](DEPLOYMENT_PRESERVATION_VERIFIER.md) covers fail-closed endpoint
 UUID and stored User/Group count measurement. It does not claim SCIM visibility, resource-ID,

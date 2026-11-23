@@ -37,26 +37,38 @@ $script:preexistingEndpointIds = @()
 $script:orphanGuardArmed = $false
 $script:orphanReconciled = $false
 
+. (Join-Path $PSScriptRoot 'live-evidence.ps1')
+Initialize-LiveEvidence -Secrets @($ClientSecret, $SharedSecret)
+
+trap {
+    $unhandledFailure = $_
+    try {
+        Invoke-OrphanReconciliation
+    } catch {
+        Write-LiveEvidenceFailure $_
+    }
+    Write-LiveEvidenceFailure $unhandledFailure
+    exit 1
+}
+
 function Write-VerboseLog {
     param([string]$Label, $Data)
     if (-not $script:VerboseMode) { return }
     if ($null -eq $Data) {
-        Write-Host "    📋 $Label" -ForegroundColor DarkGray
-    } elseif ($Data -is [string]) {
-        Write-Host "    📋 ${Label}: $Data" -ForegroundColor DarkGray
+        Write-LiveEvidenceHost "    📋 $Label" -ForegroundColor DarkGray
     } else {
-        $json = try { $Data | ConvertTo-Json -Depth 4 -Compress } catch { "$Data" }
-        if ($json.Length -gt 300) { $json = $json.Substring(0, 297) + "..." }
-        Write-Host "    📋 ${Label}: $json" -ForegroundColor DarkGray
+        $text = Format-LiveEvidence $Data
+        Write-LiveEvidenceHost "    📋 ${Label}: $text" -ForegroundColor DarkGray
     }
 }
 
 function Convert-FlowHeaders {
     param([System.Collections.IDictionary]$Headers)
     if ($null -eq $Headers) { return $null }
+    $safeHeaders = ConvertTo-LiveEvidence $Headers
     $normalized = [ordered]@{}
-    foreach ($key in $Headers.Keys) {
-        $value = $Headers[$key]
+    foreach ($key in $safeHeaders.Keys) {
+        $value = $safeHeaders[$key]
         $headerName = [string]$key
         if ($headerName -ieq 'Authorization') {
             $normalized[$headerName] = 'Bearer ***'
@@ -74,19 +86,10 @@ function Convert-FlowHeaders {
 function Convert-FlowBody {
     param($Body)
     if ($null -eq $Body) { return $null }
-    if ($Body -is [string]) {
-        if ($Body.Length -gt 6000) { return $Body.Substring(0, 6000) + '...' }
-        return $Body
-    }
-    try {
-        $json = $Body | ConvertTo-Json -Depth 10
-        if ($json.Length -gt 6000) { return $json.Substring(0, 6000) + '...' }
-        return $Body
-    } catch {
-        $str = [string]$Body
-        if ($str.Length -gt 6000) { return $str.Substring(0, 6000) + '...' }
-        return $str
-    }
+    $safe = ConvertTo-LiveEvidence $Body
+    $json = ConvertTo-Json -InputObject $safe -Depth 60 -Compress -ErrorAction Stop
+    if ($json.Length -gt 6000) { return (Format-LiveEvidence $safe -Limit 6000) }
+    return ,$safe
 }
 
 function Add-FlowStep {
@@ -102,33 +105,37 @@ function Add-FlowStep {
         [string]$ErrorMessage
     )
 
+    $safe = ConvertTo-LiveEvidence ([ordered]@{
+        uri = $Uri; requestHeaders = $RequestHeaders; requestBody = $RequestBody
+        responseHeaders = $ResponseHeaders; responseBody = $ResponseBody; error = $ErrorMessage
+    })
     $finishedAt = Get-Date
     $stepId = $global:__ScimServerLiveTestFlowSteps.Count + 1
     $flowStep = [PSCustomObject]@{
         stepId      = $stepId
         section     = $script:currentSection
-        actionStep  = "$Method $Uri"
+        actionStep  = "$Method $($safe.uri)"
         startedAt   = $StartedAt.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
         finishedAt  = $finishedAt.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
         durationMs  = [math]::Round(($finishedAt - $StartedAt).TotalMilliseconds)
         request     = [ordered]@{
             method  = $Method
-            url     = $Uri
-            headers = Convert-FlowHeaders -Headers $RequestHeaders
-            body    = Convert-FlowBody -Body $RequestBody
+            url     = $safe.uri
+            headers = Convert-FlowHeaders -Headers $safe.requestHeaders
+            body    = Convert-FlowBody -Body $safe.requestBody
         }
         response    = if ($StatusCode -gt 0 -or $null -ne $ResponseHeaders -or $null -ne $ResponseBody) {
             [ordered]@{
                 status  = $StatusCode
-                headers = Convert-FlowHeaders -Headers $ResponseHeaders
-                body    = Convert-FlowBody -Body $ResponseBody
+                headers = Convert-FlowHeaders -Headers $safe.responseHeaders
+                body    = Convert-FlowBody -Body $safe.responseBody
             }
         } else {
             $null
         }
         error       = if ($ErrorMessage) {
             [ordered]@{
-                message = $ErrorMessage
+                message = $safe.error
             }
         } else {
             $null
@@ -152,13 +159,12 @@ function Invoke-RestMethod {
         [string]$ContentType
     )
     $requestStart = Get-Date
+    $null = ConvertTo-LiveEvidence @{ headers = $Headers; body = $Body }
     $m = if ($Method) { $Method.ToUpperInvariant() } else { "GET" }
     if ($script:VerboseMode) {
-        Write-Host "    📋 → $m $Uri" -ForegroundColor DarkGray
+        Write-VerboseLog 'Request' "$m $Uri"
         if ($Body) {
-            $bs = if ($Body -is [string]) { $Body } else { try { $Body | ConvertTo-Json -Compress } catch { "$Body" } }
-            if ($bs.Length -gt 200) { $bs = $bs.Substring(0, 197) + "..." }
-            Write-Host "    📋   Body: $bs" -ForegroundColor DarkGray
+            Write-VerboseLog 'Request body' $Body
         }
     }
     $restResponseHeaders = $null
@@ -173,19 +179,15 @@ function Invoke-RestMethod {
         }
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $errorStatus -ResponseHeaders $null -ResponseBody $_.ErrorDetails.Message -ErrorMessage $_.Exception.Message
         if ($script:VerboseMode) {
-            Write-Host "    📋 ← Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
+            Write-VerboseLog 'Error' $_.Exception.Message
             if ($_.ErrorDetails.Message) {
-                $eb = $_.ErrorDetails.Message
-                if ($eb.Length -gt 200) { $eb = $eb.Substring(0, 197) + "..." }
-                Write-Host "    📋   Error Body: $eb" -ForegroundColor DarkYellow
+                Write-VerboseLog 'Error body' $_.ErrorDetails.Message
             }
         }
         throw
     }
     if ($script:VerboseMode) {
-        $json = try { $result | ConvertTo-Json -Depth 4 -Compress } catch { "$result" }
-        if ($json -and $json.Length -gt 300) { $json = $json.Substring(0, 297) + "..." }
-        Write-Host "    📋 ← Response: $json" -ForegroundColor DarkGray
+        Write-VerboseLog 'Response' $result
     }
     return $result
 }
@@ -201,13 +203,12 @@ function Invoke-WebRequest {
         [switch]$SkipHttpErrorCheck
     )
     $requestStart = Get-Date
+    $null = ConvertTo-LiveEvidence @{ headers = $Headers; body = $Body }
     $m = if ($Method) { $Method.ToUpperInvariant() } else { "GET" }
     if ($script:VerboseMode) {
-        Write-Host "    📋 → $m $Uri" -ForegroundColor DarkGray
+        Write-VerboseLog 'Request' "$m $Uri"
         if ($Body) {
-            $bs = if ($Body -is [string]) { $Body } else { try { $Body | ConvertTo-Json -Compress } catch { "$Body" } }
-            if ($bs.Length -gt 200) { $bs = $bs.Substring(0, 197) + "..." }
-            Write-Host "    📋   Body: $bs" -ForegroundColor DarkGray
+            Write-VerboseLog 'Request body' $Body
         }
     }
     try {
@@ -220,19 +221,19 @@ function Invoke-WebRequest {
         }
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $errorStatus -ResponseHeaders $null -ResponseBody $_.ErrorDetails.Message -ErrorMessage $_.Exception.Message
         if ($script:VerboseMode) {
-            Write-Host "    📋 ← HTTP Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
+            Write-VerboseLog 'HTTP error' $_.Exception.Message
         }
         throw
     }
     if ($script:VerboseMode) {
-        Write-Host "    📋 ← HTTP $($result.StatusCode)" -ForegroundColor DarkGray
+        Write-LiveEvidenceHost "    📋 ← HTTP $($result.StatusCode)" -ForegroundColor DarkGray
         if ($result.Headers['ETag']) {
             $etag = if ($result.Headers['ETag'] -is [array]) { $result.Headers['ETag'][0] } else { $result.Headers['ETag'] }
-            Write-Host "    📋   ETag: $etag" -ForegroundColor DarkGray
+            Write-LiveEvidenceHost "    📋   ETag: $etag" -ForegroundColor DarkGray
         }
         if ($result.Headers['Content-Type']) {
             $ct = if ($result.Headers['Content-Type'] -is [array]) { $result.Headers['Content-Type'][0] } else { $result.Headers['Content-Type'] }
-            Write-Host "    📋   Content-Type: $ct" -ForegroundColor DarkGray
+            Write-LiveEvidenceHost "    📋   Content-Type: $ct" -ForegroundColor DarkGray
         }
     }
     return $result
@@ -240,6 +241,7 @@ function Invoke-WebRequest {
 
 function Test-Result {
     param([bool]$Success, [string]$Message)
+    $safeMessage = Convert-LiveEvidenceText $Message
     $status = if ($Success) { "passed" } else { "failed" }
     $newFlowStepIds = @($script:flowSteps | Where-Object { $_.stepId -gt $script:lastLinkedFlowStepId } | ForEach-Object { $_.stepId })
     if ($script:flowSteps.Count -gt 0) {
@@ -252,16 +254,16 @@ function Test-Result {
     }
     $script:testResults += [PSCustomObject]@{
         section       = $script:currentSection
-        name          = $Message
+        name          = $safeMessage
         status        = $status
         actionStep    = $latestAction
         actionStepIds = $newFlowStepIds
     }
     if ($Success) {
-        Write-Host "PASS: $Message" -ForegroundColor Green
+        Write-LiveEvidenceHost "PASS: $safeMessage" -ForegroundColor Green
         $script:testsPassed++
     } else {
-        Write-Host "FAIL: $Message" -ForegroundColor Red
+        Write-LiveEvidenceHost "FAIL: $safeMessage" -ForegroundColor Red
         $script:testsFailed++
     }
 }
@@ -320,7 +322,7 @@ function Ensure-JwksHostAllowed {
         } | ConvertTo-Json) | Out-Null
         return $true
     } catch {
-        Write-Host "  ! could not ensure JWKS host '$HostName' is allowlisted: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-LiveEvidenceHost "  ! could not ensure JWKS host '$HostName' is allowlisted: $($_.Exception.Message)" -ForegroundColor Yellow
         return $false
     }
 }
@@ -369,20 +371,20 @@ function Invoke-OrphanReconciliation {
         $live = @((Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?count=500" -Headers $headers -ErrorAction Stop).endpoints)
         $leaked = @($live | Where-Object { $script:preexistingEndpointIds -notcontains $_.id })
         if ($leaked.Count -gt 0) {
-            Write-Host "`n🧹 Orphan reconciliation: $($leaked.Count) endpoint(s) leaked this run - deleting:" -ForegroundColor Yellow
+            Write-LiveEvidenceHost "`n🧹 Orphan reconciliation: $($leaked.Count) endpoint(s) leaked this run - deleting:" -ForegroundColor Yellow
             foreach ($ep in $leaked) {
                 try {
                     Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($ep.id)" -Method DELETE -Headers $headers -ErrorAction Stop | Out-Null
-                    Write-Host "   deleted $($ep.name) ($($ep.id))" -ForegroundColor DarkGray
+                    Write-LiveEvidenceHost "   deleted $($ep.name) ($($ep.id))" -ForegroundColor DarkGray
                 } catch {
-                    Write-Host "   FAILED to delete $($ep.name) ($($ep.id)): $($_.Exception.Message)" -ForegroundColor Red
+                    Write-LiveEvidenceHost "   FAILED to delete $($ep.name) ($($ep.id)): $($_.Exception.Message)" -ForegroundColor Red
                 }
             }
         } else {
             Write-Host "`n🧹 Orphan reconciliation: no leaked endpoints (clean run)" -ForegroundColor DarkGray
         }
     } catch {
-        Write-Host "⚠️  Orphan reconciliation skipped (could not list endpoints): $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-LiveEvidenceHost "⚠️  Orphan reconciliation skipped (could not list endpoints): $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
@@ -398,7 +400,7 @@ Write-VerboseLog "Client ID" $ClientId
 $tokenBody = @{client_id=$ClientId;client_secret=$ClientSecret;grant_type='client_credentials'}
 $tokenResponse = Invoke-RestMethod -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $tokenBody
 $Token = $tokenResponse.access_token
-Write-Host "✅ Token obtained: $($Token.Substring(0,30))..."
+Write-Host "✅ Token obtained."
 Write-VerboseLog "Token expires_in" "$($tokenResponse.expires_in)s"
 
 $headers = @{Authorization="Bearer $Token"; 'Content-Type'='application/json'}
@@ -408,7 +410,7 @@ $script:startTime = Get-Date
 # ORPHAN-ENDPOINT SAFETY NET (arm)
 # Snapshot the endpoints that already exist so the reconciliation sweep - which
 # runs on the normal-exit path (explicit call before the summary) AND on the
-# error path (the trap below) - can delete anything THIS run creates but fails to
+# error path (the authoritative trap above) - can delete anything THIS run creates but fails to
 # clean up. That is exactly how the 5/14 section-9z run leaked 6 endpoints: a
 # test threw before the section's cleanup line, and the end-of-run sweep only
 # matched live-test-* names so it missed live-entra/minimal/rfc/useronly/inline/
@@ -419,17 +421,14 @@ $script:startTime = Get-Date
 try {
     $script:preexistingEndpointIds = @((Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?count=500" -Headers $headers -ErrorAction Stop).endpoints | ForEach-Object { $_.id })
     $script:orphanGuardArmed = $true
-    Write-Host "🧹 Orphan guard armed: snapshotted $($script:preexistingEndpointIds.Count) pre-existing endpoint(s)" -ForegroundColor DarkGray
+    Write-LiveEvidenceHost "🧹 Orphan guard armed: snapshotted $($script:preexistingEndpointIds.Count) pre-existing endpoint(s)" -ForegroundColor DarkGray
 } catch {
-    Write-Host "⚠️  Orphan guard NOT armed (endpoint snapshot failed: $($_.Exception.Message)); leak sweep disabled for safety" -ForegroundColor Yellow
+    Write-LiveEvidenceHost "⚠️  Orphan guard NOT armed (endpoint snapshot failed: $($_.Exception.Message)); leak sweep disabled for safety" -ForegroundColor Yellow
 }
 
-# On any UNHANDLED terminating error anywhere below, reconcile (delete this run's
-# leaked endpoints) BEFORE the script stops. `break` re-throws so the exit code
-# and stop-on-error behaviour stay exactly as before - only the cleanup is added.
-# Local try/catch blocks in the sections handle their own errors first, so this
-# only fires for the unexpected failures that would otherwise leak.
-trap { Invoke-OrphanReconciliation; break }
+# The single script-level trap performs reconciliation before reporting the
+# protected fatal diagnostic and exiting 1. Local try/catch blocks continue to
+# handle expected negative-test errors without entering that fatal boundary.
 
 # ============================================
 # TEST SECTION 1: ENDPOINT CRUD OPERATIONS
@@ -928,7 +927,7 @@ for ($i = 1; $i -le 3; $i++) {
     } | ConvertTo-Json
     $pagUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $pagUserBody
     $paginationUserIds += $pagUser.id
-    Write-Host "  Created pagination user $i : $($pagUser.id)"
+    Write-LiveEvidenceHost "  Created pagination user $i : $($pagUser.id)"
 }
 
 # Test: Pagination with count
@@ -1044,7 +1043,7 @@ Test-Result -Success ($putIdUser.displayName -eq "PUT ID Override Test") -Messag
 
 # Cleanup: Delete the ID leak test user
 Invoke-RestMethod -Uri "$scimBase/Users/$serverAssignedId" -Method DELETE -Headers $headers | Out-Null
-Write-Host "  Cleaned up ID leak test user: $serverAssignedId" -ForegroundColor DarkGray
+Write-LiveEvidenceHost "  Cleaned up ID leak test user: $serverAssignedId" -ForegroundColor DarkGray
 
 # ============================================
 # TEST SECTION 4: SCIM GROUP OPERATIONS
@@ -1326,7 +1325,7 @@ foreach ($i in 2..3) {
     } | ConvertTo-Json
     $multiUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $multiUserBody
     $multiUserIds += $multiUser.id
-    Write-Host "Created user $i : $($multiUser.id)"
+    Write-LiveEvidenceHost "Created user $i : $($multiUser.id)"
 }
 
 # Create group for multi-member test
@@ -1430,7 +1429,7 @@ foreach ($uid in $multiUserIds) {
 }
 # Verify members were added
 $groupBeforeRemove = Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method GET -Headers $headers
-Write-Host "Group has $(@($groupBeforeRemove.members).Count) members before remove test"
+Write-LiveEvidenceHost "Group has $(@($groupBeforeRemove.members).Count) members before remove test"
 
 # Test: Multi-member REMOVE via value array without flag should fail
 Write-Host "`n--- Test: Multi-Member REMOVE without Flag (Should Fail) ---" -ForegroundColor Cyan
@@ -1576,7 +1575,7 @@ $scimBaseInactive = "$baseUrl/scim/endpoints/$InactiveEndpointId"
 $inactiveTestUserBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="inactive-test@test.com";displayName="Inactive Test";emails=@(@{value="inactive-test@test.com";type="work";primary=$true});active=$true} | ConvertTo-Json -Depth 3
 $inactiveTestUser = Invoke-RestMethod -Uri "$scimBaseInactive/Users" -Method POST -Headers $headers -Body $inactiveTestUserBody
 $InactiveTestUserId = $inactiveTestUser.id
-Write-Host "Created test user: $InactiveTestUserId"
+Write-LiveEvidenceHost "Created test user: $InactiveTestUserId"
 
 # Deactivate endpoint
 Write-Host "`n--- Deactivate Endpoint ---" -ForegroundColor Cyan
@@ -5242,7 +5241,7 @@ foreach ($sn in $sortNames) {
     } | ConvertTo-Json
     $sortUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $sortBody
     $sortUserIds += $sortUser.id
-    Write-Host "  Created sort test user: $sn ($($sortUser.id))"
+    Write-LiveEvidenceHost "  Created sort test user: $sn ($($sortUser.id))"
 }
 
 # Test 9q.1: GET /Users?sortBy=userName&sortOrder=ascending
@@ -5309,7 +5308,7 @@ foreach ($sgn in $sortGroupNames) {
     } | ConvertTo-Json
     $sg = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $sgBody
     $sortGroupIds += $sg.id
-    Write-Host "  Created sort test group: $sgn ($($sg.id))"
+    Write-LiveEvidenceHost "  Created sort test group: $sgn ($($sg.id))"
 }
 $sortGroups = Invoke-RestMethod -Uri "$scimBase/Groups?sortBy=displayName&sortOrder=ascending&filter=displayName co `"Sort-Group`"" -Method GET -Headers $headers
 $groupNamesAsc = $sortGroups.Resources | ForEach-Object { $_.displayName }
@@ -5348,7 +5347,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 # to a SCIM User whose userName matches. The live-test OAuth token has sub=$ClientId.
 
 # --- Setup: Create a user whose userName matches the OAuth sub claim ---
-Write-Host "`n--- Setup: Create User matching JWT sub claim ($ClientId) ---" -ForegroundColor Cyan
+Write-LiveEvidenceHost "`n--- Setup: Create User matching JWT sub claim ($ClientId) ---" -ForegroundColor Cyan
 $meUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = $ClientId
@@ -5359,7 +5358,7 @@ $meUserBody = @{
 } | ConvertTo-Json -Depth 3
 $meUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $meUserBody
 $meUserId = $meUser.id
-Write-Host "  Created /Me test user: $ClientId ($meUserId)"
+Write-LiveEvidenceHost "  Created /Me test user: $ClientId ($meUserId)"
 Test-Result -Success ($null -ne $meUserId) -Message "/Me setup: user created with userName=$ClientId"
 
 # Test 9r.1: GET /Me returns the authenticated user
@@ -5454,7 +5453,7 @@ $credEpId = $credEp.id
 $patchBody = @{ profile = @{ settings = @{ SecretTokenBearerAuthEnabled = "True" } } } | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $credScimBase = "$baseUrl/scim/endpoints/$credEpId"
-Write-Host "  Created endpoint: $credEpId"
+Write-LiveEvidenceHost "  Created endpoint: $credEpId"
 Test-Result -Success ($null -ne $credEpId) -Message "9s setup: per-cred endpoint created"
 
 # Test 9s.1: Create a per-endpoint credential
@@ -5868,7 +5867,7 @@ $groupDisplayNameUniq = Get-EffectiveUniqueness $groupDisplayName
 Test-Result -Success ($validUniqueness -contains $groupDisplayNameUniq) -Message "9u.5: Group displayName publishes a valid uniqueness keyword (effective='$groupDisplayNameUniq', RFC 7643 S8.7.1 baseline=none, server may tighten)"
 
 # --- R-REF-1: $ref sub-attribute on Group members ---
-Write-Host "`n--- R-REF-1: \$ref sub-attribute on Group members ---" -ForegroundColor Cyan
+Write-LiveEvidenceHost "`n--- R-REF-1: \$ref sub-attribute on Group members ---" -ForegroundColor Cyan
 $membersAttr = $groupSchema.attributes | Where-Object { $_.name -eq "members" }
 $refSub = $membersAttr.subAttributes | Where-Object { $_.name -eq '$ref' }
 Test-Result -Success ($null -ne $refSub) -Message "9u.6: Group members has \$ref sub-attribute (R-REF-1)"
@@ -8098,7 +8097,7 @@ $mgrScimBase = "$baseUrl$($mgrEp.scimBasePath)"
 # Ensure StrictSchemaValidation is ON
 $mgrSettings = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 5
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mgrEpId" -Method PATCH -Headers $headers -Body $mgrSettings | Out-Null
-Write-Host "Created strict endpoint $mgrEpId for manager tests" -ForegroundColor DarkGray
+Write-LiveEvidenceHost "Created strict endpoint $mgrEpId for manager tests" -ForegroundColor DarkGray
 
 # Create a test user
 $mgrUser = @{
@@ -8109,7 +8108,7 @@ $mgrUser = @{
 } | ConvertTo-Json
 $mgrCreated = Invoke-RestMethod -Uri "$mgrScimBase/Users" -Method POST -Headers $headers -Body $mgrUser
 $mgrUserId = $mgrCreated.id
-Write-Host "Created test user $mgrUserId" -ForegroundColor DarkGray
+Write-LiveEvidenceHost "Created test user $mgrUserId" -ForegroundColor DarkGray
 
 # --- Test 9z-N.1: PATCH add manager with raw string (Entra ID style) ---
 Write-Host "`n--- Test 9z-N.1: PATCH add manager with raw string ---" -ForegroundColor Cyan
@@ -10645,7 +10644,7 @@ $probeScript = {
 
 # Probe 1: GET /scim/health (200, no auth required)
 $p1 = & $probeScript "/scim/health" $baseUrl $null
-if (-not $p1.ok) { Write-Host "  9z-AJ.probe1 raw error: $($p1.err)" -ForegroundColor Yellow }
+if (-not $p1.ok) { Write-LiveEvidenceHost "  9z-AJ.probe1 raw error: $($p1.err)" -ForegroundColor Yellow }
 Test-Result -Success ($p1.ok -and $p1.status -eq 200) -Message "9z-AJ.1: GET /scim/health returns 200 (smoke)"
 
 # Required headers on EVERY response (helmet defaults)
@@ -10684,14 +10683,14 @@ if ($isHttpsDeployment) {
 
 # Probe 2: GET /scim/admin/version (200 with auth)
 $p2 = & $probeScript "/scim/admin/version" $baseUrl $headers
-if (-not $p2.ok) { Write-Host "  9z-AJ.probe2 raw error: $($p2.err)" -ForegroundColor Yellow }
+if (-not $p2.ok) { Write-LiveEvidenceHost "  9z-AJ.probe2 raw error: $($p2.err)" -ForegroundColor Yellow }
 Test-Result -Success ($p2.ok -and ($p2.status -eq 200 -or $p2.status -eq 401 -or $p2.status -eq 404)) -Message "9z-AJ.16: GET /scim/admin/version returns 200|401|404 with headers"
 Test-Result -Success ([string]$p2.headers["X-Frame-Options"] -eq "DENY") -Message "9z-AJ.17: Admin route still emits X-Frame-Options DENY"
 Test-Result -Success ([string]$p2.headers["Content-Security-Policy"] -match "default-src 'self'") -Message "9z-AJ.18: Admin route still emits CSP"
 
 # Probe 3: GET / (SPA fallback, 200 text/html or 404 in inmemory)
 $p3 = & $probeScript "/" $baseUrl $null
-if (-not $p3.ok) { Write-Host "  9z-AJ.probe3 raw error: $($p3.err)" -ForegroundColor Yellow }
+if (-not $p3.ok) { Write-LiveEvidenceHost "  9z-AJ.probe3 raw error: $($p3.err)" -ForegroundColor Yellow }
 Test-Result -Success ($p3.ok) -Message "9z-AJ.19: GET / returns response (SPA fallback)"
 Test-Result -Success ([string]$p3.headers["X-Content-Type-Options"] -eq "nosniff") -Message "9z-AJ.20: SPA shell carries X-Content-Type-Options nosniff"
 Test-Result -Success ([string]$p3.headers["Content-Security-Policy"] -match "script-src .* 'unsafe-inline'") -Message "9z-AJ.21: SPA-serving response CSP allows 'unsafe-inline' for script-src (Fluent UI v9 requirement)"
@@ -14029,7 +14028,7 @@ try {
         $samples += [int]$sw.ElapsedMilliseconds
     }
     $median = Get-Median -Values $samples
-    Write-Host "  JWT per-endpoint op ms (5 samples): $($samples -join ', ')  median=$median (threshold $perfThresholdMs)" -ForegroundColor Cyan
+    Write-LiveEvidenceHost "  JWT per-endpoint op ms (5 samples): $($samples -join ', ')  median=$median (threshold $perfThresholdMs)" -ForegroundColor Cyan
     Test-Result -Success ($median -lt $perfThresholdMs) -Message "9z-BQ.T1: JWT per-endpoint op median ${median}ms < ${perfThresholdMs}ms with $perfSeedCredCount seeded credentials (X9: loop is skipped for JWTs)"
 
     # Cleanup: deleting the endpoint cascades its credentials.
@@ -14904,7 +14903,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 try {
     $ccVersion = Invoke-RestMethod -Uri "$baseUrl/scim/admin/version" -Method GET -Headers $headers
     $ccBackend = $ccVersion.storage.persistenceBackend
-    Write-Host "  backend: $ccBackend" -ForegroundColor DarkGray
+    Write-LiveEvidenceHost "  backend: $ccBackend" -ForegroundColor DarkGray
 
     $ccEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{
         name = "live-test-dispname-$(Get-Random)"; profilePreset = "rfc-standard"
@@ -15997,11 +15996,11 @@ try {
         -Message "9z-CM.T8: NEGATIVE CONTROL - the report is live, not cached (total moved)"
 
     # Report the actual tail for THIS estate. Phase 5 is gated on this reading zero.
-    Write-Host "    tail on this estate: legacy=$($cmStatus.legacy.total) (active=$($cmStatus.legacy.active), inactive=$($cmStatus.legacy.inactive)), keyed=$($cmStatus.keyed.total), secretless=$($cmStatus.secretless.total), endpoints-with-legacy=$($cmStatus.endpoints.Count)" -ForegroundColor Yellow
+    Write-LiveEvidenceHost "    tail on this estate: legacy=$($cmStatus.legacy.total) (active=$($cmStatus.legacy.active), inactive=$($cmStatus.legacy.inactive)), keyed=$($cmStatus.keyed.total), secretless=$($cmStatus.secretless.total), endpoints-with-legacy=$($cmStatus.endpoints.Count)" -ForegroundColor Yellow
     if ($cmStatus.endpoints.Count -gt 0) {
         foreach ($e in ($cmStatus.endpoints | Select-Object -First 10)) {
             $cmLabel = if ($e.endpointName) { $e.endpointName } else { $e.endpointId }
-            Write-Host "      ${cmLabel}: $($e.legacyTotal) legacy ($($e.legacyActive) active)" -ForegroundColor Yellow
+            Write-LiveEvidenceHost "      ${cmLabel}: $($e.legacyTotal) legacy ($($e.legacyActive) active)" -ForegroundColor Yellow
         }
     }
     Test-Result -Success ($cmStatus.endpoints.Count -eq 0 -or $cmStatus.readyToRetireLegacyPath -eq $false) `
@@ -16306,9 +16305,9 @@ function Remove-TestResource {
     param ([string]$Uri, [string]$Name)
     try {
         Invoke-RestMethod -Uri $Uri -Method DELETE -Headers $headers -ErrorAction Stop | Out-Null
-        Write-Host "  ✅ Deleted $Name" -ForegroundColor Green
+        Write-LiveEvidenceHost "  ✅ Deleted $Name" -ForegroundColor Green
     } catch {
-        Write-Host "  ⚠️ Could not delete $Name" -ForegroundColor Yellow
+        Write-LiveEvidenceHost "  ⚠️ Could not delete $Name" -ForegroundColor Yellow
     }
 }
 
@@ -16338,7 +16337,7 @@ try {
     $allEndpoints = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Headers $headers -ErrorAction Stop
     $testEndpoints = $allEndpoints.endpoints | Where-Object { $_.name -like "live-test-*" }
     if ($testEndpoints.Count -gt 0) {
-        Write-Host "  Found $($testEndpoints.Count) orphaned live-test-* endpoint(s) to clean up:" -ForegroundColor Yellow
+        Write-LiveEvidenceHost "  Found $($testEndpoints.Count) orphaned live-test-* endpoint(s) to clean up:" -ForegroundColor Yellow
         foreach ($ep in $testEndpoints) {
             Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$($ep.id)" -Name "$($ep.name) ($($ep.id))"
         }
@@ -16348,13 +16347,13 @@ try {
     # Report preserved endpoints
     $preserved = $allEndpoints.endpoints | Where-Object { $_.name -notlike "live-test-*" }
     if ($preserved.Count -gt 0) {
-        Write-Host "  Preserved $($preserved.Count) non-test endpoint(s):" -ForegroundColor Cyan
+        Write-LiveEvidenceHost "  Preserved $($preserved.Count) non-test endpoint(s):" -ForegroundColor Cyan
         foreach ($ep in $preserved) {
-            Write-Host "    🔒 $($ep.name) ($($ep.id))" -ForegroundColor DarkCyan
+            Write-LiveEvidenceHost "    🔒 $($ep.name) ($($ep.id))" -ForegroundColor DarkCyan
         }
     }
 } catch {
-    Write-Host "  ⚠️ Could not list endpoints for sweep cleanup: $_" -ForegroundColor Yellow
+    Write-LiveEvidenceHost "  ⚠️ Could not list endpoints for sweep cleanup: $_" -ForegroundColor Yellow
 }
 
 # Naming-independent belt: catch anything the name-based sweep above missed
@@ -16371,10 +16370,10 @@ $finishedAt = Get-Date
 Write-Host "`n`n========================================" -ForegroundColor Magenta
 Write-Host "FINAL TEST SUMMARY" -ForegroundColor Magenta
 Write-Host "========================================" -ForegroundColor Magenta
-Write-Host "Tests Passed: $testsPassed" -ForegroundColor Green
-Write-Host "Tests Failed: $testsFailed" -ForegroundColor $(if ($testsFailed -eq 0) { "Green" } else { "Red" })
-Write-Host "Total Tests:  $($testsPassed + $testsFailed)" -ForegroundColor Cyan
-Write-Host "Duration:     $([math]::Round($elapsed.TotalSeconds, 1))s" -ForegroundColor Cyan
+Write-LiveEvidenceHost "Tests Passed: $testsPassed" -ForegroundColor Green
+Write-LiveEvidenceHost "Tests Failed: $testsFailed" -ForegroundColor $(if ($testsFailed -eq 0) { "Green" } else { "Red" })
+Write-LiveEvidenceHost "Total Tests:  $($testsPassed + $testsFailed)" -ForegroundColor Cyan
+Write-LiveEvidenceHost "Duration:     $([math]::Round($elapsed.TotalSeconds, 1))s" -ForegroundColor Cyan
 Write-VerboseLog "Base URL" $baseUrl
 
 if ($testsFailed -eq 0) {
@@ -16448,12 +16447,12 @@ if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Forc
 $outFile = Join-Path $outDir "$runId.json"
 $latestFile = Join-Path $outDir "live-results-latest.json"
 
-$jsonContent = $resultsObj | ConvertTo-Json -Depth 10
+$jsonContent = ConvertTo-LiveEvidenceJson $resultsObj
 
 $jsonContent | Out-File -FilePath $outFile -Encoding utf8
 $jsonContent | Out-File -FilePath $latestFile -Encoding utf8
 
-Write-Host "`n📊 Live test results JSON written to: test-results/$runId.json" -ForegroundColor Cyan
+Write-LiveEvidenceHost "`n📊 Live test results JSON written to: test-results/$runId.json" -ForegroundColor Cyan
 
 Write-Host "`n========================================`n" -ForegroundColor Magenta
 
@@ -16480,7 +16479,7 @@ Write-Host "`n========================================`n" -ForegroundColor Magen
 # output to a file and inspect it separately.
 Remove-Variable -Name __ScimServerLiveTestFlowSteps -Scope Global -ErrorAction SilentlyContinue
 if ($testsFailed -gt 0) {
-    Write-Host "EXIT 1 - $testsFailed assertion(s) failed." -ForegroundColor Red
+    Write-LiveEvidenceHost "EXIT 1 - $testsFailed assertion(s) failed." -ForegroundColor Red
     exit 1
 }
 exit 0

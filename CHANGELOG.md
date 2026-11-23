@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Live integration evidence redaction
+
+- Redact nested OAuth, administrator credential, password and assertion
+  material in evidence copies before flow storage, console truncation and
+  run-specific/latest JSON serialization. Preserve actual HTTP request and
+  response values, diagnostic metadata and positive administrator assertions.
+- Remove the OAuth success token prefix. Protect dynamic console strings,
+  errors and URLs with explicit sinks; unhandled failures emit a sanitized
+  diagnostic and exit 1. Invalid JSON/UTF8 evidence is explicitly marked.
+- Add a pure PowerShell production-boundary contract to default pre-push
+  checks: 0 prior dedicated assertions to 213 passing assertions. Focused
+  RED first reproduced raw body leakage. Node, browser,
+  complete live, backend and deployment counts are unchanged and were not
+  rerun in this fix worktree. No dependency, version or lockfile changes.
+- Document [policy, confirmed root causes and review obligations](docs/LIVE_EVIDENCE_REDACTION.md).
+- Consolidate fatal handling into one authoritative trap that attempts
+  reconciliation, protects cleanup and original failures, and exits 1.
+  Actual full-topology RED exposed cleanup bypass missed by the original
+  first-trap proxy. Original-data dev live execution remains blocked by the
+  separate existing cleanup ownership issue; this fix does not redesign it.
+- Discover raw and decoded URI userinfo/password material before authority
+  masking so earlier diagnostic siblings cannot retain it. Independent
+  empty-registry RED reproduced that escape; raw, encoded and fully encoded
+  controls now cover HTTP(S), PostgreSQL, Redis and MongoDB SRV schemes
+  without network access, while preserving usernames, metadata and originals.
+- Register recognized Bearer/Basic text before masking, including decoded
+  Basic credential/password material. Exempt only the exact canonical
+  redaction marker, not real credentials containing it; mask username-only
+  authorities without treating their account metadata as secrets.
+  Independent fresh-registry RED controls reproduced each escape before
+  correction, with original values, idempotence and all earlier controls
+  preserved. The existing evidence pattern and RCA now cover these boundaries.
+
 ### PostgreSQL inventory qualification fixtures
 
 - Correct only the cross-endpoint inventory E2E fixture isolation. Worker-local

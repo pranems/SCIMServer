@@ -9,6 +9,30 @@
 
 ## Active Delivery Process
 
+**Unreleased source correction, 2026-11-21:** The dedicated live evidence fix
+keeps authentication material in real HTTP inputs/responses but removes it
+from evidence copies and explicit console sinks before serialization or
+truncation. A default-running pure PowerShell contract covers the boundary.
+See [live evidence redaction and confirmed RCA](LIVE_EVIDENCE_REDACTION.md).
+No complete runner, runtime qualification or deployment was performed here.
+Follow-up full-topology RED caught a cleanup bypass hidden by the original
+first-trap proxy. One authoritative fatal trap now preserves cleanup and
+protected exit 1; 96 focused assertions pass. The existing name-based sweep
+and inventory-difference cleanup can select unowned original/concurrent
+endpoints, so original-data dev live execution remains blocked pending a
+separate ownership fix.
+Another isolated RED exposed URL userinfo being masked without material
+discovery, leaving an earlier sibling echo intact. URI authority discovery now
+registers raw/decoded userinfo and password values across HTTP(S), PostgreSQL,
+Redis and MongoDB SRV schemes. All 186 pure PowerShell assertions pass,
+including the earlier trap/cleanup controls. No network/runtime was used.
+Fresh-registry Bearer/Basic, marker-substring and SSH username-only metadata
+controls then exposed three additional discovery/classification escapes.
+The existing evidence boundary now registers auth text and decoded Basic
+passwords, exempts only the exact canonical marker, and keeps password-free
+authority accounts out of the material set. All 213 focused assertions pass;
+the prior trap, input preservation and ownership-blocker scope are retained.
+
 **Merged-source execution, 2026-11-20:** PR #275 merged at `9ee2a72d`.
 Static/runtime qualification and fresh 30-migration replay passed; each API
 unit backend passes 218/6,263. Full PostgreSQL HTTP found two inventory-test

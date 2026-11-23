@@ -1,5 +1,24 @@
 ## SCIMServer - Condensed Session Memory
 
+### Unreleased live evidence boundary correction, 2026-11-21
+
+The dedicated fix branch at baseline `554f4202` changes evidence copies only.
+Raw OAuth/admin bodies, error/URL text and token-prefix console output exposed
+a preflight concern before a complete live runner was started. The pure
+PowerShell contract reproduced the body leak before source edits. Shared
+redaction now precedes flow storage, verbose truncation and both JSON exports;
+original HTTP inputs/responses and positive admin assertions are unchanged.
+See [source-only evidence policy and RCA](docs/LIVE_EVIDENCE_REDACTION.md).
+Runtime, fixture ownership, full gates, review/merge and deployment remain
+the parent's responsibility. No version or deployment claim is made.
+
+| Date | Summary |
+|---|---|
+| 2026-11-21 | Source-only live evidence correction: causal RED, then 87 pure PowerShell assertions GREEN; registry/customization contracts and static checks pass. Normal review and runtime qualification remain outstanding. |
+| 2026-11-21 | Independent full-trap topology RED exposed skipped reconciliation. One authoritative protected fatal trap now passes 96 assertions, including cleanup failure and caught negative errors. Original-data dev live execution is blocked by separate pre-existing cleanup ownership selection. |
+| 2026-11-21 | Independent userinfo/sibling RED exposed recognized credentials missing from discovery. Raw/decoded userinfo and passwords are now registered before masking across hierarchical URI schemes; 186 focused assertions pass with the original 96 protections retained. No runtime/network or ownership redesign. |
+| 2026-11-21 | Fresh-registry RED exposed Bearer/Basic text discovery, marker-substring material exemptions and username-only URI metadata loss. Shared credential-pair discovery, exact marker equality and 213 passing assertions close these escapes while retaining the authoritative trap and existing ownership blocker. |
+
 ### Merged-source deployment qualification, 2026-11-20
 
 PR #275 is merged at `9ee2a72d91ad1fc9cdee00782d18f1d84e481104`.
