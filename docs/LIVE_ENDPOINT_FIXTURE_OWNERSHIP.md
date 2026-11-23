@@ -117,13 +117,13 @@ through it. No API implementation or HTTP contract assertion was weakened.
 | Complete unpaginated endpoint list | [EndpointController.listEndpoints](../api/src/modules/endpoint/controllers/endpoint.controller.ts:68) |
 | Original inventory validation and admission | [Initialize-LiveEndpointOwnership](../scripts/live-endpoint-ownership.ps1:10) |
 | UUID identity | [ConvertTo-LiveEndpointUuid](../scripts/live-endpoint-ownership.ps1:1) |
-| Original/unowned deletion protection | [Get-LiveEndpointRequest](../scripts/live-endpoint-ownership.ps1:33) |
-| Registration and exact-ID cleanup confirmation | [Complete-LiveEndpointRequest](../scripts/live-endpoint-ownership.ps1:73) |
-| Explicit bounded rejection-probe admission | [Invoke-LiveEndpointRejectionProbe](../scripts/live-endpoint-ownership.ps1:100) |
-| Retained handle reconciliation | [Invoke-OrphanReconciliation](../scripts/live-endpoint-ownership.ps1:132) |
-| Shared REST and web transports | [Invoke-RestMethod](../scripts/live-test.ps1:148), [Invoke-WebRequest](../scripts/live-test.ps1:199) |
-| Actual trap and final cleanup helper | [script trap](../scripts/live-test.ps1:399), [Remove-TestResource](../scripts/live-test.ps1:16270) |
-| Global settings risk examples | [Ensure-JwksHostAllowed](../scripts/live-test.ps1:322), [`credentialSecretVisibility` write](../scripts/live-test.ps1:12265), [shared ring-buffer DELETE](../scripts/live-test.ps1:2581) |
+| Original/unowned deletion protection | [Get-LiveEndpointRequest](../scripts/live-endpoint-ownership.ps1:35) |
+| Registration and exact-ID cleanup confirmation | [Complete-LiveEndpointRequest](../scripts/live-endpoint-ownership.ps1:76) |
+| Explicit bounded rejection-probe admission | [Invoke-LiveEndpointRejectionProbe](../scripts/live-endpoint-ownership.ps1:104) |
+| Retained handle reconciliation | [Invoke-OrphanReconciliation](../scripts/live-endpoint-ownership.ps1:137) |
+| Shared REST and web transports | [Invoke-RestMethod](../scripts/live-test.ps1:158), [Invoke-WebRequest](../scripts/live-test.ps1:204) |
+| Actual trap and final cleanup helper | [script trap](../scripts/live-test.ps1:49), [Remove-TestResource](../scripts/live-test.ps1:16272) |
+| Global settings risk examples | [Ensure-JwksHostAllowed](../scripts/live-test.ps1:327), [`credentialSecretVisibility` write](../scripts/live-test.ps1:12267), [shared ring-buffer DELETE](../scripts/live-test.ps1:2583) |
 
 Run only these pure PowerShell controls for this offline outcome:
 
