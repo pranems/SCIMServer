@@ -331,6 +331,10 @@ Invoke-Gate -Name 'quality gates: orchestrator contract' -WorkingDir $repoRoot -
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/run-all-gates.contract.ps1') 2>&1 | Out-Host
 }
 
+Invoke-Gate -Name 'live evidence: pre-serialization redaction contract' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/test/live-evidence-redaction.contract.ps1') 2>&1 | Out-Host
+}
+
 Invoke-Gate -Name 'test matrix: orchestrator contract' -WorkingDir $repoRoot -Action {
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/test-all-modes.contract.ps1') 2>&1 | Out-Host
 }

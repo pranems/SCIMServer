@@ -10,6 +10,10 @@ describe('integrated correctness live coverage', () => {
   it('keeps HTTP flow steps in the root live runner when nested scripts invoke the wrapper', () => {
     const command = `
 $ErrorActionPreference = 'Stop'
+. $env:SCIM_LIVE_EVIDENCE_FILE
+$sentinel = 'nested-flow-synthetic-secret'
+Initialize-LiveEvidence -Secrets @($sentinel)
+$original = @{ echo = $sentinel; label = 'retained' }
 $ast = [Management.Automation.Language.Parser]::ParseFile($env:SCIM_LIVE_TEST_FILE, [ref]$null, [ref]$null)
 $functionAst = @($ast.FindAll({
     param($node)
@@ -23,22 +27,32 @@ function Convert-FlowBody { param($Body); $Body }
 $child = Join-Path ([IO.Path]::GetTempPath()) "scim-live-nested-$([Guid]::NewGuid().ToString('N')).ps1"
 try {
     @'
-Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/one' -StatusCode 200
+Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/one' -StatusCode 200 -ResponseBody $original
 Add-FlowStep -StartedAt (Get-Date) -Method 'GET' -Uri 'http://localhost/two' -StatusCode 200
 '@ | Set-Content -LiteralPath $child
     & $child
     if ($script:flowSteps.Count -ne 2 -or $script:flowSteps[0].stepId -ne 1 -or $script:flowSteps[1].stepId -ne 2) {
         throw 'Nested script requests must append to the root live flow-step collection'
     }
+    if ($script:flowSteps[0].response.body.echo -cne '[REDACTED]' -or
+        $script:flowSteps[0].response.body.label -cne 'retained' -or
+        $original.echo -cne $sentinel) {
+        throw 'Nested flow evidence must redact its copy without changing the original response'
+    }
     'nested flow steps verified'
 } finally {
     Remove-Item -LiteralPath $child -Force -ErrorAction SilentlyContinue
     Remove-Variable -Name __ScimServerLiveTestFlowSteps -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name __ScimServerLiveEvidenceSecrets -Scope Global -ErrorAction SilentlyContinue
 }
 `;
     expect(execFileSync('pwsh', ['-NoProfile', '-Command', command], {
       encoding: 'utf8',
-      env: { ...process.env, SCIM_LIVE_TEST_FILE: resolve(scripts, 'live-test.ps1') },
+      env: {
+        ...process.env,
+        SCIM_LIVE_TEST_FILE: resolve(scripts, 'live-test.ps1'),
+        SCIM_LIVE_EVIDENCE_FILE: resolve(scripts, 'live-evidence.ps1'),
+      },
     }).trim()).toBe('nested flow steps verified');
   });
 

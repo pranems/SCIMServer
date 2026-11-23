@@ -9,6 +9,16 @@
 
 ## Active Delivery Process
 
+**Current integration, 2026-11-23:** Ownership commit `73a228a6` composes
+normally reviewed PR #280, merged at `4b4ae0a3` after every exact-tip check
+passed. The evidence branch's normal Fast push passed in 753 seconds.
+Ownership has 206 focused mock/JSON/actual-child assertions; evidence has
+213 PowerShell assertions and nine actual-helper nested-flow Jest tests.
+Combined integration qualification and normal ownership publication remain
+required. Global-state preservation, performance and deployment remain open.
+The following source-stage records retain their original scope, not current
+publication authority.
+
 **Current integration boundary:** the offline ownership source is committed at
 `f7f28c7e` and integrates normally reviewed artifact PR #279, merged at
 `8b6335f1`. Product version remains the unreleased 0.55.69 candidate.
@@ -38,6 +48,37 @@ script-scoped ownership state. One root-owned run registry now covers both
 wrappers, original inventory, retained handles, single-use rejection admission
 and sticky cleanup failures. Real child lifecycle and parent cleanup controls
 pass; normal publication of that corrected tip remains required.
+**Current integration boundary:** the evidence correction is committed at
+`62440b1d`, including actual-helper nested-script state RED/GREEN coverage
+(nine Jest tests and the independent 213 PowerShell assertions pass).
+It integrates reviewed artifact PR #279 at `8b6335f1`; product version remains
+the unreleased 0.55.69 candidate. Normal full hook, combined ownership
+qualification, global-state preservation and deployment remain open.
+The source-stage records below retain their original scope and dates.
+
+**Unreleased source correction, 2026-11-21:** The dedicated live evidence fix
+keeps authentication material in real HTTP inputs/responses but removes it
+from evidence copies and explicit console sinks before serialization or
+truncation. A default-running pure PowerShell contract covers the boundary.
+See [live evidence redaction and confirmed RCA](LIVE_EVIDENCE_REDACTION.md).
+No complete runner, runtime qualification or deployment was performed here.
+Follow-up full-topology RED caught a cleanup bypass hidden by the original
+first-trap proxy. One authoritative fatal trap now preserves cleanup and
+protected exit 1; 96 focused assertions pass. The existing name-based sweep
+and inventory-difference cleanup can select unowned original/concurrent
+endpoints, so original-data dev live execution remains blocked pending a
+separate ownership fix.
+Another isolated RED exposed URL userinfo being masked without material
+discovery, leaving an earlier sibling echo intact. URI authority discovery now
+registers raw/decoded userinfo and password values across HTTP(S), PostgreSQL,
+Redis and MongoDB SRV schemes. All 186 pure PowerShell assertions pass,
+including the earlier trap/cleanup controls. No network/runtime was used.
+Fresh-registry Bearer/Basic, marker-substring and SSH username-only metadata
+controls then exposed three additional discovery/classification escapes.
+The existing evidence boundary now registers auth text and decoded Basic
+passwords, exempts only the exact canonical marker, and keeps password-free
+authority accounts out of the material set. All 213 focused assertions pass;
+the prior trap, input preservation and ownership-blocker scope are retained.
 
 **Targeted CI artifact correction, 2026-11-21 UTC:** PR #278 is merged at
 `554f4202`. The web audit identifies High Zod GHSA-mrhx-c7xc-m3w5; fixed 4.6.6

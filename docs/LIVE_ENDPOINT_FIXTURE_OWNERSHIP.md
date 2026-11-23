@@ -184,6 +184,7 @@ The default pre-push gate and Stage 1 gate walker register this focused contract
 | Probe-source assertion initially searched only direct statements / Low | The actual rejection try blocks are nested in the syntax tree. Direct `EndBlock.Statements` lookup found none, so the new assertion failed. The assertion now locates actual try blocks recursively and still requires each unchanged HTTP 404 comparison. | Focused contract caught this before final GREEN; no source assertion or HTTP expectation was relaxed. |
 | Native JSON inventory counts rejected / High | The inventory guard required Int32, but the real JSON transport deserializes integer counts as Int64. Hand-built Int32 mock inventories masked the startup regression. The guard now accepts Int32/Int64 only, requires a nonnegative count within Int32 range, and preserves exact array-count equality. | Independent review identified the transport mismatch. Real JSON-deserialized empty/nonempty inventories reproduced RED before the fix; the focused contract then passed 184 assertions, previously 133. Added controls reject Boolean, string, floating-point, negative, oversized and mismatched counts before fixture creation reaches transport. |
 | Actual child caller lost ownership state / High | An inherited root wrapper invoked by `& child.ps1` resolved `$script:` against the child, losing the initialized original-inventory/handle state. The original nested test dot-sourced its helper, so it did not create this boundary. All ownership state and wrapper cleanup failures now share one explicitly named root-owned run registry. | The same confirmed evidence-registry failure class prompted a bounded actual-wrapper review. A real child lifecycle reproduced creation rejection before transport. After the fix, 206 assertions pass (previously 184), including both wrappers, original/unknown denial, valid lifecycle and exact absence, armed reinitialization denial, sticky child cleanup failure and exact parent retry. The old push was cancelled, not passed or bypassed. |
+| Combined contract omitted evidence dependencies and assumed a catchable fatal trap / Medium | Composing normally merged PR #280 made the wrappers depend on the real evidence helper. The ownership projection omitted that import, then its in-process interruption replay exited the whole contract when the reviewed fatal trap correctly called `exit 1`. The projection now loads the actual helper and initializer; interruption scenarios run in separately owned PowerShell processes. Exact mock transport lines prove cleanup before fatal exit, without replacing the trap or swallowing its exit. Temporary script files are removed by exact path in `finally`. | The first combined focused run failed on the missing function; the dependency-loaded run then exposed fatal process exit. The corrected ownership contract passes all 206 assertions, and the independent evidence contract passes 213. The actual-helper nested-flow Jest suite passes nine tests. The pinned baseline still fails for both actual unsafe cleanup outcomes. This was caught at the earliest combined integration gate, before normal ownership publication; no production behavior or expectation was weakened. |
 
 No commit SHA was assigned at the original offline stage because committing was not
 authorized. This ledger was reconciled against this task's observed command
@@ -191,6 +192,13 @@ failures and inspected changes, not earlier session recollections or an invented
 live run. No claim of full historical transcript reconciliation is made.
 
 ## Integration and self-improvement
+
+Ownership commit `73a228a6` now composes evidence PR #280, normally merged at
+`4b4ae0a3` after all exact-tip checks passed. The wrapper conflict resolution
+retains owned handles, protected evidence copies, sticky cleanup failures and
+one authoritative fatal trap. No name or inventory-difference sweep is restored.
+The source-stage records above remain historical; combined normal hook and
+exact-tip ownership review/CI are still required before publication.
 
 Integration must preserve the wrapper parameter signatures, module-qualified
 transport forwarding, register-before-recorder ordering and sticky cleanup
@@ -203,7 +211,8 @@ reset handles, or swallow cleanup failures to make the merged tests pass.
 
 Test/gate disposition: **applied**. The new default lifecycle contract closes
 the name/difference ownership escape, unknown mutation admission, armed baseline
-replacement and the actual-trap/probe projection gaps.
+replacement and the actual-trap/probe projection gaps. Real exit-bearing trap
+replay now runs in an owned process, not an in-process exception proxy.
 
 Design/architecture disposition: **accepted**. One small cohesive ownership
 helper serves both existing transports and all endpoint teardown paths.

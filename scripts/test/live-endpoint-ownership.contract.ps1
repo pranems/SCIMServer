@@ -24,7 +24,8 @@ $projection = ($lifecycleNodes | Where-Object {
     $_ -is [System.Management.Automation.Language.FunctionDefinitionAst] -or
     $_ -is [System.Management.Automation.Language.TrapStatementAst] -or
     ($_.Extent.StartOffset -lt $firstFunction.Extent.StartOffset -and $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and $_.Left.Extent.Text -ne '$ErrorActionPreference') -or
-    $_.Extent.Text -match '^\. .*live-endpoint-ownership\.ps1'
+    $_.Extent.Text -match '^\. .*live-(endpoint-ownership|evidence)\.ps1' -or
+    $_.Extent.Text -match '^Initialize-LiveEvidence\b'
 } | Sort-Object { $_.Extent.StartOffset } | ForEach-Object { $_.Extent.Text }) -join "`n"
 $projection = $projection.Replace('Microsoft.PowerShell.Utility\Invoke-RestMethod', 'Invoke-MockRest')
 $projection = $projection.Replace('Microsoft.PowerShell.Utility\Invoke-WebRequest', 'Invoke-MockWeb')
@@ -71,6 +72,7 @@ function Invoke-MockRest {
     param($Uri, $Method, $Headers, $Body, $ContentType, [switch]$AllowInsecureRedirect,
         $ResponseHeadersVariable, $StatusCodeVariable)
     $m = if ($Method) { "$Method".ToUpperInvariant() } else { 'GET' }
+    if ($script:emitTransportEvidence) { [Console]::WriteLine("OWNERSHIP_TRANSPORT $m $Uri") }
     $script:calls.Add([pscustomobject]@{ Uri = $Uri; Method = $m; Headers = $Headers; Body = $Body; ContentType = $ContentType; HasContentType = $PSBoundParameters.ContainsKey('ContentType'); ErrorAction = $PSBoundParameters['ErrorAction']; Redirect = $AllowInsecureRedirect })
     $status = 200
     $result = $script:inventory
@@ -99,6 +101,7 @@ function Invoke-MockWeb {
     [CmdletBinding()]
     param($Uri, $Method, $Headers, $Body, $ContentType, [switch]$AllowInsecureRedirect, [switch]$SkipHttpErrorCheck)
     $m = if ($Method) { "$Method".ToUpperInvariant() } else { 'GET' }
+    if ($script:emitTransportEvidence) { [Console]::WriteLine("OWNERSHIP_TRANSPORT $m $Uri") }
     $script:calls.Add([pscustomobject]@{ Uri = $Uri; Method = $m; Headers = $Headers; Body = $Body; ContentType = $ContentType; ErrorAction = $PSBoundParameters['ErrorAction']; Skip = $SkipHttpErrorCheck; Redirect = $AllowInsecureRedirect })
     if ($script:transportFailure) { throw 'mock transport unavailable' }
     $status = if ($m -eq 'DELETE') { $script:deleteStatus } elseif ($m -eq 'POST') { $script:createStatus } else { $script:absenceStatus }
@@ -466,20 +469,40 @@ foreach ($transport in @('Rest', 'Web')) {
 
 # Execute the full actual trap topology after a successful creation, including
 # a failure before a caller assigns the returned ID.
-Reset-Mock
-$interrupted = [scriptblock]::Create($projection + @'
+function Invoke-LifecycleProcess([string]$scenario) {
+    $mockSource = (@('Reset-Mock', 'Invoke-MockRest', 'Invoke-MockWeb') | ForEach-Object {
+        "function $_ {`n$((Get-Command $_).Definition)`n}"
+    }) -join "`n"
+    $fixture = Join-Path ([IO.Path]::GetTempPath()) "scim-owned-lifecycle-$([guid]::NewGuid().ToString('N')).ps1"
+    $setup = @"
+`$ErrorActionPreference = 'Stop'
+`$baseUrl = '$baseUrl'
+`$headers = @{ Authorization = 'mock-only' }
+`$original = '$original'
+`$owned = '$owned'
+`$unknown = '$unknown'
+"@
+    try {
+        [IO.File]::WriteAllText($fixture, "$setup`n$mockSource`n$projection`nReset-Mock`n`$script:emitTransportEvidence = `$true`n$scenario")
+        $output = & pwsh -NoProfile -NonInteractive -File $fixture 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+        return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
+    } finally {
+        Remove-Item -LiteralPath $fixture -ErrorAction Stop
+    }
+}
+$interrupted = Invoke-LifecycleProcess @'
 
 Initialize-LiveEndpointOwnership
 $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
 throw 'injected lifecycle interruption'
-'@)
-Expect-Failure { . $interrupted } 'Actual trap topology must preserve the interrupted error.'
-Assert (@($script:calls | Where-Object { $_.Method -eq 'DELETE' -and $_.Uri -match $owned }).Count -eq 1) 'Actual trap topology must clean the retained owned response ID.'
-Assert (@($script:calls | Where-Object { $_.Method -eq 'DELETE' -and $_.Uri -match $original }).Count -eq 0) 'Actual trap topology must retain originals.'
+'@
+Assert ($interrupted.ExitCode -eq 1 -and $interrupted.Output.Contains('injected lifecycle interruption')) 'Actual trap topology must preserve the interrupted error and fatal exit.'
+Assert (@($interrupted.Output -split '\r?\n' | Where-Object { $_ -ceq "OWNERSHIP_TRANSPORT DELETE $baseUrl/scim/admin/endpoints/$owned" }).Count -eq 1) 'Actual trap topology must clean the retained owned response ID.'
+Assert (-not $interrupted.Output.Contains("OWNERSHIP_TRANSPORT DELETE $baseUrl/scim/admin/endpoints/$original")) 'Actual trap topology must retain originals.'
 Assert ($actualTraps.Count -gt 0) 'The lifecycle projection must include actual top-level traps.'
 
-Reset-Mock
-$recorderInterruption = [scriptblock]::Create($projection + @'
+$recorderInterruption = Invoke-LifecycleProcess @'
 
 Initialize-LiveEndpointOwnership
 function Add-FlowStep {
@@ -487,9 +510,9 @@ function Add-FlowStep {
     if ($Method -eq 'POST') { throw 'injected recorder interruption' }
 }
 $cleanupTarget = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
-'@)
-Expect-Failure { . $recorderInterruption } 'Recorder failure must remain an interruption, not a success-shaped response.'
-Assert (@($script:calls | Where-Object { $_.Method -eq 'DELETE' -and $_.Uri -match $owned }).Count -eq 1) 'Registration must precede recorder interruption and caller assignment.'
+'@
+Assert ($recorderInterruption.ExitCode -eq 1 -and $recorderInterruption.Output.Contains('injected recorder interruption')) 'Recorder failure must remain an interruption, not a success-shaped response.'
+Assert (@($recorderInterruption.Output -split '\r?\n' | Where-Object { $_ -ceq "OWNERSHIP_TRANSPORT DELETE $baseUrl/scim/admin/endpoints/$owned" }).Count -eq 1) 'Registration must precede recorder interruption and caller assignment.'
 Assert ($source -notmatch '\$testEndpoints\s*=.*Where-Object.*live-test-') 'The actual final name-based deletion sweep must be removed.'
 foreach ($route in @('schemas', 'resource-types')) {
     $probeBlocks = @($ast.FindAll({ param($node)
