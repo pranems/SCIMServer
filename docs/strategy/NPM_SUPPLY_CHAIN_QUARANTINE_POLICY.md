@@ -9,6 +9,41 @@
 
 ## 0. Provenance, and the limits of this document
 
+### 2026-11-23 root Markdown tooling recovery
+
+The immutable root tooling lock reports `markdown-it` 14.3.0 with a High
+advisory; API/web runtime source and locks are unchanged. The patched 14.3.3
+publication is 2026-10-16 and is outside the seven-day quarantine. The
+manifest regression observed RED for `^14.3.0`, then GREEN for `^14.3.3`.
+This is not final locked remediation: the old root lock still reports High.
+
+The existing root-only CI regeneration route is retained. Before its
+normal bootstrap push, the owned installation uses the existing
+`seedManifest` baseline logic with lock writing disabled and the seven-day
+cutoff, restoring the real manifest exactly afterward. No API/web package,
+guard, hook, deadline or workflow is changed. All tracked locks remain
+byte-identical. Actual `npm ls --all` passes. The installed package identity
+multiset changes only Markdown 14.3.0 to 14.3.3; parser 1.2.1 moves from
+Mermaid's nested directory to the root but retains Mermaid ownership and
+version. Physical placement is recorded rather than hidden.
+
+| Issue | Type / severity | Resolution and why | Detection / earliest possible |
+|---|---|---|---|
+| Plain no-lock installation re-resolved unrelated root packages | Tooling / Medium | Rejected as final preparation. Reuse existing baseline seeding, then verify every package identity/version and actual owner tree. No tracked lock changed. | Explicit installed-tree union review / seeded preparation before install |
+| Exact-path bootstrap check rejected unchanged parser hoisting | Test correctness / Low | Preserve the physical diff, compare complete package identity multiplicity and verify Mermaid's actual parser owner/version plus `npm ls --all`. This distinguishes layout from dependency changes without waiving existing guards. | Private bootstrap validator / semantic owner-tree check |
+| Fresh worktree lacked js-yaml, vite and jsdom | Environment / Low | Actual chosen checks failed first; normal owned locked installs restored tools. Root/API/web lock bytes stayed unchanged. | Validation startup / tool availability |
+
+Final acceptance still requires authenticated root-only CI artifact,
+complete union/provenance/publication-age review, fresh locked installation,
+zero High/Critical root audit and normal exact-tip gates/review. The
+bootstrap is not a shipping or final-security acceptance.
+
+**Self-improvement: applied.** The default API unit regression guards the
+root Markdown floor; locked/installed controls will accompany the final
+artifact. **Design disposition: accepted.** Reuse the current CI-only root
+regenerator and existing baseline seed rather than adding a second policy
+or generation mechanism.
+
 ### 2026-11-20 Effect recovery bootstrap and final dependency evidence
 
 Effect 3.22.1 was published 2026-07-30T04:29:21.637Z and is already outside

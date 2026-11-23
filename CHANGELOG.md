@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Root documentation tooling security recovery
+
+- Raise the root-only `markdown-it` floor from `^14.3.0` to `^14.3.3`,
+  retaining Mermaid 11.17.0 and all API/web dependencies and application
+  version 0.55.70.
+- Add the observed RED/GREEN manifest regression; retain existing artifact
+  contracts (22 PASS). Normal root-only CI lock generation and final
+  locked/installed/audit evidence remain pending. The old lock's High
+  finding is not described as remediated by the bootstrap installation.
+- Document rejected unseeded dependency drift, semantic parser-hoist
+  verification and unchanged tracked locks in the
+  [supply-chain RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
+
 ### POST User query-budget correction, 0.55.69 to 0.55.70 candidate
 
 - Establish the existing application pool's READ COMMITTED default explicitly

@@ -1,5 +1,23 @@
 ## SCIMServer - Condensed Session Memory
 
+### Root Markdown tooling security recovery, 2026-11-23
+
+Separate c52-based tooling-only rollback unit. Root `markdown-it` floor moves
+from `^14.3.0` to `^14.3.3` after observed manifest RED/GREEN. Patched release
+is older than seven days. Existing baseline seeding prepares owned packages
+without lock writing; all installed identities are unchanged except Markdown
+14.3.0 to 14.3.3, with unchanged Mermaid parser 1.2.1 ownership after hoisting.
+Actual root `npm ls --all` and 22 existing artifact contracts pass. Original
+unseeded graph drift was rejected and all tracked locks remain unchanged.
+Normal bootstrap hook, root-only CI artifact and final locked audit remain
+pending; the old root lock still reports High. Application version/source,
+API/web locks, runtime fixtures, Docker Desktop and other worktrees unchanged.
+See [root tooling recovery and RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Root Markdown manifest RED/GREEN and seeded owned preparation verified; 22 artifact contracts pass. Final CI lock/security acceptance pending, not a shipping claim. |
+
 ### POST User correction in qualification, 2026-11-23
 
 The successful path now uses explicit READ COMMITTED connection startup in

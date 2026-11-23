@@ -9,6 +9,14 @@
 
 ## Active Delivery Process
 
+**Unreleased root-tooling security recovery:** `markdown-it` manifest floor
+is `^14.3.3` after observed RED/GREEN. The old tracked root lock remains
+unchanged and still reports High; final root-only CI lock/audit acceptance
+is pending. Owned seeded bootstrap passes full identity/owner verification
+and 22 artifact contracts. API/web dependencies and application version
+0.55.70 remain unchanged. See
+[root-tooling RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
+
 **Current source-reviewed performance correction:** successful POST User now uses
 explicit READ COMMITTED startup options in the existing pool, scalar-FK
 INSERT/RETURNING and conflict-only username diagnostics. Four foreground
