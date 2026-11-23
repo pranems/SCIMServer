@@ -9,6 +9,45 @@
 
 ## Active Delivery Process
 
+**Current integration, 2026-11-23:** Ownership commit `73a228a6` composes
+normally reviewed PR #280, merged at `4b4ae0a3` after every exact-tip check
+passed. The evidence branch's normal Fast push passed in 753 seconds.
+Ownership has 206 focused mock/JSON/actual-child assertions; evidence has
+213 PowerShell assertions and nine actual-helper nested-flow Jest tests.
+Combined integration qualification and normal ownership publication remain
+required. Global-state preservation, performance and deployment remain open.
+The following source-stage records retain their original scope, not current
+publication authority.
+
+**Current integration boundary:** the offline ownership source is committed at
+`f7f28c7e` and integrates normally reviewed artifact PR #279, merged at
+`8b6335f1`. Product version remains the unreleased 0.55.69 candidate.
+Ownership publication/review, redaction composition and global-state
+preservation remain required. Captured offline-stage statements below describe
+their original authority, not a prohibition on subsequent normal source review.
+
+**Offline fixture correction, 2026-11-20:** The existing
+`vprane/scimserver/containers-live-fixture-ownership-20261121` branch at base
+`554f42023fdde30918ef378987cc8f3135e4ed3a` has an uncommitted endpoint ownership
+correction with 206 passing mock/JSON/child lifecycle assertions (previously 184/133; initially 104) and passing shared pure
+contracts. Actual pinned baseline sweep/reconciliation reproduce unsafe deletes
+with mocks. Complete original inventory and exact new response IDs replace
+name/difference deletion. Preserved-dev live execution has not started; global
+settings/log/JWKS effects and separate evidence-redaction work remain open.
+No network, runtime, auth, dependency, commit/push/PR or deployment operation
+was performed. Product version and product-suite counts are unchanged. See
+[bounded results and RCA](LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+Independent review closed unowned POST/PUT/PATCH admission and armed inventory
+replacement with actual pre-fix RED controls. Only two checked, single-use
+all-zero-UUID POST rejection probes preserve their original HTTP 404 assertions;
+they require a known-owned active cleanup handle and cannot admit arbitrary UUIDs.
+Historical runtime statements below are not current authority.
+
+Actual `& child.ps1` fixture creation also reproduced loss of initialized
+script-scoped ownership state. One root-owned run registry now covers both
+wrappers, original inventory, retained handles, single-use rejection admission
+and sticky cleanup failures. Real child lifecycle and parent cleanup controls
+pass; normal publication of that corrected tip remains required.
 **Current integration boundary:** the evidence correction is committed at
 `62440b1d`, including actual-helper nested-script state RED/GREEN coverage
 (nine Jest tests and the independent 213 PowerShell assertions pass).

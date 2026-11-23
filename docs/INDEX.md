@@ -13,6 +13,10 @@ Performance remains unqualified under the migration-only exception.
 
 ### Start here
 
+**Live fixture safety:** [Endpoint ownership correction and remaining global
+mutation blockers](LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md) documents complete original
+UUID capture, registered response-ID cleanup, mock lifecycle evidence and the
+unstarted preserved-dev live boundary.
 **Unreleased live-test evidence correction:** [Redaction boundary and RCA](LIVE_EVIDENCE_REDACTION.md)
 documents the source-only protection of console and durable evidence while
 preserving real authentication and administrator assertions.

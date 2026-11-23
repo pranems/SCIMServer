@@ -193,6 +193,12 @@ $STAGES = [ordered]@{
 
     'Stage 1 - Local Static' = @(
         @{
+            Name = 'Live endpoint fixture ownership contract'
+            Kind = 'Shell'
+            Command = 'pwsh -NoProfile -File scripts\test\live-endpoint-ownership.contract.ps1'
+            WorkDir = '.'
+        }
+        @{
             Name = 'lintAndStaticAnalysis skill (orchestrator for Stage 1)'
             Kind = 'Skill'
             SkillPath = '.github/skills/lintandstaticanalysis/SKILL.md'
