@@ -56,6 +56,7 @@ export class PrismaUserRepository implements IUserRepository {
       const created = await withUniqueWrite(this.prisma, uniqueness, { endpointId: input.endpointId, resourceType: 'User' }, input, (tx) => tx.scimResource.create({
         data: {
           resourceType: 'User',
+          endpointId: input.endpointId,
           scimId: input.scimId,
           externalId: input.externalId,
           userName: input.userName,
@@ -63,7 +64,6 @@ export class PrismaUserRepository implements IUserRepository {
           active: input.active,
           payload: JSON.parse(input.rawPayload),   // domain string → JSONB
           meta: input.meta,
-          endpoint: { connect: { id: input.endpointId } },
         },
       }), { expectedProfileRevision: profileRevision });
       return toUserRecord(created as unknown as Record<string, unknown>);

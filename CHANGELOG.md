@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### POST User query-budget correction, 0.55.69 to 0.55.70 candidate
+
+- Establish the existing application pool's READ COMMITTED default explicitly
+  at connection startup. Preserve configured startup options, pool budgets,
+  stronger explicit transaction isolation, ordered locks and the separate
+  fresh post-lock snapshot.
+- Replace nested endpoint relation connection with scalar-FK INSERT/RETURNING.
+  Retain database FK enforcement and atomic repository uniqueness. Perform
+  the username lookup only after a conflict for unchanged 409 diagnostics.
+- Actual standalone HTTP improves foreground client queries from eight to
+  four against the unchanged maximum. The separate log write and PostgreSQL
+  internal FK check remain present and are reported independently.
+- Focused API units: prior four-suite baseline 103 passes; current six-suite
+  focused selection 255 passes after independent source review adds URL/SSL
+  preservation and typed lookup-failure controls (parent receipt: 253).
+  Actual PostgreSQL isolation/race/profile/User
+  selection: four suites, 123 passes. New persistent HTTP budget contract:
+  zero to one pass, with an executable five-query RED and restored GREEN.
+  These are focused selections, not new complete-suite totals. Full backend,
+  web/coverage, live, browser, image and deployment evidence remains pending.
+- Import version-only API/web metadata from CI run 45189452486 at exact merged
+  master 9d25558d. Dependency graph, public resolutions and SHA512 integrity
+  are unchanged; no local lockfile generation occurred.
+- Record [measured scope, confirmed issues and assurance limits](docs/CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23).
+
 ### Live integration evidence redaction
 
 - Redact nested OAuth, administrator credential, password and assertion

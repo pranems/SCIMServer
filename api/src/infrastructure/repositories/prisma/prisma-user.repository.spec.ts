@@ -88,7 +88,7 @@ describe('PrismaUserRepository (Phase 2 - unified table)', () => {
           resourceType: 'User',
           scimId: SCIM_ID_1,
           userName: 'alice',
-          endpoint: { connect: { id: 'ep-1' } },
+          endpointId: 'ep-1',
         }),
       });
       expect(result.id).toBe('res-1');

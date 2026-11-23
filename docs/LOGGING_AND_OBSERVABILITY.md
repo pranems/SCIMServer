@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.69`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.70`
 
 **Unreleased shutdown correction, November 19:** local source now closes active
 log-stream responses, subscriptions and keepalive timers before the HTTP server

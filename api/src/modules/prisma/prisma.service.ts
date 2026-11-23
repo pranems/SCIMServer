@@ -39,8 +39,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // stay under the database's max_connections. Re-derive it whenever the
     // replica ceiling or the DB tier changes.
     const db = resolveRuntimeConfig((k) => process.env[k]).groups.database;
+    const url = new URL(effectiveUrl);
+    const configuredOptions = url.searchParams.get('options') ?? process.env.PGOPTIONS ?? '';
+    const hasUrlOptions = url.searchParams.has('options');
+    url.searchParams.delete('options');
     const pool = new pg.Pool({
-      connectionString: effectiveUrl,
+      connectionString: hasUrlOptions ? url.toString() : effectiveUrl,
+      // Pin the application pool at connection startup, not once per write.
+      options: `${configuredOptions} -c default_transaction_isolation=read\\ committed`.trim(),
       max: db.poolMax.effective as number,
       connectionTimeoutMillis: db.poolAcquireTimeoutMs.effective as number,
       idleTimeoutMillis: db.poolIdleTimeoutMs.effective as number,

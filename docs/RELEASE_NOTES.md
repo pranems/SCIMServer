@@ -1,6 +1,6 @@
 # SCIMServer release notes
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.69`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.70`
 
 These curated notes explain what changes for operators and integrators, how to
 upgrade, and what remains limited. The [engineering changelog](../CHANGELOG.md)
@@ -12,6 +12,31 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). These notes are 
 user-facing companion, not a second independent version ledger or a raw commit
 log. Versions remain in the pre-1.0 development series; inspect compatibility
 notes rather than assuming that a patch label makes every rollback lossless.
+
+## 0.55.70
+
+**Status: independently source-reviewed candidate, not published or deployed.**
+
+Successful POST User creation now requires four foreground PostgreSQL client
+queries instead of eight. The database still checks the endpoint foreign key,
+and asynchronous request logging remains separate. Username uniqueness remains
+an atomic repository responsibility; duplicate usernames keep their existing
+409 response and diagnostic fields.
+
+The existing application connection pool explicitly selects READ COMMITTED
+at connection startup. Database- or role-level defaults no longer choose the
+application's default isolation. Existing `DATABASE_URL` startup options and
+`PGOPTIONS` are preserved, but the application isolation option is appended
+last. Explicit stronger isolation requested through Prisma's transaction API
+still works. Pool capacity, acquisition deadlines, ordered locks and the fresh
+post-lock snapshot are unchanged.
+
+Focused units, actual PostgreSQL isolation/race tests and an HTTP four-query
+regression pass. The HTTP regression rejects a restored redundant isolation
+statement with five queries. API/web version metadata is verified CI output
+with an unchanged dependency graph. Other latency limits, complete final-source
+qualification, shipping provenance and dev deployment remain open.
+See [measurements, comparison scope and execution RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23).
 
 ## 0.55.69
 

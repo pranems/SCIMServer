@@ -1,8 +1,8 @@
 # SCIMServer Documentation Index
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-20 - **Product version:** `0.55.69`
+> **Status:** User-facing reference - **Last verified:** 2026-11-20 - **Product version:** `0.55.70`
 
-> **Version:** 0.55.69 - **Updated:** 2026-11-20
+> **Version:** 0.55.70 - **Updated:** 2026-11-20
 > 6 presets - **39 endpoint settings controls** (20 boolean flags + 3 other typed settings + 16 numerics) - profile-driven User, Group, and custom ResourceType forms
 
 **Latest release:** [0.55.67 user release notes, cumulative since 0.55.20](RELEASE_NOTES.md#05567)
@@ -12,6 +12,12 @@ Dev and canary are deployed; customer production remains on 0.55.20.
 Performance remains unqualified under the migration-only exception.
 
 ### Start here
+
+**Unreviewed POST User performance correction:** [Measured four-client-query
+path, startup isolation, HTTP regression and execution RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23)
+distinguishes foreground client calls from internal FK work and asynchronous
+logging. The 0.55.70 candidate is not shipped or deployed; other performance
+and release gates remain open.
 
 **Unreleased live-test evidence correction:** [Redaction boundary and RCA](LIVE_EVIDENCE_REDACTION.md)
 documents the source-only protection of console and durable evidence while

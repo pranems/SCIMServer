@@ -1,13 +1,28 @@
 # SCIMServer - Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
-> **Version**: 0.55.69
-> **Last Updated**: November 20, 2026
-> **Last verified:** 2026-11-20
+> **Version**: 0.55.70
+> **Last Updated**: November 23, 2026
+> **Last verified:** 2026-11-23
 
 ---
 
 ## Active Delivery Process
+
+**Current source-reviewed performance correction:** successful POST User now uses
+explicit READ COMMITTED startup options in the existing pool, scalar-FK
+INSERT/RETURNING and conflict-only username diagnostics. Four foreground
+client queries are measured through actual standalone HTTP; the asynchronous
+log write is separate. A retained nested-server diagnostic additionally counts
+the foreign-key check. Six focused unit suites pass 255 tests after two
+independent review controls (parent receipt: 253); four actual
+PostgreSQL suites pass 123 tests; the new HTTP budget contract passes after
+a real five-query negative control. Version 0.55.70 metadata is exact CI
+output from master 9d25558d, with a verified unchanged dependency graph.
+Independent source review found no high-confidence production defect and added
+no production edits. This checkout is not merged, shipped or deployed. The following
+integration records retain their earlier scopes.
+See [current measurements, release boundary and RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23).
 
 **Current integration boundary:** the evidence correction is committed at
 `62440b1d`, including actual-helper nested-script state RED/GREEN coverage
