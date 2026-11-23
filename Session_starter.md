@@ -1,5 +1,30 @@
 ## SCIMServer - Condensed Session Memory
 
+### Root Markdown tooling security recovery, 2026-11-23
+
+Separate c52-based tooling-only rollback unit. Root `markdown-it` floor moves
+from `^14.3.0` to `^14.3.3` after observed manifest RED/GREEN. Patched release
+is older than seven days. Existing baseline seeding prepares owned packages
+without lock writing; all installed identities are unchanged except Markdown
+14.3.0 to 14.3.3, with unchanged Mermaid parser 1.2.1 ownership after hoisting.
+Actual root `npm ls --all` and 23 artifact contracts pass. Original
+unseeded graph drift was rejected and all tracked locks remain unchanged.
+Normal bootstrap all 29 Fast gates passed at 8d9eebdc in 738.9 seconds:
+220 API suites/6,273 tests, reduced HTTP 120 suites/2,519 tests and 45 known
+skips. Root-only CI run 45275004952 produced authenticated artifact14865984488;
+complete package-map review admits only Markdown and exact parser relocation.
+Fresh locked root installation preserves SHA-256
+80a519be2009bd87db82fcdd5f6cff09dcb0bd9ceec2eb9fd8f178a674f75bc4.
+Two Markdown unit tests pass; root audit now has zero High/Critical,
+one Moderate and two Low. Final normal gates/CI/review remain pending.
+Application version/source,
+API/web locks, runtime fixtures, Docker Desktop and other worktrees unchanged.
+See [root tooling recovery and RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Root Markdown manifest/lock RED/GREEN, 23 artifact/installed-tree contracts and authenticated CI root lock accepted locally. Fresh npm ci preserves bytes; zero High/Critical root audit. Bootstrap normal Fast passed; final exact-tip gates/review pending, not shipping acceptance. |
+
 ### POST User correction in qualification, 2026-11-23
 
 The successful path now uses explicit READ COMMITTED connection startup in

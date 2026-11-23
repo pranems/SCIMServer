@@ -23,6 +23,22 @@ function check(name, action) {
   }
 }
 try {
+  check('patched root Markdown installation and complete dependency tree are valid', () => {
+    const installed = JSON.parse(readFileSync(new URL('../node_modules/markdown-it/package.json', import.meta.url), 'utf8'));
+    assert.equal(installed.version, '14.3.3');
+    const executable = process.platform === 'win32' ? process.env.ComSpec : 'npm';
+    assert.ok(executable, 'Windows command interpreter must be available');
+    const args = process.platform === 'win32'
+      ? ['/d', '/s', '/c', 'npm ls --all --json']
+      : ['ls', '--all', '--json'];
+    const result = spawnSync(executable, args, {
+      cwd: fileURLToPath(new URL('../', import.meta.url)),
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).dependencies['markdown-it'].version, '14.3.3');
+  });
   check('workflow accepts root selection', () => {
     assert.ok(workflow.on.workflow_dispatch.inputs.workspace.options.includes('root'));
   });
