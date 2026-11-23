@@ -32,11 +32,16 @@ version. Physical placement is recorded rather than hidden.
 | Plain no-lock installation re-resolved unrelated root packages | Tooling / Medium | Rejected as final preparation. Reuse existing baseline seeding, then verify every package identity/version and actual owner tree. No tracked lock changed. | Explicit installed-tree union review / seeded preparation before install |
 | Exact-path bootstrap check rejected unchanged parser hoisting | Test correctness / Low | Preserve the physical diff, compare complete package identity multiplicity and verify Mermaid's actual parser owner/version plus `npm ls --all`. This distinguishes layout from dependency changes without waiving existing guards. | Private bootstrap validator / semantic owner-tree check |
 | Fresh worktree lacked js-yaml, vite and jsdom | Environment / Low | Actual chosen checks failed first; normal owned locked installs restored tools. Root/API/web lock bytes stayed unchanged. | Validation startup / tool availability |
+| First normal Fast bootstrap failed on missing generated Prisma client | Environment / Low | Fresh `npm ci` does not generate this checkout's client. Existing `npm run prisma:generate` generates Prisma 7.8.0 locally without connecting to a database; the exact failed TypeScript build then passes. Preserve the failed push receipt and retry normal hooks, not source/test suppression. | First Fast build / fresh-worktree prerequisite before Fast |
 
 Final acceptance still requires authenticated root-only CI artifact,
 complete union/provenance/publication-age review, fresh locked installation,
 zero High/Critical root audit and normal exact-tip gates/review. The
 bootstrap is not a shipping or final-security acceptance.
+
+Fresh-worktree prerequisite: generate the owned Prisma client before a Fast
+bootstrap hook. Validate already owns this generation step. Do not copy
+another checkout's generated client or share linked dependencies.
 
 **Self-improvement: applied.** The default API unit regression guards the
 root Markdown floor; locked/installed controls will accompany the final
