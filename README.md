@@ -1492,6 +1492,12 @@ pwsh ./lexmark-live-test.ps1
 pwsh ./full-validation-pipeline.ps1
 ```
 
+The live runner mutates global settings and shared logs as well as its owned
+endpoint fixtures. Endpoint ownership cleanup alone does not make it safe for a
+preserved deployment. Read the [ownership contract and remaining global mutation
+blockers](docs/LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md) before authorizing execution.
+Its focused PowerShell contract runs offline without starting the live runner.
+
 ### Coverage Thresholds
 
 | Metric | Threshold |

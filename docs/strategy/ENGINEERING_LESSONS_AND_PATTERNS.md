@@ -196,6 +196,35 @@ teardown still deletes it. A safe negative control must retain its known-owned
 handle in finally, exercise the actual registration path with an original
 ID, and prove that rejection leaves that handle unchanged and the original
 readable. This closes a failure-path gap that successful setup runs cannot expose.
+
+The same rule applies to live-script teardown. A naming prefix or inventory
+difference cannot prove ownership, particularly during concurrent creation.
+Capture complete originals, register successful response IDs before recording
+or returning them, and reconcile retained handles only. Require a successful
+DELETE and exact-ID absence; later retries cannot erase earlier failure evidence.
+Test every actual trap rather than a proxy: PowerShell stores top-level traps
+separately from ordinary syntax-tree statements. Applied with 206 offline
+assertions in the [live ownership correction and RCA](../LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+Transport-shaped controls must deserialize real JSON rather than rely solely
+on PowerShell literals: JSON integer counts are Int64, while an ordinary `1`
+literal is Int32. Both positive empty/nonempty inventories and fail-closed
+Boolean/string/fraction/overflow/count-mismatch cases now exercise admission.
+Execute an actual ampersand-invoked child file as well as a dot-sourced helper.
+Inherited PowerShell functions resolve `$script:` against that child, which
+can lose root-owned state. A single explicitly named run registry now retains
+all ownership state across both wrappers and callers. The hard regression
+gate requires child mutation admission/rejection, exact cleanup and sticky
+failure retention in the parent; a dot-sourced proxy is not equivalent.
+When the actual fatal boundary calls `exit`, replay it in a separately owned
+process and assert the failure exit plus exact cleanup transport outcomes.
+An in-process exception assertion cannot model process termination. Composed
+projections must load the actual dependencies and initializers of both changes.
+Absence from original inventory is not admission to mutate: concurrent unowned
+UUIDs require rejection for POST, PUT and PATCH too. If a negative HTTP probe
+needs an exception, bound it to the actual checked sentinel, route and method,
+consume admission once, retain a known-owned cleanup handle and preserve the
+original HTTP assertion. An armed baseline cannot be resnapshotted even while
+the owned-handle registry is empty.
 The same invariant belongs in the shared fixture creator before optional
 settings, credentials or users are seeded. Its routed negative control returns
 an already-known owned ID and proves zero writes reach it, without endangering

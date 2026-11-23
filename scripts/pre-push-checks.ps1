@@ -311,6 +311,10 @@ Invoke-Gate -Name 'deploy: workflow run selector' -WorkingDir $repoRoot -Action 
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'scripts/test/select-github-workflow-run.contract.ps1') 2>&1 | Out-Host
 }
 
+Invoke-Gate -Name 'live: exact endpoint fixture ownership' -WorkingDir $repoRoot -Action {
+    pwsh -NoProfile -File (Join-Path $repoRoot 'scripts\test\live-endpoint-ownership.contract.ps1') 2>&1 | Out-Host
+}
+
 Invoke-Gate -Name 'runtime: independent engine and standalone contracts' -WorkingDir $repoRoot -Action {
     pwsh -NoProfile -File (Join-Path $PSScriptRoot 'test-container-runtime.ps1') 2>&1 | Out-Host
 }

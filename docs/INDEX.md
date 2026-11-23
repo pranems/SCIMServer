@@ -13,11 +13,16 @@ Performance remains unqualified under the migration-only exception.
 
 ### Start here
 
-**Unreviewed POST User performance correction:** [Measured four-client-query
+**Source-reviewed POST User performance correction:** [Measured four-client-query
 path, startup isolation, HTTP regression and execution RCA](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23)
 distinguishes foreground client calls from internal FK work and asynchronous
 logging. The 0.55.70 candidate is not shipped or deployed; other performance
 and release gates remain open.
+
+**Live fixture safety:** [Endpoint ownership correction and remaining global
+mutation blockers](LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md) documents complete original
+UUID capture, registered response-ID cleanup, mock lifecycle evidence and the
+unstarted preserved-dev live boundary.
 
 **Unreleased live-test evidence correction:** [Redaction boundary and RCA](LIVE_EVIDENCE_REDACTION.md)
 documents the source-only protection of console and durable evidence while

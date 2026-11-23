@@ -55,6 +55,61 @@ See [the exact historical blocker, commands and RCA](docs/CUSTOMER_UPGRADE_PERFO
 |---|---|
 | 2026-11-23 | Actual-client offline POST User regression reproduces 8/max4 and optimistic 5/max4. Stop at scoped-isolation/transaction architecture blocker; production behavior and all thresholds unchanged. |
 
+### Reviewed master integration, 2026-11-23
+
+This performance branch integrates reviewed master `9d25558d`, including
+normally merged ownership PR #281. Both ownership and evidence corrections
+are retained. The records below describe their original capture-time scope;
+their earlier publication-pending statements do not undo the reviewed merge.
+
+### Historical combined integration, 2026-11-23
+
+Ownership commit `73a228a6` composes normally reviewed PR #280, merged at
+`4b4ae0a3` after all exact-tip checks passed. Its normal evidence Fast push
+passed in 753 seconds. Ownership retains 206 focused assertions; evidence
+retains 213 PowerShell assertions and nine actual-helper nested-flow Jest
+tests. Combined integration tests and normal ownership publication remain
+required. No shipping or Azure mutation; global preservation and performance
+remain separate blockers. Records below retain their capture-time scope.
+
+### Integration boundary
+
+The offline ownership source is committed at `f7f28c7e` and now integrates
+normally reviewed PR #279, merged at `8b6335f1`. The product remains its
+unreleased 0.55.69 candidate; this runner-only correction changes no dependency
+or application behavior. The two captured source-stage records below retain
+their original dates and authority. Normal ownership publication/review and
+combined lifecycle/evidence qualification remain required.
+
+### Offline endpoint fixture ownership, 2026-11-20
+
+| Date | Summary |
+|---|---|
+| 2026-11-20 | Applied an uncommitted, offline-only ownership correction on `vprane/scimserver/containers-live-fixture-ownership-20261121`, base `554f42023fdde30918ef378987cc8f3135e4ed3a`, no upstream. |
+
+- [x] ✅ COMPLETED: Complete original UUID capture, register-before-recorder
+  creation, retained owned cleanup, exact-ID absence and fatal cleanup evidence.
+- [x] ✅ COMPLETED: Focused mock/JSON/child contract GREEN, 206 assertions (previously 184/133; initially 104); actual pinned
+  unsafe sweeps reproduce RED. Shared pure gate/customization contracts pass.
+- [x] ✅ COMPLETED: Independent-review RED controls close concurrent unknown
+  POST/PUT/PATCH admission and armed-baseline replacement. The two actual sentinel
+  rejection probes retain their HTTP 404 assertions through checked single-use
+  admission with a known-owned handle; no broad unknown-ID permission remains.
+- [ ] Review separate global mutation and evidence-redaction outcomes before
+  any preserved-dev live execution. Full live execution has not started.
+
+An actual ampersand-invoked child reproduced root ownership state loss missed
+by the dot-sourced helper proxy. The shared run registry now passes both child
+transport lifecycles, negative original/unknown controls and parent-visible
+sticky cleanup failure checks. The old normal push was cancelled rather than
+publishing that known-bad source; the corrected tip still needs normal gates.
+
+Runtime is offline for this task. No network, runtime, authentication,
+dependency, commit/push/PR or deployment operations were authorized or performed.
+The separate uncommitted redaction worktree was not copied. See
+[ownership behavior, integration notes and confirmed RCA](docs/LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+Historical runtime qualification below does not describe this task's authority.
+
 ### Current integration boundary
 
 The evidence correction is committed at `62440b1d` after a normal API unit
