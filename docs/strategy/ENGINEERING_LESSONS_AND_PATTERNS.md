@@ -1,5 +1,50 @@
 # Engineering lessons and patterns - the self-improving ledger
 
+## Live evidence must branch before serialization (2026-11-21, unreleased)
+
+The live runner's header masking did not protect plaintext OAuth/admin bodies,
+error/URL text or a token-prefix success message. A pure PowerShell RED
+contract reproduced the evidence leak before any complete live run. The
+correction keeps original HTTP values separate from sanitized evidence copies,
+protects output before truncation, preserves nonsecret metadata and
+default-runs the boundary contract at pre-push. Independent per-key sentinels
+are essential: one shared sentinel can hide a missing key rule after another
+field registers the same value. See
+[policy, confirmed RCA and review obligations](../LIVE_EVIDENCE_REDACTION.md).
+The helper is one cohesive evidence concern; further abstractions are not
+justified. Runtime qualification and normal review/merge remain outstanding.
+Independent review exposed a lifecycle escape: the first-trap-only child
+test passed while the actual two-trap topology skipped cleanup. Execute every
+actual root trap in one scope and assert cleanup, protected callback failures,
+unchanged caught errors and failure exit status. The fix consolidates fatal
+handling into one authoritative trap. Existing cleanup selection still lacks
+proof of ownership and blocks original-data dev live execution; address that
+as a separate coherent change rather than expanding this redaction fix.
+The userinfo follow-up revealed a second discovery escape: masking recognized
+authentication material in its own URI field is insufficient unless it also
+enters the material set before copying earlier siblings. Independent
+empty-registry, unique-sentinel controls now cover raw/encoded userinfo and
+password echoes across hierarchical URI schemes, preserving standalone
+usernames and metadata. The same cohesive text boundary owns discovery and
+masking; scheme-specific transport abstractions are unnecessary.
+Fresh-registry parent checks subsequently exposed missing Bearer/Basic
+discovery, an overbroad marker-substring exemption and username-only URI
+metadata loss. Strengthen the same evidence pattern: every recognized mask
+source needs a positive material-discovery sibling control and a negative
+nonsecret-metadata control. Marker exemptions must match only the exact
+canonical marker, with unique-sentinel assertions rejecting partial
+redaction. URI and decoded Basic credential pairs share one real discovery
+boundary, while password-free account names remain metadata. These claims
+are now exercised by 213 passing pure PowerShell assertions, retaining the
+complete prior trap and evidence controls. No ownership redesign is included.
+The normal API hook subsequently exposed an extracted helper harness that had
+not loaded the new redactor. Loading the actual dependency revealed a real
+nested-script state escape: PowerShell `$script:` resolves against the calling
+child script. A shared run registry must use the same explicitly owned root
+scope as its collector. The strengthened nested-flow test proves step order,
+redacted evidence, retained metadata and unchanged original values with the
+real dependency. Helper-only GREEN is not evidence about nested callers.
+
 > **What this is.** The **central, continually-updated** knowledge base of cross-cutting engineering patterns learned from real issues on this codebase. It is a *living* doc: it is **appended to** every time a fix is confirmed to resolve an issue that generalizes, and it is **reviewed and re-pruned** on the Stage X audit cadence. It is the layer between raw per-build issue ledgers and hard standing rules:
 >
 > ```
