@@ -201,6 +201,39 @@ $script:createId = $owned
 Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers } 'Duplicate owned registration must reject without replacing its handle.'
 Invoke-OrphanReconciliation
 
+foreach ($json in @(
+    '{"totalResults":0,"endpoints":[]}',
+    '{"totalResults":1,"endpoints":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}]}'
+)) {
+    Reset-Mock
+    $script:inventory = $json | ConvertFrom-Json -ErrorAction Stop
+    Assert ($script:inventory.totalResults -is [long]) 'JSON inventory counts must exercise native Int64 deserialization.'
+    Initialize-LiveEndpointOwnership
+    Assert $script:orphanGuardArmed 'Complete JSON-deserialized inventory must arm ownership.'
+    Assert ($script:preexistingEndpointIds.Count -eq $script:inventory.endpoints.Count) 'JSON inventory must retain every original UUID.'
+    if ($script:inventory.totalResults -eq 1) {
+        Assert ($script:preexistingEndpointIds.Contains($original)) 'JSON inventory must retain the exact original UUID.'
+    }
+}
+
+foreach ($countJson in @(
+    'true', 'false', '"1"', '1.5', '1.0', '-1',
+    '2147483648', '9223372036854775807', '9223372036854775808',
+    '0', '2'
+)) {
+    Reset-Mock
+    $script:inventory = (
+        '{"totalResults":' + $countJson +
+        ',"endpoints":[{"id":"' + $original + '"}]}'
+    ) | ConvertFrom-Json -ErrorAction Stop
+    Expect-Failure { Initialize-LiveEndpointOwnership } 'Invalid JSON count must fail closed.'
+    Assert (-not $script:orphanGuardArmed) 'Invalid JSON count must leave ownership unarmed.'
+    Expect-Failure {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
+    } 'Invalid JSON count must block fixture creation.'
+    Assert (@($script:calls | Where-Object { $_.Method -eq 'POST' }).Count -eq 0) 'Invalid JSON count must reject before creation transport.'
+}
+
 foreach ($badId in @($null, '', 'malformed', [guid]::Empty.ToString())) {
     Reset-Mock
     Initialize-LiveEndpointOwnership

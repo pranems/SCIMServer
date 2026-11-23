@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   teardown assignment. Replace name sweeps and inventory-difference deletion
   with retained owned handles; require successful DELETE and exact-ID absence.
   Cleanup failures remain fatal even after a later successful retry. The new
-  default PowerShell contract passes 133 assertions (previously 104) and reproduces both actual
+  default PowerShell contract passes 184 assertions (previously 133; initially 104) and reproduces both actual
   unsafe baseline lifecycles with mocks. Shared gate/customization contracts pass.
   Product version, dependencies, API/web suites and live counts are unchanged.
   No full live runner, network or deployment was executed. Preserved-dev execution
@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two actual all-zero-UUID schema/resource-type POST rejection probes have
   explicit single-use admission after exact 404 preflight, with an active owned
   cleanup handle and unchanged HTTP 404 assertions and transport forwarding.
+- Actual JSON-deserialized inventory controls reproduce and fix the Int64
+  transport mismatch missed by Int32 mock literals. Both native integral types
+  remain bounded, nonnegative and equal to the full array length; Boolean,
+  string, floating-point, oversized and mismatched counts fail before creation.
 
 ### Targeted CI dependency artifacts
 

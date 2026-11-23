@@ -19,7 +19,7 @@ their original authority, not a prohibition on subsequent normal source review.
 **Offline fixture correction, 2026-11-20:** The existing
 `vprane/scimserver/containers-live-fixture-ownership-20261121` branch at base
 `554f42023fdde30918ef378987cc8f3135e4ed3a` has an uncommitted endpoint ownership
-correction with 133 passing mock lifecycle assertions (previously 104) and passing shared pure
+correction with 184 passing mock/JSON lifecycle assertions (previously 133; initially 104) and passing shared pure
 contracts. Actual pinned baseline sweep/reconciliation reproduce unsafe deletes
 with mocks. Complete original inventory and exact new response IDs replace
 name/difference deletion. Preserved-dev live execution has not started; global

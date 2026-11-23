@@ -17,7 +17,7 @@ combined lifecycle/evidence qualification remain required.
 
 - [x] ✅ COMPLETED: Complete original UUID capture, register-before-recorder
   creation, retained owned cleanup, exact-ID absence and fatal cleanup evidence.
-- [x] ✅ COMPLETED: Focused mock contract GREEN, 133 assertions (previously 104); actual pinned
+- [x] ✅ COMPLETED: Focused mock/JSON contract GREEN, 184 assertions (previously 133; initially 104); actual pinned
   unsafe sweeps reproduce RED. Shared pure gate/customization contracts pass.
 - [x] ✅ COMPLETED: Independent-review RED controls close concurrent unknown
   POST/PUT/PATCH admission and armed-baseline replacement. The two actual sentinel

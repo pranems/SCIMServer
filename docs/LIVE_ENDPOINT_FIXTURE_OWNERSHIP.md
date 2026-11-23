@@ -145,7 +145,7 @@ pwsh -NoProfile -File scripts\test\copilot-customizations.contract.ps1 -GitTree 
 | Actual pinned baseline reconciliation | RED: mock concurrent unknown UUID was deleted |
 | Independent-review unknown mutation controls | RED before correction: both wrappers admitted POST, PUT and PATCH against a concurrent unknown UUID |
 | Armed baseline lifetime control | RED before correction: reinitialization replaced the original UUID inventory when no owned handles existed |
-| Current default ownership contract | GREEN, 133 assertions; previously 104 |
+| Current default ownership contract | GREEN, 184 assertions; previously 133; initially 104 |
 | Shared gate-walker contract | PASS, all assertions |
 | Shared customization contract on HEAD | PASS, all assertions; no customization file changed |
 | PowerShell syntax and editor diagnostics | PASS, five changed/new PowerShell files parse; no reported editor errors |
@@ -182,8 +182,9 @@ The default pre-push gate and Stage 1 gate walker register this focused contract
 | Unknown mutation admission escaped 104 controls / High | To preserve nonexistent-ID HTTP probes, the first correction allowed every non-original UUID for POST/PUT/PATCH. A concurrent unowned endpoint could therefore be mutated. Admission now requires a registered owned handle; only two exact, checked, single-use all-zero-UUID POST rejection probes are exceptional. | Independent review caught this before runtime; new pre-fix RED records all six wrapper/method combinations. The earlier tests positively asserted arbitrary unknown forwarding instead of distinguishing actual rejection probes. Default controls now enforce that distinction and preserve both HTTP 404 assertions. |
 | Armed inventory could be replaced without handles / High | The initialization guard checked only retained-handle count. Before any creation, a second snapshot could erase the original baseline. It now also rejects whenever ownership is already armed, before reading another snapshot. | Independent review prompted an actual pre-fix RED proving baseline replacement. Default controls require rejection, original set identity and continued armed state. |
 | Probe-source assertion initially searched only direct statements / Low | The actual rejection try blocks are nested in the syntax tree. Direct `EndBlock.Statements` lookup found none, so the new assertion failed. The assertion now locates actual try blocks recursively and still requires each unchanged HTTP 404 comparison. | Focused contract caught this before final GREEN; no source assertion or HTTP expectation was relaxed. |
+| Native JSON inventory counts rejected / High | The inventory guard required Int32, but the real JSON transport deserializes integer counts as Int64. Hand-built Int32 mock inventories masked the startup regression. The guard now accepts Int32/Int64 only, requires a nonnegative count within Int32 range, and preserves exact array-count equality. | Independent review identified the transport mismatch. Real JSON-deserialized empty/nonempty inventories reproduced RED before the fix; the focused contract then passed 184 assertions, previously 133. Added controls reject Boolean, string, floating-point, negative, oversized and mismatched counts before fixture creation reaches transport. |
 
-No commit SHA is assigned to these resolutions because committing was not
+No commit SHA was assigned at the original offline stage because committing was not
 authorized. This ledger was reconciled against this task's observed command
 failures and inspected changes, not earlier session recollections or an invented
 live run. No claim of full historical transcript reconciliation is made.

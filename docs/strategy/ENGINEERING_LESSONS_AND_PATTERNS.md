@@ -158,8 +158,12 @@ Capture complete originals, register successful response IDs before recording
 or returning them, and reconcile retained handles only. Require a successful
 DELETE and exact-ID absence; later retries cannot erase earlier failure evidence.
 Test every actual trap rather than a proxy: PowerShell stores top-level traps
-separately from ordinary syntax-tree statements. Applied with 133 offline
+separately from ordinary syntax-tree statements. Applied with 184 offline
 assertions in the [live ownership correction and RCA](../LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
+Transport-shaped controls must deserialize real JSON rather than rely solely
+on PowerShell literals: JSON integer counts are Int64, while an ordinary `1`
+literal is Int32. Both positive empty/nonempty inventories and fail-closed
+Boolean/string/fraction/overflow/count-mismatch cases now exercise admission.
 Absence from original inventory is not admission to mutate: concurrent unowned
 UUIDs require rejection for POST, PUT and PATCH too. If a negative HTTP probe
 needs an exception, bound it to the actual checked sentinel, route and method,

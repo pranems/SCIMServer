@@ -15,7 +15,8 @@ function Initialize-LiveEndpointOwnership {
     $inventory = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Headers $headers -ErrorAction Stop
     if ($null -eq $inventory -or $null -eq $inventory.endpoints -or
         $inventory.endpoints -isnot [array] -or
-        $inventory.totalResults -isnot [int] -or $inventory.totalResults -lt 0 -or
+        ($inventory.totalResults -isnot [int] -and $inventory.totalResults -isnot [long]) -or
+        $inventory.totalResults -lt 0 -or $inventory.totalResults -gt [int]::MaxValue -or
         $inventory.totalResults -ne $inventory.endpoints.Count) {
         throw 'Original endpoint inventory is malformed or incomplete; fixture creation is blocked.'
     }
