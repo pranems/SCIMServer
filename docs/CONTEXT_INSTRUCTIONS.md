@@ -9,12 +9,43 @@
 
 ## Active Delivery Process
 
-**Unreleased root-tooling security recovery:** `markdown-it` manifest floor
+**Unreleased live-harness recovery:** The isolated follow-up retains all prior
+redaction controls and now passes 255 assertions, with nine nested-script
+wiring tests and 224 ownership checks. It caches material preparation,
+reduces measured text-loop cost, traverses actual dictionary keys and
+preserves empty/singleton and PowerShell-wrapped arrays. Real JWKS and
+downloaded log-array admission, byte-response registration and actual profile
+early/finally cleanup controls precede full execution. The PostgreSQL runner
+completed 1,845/1,845 assertions with exit zero and exact cleanup. A private
+outer timestamp parse failed on redacted evidence; separate exact-target,
+file-write-window and source-hash reconciliation retains that failed receipt.
+Fresh InMemory also completes 1,845/1,845 assertions with outer/child exit zero
+and exact cleanup. No parent fixture remains; shipping and deployment remain
+blocked by separate acceptance requirements.
+The initial root tooling graph separately reported a Markdown-it High.
+Separate #284 normally merged at `36d07884`, with an authenticated CI lock,
+zero High/Critical root audit, 29 final normal Fast gates, all six exact-tip
+checks and a recorded source self-review. Original harness tip `a1f00397`
+also passes 29 normal Fast gates and all six PR checks. The integration
+preserves both changes and must pass normal gates and exact new-tip CI before
+its own merge. The harness changes no dependencies; the merged root repair
+supplies its own authenticated lock. Direct review found no unresolved defect.
+No independent approval or all-security-green claim is made. The actual
+repository policy/protection requires green exact-tip CI and resolved review
+findings, not an external approval or a specific review service. Copilot
+quota exhaustion is retained as a service limitation, not an extra merge gate.
+Application version 0.55.70, token lifetimes, HTTP values and assertions remain
+unchanged. See [RCA and qualification limits](LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+
+**Merged root-tooling security recovery:** `markdown-it` manifest floor
 is `^14.3.3` after observed manifest/lock RED/GREEN. Authenticated root-only
 CI run45275004952 artifact is imported unchanged; fresh npm ci preserves its
 bytes. Two focused units and 23 artifact/installed-tree controls pass; root
-audit now has zero High/Critical, one Moderate and two Low. Normal bootstrap
-Fast passed all29 gates; final gates/CI/review remain pending.
+audit now has zero High/Critical, one Moderate and two Low. Final normal Fast
+passes all29 gates, API220/6274 and reduced HTTP2519/45 known skips. All six
+exact-tip checks pass, including web126/1664, test image/smoke and gated Trivy.
+Source self-review is recorded as COMMENTED, not independent approval.
+Normal PR284 merged at `36d07884`; shipping and deployment remain separate.
 API/web dependencies and application version
 0.55.70 remain unchanged. See
 [root-tooling RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).

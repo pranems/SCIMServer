@@ -60,6 +60,8 @@ function Reset-Mock {
     $script:deleteStatus = 204
     $script:absenceStatus = 404
     $script:transportFailure = $false
+    $script:webContentKind = 'string'
+    $script:lastWebResponse = $null
     $script:failOwnedRead = $false
     $script:probeStatus = 404
     $script:probeReuseRejected = $false
@@ -105,7 +107,15 @@ function Invoke-MockWeb {
     $script:calls.Add([pscustomobject]@{ Uri = $Uri; Method = $m; Headers = $Headers; Body = $Body; ContentType = $ContentType; ErrorAction = $PSBoundParameters['ErrorAction']; Skip = $SkipHttpErrorCheck; Redirect = $AllowInsecureRedirect })
     if ($script:transportFailure) { throw 'mock transport unavailable' }
     $status = if ($m -eq 'DELETE') { $script:deleteStatus } elseif ($m -eq 'POST') { $script:createStatus } else { $script:absenceStatus }
-    return [pscustomobject]@{ StatusCode = $status; Headers = @{}; Content = (@{ id = $script:createId } | ConvertTo-Json) }
+    $content = @{ id = $script:createId } | ConvertTo-Json
+    switch ($script:webContentKind) {
+        'bytes' { $content = [Text.Encoding]::UTF8.GetBytes($content) }
+        'invalid-json' { $content = [Text.Encoding]::UTF8.GetBytes('{ invalid JSON') }
+        'invalid-utf8' { $content = [byte[]]@(0xc3, 0x28) }
+        'unsupported' { $content = [pscustomobject]@{ id = $script:createId } }
+    }
+    $script:lastWebResponse = [pscustomobject]@{ StatusCode = $status; Headers = @{}; Content = $content }
+    return $script:lastWebResponse
 }
 . ([scriptblock]::Create($projection))
 $baseUrl = 'http://fixture.invalid'
@@ -244,6 +254,59 @@ foreach ($countJson in @(
     } 'Invalid JSON count must block fixture creation.'
     Assert (@($script:calls | Where-Object { $_.Method -eq 'POST' }).Count -eq 0) 'Invalid JSON count must reject before creation transport.'
 }
+
+foreach ($kind in @('string', 'bytes')) {
+    Reset-Mock
+    Initialize-LiveEndpointOwnership
+    $script:webContentKind = $kind
+    $response = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
+    Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.ContainsKey($owned)) 'String and UTF-8 byte create responses must register the exact owned UUID.'
+    $representationUnchanged = ($kind -eq 'bytes' -and $response.Content -is [byte[]]) -or
+        ($kind -eq 'string' -and $response.Content -is [string])
+    Assert ([object]::ReferenceEquals($response, $script:lastWebResponse) -and $representationUnchanged) 'Creation admission must return the original HTTP response and content representation.'
+    $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$owned" -Method DELETE -Headers $headers
+    Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted) 'Byte-aware creation admission must retain exact-ID deletion and 404 readback.'
+}
+foreach ($kind in @('invalid-json', 'invalid-utf8', 'unsupported')) {
+    Reset-Mock
+    Initialize-LiveEndpointOwnership
+    $script:webContentKind = $kind
+    Expect-Failure { Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers } 'Invalid create-response representation must fail closed.'
+    Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles.Count -eq 0) 'Invalid create-response representation cannot register ownership.'
+}
+
+Reset-Mock
+Initialize-LiveEndpointOwnership
+$entraEp = $minimalEp = $rfcEp = $userOnlyEp = $inlineEp = $null
+$patchEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
+$profileLifecycle = @($ast.EndBlock.Statements | Where-Object {
+    $_ -is [Management.Automation.Language.TryStatementAst] -and
+    $_.Body.Extent.Text.Contains('9z.36: Cleaned up PATCH test endpoint')
+})
+Assert ($profileLifecycle.Count -eq 1) 'The actual profile lifecycle cleanup must be uniquely identified.'
+$patchCleanup = @($profileLifecycle[0].Body.Statements | Where-Object {
+    $_ -is [Management.Automation.Language.TryStatementAst] -and
+    $_.Body.Extent.Text.Contains('$patchEp.id') -and $_.Body.Extent.Text.Contains('-Method DELETE')
+})
+Assert ($patchCleanup.Count -eq 1) 'The actual early PATCH-endpoint cleanup must be uniquely identified.'
+. ([scriptblock]::Create($patchCleanup[0].Extent.Text))
+$profileFinally = $profileLifecycle[0].Finally.Extent.Text
+. ([scriptblock]::Create($profileFinally.Substring(1, $profileFinally.Length - 2)))
+Assert (@($script:calls | Where-Object { $_.Method -eq 'DELETE' -and $_.Uri -eq "$baseUrl/scim/admin/endpoints/$owned" }).Count -eq 1) 'Successful profile cleanup must not DELETE the same owned endpoint again in finally.'
+Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted -and
+    $global:__ScimServerLiveEndpointOwnership.endpointCleanupFailures.Count -eq 0) 'Successful early profile deletion must retain its verified handle without a cleanup failure.'
+Reset-Mock
+Initialize-LiveEndpointOwnership
+$patchEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers
+$script:deleteStatus = 500
+$patchEndpointDeleted = $false
+. ([scriptblock]::Create($patchCleanup[0].Extent.Text))
+Assert (-not $patchEndpointDeleted -and $patchEp.id -eq $owned -and
+    -not $global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted) 'Failed early profile deletion must retain its UUID and unsuccessful result.'
+$script:deleteStatus = 204
+. ([scriptblock]::Create($profileFinally.Substring(1, $profileFinally.Length - 2)))
+Assert ($global:__ScimServerLiveEndpointOwnership.ownedEndpointHandles[$owned].Deleted -and
+    $global:__ScimServerLiveEndpointOwnership.endpointCleanupFailures.Count -eq 1) 'Finally must finish failed profile cleanup without erasing its earlier failure.'
 
 foreach ($badId in @($null, '', 'malformed', [guid]::Empty.ToString())) {
     Reset-Mock
