@@ -224,7 +224,13 @@ function Invoke-WebRequest {
     try {
         $result = Microsoft.PowerShell.Utility\Invoke-WebRequest @PSBoundParameters -AllowInsecureRedirect
         $endpointResponse = if ($endpointRequest -and $endpointRequest.Create -and $result.StatusCode -ge 200 -and $result.StatusCode -lt 300) {
-            $result.Content | ConvertFrom-Json -ErrorAction Stop
+            $content = $result.Content
+            if ($content -is [byte[]]) {
+                $content = [Text.UTF8Encoding]::new($false, $true).GetString($content)
+            } elseif ($content -isnot [string]) {
+                throw 'Endpoint creation response JSON must be text or UTF-8 bytes.'
+            }
+            $content | ConvertFrom-Json -ErrorAction Stop
         } else { $null }
         Complete-LiveEndpointRequest -Request $endpointRequest -StatusCode $result.StatusCode -Response $endpointResponse
         Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $result.StatusCode -ResponseHeaders $result.Headers -ResponseBody $result.Content -ErrorMessage $null
@@ -6847,16 +6853,22 @@ Test-Result -Success ($p35.profile.settings.UserSoftDeleteEnabled -eq "True") -M
 Test-Result -Success ($p35.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.35: StrictSchemaValidation present after merged PATCH"
 
 # Cleanup PATCH test endpoint
-try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
-Test-Result -Success $true -Message "9z.36: Cleaned up PATCH test endpoint"
+$patchEndpointDeleted = $false
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method DELETE -Headers $headers | Out-Null
+    $patchEndpointDeleted = $true
+    $patchEp = $null
+} catch {
+    Write-LiveEvidenceFailure $_
+}
+Test-Result -Success $patchEndpointDeleted -Message "9z.36: Cleaned up PATCH test endpoint"
 
 }
 finally {
     # --- Guaranteed cleanup: runs on success AND on any throw in the try above ---
     # Delete all 6 preset endpoints by object (null-guarded so a mid-section throw
-    # before a given endpoint was created is harmless). Idempotent: on the success
-    # path the patch endpoint was already deleted above; a second DELETE 404s and
-    # is swallowed.
+    # before a given endpoint was created is harmless). The successful early
+    # PATCH-endpoint cleanup clears its local reference to prevent a second DELETE.
     Write-Host "`n--- Cleanup: Delete test endpoints ---" -ForegroundColor Cyan
     @($entraEp, $minimalEp, $rfcEp, $userOnlyEp, $inlineEp, $patchEp) | ForEach-Object {
         if ($_ -and $_.id) {

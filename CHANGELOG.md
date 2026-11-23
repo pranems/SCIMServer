@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Live evidence preparation follow-up
+
+- Prepare ordered masking variants only when discovered material grows;
+  reset them for every run. Preserve discovery, exact replacement behavior,
+  original HTTP values and normal authentication lifetimes.
+- Enumerate actual dictionary keys with `PSBase.Keys` so a public JWKS
+  `keys` member cannot corrupt serialization or nested material discovery.
+- Retain 213 prior redaction assertions and add 42 reuse/invalidation,
+  dictionary/discovery, ordered-plan, culture and array-shape controls:
+  255 PASS.
+  Ownership: 206 to 224 PASS. Actual nested-script
+  wiring: one Jest suite, nine tests PASS.
+- A bounded 100-field/30-material probe reduces redundant JSON preparation
+  from 3,000 calls to zero, 1,330.49 ms to 416.16 ms. This is not an API
+  latency claim. The previous full live attempt aborted on token expiry
+  after 633 partial PASS lines. A second attempt was explicitly stopped after
+  1,255 partial PASS lines and one JWKS serialization FAIL, without a final
+  summary; exact disposable cleanup passed. Those failed receipts remain.
+- A separate process-CPU experiment measured 546.875 ms before and 46.875 ms
+  after combining necessary-signal discovery guards and a small in-process
+  .NET ordered replacement loop. Either partial optimization missed the
+  local experimental goal. No CI timing gate or API latency claim is added.
+- Preserve the existing regex culture semantics in the authorization fast
+  guard; a Turkish dotted-I RED/GREEN regression prevents an ordinal precheck
+  from skipping an otherwise matching authorization string.
+- Preserve empty/singleton arrays by assigning dictionary/property values
+  inside branches rather than enumerating them through conditional-expression
+  output. Treat PowerShell-wrapped arrays as enumerables before custom-object
+  properties in both copying and material discovery, avoiding false cycles
+  through collection metadata. Both defects have focused RED/GREEN controls.
+- Decode only the ownership admission copy of a byte HTTP response using
+  strict UTF-8. Preserve the actual response identity/body and existing UUID
+  guards; cover malformed JSON, unsupported types and invalid UTF-8.
+- Clear the PATCH-profile endpoint reference only after successful early
+  deletion. Its `finally` block no longer issues a duplicate DELETE, while
+  the failure path retains retry and sticky failure evidence. The existing
+  9z.36 assertion now checks actual success rather than unconditional true.
+- Four actual JWKS, two downloaded log-array checks, the actual early/finally
+  profile lifecycle and four nested correctness contracts pass before full
+  live execution. Complete PostgreSQL live exits zero: 169 sections,
+  1,845/1,845 assertions, zero failures, 2,060 flow steps, 450.6 seconds.
+  Fresh InMemory also completes: 169 sections, 1,845/1,845 assertions,
+  zero failures, 2,060 flow steps, 421.5 seconds, outer/child exit zero.
+  Exact owned cleanup and listener closure pass for both. The PostgreSQL
+  private outer verifier's redacted-timestamp parsing failure
+  is retained and independently reconciled using exact-target file freshness
+  and source hashes; it is not hidden as a successful original outer exit.
+- This script-only follow-up changes no application version or dependency
+  lock. See [RCA and qualification limits](docs/LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+
 ### POST User query-budget correction, 0.55.69 to 0.55.70 candidate
 
 - Establish the existing application pool's READ COMMITTED default explicitly

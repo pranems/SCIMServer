@@ -9,6 +9,29 @@
 
 ## Active Delivery Process
 
+**Unreleased live-harness recovery:** The isolated follow-up retains all prior
+redaction controls and now passes 255 assertions, with nine nested-script
+wiring tests and 224 ownership checks. It caches material preparation,
+reduces measured text-loop cost, traverses actual dictionary keys and
+preserves empty/singleton and PowerShell-wrapped arrays. Real JWKS and
+downloaded log-array admission, byte-response registration and actual profile
+early/finally cleanup controls precede full execution. The PostgreSQL runner
+completed 1,845/1,845 assertions with exit zero and exact cleanup. A private
+outer timestamp parse failed on redacted evidence; separate exact-target,
+file-write-window and source-hash reconciliation retains that failed receipt.
+Fresh InMemory also completes 1,845/1,845 assertions with outer/child exit zero
+and exact cleanup. No parent fixture remains; shipping and deployment remain
+blocked by separate acceptance requirements.
+The initial root tooling graph separately reported a Markdown-it High.
+Separate #284 now has an authenticated CI lock, zero High/Critical locally
+and all 29 final normal Fast gates plus all six exact-tip PR checks passing.
+Independent review remains pending because Copilot review quota is exhausted.
+This harness rollback unit changes no dependencies or locks and makes no
+all-security-green claim. Direct consolidation review found no new
+high-confidence production defect; normal harness gates/integration remain open.
+Application version 0.55.70, token lifetimes, HTTP values and assertions remain
+unchanged. See [RCA and qualification limits](LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+
 **Current source-reviewed performance correction:** successful POST User now uses
 explicit READ COMMITTED startup options in the existing pool, scalar-FK
 INSERT/RETURNING and conflict-only username diagnostics. Four foreground

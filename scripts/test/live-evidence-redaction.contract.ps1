@@ -255,4 +255,98 @@ foreach ($wrapper in @('Invoke-RestMethod', 'Invoke-WebRequest')) {
 }
 $gateSource = Get-Content (Join-Path $root 'scripts\pre-push-checks.ps1') -Raw
 Assert-Contract ($gateSource.Contains("'live evidence: pre-serialization redaction contract'")) 'Default pre-push gate does not run the pure evidence contract.'
+foreach ($keySet in @(
+    @{ keys = @(@{ kid = 'synthetic-public-key'; kty = 'RSA'; n = 'public-modulus'; e = 'AQAB' }) },
+    [ordered]@{ keys = @(@{ kid = 'synthetic-public-key'; kty = 'RSA'; n = 'public-modulus'; e = 'AQAB' }) },
+    [pscustomobject]@{ keys = @([pscustomobject]@{ kid = 'synthetic-public-key'; kty = 'RSA'; n = 'public-modulus'; e = 'AQAB' }) }
+)) {
+    Initialize-LiveEvidence
+    $before = ConvertTo-Json -InputObject $keySet -Depth 10 -Compress
+    $roundTrip = ConvertTo-LiveEvidenceJson $keySet | ConvertFrom-Json
+    Assert-Contract ($roundTrip.keys -is [array]) 'Singleton JWKS keys evidence changed from an array to an object.'
+    Assert-Contract ($roundTrip.keys.Count -eq 1 -and $roundTrip.keys[0].kid -ceq 'synthetic-public-key') 'A keys-named member corrupted the public JWKS evidence shape.'
+    Assert-Contract ($roundTrip.keys[0].n -ceq 'public-modulus') 'Public key metadata was lost.'
+    Assert-Contract ((ConvertTo-Json -InputObject $keySet -Depth 10 -Compress) -ceq $before) 'JWKS evidence conversion mutated the original response.'
+}
+$arrayShape = ConvertTo-LiveEvidenceJson ([ordered]@{ empty = @(); single = @('public-value') }) | ConvertFrom-Json
+Assert-Contract ($arrayShape.empty -is [array] -and $arrayShape.empty.Count -eq 0) 'Empty evidence array changed to null.'
+Assert-Contract ($arrayShape.single -is [array] -and $arrayShape.single.Count -eq 1 -and $arrayShape.single[0] -ceq 'public-value') 'Singleton scalar evidence array lost its shape.'
+foreach ($size in 0..2) {
+    $items = [object[]]::new($size)
+    for ($index = 0; $index -lt $size; $index++) { $items[$index] = "public-item-$index" }
+    $wrapped = [psobject]::AsPSObject($items)
+    $safeWrapped = ConvertTo-LiveEvidence $wrapped
+    Assert-Contract ($safeWrapped -is [array] -and $safeWrapped.Count -eq $size) 'A PowerShell-wrapped array was mistaken for a custom object or a cycle.'
+}
+Initialize-LiveEvidence
+$wrappedMaterial = [psobject]::AsPSObject(@('synthetic-wrapped-array-material'))
+$safeWrappedMaterial = ConvertTo-LiveEvidence ([ordered]@{
+    earlier = 'synthetic-wrapped-array-material'
+    password = $wrappedMaterial
+})
+Assert-Contract ($safeWrappedMaterial.earlier -ceq '[REDACTED]' -and $safeWrappedMaterial.password -ceq '[REDACTED]') 'Wrapped array material was not discovered for earlier-sibling masking.'
+Assert-Contract ($wrappedMaterial.Count -eq 1 -and $wrappedMaterial[0] -ceq 'synthetic-wrapped-array-material') 'Wrapped array discovery mutated the original value.'
+Initialize-LiveEvidence
+$keyedMaterial = 'synthetic-dictionary-material-with-keys-member'
+$safe = ConvertTo-LiveEvidence ([ordered]@{
+    earlier = $keyedMaterial
+    password = @{ keys = @($keyedMaterial) }
+})
+Assert-Contract ($safe.earlier -ceq '[REDACTED]' -and $safe.password -ceq '[REDACTED]') 'A keys-named member bypassed nested material discovery.'
+$script:materialPreparations = 0
+function ConvertTo-Json {
+    param($InputObject, [switch]$Compress, [int]$Depth = 2, [switch]$AsArray)
+    if ($InputObject -is [string] -and $InputObject.StartsWith('synthetic-preparation-')) {
+        $script:materialPreparations++
+    }
+    Microsoft.PowerShell.Utility\ConvertTo-Json @PSBoundParameters
+}
+try {
+    Initialize-LiveEvidence -Secrets @('synthetic-preparation-first secret')
+    $null = Convert-LiveEvidenceText 'warmup'
+    $script:materialPreparations = 0
+    foreach ($number in 1..10) {
+        $text = Convert-LiveEvidenceText 'synthetic-preparation-first secret metadata'
+        Assert-Contract ($text -ceq '[REDACTED] metadata') 'Repeated evidence changed its masking result.'
+    }
+    Assert-Contract ($script:materialPreparations -eq 0) 'Unchanged evidence material is re-encoded for every text field.'
+    Add-LiveEvidenceSecret 'synthetic-preparation-first secret'
+    $null = Convert-LiveEvidenceText 'duplicate registration'
+    Assert-Contract ($script:materialPreparations -eq 0) 'Duplicate registration rebuilds evidence preparation.'
+    Add-LiveEvidenceSecret 'synthetic-preparation-later/secret?'
+    $encoded = [Uri]::EscapeDataString('synthetic-preparation-later/secret?')
+    $text = Convert-LiveEvidenceText "synthetic-preparation-first secret $encoded"
+    Assert-Contract ($text -ceq '[REDACTED] [REDACTED]') 'Newly discovered material is not masked immediately.'
+    Assert-Contract ($script:materialPreparations -gt 0) 'New material did not rebuild the evidence preparation.'
+    $afterDiscovery = $script:materialPreparations
+    $null = Convert-LiveEvidenceText 'unchanged second generation'
+    Assert-Contract ($script:materialPreparations -eq $afterDiscovery) 'Second-generation preparation was not reused.'
+    Initialize-LiveEvidence -Secrets @('synthetic-preparation-newrun')
+    $text = Convert-LiveEvidenceText 'synthetic-preparation-newrun synthetic-preparation-first secret'
+    Assert-Contract ($text -ceq '[REDACTED] synthetic-preparation-first secret') 'A fresh run reused stale material with the same registry count.'
+    $safe = ConvertTo-LiveEvidence ([ordered]@{
+        earlier = 'synthetic-preparation-late-discovery'
+        token = 'synthetic-preparation-late-discovery'
+    })
+    Assert-Contract ($safe.earlier -ceq '[REDACTED]' -and $safe.token -ceq '[REDACTED]') 'Preparation caching broke late-sibling discovery.'
+} finally {
+    Remove-Item -LiteralPath Function:\ConvertTo-Json
+}
+$orderedPlan = [ScimServer.LiveEvidence.PreparedReplacements]::new(@('overlap-value', 'overlap'))
+Assert-Contract ($orderedPlan.Apply('overlap-value overlap') -ceq '[REDACTED] [REDACTED]') 'Prepared replacements changed overlap ordering.'
+$regexPlan = [ScimServer.LiveEvidence.PreparedReplacements]::new(@([regex]::new('(?i:%2f)'), 'literal'))
+Assert-Contract ($regexPlan.Apply('%2F %2f literal') -ceq '[REDACTED] [REDACTED] [REDACTED]') 'Prepared replacements changed mixed regex/string behavior.'
+$duplicatePlan = [ScimServer.LiveEvidence.PreparedReplacements]::new(@('D', 'D'))
+$duplicateReference = 'D'.Replace('D', '[REDACTED]').Replace('D', '[REDACTED]')
+Assert-Contract ($duplicatePlan.Apply('D') -ceq $duplicateReference) 'Prepared replacements deduplicated ordered entries.'
+$originalCulture = [Threading.Thread]::CurrentThread.CurrentCulture
+try {
+    [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]::GetCultureInfo('tr-TR')
+    Initialize-LiveEvidence
+    $cultureHeader = 'BAS' + [char]0x0130 + 'C synthetic-culture-material'
+    Assert-Contract ([regex]::IsMatch($cultureHeader, '(?i)\bBasic\s+')) 'Culture regression did not exercise the existing authorization expression.'
+    Assert-Contract ((Convert-LiveEvidenceText $cultureHeader) -ceq '[REDACTED]') 'Authorization discovery guard changed the regex culture semantics.'
+} finally {
+    [Threading.Thread]::CurrentThread.CurrentCulture = $originalCulture
+}
 Write-Host "PASS: $checks live evidence redaction assertions; no HTTP/runtime started."

@@ -1,5 +1,56 @@
 ## SCIMServer - Condensed Session Memory
 
+### Live evidence preparation follow-up, 2026-11-23
+
+Isolated harness-only work reduces repeated material preparation without
+changing application source, version 0.55.70, token lifetime or assertions.
+The unchanged full live attempt stopped on token expiry after 633 partial
+PASS lines; no final success is claimed. Exact owned fixtures were removed.
+Redaction contracts increased from 213 to 255 passing assertions, ownership
+now has 224 passing assertions, and actual nested-script Jest wiring remains
+nine passing tests. A 100-field/30-material probe drops repeated JSON encoding
+from 3,000 calls to zero, 1,330.49 ms to 416.16 ms. A second full attempt was
+explicitly stopped after 1,255 partial PASS lines and one JWKS serialization
+FAIL, without a final summary. Both dictionary traversal sites now use
+`PSBase.Keys` to avoid a payload member named `keys` shadowing the collection.
+Focused RED/GREEN controls cover public JWKS shape and nested discovery.
+All owned fixtures were removed, originals retained and listener absent.
+A separate CPU experiment measured 546.875 ms before discovery guards plus a
+small in-process ordered replacement loop, and 46.875 ms after. Either partial
+optimization missed the local experimental goal; this is not a CI timing gate
+or API improvement claim. Real-JWKS admission exposed array-shape loss; the
+next early run exposed wrapped-array misclassification as a cyclic custom
+object. Both have focused RED/GREEN controls, including secret discovery.
+Fresh admission now passes four real JWKS plus two actual log-array evidence
+checks. The repaired complete PostgreSQL live runner exited zero with
+1,845/1,845 passing assertions, 169 sections, 2,060 flow steps and no cleanup
+failures in 450.6 seconds. Exact fixture cleanup and listener closure passed.
+The private outer verifier initially rejected an intentionally redacted ISO
+timestamp; a separate receipt reconciles the complete result using its exact
+target, file-write interval and executed source hashes, retaining the failed
+outer receipt. Four wrong-target/stale/future/unchanged-file controls pass.
+The corresponding fresh InMemory run also completed: 1,845/1,845 assertions,
+169 sections and 2,060 flow steps in 421.5 seconds, outer/child exit zero.
+Its exact container/client-directory cleanup, original identity retention
+and listener closure pass. Both run-specific sanitized results are retained.
+Strict UTF-8 web-response admission preserves original byte responses;
+profile cleanup now clears a successfully deleted local handle rather than
+issuing a duplicate DELETE in `finally`. Actual failure-path controls retain
+the UUID for retry and preserve sticky cleanup failure evidence.
+The initial root tooling audit separately reported a Markdown-it High. Separate
+#284 has a CI-authenticated patched lock, zero High/Critical locally and all
+29 normal Fast gates plus all six exact-tip PR checks passing. Independent
+review remains pending because Copilot review quota is exhausted. This
+harness rollback unit changes no dependencies or locks. Direct consolidation
+review found no new high-confidence production defect; normal hook/CI and
+reviewed integration remain pending. No shipping or all-security-green claim.
+See
+[the current evidence boundary](docs/LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Redaction 255 PASS, nested wiring nine PASS, ownership 224 PASS. Repaired byte admission and duplicate profile deletion. Complete PostgreSQL and InMemory live each 1,845/1,845 PASS with exact cleanup; PostgreSQL private timestamp-verifier failure reconciled separately. Direct consolidation review complete; normal harness gates/integration pending. Separate tooling #284 is locally locked GREEN but not merged; no shipping or cloud acceptance. |
+
 ### POST User correction in qualification, 2026-11-23
 
 The successful path now uses explicit READ COMMITTED connection startup in

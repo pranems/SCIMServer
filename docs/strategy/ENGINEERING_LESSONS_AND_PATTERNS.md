@@ -1,5 +1,114 @@
 # Engineering lessons and patterns - the self-improving ledger
 
+## Prepare evidence transforms when material changes (2026-11-23)
+
+A complete disposable-fixture live run consumed approximately an hour before
+its normal OAuth token expired. The PowerShell child was CPU-active; a focused
+probe established that 100 ordinary text fields re-encoded 30 unchanged
+materials 3,000 times, in addition to repeated sorting and regex preparation.
+Passing leak-prevention tests did not bound this work.
+
+Keep dynamic discovery and exact masking behavior, but prepare ordered
+replacement transforms per run-owned material generation. Initialization must
+invalidate preparation even when the new set has the same size; newly learned
+material must protect the same call and earlier siblings in the second copy.
+Test preparation work directly, not just wall-clock time or output absence.
+The strengthened default contract retains every previous sentinel and adds
+reuse, duplicate-registration, run-reset and late-discovery controls.
+See [measurements and remaining live recovery](../LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+This correction proves eliminated redundant work, not the sole cause of the
+live-run duration. Do not extend authentication lifetimes to hide runner cost.
+
+## Arbitrary JSON dictionary members are not collection properties (2026-11-23)
+
+The live evidence redactor failed on a real public JWKS response because its
+`keys` member shadowed PowerShell's adapted `Keys` property. Enumerating
+`$dictionary.Keys` returned payload values, producing non-string keys and
+breaking serialization. The same access in nested secret discovery could
+also miss material needed to mask an earlier sibling.
+
+Use `$dictionary.PSBase.Keys` when traversing arbitrary `IDictionary` payloads.
+Check both recursive copy and material discovery, not just the visible
+serialization failure. Permanent hashtable and ordered-dictionary controls
+must preserve public shape and original values and verify sibling masking
+when a nested dictionary contains a `keys` member. The exact serialization
+error was reproduced before the fix; all controls pass afterward.
+
+Also preserve the collection itself when obtaining a property value. Assigning
+`$item = if (...) { $value } else { ... }` enumerated arrays through the
+pipeline, collapsing singleton arrays to their element and empty arrays to
+null. Assign inside each branch instead. Count/value assertions were blind
+because PowerShell also lets a scalar report count one and index zero.
+Require actual array type plus member values for singleton and empty cases.
+The real JWKS wrapper preflight caught this before another complete suite;
+the exact shape contract observed RED/GREEN and now covers both dictionary
+and custom-object payloads.
+
+PowerShell-wrapped arrays can also satisfy both `pscustomobject` and
+`IEnumerable`. Prefer enumerable elements over custom-object properties,
+after dictionary handling. Otherwise traversing `SyncRoot` reports a false
+cycle or recurses through collection metadata during material discovery.
+Cover empty, singleton and multiple wrapped arrays, not only plain arrays.
+The early real log-download failure and focused RED/GREEN controls
+operationalize this representation requirement; actual log-array admission
+now precedes the next complete retry.
+
+Representation handling must cover every semantic JSON consumer, not only
+evidence copies and health probes. The real ownership web wrapper still piped
+`byte[]` directly to `ConvertFrom-Json`; four late nested contracts exposed
+missing UUID registration despite positive string-only mock coverage.
+Decode a local admission copy with strict UTF-8, preserve the original HTTP
+response/body and keep all UUID ownership checks. Permanent controls must
+exercise both string and byte responses, invalid UTF-8, malformed JSON,
+unsupported types, unchanged return identity and exact-ID cleanup/readback.
+
+## Measure both preparation and application cost (2026-11-23)
+
+Caching material preparation removed redundant encodings but left an
+interpreted replacement loop and unnecessary discovery regex calls per text.
+A bounded CPU experiment showed either an in-process ordered loop alone or
+necessary-signal guards alone missed the local goal; the combination reduced
+546.875 ms to 46.875 ms for 100 fields with 30 materials after warmup.
+Keep timing experiments separate from deterministic CI contracts. Preserve
+order, duplicates and regex/string behavior with explicit equivalence checks.
+Necessary-signal prechecks must also preserve the original regex culture.
+An ordinal authorization precheck missed a Turkish dotted-I match accepted
+by the existing current-culture expression; a permanent RED/GREEN contract
+now requires current-culture case comparison in that guard.
+Do not infer full-run recovery or API latency from a synthetic helper result.
+The small helper stays in the existing evidence file without a new dependency
+or speculative service abstraction.
+
+## Successful early cleanup must discharge the local finally handle (2026-11-23)
+
+The full suite completed its assertions but failed sticky ownership
+reconciliation because an old profile call site deleted the endpoint early,
+then deliberately repeated DELETE in `finally` and swallowed the 404.
+Do not weaken the newer guard or silently clear its failure. After verified
+successful early deletion, clear the local reference. After failure, retain
+the reference for retry and preserve the original failure even if retry
+succeeds. The pre-existing cleanup assertion must report actual success.
+
+Exercise the actual early and `finally` AST blocks together, not just
+standalone deletion mocks. The positive control observed two DELETEs before
+the fix and one after. The negative control preserves the UUID after a 500,
+retries successfully and still retains the earlier sticky failure.
+Fresh real-fixture admission now executes the same actual lifecycle before
+the complete suite. Ownership has 224 passing assertions.
+
+Redacted evidence is not a raw metadata interface. The next complete runner
+passed 1,845 assertions and exited zero, but its private outer verifier tried
+to parse a timestamp whose hyphens had been masked by the exact-material
+policy. Preserve masking; do not exempt metadata or drop short material.
+The private verifier instead checks exact target plus the result file's
+write interval within the owned child invocation and changed hash when an
+earlier file exists. Wrong-target, stale, future and unchanged-file negative
+controls pass; executed source hashes and exact cleanup remain independent.
+Keep the original failed outer receipt and a separate reconciled result.
+
+Design disposition: accepted. These are cohesive call-site and private
+verification corrections; no new application abstraction is justified.
+
 ## Live evidence must branch before serialization (2026-11-21, unreleased)
 
 The live runner's header masking did not protect plaintext OAuth/admin bodies,
