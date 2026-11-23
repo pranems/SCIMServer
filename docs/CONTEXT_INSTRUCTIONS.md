@@ -10,10 +10,12 @@
 ## Active Delivery Process
 
 **Unreleased root-tooling security recovery:** `markdown-it` manifest floor
-is `^14.3.3` after observed RED/GREEN. The old tracked root lock remains
-unchanged and still reports High; final root-only CI lock/audit acceptance
-is pending. Owned seeded bootstrap passes full identity/owner verification
-and 22 artifact contracts. API/web dependencies and application version
+is `^14.3.3` after observed manifest/lock RED/GREEN. Authenticated root-only
+CI run45275004952 artifact is imported unchanged; fresh npm ci preserves its
+bytes. Two focused units and 23 artifact/installed-tree controls pass; root
+audit now has zero High/Critical, one Moderate and two Low. Normal bootstrap
+Fast passed all29 gates; final gates/CI/review remain pending.
+API/web dependencies and application version
 0.55.70 remain unchanged. See
 [root-tooling RCA](strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
 

@@ -11,11 +11,18 @@
 
 ### 2026-11-23 root Markdown tooling recovery
 
+**Current local locked result:** authenticated CI root artifact is imported,
+fresh owned `npm ci` preserves its exact bytes, and the root audit has zero
+High/Critical findings (one Moderate and two Low remain). Two Markdown
+manifest/lock unit tests and 23 artifact/installed-tree controls pass.
+Normal final exact-tip gates, CI and review remain required.
+
 The immutable root tooling lock reports `markdown-it` 14.3.0 with a High
 advisory; API/web runtime source and locks are unchanged. The patched 14.3.3
 publication is 2026-10-16 and is outside the seven-day quarantine. The
 manifest regression observed RED for `^14.3.0`, then GREEN for `^14.3.3`.
-This is not final locked remediation: the old root lock still reports High.
+At the bootstrap boundary the old root lock still reported High; the
+patched installed graph alone was not final locked remediation.
 
 The existing root-only CI regeneration route is retained. Before its
 normal bootstrap push, the owned installation uses the existing
@@ -34,17 +41,35 @@ version. Physical placement is recorded rather than hidden.
 | Fresh worktree lacked js-yaml, vite and jsdom | Environment / Low | Actual chosen checks failed first; normal owned locked installs restored tools. Root/API/web lock bytes stayed unchanged. | Validation startup / tool availability |
 | First normal Fast bootstrap failed on missing generated Prisma client | Environment / Low | Fresh `npm ci` does not generate this checkout's client. Existing `npm run prisma:generate` generates Prisma 7.8.0 locally without connecting to a database; the exact failed TypeScript build then passes. Preserve the failed push receipt and retry normal hooks, not source/test suppression. | First Fast build / fresh-worktree prerequisite before Fast |
 
-Final acceptance still requires authenticated root-only CI artifact,
-complete union/provenance/publication-age review, fresh locked installation,
-zero High/Critical root audit and normal exact-tip gates/review. The
-bootstrap is not a shipping or final-security acceptance.
+The normal bootstrap push at `8d9eebdc` passed all 29 Fast gates in
+738.9 seconds: API 220 suites/6,273 tests and reduced HTTP 120 suites/2,519
+tests, with four known skipped suites/45 tests. Exact local/remote/upstream
+identity was verified before root-only CI dispatch.
+
+| Authenticated final-lock evidence | Result |
+|---|---|
+| CI run / exact source | `45275004952` / `8d9eebdc409dc9c3c4aa6c8567b2b0e1b9b6f970`, SUCCESS |
+| Artifact / ZIP SHA-256 | `14865984488` / `64f40dda5b516e27c62350fe83631509c74f021848d3a768f6febc9e7b9ec6fe` |
+| Imported root lock SHA-256 | `80a519be2009bd87db82fcdd5f6cff09dcb0bd9ceec2eb9fd8f178a674f75bc4` |
+| Complete package-map union | Root manifest range, Markdown version/public URL/SHA-512, and exact unchanged parser 1.2.1 entry relocation only |
+| Package entries | All 157 retain public npm URLs and SHA-512 |
+| Changed-entry publication ages | Markdown 38.84 days; relocated parser 96.54 days; both exceed seven days |
+| Fresh locked install | 157 packages; imported lock bytes unchanged |
+| Root audit | Zero High/Critical, one Moderate, two Low |
+
+The locked regression observed RED against the old root lock before import,
+then GREEN against the exact artifact. API/web locks remain unchanged.
+The installed-tree check belongs to the existing root tooling contract,
+not an API unit that would require root packages in API-only CI jobs.
+No workflow, source-generation guard or runtime dependency was changed.
+Final normal gates/review are pending; no shipping/deployment acceptance.
 
 Fresh-worktree prerequisite: generate the owned Prisma client before a Fast
 bootstrap hook. Validate already owns this generation step. Do not copy
 another checkout's generated client or share linked dependencies.
 
 **Self-improvement: applied.** The default API unit regression guards the
-root Markdown floor; locked/installed controls will accompany the final
+root Markdown floor and lock; installed controls accompany the final
 artifact. **Design disposition: accepted.** Reuse the current CI-only root
 regenerator and existing baseline seed rather than adding a second policy
 or generation mechanism.

@@ -12,10 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Raise the root-only `markdown-it` floor from `^14.3.0` to `^14.3.3`,
   retaining Mermaid 11.17.0 and all API/web dependencies and application
   version 0.55.70.
-- Add the observed RED/GREEN manifest regression; retain existing artifact
-  contracts (22 PASS). Normal root-only CI lock generation and final
-  locked/installed/audit evidence remain pending. The old lock's High
-  finding is not described as remediated by the bootstrap installation.
+- Add observed RED/GREEN manifest and lock regressions (two focused unit
+  tests PASS) and an actual installed root-tree contract (23 tooling controls
+  PASS). Root-only CI run 45275004952 produces the authenticated lock:
+  all 157 entries public/SHA-512, only Markdown version plus exact unchanged
+  Mermaid parser relocation. Fresh npm ci preserves imported bytes.
+- Root audit moves from one High/one Moderate/two Low to zero High/one
+  Moderate/two Low. Normal bootstrap Fast: 220 API suites/6,273 tests and
+  reduced HTTP 120 suites/2,519 tests, 45 known skips. Final exact-tip gates,
+  CI and review remain pending; bootstrap is not final shipping acceptance.
 - Document rejected unseeded dependency drift, semantic parser-hoist
   verification and unchanged tracked locks in the
   [supply-chain RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#2026-11-23-root-markdown-tooling-recovery).
