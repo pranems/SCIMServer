@@ -1,6 +1,68 @@
 ## SCIMServer - Condensed Session Memory
 
-### Current combined integration, 2026-11-23
+### POST User correction in qualification, 2026-11-23
+
+The successful path now uses explicit READ COMMITTED connection startup in
+the existing application pool, a scalar-FK INSERT returning the complete
+resource, and conflict-only username diagnostics. Ordered locks and the
+separate post-wait snapshot are retained. The capacity, timeouts, four-call
+limit and transaction exclusions are unchanged. All three direct transaction
+owners were inspected; explicit stronger Prisma transaction isolation remains
+available. No custom adapter or second pool was introduced.
+
+Six focused suites pass 255 unit tests after independent consolidation review;
+API build and focused lint pass. The review added encoded URL/SSL preservation
+and typed conflict-lookup failure controls, with no additional production edits.
+Actual PostgreSQL verifies two independent READ COMMITTED application leases
+against a SERIALIZABLE server default. Four actual PostgreSQL suites pass 123
+isolation/race/profile/User tests. Standalone HTTP measures four foreground
+client queries, a separate fifth asynchronous log write and empty idle
+controls; endpoint deletion and exact host shutdown are verified. The
+persistent HTTP contract passes after a five-query negative control failed.
+The stronger nested-server diagnostic remains five foreground statements,
+including the foreign-key check, and is not relabelled as a four-statement
+pass. Version 0.55.70 CI metadata from exact merged 9d25558d, run 45189452486,
+was verified version-only and imported without local lockfile generation.
+Normal full final-source gates and release remain pending. Independent source
+review found no high-confidence production defect.
+The unchanged complete host benchmark passes all three query budgets and four
+bulk targets, but remains FAIL with 14/17 latency passes. GET Group,
+ServiceProviderConfig and DELETE User retain their unchanged failed limits.
+See [the current correction and historical blocker](docs/CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23).
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Implemented and measured four foreground client queries, retaining the foreign-key check, later log write and empty idle controls. Focused units, 123 actual PostgreSQL tests and the HTTP RED/GREEN contract pass. CI-only version metadata is imported; normal review and release remain pending. |
+
+### Historical POST User source-budget blocker, 2026-11-23
+
+The dedicated source checkout at merged master `4b4ae0a3` has an executable
+offline RED, not a production correction. The actual generated Prisma client
+and adapter reproduce seven immediate statements below authentication; the
+parent's separate authentication read makes eight against the unchanged four.
+An optimistic scalar-FK INSERT with no preliminary username lookup still
+requires five. The invariant test retains explicit READ COMMITTED, ordered
+locks and a separate post-wait profile/namespace snapshot.
+
+No partial production edit or global pool/isolation redesign was made.
+The new unit suite remains RED: two budget failures, one invariant pass.
+Existing focused units pass 4 suites/103 tests; API build and focused ESLint
+pass. No runtime, database, daemon, cloud, commit, push or release operation
+was performed. Parent qualification and overall Docker exit remain open.
+See [the exact historical blocker, commands and RCA](docs/CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#historical-post-user-four-call-source-blocker-2026-11-23).
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Actual-client offline POST User regression reproduces 8/max4 and optimistic 5/max4. Stop at scoped-isolation/transaction architecture blocker; production behavior and all thresholds unchanged. |
+
+### Reviewed master integration, 2026-11-23
+
+This performance branch integrates reviewed master `9d25558d`, including
+normally merged ownership PR #281. Both ownership and evidence corrections
+are retained. The records below describe their original capture-time scope;
+their earlier publication-pending statements do not undo the reviewed merge.
+
+### Historical combined integration, 2026-11-23
 
 Ownership commit `73a228a6` composes normally reviewed PR #280, merged at
 `4b4ae0a3` after all exact-tip checks passed. Its normal evidence Fast push
@@ -47,6 +109,7 @@ dependency, commit/push/PR or deployment operations were authorized or performed
 The separate uncommitted redaction worktree was not copied. See
 [ownership behavior, integration notes and confirmed RCA](docs/LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
 Historical runtime qualification below does not describe this task's authority.
+
 ### Current integration boundary
 
 The evidence correction is committed at `62440b1d` after a normal API unit

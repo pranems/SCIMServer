@@ -48,11 +48,13 @@ import { RUNTIME_CONFIG_SPECS } from '../../bootstrap/runtime-config';
 describe('PrismaService', () => {
   const originalDbUrl = process.env.DATABASE_URL;
   const originalBackend = process.env.PERSISTENCE_BACKEND;
+  const originalPgOptions = process.env.PGOPTIONS;
 
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.DATABASE_URL;
     delete process.env.PERSISTENCE_BACKEND;
+    delete process.env.PGOPTIONS;
   });
 
   afterEach(() => {
@@ -67,11 +69,50 @@ describe('PrismaService', () => {
     } else {
       process.env.PERSISTENCE_BACKEND = originalBackend;
     }
+    if (originalPgOptions === undefined) delete process.env.PGOPTIONS;
+    else process.env.PGOPTIONS = originalPgOptions;
   });
 
   // ── Constructor ────────────────────────────────────────────────────────────
 
   describe('constructor', () => {
+    it('sets READ COMMITTED through connection startup, without changing the pool budget', () => {
+      process.env.DATABASE_URL = 'postgresql://fixture@localhost/fixture?options=-c%20statement_timeout%3D2500';
+      process.env.PGOPTIONS = '-c default_transaction_isolation=serializable';
+      new PrismaService();
+      const config = jest.mocked(pg.Pool).mock.calls.at(-1)?.[0];
+      expect(config).toEqual(expect.objectContaining({
+        options: '-c statement_timeout=2500 -c default_transaction_isolation=read\\ committed',
+        max: RUNTIME_CONFIG_SPECS.database.poolMax.default,
+      }));
+      expect(new URL(config?.connectionString ?? '').searchParams.has('options')).toBe(false);
+    });
+
+    it('preserves PGOPTIONS when the URL has no startup options, with application isolation last', () => {
+      process.env.DATABASE_URL = 'postgresql://fixture@localhost/fixture';
+      process.env.PGOPTIONS = '-c application_name=budget-fixture -c default_transaction_isolation=serializable';
+      new PrismaService();
+      expect(jest.mocked(pg.Pool).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
+        connectionString: process.env.DATABASE_URL,
+        options: '-c application_name=budget-fixture -c default_transaction_isolation=serializable -c default_transaction_isolation=read\\ committed',
+      }));
+    });
+
+    it('preserves encoded URL components and SSL settings when extracting startup options', () => {
+      process.env.DATABASE_URL = 'postgresql://fixture%40tenant@fixture.invalid:5433/fixture%20db?sslmode=require&application_name=budget%20fixture&options=-c%20statement_timeout%3D2500';
+      new PrismaService();
+      const config = jest.mocked(pg.Pool).mock.calls.at(-1)?.[0];
+      const url = new URL(config?.connectionString ?? '');
+      expect(url.username).toBe('fixture%40tenant');
+      expect(url.host).toBe('fixture.invalid:5433');
+      expect(url.pathname).toBe('/fixture%20db');
+      expect([...url.searchParams]).toEqual([
+        ['sslmode', 'require'],
+        ['application_name', 'budget fixture'],
+      ]);
+      expect(config?.options).toBe('-c statement_timeout=2500 -c default_transaction_isolation=read\\ committed');
+    });
+
     it('should use fallback URL when DATABASE_URL is not set', () => {
       delete process.env.DATABASE_URL;
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();

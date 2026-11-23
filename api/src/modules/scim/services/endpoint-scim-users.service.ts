@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 import { profileRevisionArgument } from '../../../domain/repositories/profile-revision';
 import { observeWriteVersion } from '../../../domain/repositories/write-precondition';
 import type { UserRecord, UserCreateInput, UserUpdateInput } from '../../../domain/models/user.model';
@@ -106,27 +107,6 @@ export class EndpointScimUsersService {
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
 
-    // Check userName uniqueness - always 409 on conflict
-    // Note: externalId and displayName are NOT checked - saved as received per RFC 7643.
-    const conflict = await this.userRepo.findConflict(endpointId, dto.userName);
-    if (conflict) {
-      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: userName '${dto.userName}'`, {
-        endpointId, conflictScimId: conflict.scimId,
-      });
-      throw createScimError({
-        status: 409,
-        scimType: 'uniqueness',
-        detail: `A resource with userName '${dto.userName}' already exists.`,
-        diagnostics: {
-          errorCode: 'UNIQUENESS_USERNAME',
-          operation: 'create',
-          conflictingResourceId: conflict.scimId,
-          conflictingAttribute: 'userName',
-          incomingValue: dto.userName,
-        },
-      });
-    }
-
     const now = new Date();
     const scimId = randomUUID();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
@@ -154,6 +134,27 @@ export class EndpointScimUsersService {
         ...profileRevisionArgument(this.endpointContext.getProfileRevision?.()),
       );
     } catch (error) {
+      if (error instanceof RepositoryError && error.code === 'CONFLICT') {
+        const conflict = await this.userRepo.findConflict(endpointId, dto.userName).catch(lookupError =>
+          handleRepositoryError(lookupError, 'resolve user conflict', this.logger, LogCategory.SCIM_USER, { endpointId }));
+        if (conflict) {
+          this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: userName '${dto.userName}'`, {
+            endpointId, conflictScimId: conflict.scimId,
+          });
+          throw createScimError({
+            status: 409,
+            scimType: 'uniqueness',
+            detail: `A resource with userName '${dto.userName}' already exists.`,
+            diagnostics: {
+              errorCode: 'UNIQUENESS_USERNAME',
+              operation: 'create',
+              conflictingResourceId: conflict.scimId,
+              conflictingAttribute: 'userName',
+              incomingValue: dto.userName,
+            },
+          });
+        }
+      }
       handleRepositoryError(error, 'create user', this.logger, LogCategory.SCIM_USER, { userName: dto.userName, endpointId });
     }
 

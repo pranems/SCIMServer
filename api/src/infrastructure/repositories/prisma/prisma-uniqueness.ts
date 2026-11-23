@@ -146,5 +146,5 @@ export async function withUniqueWrite<T>(
       : members ?? (scope.resourceType === 'Group' ? previous?.membersAsGroup ?? [] : undefined), representation);
     assertUnique(policy, candidate, resources.filter((r) => r.id !== previous?.id).map(document));
     return execute(tx);
-  }, { isolationLevel: 'ReadCommitted', maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 10000, timeout: 30000 });
 }

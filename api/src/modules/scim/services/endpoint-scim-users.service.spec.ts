@@ -5,12 +5,14 @@ import { EndpointScimUsersService } from './endpoint-scim-users.service';
 import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import { SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 import { GOOGLE, CONTOSO, PATCH, incidentPayload, incidentOperations, incidentExpected } from '../../../../test/e2e/helpers/typed-patch-fixtures';
 
 describe('EndpointScimUsersService', () => {
@@ -75,6 +77,7 @@ describe('EndpointScimUsersService', () => {
   };
 
   beforeEach(async () => {
+    mockUserRepo.create.mockReset();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointScimUsersService,
@@ -146,6 +149,7 @@ describe('EndpointScimUsersService', () => {
 
       expect(result.userName).toBe(createDto.userName);
       expect(result.externalId).toBe(createDto.externalId);
+      expect(mockUserRepo.findConflict).not.toHaveBeenCalled();
       expect(result.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:User');
       expect(mockUserRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -198,15 +202,67 @@ describe('EndpointScimUsersService', () => {
       };
 
       mockUserRepo.findConflict.mockResolvedValue(mockUser);
+      mockUserRepo.create.mockRejectedValue(new RepositoryError('CONFLICT', 'atomic username conflict'));
 
       await expect(
         service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
       ).rejects.toThrow();
 
-      expect(mockUserRepo.create).not.toHaveBeenCalled();
+      expect(mockUserRepo.create).toHaveBeenCalledTimes(1);
     });
 
     describe('P8: uniqueness conflict diagnostic logging', () => {
+      beforeEach(() => {
+        mockUserRepo.create.mockRejectedValue(new RepositoryError('CONFLICT', 'atomic username conflict'));
+      });
+
+      it('propagates a failed conflict lookup instead of reporting a successful create', async () => {
+        const failure = new Error('Conflict lookup failed');
+        mockUserRepo.findConflict.mockRejectedValue(failure);
+        await expect(service.createUserForEndpoint({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'lookup-failure@example.test',
+        }, 'http://localhost:3000/scim', mockEndpoint.id)).rejects.toBe(failure);
+        expect(mockUserRepo.create).toHaveBeenCalledTimes(1);
+        expect(mockScimLogger.info).not.toHaveBeenCalledWith(
+          LogCategory.SCIM_USER, 'User created', expect.anything(),
+        );
+      });
+
+      it('retains the generic uniqueness error for a conflict without a matching username', async () => {
+        const conflict = new RepositoryError('CONFLICT', 'externalId conflict');
+        mockUserRepo.create.mockRejectedValue(conflict);
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        await expect(service.createUserForEndpoint({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'other-conflict@example.test',
+        }, 'http://localhost:3000/scim', mockEndpoint.id)).rejects.toMatchObject({
+          status: 409,
+          response: { scimType: 'uniqueness', detail: 'Failed to create user: externalId conflict' },
+        });
+        expect(mockScimLogger.error).toHaveBeenCalledWith(
+          LogCategory.SCIM_USER, 'Repository failure: create user', conflict, expect.anything(),
+        );
+      });
+
+      it('translates and logs a typed conflict lookup failure without reporting a username conflict', async () => {
+        const failure = new RepositoryError('UNKNOWN', 'private database failure');
+        mockUserRepo.findConflict.mockRejectedValue(failure);
+        await expect(service.createUserForEndpoint({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'typed-lookup-failure@example.test',
+        }, 'http://localhost:3000/scim', mockEndpoint.id)).rejects.toMatchObject({
+          status: 500,
+          response: { detail: 'Failed to resolve user conflict.' },
+        });
+        expect(mockScimLogger.error).toHaveBeenCalledWith(
+          LogCategory.SCIM_USER, 'Repository failure: resolve user conflict', failure,
+          expect.objectContaining({ endpointId: mockEndpoint.id, errorCode: 'UNKNOWN' }),
+        );
+        expect(mockScimLogger.info.mock.calls.some(([, message]) =>
+          message.includes('Uniqueness conflict') || message === 'User created')).toBe(false);
+      });
+
       it('should log INFO with conflicting attribute before throwing 409 on userName conflict', async () => {
         const createDto: CreateUserDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -1616,8 +1672,11 @@ describe('EndpointScimUsersService', () => {
       );
 
       expect(result.userName).toBe(createDto.userName);
-      // Verify that endpoint isolation is enforced in the uniqueness check
-      expect(mockUserRepo.findConflict).toHaveBeenCalled();
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ endpointId: 'endpoint-2', userName: createDto.userName }),
+        expect.any(Array),
+      );
+      expect(mockUserRepo.findConflict).not.toHaveBeenCalled();
     });
   });
 
@@ -1714,15 +1773,16 @@ describe('EndpointScimUsersService', () => {
           userName: 'test@example.com',
           externalId: null,
         });
+        mockUserRepo.create.mockRejectedValue(new RepositoryError('CONFLICT', 'atomic username conflict'));
 
         await expect(
           service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
         ).rejects.toThrow();
 
-        expect(mockUserRepo.create).not.toHaveBeenCalled();
+        expect(mockUserRepo.create).toHaveBeenCalledTimes(1);
       });
 
-      it('should query uniqueness using userName (case-insensitive via CITEXT)', async () => {
+      it('passes canonical input to the atomic repository without a preliminary read', async () => {
         const createDto: CreateUserDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
           userName: 'NewUser@Example.COM',
@@ -1737,11 +1797,11 @@ describe('EndpointScimUsersService', () => {
 
         await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        // findConflict receives the raw userName; the repository handles lowercasing internally
-        expect(mockUserRepo.findConflict).toHaveBeenCalledWith(
-          mockEndpoint.id,
-          'NewUser@Example.COM',
+        expect(mockUserRepo.create).toHaveBeenCalledWith(
+          expect.objectContaining({ endpointId: mockEndpoint.id, userName: 'NewUser@Example.COM' }),
+          expect.any(Array),
         );
+        expect(mockUserRepo.findConflict).not.toHaveBeenCalled();
       });
     });
 

@@ -1,6 +1,6 @@
 # Observability, Traceability, Correlation IDs, Logging, Error Handling and Diagnostics
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.69`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.70`
 
 **Unreleased stream-lifecycle correction, November 19:** the log controller
 owns active stream cleanup and runs it before HTTP-server shutdown, removing
