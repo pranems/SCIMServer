@@ -1,6 +1,6 @@
 # Remote Debugging & Diagnosis Guide
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.68`
+> **Status:** User-facing reference - **Last verified:** 2026-11-19 - **Product version:** `0.55.69`
 
 **Unreleased restart behavior, November 19:** local source explicitly ends
 active log-stream responses and clears their subscriptions/keepalive timers

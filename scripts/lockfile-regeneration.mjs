@@ -44,6 +44,74 @@ export function releaseAge(published, now = Date.now()) {
   return days;
 }
 
+export function prepareManifest(manifest, workspace, zodVersion = '', productVersion = '') {
+  for (const version of [zodVersion, productVersion]) {
+    if (version && !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+      throw new Error('Targeted artifacts require an exact stable version');
+    }
+  }
+  const prepared = { ...manifest };
+  if (productVersion) {
+    if (!['api', 'web'].includes(workspace)) throw new Error('Product versions apply only to API/web');
+    prepared.version = productVersion;
+  }
+  if (zodVersion && workspace === 'web') {
+    const sections = ['dependencies', 'devDependencies'].filter(section =>
+      Object.hasOwn(manifest[section] ?? {}, 'zod'));
+    if (sections.length !== 1) throw new Error('Zod must have one declared web dependency');
+    const section = sections[0];
+    prepared[section] = { ...manifest[section], zod: zodVersion };
+  }
+  return prepared;
+}
+
+export function verifyTargetedPackages(before, after, workspace, zodVersion) {
+  const previous = packages(before);
+  const current = packages(after);
+  if (zodVersion && workspace === 'web' && current['node_modules/zod']?.version !== zodVersion) {
+    throw new Error('Zod artifact does not contain the requested version');
+  }
+  for (const path of new Set([...Object.keys(previous), ...Object.keys(current)])) {
+    if (!path.includes('node_modules/') || JSON.stringify(previous[path]) === JSON.stringify(current[path])) continue;
+    if (workspace === 'web' && zodVersion && path === 'node_modules/zod') continue;
+    throw new Error(`Unrelated package changed in targeted artifact: ${workspace}/${path}`);
+  }
+}
+
+function targetedArtifacts(command, selection) {
+  const zodVersion = process.env.REGEN_ZOD_VERSION || '';
+  const productVersion = process.env.REGEN_PRODUCT_VERSION || '';
+  if (!zodVersion && !productVersion) return;
+  if (process.env.GITHUB_ACTIONS !== 'true') throw new Error('Targeted artifact generation is CI only');
+  if (process.platform !== 'linux') throw new Error('Targeted artifact generation requires the existing Linux CI runner');
+  const directories = workspaces(selection);
+  if (zodVersion && !directories.includes('web')) throw new Error('Zod artifacts require web selection');
+  if (productVersion && selection !== 'both') throw new Error('Product version artifacts require both API and web');
+  const prepared = directories.map(dir => {
+    const file = `${dir}/package.json`;
+    const original = JSON.parse(execFileSync('git', ['show', `HEAD:${file}`], { encoding: 'utf8' }));
+    return { dir, file, manifest: prepareManifest(original, dir, zodVersion, productVersion) };
+  });
+  if (command === 'prepare-targeted') {
+    if (zodVersion) releaseAge(npmView('zod', zodVersion));
+    for (const item of prepared) {
+      writeFileSync(item.file, JSON.stringify(item.manifest, null, 2) + '\n');
+    }
+    return;
+  }
+  for (const { dir, file, manifest } of prepared) {
+    const actual = JSON.parse(readFileSync(file, 'utf8'));
+    if (JSON.stringify(actual) !== JSON.stringify(manifest)) throw new Error(`Unexpected manifest change: ${file}`);
+    const lockPath = `${dir}/package-lock.json`;
+    const current = JSON.parse(readFileSync(lockPath, 'utf8'));
+    const previous = JSON.parse(execFileSync('git', ['show', `HEAD:${lockPath}`], { encoding: 'utf8' }));
+    verifyTargetedPackages(previous, current, dir, zodVersion);
+    if (current.version !== manifest.version || packages(current)['']?.version !== manifest.version) {
+      throw new Error(`Manifest/lockfile version differs: ${dir}`);
+    }
+  }
+}
+
 export function seedManifest(manifest, lock) {
   const baseline = packages(lock);
   const devDependencies = { ...manifest.devDependencies };
@@ -95,6 +163,10 @@ function npmView(name, version) {
 
 function main([command, selection, reportPath]) {
   const directories = workspaces(selection);
+  if (['prepare-targeted', 'verify-targeted'].includes(command)) {
+    targetedArtifacts(command, selection);
+    return;
+  }
   if (command === 'workspaces') {
     console.log(directories.join(' '));
     return;

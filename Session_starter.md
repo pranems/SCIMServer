@@ -1,5 +1,14 @@
 ## SCIMServer - Condensed Session Memory
 
+### Integration boundary
+
+The offline ownership source is committed at `f7f28c7e` and now integrates
+normally reviewed PR #279, merged at `8b6335f1`. The product remains its
+unreleased 0.55.69 candidate; this runner-only correction changes no dependency
+or application behavior. The two captured source-stage records below retain
+their original dates and authority. Normal ownership publication/review and
+combined lifecycle/evidence qualification remain required.
+
 ### Offline endpoint fixture ownership, 2026-11-20
 
 | Date | Summary |
@@ -22,6 +31,30 @@ dependency, commit/push/PR or deployment operations were authorized or performed
 The separate uncommitted redaction worktree was not copied. See
 [ownership behavior, integration notes and confirmed RCA](docs/LIVE_ENDPOINT_FIXTURE_OWNERSHIP.md).
 Historical runtime qualification below does not describe this task's authority.
+
+### Targeted artifact generation correction, 2026-11-21 UTC
+
+Reviewed PR #278 is merged at `554f42023fdde30918ef378987cc8f3135e4ed3a`.
+The completed web audit identifies High Zod GHSA-mrhx-c7xc-m3w5 in 4.4.3;
+fixed 4.6.6 is seven-day eligible. Existing CI regeneration run 44847989228
+retained 4.4.3 because the unchanged manifest still requests that version.
+The isolated correction adds supported optional targeted inputs to the
+existing read-only workflow, preserving quarantine and rejecting unrelated
+dependency changes. Its 22 focused controls pass after RED and all 27 normal
+Fast push gates pass at `ee56eb0d`. CI run `44855811919` succeeded from that exact
+source. Its five-file artifact was independently checked by immutable ZIP
+digest, extracted-byte parity, exact manifests/lock metadata, unchanged other
+dependencies and publication age before importing the 0.55.69 candidate.
+Locked installation preserves exact imported bytes and installs 4.6.6. Web
+audit has zero High/Critical findings and no Zod advisory; three Moderate
+development-tool findings remain. Reviewed merge and deployment remain open.
+Candidate web coverage passes 126 files/1,664 tests, with unchanged coverage
+85.74/75.86/75.53/83.06 above unchanged 82/70/69/78 floors.
+The deployment-owned temporary fixtures were removed exactly and its bridge
+is offline; do not reuse former fixture IDs. Initial generator source retained
+0.55.68; current artifact-imported source is the unreleased 0.55.69 candidate.
+See [workflow usage and RCA](docs/strategy/NPM_SUPPLY_CHAIN_QUARANTINE_POLICY.md#targeted-ci-artifacts-2026-11-21).
+Earlier qualification statements below remain capture-time history.
 
 ### Merged-source deployment qualification, 2026-11-20
 
