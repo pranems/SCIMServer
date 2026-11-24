@@ -28,6 +28,92 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### Token Save browser contract repair, 2026-11-24
+
+**Conclusion:** this is a local browser-test correctness repair, not a change
+to authentication, product behavior, release readiness or deployment status.
+[TokenGate.handleSave, line 72](../web/src/layout/TokenGate.tsx#L72) still writes the
+trimmed token, dismisses the dialog and invalidates the query/router state.
+Saving does not have a dedicated server-side token-save response.
+
+The preserved exact-source `f8c2ce1f2e325affd2e780d0fe5ee0aba330901c`
+native Prisma full-browser result was **327 passes, one failure, 25 skips**.
+In `token-gate.spec.ts:184`, concurrent `save.click()` operations raced.
+Trace call 4776 waited for stability, then encountered a detached button and
+timed out after 5,000 ms. Call 4778 actually clicked and completed navigation
+in 272 ms. The dashboard screenshot had no dialog; subsequent GET requests
+returned 200. Stored-token and app-shell assertions were never reached.
+This establishes a test-action delivery race, not a demonstrated defect in
+the private `pendingRef` guard.
+
+[The repaired double-click test, line 175](../web/e2e/token-gate.spec.ts#L175) resolves
+one actionable locator for one trusted `dblclick` pointer gesture. A
+test-local observer delegates to the original `Storage.prototype.setItem`
+and records successful writes only to the actual localStorage token key.
+The test requires the exact write sequence `[TOKEN]`, the exact stored token
+and a visible app shell. Equal repeated values would satisfy the old stored
+value check, but now fail the write-sequence assertion. No force click,
+synthetic DOM dispatch, swallowed action error, timeout increase, wait,
+skip, retry adjustment or visual baseline change is used.
+
+The dialog may disappear after the gesture's first click. Therefore this
+test proves the user-visible once-only persistence outcome; it does not
+claim to force a second call through a private guard branch.
+[The existing TokenGate unit case, line 188](../web/src/layout/TokenGate.test.tsx#L188)
+separately checks mocked save/query/router call counts. That unit file was
+inspected, not changed or rerun, and no new private-branch coverage is claimed.
+
+| Evidence | Exact outcome |
+|---|---|
+| Preserved full-browser RED on native Prisma | 327 passed, one failed, 25 skipped; first failure was locator action delivery. |
+| Discriminating negative control | After the trusted gesture, an intentional second actual same-value localStorage write produced seven passed, one failed, no skips. The new assertion received two token values instead of one. The injection was removed. |
+| Final complete token-gate file, native image InMemory | Eight passed, zero failed, zero skipped; process exit 0. |
+| Final complete token-gate file, native Compose Prisma | Eight passed, zero failed, zero skipped; process exit 0. |
+| Strict changed-file compiler | `npx tsc --ignoreConfig --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck --types node e2e\token-gate.spec.ts` exited 0 from `web`. |
+| Owned cleanup | All newly labelled fixture containers, volume and network removed. Original exact identities and populations remain 11 containers, 49 volumes and six networks. |
+
+Both final browser commands were
+`npx playwright test e2e/token-gate.spec.ts --workers=1 --reporter=line,json --output=<owned backend output>`
+from this repair worktree's `web` directory, with `E2E_BASE_URL` set to the
+respective admitted loopback fixture and `E2E_TOKEN` set to its disposable
+SCIM token. Runs were serial, with no configuration or threshold changes.
+Fixtures ran on Ubuntu-24.04 Engine
+`68f34f63-05bc-488a-b093-402808b594b2`, through a fresh owned Docker client
+directory and the native Unix socket. Both used
+`ghcr.io/pranems/scimserver@sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`.
+Actual HTTP version readback was 0.55.70, Node v24.22.3 and the expected
+backend. Exact request-ID log readback inside each owned container correlated
+the Windows HTTP target. The immutable image label binds production source
+to f8; only the browser harness in this worktree changes.
+
+Bounded receipts, the command journal, before/after identity sets, compiler
+results and structured private RCA are retained under this worktree's ignored
+`test-results/token-save-repair/`. The original trace, screenshot and failed
+receipt remain under the separate
+`containers-native-f8-qualification-20261124` worktree's
+`test-results/native-f8-qualification/`. Root and web dependencies were
+absent before immutable `npm ci`; no foreign dependency tree was reused.
+All three tracked lockfile hashes remain unchanged.
+
+**Execution RCA and escape analysis:**
+
+| Issue / severity | Mechanism and resolution | Detection and earliest prevention |
+|---|---|---|
+| Browser action delivery / Medium | Concurrent locator actionability checks raced against dialog dismissal. Use one trusted pointer gesture and observe actual writes rather than inferring their count from the final value. | Preserved full native browser RED; earliest useful check is this focused real-browser case. The negative control closes the equal-value duplicate-write blind spot. |
+| Private fixture correlation / Low | Immediate Prisma request-log readback returned zero matches before persisted evidence became available. The owned helper now polls the exact request-ID/path/status evidence with the established bounded parent-helper pattern. No application or test wait was added. | Preflight before the Prisma browser run; this is already the earliest fixture-admission boundary. |
+| Compiler harness and test typing / Low | TypeScript 6 rejects explicit files without `--ignoreConfig`; scoped inputs also need Node types. A required added Window-property cast was rejected. Declare the observer property as optional and capture its typed array locally; the exact strict command above then passes. | Focused compiler, before commit; the editor also reports no errors in the final changed spec. |
+| Documentation navigation / Low | The freshness checker treated `file.ts:line` navigation targets, relative or absolute, as nonexistent filenames. Use repository-relative source links with explicit verified line labels and `#L` fragments; preserve the existing checker and production source. Editor-specific fragment navigation is not claimed as verified. | Related-document F3 check; earliest useful check is link validation before commit. |
+
+**Self-improvement: applied.** The duplicate-write negative control proves
+that the strengthened assertion rejects an otherwise identical final token.
+**Design disposition: accepted.** This remains a small, cohesive test-local
+observer and gesture repair; no production strategy or abstraction is needed.
+The private RCA was captured at fix confirmation from this bounded execution;
+it is not a full historical-transcript reconciliation. No complete browser,
+live, backend matrix, unit, coverage or benchmark qualification was rerun.
+Parent delivery and separate private observer/zero-skip qualification remain
+open. Overall migration is still incomplete, and Desktop remains retained.
+
 ### November 24 offline full-deployment admission
 
 The local deployment pipeline now checks the cached tenant/subscription

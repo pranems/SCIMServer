@@ -1,5 +1,25 @@
 ## SCIMServer - Condensed Session Memory
 
+### Token Save browser contract repair, 2026-11-24
+
+The token-gate double-click test now uses one trusted Playwright `dblclick`
+gesture instead of two concurrent locator actions with an ignored exception.
+It observes successful writes to the actual token localStorage key and
+requires exactly one write with the literal token, plus the unchanged stored
+value and visible app shell. Production `TokenGate.handleSave` is unchanged.
+
+Preserved exact-f8 native Prisma RED was 327 passes, one failure and 25 skips;
+the failure was action delivery after the peer click dismissed the dialog,
+not evidence of a production pendingRef defect. A duplicate same-value write
+negative control fails the new assertion (seven passes, one failure, no skips).
+The final complete token-gate file passes eight tests with no failures or skips
+on each newly owned immutable-image InMemory and Compose Prisma fixture,
+serially. Strict file-scoped TypeScript also passes. Original native identities
+remain 11 containers, 49 volumes and six networks after exact owned cleanup.
+No image build, product/version change, cloud operation or removal occurred.
+See [the bounded repair and execution RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#token-save-browser-contract-repair-2026-11-24).
+Parent delivery, private observer qualification and overall migration remain open.
+
 ### Gallery plan-only classification, 2026-11-24
 
 `-PlanOnly` is a non-provisioning schema probe, not read-only intake. It
