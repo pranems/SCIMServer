@@ -197,6 +197,126 @@ Invoke-Assert -Description 'default validation project identity remains unique a
     -Condition $usesRunUniqueProject
 
 & {
+    . (Join-Path $repoRoot 'scripts\scim-estates.ps1')
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $admission = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-ActiveDevDeploymentAdmission'
+    }, $true)
+    $prereq = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-PrereqOrExit'
+    }, $true)
+    if ($admission) { . ([scriptblock]::Create($admission.Extent.Text)) }
+    . ([scriptblock]::Create($prereq.Extent.Text))
+    $active = Get-ScimEstate -Purpose dev
+    $registryFixture = Get-ScimEstateRegistry
+    $retiring = $registryFixture.estates | Where-Object { $_.purpose -eq 'dev' -and $_.Role -eq 'retiring' } | Select-Object -First 1
+    $state = @{}
+    function Get-ScimEstateRegistry { return $state.Registry }
+    function az {
+        if (($args -join ' ') -ne 'account show --output json' -and
+            ($args -join ' ') -ne 'account show --output none') {
+            $state.Mutations++
+            throw 'Offline contract refuses all other Azure commands.'
+        }
+        $state.Reads++
+        $global:LASTEXITCODE = $state.Exit
+        if ($args[-1] -eq 'json') { $state.Account | ConvertTo-Json -Compress }
+    }
+    function docker { $state.ContainerReads++; $global:LASTEXITCODE = 0 }
+    function Get-Command { return $true }
+    $previousRuntimeRequirement = $env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME
+    $previousExit = $global:LASTEXITCODE
+    $env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME = '0'
+    $cases = @(
+        @{ Name = 'current cached tenant/subscription with explicit approved mirror'; Mirror = 'approvedmirror.azurecr.io'; Accept = $true },
+        @{ Name = 'retiring tenant is rejected'; Tenant = $retiring.Tenant.tenantId; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'context mismatch' },
+        @{ Name = 'wrong subscription is rejected'; Sub = $retiring.Tenant.subscriptionId; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'context mismatch' },
+        @{ Name = 'missing approved mirror is rejected for anonymous GHCR dev'; Accept = $false; Error = 'No approved ACR mirror' },
+        @{ Name = 'GHCR is not an ACR mirror'; Mirror = 'ghcr.io/owner/image'; Accept = $false; Error = 'ACR login server' },
+        @{ Name = 'image path is not an ACR login server'; Mirror = 'approvedmirror.azurecr.io/scimserver'; Accept = $false; Error = 'ACR login server' },
+        @{ Name = 'registry-declared managed identity ACR supplies the default'; DeclaredAcr = $true; Accept = $true; ExpectedMirror = 'declaredmirror.azurecr.io' },
+        @{ Name = 'explicit mirror overrides compatible registry default'; DeclaredAcr = $true; Mirror = 'approvedmirror.azurecr.io'; Accept = $true },
+        @{ Name = 'undeclared ACR authentication is not a compatible default'; UnknownAuth = $true; Accept = $false; Error = 'No approved ACR mirror' },
+        @{ Name = 'wrong app target is rejected'; App = 'unapproved-app'; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'Dev target mismatch' },
+        @{ Name = 'wrong resource group is rejected'; Group = 'unapproved-group'; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'Dev target mismatch' },
+        @{ Name = 'matching explicit app and resource group are admitted'; App = $active.appName; Group = $active.resourceGroup; Mirror = 'approvedmirror.azurecr.io'; Accept = $true },
+        @{ Name = 'disabled subscription is rejected'; Disabled = $true; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'cached Azure account' },
+        @{ Name = 'unavailable cached account is rejected'; Exit = 1; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'cached Azure account' },
+        @{ Name = 'empty cached identity is rejected'; Empty = $true; Mirror = 'approvedmirror.azurecr.io'; Accept = $false; Error = 'cached Azure account' },
+        @{ Name = 'DryRun does not require account or mirror'; Dry = $true; Exit = 1; Accept = $true },
+        @{ Name = 'SkipDeploy does not require account or mirror'; Skip = $true; Exit = 1; Accept = $true }
+    )
+    try {
+        foreach ($case in $cases) {
+            $state.Clear()
+            $state.Exit = if ($case.Exit) { $case.Exit } else { 0 }
+            $state.Reads = 0
+            $state.Mutations = 0
+            $state.ContainerReads = 0
+            $state.Registry = $registryFixture | ConvertTo-Json -Depth 30 | ConvertFrom-Json
+            $fixtureActive = $state.Registry.estates | Where-Object { $_.purpose -eq 'dev' -and $_.Role -eq 'active' }
+            if ($case.DeclaredAcr -or $case.UnknownAuth) {
+                $fixtureActive.registry = 'declaredmirror.azurecr.io/scimserver'
+                $fixtureActive.registryAuth = if ($case.UnknownAuth) { 'anonymous' } else { 'managed-identity' }
+            }
+            $state.Account = if ($case.Empty) { @{} } else { @{
+                tenantId = if ($case.Tenant) { $case.Tenant } else { $active.Tenant.tenantId }
+                id = if ($case.Sub) { $case.Sub } else { $active.Tenant.subscriptionId }
+                state = if ($case.Disabled) { 'Disabled' } else { 'Enabled' }
+            } }
+            $accepted = $false
+            $message = ''
+            try {
+                if ($admission) {
+                    $result = Assert-ActiveDevDeploymentAdmission -RegistryAcr $case.Mirror `
+                        -DevAppName $case.App -DevResourceGroup $case.Group `
+                        -DryRun:([bool]$case.Dry) -SkipDeploy:([bool]$case.Skip)
+                } else {
+                    # Exercise inherited account prerequisite and parameter default, not a missing-function failure.
+                    if (-not $case.Dry -and -not $case.Skip -and -not $case.Exit) { Test-PrereqOrExit }
+                    $default = $ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'RegistryAcr' }
+                    $result = [pscustomobject]@{ RegistryAcr = if ($case.Mirror) { $case.Mirror } else { $default.DefaultValue.SafeGetValue() } }
+                }
+                $accepted = $true
+            } catch { $message = $_.Exception.Message }
+            Invoke-Assert "admission: $($case.Name)" ($accepted -eq $case.Accept -and
+                ($case.Accept -or $message.Contains($case.Error)))
+            Invoke-Assert "admission dispatches no mutation: $($case.Name)" ($state.Mutations -eq 0)
+            if ($case.Dry -or $case.Skip) {
+                Invoke-Assert "nondeployment admission performs no account lookup: $($case.Name)" ($state.Reads -eq 0)
+            } elseif ($accepted -and $case.Accept) {
+                $expectedMirror = if ($case.ExpectedMirror) { $case.ExpectedMirror } else { $case.Mirror }
+                Invoke-Assert "approved mirror is preserved: $($case.Name)" ($result.RegistryAcr -eq $expectedMirror)
+                Invoke-Assert 'admitted identity comes from the current role, not the historical alias' `
+                    ($result.Estate.Tenant.tenantId -eq $active.Tenant.tenantId -and
+                        $result.Estate.Tenant.subscriptionId -eq $active.Tenant.subscriptionId)
+            }
+        }
+        Invoke-Assert 'deployment admission runs before prerequisites and state capture' `
+            ($content.IndexOf('$deploymentAdmission = Assert-ActiveDevDeploymentAdmission') -gt 0 -and
+                $content.IndexOf('$deploymentAdmission = Assert-ActiveDevDeploymentAdmission') -lt $content.IndexOf("`nTest-PrereqOrExit"))
+        Invoke-Assert 'pipeline has no historical ACR default or retiring sign-in advice' `
+            ($content -notmatch 'acrscimsrv09\.azurecr\.io' -and $content -notmatch 'Use-ProvIAM09')
+        Invoke-Assert 'dev ARM lookups are explicitly pinned to admitted subscription' `
+            ($content -match 'containerapp show.*--subscription \$devSubscriptionId')
+        $DryRun = $true
+        $state.Exit = 0
+        $state.Reads = 0
+        $state.ContainerReads = 0
+        Test-PrereqOrExit
+        Invoke-Assert 'DryRun prerequisites dispatch no Azure or container commands' `
+            ($state.Reads -eq 0 -and $state.ContainerReads -eq 0)
+    } finally {
+        $env:SCIM_REQUIRE_INDEPENDENT_CONTAINER_RUNTIME = $previousRuntimeRequirement
+        $global:LASTEXITCODE = $previousExit
+    }
+}
+
+& {
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
     $resolver = $ast.Find({
         param($node)

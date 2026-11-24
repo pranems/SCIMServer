@@ -28,6 +28,26 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### November 24 offline full-deployment admission
+
+The local deployment pipeline now checks the cached tenant/subscription
+against the **active dev role** before any cloud-mutating stage. A retiring
+account context is rejected rather than silently targeting tenant 09.
+The current dev estate declares anonymous GHCR, so it does not provide a
+compatible approved ACR mirror default. Full deployment requires an explicit
+`-RegistryAcr` for an existing approved active mirror and actual verified
+import/push permissions. No ACR is guessed, created or waived.
+
+The original mirror/import/digest, merged-master and shipping gates remain
+mandatory. Dry-run admission and SkipDeploy admission require no mirror;
+DryRun also avoids account/container prerequisite commands. See the
+[canonical infrastructure guidance](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md#november-24-offline-deployment-admission-correction).
+Offline semantic tests establish rejection/admission logic only. They do not
+establish real account permissions, mirror availability, full-pipeline
+success or deployed performance. The separate unpublished logging candidate
+still fails HTTP performance and is not admitted by this correction.
+Docker Desktop and its artifacts remain untouched.
+
 ### Current merged-source checkpoint, 2026-11-23
 
 The current consolidated source is
