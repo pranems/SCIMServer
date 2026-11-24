@@ -28,6 +28,41 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### November 24 offline full-deployment admission
+
+The local deployment pipeline now checks the cached tenant/subscription
+against the **active dev role** before any cloud-mutating stage. A retiring
+account context is rejected rather than silently targeting tenant 09.
+The current dev estate declares anonymous GHCR, so it does not provide a
+compatible approved ACR mirror default. Full deployment requires an explicit
+`-RegistryAcr` for an existing approved active mirror and actual verified
+import/push permissions. No ACR is guessed, created or waived.
+
+The original mirror/import/digest, merged-master and shipping gates remain
+mandatory. Dry-run admission and SkipDeploy admission require no mirror;
+DryRun also avoids account/container prerequisite commands. See the
+[canonical infrastructure guidance](DEPLOYMENT_INFRASTRUCTURE_AND_FORM_FACTORS.md#november-24-offline-deployment-admission-correction).
+Offline semantic tests establish rejection/admission logic only. They do not
+establish real account permissions, mirror availability, full-pipeline
+success or deployed performance. The separate unpublished logging candidate
+still fails HTTP performance and is not admitted by this correction.
+Docker Desktop and its artifacts remain untouched.
+
+The wiring follow-up scopes every ACR CLI operation to the active dev
+subscription, including explicit approved mirrors. Different mirror
+subscriptions are unsupported rather than inferred. Current canary capture
+also resolves its app/group and pins its ingress read to the current
+canary subscription. The pipeline always checks a supplied `-DevFqdn`
+against the authoritative scoped current-dev ingress before HTTP capture;
+foreign and alternate green-label hosts are rejected. The separate
+blue/green promotion/verification flow is unchanged. SkipDeploy still needs
+the actual authorized ingress read for its existing capture, but no mirror;
+DryRun bypasses ingress and direct ACR tag-list commands.
+
+Dev revision pruning receives the admitted subscription explicitly, and the
+pruning dependency scopes each operation without switching cached accounts.
+The existing retention and serving/rollback protection rules are preserved.
+
 ### Current merged-source checkpoint, 2026-11-23
 
 The current consolidated source is

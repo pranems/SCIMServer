@@ -1,6 +1,6 @@
 # Deployment Infrastructure and Form Factors
 
-> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-20 - **Repo version at capture:** `api/package.json` = `0.55.67`
+> **Status:** Living reference - **Created:** 2026-07-29 - **Last verified:** 2026-11-24 - **Repo version at capture:** `api/package.json` = `0.55.67`
 > **Scope:** Infrastructure elements and deployment form factors. Current prov10 dev/canary observations are recorded below; Sections 4-6 retain explicitly historical tenant-09/customer measurements, not November 4 revalidation of those estates.
 > **Maintenance:** This document is **enforced**, not aspirational - see [Section 0.1](#01-maintenance-contract---this-is-a-living-document). Gate: `pwsh scripts/audit-deployment-doc.ps1`.
 > **Companion docs:** [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) (canonical for cost + load scenarios), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (how-to walkthrough), [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Docker build detail), [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) (sovereign clouds). This doc is the canonical source for **which infra elements exist, why, and their measured configuration**.
@@ -49,6 +49,73 @@ It requires the separately provisioned local SSH account and pinned host key.
 Docker Desktop artifacts are retained; removal is a separate operator action.
 
 ## Tenant 10 deployments: accepted, role-controlled cutover
+
+### November 24 offline deployment-admission correction
+
+The local source now resolves the default full deployment target through
+[Get-ScimEstate](../scripts/scim-estates.ps1#L181) with `-Purpose dev`.
+[Assert-ActiveDevDeploymentAdmission](../scripts/dev-deployment-pipeline.ps1#L256)
+checks the existing cached account's tenant ID, subscription ID and enabled
+state before prerequisites, before-state HTTP capture or numbered mutating
+stages. Both IDs must match the registry-declared active dev estate.
+Explicit app/resource-group arguments must name that same estate. Dev
+control-plane reads and the update are pinned to its subscription. A mismatch
+stops admission; no automatic sign-in, account switch or permission expansion
+is performed.
+
+The active dev registry entry currently declares anonymous GitHub Container
+Registry (GHCR), not an approved Azure Container Registry (ACR) mirror. The old
+implicit `acrscimsrv09.azurecr.io` default is removed. Full deployment therefore
+requires `-RegistryAcr` naming an **existing approved active mirror login
+server** and separately verified import/push permissions. If an active estate
+declares a managed-identity ACR, its login server can supply the default.
+An explicit approved login server remains authoritative. A URL, GHCR image
+path or ACR repository path is not a login server.
+
+The same-outcome wiring follow-up pins all six ACR CLI operations (login,
+two imports, tag listing and two manifest reads) to the active dev
+subscription. **An explicit approved mirror must exist in that subscription**;
+this pipeline does not support a different mirror subscription or infer one
+from ambient CLI context. Current canary app/group defaults and its ingress
+read resolve from `Get-ScimEstate -Purpose canary-prod`, with the read pinned
+to that estate's subscription. A different explicit canary app/group is
+rejected before capture. The existing promotion approval and blue/green
+verification path are unchanged.
+
+The dev pipeline also supplies its admitted subscription to
+`prune-revisions.ps1`. That existing dependency now scopes its list,
+deactivation and post-check directly with `--subscription` instead of
+changing cached account selection. Retention, serving-revision protection
+and the distinct-image rollback selector are unchanged. Standalone pruning
+without `-Subscription` retains its existing caller-selected CLI behavior;
+deployment callers do not rely on that ambient selection.
+
+[Resolve-ActiveDevIngress](../scripts/dev-deployment-pipeline.ps1#L326)
+always performs a read-only ingress lookup scoped to current dev before any
+dev HTTP capture, even when `-DevFqdn` is supplied. A supplied hostname must
+match that authoritative ingress; case and an optional trailing DNS dot are
+normalized. Foreign hosts, URLs and alternate green-label hosts are rejected.
+Failed, empty or malformed ARM output is not admitted as a hostname.
+Source inspection found no pipeline caller using `-DevFqdn` for a green
+label. That legitimate verification flow is owned by the unchanged
+`promote-to-prod.ps1` and `verify-deployment.ps1` scripts instead.
+
+Admission does not discover, create or certify mirror infrastructure.
+The numbered local mirror, GHCR publication, ACR import, tag/digest parity,
+merged-master source, shipping and production-approval gates remain intact.
+`-DryRun` performs no account/container prerequisite, ingress or ACR tag-list
+calls, and `-SkipDeploy` does not require a mirror through this admission
+check. SkipDeploy still validates the authoritative current-dev hostname
+before its existing HTTP capture. This does not turn
+`-SkipDeploy` into an entirely network-free full pipeline; its existing
+validation/capture requirements still apply. Empty ARM diagnostics now name
+the registry-resolved current identity without advising a retiring tenant
+alias or inferring expiry from an empty result.
+
+These are offline source/test results, not a new deployment or cloud
+qualification. The actual approved mirror, permissions and full deployment
+pipeline remain pending. The historical deployment observations below are
+unchanged.
 
 The prov10 dev and canary apps now serve version 0.55.67 from reviewed merge
 `b87412b0ad5edac47bf19aaca92bb233c12304ed` and immutable digest

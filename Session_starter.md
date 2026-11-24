@@ -1,5 +1,40 @@
 ## SCIMServer - Condensed Session Memory
 
+### Offline active deployment admission, 2026-11-24
+
+Same-outcome follow-up to `fd800991`: all ACR CLI commands now use the
+registry mirror's approved active-dev subscription scope; cross-subscription
+mirrors are unsupported. Current canary identity/scope resolves by role.
+Explicit dev ingress overrides are checked against authoritative scoped ARM
+ingress before HTTP capture. Separate blue/green verification is untouched.
+DryRun also suppresses the previously direct tag-list read. Parent has not
+accepted this source as complete or deployment ready. Original receipts
+remain intact; follow-up journals/receipts use the `wiring-` prefix under
+`test-results/active-deployment-admission/`.
+The same scope audit found dev revision pruning still ambient; the caller
+now passes its admitted subscription and pruning scopes each operation
+without `az account set`. Retention/serving/rollback policy is unchanged.
+
+| Date | Summary |
+|---|---|
+| 2026-11-24 | Isolated active-deployment preflight source correction removes the retiring ACR default, resolves current dev by role, checks cached tenant/subscription and explicit dev target before side effects, and requires an existing approved explicit ACR mirror when anonymous GHCR supplies no compatible default. Numbered mirror/import/digest/master/shipping/approval gates remain intact. Offline semantic contracts cover value correctness and DryRun non-dispatch; real mirror availability, permissions and full deployment remain pending. No runtime, cloud, Desktop removal, logging/performance or published-image change. |
+
+- [x] Offline admission correction and directly coupled operator guidance.
+- [x] Focused offline validation: 116 deployment contract assertions and 15
+  estate-validator cases pass; two PowerShell parsers, one existing literal
+  JSON block, canonical infrastructure audit and all 29 documentation
+  freshness entries pass. Receipts and planned/started/closed validation
+  journal are in `test-results/active-deployment-admission/`. Mocked account
+  checks are not real cloud, permission or deployment evidence.
+- [ ] Parent consolidation/review and approved active mirror/permission evidence.
+- [ ] Real full-pipeline and deployment acceptance, separate from mocked admission.
+
+Design disposition: accepted. One small cohesive pipeline-local admission
+function reuses `Get-ScimEstate -Purpose dev`; no generic authentication
+framework or speculative strategy seam was introduced. Self-improvement:
+applied semantic cached-identity/mirror controls, no-command DryRun coverage
+and retained failed receipts rather than treating source checks as cloud proof.
+
 ### Current container-runtime evidence checkpoint, 2026-11-24 UTC
 
 | Date | Summary |
