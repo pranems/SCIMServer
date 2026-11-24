@@ -49,12 +49,53 @@ different boundaries; a following request can wait for preceding server
 work. They do not identify which task delayed the server, or prove that
 the network or synchronous log capture caused the delay.
 
-The next bounded observation is a sampled CPU profile on the same owned
-runtime, with actual start/stop acknowledgments, measured clock bounds
-and explicit cleanup. It must wait until the independent full backend
-matrix finishes, avoiding host contention. No log persistence, foreign-key,
-uniqueness, profile coordination, pool capacity or latency limit is to be
-removed on the strength of the current data.
+### Actual sampled CPU observation, 2026-11-24 UTC
+
+After the exact-a7 six-mode matrix completed and released the host, the
+prepared observer executed once on historical exact-c52 with actual
+start/stop acknowledgments. It captured7,102 samples/3,778 nodes and368
+uniquely correlated requests. The benchmark script matches the earlier
+executed bytes. Only10/17 instrumented latency categories pass;4/4 bulk
+pass. Profiler overhead prevents treating this as an uninstrumented
+performance comparison or release admission.
+
+The measured CPU-profile/performance-clock offset interval is45.257524ms
+wide. It cannot precisely attribute10-30ms tails to individual samples.
+Whole-run stacks include PostgreSQL socket writes and Prisma work.
+Several worst samples recur at request positions50,100,150,220,270 and320;
+the existing logger flushes at50 buffered rows. This motivates observing
+actual flush timing as the next bounded experiment, not declaring causality.
+No log persistence, foreign-key, uniqueness, profile coordination, pool
+capacity or latency limit is removed on the strength of this data.
+
+All exact owned fixtures and client configuration were removed. Original
+resource identities remain, and actual Windows port64016 has zero listeners.
+Private receipt/analysis prefix:
+`parent-stage-diagnostic-20261124T005542633Z`.
+
+### Actual batch-start observation, 2026-11-24 UTC
+
+A distinct metadata-only experiment, without CPU profiling, now records
+actual flush starts on the same performance clock as server frames.
+The observer preserves the original promise, return value and exceptions;
+its expanded contract first failed on missing metadata, then all six
+neighboring stage/CPU controls passed. It does not record batch payloads,
+change the buffer, disable logging or time asynchronous completion.
+
+All six full batches contain50 rows and begin during requests49,99,149,219,
+269 and319. The following requests are the recurring slow positions.
+
+| Following category | Preceding request position | Synchronous flush call | Flush start to next server request | Next client response end | Next server span |
+|---|---:|---:|---:|---:|---:|
+| GET Group | 149 | 0.036 ms | 16.976 ms | 31.686 ms | 15.430 ms |
+| ResourceTypes | 219 | 0.088 ms | 18.102 ms | 26.784 ms | 9.679 ms |
+| Version | 319 | 0.052 ms | 15.270 ms | 20.966 ms | 6.588 ms |
+
+This confirms batch-start association, not the amount of asynchronous
+flush work or causal attribution. The unchanged diagnostic passes14/17
+latency and4/4 bulk categories. Its exact fixtures are removed and original
+identities retained. Receipt prefix:
+`parent-stage-diagnostic-20261124T011045795Z`.
 
 All exact diagnostic API/database/network resources and private client
 configuration were removed; actual Windows listener closure and original

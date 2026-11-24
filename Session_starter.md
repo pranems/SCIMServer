@@ -1,26 +1,34 @@
 ## SCIMServer - Condensed Session Memory
 
-### Current container-runtime evidence checkpoint, 2026-11-23
+### Current container-runtime evidence checkpoint, 2026-11-24 UTC
 
 | Date | Summary |
 |---|---|
 | 2026-11-23 | Root-tooling PR #284 and live-harness PR #285 normally merged through a7ef00012da717a5933cd9429a9d0afb771b1d2c. Combined d3e5cec5 passed all 29 normal Fast gates and six exact-tip checks: 220 API unit suites and 6,274 tests, 2,519 reduced HTTP passes with 45 known skips, 126 web files and 1,664 tests, plus nonshipping image, smoke and Trivy checks. |
 | 2026-11-24 UTC | Canonical removal readiness was outside the freshness manifest and used an unrecognized version label. Actual registration/header controls first failed three assertions; the minimal manifest/marker fix now passes all 30 self-test assertions and all 29 registered-document audits. Existing documentation CI invokes the guard. This documentation/governance outcome is not new runtime or release admission. |
+| 2026-11-24 UTC | Exact merged a7ef0001 now passes all six unchanged canonical modes: units220/6274 each backend, InMemory HTTP2575/45 known skips, PostgreSQL HTTP2620/zero skips and web unit/coverage126/1664 each. The original outer exit2 is retained and separately reconciled to identical snapshot bytes/Git object; all six canonical exits0 and exact cleanup pass. Candidate CI45299868150 separately passes all three jobs, exact-digest smoke and existing Trivy gate, without latest/release tags or deployment. |
 
 Both source/integration self-reviews are recorded COMMENTED, not independent
 approval. Neither merge bypassed a gate or branch protection. Both complete c52 native backend live
 runs pass1845/1845 with exact cleanup and unchanged executed harness hashes.
-The authoritative full matrix at c52 remains historical; a fresh isolated
-context now owns the complete canonical matrix at merged a7ef0001.
-Do not duplicate or preempt that execution.
+The c52 matrix remains historical; fresh exact-a7 qualification is complete.
+Its database/client resources are removed, both listeners closed and no
+worktree test process remains. Do not duplicate the unchanged matrix.
 
 Performance remains unaccepted. An instrumented historical-c52 request-stage
 run correlates368 unique IDs/statuses but still passes only13/17 latency and
 4/4 bulk categories. Small synchronous log/JSON spans do not explain all slow
 samples. Adjacent previous server tails can exceed their client response-end
 spans; do not call the residual network time or remove logging safeguards.
-CPU-profile preparation is private and not yet actual runtime evidence.
-No competing benchmark runs while the matrix owns the host.
+The later actual c52 CPU diagnostic captures7102 samples/368 correlated
+requests, but passes only10/17 instrumented latency categories. Its45.258ms
+clock-offset uncertainty prevents exact per-request CPU attribution.
+PostgreSQL write stacks and repeated50-request tails are a next hypothesis,
+not a cause claim. Exact cleanup and Windows port64016 closure pass.
+A subsequent metadata-only experiment confirms actual50-row flush starts
+at preceding request positions49,99,149,219,269,319. It passes14/17 latency
+and4/4 bulk, with exact cleanup; asynchronous completion/causality remain
+unmeasured. No logging or benchmark setting was changed.
 
 Docker Desktop, original volumes and protected backups remain retained.
 Shipping/dev, preservation-safe shared-admin authorization, gallery/WIF and

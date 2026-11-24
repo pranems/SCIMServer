@@ -22,6 +22,9 @@ retains its existing warning semantics. This applies the existing
 context-document admission rule to another current operational guide.
 Use durable phase/evidence descriptions in tracked context files, not a
 working-tree label such as "uncommitted" that becomes stale when saved.
+Allocate append-only issue identifiers against the entire ledger, including
+narrative definitions outside its main table. A table-only scan can create
+colliding evidence references even when every table row looks unique.
 See [the concrete escape and correction](../CONTAINER_RUNTIME_REMOVAL_READINESS.md#7-execution-issues-and-root-cause-ledger).
 
 ## Prepare evidence transforms when material changes (2026-11-23)

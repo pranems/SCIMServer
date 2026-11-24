@@ -28,9 +28,11 @@ plugins, and pinned key-only loopback SSH. See the
 [runtime assessment and operator workflow](docs/CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
 for actual qualification results, session activation, Linux bind paths and
 preservation limits. The [current removal-readiness report](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md)
-separates the November 23 merged-source checkpoint and actual CI/live results
+separates the November 23-24 merged-source checkpoint and actual CI/live results
 from historical trials, GUI scope, image labels and still-open final
-performance/release/dev gates.
+performance/release/dev gates. Exact merged a7ef0001 now passes its six-mode
+matrix and a separate commit-pinned candidate image CI; neither is shipping
+or deployment acceptance.
 Hosted builders remain independent of Desktop. No new cloud deployment or
 performance qualification is claimed by the local runtime checks.
 

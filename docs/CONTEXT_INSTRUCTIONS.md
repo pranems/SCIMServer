@@ -2,8 +2,8 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.70
-> **Last Updated**: November 23, 2026
-> **Last verified:** 2026-11-23
+> **Last Updated**: November 24, 2026 UTC
+> **Last verified:** 2026-11-24
 
 ---
 
@@ -41,8 +41,14 @@ also passes 29 normal Fast gates and all six PR checks. The integration
 preserves both changes and passed all29 normal Fast gates and all6 exact-tip
 checks at d3e5cec5: API220/6274, reducedHTTP2519/45 known skips and web126/1664.
 Normal exact-head PR285 merge produced a7ef00012da717a5933cd9429a9d0afb771b1d2c
-at2026-11-23T23:27:06Z. A fresh isolated context owns its complete canonical
-six-mode matrix; the c52 matrix remains historical, not relabeled.
+at2026-11-23T23:27:06Z. Fresh exact-a7 qualification now passes all6 canonical
+modes: units220/6274 each backend, InMemory HTTP2575/45 known skips,
+Prisma HTTP2620/zero skips, and web unit/coverage126/1664 each.
+Original outer exit2 remains preserved; separate exact-byte/Git-object
+reconciliation clears a stat-only snapshot marker without editing/restoring
+source. Exact cleanup and both listener closures pass. Candidate CI45299868150
+also passes its three jobs, same-digest smoke and existing Trivy policy.
+The c52 matrix remains historical, not relabeled; no shipping/deployment claim.
 The harness changes no dependencies; the merged root repair
 supplies its own authenticated lock. Direct review found no unresolved defect.
 No independent approval or all-security-green claim is made. The actual
@@ -59,7 +65,11 @@ browser outcomes passed. An independent request-stage diagnostic correlates
 categories; SQL/memory/relative/shipping admission is not claimed. Adjacent
 preceding server tails can outlast their client response-end spans, so the
 remaining gap is not automatically network time. No production cause is
-established and no benchmark competes with the current matrix.
+established. After the matrix finished, an actual historical-c52 CPU diagnostic
+captured7102 samples and368 correlated requests, with10/17 instrumented
+latency categories passing. Clock-offset uncertainty45.258ms prevents exact
+per-request CPU attribution. The existing50-row log flush is a next hypothesis,
+not a proven cause. Exact cleanup and actual Windows listener closure pass.
 Docker Desktop, original data and backups remain retained; the optional global
 Desktop-backed MCP gateway is still unmigrated. See the
 [current source checkpoint](CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-merged-source-checkpoint-2026-11-23)

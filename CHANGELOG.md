@@ -15,14 +15,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and six exact-tip checks: 220 API unit suites and 6,274 tests, 2,519
   reduced HTTP passes with 45 known skips, 126 web files and 1,664 tests,
   plus the nonshipping image, container smoke and Trivy checks.
-- Distinguish the historical c52 complete six-mode matrix, both 1,845/1,845 live
-  runs and 35 native browser outcomes from pending fresh merged-source
-  qualification. No fresh matrix result, shipping, Azure, operator visual
-  acceptance or Docker Desktop removal is invented.
+- Record the fresh exact-a7 complete six-mode matrix: API units remain220/6274
+  for each backend; full InMemory HTTP2575/45 known skips and Prisma HTTP2620/
+  zero skips; web unit and coverage each126/1664. Preserve outer exit2 and
+  separate identical-byte/Git-object snapshot reconciliation; all six canonical
+  exits0, exact cleanup and both listener closures pass. The c52 live/browser
+  proofs remain historical, not relabeled as shipping or Azure qualification.
+- Record exact-a7 candidate CI45299868150: three jobs, API220/6274, reduced
+  HTTP2519/45 known skips, web126/1664, same-digest smoke and unchanged Trivy
+  gate pass. No release/latest tag, deployment or performance waiver.
 - Record the instrumented request-stage 13/17 latency failure, 368 unique
   request/status correlations and actual diagnostic cleanup. Small
   synchronous log/JSON spans and preceding-request response tails narrow
   the investigation without a production-cause claim or threshold change.
+- Record the actual subsequent c52 CPU diagnostic:7102 samples,368 correlated
+  requests,10/17 instrumented latency categories and4/4 bulk pass. Its45.258ms
+  clock-offset uncertainty prevents exact request attribution. All owned
+  fixtures removed and actual listener closure verified.
+- Confirm actual50-row flush starts at the six recurring preceding-request
+  positions in a distinct metadata-only diagnostic, preserving promise,
+  return/error behavior and log payload privacy. Instrumented14/17latency
+  and4/4bulk pass; asynchronous completion and cause remain unmeasured.
 - Close a documentation currency gap: register the canonical removal
   readiness guide and use the existing recognized product-version marker.
   The existing self-test first reports three concrete failures, then passes
@@ -32,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation and its governance coverage only: application version
   0.55.70, runtime code, API/web test populations and dependency graphs are
   unchanged. No auditor, hook, deadline or threshold is weakened. Do not
-  duplicate the owning matrix.
+  duplicate the completed unchanged matrix.
 
 ### Live evidence preparation follow-up
 

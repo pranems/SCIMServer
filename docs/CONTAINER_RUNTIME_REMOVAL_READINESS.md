@@ -1,7 +1,7 @@
 # Docker Desktop removal readiness
 
-**Last verified:** 2026-11-23
-**Status:** Source migration and follow-up repairs are merged. Final combined-source qualification, performance and release/dev acceptance remain open.
+**Last verified:** 2026-11-24
+**Status:** Merged-source six-mode qualification and candidate-image CI pass. Performance and release/dev acceptance remain open.
 **Product version:** 0.55.70; documentation scope, not new qualification, shipping or deployment evidence
 **Deadline from the supplied notice:** December 2, 2026
 
@@ -51,12 +51,29 @@ The header's product version states documentation scope only; dated
 qualification records remain pinned to their actual source. The 30-day
 verification-age setting retains the existing warning behavior.
 
-The complete canonical six-mode matrix passed at historical merged source
-`c52de06f`: API 219 suites/6,272 tests for each backend; InMemory HTTP
-2,575 passes/45 backend-specific skips; PostgreSQL HTTP 2,620 passes/zero
-skips; web unit and coverage each 126 files/1,664 tests. A fresh isolated
-qualification context now owns the complete matrix at `a7ef0001`.
-Until that execution finishes, the old matrix is not relabeled as new evidence.
+On November 24 UTC, fresh exact-`a7ef0001` qualification completed all six
+unchanged canonical modes. API units pass 220 suites/6,274 tests for each
+backend; InMemory HTTP passes 2,575 with 45 known backend skips; PostgreSQL
+HTTP passes 2,620 with zero skips; web unit and coverage each pass 126
+files/1,664 tests. Coverage is 85.74% lines, 75.86% branches, 75.53%
+functions and 83.06% statements. The original outer verifier exited 2 on
+a snapshot Git needs-update marker. Its failed receipt is preserved;
+separate reconciliation verifies identical raw bytes and Git object,
+empty content diff, clean final status and unchanged input hashes.
+All six canonical exits are zero. No snapshot was restored or regenerated.
+Exact owned database/client cleanup, both listener closures and zero
+remaining worktree test processes pass. Jest forced-exit advisories remain
+visible. This is new merged-source evidence, not relabeled c52 history.
+
+The same merged source separately passes all three jobs in
+[candidate CI 45299868150](https://github.com/pranems/SCIMServer/actions/runs/45299868150).
+Its image digest is
+`sha256:1ad5ffb6f27350f68da2262b87224897028e1a686965561edf582904bdd2874f`.
+The exact digest boots, serves discovery and passes the existing
+HIGH/CRITICAL-gating Trivy policy. Validation confirms API220/6274,
+reduced HTTP2519/45 known skips and web126/1664. The test tag is
+`test-desktop-exit-merged-a7ef0001-20261124T004621Z`; no release/latest
+tag, Azure deployment or shipping admission is claimed.
 
 The actual repaired live runner and evidence-helper hashes match complete
 fresh PostgreSQL and InMemory runs, each 1,845/1,845 assertions, 169 sections
@@ -71,8 +88,14 @@ Performance remains open, not waived. Complete host, Windows-container and
 Linux-client runs passed 13/17, 14/17 and 13/17 latency categories respectively.
 Four whole-artifact p95 increases above 10% remain unaccepted; the compared
 application Node patches differ. A separate instrumented request-stage
-diagnostic still passes only 13/17 latency categories and is not release
-admission. See the [request-stage findings](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#request-stage-diagnostic-2026-11-23).
+diagnostic passes only 13/17 latency categories. A later actual CPU-profiled
+c52 experiment captures 7,102 samples and 368 correlated requests but passes
+only 10/17 instrumented latency categories. Its 45.258 ms clock-offset
+uncertainty prevents exact attribution of 10-30 ms tails. Repeated tail
+positions and PostgreSQL socket/Prisma stacks motivate testing the existing
+50-row log flush, not removing logging guarantees or claiming a cause.
+Both experiments have exact cleanup and are not release admission.
+See the [request-stage findings](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#request-stage-diagnostic-2026-11-23).
 
 Recorded source and integration reviews are honest COMMENTED self-reviews,
 not independent approvals. Actual master protection and the delivery process
@@ -756,8 +779,12 @@ They do not change the earlier receipt or imply that release/dev gates passed.
 | R36 | Harness environment / Low | Empty NODE_DISABLE_COMPILE_CACHE still disabled activation; the pre-test probe refused to run. | Omit the disabling variable and require getCompileCacheDir to return the owned cache directory. Focused 90 and complete hook pass. Earliest gate: explicit activation before claiming an optimization; absent and empty environment values are not interchangeable. |
 | R37 | Validation interruption / Medium, focused recovery only | The bbcd6791 hook log jumps from 03:05:25.749 to 11:54:24.265 UTC (31,738.516 seconds). The first subsequent failure is endpoint cleanup expecting 204 but receiving 401 with bearer_oauth_expired; that suite accounts for all 31 failed tests. The outer Git runner also timed out. The OS-level cause, including possible sleep, is not established. | Preserve release-push-1795143190717.txt/json and the late failed-hook summary. Verify no owned test workers remain before retry. The unchanged exact query-semantics suite passes all 42 tests with process status 0 in release-query-recovery-1795180255034.json. This proves focused recovery, not a successful final push. No token lifetime, test deadline, selector or threshold changed. Detection: owning HTTP hook; earliest useful check: distinguish a wall-clock discontinuity from application execution time before modifying code. |
 | R38 | Editor tool transport / Low | Tool discovery for parent messaging and the focused editor test request each returned no response after 1,800 seconds. Neither result proves delivery or test execution. | Do not claim a parent milestone was delivered. A process scan confirmed no worktree Node test workers before a receipt-producing native Node runner executed the exact suite successfully. No repeated editor request or overlapping test run was started. This extends R28's requirement to verify semantic receipts and process completion rather than infer success from unavailable tool output. |
-| R39 | Documentation coverage / Medium, applied | The README-linked current readiness guide retained its earlier source while the freshness gate passed all 28 registered documents. This guide was absent from the manifest, and its Product source label was not an F1 version marker. | Permanent actual-header/registration controls first failed three assertions. Register the guide and use the recognized Product version documentation-scope marker: all 30 self-test assertions and all 29 document audits pass. Existing documentation CI already invokes the self-test; no auditor or workflow change was needed. Dated evidence stays pinned, and the 30-day age setting remains a warning. Detection: source-document consolidation; earliest prevention: manifest admission plus actual-marker stale/current controls when the guide became the current acceptance record. |
-| R40 | Private diagnostic test correctness / Medium | The CPU-observer positive contract acknowledged installation but could not find the owned symbol through the host VM sandbox. Negative cleanup assertions using that same proxy could also pass without checking the actual context global. | Read and delete the symbol inside vm.runInContext. The nine neighboring contracts pass, and the final four focused CPU lifecycle contracts pass after adding stop-failure cleanup. This is mock/driver preparation, not a real CPU-profile or performance pass. Earliest detection: positive persistence plus actual-context negative cleanup before runtime instrumentation. |
+| R40 | Documentation coverage / Medium, applied | The README-linked current readiness guide retained its earlier source while the freshness gate passed all 28 registered documents. This guide was absent from the manifest, and its Product source label was not an F1 version marker. | Permanent actual-header/registration controls first failed three assertions. Register the guide and use the recognized Product version documentation-scope marker: all 30 self-test assertions and all 29 document audits pass. Existing documentation CI already invokes the self-test; no auditor or workflow change was needed. Dated evidence stays pinned, and the 30-day age setting remains a warning. Detection: source-document consolidation; earliest prevention: manifest admission plus actual-marker stale/current controls when the guide became the current acceptance record. |
+| R41 | Private diagnostic test correctness / Medium | The CPU-observer positive contract acknowledged installation but could not find the owned symbol through the host VM sandbox. Negative cleanup assertions using that same proxy could also pass without checking the actual context global. | Read and delete the symbol inside vm.runInContext. The nine neighboring contracts pass, and the final four focused CPU lifecycle contracts pass after adding stop-failure cleanup. This is mock/driver preparation, not a real CPU-profile or performance pass. Earliest detection: positive persistence plus actual-context negative cleanup before runtime instrumentation. |
+| R42 | Private fixture admission / Low, applied | Both created and running PostgreSQL fixtures omitted tmpfs entries from Docker Mounts even though HostConfig.Tmpfs declared the intended storage. The private guard refused both attempts before the matrix. | Preserve both failed receipts. Admit exact configured tmpfs, reject persistent mounts, then verify the running filesystem with stat. The actual filesystem is tmpfs; no repository guard or runner changed. Detection and earliest prevention: storage admission before the canonical matrix. |
+| R43 | Private verifier / Git metadata / Low, reconciled | All six canonical modes exited zero, but the outer verifier exited 2 on a snapshot needs-update marker while content diff was empty. The exact OS/index-cache trigger is not established. | Preserve the failed outer receipt. Separate reconciliation verifies identical raw snapshot bytes and Git object, unchanged input hashes and clean final status without restoring/editing source. Verify content and metadata separately before declaring drift. Detection: final wrapper; earliest useful check: distinguish content drift from stat-only markers immediately after a snapshot-capable test. |
+| R44 | CI dispatch / Low, applied | Dispatching the merged commit as a workflow ref returned HTTP 422 No ref found and created no run. | Verify named master before dispatch; identify the single new run from pre/post IDs and verify its immutable head. Cancel a mismatch rather than admitting it. Exact-a7 run45299868150 completes successfully with unchanged workflow/gates and no latest/release tag. Detection: dispatch API; earliest prevention: distinguish supported named refs from commit identity, then require head admission. |
+| R45 | Documentation consistency / Low, applied | Newly allocated issue R39 collided with an existing narrative R39 outside the main table. | Preserve the existing narrative identifier; assign new entries R40 onward and check that range across all table/narrative definitions. An initial overly broad check conflated unrelated historical low-ID tables; scoped R39-R45 validation now passes. Detection: final scoped documentation check; earliest prevention: scan every issue-definition form before allocating an append-only ID. No historical issue or failed receipt is deleted. |
 
 November 20 interruption disposition: the failed full run remains blocked
 despite the unchanged focused recovery. The self-improvement applied here is
