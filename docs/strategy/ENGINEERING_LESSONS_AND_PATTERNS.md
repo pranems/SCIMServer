@@ -20,6 +20,8 @@ qualification claims. Never relabel an old matrix, source hash or shipping
 result because the marker was refreshed. The verification-age setting
 retains its existing warning semantics. This applies the existing
 context-document admission rule to another current operational guide.
+Use durable phase/evidence descriptions in tracked context files, not a
+working-tree label such as "uncommitted" that becomes stale when saved.
 See [the concrete escape and correction](../CONTAINER_RUNTIME_REMOVAL_READINESS.md#7-execution-issues-and-root-cause-ledger).
 
 ## Prepare evidence transforms when material changes (2026-11-23)

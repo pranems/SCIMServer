@@ -5,7 +5,7 @@
 | Date | Summary |
 |---|---|
 | 2026-11-23 | Root-tooling PR #284 and live-harness PR #285 normally merged through a7ef00012da717a5933cd9429a9d0afb771b1d2c. Combined d3e5cec5 passed all 29 normal Fast gates and six exact-tip checks: 220 API unit suites and 6,274 tests, 2,519 reduced HTTP passes with 45 known skips, 126 web files and 1,664 tests, plus nonshipping image, smoke and Trivy checks. |
-| 2026-11-24 UTC | Canonical removal readiness was outside the freshness manifest and used an unrecognized version label. Actual registration/header controls first failed three assertions; the minimal manifest/marker fix now passes all 30 self-test assertions and all 29 registered-document audits. Existing documentation CI invokes the guard. This remains an uncommitted documentation/governance change, not new runtime or release admission. |
+| 2026-11-24 UTC | Canonical removal readiness was outside the freshness manifest and used an unrecognized version label. Actual registration/header controls first failed three assertions; the minimal manifest/marker fix now passes all 30 self-test assertions and all 29 registered-document audits. Existing documentation CI invokes the guard. This documentation/governance outcome is not new runtime or release admission. |
 
 Both source/integration self-reviews are recorded COMMENTED, not independent
 approval. Neither merge bypassed a gate or branch protection. Both complete c52 native backend live
