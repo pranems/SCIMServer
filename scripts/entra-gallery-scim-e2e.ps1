@@ -19,7 +19,11 @@
 
 .PARAMETER PlanOnly
     Resolve and validate the estate, identities, gallery application, schema,
-    and WIF reference without creating fixtures.
+    and WIF reference without configuring credentials or provisioning User,
+    Group or SCIM endpoint fixtures. This is not read-only: it creates a
+    temporary synchronization job for schema discovery. Default finally
+    cleanup removes and verifies the owned job. KeepArtifacts retains it
+    and records a cleanup failure.
 #>
 [CmdletBinding()]
 param(
@@ -1238,7 +1242,7 @@ function Write-Reports {
         }
     )
     $extensionDisposition = if ($PlanOnly) {
-        'NOT_RUN: plan-only intake does not provision the reviewed custom mapping.'
+        'NOT_RUN: plan-only schema probe does not provision the reviewed custom mapping.'
     }
     elseif ($Modes.Count -gt 0 -and $missingExtensionChecks.Count -eq 0) {
         'PASS: the reviewed department-to-costCode mapping was verified on create and update in every requested auth mode.'
@@ -1356,11 +1360,12 @@ try {
     Add-Result 'intake' 'dev estate and identity boundary' 'PASS' "Resolved the active dev estate, matching interactive tenant profile, and unused gallery service principal."
 
     if ($PlanOnly) {
+        Write-Warning 'PlanOnly is not read-only: it creates a temporary synchronization job for schema discovery. Default finally cleanup removes and verifies the owned job; KeepArtifacts retains it and causes cleanup failure.'
         $currentStage = 'create plan-only schema probe job'
         $probeJob = New-SynchronizationJob
         $currentStage = 'read plan-only gallery schema'
         $probeRule = Get-SynchronizationRule -JobId $probeJob.id
-        Add-Result 'plan' 'gallery schema' 'PASS' "Resolved $($probeRule.name) without configuring credentials or provisioning objects."
+        Add-Result 'plan' 'gallery schema' 'PASS' "Resolved $($probeRule.name) through the owned temporary job without configuring credentials or provisioning User, Group or SCIM endpoint fixtures."
         if ($Modes -contains 'WorkloadIdentity') {
             $currentStage = 'resolve WIF reference'
             $referenceSp = Get-ExactServicePrincipal -DisplayName $WifReferenceServicePrincipalName

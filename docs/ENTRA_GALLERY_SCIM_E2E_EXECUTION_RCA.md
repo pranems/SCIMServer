@@ -8,6 +8,40 @@ This ledger records issues found while building and running the owned Microsoft 
 
 ## Current dev deployment and diagnostic checkpoint
 
+### Offline plan-only classification correction, 2026-11-24
+
+This checkpoint is source and mocked execution evidence only. The historical
+live proof below retains its original version, date and counts. No new
+directory operation, authentication attempt or expanded gallery matrix was
+run.
+
+`-PlanOnly` already POSTs a temporary synchronization job and registers its
+exact ID before reading the gallery schema. Default `finally` cleanup
+removes and verifies owned artifacts. `-KeepArtifacts` instead records
+retention as cleanup failure. The flag does not create User, Group or SCIM
+endpoint provisioning fixtures, but that does not make it read-only.
+
+The existing offline contract now executes the actual plan branch and job
+creator with bounded Graph/schema mocks. Three assertions failed against the
+old help, skill prescription and missing warning; the job-creation/ownership
+control passed unchanged. After correcting guidance and adding the warning
+before the POST, all **96 assertions pass**, preserving the original 92.
+The warning is disclosure, not authorization to run against an active estate.
+Read-only preparation remains separate local registry inspection and
+authorized directory GET requests, not invocation of this flag.
+
+| ID | Type / severity | Symptom and root cause | Resolution and why it works | Prevention | Detection / earliest gate |
+|---|---|---|---|---|---|
+| GM-I28 | Safety classification / High | Help said no fixtures and the skill prescribed non-provisioning intake, while the actual branch POSTs a synchronization job. Existing 92 contracts did not assert that distinction or warning order. | Explicitly disclose the temporary job, default cleanup and retention failure in help/skill/results, and warn before job creation. No auth, provisioning or cleanup behavior was changed. | Three concrete RED assertions became GREEN; actual branch/job mocks verify ownership and warning before mutation. Promote the recurring safe-mode naming pattern. | Parent source review / initial command-safety and instruction contract; one escape from existing contract to review |
+| GM-I29 | Tooling / Low | An initial bounded read requested line 1510 although the source ends at 1415; the tool returned no content for that range. | Read the actual final catch/finally/exit range at 1380-1415. Cleanup and nonzero retention outcome were verified from source before documenting them. | Use discovered source positions rather than an estimated tail; a failed read is not evidence of missing cleanup. | Tool response / same read; zero escape |
+
+Design disposition: **accepted**. This adds one cohesive warning, related
+operator guidance and actual-source tests, not a new no-write flag or a
+second provisioning path. Self-improvement: **applied** through executable
+effect ordering and the shared safe-mode classification pattern.
+These bounded entries were captured after confirmed RED/GREEN. They do not
+claim reconciliation of the complete historical session transcript.
+
 ### Native linked-member correction verified locally
 
 Diagnostic PR #227 merged normally at `f5046202` after 24 protected gates and
