@@ -172,21 +172,36 @@ test.describe('TokenGate - v0.52.1 RCA paths', () => {
     await expect(page.getByTestId('token-input')).toHaveCount(0);
   });
 
-  test('double-click on Save does not double-submit (pendingRef guard)', async ({ page }) => {
+  test('double-click on Save persists the token once and opens the app shell', async ({ page }) => {
     await freshSession(page);
 
     await page.getByTestId('token-input').fill(TOKEN);
 
-    // Fire two clicks back-to-back. The synchronous pendingRef guard in
-    // TokenGate.handleSave() must short-circuit the second click; both
-    // resolve to a single save + a single navigate.
-    const save = page.getByTestId('token-save');
-    await Promise.all([save.click(), save.click().catch(() => undefined)]);
+    await page.evaluate((key) => {
+      const writes: string[] = [];
+      const observedWindow = window as Window & { __tokenSaveWrites?: string[] };
+      observedWindow.__tokenSaveWrites = writes;
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (name: string, value: string): void {
+        setItem.call(this, name, value);
+        if (this === window.localStorage && name === key) {
+          writes.push(value);
+        }
+      };
+    }, TOKEN_STORAGE_KEY);
+
+    // Resolve one actionable target for one trusted pointer gesture. The
+    // dialog may disappear after its first click; this checks the visible
+    // once-only outcome, not whether a private pendingRef branch was reached.
+    await page.getByTestId('token-save').dblclick();
 
     await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 30_000 });
 
-    // Token written exactly once (value is the literal token, not
-    // duplicated / concatenated by a re-entrant write).
+    const writes = await page.evaluate(
+      () => (window as Window & { __tokenSaveWrites?: string[] }).__tokenSaveWrites,
+    );
+    expect(writes).toEqual([TOKEN]);
+
     const stored = await page.evaluate(
       (key) => window.localStorage.getItem(key),
       TOKEN_STORAGE_KEY,
