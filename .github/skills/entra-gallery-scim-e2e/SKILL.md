@@ -18,17 +18,31 @@ Use this skill when validating the real Microsoft Entra provisioning service aga
 7. Treat `BLOCKED`, `UNSUPPORTED`, or `SKIPPED` as a failed required gate. Every mode must prove Group/membership and the reviewed custom mapping; arbitrary mappings remain outside the finite coverage claim.
 8. Do not promote or change production as part of this skill.
 9. Obtain an explicit handoff from any active dev validation or deployment
-   owner before provisioning. Zero gallery jobs does not prove the estate is
+   owner before any run, including `-PlanOnly`. Zero gallery jobs does not prove the estate is
    free: another run may be capturing endpoint integrity or executing browser
    checks. Do not overlap those runs or delete another run's fixtures.
 
 ## Run sequence
 
-Start with the non-provisioning intake:
+Do not use `-PlanOnly` for read-only intake. Prepare without directory writes
+by inspecting the local estate registry and, where authorized, separate
+directory GET requests. Do not run this executable to obtain a no-write
+intake.
+
+After the mutation/cleanup boundary and run-owner handoff are established,
+start with the non-provisioning schema probe:
 
 ```powershell
 pwsh -NoProfile -File scripts\entra-gallery-scim-e2e.ps1 -PlanOnly
 ```
+
+This is not read-only: the probe creates a temporary synchronization job on
+the dedicated gallery service principal, then reads its schema. It does not
+configure credentials or create User, Group or SCIM endpoint fixtures.
+Default `finally` cleanup deletes and verifies the exact owned job; report
+cleanup failures rather than claiming the directory is unchanged.
+`-KeepArtifacts` retains the job and records a cleanup failure. A successful
+probe is not the complete authentication matrix or gallery release acceptance.
 
 Then run the complete required authentication matrix:
 

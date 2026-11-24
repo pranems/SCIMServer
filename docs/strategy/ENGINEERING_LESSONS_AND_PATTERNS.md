@@ -1,5 +1,28 @@
 # Engineering lessons and patterns - the self-improving ledger
 
+## Safe-mode names do not establish side-effect boundaries (2026-11-24)
+
+Two distinct commands exposed this recurring gap. Deployment `DryRun` had
+prerequisite and direct tag reads outside its dry-run gate. Gallery
+`PlanOnly` intentionally creates a synchronization job for schema discovery,
+although help and the agent skill could be read as prescribing a no-write
+intake.
+
+Classify the actual effect, not the flag name. Execute the real branch with
+bounded mocks and assert the operation arguments, ownership registration,
+warning-before-mutation order and cleanup/retention outcomes. Test the CLI
+help and the skill's prescription against that observed boundary. A
+non-provisioning probe can still mutate the directory, and default cleanup
+does not make the intervening operation read-only.
+
+Keep truly no-write preparation separate; do not invent another flag or
+duplicate provisioning logic when accurate guidance and a pre-mutation
+warning satisfy the need. The gallery fix preserved all 92 original
+contracts and adds four controls, with three concrete RED failures before
+96 GREEN assertions. No real directory write was needed to establish the
+classification.
+See [the gallery correction and escape analysis](../ENTRA_GALLERY_SCIM_E2E_EXECUTION_RCA.md#offline-plan-only-classification-correction-2026-11-24).
+
 ## Documentation gates must cover the real document and marker (2026-11-24)
 
 The canonical Docker Desktop removal-readiness guide retained an earlier

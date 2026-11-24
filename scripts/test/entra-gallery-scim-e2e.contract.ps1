@@ -139,6 +139,75 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $skillPath))
     $gate = Get-Content -LiteralPath $gatePath -Raw
     $skill = Get-Content -LiteralPath $skillPath -Raw
 
+    $planHelp = [regex]::Match($gate, '(?s)\.PARAMETER PlanOnly\s+(.*?)#>').Groups[1].Value
+    Assert-Contract 'PlanOnly help discloses job creation, cleanup and retention' (
+        $planHelp -match 'not read-only' -and
+        $planHelp -match 'temporary synchronization job' -and
+        $planHelp -match 'finally' -and
+        $planHelp -match 'KeepArtifacts'
+    )
+    Assert-Contract 'skill does not prescribe PlanOnly for read-only intake' (
+        $skill.Contains('Do not use `-PlanOnly` for read-only intake') -and
+        $skill -match 'temporary synchronization job' -and
+        $skill -match 'KeepArtifacts'
+    )
+    & {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($gatePath, [ref]$null, [ref]$null)
+        $branch = @($ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.IfStatementAst] -and
+            $node.Extent.Text.StartsWith('if ($PlanOnly)') -and
+            $node.Extent.Text.Contains('create plan-only schema probe job')
+        }, $true))
+        $jobFunction = @($ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'New-SynchronizationJob'
+        }, $true))
+        if ($branch.Count -ne 1 -or $jobFunction.Count -ne 1) {
+            throw 'Expected one actual PlanOnly branch and synchronization-job creator.'
+        }
+        $PlanOnly = $true
+        $Modes = @('SecretToken')
+        $gallerySp = @{ id = 'owned-probe-principal' }
+        $createdJobIds = [System.Collections.Generic.List[string]]::new()
+        $events = [System.Collections.Generic.List[string]]::new()
+        $warnings = [System.Collections.Generic.List[string]]::new()
+        function Write-Warning {
+            param([string]$Message)
+            $warnings.Add($Message)
+            $events.Add('warning')
+        }
+        function Invoke-Graph {
+            param([string]$Method, [string]$Path, $Body)
+            if ($Method -ne 'POST' -or
+                $Path -ne 'servicePrincipals/owned-probe-principal/synchronization/jobs' -or
+                $Body.templateId -ne 'isvonboarding') {
+                throw 'Unexpected mocked directory operation.'
+            }
+            $events.Add('job-create')
+            @{ id = 'owned-probe-job' }
+        }
+        function Get-SynchronizationRule {
+            param([string]$JobId)
+            if ($JobId -ne 'owned-probe-job') { throw 'Unexpected schema job.' }
+            $events.Add('schema-read')
+            @{ name = 'reviewed-rule' }
+        }
+        function Add-Result { param($Scenario, $Check, $Status, $Detail) }
+        . ([scriptblock]::Create($jobFunction[0].Extent.Text))
+        & ([scriptblock]::Create($branch[0].Extent.Text))
+        Assert-Contract 'actual PlanOnly branch registers its POST-created job before schema discovery' (
+            $createdJobIds.Count -eq 1 -and $createdJobIds[0] -eq 'owned-probe-job' -and
+            ($events | Where-Object { $_ -ne 'warning' }) -join ',' -eq 'job-create,schema-read'
+        )
+        Assert-Contract 'actual PlanOnly branch warns before directory mutation' (
+            ($events -join ',') -eq 'warning,job-create,schema-read' -and
+            $warnings.Count -eq 1 -and
+            $warnings[0] -match 'not read-only.*temporary synchronization job.*KeepArtifacts'
+        )
+    }
+
     foreach ($required in @(
         'Get-ScimEstate',
         "Purpose 'dev'",

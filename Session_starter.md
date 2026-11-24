@@ -1,5 +1,30 @@
 ## SCIMServer - Condensed Session Memory
 
+### Gallery plan-only classification, 2026-11-24
+
+`-PlanOnly` is a non-provisioning schema probe, not read-only intake. It
+creates an owned synchronization job and reads its schema. Default `finally`
+cleanup removes and verifies the job; `-KeepArtifacts` retains it and records
+cleanup failure. CLI help, the warning before job creation, result wording
+and the project skill now disclose that boundary. Actual-branch mocks prove
+job POST/ownership/schema ordering and the warning before mutation. Three
+assertion-level RED failures became GREEN; all 96 gallery contracts pass,
+including the unchanged 92 original assertions. No directory/cloud operation
+or full expanded gallery run was executed.
+
+| Date | Summary |
+|---|---|
+| 2026-11-24 | PR #287 normally merged at dbe17d37 after recorded self-review, parent source review, all 32 unchanged Validate gates and six successful exact-b4f76afb checks. Independent GitHub approval is not configured; additional Copilot review was quota-denied and is not claimed complete. No admin override, source-version change or deployment. Approved active mirror/permissions and authoritative merged-runtime qualification remain open. |
+| 2026-11-24 | Gallery plan-only guidance and pre-mutation warning corrected with 96 passing offline contracts. Source/auth/provisioning/cleanup behavior is unchanged; the flag must not substitute for a no-write intake or the complete gallery matrix. |
+
+- [x] Offline plan-only safety classification and actual warning-order regression.
+- [ ] Ordinary delivery and full applicable merged-source qualification.
+- [ ] Authorized, owned three-mode native gallery run with exact cleanup.
+
+Design disposition: accepted; one warning and directly related guidance, no
+new flag, protocol or speculative abstraction. Self-improvement: applied
+actual job/warning traces and promoted the recurring safe-mode naming gap.
+
 ### Offline active deployment admission, 2026-11-24
 
 Same-outcome follow-up to `fd800991`: all ACR CLI commands now use the
