@@ -9,6 +9,17 @@
 
 ## Active Delivery Process
 
+**Unreleased readiness-guide currency repair:** The canonical removal-readiness
+guide is now registered in the existing freshness manifest and uses its
+recognized product-version marker. The permanent guard reads the actual
+guide marker: three assertions first failed, then all 30 self-test assertions
+and all 29 document audits passed. The existing documentation CI invokes
+that self-test; no workflow, hook or auditor logic changed. The 30-day age
+setting retains existing warning semantics. Version labels express
+documentation scope, not relabeled runtime qualification or shipping evidence.
+Application version, API/web test populations and dependency graphs remain
+unchanged. The full runtime matrix and performance acceptance remain separate.
+
 **Unreleased live-harness recovery:** The isolated follow-up retains all prior
 redaction controls and now passes 255 assertions, with nine nested-script
 wiring tests and 224 ownership checks. It caches material preparation,
@@ -27,8 +38,12 @@ Separate #284 normally merged at `36d07884`, with an authenticated CI lock,
 zero High/Critical root audit, 29 final normal Fast gates, all six exact-tip
 checks and a recorded source self-review. Original harness tip `a1f00397`
 also passes 29 normal Fast gates and all six PR checks. The integration
-preserves both changes and must pass normal gates and exact new-tip CI before
-its own merge. The harness changes no dependencies; the merged root repair
+preserves both changes and passed all29 normal Fast gates and all6 exact-tip
+checks at d3e5cec5: API220/6274, reducedHTTP2519/45 known skips and web126/1664.
+Normal exact-head PR285 merge produced a7ef00012da717a5933cd9429a9d0afb771b1d2c
+at2026-11-23T23:27:06Z. A fresh isolated context owns its complete canonical
+six-mode matrix; the c52 matrix remains historical, not relabeled.
+The harness changes no dependencies; the merged root repair
 supplies its own authenticated lock. Direct review found no unresolved defect.
 No independent approval or all-security-green claim is made. The actual
 repository policy/protection requires green exact-tip CI and resolved review
@@ -36,6 +51,19 @@ findings, not an external approval or a specific review service. Copilot
 quota exhaustion is retained as a service limitation, not an extra merge gate.
 Application version 0.55.70, token lifetimes, HTTP values and assertions remain
 unchanged. See [RCA and qualification limits](LIVE_EVIDENCE_REDACTION.md#preparation-reuse-and-live-run-expiry).
+
+**Current runtime evidence boundary:** the historical c52 full matrix passed
+all6 modes, both complete local live backends passed1845/1845, and35 native
+browser outcomes passed. An independent request-stage diagnostic correlates
+368 unique actual requests but still passes only13/17 latency and4/4 bulk
+categories; SQL/memory/relative/shipping admission is not claimed. Adjacent
+preceding server tails can outlast their client response-end spans, so the
+remaining gap is not automatically network time. No production cause is
+established and no benchmark competes with the current matrix.
+Docker Desktop, original data and backups remain retained; the optional global
+Desktop-backed MCP gateway is still unmigrated. See the
+[current source checkpoint](CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-merged-source-checkpoint-2026-11-23)
+and [request-stage analysis](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#request-stage-diagnostic-2026-11-23).
 
 **Merged root-tooling security recovery:** `markdown-it` manifest floor
 is `^14.3.3` after observed manifest/lock RED/GREEN. Authenticated root-only

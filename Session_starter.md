@@ -1,5 +1,35 @@
 ## SCIMServer - Condensed Session Memory
 
+### Current container-runtime evidence checkpoint, 2026-11-23
+
+| Date | Summary |
+|---|---|
+| 2026-11-23 | Root-tooling PR #284 and live-harness PR #285 normally merged through a7ef00012da717a5933cd9429a9d0afb771b1d2c. Combined d3e5cec5 passed all 29 normal Fast gates and six exact-tip checks: 220 API unit suites and 6,274 tests, 2,519 reduced HTTP passes with 45 known skips, 126 web files and 1,664 tests, plus nonshipping image, smoke and Trivy checks. |
+| 2026-11-24 UTC | Canonical removal readiness was outside the freshness manifest and used an unrecognized version label. Actual registration/header controls first failed three assertions; the minimal manifest/marker fix now passes all 30 self-test assertions and all 29 registered-document audits. Existing documentation CI invokes the guard. This remains an uncommitted documentation/governance change, not new runtime or release admission. |
+
+Both source/integration self-reviews are recorded COMMENTED, not independent
+approval. Neither merge bypassed a gate or branch protection. Both complete c52 native backend live
+runs pass1845/1845 with exact cleanup and unchanged executed harness hashes.
+The authoritative full matrix at c52 remains historical; a fresh isolated
+context now owns the complete canonical matrix at merged a7ef0001.
+Do not duplicate or preempt that execution.
+
+Performance remains unaccepted. An instrumented historical-c52 request-stage
+run correlates368 unique IDs/statuses but still passes only13/17 latency and
+4/4 bulk categories. Small synchronous log/JSON spans do not explain all slow
+samples. Adjacent previous server tails can exceed their client response-end
+spans; do not call the residual network time or remove logging safeguards.
+CPU-profile preparation is private and not yet actual runtime evidence.
+No competing benchmark runs while the matrix owns the host.
+
+Docker Desktop, original volumes and protected backups remain retained.
+Shipping/dev, preservation-safe shared-admin authorization, gallery/WIF and
+required operator visual acceptance remain separate. The optional global
+Desktop-backed MCP gateway remains unmigrated.
+See the [current source checkpoint](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-merged-source-checkpoint-2026-11-23)
+and [request-stage findings](docs/CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#request-stage-diagnostic-2026-11-23).
+The dated history below preserves earlier failures and is not a newer status.
+
 ### Live evidence preparation follow-up, 2026-11-23
 
 Isolated harness-only work reduces repeated material preparation without

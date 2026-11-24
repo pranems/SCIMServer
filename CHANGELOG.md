@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Container-runtime evidence consolidation
+
+- Refresh the actual source/readiness and performance reports to merged
+  a7ef0001, preserving all dated failures and evidence scopes. PR #284 and
+  PR #285 are normally merged; combined d3e5cec5 passed 29 normal Fast gates
+  and six exact-tip checks: 220 API unit suites and 6,274 tests, 2,519
+  reduced HTTP passes with 45 known skips, 126 web files and 1,664 tests,
+  plus the nonshipping image, container smoke and Trivy checks.
+- Distinguish the historical c52 complete six-mode matrix, both 1,845/1,845 live
+  runs and 35 native browser outcomes from pending fresh merged-source
+  qualification. No fresh matrix result, shipping, Azure, operator visual
+  acceptance or Docker Desktop removal is invented.
+- Record the instrumented request-stage 13/17 latency failure, 368 unique
+  request/status correlations and actual diagnostic cleanup. Small
+  synchronous log/JSON spans and preceding-request response tails narrow
+  the investigation without a production-cause claim or threshold change.
+- Close a documentation currency gap: register the canonical removal
+  readiness guide and use the existing recognized product-version marker.
+  The existing self-test first reports three concrete failures, then passes
+  all 30 assertions; the full freshness audit passes all 29 documents.
+  Existing CI already invokes this self-test. Dated qualification evidence
+  stays pinned; the 30-day age setting remains the existing warning behavior.
+- Documentation and its governance coverage only: application version
+  0.55.70, runtime code, API/web test populations and dependency graphs are
+  unchanged. No auditor, hook, deadline or threshold is weakened. Do not
+  duplicate the owning matrix.
+
 ### Live evidence preparation follow-up
 
 - Prepare ordered masking variants only when discovered material grows;
@@ -59,8 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Original harness tip `a1f00397`: all 29 normal Fast gates and six exact-tip
   PR checks PASS, API219/6272, reduced HTTP2519/45 known skips and web126/1664.
   Integration preserves normally merged tooling PR284 and both documentation
-  histories. The combined tip requires its own normal checks before merge;
-  no shipping or deployment acceptance is inferred.
+  histories. Combined d3e5cec5 passes all29 normal Fast gates and all6
+  exact-tip checks, API220/6274, reducedHTTP2519/45 known skips and
+  web126/1664. PR285 normally merges at a7ef0001; no independent approval,
+  shipping or deployment acceptance is inferred.
 
 ### Root documentation tooling security recovery
 

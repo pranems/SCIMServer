@@ -1,8 +1,76 @@
 # Why 0.55.56 is slower than customer production 0.55.20
 
+## Request-stage diagnostic, 2026-11-23
+
+**Current conclusion:** the runtime migration source and its repairs are
+merged through `a7ef0001`, but performance acceptance remains open. The
+historical comparisons below are not replaced by this diagnostic.
+
+A fresh owned PostgreSQL fixture on independent native WSL Engine used
+the exact accepted c52 application image and the unchanged reference
+benchmark. Runtime-only inspector access stayed on container loopback;
+no debugger port was published and no application file was changed.
+All 368 client request IDs and statuses correlate uniquely to the actual
+server. Two warmups, 18 retained samples, deadlines and thresholds remain
+unchanged. This is an instrumented historical-source experiment, not final
+merged-source, SQL, memory, relative-baseline or shipping admission.
+
+The original benchmark still fails: 13/17 latency and 4/4 bulk categories
+pass. The following rows describe the worst retained response-end samples,
+not an accepted replacement for the benchmark's full client timing.
+
+| Category | Original benchmark p95 | Same-request server span | Synchronous log capture | JSON serialization | Residual outside server span | GC overlap |
+|---|---:|---:|---:|---:|---:|---:|
+| GET Group | 32.268 ms | 14.607 ms | 0.092 ms | 0.282 ms | 17.530 ms | 3.604 ms |
+| ResourceTypes | 27.725 ms | 10.028 ms | 0.097 ms | 0.232 ms | 17.545 ms | 0 ms |
+| ServiceProviderConfig | 10.432 ms | 8.841 ms | 0.143 ms | 0.369 ms | 1.411 ms | 6.073 ms |
+| Version | 19.698 ms | 5.182 ms | 0.096 ms | 0.200 ms | 14.376 ms | 0 ms |
+
+The client observer stops at response end, before subsequent client JSON
+parsing. This explains the small difference between original benchmark
+totals and the component sum. Event-loop active duration is wall time,
+not measured thread CPU consumption. Already-bound Nest controller methods
+are not timed by a post-bootstrap prototype patch.
+
+### Worked example: why the residual is not automatically network time
+
+The slow Version request has a 19.558 ms client response-end measurement
+and a 5.182 ms server request-to-finish span. Calling the remaining
+14.376 ms a network delay would be premature. The immediately preceding
+request reached the client in 3.260 ms while its server request-to-finish
+span lasted 16.187 ms. The next server request starts only 0.393 ms after
+that preceding finish. GET Group and ResourceTypes show the same pattern:
+their preceding server spans are 20.125/19.097 ms while the corresponding
+client response-end spans are 4.099/3.447 ms.
+
+These are exact adjacent request identities in a sequential benchmark.
+They show that response receipt and the observed server finish are
+different boundaries; a following request can wait for preceding server
+work. They do not identify which task delayed the server, or prove that
+the network or synchronous log capture caused the delay.
+
+The next bounded observation is a sampled CPU profile on the same owned
+runtime, with actual start/stop acknowledgments, measured clock bounds
+and explicit cleanup. It must wait until the independent full backend
+matrix finishes, avoiding host contention. No log persistence, foreign-key,
+uniqueness, profile coordination, pool capacity or latency limit is to be
+removed on the strength of the current data.
+
+All exact diagnostic API/database/network resources and private client
+configuration were removed; actual Windows listener closure and original
+identity retention pass. Private receipts are retained outside Git under
+the `parent-stage-diagnostic-20261123T232833481Z` prefix. No fresh
+contents-preservation or Docker Desktop removal claim is made.
+
+Self-improvement is applied through real HTTP callback/payload tests,
+unique request/status correlation and wrong-ID/run/status rejection
+before accepted analysis output. Design disposition: accepted. The
+observer is private and cohesive; no speculative production refactor or
+new runtime dependency was introduced.
+
 ## POST User correction in qualification, 2026-11-23
 
-**Current status: independently source-reviewed locally, not released or admitted.**
+**Current status: normally merged in PR #283 at c52de06f and retained through a7ef0001; not released or admitted.**
 The earlier eight-statement trace and five-statement lower bound below remain
 historical evidence for the original transaction design.
 

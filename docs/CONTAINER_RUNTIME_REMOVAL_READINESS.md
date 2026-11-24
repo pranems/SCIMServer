@@ -1,8 +1,8 @@
 # Docker Desktop removal readiness
 
-**Last verified:** 2026-11-20
-**Status:** In progress. Local corrections are tested; consolidated release and Azure dev gates remain open.
-**Product baseline:** 0.55.67
+**Last verified:** 2026-11-23
+**Status:** Source migration and follow-up repairs are merged. Final combined-source qualification, performance and release/dev acceptance remain open.
+**Product version:** 0.55.70; documentation scope, not new qualification, shipping or deployment evidence
 **Deadline from the supplied notice:** December 2, 2026
 
 ## Executive summary
@@ -27,6 +27,70 @@ can still require closing and reopening; no claim is made that every other
 editor window has refreshed.
 
 ## 1. One authoritative status model
+
+### Current merged-source checkpoint, 2026-11-23
+
+The current consolidated source is
+`a7ef00012da717a5933cd9429a9d0afb771b1d2c`, following normal merges of
+[root-tooling PR #284](https://github.com/pranems/SCIMServer/pull/284) and
+[live-harness PR #285](https://github.com/pranems/SCIMServer/pull/285).
+The combined reviewed tip `d3e5cec5` passed all 29 normal Fast push gates
+and all six exact-tip PR checks in
+[workflow 45287233922](https://github.com/pranems/SCIMServer/actions/runs/45287233922).
+Exact CI inventory: API 220 suites/6,274 tests; reduced HTTP 2,519 passes
+and 45 known backend skips; web 126 files/1,664 tests. The nonshipping
+test image, container smoke and HIGH/CRITICAL-gating Trivy checks pass.
+These checks do not replace the complete backend matrix or admit a release.
+
+The guide itself is now included in the existing documentation currency
+manifest. Permanent controls using its actual header first failed three
+assertions, then passed all 30 self-test assertions after the minimal
+manifest/marker correction. The full audit passes all 29 registered
+documents, and existing documentation CI already invokes the self-test.
+The header's product version states documentation scope only; dated
+qualification records remain pinned to their actual source. The 30-day
+verification-age setting retains the existing warning behavior.
+
+The complete canonical six-mode matrix passed at historical merged source
+`c52de06f`: API 219 suites/6,272 tests for each backend; InMemory HTTP
+2,575 passes/45 backend-specific skips; PostgreSQL HTTP 2,620 passes/zero
+skips; web unit and coverage each 126 files/1,664 tests. A fresh isolated
+qualification context now owns the complete matrix at `a7ef0001`.
+Until that execution finishes, the old matrix is not relabeled as new evidence.
+
+The actual repaired live runner and evidence-helper hashes match complete
+fresh PostgreSQL and InMemory runs, each 1,845/1,845 assertions, 169 sections
+and 2,060 flow steps, with exact owned cleanup. These ran against the
+accepted c52 application image on independent native WSL Engine. PostgreSQL's
+original private outer timestamp-parser failure is retained with a separate
+exact-target/freshness/source-hash reconciliation; InMemory outer and child
+both exited zero. Earlier c52 native browser qualification covers 35 outcomes,
+12 InMemory and 23 PostgreSQL. These are not new shipping-image or Azure proofs.
+
+Performance remains open, not waived. Complete host, Windows-container and
+Linux-client runs passed 13/17, 14/17 and 13/17 latency categories respectively.
+Four whole-artifact p95 increases above 10% remain unaccepted; the compared
+application Node patches differ. A separate instrumented request-stage
+diagnostic still passes only 13/17 latency categories and is not release
+admission. See the [request-stage findings](CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#request-stage-diagnostic-2026-11-23).
+
+Recorded source and integration reviews are honest COMMENTED self-reviews,
+not independent approvals. Actual master protection and the delivery process
+require exact-tip green CI and resolved findings, not a particular external
+review service. Copilot review quota exhaustion was not bypassed or retried.
+
+Docker Desktop, the original volume inventory and protected backups remain
+retained. A fresh diagnostic's original-ID retention is not a new contents
+preservation check. Final shipping-image/dev validation, preservation-safe
+shared-admin authorization, native gallery/WIF validation and required
+operator visual acceptance remain separate. The optional global
+Desktop-backed MCP gateway is retained and unmigrated; the project-native
+browser alternative is separately qualified. No uninstall, Intune consent,
+customer-prod promotion or automatic canary is authorized by this report.
+
+The dated sections below retain their original failures and intermediate
+results. Read this checkpoint first rather than treating an older local
+correction or dashboard count as the current acceptance state.
 
 ### Merged-source PostgreSQL qualification blocker, 2026-11-20
 
@@ -268,15 +332,15 @@ The sequence shows why a historical FAIL or NOT RUN remains useful evidence
 without overruling a later test. Equally, a November 18 pass does not prove a
 November 19 application correction or a new Azure deployment.
 
-## 2. Current acceptance dashboard
+## 2. Dated acceptance dashboard and current qualification boundaries
 
 | Requirement | State | Evidence / next action |
 |---|---|---|
-| Independent Engine and Windows clients | PASS, previous qualification | Real SSH Engine response rechecked November 19; no Desktop executable used. |
+| Independent Engine and Windows clients | PASS for measured scopes | Native Unix-socket Engine qualification rechecked November 23 with fresh private client configuration and exact daemon identity. Independent Windows/SSH/GUI operations retain their November 19-20 evidence; no new bridge or reboot claim. No Desktop executable used. |
 | Mermaid environment | PASS, November 19 | Doctor reports exactly one built-in renderer and no blockers. |
 | Original data preservation | PASS, November 18 | Both cold VHD copies/configuration hashes; all 40 volume fingerprints; isolated primary recovery and 20-to-30 migration replay. |
 | Complete Engine browser suite | PASS, November 18 source | 353 passed; zero failures/skips/flakes; 13 pixel comparisons, no baseline replacement. Final-source browser proof still required. |
-| API/backend/web matrix | PASS, November 18 source | Units 6,254 each backend; E2E 2,612 Prisma / 2,570 in-memory, 42 backend skips; web 1,662. Not fresh final-source counts. |
+| API/backend/web matrix | Historical c52 PASS; combined a7 qualification in progress | c52 units 219/6,272 each; HTTP 2,620 Prisma / 2,575 InMemory with 45 backend-specific skips; web unit and coverage 126/1,664 each. A fresh context owns the unchanged complete six-mode matrix at a7ef0001; no new result is inferred. |
 | Native in-memory inventory | CORRECTED, local source | Actual-module and HTTP regressions reproduced zero rows before the fix. EndpointModule import restores endpoint enumeration. |
 | Active log-stream shutdown | CORRECTED, local source | Real open HTTP stream blocked the three-second deadline before the fix; lifecycle cleanup now closes it without client-first disconnect. |
 | Actual container active-stream shutdown | PASS, consolidation source 45885140 | A genuinely connected SSE client ends without client-first disconnect when Docker sends SIGTERM. Stop completes in 1,035 ms with exit 0 and no OOM kill; the final correlated request has one durable database log row. Restart preserves the original user ID/value. Owned endpoint deletion/status/absence and exact full-container-ID cleanup pass. This is a local nonshipping image, not Azure dev evidence. |
@@ -289,7 +353,7 @@ November 19 application correction or a new Azure deployment.
 | Current packaged browser | PASS, Prisma and in-memory | Each mode passes the user/group inventory, reload, actual displayed row values and original SCIM-ID readback regression. This is not a new complete 353-case run. |
 | Graphical management | PASS for measured scope, November 20 | Actual image/OCI-label inspection, all 49 volume names and read-only metadata, individual lifecycle/logs, exact independent emitted executable, real-repository reload, and new Windows-created Compose Start/healthy, Logs/ready, Stop/refreshed Exited(0) pass. All GUI fixtures and the isolated GUI/CDP process were removed. Historical Linux-created group commands remain a documented Windows-cwd limitation; generic GUI Up/build/watch and registry publication are not qualified. |
 | Image metadata and retention | CORRECTED, local source | Ten metadata/caller checks pass after reproducing the dispatch-publisher omission and absent automatic contract execution. The pre-consolidation inventory had five records; the added nonshipping local qualification image is retained. No repository needed pruning. New authoritative publication/label/digest readback remains pending. |
-| Automatic offline runtime gate | PASS, consolidation source 17ac92ef | The complete hook passes all seven offline suites, including the six new GUI-settings cases. Pre-push, dev Stage 1.14 and Windows/Node 24 CI call the common runner; CI image publication depends on that job. Hosted CI execution itself remains pending. |
+| Automatic offline runtime gate | PASS, combined d3e5cec5 | Normal Fast push passes all 29 gates, including the common runtime contracts. Exact-tip Windows/Node 24 CI runtime contracts also pass in workflow 45287233922. This is not a fresh GUI/reboot or shipping-image claim. |
 | Normal startup/reconnect workflow | PASS for measured transport/GUI scope | Actual cold transport starts from verified listener absence and failed GUI tree; the real startup task restores the exact repository and same daemon/image. Owned GUI task/listener/GUI/CDP cleanup passes. Not a WSL/Engine reboot; explicit operator visual acceptance remains open. |
 | Documentation | PASS, focused November 19 | Freshness/coupling: all 27 docs; infrastructure: all 13 elements covered; 55 literal JSON blocks parse; links/style pass. New report diagrams render in strict light/dark Chromium. |
 | Final ordered pipeline | OPEN | Must record each applicable gate and consolidate changed-source evidence. |
@@ -692,6 +756,8 @@ They do not change the earlier receipt or imply that release/dev gates passed.
 | R36 | Harness environment / Low | Empty NODE_DISABLE_COMPILE_CACHE still disabled activation; the pre-test probe refused to run. | Omit the disabling variable and require getCompileCacheDir to return the owned cache directory. Focused 90 and complete hook pass. Earliest gate: explicit activation before claiming an optimization; absent and empty environment values are not interchangeable. |
 | R37 | Validation interruption / Medium, focused recovery only | The bbcd6791 hook log jumps from 03:05:25.749 to 11:54:24.265 UTC (31,738.516 seconds). The first subsequent failure is endpoint cleanup expecting 204 but receiving 401 with bearer_oauth_expired; that suite accounts for all 31 failed tests. The outer Git runner also timed out. The OS-level cause, including possible sleep, is not established. | Preserve release-push-1795143190717.txt/json and the late failed-hook summary. Verify no owned test workers remain before retry. The unchanged exact query-semantics suite passes all 42 tests with process status 0 in release-query-recovery-1795180255034.json. This proves focused recovery, not a successful final push. No token lifetime, test deadline, selector or threshold changed. Detection: owning HTTP hook; earliest useful check: distinguish a wall-clock discontinuity from application execution time before modifying code. |
 | R38 | Editor tool transport / Low | Tool discovery for parent messaging and the focused editor test request each returned no response after 1,800 seconds. Neither result proves delivery or test execution. | Do not claim a parent milestone was delivered. A process scan confirmed no worktree Node test workers before a receipt-producing native Node runner executed the exact suite successfully. No repeated editor request or overlapping test run was started. This extends R28's requirement to verify semantic receipts and process completion rather than infer success from unavailable tool output. |
+| R39 | Documentation coverage / Medium, applied | The README-linked current readiness guide retained its earlier source while the freshness gate passed all 28 registered documents. This guide was absent from the manifest, and its Product source label was not an F1 version marker. | Permanent actual-header/registration controls first failed three assertions. Register the guide and use the recognized Product version documentation-scope marker: all 30 self-test assertions and all 29 document audits pass. Existing documentation CI already invokes the self-test; no auditor or workflow change was needed. Dated evidence stays pinned, and the 30-day age setting remains a warning. Detection: source-document consolidation; earliest prevention: manifest admission plus actual-marker stale/current controls when the guide became the current acceptance record. |
+| R40 | Private diagnostic test correctness / Medium | The CPU-observer positive contract acknowledged installation but could not find the owned symbol through the host VM sandbox. Negative cleanup assertions using that same proxy could also pass without checking the actual context global. | Read and delete the symbol inside vm.runInContext. The nine neighboring contracts pass, and the final four focused CPU lifecycle contracts pass after adding stop-failure cleanup. This is mock/driver preparation, not a real CPU-profile or performance pass. Earliest detection: positive persistence plus actual-context negative cleanup before runtime instrumentation. |
 
 November 20 interruption disposition: the failed full run remains blocked
 despite the unchanged focused recovery. The self-improvement applied here is
