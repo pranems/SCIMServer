@@ -1,5 +1,32 @@
 # Engineering lessons and patterns - the self-improving ledger
 
+## Documentation gates must cover the real document and marker (2026-11-24)
+
+The canonical Docker Desktop removal-readiness guide retained an earlier
+source while the freshness audit passed all 28 registered documents. The
+guide was not registered, and its `Product source` label was not recognized
+by the version detector. Generic tests of an idealized version header could
+not catch either omission.
+
+When a guide becomes the operator's current acceptance record, register it
+and test stale/current values through its actual header. The new controls
+first produced three concrete failures; the minimal manifest/marker fix
+passes all 30 self-test assertions and all 29 document audits. Existing
+documentation CI already calls the self-test, so no parallel checker or
+workflow change was needed.
+
+Keep the product-version marker's documentation scope separate from dated
+qualification claims. Never relabel an old matrix, source hash or shipping
+result because the marker was refreshed. The verification-age setting
+retains its existing warning semantics. This applies the existing
+context-document admission rule to another current operational guide.
+Use durable phase/evidence descriptions in tracked context files, not a
+working-tree label such as "uncommitted" that becomes stale when saved.
+Allocate append-only issue identifiers against the entire ledger, including
+narrative definitions outside its main table. A table-only scan can create
+colliding evidence references even when every table row looks unique.
+See [the concrete escape and correction](../CONTAINER_RUNTIME_REMOVAL_READINESS.md#7-execution-issues-and-root-cause-ledger).
+
 ## Prepare evidence transforms when material changes (2026-11-23)
 
 A complete disposable-fixture live run consumed approximately an hour before

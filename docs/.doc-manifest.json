@@ -228,6 +228,12 @@
       "maxAgeDays": 90
     },
     {
+      "path": "docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md",
+      "title": "Canonical container runtime removal readiness and acceptance boundaries",
+      "sources": [],
+      "maxAgeDays": 30
+    },
+    {
       "path": "docs/CONTEXT_INSTRUCTIONS.md",
       "title": "Agent-facing project context (gated for version currency, not user-facing)",
       "sources": [],

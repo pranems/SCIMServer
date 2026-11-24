@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Container-runtime evidence consolidation
+
+- Refresh the actual source/readiness and performance reports to merged
+  a7ef0001, preserving all dated failures and evidence scopes. PR #284 and
+  PR #285 are normally merged; combined d3e5cec5 passed 29 normal Fast gates
+  and six exact-tip checks: 220 API unit suites and 6,274 tests, 2,519
+  reduced HTTP passes with 45 known skips, 126 web files and 1,664 tests,
+  plus the nonshipping image, container smoke and Trivy checks.
+- Record the fresh exact-a7 complete six-mode matrix: API units remain220/6274
+  for each backend; full InMemory HTTP2575/45 known skips and Prisma HTTP2620/
+  zero skips; web unit and coverage each126/1664. Preserve outer exit2 and
+  separate identical-byte/Git-object snapshot reconciliation; all six canonical
+  exits0, exact cleanup and both listener closures pass. The c52 live/browser
+  proofs remain historical, not relabeled as shipping or Azure qualification.
+- Record exact-a7 candidate CI45299868150: three jobs, API220/6274, reduced
+  HTTP2519/45 known skips, web126/1664, same-digest smoke and unchanged Trivy
+  gate pass. No release/latest tag, deployment or performance waiver.
+- Record the instrumented request-stage 13/17 latency failure, 368 unique
+  request/status correlations and actual diagnostic cleanup. Small
+  synchronous log/JSON spans and preceding-request response tails narrow
+  the investigation without a production-cause claim or threshold change.
+- Record the actual subsequent c52 CPU diagnostic:7102 samples,368 correlated
+  requests,10/17 instrumented latency categories and4/4 bulk pass. Its45.258ms
+  clock-offset uncertainty prevents exact request attribution. All owned
+  fixtures removed and actual listener closure verified.
+- Confirm actual50-row flush starts at the six recurring preceding-request
+  positions in a distinct metadata-only diagnostic, preserving promise,
+  return/error behavior and log payload privacy. Instrumented14/17latency
+  and4/4bulk pass; asynchronous completion and cause remain unmeasured.
+- Close a documentation currency gap: register the canonical removal
+  readiness guide and use the existing recognized product-version marker.
+  The existing self-test first reports three concrete failures, then passes
+  all 30 assertions; the full freshness audit passes all 29 documents.
+  Existing CI already invokes this self-test. Dated qualification evidence
+  stays pinned; the 30-day age setting remains the existing warning behavior.
+- Documentation and its governance coverage only: application version
+  0.55.70, runtime code, API/web test populations and dependency graphs are
+  unchanged. No auditor, hook, deadline or threshold is weakened. Do not
+  duplicate the completed unchanged matrix.
+
 ### Live evidence preparation follow-up
 
 - Prepare ordered masking variants only when discovered material grows;
@@ -59,8 +99,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Original harness tip `a1f00397`: all 29 normal Fast gates and six exact-tip
   PR checks PASS, API219/6272, reduced HTTP2519/45 known skips and web126/1664.
   Integration preserves normally merged tooling PR284 and both documentation
-  histories. The combined tip requires its own normal checks before merge;
-  no shipping or deployment acceptance is inferred.
+  histories. Combined d3e5cec5 passes all29 normal Fast gates and all6
+  exact-tip checks, API220/6274, reducedHTTP2519/45 known skips and
+  web126/1664. PR285 normally merges at a7ef0001; no independent approval,
+  shipping or deployment acceptance is inferred.
 
 ### Root documentation tooling security recovery
 

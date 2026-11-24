@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-18 - **Product version:** `0.55.70`
+> **Status:** User-facing reference - **Last verified:** 2026-11-23 - **Product version:** `0.55.70`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -13,7 +13,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed engineering history.
 four foreground PostgreSQL client queries while retaining atomic uniqueness,
 the endpoint foreign key and separate request logging. Pool isolation is
 explicit at connection startup. This is not a shipped or deployed release;
-the full host latency benchmark still fails three unchanged limits. See
+unchanged host/container latency and final release gates remain open. See
 [measured scope and remaining qualification](docs/CUSTOMER_UPGRADE_PERFORMANCE_RCA.md#post-user-correction-in-qualification-2026-11-23).
 
 **0.55.69 source candidate:** exact CI-generated manifests and locks update
@@ -28,8 +28,11 @@ plugins, and pinned key-only loopback SSH. See the
 [runtime assessment and operator workflow](docs/CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)
 for actual qualification results, session activation, Linux bind paths and
 preservation limits. The [current removal-readiness report](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md)
-separates November 18 trials from November 19 native-workflow corrections,
-GUI setup, image labels and the still-pending final release/dev gates.
+separates the November 23-24 merged-source checkpoint and actual CI/live results
+from historical trials, GUI scope, image labels and still-open final
+performance/release/dev gates. Exact merged a7ef0001 now passes its six-mode
+matrix and a separate commit-pinned candidate image CI; neither is shipping
+or deployment acceptance.
 Hosted builders remain independent of Desktop. No new cloud deployment or
 performance qualification is claimed by the local runtime checks.
 

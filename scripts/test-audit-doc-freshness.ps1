@@ -76,6 +76,44 @@ $goodHeader = @"
 Body text.
 "@
 
+Write-Host "=== canonical runtime readiness must be covered by currency enforcement ===" -ForegroundColor Cyan
+$runtimePath = 'docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md'
+$runtimeEntries = @(
+    (Get-Content (Join-Path $repoRoot 'docs/.doc-manifest.json') -Raw | ConvertFrom-Json).docs |
+        Where-Object { $_.path -ceq $runtimePath }
+)
+Assert 'runtime readiness is registered exactly once' ($runtimeEntries.Count -eq 1) 'The README-linked current acceptance report must not sit outside the currency gate.'
+if ($runtimeEntries.Count -eq 1) {
+    Assert 'runtime readiness declares a bounded verification-age warning' (
+        $runtimeEntries[0].maxAgeDays -gt 0 -and $runtimeEntries[0].maxAgeDays -le 90
+    ) 'Runtime acceptance state must not be trusted indefinitely.'
+}
+$runtimeMarkers = @(
+    Get-Content (Join-Path $repoRoot $runtimePath) -TotalCount 15 |
+        Where-Object { $_ -match '^\*\*Product (?:version|baseline|source):\*\*' }
+)
+Assert 'runtime readiness has one explicit product marker' ($runtimeMarkers.Count -eq 1) $runtimeMarkers
+if ($runtimeMarkers.Count -eq 1) {
+    $runtimeHeader = @"
+# Runtime readiness currency fixture
+
+**Last verified:** $((Get-Date).ToString('yyyy-MM-dd'))
+$($runtimeMarkers[0])
+"@
+    $d = New-Scratch
+    try {
+        Set-Doc $d 'RUNTIME.md' ($runtimeHeader -replace '\d+\.\d+\.\d+', '9.9.8') | Out-Null
+        $mf = Set-Manifest $d @(@{ path = 'docs/RUNTIME.md'; title = 'runtime'; sources = @(); maxAgeDays = 30 })
+        $r = Invoke-Gate $d $mf -SkipCoupling
+        Assert 'actual runtime marker rejects a stale version' ($r.ExitCode -eq 1) $r.Output
+        Assert 'actual runtime marker reports F1' ($r.Output -match '\[F1\]') $r.Output
+        Set-Doc $d 'RUNTIME.md' ($runtimeHeader -replace '\d+\.\d+\.\d+', '9.9.9') | Out-Null
+        $r = Invoke-Gate $d $mf -SkipCoupling
+        Assert 'actual runtime marker accepts the current version' ($r.ExitCode -eq 0) $r.Output
+    }
+    finally { Remove-Item -LiteralPath $d -Recurse -Force }
+}
+
 Write-Host "=== positive control: a clean doc must PASS ===" -ForegroundColor Cyan
 $d = New-Scratch
 Set-Doc $d 'GOOD.md' $goodHeader | Out-Null
