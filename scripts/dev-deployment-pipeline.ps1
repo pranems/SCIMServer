@@ -38,6 +38,7 @@
     Existing approved ACR login server for required mirror/import/digest gates.
     Defaults only from an ACR declared by the current active dev estate.
     Anonymous GHCR estates require an explicit approved target; none is created.
+    Both declared and explicit mirrors must be in the active dev subscription.
 
 .PARAMETER RegistryGhcr
     GHCR image base (default: ghcr.io/pranems/scimserver).
@@ -51,7 +52,9 @@
     deployment rejects a different explicit app.
 
 .PARAMETER DevFqdn
-    Dev FQDN. Auto-resolved from the Container App if omitted.
+    Current dev ingress hostname. Always resolved from the active dev Container
+    App before HTTP capture; an explicit hostname must match it. Green-label
+    verification belongs to promote-to-prod.ps1, not this pipeline override.
 
 .PARAMETER PgImage
     PostgreSQL image for the local Stage 2.2 E2E DB (default:
@@ -132,8 +135,8 @@ param(
     [switch]$SkipPlaywright,
     [switch]$SkipDeploy,
     [switch]$AutoCanary,
-    [string]$CanaryResourceGroup = 'scimserver-prod',
-    [string]$CanaryAppName = 'scimserver',
+    [string]$CanaryResourceGroup,
+    [string]$CanaryAppName,
     [switch]$DryRun,
     [switch]$ConfirmTag,
     [string]$ReportDir
@@ -320,6 +323,36 @@ function Test-PrereqOrExit {
     }
 }
 
+function Resolve-ActiveDevIngress {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Estate,
+        [string]$DevFqdn,
+        [string]$DevAppName,
+        [string]$DevResourceGroup,
+        [switch]$DryRun
+    )
+
+    if ($DryRun) { return $(if ($DevFqdn) { $DevFqdn } else { 'dry-run.invalid' }) }
+    if (($DevAppName -and $DevAppName -ne $Estate.appName) -or
+        ($DevResourceGroup -and $DevResourceGroup -ne $Estate.resourceGroup)) {
+        throw "Dev target mismatch: active dev is '$($Estate.appName)/$($Estate.resourceGroup)'."
+    }
+    $resolved = az containerapp show -n $Estate.appName -g $Estate.resourceGroup `
+        --subscription $Estate.Tenant.subscriptionId --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($resolved -join "`n"))) {
+        throw "Could not resolve current dev ingress for '$($Estate.id)' in subscription '$($Estate.Tenant.subscriptionId)'. Check authorized read permissions and target availability; no sign-in or context switch is performed."
+    }
+    $resolved = ($resolved -join "`n").Trim().TrimEnd('.')
+    if ([uri]::CheckHostName($resolved) -ne [UriHostNameType]::Dns) {
+        throw "Could not resolve a valid current dev ingress hostname for '$($Estate.id)'."
+    }
+    if ($DevFqdn -and $DevFqdn.Trim().TrimEnd('.') -ne $resolved) {
+        throw "DevFqdn mismatch: the supplied hostname does not match authoritative current dev ingress '$resolved'. Alternate hosts and green labels are not supported by this pipeline."
+    }
+    return $resolved
+}
+
 function Get-ValidatedLocalImageId {
     param([Parameter(Mandatory)] [string]$ProjectName)
 
@@ -401,6 +434,16 @@ Write-Stage 0 'Pre-flight + state capture'
 try {
     $deploymentAdmission = Assert-ActiveDevDeploymentAdmission -RegistryAcr $RegistryAcr `
         -DevResourceGroup $DevResourceGroup -DevAppName $DevAppName -DryRun:$DryRun -SkipDeploy:$SkipDeploy
+    if ($AutoCanary -and -not $SkipDeploy) {
+        $canaryEstate = Get-ScimEstate -Purpose 'canary-prod'
+        if (($CanaryAppName -and $CanaryAppName -ne $canaryEstate.appName) -or
+            ($CanaryResourceGroup -and $CanaryResourceGroup -ne $canaryEstate.resourceGroup)) {
+            throw "Canary target mismatch: current canary is '$($canaryEstate.appName)/$($canaryEstate.resourceGroup)'."
+        }
+        $CanaryAppName = $canaryEstate.appName
+        $CanaryResourceGroup = $canaryEstate.resourceGroup
+        $canarySubscriptionId = $canaryEstate.Tenant.subscriptionId
+    }
 } catch {
     Write-Error $_ -ErrorAction Continue
     exit 2
@@ -408,6 +451,7 @@ try {
 if ($deploymentAdmission) { $RegistryAcr = $deploymentAdmission.RegistryAcr }
 $devEstate = if ($deploymentAdmission) { $deploymentAdmission.Estate } else { Get-ScimEstate -Purpose dev }
 $devSubscriptionId = $devEstate.Tenant.subscriptionId
+$registrySubscriptionId = $devSubscriptionId
 if (-not $DevResourceGroup) { $DevResourceGroup = $devEstate.resourceGroup }
 if (-not $DevAppName) { $DevAppName = $devEstate.appName }
 Test-PrereqOrExit
@@ -422,22 +466,12 @@ if ($ImageTag -ne $gitSha -and -not $ConfirmTag) {
     if ($reply -ne 'yes') { exit 3 }
 }
 
-if (-not $DevFqdn) {
-    if ($DryRun) {
-        $DevFqdn = 'dry-run.invalid'
-    } else {
-        $DevFqdn = az containerapp show -n $DevAppName -g $DevResourceGroup --subscription $devSubscriptionId --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
-    }
-}
-
-# An EXPIRED tenant does not error - ARM just returns nothing, and the run then
-# builds "https:///scim/..." and fails somewhere unrelated. Fail here instead,
-# naming the actual cause.
-if (-not $DryRun -and -not $DevFqdn) {
-    throw "Could not resolve the dev FQDN for $DevAppName/$DevResourceGroup. " +
-          "The registry-declared current dev tenant is '$($devEstate.Tenant.tenantId)' with subscription '$devSubscriptionId'. " +
-          "Check the existing authorized account, target availability and read permissions against Get-ScimEstate -Purpose dev. " +
-          "An empty ARM result does not prove subscription expiry; no sign-in or context switch is performed."
+try {
+    $DevFqdn = Resolve-ActiveDevIngress -Estate $devEstate -DevFqdn $DevFqdn `
+        -DevAppName $DevAppName -DevResourceGroup $DevResourceGroup -DryRun:$DryRun
+} catch {
+    Write-Error $_ -ErrorAction Continue
+    exit 2
 }
 
 Add-Result -Stage '0.1' -Gate 'Prerequisites + git/az/docker auth' -Status 'PASS' -Detail "SHA=$gitSha branch=$gitBranch dirty=$dirty"
@@ -710,7 +744,7 @@ if (-not $SkipDeploy) {
     # Containers are already cleaned up; the run-owned image tag survives.
     # GHCR still supplies the independently built deployable artifact.
     if ($dockerValidationPassed) {
-        Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') } | Out-Null
+        Invoke-Gate '4.2a' "ACR login ($RegistryAcr)" { az acr login --name ($RegistryAcr -replace '\.azurecr\.io$', '') --subscription $registrySubscriptionId } | Out-Null
         $localMirrorTag = "local-$ImageTag"
         Invoke-Gate '4.2b' "Mirror local image -> $RegistryAcr/scimserver:$localMirrorTag" {
             $localImageId = Get-ValidatedLocalImageId -ProjectName $validationProjectName
@@ -886,12 +920,12 @@ if (-not $SkipDeploy) {
     # published is both more robust AND more correct: dev runs exactly the bits
     # GHCR serves. The local image is not the deployment artifact, but required
     # local validation gates must still pass before publication or deployment.
-    $acrName = $RegistryAcr.Split('.')[0]
+    $acrName = ($RegistryAcr -split '\.')[0]
     if ($releaseArtifactReady) {
         $releaseArtifactReady = Invoke-Gate '4.5' "Import ${RegistryGhcr}:$version -> ACR version + latest" {
-            az acr import --name $acrName --source "${RegistryGhcr}@${verifiedGhcrDigest}" --image "scimserver:${version}" --force
+            az acr import --name $acrName --subscription $registrySubscriptionId --source "${RegistryGhcr}@${verifiedGhcrDigest}" --image "scimserver:${version}" --force
             if ($LASTEXITCODE -ne 0) { throw "Could not import ACR version tag from ${RegistryGhcr}@${verifiedGhcrDigest}." }
-            az acr import --name $acrName --source "${RegistryGhcr}@${verifiedGhcrDigest}" --image 'scimserver:latest' --force
+            az acr import --name $acrName --subscription $registrySubscriptionId --source "${RegistryGhcr}@${verifiedGhcrDigest}" --image 'scimserver:latest' --force
             if ($LASTEXITCODE -ne 0) { throw "Could not import ACR latest tag from ${RegistryGhcr}@${verifiedGhcrDigest}." }
         }
     } else {
@@ -902,7 +936,9 @@ if (-not $SkipDeploy) {
     # 4.5b - Both ACR shipping tags must exist, and both must identify the exact
     # GHCR artifact. A mutable tag that points at a local rebuild is not the same
     # artifact even when package versions and compiled output happen to match.
-    $acrTags = @(az acr repository show-tags --name $acrName --repository scimserver -o tsv 2>$null)
+    $acrTags = if ($DryRun) { @() } else {
+        @(az acr repository show-tags --name $acrName --subscription $registrySubscriptionId --repository scimserver -o tsv 2>$null)
+    }
     $tagPresent = $releaseArtifactReady -and ($acrTags -contains $version) -and ($acrTags -contains 'latest')
     if ($tagPresent) {
         Add-Result -Stage '4.5b' -Gate 'Deployable image tags exist in ACR' -Status 'PASS' -Detail "scimserver:$version, scimserver:latest"
@@ -914,8 +950,8 @@ if (-not $SkipDeploy) {
     if ($tagPresent) {
         Invoke-Gate '4.5c' 'GHCR and ACR version/latest digest parity' {
             $ghcrDigest = $verifiedGhcrDigest
-            $acrVersionDigest = (az acr manifest show-metadata --registry $acrName --name "scimserver:$version" --query digest -o tsv 2>$null).Trim()
-            $acrLatestDigest = (az acr manifest show-metadata --registry $acrName --name 'scimserver:latest' --query digest -o tsv 2>$null).Trim()
+            $acrVersionDigest = (az acr manifest show-metadata --registry $acrName --subscription $registrySubscriptionId --name "scimserver:$version" --query digest -o tsv 2>$null).Trim()
+            $acrLatestDigest = (az acr manifest show-metadata --registry $acrName --subscription $registrySubscriptionId --name 'scimserver:latest' --query digest -o tsv 2>$null).Trim()
             if ($ghcrDigest -ne $acrVersionDigest -or $ghcrDigest -ne $acrLatestDigest) {
                 throw "Registry digest mismatch: GHCR=$ghcrDigest ACR-version=$acrVersionDigest ACR-latest=$acrLatestDigest"
             }
@@ -1169,7 +1205,7 @@ if (-not $SkipDeploy -and @($script:results | Where-Object { $_.Status -eq 'FAIL
     if (-not $DryRun -and @($script:results | Where-Object { $_.Status -eq 'FAIL' }).Count -eq 0) {
         try {
             $devKeep = Get-ScimEstateRevisionKeep -AppName $DevAppName -ResourceGroup $DevResourceGroup
-            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep $devKeep
+            & (Join-Path $PSScriptRoot 'prune-revisions.ps1') -ResourceGroup $DevResourceGroup -AppName $DevAppName -Keep $devKeep -Subscription $devSubscriptionId
             Add-Result -Stage '6.2' -Gate "Revision hygiene (keep newest $devKeep active)" -Status 'PASS' -Detail 'stale revisions deactivated'
         } catch {
             Add-Result -Stage '6.2' -Gate 'Revision hygiene' -Status 'FAIL' -Detail $_.Exception.Message
@@ -1220,7 +1256,7 @@ if ($AutoCanary -and -not $SkipDeploy) {
         Add-Result -Stage '6.5' -Gate 'Auto-canary blue/green to proudbush' -Status 'PENDING' -Detail 'dry-run'
     } else {
         # Resolve canary FQDN + capture the BEFORE inventory from live blue.
-        $canaryFqdn = az containerapp show -n $CanaryAppName -g $CanaryResourceGroup --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
+        $canaryFqdn = az containerapp show -n $CanaryAppName -g $CanaryResourceGroup --subscription $canarySubscriptionId --query 'properties.configuration.ingress.fqdn' -o tsv 2>$null
         $verifyScript = Join-Path $repoRoot 'scripts/verify-deployment.ps1'
         $beforeSnap = Join-Path $ReportDir "inventory-$CanaryAppName-before.json"
 
@@ -1233,7 +1269,6 @@ if ($AutoCanary -and -not $SkipDeploy) {
         # data/ID before-after diff). promote-to-prod.ps1 handles the 0% green
         # soak, the verify-on-green, the flip, and auto-rollback on any failure.
         $promoteScript = Join-Path $repoRoot 'scripts/promote-to-prod.ps1'
-        $canaryEstate = Get-ScimEstate -Purpose 'canary-prod'
         Write-Host "  Auto blue/green promote proudbush ($CanaryAppName/$CanaryResourceGroup) @ $version..." -ForegroundColor Yellow
 
         # promote-to-prod.ps1 prompts for 'yes'; feed it non-interactively.

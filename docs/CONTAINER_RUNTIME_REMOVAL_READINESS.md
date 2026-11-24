@@ -48,6 +48,21 @@ success or deployed performance. The separate unpublished logging candidate
 still fails HTTP performance and is not admitted by this correction.
 Docker Desktop and its artifacts remain untouched.
 
+The wiring follow-up scopes every ACR CLI operation to the active dev
+subscription, including explicit approved mirrors. Different mirror
+subscriptions are unsupported rather than inferred. Current canary capture
+also resolves its app/group and pins its ingress read to the current
+canary subscription. The pipeline always checks a supplied `-DevFqdn`
+against the authoritative scoped current-dev ingress before HTTP capture;
+foreign and alternate green-label hosts are rejected. The separate
+blue/green promotion/verification flow is unchanged. SkipDeploy still needs
+the actual authorized ingress read for its existing capture, but no mirror;
+DryRun bypasses ingress and direct ACR tag-list commands.
+
+Dev revision pruning receives the admitted subscription explicitly, and the
+pruning dependency scopes each operation without switching cached accounts.
+The existing retention and serving/rollback protection rules are preserved.
+
 ### Current merged-source checkpoint, 2026-11-23
 
 The current consolidated source is

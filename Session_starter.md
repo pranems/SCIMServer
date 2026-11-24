@@ -2,6 +2,19 @@
 
 ### Offline active deployment admission, 2026-11-24
 
+Same-outcome follow-up to `fd800991`: all ACR CLI commands now use the
+registry mirror's approved active-dev subscription scope; cross-subscription
+mirrors are unsupported. Current canary identity/scope resolves by role.
+Explicit dev ingress overrides are checked against authoritative scoped ARM
+ingress before HTTP capture. Separate blue/green verification is untouched.
+DryRun also suppresses the previously direct tag-list read. Parent has not
+accepted this source as complete or deployment ready. Original receipts
+remain intact; follow-up journals/receipts use the `wiring-` prefix under
+`test-results/active-deployment-admission/`.
+The same scope audit found dev revision pruning still ambient; the caller
+now passes its admitted subscription and pruning scopes each operation
+without `az account set`. Retention/serving/rollback policy is unchanged.
+
 | Date | Summary |
 |---|---|
 | 2026-11-24 | Isolated active-deployment preflight source correction removes the retiring ACR default, resolves current dev by role, checks cached tenant/subscription and explicit dev target before side effects, and requires an existing approved explicit ACR mirror when anonymous GHCR supplies no compatible default. Numbered mirror/import/digest/master/shipping/approval gates remain intact. Offline semantic contracts cover value correctness and DryRun non-dispatch; real mirror availability, permissions and full deployment remain pending. No runtime, cloud, Desktop removal, logging/performance or published-image change. |

@@ -197,6 +197,221 @@ Invoke-Assert -Description 'default validation project identity remains unique a
     -Condition $usesRunUniqueProject
 
 & {
+    $prunePath = Join-Path $repoRoot 'scripts\prune-revisions.ps1'
+    $pruneAst = [System.Management.Automation.Language.Parser]::ParseFile($prunePath, [ref]$null, [ref]$null)
+    $Subscription = 'synthetic-approved-subscription'
+    $subscriptionArgs = @()
+    $scopeAssignment = $pruneAst.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -eq '$subscriptionArgs'
+    }, $true)
+    if ($scopeAssignment) { . ([scriptblock]::Create($scopeAssignment.Extent.Text)) }
+    $commands = @($pruneAst.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'az'
+    }, $true))
+    $AppName = 'current-dev'
+    $ResourceGroup = 'current-group'
+    $r = @{ name = 'owned-old-revision' }
+    $state = @{}
+    function az { $state.Args = @($args); $global:LASTEXITCODE = 0; return '[]' }
+    Invoke-Assert 'pruning has exactly three cloud operations and no automatic account switch' ($commands.Count -eq 3)
+    foreach ($command in $commands) {
+        & ([scriptblock]::Create($command.Extent.Text)) | Out-Null
+        $index = [array]::IndexOf($state.Args, '--subscription')
+        Invoke-Assert "executed pruning operation keeps explicit scope without switching account: $($command.CommandElements[1].Extent.Text)" `
+            ($state.Args[0] -eq 'containerapp' -and $index -ge 0 -and $state.Args[$index + 1] -eq $Subscription)
+    }
+    Invoke-Assert 'dev pipeline passes admitted subscription to its pruning dependency' `
+        ($content.Contains("'prune-revisions.ps1') -ResourceGroup " + '$DevResourceGroup -AppName $DevAppName -Keep $devKeep -Subscription $devSubscriptionId'))
+    $Subscription = $null
+    if ($scopeAssignment) { . ([scriptblock]::Create($scopeAssignment.Extent.Text)) }
+    Invoke-Assert 'standalone pruning without explicit scope preserves optional caller behavior without a switch' `
+        (@($subscriptionArgs).Count -eq 0)
+}
+
+& {
+    . (Join-Path $repoRoot 'scripts\scim-estates.ps1')
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $active = Get-ScimEstate -Purpose dev
+    $canaryEstate = Get-ScimEstate -Purpose 'canary-prod'
+    $devSubscriptionId = $active.Tenant.subscriptionId
+    $registrySubscriptionId = $null
+    $canarySubscriptionId = $null
+    $canaryAdmission = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.IfStatementAst] -and
+        $node.Extent.Text.StartsWith('if ($AutoCanary -and -not $SkipDeploy)') -and
+        $node.Extent.Text.Contains('$canarySubscriptionId =')
+    }, $true)
+    $AutoCanary = $true
+    $SkipDeploy = $false
+    $CanaryAppName = $null
+    $CanaryResourceGroup = $null
+    if ($canaryAdmission) { . ([scriptblock]::Create($canaryAdmission.Extent.Text)) }
+    Invoke-Assert 'canary defaults and scope derive from the actual current-role admission block' `
+        ($CanaryAppName -eq $canaryEstate.appName -and $CanaryResourceGroup -eq $canaryEstate.resourceGroup -and
+            $canarySubscriptionId -eq $canaryEstate.Tenant.subscriptionId)
+    if ($canaryAdmission) {
+        $CanaryAppName = 'foreign-canary'
+        $rejected = $false
+        try { . ([scriptblock]::Create($canaryAdmission.Extent.Text)) } catch {
+            $rejected = $_.Exception.Message.Contains('Canary target mismatch')
+        }
+        Invoke-Assert 'foreign explicit canary target is rejected before any cloud command' $rejected
+        $CanaryAppName = $canaryEstate.appName
+    }
+    $scopeAssignment = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -eq '$registrySubscriptionId'
+    }, $true)
+    if ($scopeAssignment) { . ([scriptblock]::Create($scopeAssignment.Extent.Text)) }
+    $acrCommands = @($ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'az' -and $node.CommandElements[1].Extent.Text -eq 'acr'
+    }, $true))
+    $canaryCommand = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'az' -and $node.Extent.Text.Contains('$CanaryAppName')
+    }, $true)
+    $RegistryAcr = 'approvedmirror.azurecr.io'
+    $acrName = 'approvedmirror'
+    $RegistryGhcr = 'ghcr.io/example/scimserver'
+    $verifiedGhcrDigest = 'sha256:' + ('a' * 64)
+    $version = '1.2.3'
+    $CanaryAppName = $canaryEstate.appName
+    $CanaryResourceGroup = $canaryEstate.resourceGroup
+    $state = @{}
+    function az { $state.Args = @($args); $global:LASTEXITCODE = 0; return 'offline-result' }
+    Invoke-Assert 'exact nonempty ACR command population is retained (login, two imports, tags, two manifests)' ($acrCommands.Count -eq 6)
+    foreach ($command in $acrCommands) {
+        $state.Args = @()
+        & ([scriptblock]::Create($command.Extent.Text)) | Out-Null
+        $index = [array]::IndexOf($state.Args, '--subscription')
+        Invoke-Assert "executed ACR command uses active approved mirror scope: $($command.CommandElements[2].Extent.Text)" `
+            ($index -ge 0 -and $state.Args[$index + 1] -eq $devSubscriptionId)
+    }
+    $state.Args = @()
+    & ([scriptblock]::Create($canaryCommand.Extent.Text)) | Out-Null
+    $index = [array]::IndexOf($state.Args, '--subscription')
+    Invoke-Assert 'executed canary ingress read uses resolved current canary subscription' `
+        ($index -ge 0 -and $state.Args[$index + 1] -eq $canaryEstate.Tenant.subscriptionId)
+    Invoke-Assert 'approved mirror subscription is derived from admitted active dev, never ambient' `
+        ($registrySubscriptionId -eq $devSubscriptionId)
+    $nameAssignment = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -eq '$acrName'
+    }, $true)
+    $tagAssignment = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -eq '$acrTags'
+    }, $true)
+    $DryRun = $true
+    foreach ($mirror in @('', 'approvedmirror.azurecr.io')) {
+        $RegistryAcr = $mirror
+        $state.Args = @()
+        $completed = $false
+        try {
+            . ([scriptblock]::Create($nameAssignment.Extent.Text))
+            . ([scriptblock]::Create($tagAssignment.Extent.Text))
+            $completed = $true
+        } catch {}
+        Invoke-Assert "DryRun tag inspection neither needs a mirror nor dispatches Azure: '$mirror'" `
+            ($completed -and $state.Args.Count -eq 0)
+    }
+}
+
+& {
+    . (Join-Path $repoRoot 'scripts\scim-estates.ps1')
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
+    $devEstate = Get-ScimEstate -Purpose dev
+    $devSubscriptionId = $devEstate.Tenant.subscriptionId
+    $DevAppName = $devEstate.appName
+    $DevResourceGroup = $devEstate.resourceGroup
+    $resolver = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Resolve-ActiveDevIngress'
+    }, $true)
+    if ($resolver) { . ([scriptblock]::Create($resolver.Extent.Text)) }
+    $inheritedResolution = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.IfStatementAst] -and
+        $node.Extent.Text.StartsWith('if (-not $DevFqdn)')
+    }, $true)
+    $state = @{}
+    function az {
+        $state.Reads++
+        $state.Args = @($args)
+        if ($args[0] -ne 'containerapp' -or $args[1] -ne 'show') {
+            $state.Mutations++
+            throw 'Offline hostname contract refuses all other Azure commands.'
+        }
+        $global:LASTEXITCODE = $state.Exit
+        return $state.Host
+    }
+    $cases = @(
+        @{ Name = 'default resolves authoritative active ingress'; Accept = $true },
+        @{ Name = 'matching explicit current ingress is preserved'; Fqdn = 'current-dev.example.test'; Accept = $true },
+        @{ Name = 'case-insensitive matching hostname is admitted'; Fqdn = 'CURRENT-DEV.EXAMPLE.TEST'; Accept = $true },
+        @{ Name = 'trailing DNS dot preserves the authoritative hostname'; Fqdn = 'current-dev.example.test.'; Accept = $true },
+        @{ Name = 'foreign explicit host is rejected before fixture dispatch'; Fqdn = 'foreign.example.test'; Accept = $false; Error = 'DevFqdn mismatch' },
+        @{ Name = 'URL instead of hostname is rejected'; Fqdn = 'https://current-dev.example.test'; Accept = $false; Error = 'DevFqdn mismatch' },
+        @{ Name = 'green label is unsupported by the dev pipeline'; Fqdn = 'current-dev---green.example.test'; Accept = $false; Error = 'DevFqdn mismatch' },
+        @{ Name = 'unavailable ingress is rejected'; Empty = $true; Accept = $false; Error = 'Could not resolve' },
+        @{ Name = 'failed ARM read with misleading output is rejected'; Exit = 1; Accept = $false; Error = 'Could not resolve' },
+        @{ Name = 'malformed authoritative ingress is rejected'; Host = 'https://current-dev.example.test'; Accept = $false; Error = 'Could not resolve' },
+        @{ Name = 'DryRun default performs no read'; Dry = $true; Accept = $true },
+        @{ Name = 'DryRun explicit hostname performs no read'; Dry = $true; Fqdn = 'plan-only.example.test'; Accept = $true },
+        @{ Name = 'SkipDeploy capture still rejects foreign hostname'; Skip = $true; Fqdn = 'foreign.example.test'; Accept = $false; Error = 'DevFqdn mismatch' }
+    )
+    foreach ($case in $cases) {
+        $state.Clear()
+        $state.Reads = 0
+        $state.Mutations = 0
+        $state.Fixtures = 0
+        $state.Args = @()
+        $state.Host = if ($case.Empty) { '' } elseif ($case.Host) { $case.Host } else { 'current-dev.example.test' }
+        $state.Exit = if ($case.Exit) { $case.Exit } else { 0 }
+        $DryRun = [bool]$case.Dry
+        $SkipDeploy = [bool]$case.Skip
+        $DevFqdn = $case.Fqdn
+        $accepted = $false
+        $message = ''
+        try {
+            if ($resolver) {
+                $DevFqdn = Resolve-ActiveDevIngress -Estate $devEstate -DevFqdn $DevFqdn -DryRun:$DryRun
+            } else {
+                . ([scriptblock]::Create($inheritedResolution.Extent.Text))
+            }
+            $accepted = $true
+            $state.Fixtures++
+        } catch { $message = $_.Exception.Message }
+        Invoke-Assert "ingress semantic outcome: $($case.Name)" `
+            ($accepted -eq $case.Accept -and ($case.Accept -or $message.Contains($case.Error)))
+        Invoke-Assert "ingress rejects before fixture mutation: $($case.Name)" `
+            ($state.Mutations -eq 0 -and ($case.Accept -or $state.Fixtures -eq 0))
+        if ($DryRun) {
+            Invoke-Assert "DryRun ingress has no cloud read: $($case.Name)" ($state.Reads -eq 0)
+        } elseif ($accepted -and $case.Accept) {
+            $index = [array]::IndexOf($state.Args, '--subscription')
+            Invoke-Assert "explicit or default ingress is authoritatively scoped: $($case.Name)" `
+                ($state.Reads -eq 1 -and $index -ge 0 -and $state.Args[$index + 1] -eq $devSubscriptionId -and
+                    $DevFqdn -eq 'current-dev.example.test')
+        }
+    }
+    Invoke-Assert 'authoritative ingress admission is wired before dev HTTP capture' `
+        ($content.IndexOf('$DevFqdn = Resolve-ActiveDevIngress') -gt 0 -and
+            $content.IndexOf('$DevFqdn = Resolve-ActiveDevIngress') -lt $content.IndexOf('# Capture before-deploy state of dev'))
+}
+
+& {
     . (Join-Path $repoRoot 'scripts\scim-estates.ps1')
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($pipeline, [ref]$null, [ref]$null)
     $admission = $ast.Find({

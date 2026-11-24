@@ -54,7 +54,7 @@ Docker Desktop artifacts are retained; removal is a separate operator action.
 
 The local source now resolves the default full deployment target through
 [Get-ScimEstate](../scripts/scim-estates.ps1#L181) with `-Purpose dev`.
-[Assert-ActiveDevDeploymentAdmission](../scripts/dev-deployment-pipeline.ps1#L253)
+[Assert-ActiveDevDeploymentAdmission](../scripts/dev-deployment-pipeline.ps1#L256)
 checks the existing cached account's tenant ID, subscription ID and enabled
 state before prerequisites, before-state HTTP capture or numbered mutating
 stages. Both IDs must match the registry-declared active dev estate.
@@ -72,11 +72,41 @@ declares a managed-identity ACR, its login server can supply the default.
 An explicit approved login server remains authoritative. A URL, GHCR image
 path or ACR repository path is not a login server.
 
+The same-outcome wiring follow-up pins all six ACR CLI operations (login,
+two imports, tag listing and two manifest reads) to the active dev
+subscription. **An explicit approved mirror must exist in that subscription**;
+this pipeline does not support a different mirror subscription or infer one
+from ambient CLI context. Current canary app/group defaults and its ingress
+read resolve from `Get-ScimEstate -Purpose canary-prod`, with the read pinned
+to that estate's subscription. A different explicit canary app/group is
+rejected before capture. The existing promotion approval and blue/green
+verification path are unchanged.
+
+The dev pipeline also supplies its admitted subscription to
+`prune-revisions.ps1`. That existing dependency now scopes its list,
+deactivation and post-check directly with `--subscription` instead of
+changing cached account selection. Retention, serving-revision protection
+and the distinct-image rollback selector are unchanged. Standalone pruning
+without `-Subscription` retains its existing caller-selected CLI behavior;
+deployment callers do not rely on that ambient selection.
+
+[Resolve-ActiveDevIngress](../scripts/dev-deployment-pipeline.ps1#L326)
+always performs a read-only ingress lookup scoped to current dev before any
+dev HTTP capture, even when `-DevFqdn` is supplied. A supplied hostname must
+match that authoritative ingress; case and an optional trailing DNS dot are
+normalized. Foreign hosts, URLs and alternate green-label hosts are rejected.
+Failed, empty or malformed ARM output is not admitted as a hostname.
+Source inspection found no pipeline caller using `-DevFqdn` for a green
+label. That legitimate verification flow is owned by the unchanged
+`promote-to-prod.ps1` and `verify-deployment.ps1` scripts instead.
+
 Admission does not discover, create or certify mirror infrastructure.
 The numbered local mirror, GHCR publication, ACR import, tag/digest parity,
 merged-master source, shipping and production-approval gates remain intact.
-`-DryRun` performs no account/container prerequisite calls, and `-SkipDeploy`
-does not require a mirror through this admission check. This does not turn
+`-DryRun` performs no account/container prerequisite, ingress or ACR tag-list
+calls, and `-SkipDeploy` does not require a mirror through this admission
+check. SkipDeploy still validates the authoritative current-dev hostname
+before its existing HTTP capture. This does not turn
 `-SkipDeploy` into an entirely network-free full pipeline; its existing
 validation/capture requirements still apply. Empty ARM diagnostics now name
 the registry-resolved current identity without advising a retiring tenant

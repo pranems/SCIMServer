@@ -35,6 +35,11 @@
   SAFETY: a revision currently serving traffic is NEVER deactivated, even if
   it falls outside the newest N. The script aborts rather than leave an app
   with nothing serving.
+
+.PARAMETER Subscription
+  Scope each revision operation to this subscription without changing the
+  cached account selection. Deployment callers pass their admitted estate ID.
+  When omitted, standalone callers retain their existing CLI selection.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -63,7 +68,7 @@ if (-not $PSBoundParameters.ContainsKey('Keep')) {
 
 if ($Keep -lt 1) { throw "-Keep must be at least 1 (got $Keep)." }
 
-if ($Subscription) { az account set --subscription $Subscription | Out-Null }
+$subscriptionArgs = if ($Subscription) { @('--subscription', $Subscription) } else { @() }
 
 Write-Host ""
 Write-Host "=== Revision hygiene: $AppName (rg: $ResourceGroup) ===" -ForegroundColor Cyan
@@ -74,7 +79,7 @@ if ($Keep -eq 1) {
     Write-Host "  keep=1: after this prune there is NO rollback target. Recovery is roll-forward: re-run the promotion with the previous image tag." -ForegroundColor Yellow
 }
 
-$raw = az containerapp revision list -n $AppName -g $ResourceGroup -o json 2>$null
+$raw = az containerapp revision list -n $AppName -g $ResourceGroup @subscriptionArgs -o json 2>$null
 if (-not $raw) { throw "Could not list revisions for $AppName in $ResourceGroup." }
 
 $active = @($raw | ConvertFrom-Json | Where-Object { $_.properties.active } |
@@ -128,7 +133,7 @@ if ($toDeactivate.Count -eq 0) {
 $failed = @()
 foreach ($r in $toDeactivate) {
     if ($PSCmdlet.ShouldProcess($r.name, 'deactivate revision')) {
-        $out = az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r.name 2>&1
+        $out = az containerapp revision deactivate -n $AppName -g $ResourceGroup @subscriptionArgs --revision $r.name 2>&1
         if ($LASTEXITCODE -ne 0) {
             # Azure's revision list is eventually consistent, so a revision another
             # run just deactivated can still appear active here. Deactivating an
@@ -151,7 +156,7 @@ if ($failed.Count -gt 0) {
 }
 
 # Verify the outcome rather than trusting the command's exit code.
-$after = @(az containerapp revision list -n $AppName -g $ResourceGroup -o json | ConvertFrom-Json |
+$after = @(az containerapp revision list -n $AppName -g $ResourceGroup @subscriptionArgs -o json | ConvertFrom-Json |
     Where-Object { $_.properties.active })
 $stillServing = @($after | Where-Object { [int]$_.properties.trafficWeight -gt 0 })
 
