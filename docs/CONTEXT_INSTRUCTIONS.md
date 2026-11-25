@@ -9,6 +9,20 @@
 
 ## Active Delivery Process
 
+**Fresh-worktree API preparation, November 24:** run the existing
+[standalone builder](../scripts/build-standalone.ps1) with `-PrepareOnly`
+explicitly before native development or Fast push. It shares checked API
+`npm ci -> Prisma generation -> TypeScript compilation`, supplies a
+nonconnecting generation-only datasource and restores caller state. It
+does not assemble/clean a package, install root/web dependencies, start a
+runtime or migrate/connect a database. Hooks remain unchanged and never
+silently prepare the tree. Actual ci-only build reproduced TS2307/exit 2;
+preparation with no DATABASE_URL exits 0. The new on-demand contracts pass
+97 assertions after 41 base assertion failures; existing standalone
+contracts and API lint pass unchanged. This is local setup evidence only;
+the following native runtime/image/browser receipts remain separately pinned.
+See [the execution record](CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-api-preparation-follow-up-2026-11-24).
+
 **Authoritative local native checkpoint, November 24:** unchanged 0.55.70
 production sources pass immutable-image InMemory, actual Compose Prisma
 and owned Windows Node InMemory full live runs, each 1,845/1,845 with

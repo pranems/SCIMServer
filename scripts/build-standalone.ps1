@@ -17,7 +17,8 @@
 
     Prisma generation requires DATABASE_URL during the build because its
     configuration is evaluated before generation. A nonconnecting, build-only
-    loopback URL is sufficient; generation does not open a database connection.
+    loopback URL is supplied only for generation and the caller's value is
+    restored afterward; generation does not open a database connection.
     Runtime launchers still require the intended database URL for migrations.
 
     Optionally bundles a portable Node.js binary so the target machine
@@ -26,6 +27,12 @@
 
 .PARAMETER OutputDir
     Output directory name (default: standalone)
+
+.PARAMETER PrepareOnly
+    Install locked API dependencies, generate Prisma and compile the API only.
+    Does not clean or assemble a package, build the web UI, start a runtime,
+    connect to a database or apply migrations. Run explicitly in a fresh
+    worktree before local development or the Fast pre-push hook.
 
 .PARAMETER IncludeNode
     Download and include a portable Node.js binary in the package.
@@ -54,6 +61,7 @@
     Create a .zip archive of the standalone folder
 
 .EXAMPLE
+    .\build-standalone.ps1 -PrepareOnly
     .\build-standalone.ps1
     .\build-standalone.ps1 -IncludeNode -Zip
     .\build-standalone.ps1 -Port 6000 -IncludeNode -Zip
@@ -62,6 +70,7 @@
 #>
 param(
     [string]$OutputDir = "standalone",
+    [switch]$PrepareOnly,
     [switch]$IncludeNode,
     [string]$NodeVersion,
     [switch]$IncludePostgres,
@@ -75,6 +84,15 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ApiDir = Join-Path $RepoRoot "api"
 $WebDir = Join-Path $RepoRoot "web"
 $OutPath = Join-Path $RepoRoot $OutputDir
+
+if ($PrepareOnly -and ($IncludeNode -or $IncludePostgres -or $Zip)) {
+    throw 'PrepareOnly cannot be combined with packaging options IncludeNode, IncludePostgres or Zip.'
+}
+foreach ($tool in @('node', 'npm', 'npx')) {
+    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+        throw "Required build tool '$tool' is missing. Install it before running preparation."
+    }
+}
 
 # ── Auto-detect values from project metadata ──
 $pkgJsonPath = Join-Path $ApiDir "package.json"
@@ -112,25 +130,24 @@ if ($IncludePostgres) {
 }
 Write-Host ""
 
-# ── Step 1: Clean previous output ──
-if (Test-Path $OutPath) {
-    Write-Host "[1/7] Cleaning previous build..." -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $OutPath
-}
-New-Item -ItemType Directory -Path $OutPath -Force | Out-Null
-
-# ── Step 2: Install API dependencies ──
-Write-Host "[2/7] Installing API dependencies..." -ForegroundColor Yellow
+# ── Step 1: Install API dependencies ──
+Write-Host "[1/7] Installing API dependencies..." -ForegroundColor Yellow
 Push-Location $ApiDir
 try {
     npm ci --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw "API clean dependency installation failed (exit $LASTEXITCODE)" }
 } finally { Pop-Location }
 
-# ── Step 3: Generate Prisma client & build TypeScript ──
-Write-Host "[3/7] Generating Prisma client & compiling TypeScript..." -ForegroundColor Yellow
+# ── Step 2: Generate Prisma client & build TypeScript ──
+Write-Host "[2/7] Generating Prisma client & compiling TypeScript..." -ForegroundColor Yellow
 Push-Location $ApiDir
 try {
+    if (-not (Test-Path (Join-Path $ApiDir 'node_modules\prisma\build\index.js'))) {
+        throw 'Local Prisma CLI is missing after npm ci. Check the dependency installation before retrying.'
+    }
+    if (-not (Test-Path (Join-Path $ApiDir 'node_modules\typescript\bin\tsc'))) {
+        throw 'Local TypeScript compiler is missing after npm ci. Check the dependency installation before retrying.'
+    }
     # Clear any stale tsc incremental buildinfo + dist before recompiling.
     # Without this, tsc may skip emitting most files when the buildinfo
     # cache thinks they are up to date but the dist/ has been wiped or
@@ -138,11 +155,28 @@ try {
     # crashes at runtime with "Cannot find module './modules/app/app.module'".
     Remove-Item -Force -ErrorAction SilentlyContinue 'tsconfig.build.tsbuildinfo'
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue 'dist'
-    npx prisma generate
-    if ($LASTEXITCODE -ne 0) { throw "Prisma client generation failed (exit $LASTEXITCODE)" }
+    $savedDatabaseUrl = $env:DATABASE_URL
+    try {
+        # Prisma evaluates its datasource config even though generate never connects.
+        $env:DATABASE_URL = 'postgresql://build:build@127.0.0.1:1/build'
+        npx prisma generate
+        if ($LASTEXITCODE -ne 0) { throw "Prisma client generation failed (exit $LASTEXITCODE)" }
+    } finally { $env:DATABASE_URL = $savedDatabaseUrl }
     npx tsc -p tsconfig.build.json
-    if ($LASTEXITCODE -ne 0) { throw "TypeScript compilation failed" }
+    if ($LASTEXITCODE -ne 0) { throw "TypeScript compilation failed (exit $LASTEXITCODE)" }
 } finally { Pop-Location }
+
+if ($PrepareOnly) {
+    Write-Host 'API preparation complete. No package, runtime or database was started.' -ForegroundColor Green
+    return
+}
+
+# ── Step 3: Clean previous output only after API preparation succeeds ──
+if (Test-Path $OutPath) {
+    Write-Host "[3/7] Cleaning previous build..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $OutPath
+}
+New-Item -ItemType Directory -Path $OutPath -Force | Out-Null
 
 # ── Step 4: Build web frontend (if present) ──
 $WebDistDir = Join-Path $WebDir "dist"

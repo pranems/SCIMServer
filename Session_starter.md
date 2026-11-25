@@ -1,5 +1,36 @@
 ## SCIMServer - Condensed Session Memory
 
+### Native API prerequisite preparation, 2026-11-24
+
+Base master `fc99388f` includes normally merged PR #290. Fresh worktrees
+must explicitly run `pwsh -NoProfile -File scripts\build-standalone.ps1
+-PrepareOnly` before API development or Fast push. The existing builder
+now shares checked immutable `npm ci`, Prisma generation and compilation
+without package cleanup/assembly or runtime startup in this mode.
+Generation temporarily uses a nonconnecting datasource, requires the local
+CLI and restores caller environment/location on failure. The Fast hook
+neither installs packages nor generates the client.
+
+Actual owned `npm ci` installed 660 API packages, exit 0; compilation alone
+then reproduced missing-generated-client TS2307, exit 2. Preparation with no
+DATABASE_URL exits 0, generates Prisma 7.8.0 and emits the compiled entry
+without a package. Final on-demand execution contracts: base 41 assertion
+failures/exit 1, corrected 97 assertions/exit 0. Existing standalone
+migration contracts pass unchanged. API lint exits 0 with zero errors and
+507 unchanged warnings. Root/web restoration is separate and all three
+lockfile hashes remain unchanged.
+
+| Date | Summary |
+|---|---|
+| 2026-11-24 | [x] Explicit API-only preparation operationalized in the existing builder with actual TS2307 RED and DB-free compile GREEN. New focused contracts cover ordering, errors, missing tools, environment restoration and retained package output. |
+
+Self-improvement applied: executable preparation contracts replace reliance
+on documentation alone. Design accepted: reuse two cohesive builder stages,
+no second installer, package lifecycle, hook redesign or application change.
+See [the bounded RCA and evidence scope](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-api-preparation-follow-up-2026-11-24).
+Normal Fast delivery and PR publication are recorded separately after their
+actual results; parent review/merge remain outside this implementation.
+
 ### Authoritative local native qualification, 2026-11-24
 
 The unchanged 0.55.70 production sources pass three native full live modes:
