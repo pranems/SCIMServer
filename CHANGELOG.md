@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Explicit native API prerequisite preparation
+
+- Reuse `scripts/build-standalone.ps1 -PrepareOnly` for checked immutable
+  API installation, Prisma generation and compilation. Return before
+  package cleanup/assembly, web builds, downloads or runtime startup.
+- Scope a nonconnecting datasource to generation and restore the caller's
+  environment. Require installed local Prisma/TypeScript CLIs and report
+  stage failures explicitly. Existing normal packaging shares these stages
+  and preserves its later flow; hooks, migrations and application behavior
+  are unchanged.
+- Add 97 on-demand preparation assertions after 41 failures against the
+  base builder. Reproduce actual ci-only TS2307/exit 2 and successful
+  DB-free preparation/exit 0. Existing standalone migration contracts pass;
+  API lint remains zero errors/507 warnings. No version or lockfile change.
+  API unit/HTTP and browser test populations are unchanged; the normal Fast
+  hook owns complete pre-push execution, not duplicate manual full suites.
+- Update the existing local-development, infrastructure, context and
+  removal-readiness records. No new live/browser, image, deployment,
+  performance, Desktop-removal or gateway-migration proof is implied.
+
 ### Container-runtime evidence consolidation
 
 - Refresh the actual source/readiness and performance reports to merged

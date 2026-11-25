@@ -9,6 +9,22 @@
 
 ## Local runtime update, November 18
 
+**Local API preparation follow-up, November 24:** the existing
+[standalone builder](../scripts/build-standalone.ps1) accepts `-PrepareOnly`.
+It performs checked immutable API dependency installation, Prisma generation
+and compilation, then returns before package cleanup/assembly, web builds,
+downloads or runtime startup. Generation temporarily uses a deliberately
+nonconnecting loopback datasource and restores the caller's `DATABASE_URL`
+even on failure. Both preparation and normal packaging use this shared
+sequence; normal packaging still continues through the existing later steps.
+Local Prisma and TypeScript CLI files must exist after installation, so a
+missing tool is an explicit failure rather than an implicit npx download.
+The [fresh-worktree instructions](../README.md#local-development) keep root/web
+dependencies and database migration/startup separate. No infrastructure,
+image, cloud setting or deployment changed. The
+[bounded execution record](CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-api-preparation-follow-up-2026-11-24)
+is setup-script evidence, not a new native runtime qualification.
+
 The independent Windows development route is Engine in Ubuntu WSL with native
 Windows Docker/Compose/Buildx clients over pinned, key-only loopback SSH.
 [Runtime evidence and operator workflow](CONTAINER_RUNTIME_MIGRATION_ASSESSMENT.md)

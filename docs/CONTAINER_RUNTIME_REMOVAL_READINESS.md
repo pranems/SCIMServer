@@ -33,6 +33,99 @@ editor window has refreshed.
 
 ## 1. One authoritative status model
 
+### Native API preparation follow-up, 2026-11-24
+
+**Conclusion:** fresh native worktrees now have an explicit API-only
+preparation command in the existing
+[standalone builder](../scripts/build-standalone.ps1). Base master
+`fc99388f5109802ff2255ba07527510e94eef644` includes normally merged PR #290.
+This follow-up changes local setup tooling only, not the qualified
+application, dependency graph, image, runtime or cloud estate.
+
+```powershell
+pwsh -NoProfile -File .\scripts\build-standalone.ps1 -PrepareOnly
+```
+
+The sequence is immutable API `npm ci`, local Prisma generation, then
+TypeScript compilation. Every stage checks its native exit before continuing.
+Generation temporarily sets `DATABASE_URL` to
+`postgresql://build:build@127.0.0.1:1/build`, a deliberately nonconnecting
+build-only value, and restores the caller's value before compilation even
+when generation fails. No real database or secret is required. Local Prisma
+and TypeScript CLI files are checked after installation; a missing CLI cannot
+silently turn into an npx download. Missing host tools fail explicitly.
+
+`-PrepareOnly` returns before package cleanup/assembly, web builds, optional
+binary downloads and all runtime work. Packaging options are rejected before
+installation. The normal builder reuses the same stages and then continues
+through its existing package flow. Root and web dependencies remain separate;
+the unchanged Fast hook validates rather than installs or prepares source.
+The compiled API's older static frontend is not a browser acceptance target.
+Use the current Vite frontend for development or the assembled package for
+its separately qualified workflow.
+
+#### Observed command results
+
+| Check | Actual result | Claim established |
+|---|---|---|
+| Fresh `npm --prefix api run build` | Exit 1: missing `tsc` | Owned package dependencies really were absent before restoration. |
+| Approved-proxy `npm --prefix api ci --no-audit --no-fund --registry=https://packagefeedproxy.microsoft.io/npm/` | Exit 0, 660 packages | Immutable package restoration alone. |
+| Build immediately after that install | Exit 2, TS2307 at generated Prisma imports | Package restoration does not restore ignored application-generated source. |
+| `pwsh -NoProfile -File scripts\build-standalone.ps1 -PrepareOnly`, with no DATABASE_URL | Exit 0; Prisma 7.8.0 client and compiled API entry present; no `standalone` output | Actual generation/compilation succeeds without a real datasource or package. |
+| New `native-preparation.contract.ps1` against the exact base builder | Exit 1, 41 assertion failures | The base does not implement the new preparation boundary or generation environment. |
+| Same new on-demand contracts against the correction | Exit 0, 97 assertions | Exact command order, install/generation/build failures, missing host/local tools, caller environment/location restoration, unchanged lock and retained package output. |
+| Existing `standalone-migrations.contract.ps1` | Exit 0, 59 assertions, unchanged | Existing generated package/launcher contracts remain intact. No actual database was started by this mock suite. |
+| `npm --prefix api run lint` | Exit 0, zero errors and 507 existing warnings | No API lint regression. |
+
+All three source lock SHA-256 values are unchanged:
+
+| Lockfile | SHA-256 |
+|---|---|
+| API | `6e9c81f9875a0aea9b62bc32896ee711423e1c5ee985226e0475088004ab0594` |
+| Web | `23960ff78d58a6db808f4ecbce3769e66324f42bcbf2e6a107de5abe31b39106` |
+| Root tooling | `3f5beca5fe56374c3ddb606861d4170fe197d285099636ab55bd4c60d9121245` |
+
+Private receipts remain under the supplied session evidence root, in
+`files\native-prerequisite-preparation-20261124`. Initial unsuccessful test
+development logs and the original fresh-build failure are retained.
+
+| Receipt | SHA-256 |
+|---|---|
+| `api-ci-only-build-red.log` | `0f28dad8b5fe7cfe6366e8cfda084a7712eef7e1d5e213ecd4b60207023c5ab4` |
+| `actual-prepare-green.log` | `d2b5c81363a46c13899f5ac1a342054ea3771ce9be07a318f6fa5e6ad634dbe7` |
+
+These hashes identify bounded setup receipts, not a nested native lifecycle
+journal or a complete rerun of the prior native qualification. The three
+1,845-assertion live runs and two 353-test browser runs below remain pinned to
+their original source/runtime/image identities. No Desktop deletion, gateway
+migration, shipping image, workflow dispatch, Azure/Graph write, migration,
+runtime start or performance tuning was performed here.
+
+#### Execution issues, root causes and prevention
+
+| ID | Type / severity | Symptom and root cause | Correction and why it works | Detection and earliest useful prevention |
+|---|---|---|---|---|
+| R46 | Setup prerequisites / Medium | Two earlier normal fresh-worktree Fast pushes failed TS2307. This owned reproduction confirms that the ignored Prisma client is application-generated source, not an npm-installed package. The builder had the correct order but coupled it to packaging and caller-provided generation configuration. | Reuse its two stages with explicit `-PrepareOnly` and a scoped nonconnecting generation datasource. Actual ci-only build exits 2, then real preparation exits 0. Every failed stage stops the sequence; all lock bytes remain unchanged. | Earlier detection was the Fast API build. Earliest useful prevention is explicit preparation before that hook, plus the new on-demand order/failure contracts. Automatic hook/test registry integration is not claimed or changed. |
+| R47 | New test-double scope / Low | The first contract double used script-scoped state which resolved in the invoked builder's child scope, rather than the test owner. That caused test-harness failures and was not valid order evidence. | Share uniquely named process-global contract state and remove it in finally. Reexecute the exact base with the corrected doubles: 41 real assertion failures, then 97 GREEN assertions. | Detected in focused contract output before real preparation. Earliest check is proving that real command invocation reaches the test-owned recording state. Initial failed logs remain retained. |
+| R48 | New fixture teardown / Low | Repeating a missing-CLI scenario tried to remove its already-absent sentinel on the second datasource case. The runner terminated after 76 PASS lines, not a complete successful suite. | Check exact sentinel existence before targeted removal; reset generated/compiled fixture outputs for each case. Final completion and actual exit 0 now accompany the 97 assertions. | Detected at the contract runner's nonzero exit. Earliest check is full fixture lifecycle completion, not a partial PASS count. |
+| R49 | Edit placement / Low | An initial patch put the post-install CLI checks before npm ci. This would prevent a fresh worktree from preparing at all. | Move checks to the generation stage after the checked install. The actual fresh-worktree run and ordered call assertions prove install comes first. | Detected by direct source read before execution of that candidate. Earliest check is the real stage ordering, not just presence of each command. |
+
+**Provenance/completeness:** this bounded follow-up reconciles its persisted
+command logs and diagnosed tooling issues. The earlier parent transcript and
+native lifecycle artifacts were not reread or requalified, and no full
+historical transcript completeness claim is made. Missing root Mermaid and
+web Vite dependencies were expected fresh-worktree prerequisite failures;
+owned approved-proxy npm ci restores each separately without editing locks.
+The existing npm fetch registry is the approved proxy; no npm configuration
+or quarantine setting was changed.
+
+**Self-improvement applied:** tests assert the preparation outcome and failure
+boundary rather than relying on the documented command order alone.
+**Design accepted:** reuse the existing cohesive install/generate/compile
+stages. No new installer abstraction, hook coupling or application dependency
+is justified. Final normal Fast delivery and exact-head CI are separate
+receipts; parent review and merge remain required.
+
 ### Verified native qualification checkpoint, 2026-11-24
 
 **Conclusion:** unchanged production sources pass three native full live

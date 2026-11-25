@@ -1,6 +1,6 @@
 # SCIMServer
 
-> **Status:** User-facing reference - **Last verified:** 2026-11-23 - **Product version:** `0.55.70`
+> **Status:** User-facing reference - **Last verified:** 2026-11-24 - **Product version:** `0.55.70`
 
 > Production-ready, multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning and any RFC 7643/7644-compliant identity client.
 
@@ -347,13 +347,41 @@ curl -X POST http://localhost:8080/scim/endpoints/{endpointId}/Users \
 
 ### Local Development
 
+In a fresh clone or worktree, prepare the API explicitly before development
+or a Fast push. This reuses the standalone builder without producing a
+package or starting anything:
+
+```powershell
+pwsh -NoProfile -File .\scripts\build-standalone.ps1 -PrepareOnly
+```
+
+The command runs immutable API `npm ci`, Prisma generation, then TypeScript
+compilation, checking each result. Prisma's ignored generated source is
+not restored by `npm ci` alone. Generation uses a nonconnecting build-only
+loopback datasource and restores any caller `DATABASE_URL` before compilation.
+It needs no database or secret, applies no migrations, and never falls back
+to `npm install` or a downloaded missing CLI. Failures stop preparation.
+The command uses the configured npm registry; on corporate Windows machines
+use the approved proxy configuration described in
+[the local build guide](docs/LOCAL_DOCKER_BUILD.md).
+
+Root documentation and web dependencies are separate. Restore their locked
+dependencies with `npm ci` in the root and `web` directories when absent;
+API-only preparation does not install them. Hooks remain validation-only
+and do not prepare a fresh dependency or generated-source tree.
+
+To run the PostgreSQL development API afterward, deliberately configure the
+intended development `DATABASE_URL` and start the database separately:
+
 ```bash
 cd api
-npm ci
-npx prisma generate
 npx prisma migrate deploy     # requires PostgreSQL running on localhost:5432
 npm run start:dev              # http://localhost:3000
 ```
+
+These runtime commands are not part of preparation. Use the current Vite
+frontend for browser development; the API-only build does not refresh
+`api/public` or establish browser qualification.
 
 ### One-Click Azure Deployment
 

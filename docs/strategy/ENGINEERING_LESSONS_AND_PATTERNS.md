@@ -1,5 +1,30 @@
 # Engineering lessons and patterns - the self-improving ledger
 
+## Package restoration is not generated-source preparation (2026-11-24)
+
+Two fresh-worktree Fast pushes failed compilation because the ignored Prisma
+client was absent. A new owned reproduction confirms that immutable API
+`npm ci` succeeds while compilation still exits 2 with TS2307. Restoring
+packages and generating application source are distinct prerequisites.
+
+Reuse the existing checked build sequence through an explicit API-only
+preparation mode rather than hiding installation in hooks or introducing a
+second installer. Scope Prisma's nonconnecting datasource to generation and
+restore caller state on both success and failure. Check local CLI existence
+after installation to prevent network-capable npx from filling a missing tool.
+Keep package output, root/web dependency restoration, migrations and runtime
+startup outside API-only preparation.
+
+The new on-demand contracts execute the real builder with bounded command
+doubles and discriminating ordering/error/environment/output assertions.
+Actual ci-only compile RED and actual generation/compile GREEN independently
+prove the source prerequisite. Existing default packaging contracts remain
+unchanged. Do not claim automatic delivery integration for an on-demand
+contract, or reuse prior live/browser receipts as new setup-script proof.
+Design accepted: a mode over two existing cohesive stages is sufficient;
+a speculative installer abstraction or hook redesign would add needless
+coupling. See [the bounded RCA](../CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-api-preparation-follow-up-2026-11-24).
+
 ## Safe-mode names do not establish side-effect boundaries (2026-11-24)
 
 Two distinct commands exposed this recurring gap. Deployment `DryRun` had
