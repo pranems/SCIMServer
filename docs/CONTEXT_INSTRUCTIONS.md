@@ -9,6 +9,28 @@
 
 ## Active Delivery Process
 
+**Current listener and optional gateway correction, November 25:** the
+pre-existing SSH listener on `22222` is present: Windows `wslrelay.exe`
+PID 37236 started November 23, and WSL `sshd` PID 747 listens on
+`127.0.0.1:22222`. This does not identify its initiator or separate forwarding-
+helper state. Native gateway qualification did not use this port or start,
+restart or stop these processes. Preserve the unowned shared service.
+Older cleanup receipts and `23750` absence do not establish current `22222`
+absence; the blanket global bridge-OFFLINE claim is withdrawn.
+The official standalone Docker MCP Gateway v0.44.3 prerelease is now a
+private protocol-qualified candidate for only `playwright` (initialize,
+23 tools, intercepted browser fixture, close and EOF exit 0), not SCIM/cloud/
+authenticated browsing, networking or actual Copilot/SDK host loading.
+Keep it UNACTIVATED and retain the existing project-native browser route:
+the unavailable user has not approved global prerelease activation.
+Global `MCP_DOCKER` remains legacy and Desktop-dependent, with configuration
+and Desktop artifacts unchanged. PR #293 normally merged as `0001de6a`;
+this is a new ownership correction, not a redo of completed delivery.
+See the [current correction](CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-listener-ownership-and-optional-gateway-correction-2026-11-25).
+Self-improvement applied: check the actual configured transport and distinguish
+listener evidence from ownership. Design accepted: documentation only, with
+no speculative process-control framework.
+
 **Current native delivery, November 25:** PR #291 and PR #292 completed
 normal review, six successful exact-head CI checks each and normal merge
 as `a72f95b0` and `a27c9487`. Owner Fast passed 29/29 for each. The parent
@@ -40,7 +62,8 @@ table/name widths are 1101/427.15625px. Production inputs and all locks are
 unchanged from qualified f8 on base a72f95b0 (PR #291), so no CSS fix, version
 bump or new image is required. Existing complete 353-pass receipts remain
 separate; this is scoped local browser proof, not a full/cloud qualification
-or operator visual acceptance. Offline bridge/Desktop artifacts are untouched.
+or operator visual acceptance. Desktop artifacts are untouched; this dated
+qualification does not establish current SSH-listener absence.
 See [readiness](CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-narrow-viewport-access-follow-up-2026-11-25).
 Self-improvement is applied through outcome/negative-control assertions;
 design is accepted because the existing panel is cohesive and functional.

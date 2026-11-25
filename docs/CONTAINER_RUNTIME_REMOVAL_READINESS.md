@@ -5,6 +5,65 @@
 **Product version:** 0.55.70; documentation scope, not new qualification, shipping or deployment evidence
 **Deadline from the supplied notice:** December 2, 2026
 
+## Current listener ownership and optional gateway correction, 2026-11-25
+
+**Current correction:** the historical SSH transport port `22222` was observed
+listening. The Windows relay was the pre-existing `wslrelay.exe`, PID 37236,
+at `C:\Program Files\WSL\wslrelay.exe`, started
+`2026-11-23T09:23:23.0895089-06:00`; WSL `sshd`, PID 747, listened on
+`127.0.0.1:22222`. This establishes a listener, not who started it or the state
+of a separate forwarding helper. Native gateway qualification did not use
+this port or start, restart or stop these processes. Preserve the unowned
+shared service. No forwarding helper was restarted by that qualification.
+The earlier blanket claim that the global bridge is OFFLINE is withdrawn.
+An absent listener on `23750`, or an older cleanup receipt, does not prove
+the current configured SSH transport on `22222` is absent.
+
+The optional native Model Context Protocol (MCP) gateway is now a **qualified
+private, unactivated candidate**, not a repository feature or global cutover.
+The official MIT-licensed standalone Docker MCP Gateway
+[v0.44.3 prerelease](https://github.com/docker/mcp-gateway/releases/tag/v0.44.3)
+supports [Docker Engine installation](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
+with `DOCKER_MCP_IN_CONTAINER=1`; it is not the paid, invite-only Governance
+offering. The isolated WSL profile uses a clean environment, separate HOME
+and DOCKER_CONFIG, binary/catalog hashes, a daemon-identity guard and the
+explicit native Unix socket. It needs no Desktop secret service, Windows
+resolver or global bridge.
+
+Private evidence records actual MCP initialize with protocol `2025-11-25`,
+serverInfo version `2.0.1` (distinct from CLI `0.44.3`), 23 tools, zero protocol
+errors and zero non-JSON stdout. Only the originally configured server ID,
+`playwright`, was qualified. A browser-intercepted loopback fixture passed
+title, heading and button `pending -> passed`, then browser close and EOF
+shutdown exited 0. This used no HTTP listener and proves neither SCIM/cloud/
+authenticated browsing nor container-to-host networking. Four launcher
+contracts and tamper/identity negative controls passed after RED and an LF
+line-ending correction. Official HTTPS origin and release digest were
+verified; independent build attestation was not.
+
+The parent authenticated all 84 regular evidence files against a manifest
+whose SHA256 is `2F7BA5AFAE1E3B66A8E08EDD623169BB3A027C7A1E0B4DE482CDA67E7AF2110E`.
+These are private qualification receipts, not newly executed checks in this
+documentation change. Six original MCP file hashes, two client configuration
+hashes and the original 11 containers, 49 volumes and six networks retained
+their identities. No original credentials or database were copied.
+
+**Disposition: keep the candidate UNACTIVATED and retain the existing
+project-native browser route.** The user was unavailable for the requested
+prerelease activation decision; absence of approval is not approval.
+Global `MCP_DOCKER` remains the legacy bare `docker mcp gateway run` command
+with its Desktop dependency. Its configuration and Desktop artifacts are
+untouched. Actual Copilot/SDK host loading and global activation were not
+qualified, and not all machine tooling is Desktop-free.
+
+**Self-improvement applied:** a current service-absence claim must identify
+the actual configured transport and distinguish listener evidence from
+process ownership and separate-helper state. Historical or wrong-port checks
+cannot support that claim. **Design disposition: accepted** - this bounded
+documentation correction needs no speculative process-control framework.
+PR #293 normally merged as `0001de6a` at 12:31:36 UTC on November 25; this
+new ownership correction does not reopen that completed delivery.
+
 ## Executive summary
 
 The selected replacement remains independent Docker Engine in Ubuntu WSL,
@@ -51,7 +110,7 @@ not the external deployment or operator-acceptance gates.
 | Performance | The campaign is closed FAIL and unpublished: ResourceTypes p95 was 11.0344 ms against less than 10 ms, and Group POST regressed 34.088471% against at most 10%. No replay or acceptance is implied. |
 | Mandatory Azure mirror lane | BLOCKED. An approved existing Azure Container Registry (ACR) login server, ARM resource ID and explicit approval are missing, as are verified import/push, network and digest permissions. The current expected tenant and principal have verified dev Contributor access; two authorized group inventories were empty. Subscription-wide permissions were empty, so global registry absence cannot be inferred. The latest user response supplied no resource or approval. |
 | Remaining external gates | Full ordered merged-master dev, gallery and workload identity federation (WIF) checks and explicit operator visual acceptance remain pending. No billable registry creation, account substitution, certificate authentication, mirror/GHCR bypass, skipped-gate qualification, role grants or Azure writes are authorized. |
-| Desktop and bridge boundary | Desktop uninstall, Intune consent and original artifact deletion remain forbidden and unperformed. The optional global Desktop MCP gateway is retained and explicitly unmigrated; the project has a native browser alternative. The global bridge remains OFFLINE, with no restart. |
+| Desktop and bridge boundary | Desktop uninstall, Intune consent and original artifact deletion remain forbidden and unperformed. Global MCP remains legacy and unmigrated; the optional protocol-qualified native candidate stays UNACTIVATED, with the project-native browser route retained. The pre-existing SSH listener on `22222` is present; qualification neither used it nor started, restarted or stopped its processes. Listener presence does not establish ownership or separate forwarding-helper state. See the current correction above; no blanket bridge-OFFLINE claim applies. |
 
 Earlier frozen history evidence covers only its recorded candidate set, not
 the whole build or every child/peer conversation. The fresh final source-log

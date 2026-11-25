@@ -1,5 +1,32 @@
 ## SCIMServer - Condensed Session Memory
 
+### Current listener ownership and optional gateway, 2026-11-25
+
+| Date | Summary |
+|---|---|
+| 2026-11-25 | Correct the current blanket bridge-OFFLINE claim: the pre-existing SSH listener on `22222` is present. Retain the protocol-qualified native MCP candidate UNACTIVATED; no global prerelease cutover is approved. |
+
+Observed Windows `wslrelay.exe` PID 37236 started November 23; WSL `sshd`
+PID 747 listens on `127.0.0.1:22222`. This proves listener presence, not its
+initiator or separate forwarding-helper state. Native gateway qualification
+did not use the port or start, restart or stop these processes; preserve the
+unowned shared service. Earlier `23750` absence and dated cleanup receipts
+do not establish current `22222` absence.
+
+Private official standalone Docker MCP Gateway v0.44.3 prerelease evidence
+qualifies only `playwright`: MCP initialize, 23 tools, intercepted browser
+fixture outcomes, browser close and EOF exit 0. This is not SCIM/cloud/
+authenticated browsing, network proof or actual Copilot/SDK host loading.
+Global `MCP_DOCKER` remains legacy and Desktop-dependent; its configuration
+and Desktop artifacts are unchanged. The user was unavailable for activation,
+so keep the candidate UNACTIVATED and the existing project-native browser route.
+PR #293 normally merged as `0001de6a`; this is a new ownership correction.
+All performance, Azure, gallery and operator gates remain unchanged.
+See the [current correction](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-listener-ownership-and-optional-gateway-correction-2026-11-25).
+Self-improvement applied: check the configured transport and distinguish
+listener evidence from ownership before asserting absence. Design accepted:
+documentation only; no speculative process-control framework.
+
 ### Current native readiness delivery, 2026-11-25
 
 | Date | Summary |
@@ -15,8 +42,10 @@ Source equivalence is not new runtime evidence. Performance is closed FAIL
 and unpublished. The mandatory approved-existing-ACR lane stays BLOCKED;
 ordered merged-master dev/gallery/WIF checks and operator visual acceptance
 remain pending. Desktop removal and artifact deletion remain forbidden, the
-optional global Desktop MCP gateway remains unmigrated, and the bridge stays
-OFFLINE. No cloud write, runtime replay or final-history completeness claim
+optional global Desktop MCP gateway remains unmigrated. The current correction
+above supersedes this handoff's earlier blanket bridge-OFFLINE claim; the
+pre-existing `22222` listener is present. No cloud write, runtime replay or
+final-history completeness claim
 is added. See the [current dashboard](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-delivery-dashboard-2026-11-25).
 Self-improvement applied: distinguish current delivery from dated snapshots.
 Design accepted: a documentation-only boundary correction needs no new seam.
@@ -40,8 +69,9 @@ reject inaccessible clipping with the same outcome assertion.
 Final scoped results: 6 pass/0 fail/0 skip per native backend; strict new-spec
 typecheck passes. Prior complete 353-pass corrected browser runs and original
 352-pass/1-fail receipts remain unchanged. No full matrix, cloud, performance,
-operator acceptance or Desktop-removal claim is added. The offline bridge and
-Desktop artifacts are untouched. The exact owned trial resources are removed
+operator acceptance or Desktop-removal claim is added. Desktop artifacts are
+untouched; this dated qualification does not establish current SSH-listener
+absence. The exact owned trial resources are removed
 with original native 11/49/6 identities preserved, not new data-byte proof.
 See [readiness](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-narrow-viewport-access-follow-up-2026-11-25).
 Self-improvement applied: natural-access assertion plus clipping negative
