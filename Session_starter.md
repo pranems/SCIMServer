@@ -2,9 +2,12 @@
 
 ### Authoritative local native qualification, 2026-11-24
 
-The unchanged 0.55.70 production image at digest
+The unchanged 0.55.70 production sources pass three native full live modes:
+immutable-image InMemory, actual Compose Prisma and owned Windows Node
+InMemory, each 1,845/1,845 with actual exit 0. The first two use the image at digest
 `sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`
-passes three native full live runs, each 1,845/1,845 with actual exit 0.
+with Node 24.22.3; Windows Node runs directly on the host at 24.13.0,
+not inside that image.
 Retired explanatory-row credits remain in those harness counts.
 Final complete browsers on native InMemory and actual Compose Prisma each
 pass 353 tests with zero failures, skips, flakes or unhandled errors, actual
@@ -43,6 +46,7 @@ retained and fixture ports are absent, not new database-byte proof.
 | Date | Summary |
 |---|---|
 | 2026-11-24 | [x] Local native full live and zero-skip complete browser qualification consolidated in the existing readiness guide, with original failures and exact source/image/evidence boundaries retained. No runtime, version, lock, cloud or Desktop change. |
+| 2026-11-24 | Parent source review caught image attribution incorrectly covering the Windows Node live mode. Corrected all three context/readiness records to name the actual modes and distinguish host/source evidence from image evidence; correction acceptance remains pending. |
 
 - [x] Local native qualification and composed six-mode acceptance.
 - [ ] Ordered Azure dev pipeline: existing approved mirror and actual permissions.
@@ -56,8 +60,8 @@ The optional global Desktop-backed MCP gateway remains unmigrated.
 Latest RCA was captured contemporaneously; full transcript reconciliation
 after November 24 01:39 UTC is not verified.
 See [the authoritative qualification and preserved failures](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#verified-native-qualification-checkpoint-2026-11-24).
-Self-improvement applied: separate composed acceptance, operational guards
-and measured layout from stronger unverified claims. Design accepted:
+Self-improvement applied: separate composed acceptance, operational guards,
+host-versus-image provenance and measured layout from stronger unverified claims. Design accepted:
 documentation-only consolidation, no production growth.
 
 ### Token Save browser contract repair, 2026-11-24

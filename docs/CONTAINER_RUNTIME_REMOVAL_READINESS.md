@@ -35,9 +35,12 @@ editor window has refreshed.
 
 ### Verified native qualification checkpoint, 2026-11-24
 
-**Conclusion:** the unchanged production image passes all three native full
-live runs and the complete browser suite on both InMemory and actual Compose
-Prisma. The browser qualification has zero skips and includes pixel
+**Conclusion:** unchanged production sources pass three native full live
+modes: immutable-image InMemory, actual Compose Prisma and owned Windows
+Node InMemory, each 1,845/1,845 with actual exit 0. Only the first two use
+the attested OCI image; Windows Node runs directly on the host.
+The image also passes the complete browser suite on both InMemory and actual
+Compose Prisma. The browser qualification has zero skips and includes pixel
 comparisons. This is local runtime qualification, not a green Azure dev
 pipeline, accepted performance, directory integration or removal approval.
 
@@ -78,7 +81,7 @@ offline and untouched; these results do not qualify that bridge.
 | Original canonical six-mode run at f8 | Exit 1; five of six modes passed. The complete-coverage lane initially reported 117 files/1,560 passes with worker-start timeouts. | Original run remains FAIL. The timeout root cause is unproven. |
 | Retry of only the failed complete-coverage lane, unchanged inputs | 126 files/1,664 passes; lines 85.74%, branches 75.86%, statements 83.06%, functions 75.53%. | Composed six-mode acceptance, not an original all-green canonical invocation. |
 | Other complete matrix lanes | API units 220 suites/6,274 passes on each backend; full InMemory HTTP 2,575 passes/45 known skips; Prisma HTTP 2,620 passes; ordinary web 126 files/1,664 passes. | Full HTTP is distinct from the reduced pre-push/CI HTTP population. |
-| Three native full live runs | Each 1,845/1,845 with actual process exit 0, 169 sections and 2,060 steps. | Harness counts include credits for retired explanatory rows; not every historical capability was executed. |
+| Three native full live modes | Immutable-image InMemory, actual Compose Prisma and owned Windows Node InMemory: each 1,845/1,845 with actual process exit 0, 169 sections and 2,060 steps. | Unchanged production-source evidence in all three modes; attested image/Node 24.22.3 only in the first two. Windows Node is host 24.13.0, not an image run. Harness counts include credits for retired explanatory rows; not every historical capability was executed. |
 | Earlier complete browser attempts, each backend | Each 352 passed, one failed, zero skipped, actual exit 1. | Remain FAIL. Global OAuth fixture inputs did not match the fresh owned server. |
 | Corrected focused token-log case, each backend | One passed, actual exit 0, before each complete run. | The first causal failure was verified before full-suite repetition. |
 | Final complete browser suite, native InMemory | 353 passed; zero failures, skips, flaky tests or unhandled errors; actual exit 0. | Three workers, zero retries; all 13 pixel tests and eight Token Save tests pass. |
@@ -163,13 +166,14 @@ claim. The private inventory and full report remain private.
 | Browser OAuth fixture mismatch / Medium | Existing global fallback did not equal the fresh server secret. Bind the actual supported environment value and literal client ID on owned fixtures. | Earlier full browser FAIL; source-aware OAuth preflight and the focused token-log case could catch this before a full run. Three refused controls and one accepted control verify the private correction. |
 | JSON admission key order / Low | Six raw JSON comparisons rejected equivalent objects. Canonicalize object keys, preserving all values and array order; no profile relaxation. | Private admission before execution; compare semantic objects rather than serialization order. All failed receipts remain immutable. |
 | Layout claim boundary / Medium | Bounded columns can pass while the table extends outside a narrow viewport because of its existing minimum width. | Measured browser geometry. Report clipping and viewport fit as separate outcomes; operator/scroll acceptance is still open. |
+| Published documentation provenance / Medium | Initial consolidation attributed all three live modes to the OCI image, although the third was owned Windows Node InMemory on host Node 24.13.0. Corrected the readiness guide, both context records and PR summary to name each actual mode and attribute the image only where used. No result, source or runtime changed. | Parent direct review of published documentation caught the wording error. Earliest prevention: reconcile each result's launcher and runtime identity before summarizing source equivalence as image evidence. Parent acceptance of this correction remains pending. |
 
 Latest issues were captured contemporaneously. Full historical transcript
 reconciliation after November 24 at 01:39 UTC is not verified; this section
 does not invent complete migration RCA coverage.
 
 **Self-improvement: applied.** The guide now separates original failures,
-unchanged retries, source/image equivalence, actual exits, semantic admission
+unchanged retries, host-versus-image provenance, source/image equivalence, actual exits, semantic admission
 and measured layout outcomes. Private operational controls are explicitly
 distinguished from committed gates. **Design disposition: accepted.**
 Documentation consolidation introduces no production growth, dependency

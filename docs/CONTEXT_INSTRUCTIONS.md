@@ -9,11 +9,13 @@
 
 ## Active Delivery Process
 
-**Authoritative local native checkpoint, November 24:** the unchanged
-0.55.70 production image
+**Authoritative local native checkpoint, November 24:** unchanged 0.55.70
+production sources pass immutable-image InMemory, actual Compose Prisma
+and owned Windows Node InMemory full live runs, each 1,845/1,845 with
+actual exit 0 (including retired explanatory-row credits). The first two use
 `ghcr.io/pranems/scimserver@sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`
-passes three native full live runs, each 1,845/1,845 with actual exit 0
-(including retired explanatory-row credits). Final native InMemory and
+with image Node 24.22.3. The third runs directly on Windows host Node
+24.13.0, not inside the OCI image. Final native InMemory and
 actual Compose Prisma browser runs each pass 353, with zero failures,
 skips, flakes or unhandled errors, actual exit 0, three workers and zero
 retries. Each includes 13 pixel tests and eight token tests. No visual
@@ -71,7 +73,11 @@ Full historical transcript reconciliation after November 24 01:39 UTC is
 not verified; latest issues were captured contemporaneously.
 
 See [the current qualification, receipt hashes and preserved failures](CONTAINER_RUNTIME_REMOVAL_READINESS.md#verified-native-qualification-checkpoint-2026-11-24).
-Self-improvement applied: keep operational proofs, composed retries and
+Parent direct source review caught the initial published wording attributing
+all three live runs to the image. This correction names each actual mode;
+parent acceptance of the correction remains pending. No runtime evidence
+was rerun or relabeled.
+Self-improvement applied: keep host-versus-image provenance, operational proofs, composed retries and
 measured outcomes distinct from permanent gates and stronger claims.
 Design accepted: three existing documentation files, no production growth.
 Older source-stage records below retain their capture-time scope.
