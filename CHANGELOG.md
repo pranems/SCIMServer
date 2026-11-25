@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Current SSH listener ownership and optional gateway boundary, 2026-11-25
+
+- Withdraw the current blanket global bridge-OFFLINE claim. The pre-existing
+  `wslrelay.exe`/`sshd` listener on `22222` is present. Qualification did not
+  use it or start, restart or stop its processes. Listener presence does not
+  establish ownership or separate forwarding-helper state. Preserve the
+  shared service and all older dated cleanup and original FAIL receipts.
+- Record the private official standalone Docker MCP Gateway v0.44.3
+  prerelease as protocol-qualified for only `playwright`, not globally
+  activated or actual Copilot/SDK host-loaded. Keep it UNACTIVATED because
+  user approval is unavailable; retain the project-native browser route.
+  Global MCP remains legacy and Desktop-dependent.
+- Change only the existing readiness, session, context and changelog documents.
+  Product version, source, locks, test populations, performance FAIL, Azure
+  ACR block, gallery and operator gates are unchanged. This is a new ownership
+  correction after normally merged PR #293, not new shipping acceptance.
+- Self-improvement applied: actual configured-transport and ownership checks
+  replace historical/wrong-port inference. Design accepted: no new framework.
+
 ### Current native readiness delivery correction, 2026-11-25
 
 - Correct the authoritative current dashboard after normal PR #291 and
