@@ -1,5 +1,69 @@
 ## SCIMServer - Condensed Session Memory
 
+### Authoritative local native qualification, 2026-11-24
+
+The unchanged 0.55.70 production sources pass three native full live modes:
+immutable-image InMemory, actual Compose Prisma and owned Windows Node
+InMemory, each 1,845/1,845 with actual exit 0. The first two use the image at digest
+`sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`
+with Node 24.22.3; Windows Node runs directly on the host at 24.13.0,
+not inside that image.
+Retired explanatory-row credits remain in those harness counts.
+Final complete browsers on native InMemory and actual Compose Prisma each
+pass 353 tests with zero failures, skips, flakes or unhandled errors, actual
+exit 0, three workers and zero retries. Each includes 13 pixel tests and
+eight Token Save tests. Earlier 352/one-failure runs remain FAIL.
+
+The fixture-only OAuth correction explicitly binds the existing
+`E2E_OAUTH_CLIENT_SECRET` to the fresh owned server secret and configures
+the existing literal test client ID. Three invalid-input controls refuse
+admission; correct input and each focused token-log case pass before full
+runs. These private operational guards are not new committed tests.
+No secrets, baseline edits, production changes or operator approval are implied.
+
+PR #289 normally merged at `82e5f9aa495bee68da34325ab52952e1830e7290`;
+executed test HEAD `28f56ef8` has the same complete Git tree. Production
+API/web/Dockerfile/lock objects remain identical to f8. Do not relabel the
+image revision or executed HEAD. PR #289 passed normal Validate 32/32 and
+all six configured exact-head checks, with owner COMMENTED self-review and
+parent direct source review, not independent approval.
+
+The f8 matrix is composed acceptance: original canonical exit 1, five of
+six modes passed, and partial coverage 117/1,560 remains FAIL with unproven
+worker-timeout cause. Only the unchanged failed complete-coverage lane was
+retried, passing 126/1,664. Units are 220/6,274 per backend; full HTTP is
+2,575/45 known skips InMemory and 2,620 Prisma. Do not repeat unchanged
+matrices or promote composed evidence to an original all-green invocation.
+
+Measured Operations columns and clipping pass at 1,440 and 900 pixels;
+the narrow table right edge is 930 at a 900-pixel viewport. Whole-table
+viewport fit, horizontal-scroll access and operator judgment are not proven.
+All 1,151 artifact hashes/sizes and 1,928 source hashes were parent-verified;
+304 frozen events contain 101 ID-matched lifecycles, 83 native exits and
+18 PowerShell statuses. Original 11 containers/49 volumes/six networks are
+retained and fixture ports are absent, not new database-byte proof.
+
+| Date | Summary |
+|---|---|
+| 2026-11-24 | [x] Local native full live and zero-skip complete browser qualification consolidated in the existing readiness guide, with original failures and exact source/image/evidence boundaries retained. No runtime, version, lock, cloud or Desktop change. |
+| 2026-11-24 | Parent source review caught image attribution incorrectly covering the Windows Node live mode. Corrected all three context/readiness records to name the actual modes and distinguish host/source evidence from image evidence; correction acceptance remains pending. |
+
+- [x] Local native qualification and composed six-mode acceptance.
+- [ ] Ordered Azure dev pipeline: existing approved mirror and actual permissions.
+- [ ] Full three-mode gallery/directory WIF flows and operator visual acceptance.
+- [ ] Separate Desktop/Intune/artifact-deletion authorization; not granted.
+
+The logging performance campaign is closed FAIL/unpublished: ResourceTypes
+p95 11.0344 ms against strict <10 ms and Group POST p95 +34.08847% against
+10%. No new billable resources, funding approval, canary or prod operation.
+The optional global Desktop-backed MCP gateway remains unmigrated.
+Latest RCA was captured contemporaneously; full transcript reconciliation
+after November 24 01:39 UTC is not verified.
+See [the authoritative qualification and preserved failures](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#verified-native-qualification-checkpoint-2026-11-24).
+Self-improvement applied: separate composed acceptance, operational guards,
+host-versus-image provenance and measured layout from stronger unverified claims. Design accepted:
+documentation-only consolidation, no production growth.
+
 ### Token Save browser contract repair, 2026-11-24
 
 The token-gate double-click test now uses one trusted Playwright `dblclick`
@@ -18,7 +82,8 @@ serially. Strict file-scoped TypeScript also passes. Original native identities
 remain 11 containers, 49 volumes and six networks after exact owned cleanup.
 No image build, product/version change, cloud operation or removal occurred.
 See [the bounded repair and execution RCA](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#token-save-browser-contract-repair-2026-11-24).
-Parent delivery, private observer qualification and overall migration remain open.
+PR #289 delivery and complete local browser qualification are now recorded
+above. Overall migration, Azure dev and operator acceptance remain open.
 
 ### Gallery plan-only classification, 2026-11-24
 

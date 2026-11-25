@@ -1,7 +1,7 @@
 # Docker Desktop removal readiness
 
 **Last verified:** 2026-11-24
-**Status:** Merged-source six-mode qualification and candidate-image CI pass. Performance and release/dev acceptance remain open.
+**Status:** Local native Engine live and complete browser qualification pass; six-mode acceptance is composed, not an original all-green run. Performance, Azure dev, directory flows and operator acceptance remain open.
 **Product version:** 0.55.70; documentation scope, not new qualification, shipping or deployment evidence
 **Deadline from the supplied notice:** December 2, 2026
 
@@ -20,6 +20,11 @@ Markdown. Presenting the HTML first and mixing initial closing receipts with
 later results made the final state unnecessarily difficult to understand.
 This document separates dated evidence, current corrections and open gates.
 
+The latest November 24 checkpoint below is authoritative for local native
+qualification. It preserves earlier failed runs rather than replacing their
+receipts. Passing local tests does not authorize deployment, Docker Desktop
+removal, artifact deletion or production promotion.
+
 The marketplace Mermaid renderer and its already-uninstalled residual
 directory are now removed. `npm run docs:mermaid:doctor` passes with one
 built-in renderer, Mermaid 11.17.0, matching the gate. An already-open preview
@@ -27,6 +32,174 @@ can still require closing and reopening; no claim is made that every other
 editor window has refreshed.
 
 ## 1. One authoritative status model
+
+### Verified native qualification checkpoint, 2026-11-24
+
+**Conclusion:** unchanged production sources pass three native full live
+modes: immutable-image InMemory, actual Compose Prisma and owned Windows
+Node InMemory, each 1,845/1,845 with actual exit 0. Only the first two use
+the attested OCI image; Windows Node runs directly on the host.
+The image also passes the complete browser suite on both InMemory and actual
+Compose Prisma. The browser qualification has zero skips and includes pixel
+comparisons. This is local runtime qualification, not a green Azure dev
+pipeline, accepted performance, directory integration or removal approval.
+
+#### Source, image and review identities
+
+[PR #289](https://github.com/pranems/SCIMServer/pull/289), the test-only Token
+Save repair at `28f56ef80620d4d853d7259043cbcc4d0ae4a424`, normally merged
+at `82e5f9aa495bee68da34325ab52952e1830e7290` on November 24 at
+22:44:39 UTC. Normal Validate passed 32/32 gates: API 220 suites/6,274
+passes, reduced HTTP 2,519 passes/45 known skips, and web 126 files/1,664
+passes. API lint had zero errors/507 warnings; web TypeScript had 66 existing
+errors, unchanged and below the existing ceiling of 96. All six configured
+exact-head checks succeeded. The owner recorded a COMMENTED source
+self-review and the parent performed direct source review; neither is an
+independent GitHub approval. These are PR #289 results, not results of a
+subsequent documentation-only PR.
+
+The complete Git trees of the executed test head `28f56ef8` and merged
+`82e5f9aa` are identical:
+`eea50f4d6dbe7d4204e12eaa37934b63a4c34236`. Production API/web source,
+Dockerfile and all three lock objects are identical to attested
+`f8c2ce1f2e325affd2e780d0fe5ee0aba330901c`. This equivalence does not
+change the executed test HEAD or the image's Open Container Initiative
+(OCI) revision label.
+
+The authoritative unchanged image is
+`ghcr.io/pranems/scimserver@sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`.
+Its application version is 0.55.70 and Node is 24.22.3; the Windows host
+Node is 24.13.0. Native qualification used Docker Engine 29.1.3 on Ubuntu
+24.04, through the native Unix socket. The separately documented independent
+Windows SSH route remains available. The global Desktop daemon bridge was
+offline and untouched; these results do not qualify that bridge.
+
+#### Results and preserved failures
+
+| Evidence boundary | Observed outcome | Interpretation |
+|---|---|---|
+| Original canonical six-mode run at f8 | Exit 1; five of six modes passed. The complete-coverage lane initially reported 117 files/1,560 passes with worker-start timeouts. | Original run remains FAIL. The timeout root cause is unproven. |
+| Retry of only the failed complete-coverage lane, unchanged inputs | 126 files/1,664 passes; lines 85.74%, branches 75.86%, statements 83.06%, functions 75.53%. | Composed six-mode acceptance, not an original all-green canonical invocation. |
+| Other complete matrix lanes | API units 220 suites/6,274 passes on each backend; full InMemory HTTP 2,575 passes/45 known skips; Prisma HTTP 2,620 passes; ordinary web 126 files/1,664 passes. | Full HTTP is distinct from the reduced pre-push/CI HTTP population. |
+| Three native full live modes | Immutable-image InMemory, actual Compose Prisma and owned Windows Node InMemory: each 1,845/1,845 with actual process exit 0, 169 sections and 2,060 steps. | Unchanged production-source evidence in all three modes; attested image/Node 24.22.3 only in the first two. Windows Node is host 24.13.0, not an image run. Harness counts include credits for retired explanatory rows; not every historical capability was executed. |
+| Earlier complete browser attempts, each backend | Each 352 passed, one failed, zero skipped, actual exit 1. | Remain FAIL. Global OAuth fixture inputs did not match the fresh owned server. |
+| Corrected focused token-log case, each backend | One passed, actual exit 0, before each complete run. | The first causal failure was verified before full-suite repetition. |
+| Final complete browser suite, native InMemory | 353 passed; zero failures, skips, flaky tests or unhandled errors; actual exit 0. | Three workers, zero retries; all 13 pixel tests and eight Token Save tests pass. |
+| Final complete browser suite, actual native Compose Prisma | 353 passed; zero failures, skips, flaky tests or unhandled errors; actual exit 0. | Same flags and concurrency; all 13 pixel tests and eight Token Save tests pass. |
+
+The browser opt-ins were `E2E_ALLOW_MUTATIONS=1`,
+`E2E_SHAPE_COVERAGE=1` and `E2E_VISUAL_BASELINES=1`, exclusively against
+fresh owned disposable servers. Six shape templates, 18 Users, 10 Groups,
+15 memberships, one credential and zero Devices, plus owned long-user
+fixtures, were prepared before API caching. Definitions alone were copied
+to new InMemory fixtures; schema strictness and extension definitions were
+not weakened. No diff PNG required classification, no visual baseline was
+edited and no operator visual approval is inferred from pixel-test success.
+
+#### Correct OAuth inputs, not a product change
+
+The existing
+[token-log browser case, declaration line 170](../web/e2e/logs-activity-tables.spec.ts#L170)
+requires a successful global token response at assertion line 227.
+Its existing request uses the literal client ID `scimserver-client` and
+[the `E2E_OAUTH_CLIENT_SECRET` fallback, line 224](../web/e2e/logs-activity-tables.spec.ts#L224).
+The fresh owned server used a different disposable secret from that fallback.
+The private fixture explicitly bound this already-supported environment
+variable to the actual owned server secret and configured the literal client
+ID on that server. No repository launcher, test, authentication or runtime
+configuration was changed.
+
+Before focused and full execution, private `Resolve-BrowserOAuth` checked
+the actual source-supported resolution. Wrong-secret, wrong-ID and
+omitted-environment controls each refused admission with actual exit 1;
+correct inputs exited 0 and produced an actual OAuth 200 with contract-safe
+proof. This is operational proof in private guard files, not a newly
+committed permanent repository regression gate. Secrets and token values
+are not published. Do not invent a browser client-ID environment override
+that this source does not consume.
+
+#### Measured layout contract and its limit
+
+[OperationsPage rowTable, line 107](../web/src/pages/OperationsPage.tsx#L107)
+retains its existing minimum width of 640 pixels. Browser measurements
+prove bounded columns and actual text clipping, not whole-table viewport fit.
+
+| Viewport | Table width | Name column | Clipping client/scroll width, InMemory / Prisma | Result |
+|---|---:|---:|---|---|
+| 1,440 pixels | 1,101 pixels | 427.156 pixels, about 38.8% | 403/684 and 403/664 pixels | All four headers remain within the table. |
+| 900 pixels | 640 pixels | 243.469 pixels, about 38.0% | 219/684 and 219/664 pixels | All four headers remain within the table; name column neither expands nor collapses. |
+
+At the narrow viewport the table's right edge was 930 pixels, beyond the
+900-pixel viewport. Therefore these measurements do **not** prove responsive
+viewport fit. Horizontal-scroll access and operator layout judgment remain
+unmeasured. Existing inventory geometry cases at 1,440, 900 and 390 pixels
+passed on each backend, but do not remove the Operations limitation.
+No unrelated CSS or browser spec was changed. Operator visual acceptance
+on Azure dev remains pending; do not call this "validated on dev" or
+"ready for prod."
+
+#### Evidence seal, cleanup and execution RCA
+
+The parent independently verified all 1,151 artifact hashes/sizes and
+1,928 unchanged tracked-source hashes. The frozen journal has 304 events:
+one expected-plan event and 101 complete ID-matched lifecycles, including
+83 actual native process exits and 18 PowerShell operation statuses.
+These are different kinds of completion evidence, not 101 native exits.
+Interleaved events are matched by ID, not assumed adjacent triples.
+Sealing followed all runtime writers and closures against the frozen
+journal; manifest/bookkeeping writes are explicitly excluded.
+
+| Immutable evidence | SHA-256 |
+|---|---|
+| Final browser qualification receipt | `256134720F4246A7EDB1B713E66E91226E5ADE2161A65BC068CC08A908E9AC15` |
+| Artifact manifest | `0A2635F0BA9FA46F15D28C5227C928E59958A2F82368FD0056B1252B904EE463` |
+| Frozen operational journal | `E203ACD86913BA48BCC8C730C2686027E09C9A651510042165FB5C8DD9B234FA` |
+
+Final cleanup retained the original 11 containers, 49 volumes and six
+networks; actual fixture ports 52747, 52748 and 52749 were absent.
+This is identity preservation, **not** a fresh database-byte-preservation
+claim. The private inventory and full report remain private.
+
+| Issue / severity | Observed cause and correction | Detection / earliest prevention |
+|---|---|---|
+| Complete-coverage worker startup / Medium | Original 117-file partial result failed. Only the unchanged failed lane was retried successfully; root cause remains unproven. | Full matrix coverage lane. Preserve both receipts and report composed acceptance. |
+| Browser OAuth fixture mismatch / Medium | Existing global fallback did not equal the fresh server secret. Bind the actual supported environment value and literal client ID on owned fixtures. | Earlier full browser FAIL; source-aware OAuth preflight and the focused token-log case could catch this before a full run. Three refused controls and one accepted control verify the private correction. |
+| JSON admission key order / Low | Six raw JSON comparisons rejected equivalent objects. Canonicalize object keys, preserving all values and array order; no profile relaxation. | Private admission before execution; compare semantic objects rather than serialization order. All failed receipts remain immutable. |
+| Layout claim boundary / Medium | Bounded columns can pass while the table extends outside a narrow viewport because of its existing minimum width. | Measured browser geometry. Report clipping and viewport fit as separate outcomes; operator/scroll acceptance is still open. |
+| Published documentation provenance / Medium | Initial consolidation attributed all three live modes to the OCI image, although the third was owned Windows Node InMemory on host Node 24.13.0. Corrected the readiness guide, both context records and PR summary to name each actual mode and attribute the image only where used. No result, source or runtime changed. | Parent direct review of published documentation caught the wording error. Earliest prevention: reconcile each result's launcher and runtime identity before summarizing source equivalence as image evidence. Parent acceptance of this correction remains pending. |
+
+Latest issues were captured contemporaneously. Full historical transcript
+reconciliation after November 24 at 01:39 UTC is not verified; this section
+does not invent complete migration RCA coverage.
+
+**Self-improvement: applied.** The guide now separates original failures,
+unchanged retries, host-versus-image provenance, source/image equivalence, actual exits, semantic admission
+and measured layout outcomes. Private operational controls are explicitly
+distinguished from committed gates. **Design disposition: accepted.**
+Documentation consolidation introduces no production growth, dependency
+edge, new abstraction or speculative runtime change.
+
+- [x] Local native full live qualification and complete zero-skip browser qualification.
+- [x] Composed six-mode acceptance with original failure retained.
+- [ ] Full ordered Azure dev pipeline with existing approved ACR mirror and actual permissions.
+- [ ] Authorized three-mode gallery/directory workload identity federation (WIF) flows, all 13 checks.
+- [ ] Operator visual acceptance on dev, including remaining layout judgment.
+- [ ] Separate removal/Intune and artifact-deletion authorization; not granted by local qualification.
+
+The logging performance candidate campaign is closed, FAIL and unpublished:
+ResourceTypes p95 was 11.0344 ms against strict `<10 ms`; Group POST p95
+increased 34.08847% against the allowed 10%. No further unchanged benchmark
+is claimed. The ordered dev pipeline remains blocked by missing approved
+mirror/permission evidence in the current active ephemeral estate. No new
+funding approval or billable resource was authorized.
+
+Full gallery/directory WIF flows remain pending. PR #288's 96 offline
+contracts are not an executed directory flow. Gallery `PlanOnly` creates a
+temporary synchronization job and is not read-only. The optional global
+Desktop-backed MCP gateway remains retained and unmigrated; the native
+project browser alternative is qualified. No Desktop uninstall, Intune
+consent, artifact deletion, AutoCanary or customer-production operation
+is authorized. Older checkpoints below retain their capture-time scope.
 
 ### Token Save browser contract repair, 2026-11-24
 
@@ -149,9 +322,9 @@ Dev revision pruning receives the admitted subscription explicitly, and the
 pruning dependency scopes each operation without switching cached accounts.
 The existing retention and serving/rollback protection rules are preserved.
 
-### Current merged-source checkpoint, 2026-11-23
+### Historical merged-source checkpoint, 2026-11-23
 
-The current consolidated source is
+The consolidated source at this historical checkpoint was
 `a7ef00012da717a5933cd9429a9d0afb771b1d2c`, following normal merges of
 [root-tooling PR #284](https://github.com/pranems/SCIMServer/pull/284) and
 [live-harness PR #285](https://github.com/pranems/SCIMServer/pull/285).
@@ -483,8 +656,8 @@ November 19 application correction or a new Azure deployment.
 | Independent Engine and Windows clients | PASS for measured scopes | Native Unix-socket Engine qualification rechecked November 23 with fresh private client configuration and exact daemon identity. Independent Windows/SSH/GUI operations retain their November 19-20 evidence; no new bridge or reboot claim. No Desktop executable used. |
 | Mermaid environment | PASS, November 19 | Doctor reports exactly one built-in renderer and no blockers. |
 | Original data preservation | PASS, November 18 | Both cold VHD copies/configuration hashes; all 40 volume fingerprints; isolated primary recovery and 20-to-30 migration replay. |
-| Complete Engine browser suite | PASS, November 18 source | 353 passed; zero failures/skips/flakes; 13 pixel comparisons, no baseline replacement. Final-source browser proof still required. |
-| API/backend/web matrix | Historical c52 PASS; combined a7 qualification in progress | c52 units 219/6,272 each; HTTP 2,620 Prisma / 2,575 InMemory with 45 backend-specific skips; web unit and coverage 126/1,664 each. A fresh context owns the unchanged complete six-mode matrix at a7ef0001; no new result is inferred. |
+| Complete Engine browser suite | PASS, November 24 executed 28f/merged-equivalent 82e | Each native InMemory and actual Compose Prisma run: 353 passed, zero failures/skips/flakes/unhandled errors, actual exit 0; 13 pixel comparisons and eight token tests pass. Earlier 352/one-failure runs remain FAIL. No baseline replacement or operator acceptance. |
+| API/backend/web matrix | Composed six-mode acceptance at f8 | Units 220/6,274 each; full HTTP 2,620 Prisma / 2,575 InMemory with 45 known skips; web 126/1,664. Original canonical exit 1 and partial coverage FAIL remain preserved; only unchanged failed coverage lane was retried. Historical a7/c52 runs retain their own identities. |
 | Native in-memory inventory | CORRECTED, local source | Actual-module and HTTP regressions reproduced zero rows before the fix. EndpointModule import restores endpoint enumeration. |
 | Active log-stream shutdown | CORRECTED, local source | Real open HTTP stream blocked the three-second deadline before the fix; lifecycle cleanup now closes it without client-first disconnect. |
 | Actual container active-stream shutdown | PASS, consolidation source 45885140 | A genuinely connected SSE client ends without client-first disconnect when Docker sends SIGTERM. Stop completes in 1,035 ms with exit 0 and no OOM kill; the final correlated request has one durable database log row. Restart preserves the original user ID/value. Owned endpoint deletion/status/absence and exact full-container-ID cleanup pass. This is a local nonshipping image, not Azure dev evidence. |
@@ -500,8 +673,8 @@ November 19 application correction or a new Azure deployment.
 | Automatic offline runtime gate | PASS, combined d3e5cec5 | Normal Fast push passes all 29 gates, including the common runtime contracts. Exact-tip Windows/Node 24 CI runtime contracts also pass in workflow 45287233922. This is not a fresh GUI/reboot or shipping-image claim. |
 | Normal startup/reconnect workflow | PASS for measured transport/GUI scope | Actual cold transport starts from verified listener absence and failed GUI tree; the real startup task restores the exact repository and same daemon/image. Owned GUI task/listener/GUI/CDP cleanup passes. Not a WSL/Engine reboot; explicit operator visual acceptance remains open. |
 | Documentation | PASS, focused November 19 | Freshness/coupling: all 27 docs; infrastructure: all 13 elements covered; 55 literal JSON blocks parse; links/style pass. New report diagrams render in strict light/dark Chromium. |
-| Final ordered pipeline | OPEN | Must record each applicable gate and consolidate changed-source evidence. |
-| Azure dev | OPEN | Existing registry-selected service-principal session verified; no certificate sign-in initiated. Deploy only at the proper reviewed-source gate. |
+| Final ordered pipeline | BLOCKED | Local qualification is complete within the November 24 scope; ordered Azure pipeline still needs existing approved active ACR mirror and actual permission evidence. No funding approval or new resource authorized. |
+| Azure dev | OPEN | No new deployment; performance, gallery/directory flows and operator visual acceptance remain separate. Do not reuse an older account/session check as current authorization. |
 
 The November 19 raw native in-memory and both packaged-backend runs each report 1,845
 passes and zero failures, including four added inventory-envelope/row checks.

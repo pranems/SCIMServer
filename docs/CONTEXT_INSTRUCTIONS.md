@@ -9,6 +9,79 @@
 
 ## Active Delivery Process
 
+**Authoritative local native checkpoint, November 24:** unchanged 0.55.70
+production sources pass immutable-image InMemory, actual Compose Prisma
+and owned Windows Node InMemory full live runs, each 1,845/1,845 with
+actual exit 0 (including retired explanatory-row credits). The first two use
+`ghcr.io/pranems/scimserver@sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`
+with image Node 24.22.3. The third runs directly on Windows host Node
+24.13.0, not inside the OCI image. Final native InMemory and
+actual Compose Prisma browser runs each pass 353, with zero failures,
+skips, flakes or unhandled errors, actual exit 0, three workers and zero
+retries. Each includes 13 pixel tests and eight token tests. No visual
+baseline changed and operator visual acceptance on dev remains pending.
+Earlier full 352/one-failure runs remain FAIL, not relabeled.
+
+The private fixture corrected only OAuth inputs: the existing browser
+`E2E_OAUTH_CLIENT_SECRET` resolves to the fresh owned server secret, and
+the literal existing test client ID is configured on that owned server.
+Source-aware private admission refused wrong-secret, wrong-ID and omitted
+environment controls with actual exit 1; correct OAuth proof and each focused
+token-log case passed before full execution. These are private operational
+guards, not new permanent repository tests or a launcher/authentication fix.
+No secrets are published.
+
+PR #289 normally merged at `82e5f9aa495bee68da34325ab52952e1830e7290`
+at 22:44:39 UTC. Normal Validate was 32/32, API 220/6,274, reduced HTTP
+2,519/45 known skips, web 126/1,664, API lint zero errors/507 warnings,
+web TypeScript 66 unchanged existing errors below ceiling 96, and all six
+configured exact-head checks SUCCESS. Owner COMMENTED self-review and
+parent direct source review are not independent approval. Executed test
+HEAD `28f56ef8` and merged 82e have complete tree
+`eea50f4d6dbe7d4204e12eaa37934b63a4c34236`; production API/web source,
+Dockerfile and three lock objects match attested f8. Keep executed HEAD,
+image OCI revision and subsequent documentation PR checks separate.
+
+The f8 six-mode result is composed acceptance, not original canonical
+success: original exit 1, five modes passed, initial partial coverage
+117/1,560 FAIL with unproven worker-start-timeout cause. Only the unchanged
+failed complete-coverage lane was retried: 126/1,664, lines 85.74%,
+branches 75.86%, statements 83.06%, functions 75.53%. Other full lanes:
+API units 220/6,274 each backend, InMemory HTTP 2,575/45 known skips,
+Prisma HTTP 2,620 and ordinary web 126/1,664.
+
+Operations column/truncation measurements pass at 1,440 and 900 pixels,
+but the narrow table extends to 930 in a 900-pixel viewport due to the
+existing 640-pixel minimum width. Whole-table viewport fit and horizontal
+scroll access are not proven; inventory geometry at 1,440/900/390 passes.
+The parent verified 1,151 artifact hashes/sizes and 1,928 unchanged source
+hashes against the frozen 304-event journal: 101 ID-matched lifecycles,
+83 native exits and 18 PowerShell statuses. Original 11 containers,
+49 volumes and six networks retained; fixture ports absent. This proves
+identity retention, not database-byte preservation.
+
+Logging performance remains closed FAIL/unpublished: ResourceTypes p95
+11.0344 ms against strict <10 ms; Group POST p95 +34.08847% against 10%.
+Ordered Azure dev still needs an existing approved active ACR mirror and
+actual permissions; no new funding or billable resources are authorized.
+Full three-mode gallery/directory WIF 13-check flows remain pending.
+PR #288's 96 offline contracts do not execute directory flows; PlanOnly
+creates a temporary synchronization job and is not read-only.
+The optional global Desktop-backed MCP gateway remains unmigrated.
+No Desktop uninstall, Intune consent, artifact deletion, AutoCanary or prod.
+Full historical transcript reconciliation after November 24 01:39 UTC is
+not verified; latest issues were captured contemporaneously.
+
+See [the current qualification, receipt hashes and preserved failures](CONTAINER_RUNTIME_REMOVAL_READINESS.md#verified-native-qualification-checkpoint-2026-11-24).
+Parent direct source review caught the initial published wording attributing
+all three live runs to the image. This correction names each actual mode;
+parent acceptance of the correction remains pending. No runtime evidence
+was rerun or relabeled.
+Self-improvement applied: keep host-versus-image provenance, operational proofs, composed retries and
+measured outcomes distinct from permanent gates and stronger claims.
+Design accepted: three existing documentation files, no production growth.
+Older source-stage records below retain their capture-time scope.
+
 **Unreleased readiness-guide currency repair:** The canonical removal-readiness
 guide is now registered in the existing freshness manifest and uses its
 recognized product-version marker. The permanent guard reads the actual
