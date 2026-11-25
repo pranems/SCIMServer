@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Native Operations narrow-viewport access qualification
+
+- Add six permanent Playwright cases for All-users and All-groups at 1440px
+  and 900px, including two discriminating inaccessible-clipping controls.
+  Assert real header/cell bounds, clipping ancestors, inner overflow,
+  hit-testable actions, clipboard copies and endpoint navigation.
+- Confirm the existing 561px results region naturally scrolls a 640px table
+  by 79px at 900px, moving the trailing cell right edge from 930px to 851px.
+  Wide table/name widths remain 1101/427.15625px; narrow name width is
+  243.46875px. No production CSS change is needed.
+- Final scoped native browser runs: InMemory 6 pass/0 fail/0 skip and actual
+  Compose Prisma 6 pass/0 fail/0 skip. New spec strict compilation passes.
+  Permanent browser population increases by six; prior complete 353-pass
+  corrected runs and original 352-pass/1-fail runs are not relabeled or
+  replaced. API unit/HTTP, web unit and live populations are unchanged.
+- Update readiness/session/context records with measured access and explicit
+  limits. API, web production source, Dockerfile and all three locks remain
+  equivalent to the qualified nonshipping f8 image on a72f95b0. No version,
+  pixel baseline, hook, cloud, deployment, performance or Desktop change.
+- Self-improvement applied: natural-input access and nested-clipping controls.
+  Design accepted: preserve the functional existing results-panel responsibility.
+
 ### Explicit native API prerequisite preparation
 
 - Reuse `scripts/build-standalone.ps1 -PrepareOnly` for checked immutable
