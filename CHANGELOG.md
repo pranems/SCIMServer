@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Current native readiness delivery correction, 2026-11-25
+
+- Correct the authoritative current dashboard after normal PR #291 and
+  PR #292 review, exact-head CI and merge. Each passed owner Fast 29/29
+  and six CI checks. Preserve all older dated snapshots, original FAIL
+  receipts and qualification limits; close source delivery only.
+- Keep the approved-existing-ACR lane BLOCKED and merged-master
+  dev/gallery/WIF checks and operator visual acceptance pending.
+  Performance remains closed FAIL and unpublished; Desktop removal,
+  artifact deletion, cloud writes and bridge restart are not authorized.
+- Change only readiness, session memory, context and this changelog.
+  Product 0.55.70, dependencies, locks, production inputs, test populations
+  and runtime evidence are unchanged. No new full qualification is claimed.
+- Self-improvement applied: separate current status from historical pending
+  statements. Design accepted: no runtime or validation abstraction needed.
+
 ### Native Operations narrow-viewport access qualification
 
 - Add six permanent Playwright cases for All-users and All-groups at 1440px

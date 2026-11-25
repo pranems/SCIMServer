@@ -1,7 +1,7 @@
 # Docker Desktop removal readiness
 
 **Last verified:** 2026-11-25
-**Status:** Local native Engine live and complete browser qualification pass; six-mode acceptance is composed, not an original all-green run. Performance, Azure dev, directory flows and operator acceptance remain open.
+**Status:** PRs #291 and #292 normally merged; local native qualification and scoped usability proof are accepted within their recorded limits. The mandatory Azure mirror lane is blocked; deployment, directory flows, operator acceptance and Desktop removal are not authorized. Performance remains closed FAIL and unpublished.
 **Product version:** 0.55.70; documentation scope, not new qualification, shipping or deployment evidence
 **Deadline from the supplied notice:** December 2, 2026
 
@@ -20,9 +20,11 @@ Markdown. Presenting the HTML first and mixing initial closing receipts with
 later results made the final state unnecessarily difficult to understand.
 This document separates dated evidence, current corrections and open gates.
 
-The latest November 24 checkpoint below is authoritative for local native
-qualification. It preserves earlier failed runs rather than replacing their
-receipts. Passing local tests does not authorize deployment, Docker Desktop
+The November 25 delivery dashboard below is authoritative for current source
+delivery and remaining gates. The November 24 qualification checkpoint and
+other dated snapshots retain their original evidence and limits; their
+pending statements describe those earlier boundaries, not today's delivery
+status. Passing local tests does not authorize deployment, Docker Desktop
 removal, artifact deletion or production promotion.
 
 The marketplace Mermaid renderer and its already-uninstalled residual
@@ -32,6 +34,33 @@ can still require closing and reopening; no claim is made that every other
 editor window has refreshed.
 
 ## 1. One authoritative status model
+
+### Current delivery dashboard, 2026-11-25
+
+The API preparation and narrow-viewport follow-ups have completed normal
+review, exact-head CI and merge. This closes their source-delivery boundary,
+not the external deployment or operator-acceptance gates.
+
+| Outcome | Current status and evidence boundary |
+|---|---|
+| API-only preparation, [PR #291](https://github.com/pranems/SCIMServer/pull/291) | Head `3d88ddce` normally merged as `a72f95b0` at 01:33:18 UTC on November 25. The merged tree equals the reviewed tree. Owner Fast passed 29/29 gates in 897.2 seconds, six exact-head CI checks succeeded, and the parent independently passed 97 preparation assertions. Real database-free install/generate/build ran during implementation, not independently again at the exact final tip. The on-demand contract is not an automatic gate. |
+| Operations access, [PR #292](https://github.com/pranems/SCIMServer/pull/292) | Head `b5f0d405` normally merged as `a27c9487` at 02:44:02 UTC on November 25. The merged tree equals the reviewed tree. Owner Fast passed 29/29 gates in 749.4 seconds and all six exact-tip CI checks succeeded. The parent authenticated 186 files and independently passed strict compilation of the exact spec. Its GitHub review was COMMENTED, not an independent approval. |
+| Scoped browser usability | Both native InMemory and actual Compose Prisma passed 6/6 cases: four positive cases and two negative controls, with no failures, skips, flaky cases or errors. The existing scrolling design works; no CSS fix was made. Exact owned cleanup preserved the original native resource identities, not a new data-byte proof. |
+| Existing native qualification | Three full live runs passed 1,845/1,845 each; two corrected full browser runs passed 353/353 each, including 13 pixel cases and eight token cases. Acceptance composes distinct receipts. The original matrix exit 1 and original 352-pass/1-fail browser runs remain FAIL. Direct Windows Node used host Node 24.13.0, not an OCI image; container Node was 24.22.3. |
+| Product and runtime boundary | Product 0.55.70, Prisma 7.8.0, Effect 3.22.1 and protected production inputs/locks remain unchanged from qualified nonshipping source `f8c2ce1f` and its pinned image recorded below. Source equivalence is not fresh runtime proof. Current cloud configured-image metadata describes an older build, not actual running-package proof or qualified f8. This documentation adds no full matrix, shipping or Azure qualification. |
+| Performance | The campaign is closed FAIL and unpublished: ResourceTypes p95 was 11.0344 ms against less than 10 ms, and Group POST regressed 34.088471% against at most 10%. No replay or acceptance is implied. |
+| Mandatory Azure mirror lane | BLOCKED. An approved existing Azure Container Registry (ACR) login server, ARM resource ID and explicit approval are missing, as are verified import/push, network and digest permissions. The current expected tenant and principal have verified dev Contributor access; two authorized group inventories were empty. Subscription-wide permissions were empty, so global registry absence cannot be inferred. The latest user response supplied no resource or approval. |
+| Remaining external gates | Full ordered merged-master dev, gallery and workload identity federation (WIF) checks and explicit operator visual acceptance remain pending. No billable registry creation, account substitution, certificate authentication, mirror/GHCR bypass, skipped-gate qualification, role grants or Azure writes are authorized. |
+| Desktop and bridge boundary | Desktop uninstall, Intune consent and original artifact deletion remain forbidden and unperformed. The optional global Desktop MCP gateway is retained and explicitly unmigrated; the project has a native browser alternative. The global bridge remains OFFLINE, with no restart. |
+
+Earlier frozen history evidence covers only its recorded candidate set, not
+the whole build or every child/peer conversation. The fresh final source-log
+omission review is still in progress; this dashboard does not claim its result.
+
+**Self-improvement:** applied a single current delivery dashboard so historical
+pending statements cannot be mistaken for current gates. **Design disposition:
+accepted** - documentation-only consolidation preserves the existing runtime
+and validation responsibilities; another abstraction would be speculative.
 
 ### Native narrow-viewport access follow-up, 2026-11-25
 
@@ -94,8 +123,10 @@ folder. Original native 11-container/49-volume/6-network identities are
 preserved; identity preservation is not fresh data-byte proof. Docker
 Desktop, its artifacts/backups and the offline global bridge remain
 untouched. Azure browser execution remains blocked by the missing approved
-ACR mirror, and directory flows, performance, operator visual acceptance,
-independent review/merge and Desktop removal remain open.
+ACR mirror. Directory flows, operator visual acceptance and Desktop removal
+remain open; performance is closed FAIL and unpublished. PR #292 has now
+completed normal review, exact-tip CI and merge, as recorded in the current
+delivery dashboard. This closes source delivery only.
 
 **Self-improvement:** applied a permanent clipping-ancestor and natural-input
 access guard with discriminating negative controls. **Design disposition:
