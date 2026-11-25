@@ -1,5 +1,26 @@
 ## SCIMServer - Condensed Session Memory
 
+### Current native readiness delivery, 2026-11-25
+
+| Date | Summary |
+|---|---|
+| 2026-11-25 | Correct current readiness after normal PR #291/#292 review, exact-head CI and merge. Earlier dated snapshots remain historical, with original FAIL receipts and evidence limits intact. |
+
+Current merged source is `a27c9487`; PR #291 merged as `a72f95b0`.
+Each had six successful exact-head CI checks and owner Fast 29/29.
+The parent passed 97 preparation assertions and independently compiled the
+exact browser spec; its PR #292 review was COMMENTED, not an approval.
+Product 0.55.70 and protected inputs/locks are unchanged from qualified f8.
+Source equivalence is not new runtime evidence. Performance is closed FAIL
+and unpublished. The mandatory approved-existing-ACR lane stays BLOCKED;
+ordered merged-master dev/gallery/WIF checks and operator visual acceptance
+remain pending. Desktop removal and artifact deletion remain forbidden, the
+optional global Desktop MCP gateway remains unmigrated, and the bridge stays
+OFFLINE. No cloud write, runtime replay or final-history completeness claim
+is added. See the [current dashboard](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-delivery-dashboard-2026-11-25).
+Self-improvement applied: distinguish current delivery from dated snapshots.
+Design accepted: a documentation-only boundary correction needs no new seam.
+
 ### Native narrow-viewport access, 2026-11-25
 
 | Date | Summary |

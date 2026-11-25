@@ -9,6 +9,25 @@
 
 ## Active Delivery Process
 
+**Current native delivery, November 25:** PR #291 and PR #292 completed
+normal review, six successful exact-head CI checks each and normal merge
+as `a72f95b0` and `a27c9487`. Owner Fast passed 29/29 for each. The parent
+passed 97 preparation assertions and independently compiled the exact
+browser spec; its PR #292 GitHub review was COMMENTED, not approval.
+The [current readiness dashboard](CONTAINER_RUNTIME_REMOVAL_READINESS.md#current-delivery-dashboard-2026-11-25)
+supersedes delivery-status wording in older dated snapshots, not their
+measurements, original FAIL receipts or limits. Product 0.55.70 and
+protected inputs/locks remain equivalent to qualified nonshipping f8;
+source equivalence does not prove a fresh runtime. Performance is closed
+FAIL and unpublished. The mandatory approved-existing-ACR lane remains
+BLOCKED. Ordered merged-master dev/gallery/WIF checks and explicit operator
+visual acceptance remain pending. No cloud writes, Desktop uninstall,
+Intune consent, original artifact deletion or global bridge restart are
+authorized. The optional global Desktop MCP gateway remains unmigrated.
+The separate final source-history review is in progress, not certified here.
+Self-improvement applied: one current delivery boundary. Design accepted:
+documentation consolidation does not change runtime responsibilities.
+
 **Native horizontal access, November 25:** the existing Operations results
 panel already scrolls naturally. The new permanent browser spec measures all
 headers, cells and row actions at 1440px/900px, requires actual inner overflow,
