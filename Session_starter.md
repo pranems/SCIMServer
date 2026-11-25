@@ -1,5 +1,32 @@
 ## SCIMServer - Condensed Session Memory
 
+### Native narrow-viewport access, 2026-11-25
+
+| Date | Summary |
+|---|---|
+| 2026-11-25 | Scoped browser proof confirms existing Operations horizontal scrolling, not a production layout bug. Permanent six-case spec passes in both native InMemory and actual Compose Prisma modes. |
+
+Base `a72f95b0` (normally merged PR #291), product 0.55.70 and unchanged
+production inputs remain equivalent to qualified f8. At 1440px both tables
+measure 1101px/name 427.15625px. At 900px they measure 640px/name
+243.46875px; the results region is 561px wide, and natural horizontal wheel
+input moves its scroll offset 0 -> 79px, bringing the trailing cell right
+edge 930 -> 851px inside the visible region. Every header/cell and copy/link
+action is measured against real clipping ancestors and viewport bounds.
+Both long-name inner elements actually overflow. Two negative controls
+reject inaccessible clipping with the same outcome assertion.
+
+Final scoped results: 6 pass/0 fail/0 skip per native backend; strict new-spec
+typecheck passes. Prior complete 353-pass corrected browser runs and original
+352-pass/1-fail receipts remain unchanged. No full matrix, cloud, performance,
+operator acceptance or Desktop-removal claim is added. The offline bridge and
+Desktop artifacts are untouched. The exact owned trial resources are removed
+with original native 11/49/6 identities preserved, not new data-byte proof.
+See [readiness](docs/CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-narrow-viewport-access-follow-up-2026-11-25).
+Self-improvement applied: natural-access assertion plus clipping negative
+controls. Design accepted: reuse the existing scrolling panel; no speculative
+production abstraction or CSS change.
+
 ### Native API prerequisite preparation, 2026-11-24
 
 Base master `fc99388f` includes normally merged PR #290. Fresh worktrees

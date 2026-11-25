@@ -2,12 +2,29 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.
 > **Version**: 0.55.70
-> **Last Updated**: November 24, 2026 UTC
-> **Last verified:** 2026-11-24
+> **Last Updated**: November 25, 2026 UTC
+> **Last verified:** 2026-11-25
 
 ---
 
 ## Active Delivery Process
+
+**Native horizontal access, November 25:** the existing Operations results
+panel already scrolls naturally. The new permanent browser spec measures all
+headers, cells and row actions at 1440px/900px, requires actual inner overflow,
+and verifies clipboard copies and endpoint navigation. Two inaccessible
+clipping controls are rejected. Both fresh native InMemory and actual Compose
+Prisma targets pass 6 scoped cases with zero skips. At 900px table width is
+640px, name width 243.46875px and results width 561px; wheel input changes
+scroll offset 0 -> 79px and trailing cell right edge 930 -> 851px. At 1440px
+table/name widths are 1101/427.15625px. Production inputs and all locks are
+unchanged from qualified f8 on base a72f95b0 (PR #291), so no CSS fix, version
+bump or new image is required. Existing complete 353-pass receipts remain
+separate; this is scoped local browser proof, not a full/cloud qualification
+or operator visual acceptance. Offline bridge/Desktop artifacts are untouched.
+See [readiness](CONTAINER_RUNTIME_REMOVAL_READINESS.md#native-narrow-viewport-access-follow-up-2026-11-25).
+Self-improvement is applied through outcome/negative-control assertions;
+design is accepted because the existing panel is cohesive and functional.
 
 **Fresh-worktree API preparation, November 24:** run the existing
 [standalone builder](../scripts/build-standalone.ps1) with `-PrepareOnly`

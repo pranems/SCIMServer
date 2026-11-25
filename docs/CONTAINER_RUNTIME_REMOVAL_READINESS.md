@@ -1,6 +1,6 @@
 # Docker Desktop removal readiness
 
-**Last verified:** 2026-11-24
+**Last verified:** 2026-11-25
 **Status:** Local native Engine live and complete browser qualification pass; six-mode acceptance is composed, not an original all-green run. Performance, Azure dev, directory flows and operator acceptance remain open.
 **Product version:** 0.55.70; documentation scope, not new qualification, shipping or deployment evidence
 **Deadline from the supplied notice:** December 2, 2026
@@ -32,6 +32,75 @@ can still require closing and reopening; no claim is made that every other
 editor window has refreshed.
 
 ## 1. One authoritative status model
+
+### Native narrow-viewport access follow-up, 2026-11-25
+
+**Conclusion:** the Operations tables already provide functional horizontal
+scrolling. No production CSS change is needed. At 900px the table initially
+extends past the viewport, but the existing results region lets a user
+reach the trailing column through horizontal mouse-wheel input.
+
+The permanent [browser regression spec](../web/e2e/operations-horizontal-access.spec.ts)
+creates its own endpoint, long user and group through HTTP. It resolves
+the actual administrative row ID rather than assuming it equals the SCIM
+resource ID. Each fixture endpoint is deleted and absence is checked.
+The four positive cases measure every header and cell against the viewport
+and all clipping ancestors, require actual inner text overflow, and verify
+hit-testable copy and navigation actions. ID and timestamp copies are checked
+against the clipboard, and endpoint navigation is exercised.
+
+| Native backend | Viewport | Users / groups table width | Name column width | Trailing cell right edge before / after input | Visible region right edge |
+|---|---:|---:|---:|---:|---:|
+| InMemory | 1440px | 1101px | 427.15625px | 1391px / 1391px | 1391px |
+| InMemory | 900px | 640px | 243.46875px | 930px / 851px | 851px |
+| Actual Compose Prisma | 1440px | 1101px | 427.15625px | 1391px / 1391px | 1391px |
+| Actual Compose Prisma | 900px | 640px | 243.46875px | 930px / 851px | 851px |
+
+At 900px each results region is 561px wide and naturally scrolls from 0
+to 79px. Thus the 640px table does not need to fit the whole viewport at
+once. Both user and group names actually clip: inner client widths are
+403px at 1440px and 219px at 900px, with measured content widths greater
+than those limits. Presence, CSS properties and `innerText` alone are not
+used as proof of layout correctness.
+
+Two deliberate negative controls disable horizontal user scrolling in
+every overflowing ancestor while preserving the table and its truncation.
+The same access assertion rejects their clipped trailing columns. An
+initial control disabled only the outer main panel and was correctly found
+insufficient because the inner results region still scrolled. This closes
+the viewport-access assertion gap without changing the intended UX.
+
+Final scoped browser results are **6 pass / 0 fail / 0 skip in each native
+mode**, 12 total executions. The prior complete corrected 353-pass browser
+receipts and the original 352-pass/1-fail receipts remain separate and
+unchanged. This is not a new complete browser-matrix or performance claim.
+The new spec compiles under strict TypeScript checking.
+
+Source base is normally merged `a72f95b0` (PR #291), version 0.55.70.
+API, web production source, Dockerfile, dependency manifests and all three
+locks are byte-equivalent to qualified `f8c2ce1f`. These browser checks used
+only the pinned nonshipping f8 image
+`sha256:66827a266316c42db5fff1499009d045da9364a9083cfb950860be49371a735f`,
+not the stale host static frontend or any cloud deployment. Both fresh
+owned loopback targets reported the actual expected version and backend.
+Each positive navigation also waits for the exact seeded resource row and
+successful SCIM HTTP response before cleanup. All eight positive browser
+request IDs match the corresponding live request-log item, path and HTTP 200.
+
+Private failed receipts, final measurements, execution issues and exact
+owned cleanup evidence are retained under
+`native-narrow-viewport-20261125` in the parent session's private evidence
+folder. Original native 11-container/49-volume/6-network identities are
+preserved; identity preservation is not fresh data-byte proof. Docker
+Desktop, its artifacts/backups and the offline global bridge remain
+untouched. Azure browser execution remains blocked by the missing approved
+ACR mirror, and directory flows, performance, operator visual acceptance,
+independent review/merge and Desktop removal remain open.
+
+**Self-improvement:** applied a permanent clipping-ancestor and natural-input
+access guard with discriminating negative controls. **Design disposition:
+accepted** - the existing results panel already owns scrolling, and a new
+production wrapper or abstraction would be speculative.
 
 ### Native API preparation follow-up, 2026-11-24
 
